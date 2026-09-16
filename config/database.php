@@ -38,9 +38,15 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
+            // Mặc định của Laravel là null (không đặt gì) -> SQLite lỗi ngay "database is locked" khi
+            // hai tiến trình ghi cùng lúc, và ghi tuần tự rất chậm. Đặt tường minh để SQLite dùng được
+            // ở production (shared hosting không phải lúc nào cũng có MySQL sẵn):
+            //   busy_timeout  — chờ tối đa 5 giây giành lock thay vì ném lỗi ngay
+            //   journal_mode  — WAL: đọc không chặn ghi (nhiều PHP-FPM worker cùng lúc)
+            //   synchronous   — NORMAL: an toàn với WAL, nhanh hơn FULL nhiều
+            'busy_timeout' => env('DB_BUSY_TIMEOUT', 5000),
+            'journal_mode' => env('DB_JOURNAL_MODE', 'WAL'),
+            'synchronous' => env('DB_SYNCHRONOUS', 'NORMAL'),
             'transaction_mode' => 'DEFERRED',
         ],
 
