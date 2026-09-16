@@ -320,6 +320,14 @@ class StudioLibraryService
     {
         $rel = ltrim(str_replace('\\', '/', trim($rel)), '/');
         $rel = preg_replace('#^(storage/)+#', '', $rel) ?? $rel;
+
+        // [BẢO MẬT] Chặn leo thư mục NGAY TẠI ĐÂY: bất kỳ segment '..' nào cũng bị từ chối.
+        // Trước đây hàm chỉ kiểm TIỀN TỐ ('studio/ref/' | 'studio/assets/') nên
+        // 'studio/ref/../../../<file>' vẫn lọt qua toàn bộ các lớp còn lại và bị unlink.
+        if (in_array('..', explode('/', $rel), true)) {
+            return '';
+        }
+
         if (str_starts_with($rel, 'studio/ref/') || str_starts_with($rel, 'studio/assets/')) {
             return $rel;
         }
@@ -512,13 +520,29 @@ class StudioLibraryService
      */
     private function safeUnlink(string $path): bool
     {
-        $root = rtrim(str_replace('\\', '/', Storage::disk('public')->path('')), '/').'/';
-        $normalized = str_replace('\\', '/', $path);
-        if (! str_starts_with($normalized, $root) || ! is_file($path)) {
+        // [BẢO MẬT] So trên ĐƯỜNG DẪN ĐÃ RESOLVE (realpath gỡ hết '..' và symlink) thay vì so CHUỖI.
+        // Bản cũ so chuỗi thô nên '<root>/studio/ref/../../../x' vẫn "bắt đầu bằng root" và lọt,
+        // trong khi is_file()/unlink() lại resolve '..' ra file NGOÀI root -> xoá file tuỳ ý.
+        // Đây là lớp phòng thủ thứ 2: kể cả caller tương lai truyền đường dẫn traversal thì unlink
+        // vẫn không thể ra ngoài root.
+        // [BẢO MẬT] So trên ĐƯỜNG DẪN ĐÃ RESOLVE (realpath gỡ hết '..' và symlink) thay vì so CHUỖI.
+        // Bản cũ so chuỗi thô nên '<root>/studio/ref/../../../x' vẫn "bắt đầu bằng root" và lọt,
+        // trong khi is_file()/unlink() lại resolve '..' ra file NGOÀI root -> xoá file tuỳ ý.
+        // Đây là lớp phòng thủ thứ 2: kể cả caller tương lai truyền đường dẫn traversal thì unlink
+        // vẫn không thể ra ngoài root.
+        $root = realpath(Storage::disk('public')->path(''));
+        $real = realpath($path);
+
+        if ($root === false || $real === false || ! is_file($real)) {
             return false;
         }
 
-        return @unlink($path);
+        $root = rtrim(str_replace('\\', '/', $root), '/').'/';
+        if (! str_starts_with(str_replace('\\', '/', $real), $root)) {
+            return false;
+        }
+
+        return @unlink($real);
     }
 
     /**
