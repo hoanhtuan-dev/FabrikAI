@@ -1708,7 +1708,9 @@ RULES:
     {
         $data = $request->validate([
             'reference_url' => ['required', 'string', 'max:2048'],
-            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            // N6: scope theo owner — trước đây 'exists:projects,id' không giới hạn nên gắn được
+            // bản ghi thư viện prompt vào project_id của user KHÁC (IDOR-lite). Khớp 4 site K.8.
+            'project_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('projects', 'id')->where('user_id', $request->user()->id)],
             'styles' => ['nullable', 'array'],
             'background' => ['nullable', 'string', 'max:200'],
             'pose' => ['nullable', 'string', 'max:200'],
@@ -1815,7 +1817,9 @@ RULES:
     {
         return $request->validate([
             'reference_url' => ['nullable', 'string', 'max:2048'],
-            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            // N6: scope theo owner — trước đây 'exists:projects,id' không giới hạn nên gắn được
+            // bản ghi thư viện prompt vào project_id của user KHÁC (IDOR-lite). Khớp 4 site K.8.
+            'project_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('projects', 'id')->where('user_id', $request->user()->id)],
             'styles' => ['nullable', 'array'],
             'background' => ['nullable', 'string', 'max:200'],
             'pose' => ['nullable', 'string', 'max:200'],
@@ -2660,7 +2664,11 @@ RULES:
         $promptVi = $svc->buildPromptVi($type, $answers);
 
         // Tự lưu thành preset (data của Trợ lý thiết kế) để nút Preset trong popup Prompt load được.
-        app(\App\Services\StylistCatalog::class)->savePreset($svc->nameOf($type), $promptEn, $type);
+        // N7: endpoint này nằm ở nhóm PUBLIC — chỉ ghi DB khi ĐÃ ĐĂNG NHẬP, nếu không kẻ ẩn danh
+        // có thể bơm bản ghi vào stylist_presets không giới hạn (và chạy ensureTables/Schema::create).
+        if (auth()->check()) {
+            app(\App\Services\StylistCatalog::class)->savePreset($svc->nameOf($type), $promptEn, $type);
+        }
 
         return response()->json(['prompt_en' => $promptEn, 'prompt_vi' => $promptVi]);
     }
@@ -3111,9 +3119,8 @@ RULES:
             if ($resp->successful()) {
                 $upscaledUrl = data_get($resp->json(), 'output.results.0.url');
                 if ($upscaledUrl) {
-                    $imgSvc = app(\App\Services\ImageAIService::class);
-                    // storeRemoteImage is protected — use a direct store via file_get_contents
-                    $contents = @file_get_contents($upscaledUrl);
+                    // N1: helper SSRF dùng chung (trước đây @file_get_contents thô → SSRF + treo worker + đầy disk).
+                    $contents = studio_fetch_remote_bytes($upscaledUrl);
                     if ($contents) {
                         $name = 'studio/sr-'.Str::uuid().'.png';
                         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $contents);
@@ -3151,7 +3158,8 @@ RULES:
             if ($resp->successful()) {
                 $enhancedUrl = data_get($resp->json(), 'output.results.0.url');
                 if ($enhancedUrl) {
-                    $contents = @file_get_contents($enhancedUrl);
+                    // N1: helper SSRF dùng chung.
+                    $contents = studio_fetch_remote_bytes($enhancedUrl);
                     if ($contents) {
                         $name = 'studio/fe-'.Str::uuid().'.png';
                         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $contents);

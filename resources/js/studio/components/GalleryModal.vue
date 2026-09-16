@@ -169,17 +169,19 @@ function scrollStripToActive() {
 }
 
 // ── Copy prompt ──
-function copyPrompt() {
+async function copyPrompt() {
   const p = current.value?.prompt || current.value?.image_prompt_en || '';
   if (!p) { store.toast('Không có prompt để sao chép.', 'error'); return; }
-  try { navigator.clipboard.writeText(p); store.toast('Đã sao chép prompt.'); } catch (e) { store.toast('Lỗi sao chép.', 'error'); }
+  // N12: PHẢI await — writeText trả Promise, không await thì catch không bao giờ bắt được
+  // rejection (bị chặn quyền / insecure context) và toast báo thành công GIẢ.
+  try { await navigator.clipboard.writeText(p); store.toast('Đã sao chép prompt.'); } catch (e) { store.toast('Lỗi sao chép.', 'error'); }
 }
 const canUsePrompt = computed(() => !!(current.value?.prompt || current.value?.image_prompt_en));
 // Nút "Sử dụng": copy prompt vào ô Tạo Ảnh + mở popup Prompt Tạo Ảnh (ConceptCard — cần step 1 mount).
-function usePrompt() {
+async function usePrompt() {
   const p = current.value?.prompt || current.value?.image_prompt_en || '';
   if (!p) { store.toast('Ảnh này không có prompt để sử dụng.', 'error'); return; }
-  try { navigator.clipboard.writeText(p); } catch (e) { /* popup vẫn mở */ }
+  try { await navigator.clipboard.writeText(p); } catch (e) { /* popup vẫn mở */ }
   store.imagePromptEn = p;
   store.step = 1;           // đảm bảo ConceptCard (chứa popup Prompt Tạo Ảnh) được mount
   close();                  // đóng viewer trước (popup z70 < viewer z110)

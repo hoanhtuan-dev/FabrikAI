@@ -10,6 +10,26 @@ return [
     | the pricing for a SaaS model later.
     */
     'image_credits' => (int) env('STUDIO_IMAGE_CREDITS', 1),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Giới hạn an toàn khi decode ảnh (T14)
+    |--------------------------------------------------------------------------
+    | Cap số pixel chống "decompression bomb": ảnh nén vài chục KB có thể giải nén
+    | thành ảnh hàng trăm MP và làm OOM worker. Kiểm tra chạy TRƯỚC imagecreatefromstring()
+    | (đọc header bằng getimagesizefromstring) nên bitmap chưa kịp cấp phát.
+    | 0 = tắt cap. Override được từ trang Cài đặt qua setting DB studio_image_max_pixels.
+    */
+    'image_max_pixels' => (int) env('STUDIO_IMAGE_MAX_PIXELS', 30000000),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Allowlist host cho ảnh/video tải từ URL REMOTE (S3/N1/N4)
+    |--------------------------------------------------------------------------
+    | CSV các host được phép, khớp cả subdomain (vd: "dashscope.aliyuncs.com").
+    | Rỗng = không chặn host nào (vẫn giữ scheme http/https + timeout + cap dung lượng).
+    */
+    'remote_image_hosts' => env('STUDIO_REMOTE_IMAGE_HOSTS', ''),
     'video_credits' => (int) env('STUDIO_VIDEO_CREDITS', 10),
     'processing' => env('STUDIO_PROCESSING', 'sync'), // sync | queue (async + worker)
     'image_provider' => env('STUDIO_IMAGE_PROVIDER', 'flux'), // flux | wan | qwen

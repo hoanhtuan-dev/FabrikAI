@@ -243,6 +243,23 @@ if (! function_exists('studio_image_decode')) {
             return false;
         }
 
+        // Cap SỐ PIXEL — PHẢI chạy TRƯỚC khi decode (T14/S2). Bản trước đặt kiểm tra này SAU
+        // imagecreatefromstring() nên bitmap đã được cấp phát xong mới bị từ chối: đúng cái OOM
+        // mà cap này sinh ra để chặn thì đã xảy ra rồi. Đọc kích thước từ header trước, nên ảnh
+        // "bomb" (PNG/JPEG nén vài chục KB giải nén thành hàng trăm MP) bị loại khi chưa tốn RAM.
+        // Mặc định 30 MP (~8192×3660) — ảnh 4K (16,7 MP) vẫn qua; 0 = tắt cap.
+        $maxPixels = (int) (function_exists('studio_config') ? studio_config('image_max_pixels', 30000000) : 30000000);
+        if ($maxPixels > 0) {
+            $info = @getimagesizefromstring((string) $data);
+            if (is_array($info) && ! empty($info[0]) && ! empty($info[1]) && ($info[0] * $info[1]) > $maxPixels) {
+                \Illuminate\Support\Facades\Log::warning('studio_image_decode: từ chối ảnh vượt ngưỡng pixel (trước decode)', [
+                    'w' => $info[0], 'h' => $info[1], 'max' => $maxPixels,
+                ]);
+
+                return false;
+            }
+        }
+
         // Decode thật bằng GD. (Đã sửa lỗi [critical]: dòng này từng đệ quy vào
         // chính studio_image_decode() → tràn stack/OOM giết worker tại 43 call-site.)
         $gd = @imagecreatefromstring((string) $data);
@@ -250,12 +267,9 @@ if (! function_exists('studio_image_decode')) {
             return false;
         }
 
-        // Cap SỐ PIXEL (decompression bomb): file PNG/JPEG nén vài chục KB có thể giải nén
-        // thành ảnh hàng trăm MP → OOM worker ngay tại decode, trước mọi vòng lặp per-pixel.
-        // Mặc định 30 MP (~8192×3660) — ảnh 4K (16,7 MP) vẫn qua; 0 = tắt cap.
-        $maxPixels = (int) (function_exists('studio_config') ? studio_config('image_max_pixels', 30000000) : 30000000);
+        // Chốt lại SAU decode cho định dạng không đọc được kích thước từ header (defense-in-depth).
         if ($maxPixels > 0 && imagesx($gd) * imagesy($gd) > $maxPixels) {
-            \Illuminate\Support\Facades\Log::warning('studio_image_decode: từ chối ảnh vượt ngưỡng pixel', [
+            \Illuminate\Support\Facades\Log::warning('studio_image_decode: từ chối ảnh vượt ngưỡng pixel (sau decode)', [
                 'w' => imagesx($gd), 'h' => imagesy($gd), 'max' => $maxPixels,
             ]);
             unset($gd);
@@ -307,6 +321,70 @@ if (! function_exists('studio_safe_public_file')) {
         }
 
         return null;
+    }
+}
+
+if (! function_exists('studio_fetch_remote_bytes')) {
+    /**
+     * Tải nội dung từ URL REMOTE với guard SSRF dùng chung cho toàn module (S3 · N1 · N4):
+     * chỉ scheme http/https · timeout 30s + connect_timeout 10s · redirect ≤2 (chỉ http/https) ·
+     * cap dung lượng (mặc định 50 MiB) · allowlist host tùy chọn qua setting studio
+     * 'remote_image_hosts' (CSV, rỗng = không chặn host).
+     *
+     * Nguồn dùng chung DUY NHẤT: ImageAIService::storeRemoteImage(), StudioController
+     * applySuperResolution()/applyFaceEnhance(), VideoAIService::callDashscopeVideo() đều đi qua đây.
+     * Trước đây 3 đường sau tự gọi @file_get_contents() thô (SSRF + treo worker + đầy disk).
+     *
+     * @return string|null  bytes, hoặc null khi URL không hợp lệ/bị chặn/tải lỗi/vượt cap
+     */
+    function studio_fetch_remote_bytes(string $url, int $maxBytes = 52428800): ?string
+    {
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            return null;
+        }
+
+        $allowedHosts = array_filter(array_map('trim', explode(',', (string) studio_config('remote_image_hosts', ''))));
+        if ($allowedHosts) {
+            $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+            $hostOk = false;
+            foreach ($allowedHosts as $allowed) {
+                $allowed = strtolower(ltrim($allowed, '.'));
+                if ($host === $allowed || str_ends_with($host, '.'.$allowed)) {
+                    $hostOk = true;
+                    break;
+                }
+            }
+            if (! $hostOk) {
+                \Illuminate\Support\Facades\Log::warning('studio_fetch_remote_bytes: host ngoài allowlist', ['host' => $host]);
+
+                return null;
+            }
+        }
+
+        try {
+            $res = \Illuminate\Support\Facades\Http::timeout(30)
+                ->withOptions(['connect_timeout' => 10, 'allow_redirects' => ['max' => 2, 'protocols' => ['http', 'https']]])
+                ->get($url);
+            if (! $res->successful()) {
+                return null;
+            }
+            $contents = (string) $res->body();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
+
+        if ($contents === '' || strlen($contents) > $maxBytes) {
+            \Illuminate\Support\Facades\Log::warning('studio_fetch_remote_bytes: rỗng hoặc vượt cap', [
+                'url' => $url, 'bytes' => strlen($contents), 'max' => $maxBytes,
+            ]);
+
+            return null;
+        }
+
+        return $contents;
     }
 }
 

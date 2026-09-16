@@ -68,7 +68,9 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->gr
     Route::get('/swap-models', [StudioController::class, 'swapCatalog'])->defaults('kind', 'models')->name('swap-models');
     Route::get('/swap-poses', [StudioController::class, 'swapCatalog'])->defaults('kind', 'poses')->name('swap-poses');
     Route::get('/swap-backgrounds', [StudioController::class, 'swapBackgrounds'])->name('swap-backgrounds');
-    Route::get('/studiosample/{file}', [StudioController::class, 'assetSample'])->name('studio.asset');
+    // (T15) Đã xóa Route::get('/studiosample/{file}') — trỏ tới StudioController::assetSample()
+    // KHÔNG tồn tại (reflection = MISSING) nên mọi request vào URL này ném BadMethodCallException 500.
+    // Không có call-site nào tham chiếu route name 'studio.asset' hay URL /studiosample.
     Route::post('/stylist', [StudioController::class, 'stylist'])->name('stylist');
     Route::post('/stylist/refine', [StudioController::class, 'stylistRefine'])->name('stylist.refine');
     Route::post('/upscale', [StudioController::class, 'upscale'])->name('upscale');
@@ -163,7 +165,9 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->gr
 });
 
 // ── Public FabrikAI API (read-only + images, no auth) ──
-Route::prefix('api')->name('api.')->group(function () {
+// N7: nhóm này có 2 POST (stylist/cluster, stylist/prompt) — /stylist/prompt chỉ ghi DB khi đã
+// đăng nhập (xem StudioController::stylistPrompt), và throttle 60 req/phút/IP chặn lạm dụng.
+Route::prefix('api')->name('api.')->middleware('throttle:60,1')->group(function () {
     Route::get('/boot', [StudioController::class, 'boot'])->name('boot');
     Route::get('/stylist/types', [StudioController::class, 'stylistTypes'])->name('stylist.types');
     Route::post('/stylist/cluster', [StudioController::class, 'stylistCluster'])->name('stylist.cluster');

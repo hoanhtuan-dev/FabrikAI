@@ -128,7 +128,8 @@ class VideoAIService
                     throw new \RuntimeException('DashScope hoàn tất nhưng không trả video.');
                 }
 
-                $contents = @file_get_contents($url);
+                // N4: helper SSRF dùng chung — cap 200 MiB cho video (rộng hơn 50 MiB của ảnh).
+                $contents = studio_fetch_remote_bytes($url, 209715200);
                 if (! $contents) {
                     throw new \RuntimeException('Không tải được video.');
                 }

@@ -75,9 +75,10 @@ function onRowDrop(e, l) {
 }
 
 // Palette: click swatch = gán màu tô + copy clipboard + toast (y hệt copyColor StudioApp :25-28).
-function copyColor(c) {
+async function copyColor(c) {
   store.inpaintFillColor = c; // đồng bộ màu cho công cụ tô màu
-  try { navigator.clipboard.writeText(c); store.toast('Đã chọn màu ' + c); } catch (e) { store.toast('Lỗi copy.', 'error'); }
+  // N12: phải await (xem GalleryModal.copyPrompt) — nếu không, toast báo thành công giả.
+  try { await navigator.clipboard.writeText(c); store.toast('Đã chọn màu ' + c); } catch (e) { store.toast('Lỗi copy.', 'error'); }
 }
 
 // Modal xác nhận Xóa nền AI (nội bộ panel) — markup y hệt StudioApp :542-551.

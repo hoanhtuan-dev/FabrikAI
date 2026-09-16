@@ -90,7 +90,7 @@
     "name": "runtime-dom.esm-bundler"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DbPEs5qZ.css",
+    "file": "assets/app-D7me1GGp.css",
     "name": "app",
     "names": [
       "app.css"
@@ -105,7 +105,7 @@
     "isEntry": true
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-DJXHwxvK.js",
+    "file": "assets/main-BWO2OmR7.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -116,7 +116,7 @@
       "_StylistDataManager-D7pOBaRH.js"
     ],
     "css": [
-      "assets/main-Cl1BgpF5.css"
+      "assets/main-BYgcXj9d.css"
     ]
   },
   "resources/js/studio/presets.js": {

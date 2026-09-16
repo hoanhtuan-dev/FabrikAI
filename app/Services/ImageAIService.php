@@ -1136,39 +1136,12 @@ class ImageAIService
 
     protected function storeRemoteImage(string $url, ?bool $postprocess = null): ?string
     {
-        // SSRF guard (S3): URL đến từ response của provider (hoặc host admin tự cấu hình)
-        // — chỉ http/https, timeout rõ ràng, giới hạn redirect + kích thước, tùy chọn
-        // allowlist host qua setting studio 'remote_image_hosts' (CSV, rỗng = không chặn).
-        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
-        if (! in_array($scheme, ['http', 'https'], true)) {
-            return null;
-        }
-        $allowedHosts = array_filter(array_map('trim', explode(',', (string) studio_config('remote_image_hosts', ''))));
-        if ($allowedHosts) {
-            $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-            $hostOk = false;
-            foreach ($allowedHosts as $allowed) {
-                $allowed = strtolower(ltrim($allowed, '.'));
-                if ($host === $allowed || str_ends_with($host, '.'.$allowed)) { $hostOk = true; break; }
-            }
-            if (! $hostOk) {
-                return null;
-            }
-        }
-        try {
-            $res = Http::timeout(30)
-                ->withOptions(['connect_timeout' => 10, 'allow_redirects' => ['max' => 2, 'protocols' => ['http', 'https']]])
-                ->get($url);
-            if (! $res->successful()) {
-                return null;
-            }
-            $contents = $res->body();
-        } catch (\Throwable $e) {
-            report($e);
-
-            return null;
-        }
-        if (! $contents || strlen($contents) > 52428800) { // cap 50 MiB
+        // SSRF guard (S3/N1) — đi qua helper DÙNG CHUNG studio_fetch_remote_bytes() ở helpers.php
+        // (scheme http/https · timeout 30s/connect 10s · redirect ≤2 · cap 50 MiB · allowlist host).
+        // Guard này TRƯỚC ĐÂY được copy tại chỗ, nên 3 đường khác (2 site ở StudioController +
+        // VideoAIService) đã tự gọi @file_get_contents thô và bỏ qua toàn bộ guard.
+        $contents = studio_fetch_remote_bytes($url);
+        if ($contents === null) {
             return null;
         }
 
