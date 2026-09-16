@@ -1359,17 +1359,8 @@ RULES:
      */
     protected function enqueuePending(Generation $generation): void
     {
-        if (! \Illuminate\Support\Facades\Cache::add('studio:queued:'.$generation->id, 1, now()->addMinutes(10))) {
-            return; // đã enqueue cho generation này rồi
-        }
-
-        if (($generation->meta['swap'] ?? false) === true) {
-            \App\Jobs\SwapModelJob::dispatch($generation->id);
-        } elseif ($generation->type === 'video') {
-            RenderVideoJob::dispatch($generation->id);
-        } else {
-            RenderImageJob::dispatch($generation->id);
-        }
+        // Dùng CHUNG helper với Generation::created() -> cùng một chốt chống dội queue.
+        studio_dispatch_generation($generation);
     }
 
     /**

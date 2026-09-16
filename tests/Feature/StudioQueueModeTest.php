@@ -125,6 +125,57 @@ class StudioQueueModeTest extends TestCase
         $this->assertSame('pending', $g->fresh()->status);
     }
 
+    public function test_generation_is_enqueued_at_creation_not_only_on_poll(): void
+    {
+        // [BUG THẬT gặp khi deploy fabrikai.shop] Bản cũ CHỈ enqueue trong show() (lúc client poll).
+        // Người dùng tạo ảnh rồi đóng tab ngay ⇒ không ai poll ⇒ generation nằm 'pending' VĨNH VIỄN
+        // trong khi credit đã bị trừ. Đã kiểm chứng bằng chạy thật trên production: tạo generation
+        // xong bảng 'jobs' vẫn rỗng cho tới khi có request poll.
+        config(['studio.queue_worker' => true]);
+        Queue::fake();
+
+        $g = $this->generation(['status' => 'pending']);
+
+        Queue::assertPushed(RenderImageJob::class, fn ($job) => $job->generationId === $g->id);
+    }
+
+    public function test_creation_does_not_enqueue_twice_when_client_also_polls(): void
+    {
+        // Chốt Cache::add dùng chung cho cả 2 đường (created() + show()) -> vẫn đúng MỘT job.
+        config(['studio.queue_worker' => true]);
+        Queue::fake();
+
+        $g = $this->generation(['status' => 'pending']);
+        $this->actingAs($this->admin())->getJson('/api/generations/'.$g->id)->assertOk();
+        $this->actingAs($this->admin())->getJson('/api/generations/'.$g->id)->assertOk();
+
+        Queue::assertPushed(RenderImageJob::class, 1);
+    }
+
+    public function test_inline_mode_does_not_dispatch_at_creation(): void
+    {
+        // Chế độ dev (không worker) phải giữ nguyên hành vi cũ: KHÔNG đụng tới queue, request poll
+        // tự xử lý inline. Nếu test này đỏ nghĩa là model event đang chạy cả khi máy chủ không có worker.
+        $this->assertFalse((bool) config('studio.queue_worker'));
+        Queue::fake();
+
+        $this->generation(['status' => 'pending']);
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_video_and_swap_generations_are_enqueued_at_creation_too(): void
+    {
+        config(['studio.queue_worker' => true]);
+        Queue::fake();
+
+        $this->generation(['type' => 'video', 'status' => 'pending']);
+        $this->generation(['type' => 'image', 'status' => 'pending', 'meta' => ['swap' => true]]);
+
+        Queue::assertPushed(RenderVideoJob::class, 1);
+        Queue::assertPushed(SwapModelJob::class, 1);
+    }
+
     // ── 3. Không dội queue khi client poll liên tục ──────────────────────
 
     public function test_repeated_polling_enqueues_a_generation_only_once(): void

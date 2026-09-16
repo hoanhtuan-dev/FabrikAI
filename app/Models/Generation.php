@@ -24,6 +24,29 @@ class Generation extends Model
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    /**
+     * Đẩy job NGAY LÚC TẠO khi máy chủ có worker nền.
+     *
+     * Trước đây việc enqueue chỉ xảy ra trong StudioController::show() (lúc client poll), nên một
+     * generation tạo ra mà không bị poll sẽ nằm 'pending' mãi mãi — credit đã trừ mà không có kết quả.
+     * Đặt ở ĐÂY (model event) thay vì sửa từng controller vì có ~8 đường tạo generation
+     * (generate · video · inpaint · region · pattern · tryon · reimagine · upscale) — sửa từng chỗ là
+     * mẫu lỗi "vá một nơi, quên chỗ tương đương" đã gặp nhiều lần trong repo này.
+     *
+     * Chỉ chạy khi config('studio.queue_worker') = true: ở chế độ dev (không worker) hành vi cũ được
+     * giữ nguyên — request poll tự xử lý inline.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (self $generation) {
+            if (! config('studio.queue_worker')) {
+                return;
+            }
+
+            studio_dispatch_generation($generation);
+        });
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

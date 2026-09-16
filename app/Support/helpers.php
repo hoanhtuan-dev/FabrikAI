@@ -966,6 +966,43 @@ if (! function_exists('studio_model_catalog')) {
     }
 }
 
+if (! function_exists('studio_dispatch_generation')) {
+    /**
+     * Đẩy job xử lý cho MỘT generation, kèm chốt chống dội queue.
+     *
+     * [BUG THẬT gặp khi deploy fabrikai.shop 2026-09-17] Bản cũ CHỈ enqueue ở show() — tức là lúc
+     * client POLL. Hệ quả: người dùng tạo ảnh rồi đóng tab ngay ⇒ không ai poll ⇒ generation nằm
+     * 'pending' VĨNH VIỄN trong khi credit đã bị trừ. Đã kiểm chứng bằng chạy thật: tạo generation
+     * xong, bảng 'jobs' vẫn rỗng cho tới khi có request poll.
+     *
+     * Nay dùng chung cho 2 chỗ: (1) Generation::created() — đẩy ngay lúc tạo, (2) show() — lưới an
+     * toàn cho generation cũ/còn sót. Chốt Cache::add bảo đảm mỗi generation chỉ vào queue MỘT lần
+     * dù cả hai chỗ cùng gọi (job trùng cũng vô hại vì job tự CAS pending→processing rồi return).
+     *
+     * @return bool true nếu lần gọi này thực sự đẩy job vào queue.
+     */
+    function studio_dispatch_generation(\App\Models\Generation $generation): bool
+    {
+        if ($generation->status !== 'pending') {
+            return false;
+        }
+
+        if (! \Illuminate\Support\Facades\Cache::add('studio:queued:'.$generation->id, 1, now()->addMinutes(10))) {
+            return false;   // đã đẩy cho generation này rồi
+        }
+
+        if (($generation->meta['swap'] ?? false) === true) {
+            \App\Jobs\SwapModelJob::dispatch($generation->id);
+        } elseif ($generation->type === 'video') {
+            \App\Jobs\RenderVideoJob::dispatch($generation->id);
+        } else {
+            \App\Jobs\RenderImageJob::dispatch($generation->id);
+        }
+
+        return true;
+    }
+}
+
 if (! function_exists('studio_models')) {
     function studio_models(?string $group = null)
     {
