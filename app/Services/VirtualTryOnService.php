@@ -417,6 +417,14 @@ class VirtualTryOnService
         }
         if ($best) {
             logger()->info('Swap best candidate selected', ['score' => round((float) $bestScore, 2)]);
+        } elseif (count($urls) > 1) {
+            // M11: không score được candidate nào -> nơi gọi giữ bản ĐẦU TIÊN (degrade âm thầm).
+            // Trước đây chỉ log khi CHỌN được bản tốt, nên key hỏng làm QA tắt lặng lẽ không dấu vết.
+            // Phân biệt rõ "không có key" với "có key nhưng score hỏng".
+            logger()->warning('Swap QA degraded to first candidate', [
+                'candidates' => count($urls),
+                'vision_key_present' => (bool) (studio_api_key('qwen') ?: studio_api_key('dashscope')),
+            ]);
         }
         return $best;
     }

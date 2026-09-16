@@ -102,6 +102,12 @@ class StylistDataController extends Controller
                 'id' => $m->id, 'slug' => $m->slug, 'name' => $m->name, 'emoji' => $m->emoji, 'color' => $m->color, 'sort_order' => $m->sort_order,
             ]]);
         } catch (\Throwable $e) {
+            // M03: vòng $dup ở trên không atomic — request thứ hai (đồng thời) ném ConstraintViolation.
+            // Trả 422 kèm hướng dẫn thay vì 500 chung chung.
+            if (studio_is_unique_violation($e)) {
+                return response()->json(['ok' => false, 'message' => 'Mục này đã tồn tại (có thể do thao tác đồng thời). Vui lòng tải lại và thử lại.'], 422);
+            }
+
             return studio_fail($e, 'Lưu mục stylist', 500);
         }
     }
@@ -151,6 +157,12 @@ class StylistDataController extends Controller
                 'id' => $m->id, 'key' => $m->key, 'q' => $m->question, 'opts' => $m->options, 'sort_order' => $m->sort_order,
             ]]);
         } catch (\Throwable $e) {
+            // M03: vòng $dup ở trên không atomic — request thứ hai (đồng thời) ném ConstraintViolation.
+            // Trả 422 kèm hướng dẫn thay vì 500 chung chung.
+            if (studio_is_unique_violation($e)) {
+                return response()->json(['ok' => false, 'message' => 'Mục này đã tồn tại (có thể do thao tác đồng thời). Vui lòng tải lại và thử lại.'], 422);
+            }
+
             return studio_fail($e, 'Lưu mục stylist', 500);
         }
     }

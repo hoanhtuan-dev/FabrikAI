@@ -81,7 +81,12 @@ async function addAsset() {
   const r = await fetch('/api/assets', { headers: { Accept: 'application/json' } }); if (!r.ok) { store.toast('Lỗi tải thư viện.', 'error'); return; } assets.value = (await r.json()).items || [];
   store.toast('Đã thêm ' + (addType.value === 'model' ? 'khuôn mặt' : 'dáng') + '.');
 }
-async function delAsset(a) { const r = await fetch('/api/assets/' + a.id, { method: 'DELETE', headers: { 'X-XSRF-TOKEN': CSRF(), Accept: 'application/json' } }); if (r.ok) { assets.value = assets.value.filter(x => x.id !== a.id); const id = String(a.id); if (store.swapModelIds.includes(id)) { store.swapModelIds = store.swapModelIds.filter(x => x !== id); } if (store.swapPoseIds.includes(id)) { store.swapPoseIds = store.swapPoseIds.filter(x => x !== id); } store.toast('Đã xóa.'); } }
+async function delAsset(a) {
+  // M21: validate id trước khi ghép URL — trước đây nối thẳng a.id nên id lạ có thể tạo ra
+  // request tới URL không mong muốn. Backend vẫn là phòng thủ thật, đây là lớp client.
+  const assetId = Number(a && a.id);
+  if (!Number.isInteger(assetId) || assetId <= 0) { store.toast('Không xóa được: id không hợp lệ.', 'error'); return; }
+  const r = await fetch('/api/assets/' + assetId, { method: 'DELETE', headers: { 'X-XSRF-TOKEN': CSRF(), Accept: 'application/json' } }); if (r.ok) { assets.value = assets.value.filter(x => x.id !== a.id); const id = String(a.id); if (store.swapModelIds.includes(id)) { store.swapModelIds = store.swapModelIds.filter(x => x !== id); } if (store.swapPoseIds.includes(id)) { store.swapPoseIds = store.swapPoseIds.filter(x => x !== id); } store.toast('Đã xóa.'); } }
 </script>
 <template>
   <div class="card p-4" style="background: linear-gradient(160deg, rgba(232,87,125,.08), rgba(74,122,144,.05));">

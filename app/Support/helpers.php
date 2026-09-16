@@ -331,6 +331,27 @@ if (! function_exists('studio_safe_public_file')) {
     }
 }
 
+if (! function_exists('studio_is_unique_violation')) {
+    /**
+     * M03: nhận diện lỗi vi phạm ràng buộc UNIQUE của DB.
+     *
+     * Các luồng stylist dùng "check-then-act" (SELECT xem slug/key đã tồn tại chưa rồi mới INSERT)
+     * — không atomic: hai request đồng thời cùng qua được vòng kiểm tra, request thứ hai ném
+     * ConstraintViolation. DB ĐÃ có unique index cho slug/key (migration
+     * 2026_09_03_000000_create_stylist_catalog_tables.php:13,23) nên không tạo bản ghi trùng,
+     * nhưng trước đây lỗi này trả 500 chung chung thay vì 422 kèm hướng dẫn.
+     */
+    function studio_is_unique_violation(\Throwable $e): bool
+    {
+        $m = $e->getMessage();
+
+        return str_contains($m, 'UNIQUE constraint failed')   // SQLite
+            || str_contains($m, 'Duplicate entry')            // MySQL
+            || str_contains($m, 'SQLSTATE[23000]')            // chuẩn chung
+            || str_contains($m, 'Integrity constraint violation');
+    }
+}
+
 if (! function_exists('studio_generation_error')) {
     /**
      * Thông điệp lỗi ghi vào cột Generation.error (N8/N10). Cột này TRẢ CHO CLIENT qua
