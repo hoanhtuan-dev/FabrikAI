@@ -1,0 +1,34 @@
+# Ep MIME type chuan cho .js — Hostinger mac dinh tra "application/x-javascript" (khong thuoc
+# JavaScript MIME type list theo WHATWG spec) khien Chromium bao "cross-world service worker
+# resource mismatch" + "preloaded but not used" cho modulepreload cua cac chunk dung chung.
+# text/javascript la MIME chuan duoc moi trinh duyet cong nhan cho ES modules.
+<IfModule mod_mime.c>
+    AddType text/javascript .js
+    AddType text/javascript .mjs
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Handle X-XSRF-Token Header
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Send Requests To Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>

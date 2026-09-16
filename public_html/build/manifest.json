@@ -1,0 +1,156 @@
+{
+  "_StylistDataManager-D7pOBaRH.js": {
+    "file": "assets/StylistDataManager-D7pOBaRH.js",
+    "name": "StylistDataManager",
+    "imports": [
+      "_runtime-dom.esm-bundler-DnIsyHw5.js"
+    ]
+  },
+  "__plugin-vue_export-helper-BDNMzG2s.js": {
+    "file": "assets/_plugin-vue_export-helper-BDNMzG2s.js",
+    "name": "_plugin-vue_export-helper"
+  },
+  "_fonts-BRD9E1vz.css": {
+    "file": "assets/fonts-BRD9E1vz.css",
+    "src": "_fonts-BRD9E1vz.css"
+  },
+  "_fraunces-400-normal-6IfK1voy.woff2": {
+    "file": "assets/fraunces-400-normal-6IfK1voy.woff2",
+    "src": "_fraunces-400-normal-6IfK1voy.woff2"
+  },
+  "_fraunces-400-normal-NUPT2cO8.woff": {
+    "file": "assets/fraunces-400-normal-NUPT2cO8.woff",
+    "src": "_fraunces-400-normal-NUPT2cO8.woff"
+  },
+  "_fraunces-500-normal-BTR4KCeb.woff": {
+    "file": "assets/fraunces-500-normal-BTR4KCeb.woff",
+    "src": "_fraunces-500-normal-BTR4KCeb.woff"
+  },
+  "_fraunces-500-normal-DnGCNyPD.woff2": {
+    "file": "assets/fraunces-500-normal-DnGCNyPD.woff2",
+    "src": "_fraunces-500-normal-DnGCNyPD.woff2"
+  },
+  "_fraunces-600-normal-BFCDtZfi.woff2": {
+    "file": "assets/fraunces-600-normal-BFCDtZfi.woff2",
+    "src": "_fraunces-600-normal-BFCDtZfi.woff2"
+  },
+  "_fraunces-600-normal-DL5QCzvS.woff": {
+    "file": "assets/fraunces-600-normal-DL5QCzvS.woff",
+    "src": "_fraunces-600-normal-DL5QCzvS.woff"
+  },
+  "_fraunces-700-normal-CEOla-zY.woff2": {
+    "file": "assets/fraunces-700-normal-CEOla-zY.woff2",
+    "src": "_fraunces-700-normal-CEOla-zY.woff2"
+  },
+  "_fraunces-700-normal-DTjk5d1Q.woff": {
+    "file": "assets/fraunces-700-normal-DTjk5d1Q.woff",
+    "src": "_fraunces-700-normal-DTjk5d1Q.woff"
+  },
+  "_inter-400-normal-C38fXH4l.woff2": {
+    "file": "assets/inter-400-normal-C38fXH4l.woff2",
+    "src": "_inter-400-normal-C38fXH4l.woff2"
+  },
+  "_inter-400-normal-CyCys3Eg.woff": {
+    "file": "assets/inter-400-normal-CyCys3Eg.woff",
+    "src": "_inter-400-normal-CyCys3Eg.woff"
+  },
+  "_inter-500-normal-BL9OpVg8.woff": {
+    "file": "assets/inter-500-normal-BL9OpVg8.woff",
+    "src": "_inter-500-normal-BL9OpVg8.woff"
+  },
+  "_inter-500-normal-Cerq10X2.woff2": {
+    "file": "assets/inter-500-normal-Cerq10X2.woff2",
+    "src": "_inter-500-normal-Cerq10X2.woff2"
+  },
+  "_inter-600-normal-CiBQ2DWP.woff": {
+    "file": "assets/inter-600-normal-CiBQ2DWP.woff",
+    "src": "_inter-600-normal-CiBQ2DWP.woff"
+  },
+  "_inter-600-normal-LgqL8muc.woff2": {
+    "file": "assets/inter-600-normal-LgqL8muc.woff2",
+    "src": "_inter-600-normal-LgqL8muc.woff2"
+  },
+  "_inter-700-normal-BLAVimhd.woff": {
+    "file": "assets/inter-700-normal-BLAVimhd.woff",
+    "src": "_inter-700-normal-BLAVimhd.woff"
+  },
+  "_inter-700-normal-Yt3aPRUw.woff2": {
+    "file": "assets/inter-700-normal-Yt3aPRUw.woff2",
+    "src": "_inter-700-normal-Yt3aPRUw.woff2"
+  },
+  "_pinia-SN907wts.js": {
+    "file": "assets/pinia-SN907wts.js",
+    "name": "pinia",
+    "imports": [
+      "_runtime-dom.esm-bundler-DnIsyHw5.js"
+    ]
+  },
+  "_runtime-dom.esm-bundler-DnIsyHw5.js": {
+    "file": "assets/runtime-dom.esm-bundler-DnIsyHw5.js",
+    "name": "runtime-dom.esm-bundler"
+  },
+  "resources/css/app.css": {
+    "file": "assets/app-DbPEs5qZ.css",
+    "name": "app",
+    "names": [
+      "app.css"
+    ],
+    "src": "resources/css/app.css",
+    "isEntry": true
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-yNxDUqfM.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/studio/main.js": {
+    "file": "assets/main-DJXHwxvK.js",
+    "name": "main",
+    "src": "resources/js/studio/main.js",
+    "isEntry": true,
+    "imports": [
+      "_runtime-dom.esm-bundler-DnIsyHw5.js",
+      "_pinia-SN907wts.js",
+      "__plugin-vue_export-helper-BDNMzG2s.js",
+      "_StylistDataManager-D7pOBaRH.js"
+    ],
+    "css": [
+      "assets/main-Cl1BgpF5.css"
+    ]
+  },
+  "resources/js/studio/presets.js": {
+    "file": "assets/presets-BNpBflf0.js",
+    "name": "presets",
+    "src": "resources/js/studio/presets.js",
+    "isEntry": true,
+    "imports": [
+      "_runtime-dom.esm-bundler-DnIsyHw5.js"
+    ]
+  },
+  "resources/js/studio/settings.js": {
+    "file": "assets/settings-BMmUxS-Q.js",
+    "name": "settings",
+    "src": "resources/js/studio/settings.js",
+    "isEntry": true,
+    "imports": [
+      "_runtime-dom.esm-bundler-DnIsyHw5.js",
+      "_pinia-SN907wts.js",
+      "__plugin-vue_export-helper-BDNMzG2s.js"
+    ],
+    "css": [
+      "assets/settings-C-Nts1_x.css"
+    ]
+  },
+  "resources/js/studio/stylist-data.js": {
+    "file": "assets/stylist-data-DlJlx4cK.js",
+    "name": "stylist-data",
+    "src": "resources/js/studio/stylist-data.js",
+    "isEntry": true,
+    "imports": [
+      "_runtime-dom.esm-bundler-DnIsyHw5.js",
+      "_pinia-SN907wts.js",
+      "_StylistDataManager-D7pOBaRH.js"
+    ]
+  }
+}

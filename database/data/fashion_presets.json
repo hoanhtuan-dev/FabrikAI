@@ -1,0 +1,72 @@
+{
+  "styles": [
+    {
+      "label": "Old Money / Classic",
+      "prompt": "old money aesthetic, timeless elegance, tailored linen and cashmere, neutral tones, wealthy heritage style, pristine condition"
+    },
+    {
+      "label": "Gorpcore / Techwear",
+      "prompt": "gorpcore fashion, utilitarian techwear, waterproof tactical fabrics, functional layers, toggle cords, earthy and dark tones"
+    },
+    {
+      "label": "Coquette Core",
+      "prompt": "coquette aesthetic, hyper-feminine, pastel pink ribbons, delicate lace, pearl accents, romantic vintage inspired, soft textures"
+    },
+    {
+      "label": "Acubi / Korean Y2K",
+      "prompt": "acubi style, korean y2k streetwear, minimalist distressed, muted neutral tones, subtle cutouts, sheer layering"
+    },
+    {
+      "label": "High-End Streetwear",
+      "prompt": "high-end streetwear, hypebeast culture, oversized luxury, heavy cotton, bold graphic placement, urban edge"
+    },
+    {
+      "label": "Boho Chic (Modern)",
+      "prompt": "modern bohemian chic, flowing earth-tone fabrics, macrame details, layered jewelry, effortless desert vibe"
+    }
+  ],
+  "backgrounds": [
+    {
+      "label": "High-End Boutique (Shop)",
+      "prompt": "inside a luxury fashion boutique, elegant clothing racks in background, warm ambient lighting, marble floor, premium retail space"
+    },
+    {
+      "label": "Minimalist Studio",
+      "prompt": "minimalist white cyclorama studio, soft diffused softbox lighting, clean infinite backdrop, sharp focus on the garment"
+    },
+    {
+      "label": "Urban Street Style",
+      "prompt": "walking on a busy urban street, shallow depth of field, cinematic daylight, paparazzi street style photography, bokeh background"
+    },
+    {
+      "label": "Backstage / Fitting Room",
+      "prompt": "fashion show backstage mirror, raw flash photography, candid behind-the-scenes vibe, messy but stylish, polaroid aesthetic"
+    },
+    {
+      "label": "Sunset Desert (Ngoại cảnh)",
+      "prompt": "golden hour in the desert, cinematic sunset lighting, wind blowing the fabric, dramatic shadows, wide open landscape"
+    },
+    {
+      "label": "Concrete Brutalism",
+      "prompt": "brutalist concrete architecture background, harsh natural sunlight, strong geometric shadows, modern editorial"
+    }
+  ],
+  "poses": [
+    {
+      "label": "Dynamic Walking",
+      "prompt": "dynamic mid-stride walking pose, natural motion, fabric flowing in movement"
+    },
+    {
+      "label": "Casual Lean",
+      "prompt": "casual leaning against the wall, relaxed posture, hands in pockets, effortless cool"
+    },
+    {
+      "label": "Over-the-Shoulder",
+      "prompt": "looking over the shoulder, highlighting the back details of the garment, elegant neck posture"
+    },
+    {
+      "label": "Macro Fabric Detail",
+      "prompt": "extreme close up shot, waist level, focusing entirely on fabric texture and stitching, face cropped out"
+    }
+  ]
+}

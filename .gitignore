@@ -1,0 +1,42 @@
+*.log
+.DS_Store
+.env
+.env.backup
+.env.production
+.env.local
+*.local
+.phpactor.json
+.phpunit.result.cache
+/.codex
+/.cursor/
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+/node_modules
+/dist/
+npm-debug.log*
+# public_html/build IS COMMITTED so shared-hosting deploys need no Node. Remove this comment to ignore again.
+/public_html/fonts-manifest.dev.json
+/public_html/hot
+/public_html/storage
+/storage/*.key
+/storage/pail
+/vendor
+_ide_helper.php
+Homestead.json
+Homestead.yaml
+Thumbs.db
+
+# ── Bảo mật: KHÔNG commit dữ liệu cục bộ ──
+/database/*.sqlite
+/database/*.sqlite-journal
+
+# ── Tài liệu nội bộ (repo PUBLIC — báo cáo chứa chi tiết lỗ hổng CHƯA vá) ──
+STUDIO_REVIEW.md
+STUDIO_REVIEW_PROGRESS.md
+STUDIO_UI_REDESIGN.md
+DELEGATION_PLAYBOOK.md
+DEPLOY.md
