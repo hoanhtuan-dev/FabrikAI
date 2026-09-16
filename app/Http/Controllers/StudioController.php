@@ -1338,8 +1338,14 @@ RULES:
      */
     protected function failStuck(Generation $generation, string $message): void
     {
-        $generation->update(['status' => 'failed', 'error' => $message]);
-        if ($generation->credits_cost > 0) {
+        // M02: CAS (compare-and-swap) — chỉ request nào ĐỔI ĐƯỢC trạng thái khỏi 'processing'
+        // mới được hoàn tiền. Trước đây update + increment không điều kiện nên 2 request đồng
+        // thời (poll show() + reconcileStuckCredits) cùng hoàn tiền một generation = double refund.
+        $claimed = Generation::where('id', $generation->id)
+            ->where('status', 'processing')
+            ->update(['status' => 'failed', 'error' => $message]);
+
+        if ($claimed && $generation->credits_cost > 0) {
             $generation->user?->increment('credits_balance', $generation->credits_cost);
         }
     }
@@ -1479,8 +1485,13 @@ RULES:
             ->get();
 
         foreach ($stuck as $g) {
-            $g->update(['status' => 'failed', 'error' => 'Hết thời gian xử lý (job bị ngắt).']);
-            if ($g->credits_cost > 0) {
+            // M02: CAS như failStuck() — hàm này chạy ở ĐẦU mỗi queueGeneration(), nên 2 request
+            // đồng thời rất dễ cùng SELECT ra một generation kẹt và hoàn tiền 2 lần.
+            $claimed = Generation::where('id', $g->id)
+                ->where('status', 'processing')
+                ->update(['status' => 'failed', 'error' => 'Hết thời gian xử lý (job bị ngắt).']);
+
+            if ($claimed && $g->credits_cost > 0) {
                 $g->user?->increment('credits_balance', $g->credits_cost);
             }
         }
