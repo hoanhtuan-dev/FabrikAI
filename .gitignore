@@ -35,9 +35,7 @@ Thumbs.db
 /database/*.sqlite-journal
 
 # ── Tài liệu nội bộ (repo PUBLIC — báo cáo chứa chi tiết lỗ hổng CHƯA vá) ──
-STUDIO_REVIEW.md
-STUDIO_REVIEW_PROGRESS.md
-STUDIO_REVIEW_PRODUCT.md
+STUDIO_REVIEW*.md
 STUDIO_UI_REDESIGN.md
 DELEGATION_PLAYBOOK.md
 DEPLOY.md
