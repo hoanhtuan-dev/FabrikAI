@@ -176,6 +176,43 @@ class StudioQueueModeTest extends TestCase
         Queue::assertPushed(SwapModelJob::class, 1);
     }
 
+    public function test_fresh_pending_generation_is_not_processed_inline_in_queue_mode(): void
+    {
+        // Khi CÓ worker nền (cron 1 phút), generation mới phải được để worker xử lý — request poll
+        // KHÔNG được giành việc, nếu không thì chế độ queue mất hết ý nghĩa (request lại bị giữ lâu).
+        config(['studio.queue_worker' => true]);
+        Queue::fake();
+
+        $g = $this->generation(['status' => 'pending']);
+
+        $this->actingAs($this->admin())->getJson('/api/generations/'.$g->id)->assertOk();
+
+        $this->assertSame('pending', $g->fresh()->status,
+            'Generation mới (chưa quá ngưỡng chờ) không được xử lý inline khi đang ở chế độ queue.');
+    }
+
+    public function test_stale_pending_generation_falls_back_to_inline_when_no_worker_runs(): void
+    {
+        // [LƯỚI AN TOÀN] Bật cờ queue mà máy chủ KHÔNG có worker nào chạy (cron chưa tạo) thì
+        // generation sẽ kẹt 'pending' mãi và người dùng mất credit. Sau ngưỡng chờ, request poll
+        // phải tự xử lý inline để người dùng vẫn có kết quả.
+        config(['studio.queue_worker' => true]);
+        // BẮT BUỘC: Queue::fake() để đường ENQUEUE không tự chạy. Thiếu dòng này thì
+        // QUEUE_CONNECTION=sync khiến dispatch() chạy ngay, generation đổi trạng thái do ENQUEUE
+        // chứ không phải do lưới an toàn => test XANH kể cả khi đã gỡ lưới (mutation-test bắt được).
+        Queue::fake();
+
+        $g = $this->generation(['status' => 'pending']);
+        // Đẩy created_at ra quá ngưỡng (90s) — mô phỏng "không worker nào nhặt việc".
+        \Illuminate\Support\Facades\DB::table('generations')->where('id', $g->id)
+            ->update(['created_at' => now()->subMinutes(5)]);
+
+        $this->actingAs($this->admin())->getJson('/api/generations/'.$g->id)->assertOk();
+
+        $this->assertNotSame('pending', $g->fresh()->status,
+            'Không có worker chạy thì phải tự xử lý inline thay vì để generation kẹt pending mãi.');
+    }
+
     // ── 3. Không dội queue khi client poll liên tục ──────────────────────
 
     public function test_repeated_polling_enqueues_a_generation_only_once(): void

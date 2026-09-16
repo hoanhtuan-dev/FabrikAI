@@ -23,6 +23,12 @@ class StudioController extends Controller
      *   3) (tuỳ chọn) bổ sung nhánh prompt trong regionPrompt().
      * Luồng chung (mask → AI edit / local fill → generation + poll) tự động áp dụng.
      */
+    /**
+     * Số giây một generation được phép nằm pending trong chế độ queue TRƯỚC KHI request poll tự
+     * xử lý inline (lưới an toàn khi máy chủ không có worker nền). Phải LỚN HƠN chu kỳ cron 1 phút.
+     */
+    protected const QUEUE_FALLBACK_SECONDS = 90;
+
     protected const REGION_OPS = [
         'erase' => ['label' => 'Xóa vùng', 'needs_prompt' => false],
         'replace' => ['label' => 'Thay vùng', 'needs_prompt' => true],
@@ -1421,6 +1427,26 @@ RULES:
             // Máy chủ chưa có worker thì giữ "lazy worker" xử lý inline như trước.
             if (config('studio.queue_worker')) {
                 $this->enqueuePending($generation);
+
+                // ── LƯỚI AN TOÀN: queue-first, inline-FALLBACK ─────────────────────────────
+                // [Gặp thật khi deploy 2026-09-17] Bật STUDIO_QUEUE_WORKER=true mà trên máy chủ
+                // KHÔNG có worker nền nào chạy (cron chưa tạo, hoặc worker chết) thì job nằm mãi
+                // trong bảng jobs: generation không bao giờ rời pending và người dùng MẤT CREDIT
+                // mà không có kết quả. Đã kiểm chứng: cron của host chỉ có của domain khác.
+                //
+                // Vì vậy: nếu generation vẫn pending sau QUEUE_FALLBACK_SECONDS thì tự xử lý inline.
+                // Ngưỡng phải LỚN HƠN chu kỳ cron (1 phút) để không giành việc với worker thật —
+                // khi có worker, job CAS sang processing trong vòng <=60 giây nên nhánh này không chạy.
+                if ($generation->created_at
+                    && $generation->created_at->lt(now()->subSeconds(self::QUEUE_FALLBACK_SECONDS))) {
+                    logger()->warning(
+                        'Không có queue worker xử lý generation #'.$generation->id.
+                        ' sau '.self::QUEUE_FALLBACK_SECONDS.'s — chuyển sang xử lý inline. '.
+                        'Kiểm tra cron queue:work --stop-when-empty đã được tạo trong hPanel chưa.'
+                    );
+
+                    $this->processPendingInline($generation);
+                }
             } else {
                 $this->processPendingInline($generation);
             }
