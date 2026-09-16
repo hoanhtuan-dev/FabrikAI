@@ -140,13 +140,21 @@ const pCols = ref(4);
 const pSort = ref('newest');
 const selProds = ref([]);
 
+// §5.2: trước đây lỗi tải chỉ được console.error rồi render empty state "Chưa có sản phẩm." —
+// người dùng tưởng thật sự không có sản phẩm và không có cách thử lại.
+const productsError = ref('');
 async function loadProducts() {
+  productsError.value = '';
   try {
     const r = await fetch('/api/references?_=' + Date.now(), { headers: { Accept: 'application/json' } });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     products.value = d.items || [];
-  } catch (e) { console.error('studio request failed', e); }
+  } catch (e) {
+    console.error('studio request failed', e);
+    products.value = [];
+    productsError.value = e.message || 'Không tải được danh sách sản phẩm.';
+  }
 }
 
 function toggleProd(p) {
@@ -304,7 +312,11 @@ watch(() => props.modelValue, (open) => {
               <span v-if="isSelProd(p)" class="pointer-events-none absolute inset-0 grid place-items-center bg-brand-500/15"><span class="grid h-9 w-9 place-items-center rounded-full bg-brand-500 text-white shadow-lg ring-2 ring-white/50"><StudioIcon name="check" size="h-5 w-5"/></span></span>
               <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span>
             </div>
-            <p v-if="!sortedProducts.length" class="col-span-full py-10 text-center text-xs text-cream-300/50">{{ products.length ? 'Không có sản phẩm khớp tìm kiếm.' : 'Chưa có sản phẩm.' }}</p>
+            <div v-if="!sortedProducts.length" class="col-span-full py-10 text-center">
+              <p v-if="productsError" class="text-xs text-red-300">Không tải được danh sách sản phẩm: {{ productsError }}</p>
+              <p v-else class="text-xs text-cream-300/50">{{ products.length ? 'Không có sản phẩm khớp tìm kiếm.' : 'Chưa có sản phẩm.' }}</p>
+              <button v-if="productsError" @click="loadProducts" class="mt-2 rounded-full border border-ink-600 bg-ink-800 px-3 py-1 text-xs font-semibold text-cream-200 transition hover:bg-ink-700">Thử lại</button>
+            </div>
           </div>
         </template>
       </div>

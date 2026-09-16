@@ -1464,7 +1464,10 @@ export const useStudioStore = defineStore('studio', {
     // Dự án thiết kế (Project Workspace) — CRUD + workflow cho Designer.
     // ═══════════════════════════════════════════════════════════════════
     async loadProjects() {
-      if (this.projectLoading) return this.projects;
+      // §5.2: khi đang tải mà có yêu cầu mới, hàm cũ bỏ qua luôn -> nơi gọi (toggleArchived/
+      // togglePending) tưởng đã refresh nhưng danh sách vẫn là bản cũ tới lần tải kế tiếp.
+      // Nay đánh dấu để chạy lại ngay sau khi lượt đang chạy xong.
+      if (this.projectLoading) { this._projectReloadQueued = true; return this.projects; }
       this.projectLoading = true;
       // Hàng đợi duyệt (Super Admin): ?scope=pending — bỏ param archived.
       const mkQuery = () => this.projectScope === 'pending'
@@ -1491,7 +1494,10 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) {
         this.toast(e.message || 'Không tải được dự án.', 'error');
         return this.projects;
-      } finally { this.projectLoading = false; }
+      } finally {
+        this.projectLoading = false;
+        if (this._projectReloadQueued) { this._projectReloadQueued = false; this.loadProjects(); }
+      }
     },
     async loadProject(id, opts = {}) {
       // reviewOnly: mở dự án người khác (scope=pending) → chỉ xem, KHÔNG áp dụng
@@ -2705,7 +2711,19 @@ export const useStudioStore = defineStore('studio', {
     },
     // Lưu bố cục layer (danh sách + layer active) để khôi phục khi tải lại trang.
     saveLayerLayout() {
-      try { localStorage.setItem('fabrikai.layers', JSON.stringify({ layers: this.canvasLayers, activeLayerId: this.activeLayerId, selectedLayerIds: this.selectedLayerIds, layerGroups: this.layerGroups })); } catch (e) { console.error('studio operation failed', e); }
+      // §5.2: canvasLayers chứa ảnh dạng data-URL (canvas.toDataURL) nên mỗi mutation ghi vài MB
+      // vào localStorage (quota ~5MB) và được gọi ở 57 chỗ. QuotaExceededError TRƯỚC ĐÂY bị nuốt
+      // (chỉ console.error) -> người dùng mất bố cục mà không biết vì sao. Nay báo rõ MỘT LẦN.
+      // (Không tự ý bỏ data-URL khi lưu: bản khôi phục chưa hỗ trợ layer thiếu ảnh — cần làm cả 2 phía.)
+      try {
+        localStorage.setItem('fabrikai.layers', JSON.stringify({ layers: this.canvasLayers, activeLayerId: this.activeLayerId, selectedLayerIds: this.selectedLayerIds, layerGroups: this.layerGroups }));
+      } catch (e) {
+        console.error('studio saveLayerLayout failed (vượt quota localStorage?)', e);
+        if (!this._layoutSaveWarned) {
+          this._layoutSaveWarned = true;
+          this.toast('Trang vẽ quá lớn để tự lưu vào trình duyệt — bố cục có thể mất khi tải lại. Hãy xuất/lưu bớt ảnh.', 'error');
+        }
+      }
     },
     // Lưu VẬT LÝ (nút Save): flush toàn bộ trạng thái + thông báo thành công.
     saveNow() { this.saveLayerLayout(); this.toast('Đã lưu trang.'); },

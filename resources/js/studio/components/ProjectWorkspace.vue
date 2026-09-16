@@ -96,8 +96,13 @@ async function openCreate() {
   tagsText.value = '';
   creating.value = true;
   editing.value = false;
+  editingId.value = null;
 }
+// §5.2: giữ id dự án NGAY LÚC MỞ FORM. Trước đây submitEdit() đọc store.activeProject?.id lúc
+// bấm Lưu — nếu người dùng đổi dự án đang chọn trong lúc form mở thì lưu nhầm sang dự án khác.
+const editingId = ref(null);
 function openEdit(p) {
+  editingId.value = p.id ?? null;
   form.value = {
     name: p.name || '',
     base_concept: p.base_concept || '',
@@ -128,10 +133,13 @@ async function submitCreate() {
 }
 async function submitEdit() {
   if (!form.value.name.trim()) { store.toast('Nhập tên dự án.', 'error'); return; }
+  // Lưu vào ĐÚNG dự án đã mở form (editingId), không phải dự án đang được chọn lúc bấm Lưu.
+  const targetId = editingId.value ?? projectId.value;
+  if (targetId == null) { store.toast('Không xác định được dự án cần lưu — mở lại form.', 'error'); return; }
   busy.value = true;
   try {
     const payload = { ...form.value, tags: parseTags() };
-    const d = await store.updateProject(projectId.value, payload);
+    const d = await store.updateProject(targetId, payload);
     if (d) closeForm();
   } finally { busy.value = false; }
 }
