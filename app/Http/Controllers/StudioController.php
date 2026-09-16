@@ -53,15 +53,9 @@ class StudioController extends Controller
         ]);
     }
 
-    /**
-     * Redirect các trang HTML cũ của /studio sang SPA FabrikAI (standalone).
-     * Giữ route name studio.* để admin/liên kết cũ không bị vỡ.
-     */
-    public function redirectToFabrikai(string $path = '')
-    {
-        $base = rtrim(env('FABRIKAI_URL', 'http://localhost:5173'), '/');
-        return redirect()->away($base . ($path === '' ? '' : '/' . ltrim($path, '/')));
-    }
+    // (T8) Đã xóa redirectToFabrikai(): KHÔNG route nào gọi nó và nó đọc env('FABRIKAI_URL')
+    // ngay trong code ứng dụng — vỡ khi config:cache. Việc chuyển trang /studio cũ nay do
+    // Route::redirect('/studio', '/') + Route::redirect('/studio/library', '/') đảm nhiệm.
 
     /**
      * FabrikAI SPA page shells (độc lập, không còn tiền tố /studio).

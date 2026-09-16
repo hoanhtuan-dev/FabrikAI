@@ -98,12 +98,6 @@
     "src": "resources/css/app.css",
     "isEntry": true
   },
-  "resources/js/app.js": {
-    "file": "assets/app-yNxDUqfM.js",
-    "name": "app",
-    "src": "resources/js/app.js",
-    "isEntry": true
-  },
   "resources/js/studio/main.js": {
     "file": "assets/main-3Dlm6mwg.js",
     "name": "main",
