@@ -336,8 +336,15 @@ export const useStudioStore = defineStore('studio', {
   actions: {
     async api(url, body = {}, signal = null) {
       const res = await fetch(url, { method: 'POST', headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body), signal });
+      const ct = res.headers.get('content-type') || '';
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra.');
+      // M04: hết phiên -> Laravel redirect về /dang-nhap và trả HTML 200. Nếu chỉ check res.ok thì
+      // HTML đó parse thành {} và MỌI caller mutation tưởng là thành công. Guard y như _libraryFetch
+      // và deleteGen.
+      if (!res.ok || res.redirected || !ct.includes('application/json')) {
+        if (res.redirected || (res.url && res.url.includes('/dang-nhap'))) this.needsLogin = true;
+        throw new Error(data.message || 'Phiên đăng nhập đã hết hoặc máy chủ trả dữ liệu không hợp lệ — hãy tải lại trang.');
+      }
       return data;
     },
     addGen(g) {
@@ -1143,7 +1150,9 @@ export const useStudioStore = defineStore('studio', {
     },
     async loadMoreLibrary() {
       if (!this.libraryHasMore || this.libraryLoading) return;
-      this.libraryFilters.page = (this.libraryFilters.page || 1) + 1;
+      // M05: page CHỈ lấy từ response (loadLibrary set this.libraryFilters.page = d.current_page).
+      // Trước đây tăng ở đây RỒI tăng lần nữa trong loadLibrary -> nhảy cóc trang khi backend
+      // không trả current_page. Không tăng trước nữa.
       await this.loadLibrary(false);
     },
     setLibraryFilter(key, value) {

@@ -131,7 +131,20 @@ Tags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
                 $json = json_decode(trim($text), true);
                 if (is_array($json)) {
                     $raw = $json;
+                } else {
+                    logger()->warning('GeminiService: response không phải JSON hợp lệ', [
+                        'model' => $model, 'body' => substr($text, 0, 200),
+                    ]);
                 }
+            } else {
+                // M12: non-2xx TRƯỚC ĐÂY im lặng hoàn toàn (không log, không backoff) — 429 quota
+                // và 401/403 key hỏng đều rơi vào đây rồi lặng lẽ trả stub, không ai biết vì sao.
+                // Nhánh Qwen đã log status từ trước; nay Gemini ngang bằng.
+                logger()->warning('GeminiService: HTTP '.$resp->status(), [
+                    'model' => $model,
+                    'rate_limited' => $resp->status() === 429,
+                    'body' => substr((string) $resp->body(), 0, 200),
+                ]);
             }
         } catch (\Throwable $e) {
             logger()->error('GeminiService failed: '.$e->getMessage());

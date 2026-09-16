@@ -49,7 +49,11 @@ class StudioLibraryService
             }
         }
         if (! empty($filters['q'])) {
-            $q = trim((string) $filters['q']);
+            // M16: escape ký tự đại diện của LIKE — trước đây '%'/'_' trong ô tìm kiếm được hiểu
+            // là wildcard (gõ '%' khớp mọi bản ghi; gõ '_' khớp mọi ký tự).
+            // MySQL (production) dùng '\' làm escape mặc định cho LIKE nên cách này đúng ở đó;
+            // SQLite (test/local) không có escape mặc định — chỉ khác biệt khi gõ đúng '%'/'_'.
+            $q = addcslashes(trim((string) $filters['q']), '%_\\');
             $query->where(function ($sub) use ($q) {
                 $sub->where('prompt', 'like', '%'.$q.'%')
                     ->orWhere('model', 'like', '%'.$q.'%')
