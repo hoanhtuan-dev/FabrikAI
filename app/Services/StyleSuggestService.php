@@ -330,14 +330,19 @@ class StyleSuggestService
 
         $ids = [];
 
+        // M10: nạp catalog MỘT lần rồi tra trong bộ nhớ. Trước đây mỗi label trong mỗi category
+        // chạy một query riêng (vòng lặp LỒNG nhau) trên cùng một bảng nhỏ.
+        // orderBy('sort_order') để giữ đúng thứ tự mà scopeCategory() vẫn đảm bảo.
+        $catalog = Preset::orderBy('sort_order')->get()->groupBy('category');
+
         foreach ($wants as $category => $labels) {
+            $pool = $catalog->get($category) ?? collect();
             foreach ($labels as $label) {
                 if (! is_string($label) || $label === '') {
                     continue;
                 }
-                $found = Preset::category($category)->get()
-                    ->first(fn ($p) => str_contains(mb_strtolower($p->ui_label ?? ''), mb_strtolower($label))
-                        || str_contains(mb_strtolower($label), mb_strtolower($p->ui_label ?? '')));
+                $found = $pool->first(fn ($p) => str_contains(mb_strtolower($p->ui_label ?? ''), mb_strtolower($label))
+                    || str_contains(mb_strtolower($label), mb_strtolower($p->ui_label ?? '')));
                 if ($found) {
                     $ids[] = $found->id;
                 }
@@ -451,11 +456,14 @@ class StyleSuggestService
 
     protected function suggestViaColor(string $imagePath, int $creativeLevel = 6, int $adherence = 8, int $detailLevel = 8): array
     {
-        $styles = Preset::category('style')->get();
-        $backgrounds = Preset::category('background')->get();
-        $poses = Preset::category('pose')->get();
-        $fabrics = Preset::category('fabric')->get();
-        $silhouettes = Preset::category('silhouette')->get();
+        // M10: nạp catalog MỘT lần (trước đây 5 query riêng cho 5 category).
+        // orderBy('sort_order') để tương đương scopeCategory().
+        $catalog = Preset::orderBy('sort_order')->get()->groupBy('category');
+        $styles = $catalog->get('style') ?? collect();
+        $backgrounds = $catalog->get('background') ?? collect();
+        $poses = $catalog->get('pose') ?? collect();
+        $fabrics = $catalog->get('fabric') ?? collect();
+        $silhouettes = $catalog->get('silhouette') ?? collect();
 
         [$warm, $brightness] = $this->analyzeImage($imagePath);
 
