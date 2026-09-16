@@ -1,4 +1,7 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import SettingsApp from './SettingsApp.vue';
-createApp(SettingsApp).use(createPinia()).mount('#settings-root');
+import { killLegacyServiceWorker, mountGuarded } from './pageBoot.js';
+
+killLegacyServiceWorker();
+mountGuarded(createApp(SettingsApp).use(createPinia()), '#settings-root');

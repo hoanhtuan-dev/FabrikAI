@@ -202,6 +202,52 @@ class StaticIntegrityTest extends TestCase
         );
     }
 
+    public function test_spa_entries_all_boot_through_the_shared_module(): void
+    {
+        // Lớp bug đã tái diễn nhiều lần trong repo: bản vá áp ở MỘT chỗ rồi bỏ quên chỗ tương đương.
+        // Cụ thể ở đây: `main.js` gỡ service worker cũ + guard element gốc, còn `settings.js` /
+        // `presets.js` / `stylist-data.js` thì không — nên vào thẳng /settings vẫn bị SW cũ phục vụ
+        // asset cũ, và blade thiếu element thì lỗi mount khó đọc.
+        //
+        // Bất biến: việc khởi động SPA chỉ được định nghĩa ở ĐÚNG MỘT file (pageBoot.js).
+        $entries = ['main.js', 'settings.js', 'presets.js', 'stylist-data.js'];
+        $jsFiles = $this->jsFiles();
+        $violations = [];
+
+        foreach ($jsFiles as $file) {
+            $src = (string) file_get_contents($file);
+            $rel = $this->rel($file);
+
+            if (str_contains($src, 'serviceWorker') && $rel !== 'resources/js/studio/pageBoot.js') {
+                $violations[] = "{$rel} tự gỡ service worker thay vì dùng pageBoot.js";
+            }
+            if (str_contains($src, '.mount(') && $rel !== 'resources/js/studio/pageBoot.js') {
+                $violations[] = "{$rel} tự mount thay vì dùng mountGuarded() của pageBoot.js";
+            }
+        }
+
+        foreach ($entries as $entry) {
+            $rel = 'resources/js/studio/'.$entry;
+            if (! is_file(base_path($rel))) {
+                $violations[] = "thiếu entry {$rel}";
+                continue;
+            }
+            $src = (string) file_get_contents(base_path($rel));
+            if (! str_contains($src, "from './pageBoot.js'")) {
+                $violations[] = "{$rel} không import './pageBoot.js'";
+            }
+            foreach (['killLegacyServiceWorker', 'mountGuarded'] as $fn) {
+                if (! str_contains($src, $fn.'(')) {
+                    $violations[] = "{$rel} không gọi {$fn}()";
+                }
+            }
+        }
+
+        $this->assertSame([], $violations,
+            "Entry SPA lệch chuẩn khởi động:\n".implode("\n", $violations)
+        );
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     /** @return string[] */
@@ -229,6 +275,19 @@ class StaticIntegrityTest extends TestCase
         $out = [];
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(resource_path('views'))) as $f) {
             if ($f->isFile() && str_ends_with($f->getFilename(), '.blade.php')) {
+                $out[] = $f->getPathname();
+            }
+        }
+
+        return $out;
+    }
+
+    /** @return string[] */
+    private function jsFiles(): array
+    {
+        $out = [];
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(resource_path('js'))) as $f) {
+            if ($f->isFile() && $f->getExtension() === 'js') {
                 $out[] = $f->getPathname();
             }
         }

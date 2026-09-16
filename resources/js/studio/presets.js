@@ -1,3 +1,6 @@
 import { createApp } from 'vue';
 import PresetsApp from './PresetsApp.vue';
-createApp(PresetsApp).mount('#presets-root');
+import { killLegacyServiceWorker, mountGuarded } from './pageBoot.js';
+
+killLegacyServiceWorker();
+mountGuarded(createApp(PresetsApp), '#presets-root');

@@ -1,4 +1,7 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import StylistDataApp from './StylistDataApp.vue';
-createApp(StylistDataApp).use(createPinia()).mount('#stylist-data-root');
+import { killLegacyServiceWorker, mountGuarded } from './pageBoot.js';
+
+killLegacyServiceWorker();
+mountGuarded(createApp(StylistDataApp).use(createPinia()), '#stylist-data-root');
