@@ -60,17 +60,25 @@ const confirming = ref(false);
 let confirmTimer = null;
 function startConfirm() { confirming.value = true; clearTimeout(confirmTimer); confirmTimer = setTimeout(() => { confirming.value = false; }, 3500); }
 function resetConfirm() { confirming.value = false; clearTimeout(confirmTimer); }
+const deleting = ref(false);
 async function doDelete() {
+  // §5.2: trước đây không có cờ đang-xóa và nút không :disabled -> bấm nhanh 2 lần gửi 2 lệnh DELETE.
+  if (deleting.value) return;
   const g = current.value; if (!g) return;
+  deleting.value = true;
   const at = idx.value; // vị trí trước khi xóa
-  const ok = await store.deleteGen(g);
-  resetConfirm();
-  if (!ok) return; // xóa thất bại → giữ modal
-  const left = items.value;
-  if (!left.length) { close(); return; }
-  const next = left[Math.min(Math.max(at, 0), left.length - 1)];
-  store.viewer = next;
-  resetZoom();
+  try {
+    const ok = await store.deleteGen(g);
+    resetConfirm();
+    if (!ok) return; // xóa thất bại → giữ modal
+    const left = items.value;
+    if (!left.length) { close(); return; }
+    const next = left[Math.min(Math.max(at, 0), left.length - 1)];
+    store.viewer = next;
+    resetZoom();
+  } finally {
+    deleting.value = false;
+  }
 }
 
 // ── Zoom / pan ──
@@ -488,7 +496,7 @@ onBeforeUnmount(() => {
             <p class="mb-1.5 flex items-center justify-center gap-1 text-center text-[11px] font-medium text-red-200"><StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> Xóa vĩnh viễn? Hành động này không thể hoàn tác.</p>
             <div class="flex gap-1.5">
               <button @click="resetConfirm" class="flex-1 rounded-md border border-ink-600 bg-ink-800 py-2 text-xs font-semibold text-cream-200 transition hover:bg-ink-700">Hủy</button>
-              <button @click="doDelete" class="inline-flex items-center justify-center gap-1 flex-1 rounded-md bg-red-600 py-2 text-xs font-semibold text-white transition hover:bg-red-500">
+              <button @click="doDelete" :disabled="deleting" class="inline-flex items-center justify-center gap-1 flex-1 rounded-md bg-red-600 py-2 text-xs font-semibold text-white transition hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed">
                 <StudioIcon name="trash" size="h-3.5 w-3.5" />
                 Xóa vĩnh viễn
               </button>

@@ -1194,7 +1194,20 @@ export const useStudioStore = defineStore('studio', {
     librarySelectOld() {
       const days = Number(this.libraryFilters.old_days) || 30;
       const cutoff = Date.now() - days * 86400000;
-      this.librarySelection = this.libraryItems.filter(g => g.status === 'completed' && g.media_url && (g.created_ts ? (g.created_ts * 1000) < cutoff : false)).map(g => g.id);
+      // §5.2: trước đây chỉ dựa created_ts; bản ghi thiếu created_ts bị LOẠI ÂM THẦM khỏi "chọn ảnh cũ"
+      // (người dùng thấy danh sách thiếu mà không hiểu vì sao). Nay fallback created_at rồi tới id.
+      const tsOf = (g) => {
+        if (g.created_ts) return g.created_ts * 1000;
+        const t = g.created_at ? Date.parse(g.created_at) : NaN;
+        return Number.isFinite(t) ? t : null;
+      };
+      this.librarySelection = this.libraryItems
+        .filter(g => {
+          if (g.status !== 'completed' || !g.media_url) return false;
+          const t = tsOf(g);
+          return t !== null && t < cutoff;
+        })
+        .map(g => g.id);
     },
     async libraryBulkDelete() {
       const ids = this.librarySelection.filter(Boolean);
@@ -2821,7 +2834,19 @@ export const useStudioStore = defineStore('studio', {
       this.saveLayerLayout();
       this.toast('Đã thêm ' + list.length + ' ảnh vào canvas.');
     },
-    async translate(promptTo) { if (!promptTo) { this.toast('Nhập prompt.', 'error'); return; } this.suggestResult = this.suggestResult || {}; try { const d = await this.api('/api/translate', { text: promptTo, direction: 'vi' }); this.suggestResult.prompt_vi = d.text || d; this.toast('Đã dịch sang tiếng Việt.'); } catch (e) { this.toast(e.message || 'Lỗi dịch.', 'error'); } },
+    async translate(promptTo) {
+      if (!promptTo) { this.toast('Nhập prompt.', 'error'); return; }
+      this.suggestResult = this.suggestResult || {};
+      try {
+        const d = await this.api('/api/translate', { text: promptTo, direction: 'vi' });
+        // §5.2: trước đây 'd.text || d' — thiếu d.text thì lưu NGUYÊN OBJECT vào ô văn bản, hiển thị
+        // ra "[object Object]". Nay luôn là chuỗi.
+        const text = typeof d?.text === 'string' ? d.text : (typeof d === 'string' ? d : '');
+        if (!text) { this.toast('Máy dịch không trả nội dung — thử lại.', 'error'); return; }
+        this.suggestResult.prompt_vi = text;
+        this.toast('Đã dịch sang tiếng Việt.');
+      } catch (e) { this.toast(e.message || 'Lỗi dịch.', 'error'); }
+    },
     async suggestStyle(image) {
       if (!this.suggestEnabled) { this.toast('Tính năng "Gợi ý từ ảnh" đang bị tắt trong cài đặt.', 'error'); return; }
       if (!image) { this.toast('Chọn ảnh nguồn để gợi ý.', 'error'); return; }

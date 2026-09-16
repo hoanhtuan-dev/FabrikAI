@@ -105,22 +105,44 @@ function loadDraft() {
     const raw = localStorage.getItem(DRAFT_KEY);
     if (!raw) return false;
     const draft = JSON.parse(raw);
-    if (!draft.prompt) return false;
-    store.imagePromptEn = draft.prompt;
-    if (draft.creativeLevel != null) { store.creativeLevel = draft.creativeLevel; localCreative.value = draft.creativeLevel; }
-    if (draft.texture != null) { store.texture = draft.texture; localTexture.value = draft.texture; }
-    if (draft.variantCount != null) { store.variantCount = draft.variantCount; localVariant.value = draft.variantCount; }
-    if (draft.imageRatio) store.imageRatio = draft.imageRatio;
-    if (draft.imageRes) store.imageRes = draft.imageRes;
-    if (draft.negativePrompt) store.negativePromptEn = draft.negativePrompt;
-    if (draft.bodyHeight != null) store.bodyHeight = draft.bodyHeight;
-    if (draft.bodyBuild != null) store.bodyBuild = draft.bodyBuild;
-    if (draft.bodyWaist != null) store.bodyWaist = draft.bodyWaist;
-    if (draft.bodyShoulders != null) store.bodyShoulders = draft.bodyShoulders;
-    if (draft.bodyHips != null) store.bodyHips = draft.bodyHips;
-    if (draft.hairStyle) store.hairStyle = draft.hairStyle;
-    if (draft.hairColor) store.hairColor = draft.hairColor;
-    if (draft.imageSeed) store.imageSeed = draft.imageSeed;
+    if (!draft || typeof draft !== 'object') return false;
+    if (typeof draft.prompt !== 'string' || !draft.prompt) return false;
+
+    // §5.2: draft đọc từ localStorage KHÔNG được kiểm kiểu/giới hạn — dữ liệu cũ hoặc bị sửa tay
+    // có thể đẩy giá trị sai (chuỗi vào ô số, tỷ lệ/độ phân giải lạ -> 422 từ server). Nay clamp
+    // đúng như ô nhập.
+    const num = (v, lo, hi, fallback = null) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback;
+    };
+    const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : null);
+
+    store.imagePromptEn = draft.prompt.slice(0, 4000);
+
+    const cl = num(draft.creativeLevel, 1, 10);
+    if (cl !== null) { store.creativeLevel = cl; localCreative.value = cl; }
+    const tx = num(draft.texture, 0, 10);
+    if (tx !== null) { store.texture = tx; localTexture.value = tx; }
+    const vc = num(draft.variantCount, 1, 4);
+    if (vc !== null) { store.variantCount = vc; localVariant.value = vc; }
+
+    const ratios = ['1:1', '4:3', '3:4', '16:9', '9:16', '4:5', '21:9', '19:6'];
+    if (typeof draft.imageRatio === 'string' && ratios.includes(draft.imageRatio)) store.imageRatio = draft.imageRatio;
+    // imageRes là NHÃN (1K/2K) chứ không phải số -> chỉ nhận đúng 2 giá trị hợp lệ.
+    if (typeof draft.imageRes === 'string' && ['1K', '2K'].includes(draft.imageRes)) store.imageRes = draft.imageRes;
+
+    const neg = str(draft.negativePrompt, 2000);
+    if (neg) store.negativePromptEn = neg;
+
+    const b = num(draft.bodyHeight, 1, 10); if (b !== null) store.bodyHeight = b;
+    const bb = num(draft.bodyBuild, 1, 10); if (bb !== null) store.bodyBuild = bb;
+    const bw = num(draft.bodyWaist, 1, 10); if (bw !== null) store.bodyWaist = bw;
+    const bs = num(draft.bodyShoulders, 1, 10); if (bs !== null) store.bodyShoulders = bs;
+    const bh = num(draft.bodyHips, 1, 10); if (bh !== null) store.bodyHips = bh;
+
+    const hs = str(draft.hairStyle, 100); if (hs) store.hairStyle = hs;
+    const hc = str(draft.hairColor, 100); if (hc) store.hairColor = hc;
+    const seed = str(draft.imageSeed, 64); if (seed) store.imageSeed = seed;
     return true;
   } catch (e) { return false; }
 }
