@@ -966,6 +966,41 @@ if (! function_exists('studio_model_catalog')) {
     }
 }
 
+if (! function_exists('studio_drop_queued_generation')) {
+    /**
+     * Xoá job đã enqueue cho MỘT generation (nếu có) khỏi bảng queue.
+     *
+     * [Vì sao cần] Khi máy chủ KHÔNG có worker nền, mỗi generation vẫn được enqueue (đúng thiết kế)
+     * nhưng rồi được lưới an toàn xử lý inline. Job đã enqueue sẽ nằm lại trong bảng jobs MÃI MÃI —
+     * không ai nhặt, và cứ mỗi ảnh lại thêm một job chết. Hàm này dọn nó sau khi đã xử lý inline.
+     *
+     * Không dùng WHERE ... LIKE vì payload chứa chuỗi đã escape (generationId\";i:1;) và MySQL coi
+     * backslash là ký tự escape trong LIKE -> mẫu dễ khớp sai. Lọc ở phía PHP cho chắc.
+     *
+     * @return int số job đã xoá
+     */
+    function studio_drop_queued_generation(int $generationId): int
+    {
+        $needle = 'generationId\";i:'.$generationId.';';
+        $deleted = 0;
+
+        try {
+            $rows = \Illuminate\Support\Facades\DB::table('jobs')->get(['id', 'payload']);
+        } catch (\Throwable $e) {
+            return 0;   // bảng jobs chưa tồn tại / DB không phải queue store
+        }
+
+        foreach ($rows as $row) {
+            if (str_contains((string) $row->payload, $needle)) {
+                \Illuminate\Support\Facades\DB::table('jobs')->where('id', $row->id)->delete();
+                $deleted++;
+            }
+        }
+
+        return $deleted;
+    }
+}
+
 if (! function_exists('studio_dispatch_generation')) {
     /**
      * Đẩy job xử lý cho MỘT generation, kèm chốt chống dội queue.

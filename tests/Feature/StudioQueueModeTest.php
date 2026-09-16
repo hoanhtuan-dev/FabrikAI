@@ -213,6 +213,30 @@ class StudioQueueModeTest extends TestCase
             'Không có worker chạy thì phải tự xử lý inline thay vì để generation kẹt pending mãi.');
     }
 
+    public function test_inline_fallback_cleans_up_the_queued_job(): void
+    {
+        // Khi máy chủ không có worker: generation vẫn được enqueue (đúng thiết kế) rồi được lưới an
+        // toàn xử lý inline. Nếu không dọn, job đã enqueue nằm lại trong bảng 'jobs' MÃI MÃI — cứ mỗi
+        // ảnh lại thêm một job chết.
+        // Dùng queue store THẬT (database) để job thực sự được ghi thành row.
+        config(['studio.queue_worker' => true, 'queue.default' => 'database']);
+
+        $g = $this->generation(['status' => 'pending']);
+
+        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('jobs')->count(),
+            'Tạo generation phải đẩy đúng một job vào hàng đợi.');
+
+        // Đẩy created_at quá ngưỡng 90s để kích hoạt lưới an toàn.
+        \Illuminate\Support\Facades\DB::table('generations')->where('id', $g->id)
+            ->update(['created_at' => now()->subMinutes(5)]);
+
+        $this->actingAs($this->admin())->getJson('/api/generations/'.$g->id)->assertOk();
+
+        $this->assertNotSame('pending', $g->fresh()->status, 'Lưới an toàn phải xử lý inline.');
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('jobs')->count(),
+            'Job đã enqueue phải được dọn sau khi xử lý inline — không để lại job chết.');
+    }
+
     // ── 3. Không dội queue khi client poll liên tục ──────────────────────
 
     public function test_repeated_polling_enqueues_a_generation_only_once(): void

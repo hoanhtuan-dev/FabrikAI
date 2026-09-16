@@ -1446,6 +1446,10 @@ RULES:
                     );
 
                     $this->processPendingInline($generation);
+
+                    // Dọn job đã enqueue nhưng không ai nhặt — nếu để lại, mỗi ảnh sẽ thêm một job
+                    // chết trong bảng jobs (không hại nhưng tích tụ vô ích).
+                    studio_drop_queued_generation($generation->id);
                 }
             } else {
                 $this->processPendingInline($generation);
