@@ -23,8 +23,17 @@ class User extends Authenticatable
     /** Danh sách role có quyền vào khu vực quản trị. */
     public const ADMIN_ROLES = [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN];
 
+    /**
+     * CHỈ các field được phép điền qua mass-assignment.
+     *
+     * [BẢO MẬT] 'role', 'is_active' và 'credits_balance' CỐ Ý không nằm ở đây: chúng là field đặc
+     * quyền/tiền. Nếu để trong $fillable, bất kỳ endpoint tương lai nào làm
+     * $user->update($request->all()) sẽ cho phép tự nâng quyền lên admin VÀ tự cộng credit.
+     * Đường ghi chính thức phải tường minh: forceFill(...)->save() (seeder + service).
+     * Đây đúng là cách K.1 F4 đã siết cho Project (rút user_id/status khỏi $fillable).
+     */
     protected $fillable = [
-        'name', 'email', 'password', 'role', 'phone', 'avatar', 'is_active', 'credits_balance',
+        'name', 'email', 'password', 'phone', 'avatar',
     ];
 
     protected $hidden = [

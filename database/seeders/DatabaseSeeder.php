@@ -114,33 +114,29 @@ class DatabaseSeeder extends Seeder
     protected function users(): void
     {
         // Super Admin — tài khoản quyền cao nhất, duy nhất được quản lý tài khoản khác.
+        // 'role' / 'credits_balance' KHÔNG còn trong User::$fillable (xem chú thích ở model)
+        // -> phải ghi tường minh bằng forceFill().
         User::updateOrCreate(['email' => 'tuan.ho.designer@gmail.com'], [
             'name' => 'Tuan Ho (Super Admin)',
             'password' => Hash::make('hattf2768'),
-            'role' => User::ROLE_SUPER_ADMIN,
             'phone' => '0900000001',
-            'credits_balance' => 0,
             'email_verified_at' => now(),
-        ]);
+        ])->forceFill(['role' => User::ROLE_SUPER_ADMIN, 'credits_balance' => 0])->save();
 
         // Admin thường — vào được khu vực quản trị nhưng KHÔNG quản lý tài khoản.
         User::updateOrCreate(['email' => 'admin@trillfa.com'], [
             'name' => 'Quản trị Trillfa',
             'password' => Hash::make('password'),
-            'role' => User::ROLE_ADMIN,
             'phone' => '0900000000',
-            'credits_balance' => 1000,
             'email_verified_at' => now(),
-        ]);
+        ])->forceFill(['role' => User::ROLE_ADMIN, 'credits_balance' => 1000])->save();
 
         User::updateOrCreate(['email' => 'customer@trillfa.com'], [
             'name' => 'Nguyễn Văn An',
             'password' => Hash::make('password'),
-            'role' => 'customer',
             'phone' => '0912345678',
-            'credits_balance' => 200,
             'email_verified_at' => now(),
-        ]);
+        ])->forceFill(['role' => User::ROLE_CUSTOMER, 'credits_balance' => 200])->save();
 
         $names = ['Trần Thị Bích', 'Lê Minh Cường', 'Phạm Thu Hà', 'Võ Đức Duy', 'Đặng Kim Ngân'];
         foreach ($names as $i => $name) {
@@ -148,10 +144,10 @@ class DatabaseSeeder extends Seeder
             $user = User::updateOrCreate(['email' => $email], [
                 'name' => $name,
                 'password' => Hash::make('password'),
-                'role' => 'customer',
                 'phone' => '09'.rand(10000000, 99999999),
                 'email_verified_at' => now(),
             ]);
+            $user->forceFill(['role' => User::ROLE_CUSTOMER])->save();
             $user->addresses()->create([
                 'name' => $name,
                 'phone' => $user->phone,
