@@ -17,6 +17,7 @@ use Tests\TestCase;
  *  - S3 SSRF guard trong storeRemoteImage()
  *  - S4 stored XSS — escape e() trong stub HTML ProductAIService
  *  - S8 whitelist scope cleanup (422 thay vì ok giả)
+ *  - (S5 đã gỡ cùng AdminProductController ở T8 — xem ghi chú trong file)
  */
 class StudioSecurityFixesTest extends TestCase
 {
@@ -55,16 +56,15 @@ class StudioSecurityFixesTest extends TestCase
     }
 
     // ── S5: AdminProductController::resolveImagePath containment ────────
-
-    public function test_admin_product_image_url_cannot_traverse_to_env(): void
-    {
-        $ctl = app(\App\Http\Controllers\Admin\AdminProductController::class);
-        $m = new \ReflectionMethod($ctl, 'resolveImagePath');
-        $m->setAccessible(true);
-        $this->assertNull($m->invoke($ctl, '/../.env'));
-        $this->assertNull($m->invoke($ctl, asset('../.env')));
-        $this->assertNull($m->invoke($ctl, '/storage/../../.env'));
-    }
+    //
+    // ĐÃ GỠ Ở T8 (2026-09-16): AdminProductController nằm trong nhóm 32 controller có 0 route
+    // (admin CRUD của storefront — storefront đã bỏ khỏi FabrikAI, StorefrontModuleServiceProvider
+    // không được đăng ký trong bootstrap/providers.php). Code + test S5 gốc khôi phục được ở
+    // commit cha của commit "chore(T8)".
+    //
+    // Bản thân bản vá S5 KHÔNG mất coverage: nó chỉ uỷ quyền cho helper dùng chung
+    // studio_safe_public_file() — vẫn được phủ đầy đủ bởi StudioLocalFileContainmentTest
+    // (chặn '..' + charset + realpath containment) và các test S1 ngay trên file này.
 
     // ── S6 residual: vision data-uri traversal ──────────────────────────
 
