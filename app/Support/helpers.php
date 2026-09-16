@@ -264,6 +264,13 @@ if (! function_exists('studio_image_decode')) {
         // chính studio_image_decode() → tràn stack/OOM giết worker tại 43 call-site.)
         $gd = @imagecreatefromstring((string) $data);
         if ($gd === false) {
+            // M20: 43 call-site trước đây nhận false rồi trả null/"no mask"/"no description" ÂM THẦM,
+            // không cách nào biết vì sao. Log lại kích thước + 12 byte đầu để chẩn đoán.
+            \Illuminate\Support\Facades\Log::warning('studio_image_decode: decode thất bại', [
+                'bytes' => strlen((string) $data),
+                'magic' => bin2hex(substr((string) $data, 0, 12)),
+            ]);
+
             return false;
         }
 

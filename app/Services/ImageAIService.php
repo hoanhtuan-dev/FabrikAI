@@ -250,6 +250,10 @@ class ImageAIService
     {
         $msg = $this->dashscopeError ?: 'Không thể gọi nhà cung cấp AI. Kiểm tra key / model / độ phân giải trong Cài đặt.';
         $lower = strtolower((string) $msg);
+        // M14: dashscopeError có thể là body provider thô (240 ký tự) hoặc message exception nội bộ
+        // (xem tryDashscope :513-575 và :960). Chỉ 4 nhánh dưới đây là message ĐÃ MAP cho user;
+        // mọi lỗi khác trước đây rơi xuống return $msg = trả NGUYÊN VĂN ra UI.
+        $mapped = true;
 
         if (str_contains($lower, 'allocationquota') || str_contains($lower, 'throttling') || str_contains($msg, '(429)')) {
             $msg = 'Hạn mức tài khoản QwenCloud đã hết (Throttling.AllocationQuota). '
@@ -267,6 +271,18 @@ class ImageAIService
             $msg = 'Khóa QwenCloud hợp lệ, nhưng model ảnh chưa được kích hoạt/mua trên tài khoản (AccessDenied.Unpurchased). '
                 .'Vào https://home.qwencloud.com → Model Center → bật / mua một model Qwen-Image (Qwen-Image, Qwen-Image-Max, Qwen-Image-Plus, Qwen-Image-3.0). '
                 .'Tài khoản này hiện chỉ có model giọng nói (ASR/TTS). Sau khi bật, chọn lại “Ảnh Qwen” trong Cài đặt.';
+        } else {
+            $mapped = false;
+        }
+
+        if (! $mapped) {
+            // Log đầy đủ ở server (kèm raw) rồi trả câu chung; giữ nguyên văn khi APP_DEBUG để dev
+            // còn chẩn đoán. Trước đây lỗi chưa map đi thẳng ra UI, có thể lộ chi tiết nội bộ/provider.
+            logger()->warning('ImageAI provider error (unmapped)', ['detail' => (string) $this->dashscopeError]);
+
+            if (! config('app.debug')) {
+                $msg = 'Không tạo được ảnh. Nhà cung cấp AI trả lỗi chưa xác định — kiểm tra key / model / độ phân giải trong Cài đặt rồi thử lại.';
+            }
         }
 
         return $msg;

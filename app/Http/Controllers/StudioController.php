@@ -3289,6 +3289,14 @@ RULES:
             ],
         ]);
 
+        // M01: trừ credit ngay lúc tạo — SwapModelJob giả định đúng điều này khi hoàn tiền
+        // ("Credit đã trừ lúc tạo generation — thất bại phải hoàn", SwapModelJob.php:69).
+        // Trước đây swapModel() KHÔNG đi qua queueGeneration() và KHÔNG trừ gì, nên hoàn tiền khi
+        // lỗi là CỘNG THÊM credit, còn credits_left/studio_usage() thì báo thiếu.
+        // Giữ đúng chính sách của queueGeneration(): tool nội bộ, không chặn cứng theo credit,
+        // chỉ trừ để theo dõi (số dư có thể âm).
+        auth()->user()->decrement('credits_balance', (int) ($gen->credits_cost ?: 1));
+
         \App\Jobs\SwapModelJob::dispatch($gen->id);
 
         return response()->json(['generation_id' => $gen->id, 'status' => 'pending', 'provider' => 'qwen', 'model' => $swapModel, 'task_id' => null]);
@@ -3384,6 +3392,12 @@ RULES:
         $actualModel = $svc->lastModel() ?: $swapModel;
         $credits = max(1, $svc->calls()); // 2-3 (edit: try-on + face-swap + background)
 
+        // M01: lúc tạo generation mới trừ 1 credit; pipeline thực tế tốn 2-3 lượt gọi (try-on +
+        // face-swap + background) nên credits_cost được nâng lên $credits. Phải trừ THÊM phần chênh,
+        // nếu không thì credits_balance thấp hơn credits_cost và mọi đường hoàn tiền (SwapModelJob:refund
+        // dùng chính credits_cost) sẽ hoàn nhiều hơn số đã trừ = credit sinh ra từ hư không.
+        $alreadyCharged = (int) ($gen->credits_cost ?: 0);
+
         $gen->update([
             'status' => 'completed', 'media_url' => $fallback,
             'model' => $actualModel, 'credits_cost' => $credits,
@@ -3393,6 +3407,10 @@ RULES:
                 'qa' => $qaScores,
             ]),
         ]);
+
+        if ($credits > $alreadyCharged) {
+            $gen->user?->decrement('credits_balance', $credits - $alreadyCharged);
+        }
     }
 
     public function translate(Request $request)
