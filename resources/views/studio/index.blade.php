@@ -6,7 +6,10 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#193d2b">
     <meta name="color-scheme" content="dark light">
-    <link rel="manifest" href="/manifest.json">
+    {{-- T5: PWA đã GỠ HẲN (2026-09-17) — đã xoá `/sw.js` + `/manifest.json` + các icon chỉ phục vụ
+         manifest. Trước đó service worker không bao giờ được đăng ký lại, nên PWA vốn là code chết.
+         Việc gỡ SW cũ trong trình duyệt người dùng vẫn chạy ở `pageBoot.js` (cần thiết: xoá file trên
+         máy chủ KHÔNG tự gỡ SW đã cài sẵn ở phía client). --}}
     <link rel="apple-touch-icon" href="/icons/studio-apple-touch-icon.png">
     <link rel="icon" type="image/png" href="/icons/studio-favicon-32.png">
     <title>FabrikAI — AI Fashion Design Studio</title>

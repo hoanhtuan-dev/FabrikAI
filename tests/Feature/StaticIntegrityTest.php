@@ -300,6 +300,50 @@ class StaticIntegrityTest extends TestCase
         );
     }
 
+    public function test_pwa_is_removed_but_stale_service_worker_cleanup_stays(): void
+    {
+        // T5 (chốt 2026-09-17): PWA gỡ HẲN. Trước đó service worker không bao giờ được đăng ký lại
+        // (`main.js` chỉ gỡ) nên `/sw.js` + `/manifest.json` là code chết.
+        //
+        // Nhưng KHÔNG được gỡ theo `killLegacyServiceWorker()`: xoá file trên máy chủ không tự gỡ
+        // service worker đã cài trong trình duyệt người dùng — nếu bỏ hàm đó, người dùng cũ sẽ mãi
+        // bị SW cũ phục vụ asset cũ (SPA trắng trang). Test này khoá CẢ HAI chiều.
+        foreach (['public_html/sw.js', 'public_html/manifest.json'] as $dead) {
+            $this->assertFileDoesNotExist(base_path($dead), "T5: {$dead} phải đã bị xoá");
+        }
+
+        $refs = [];
+        foreach (['resources/views', 'resources/js', 'routes', 'app', 'config'] as $dir) {
+            $path = base_path($dir);
+            if (! is_dir($path)) {
+                continue;
+            }
+            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path)) as $f) {
+                if (! $f->isFile()) {
+                    continue;
+                }
+                $src = (string) file_get_contents($f->getPathname());
+                // Chỉ tính THAM CHIẾU THẬT: bỏ qua dòng chú thích mô tả việc gỡ.
+                foreach (explode("\n", $src) as $line) {
+                    if (! preg_match('#/manifest\.json|["\x27]/sw\.js#', $line)) {
+                        continue;
+                    }
+                    if (preg_match('#^\s*(//|\*|/\*|\{\{--|<!--)#', $line)) {
+                        continue;
+                    }
+                    $refs[] = $this->rel($f->getPathname()).' -> '.trim($line);
+                }
+            }
+        }
+
+        $this->assertSame([], $refs, "Còn tham chiếu tới file PWA đã xoá:\n".implode("\n", $refs));
+
+        // Chiều ngược lại: dọn SW cũ VẪN phải còn.
+        $boot = (string) file_get_contents(resource_path('js/studio/pageBoot.js'));
+        $this->assertStringContainsString('export function killLegacyServiceWorker', $boot,
+            'T5: xoá file PWA trên máy chủ KHÔNG thay thế được việc gỡ service worker đã cài ở trình duyệt người dùng.');
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     /** @return string[] */
