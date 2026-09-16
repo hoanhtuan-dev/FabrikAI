@@ -41,10 +41,22 @@ class ProcessStudioGenerations extends Command
             ->get();
 
         foreach ($stuck as $generation) {
-            $generation->update([
-                'status' => 'failed',
-                'error' => 'Hết thời gian xử lý (worker bị ngắt). Đã hoàn tiền vào tài khoản — vui lòng tạo lại.',
-            ]);
+            // M02 (đồng bộ với StudioController::failStuck/reconcileStuckCredits): CAS — chỉ lượt nào
+            // ĐỔI ĐƯỢC trạng thái khỏi 'processing' mới hoàn credit. Trước đây khối này update +
+            // increment KHÔNG điều kiện, nên hai lượt cron chồng nhau (shared hosting) cùng SELECT ra
+            // một row sẽ hoàn tiền 2 lần. Comment ở đầu class chỉ nói về CAS của các JOB, không phải
+            // khối heal này.
+            $claimed = Generation::where('id', $generation->id)
+                ->where('status', 'processing')
+                ->update([
+                    'status' => 'failed',
+                    'error' => 'Hết thời gian xử lý (worker bị ngắt). Đã hoàn tiền vào tài khoản — vui lòng tạo lại.',
+                ]);
+
+            if (! $claimed) {
+                continue; // lượt khác đã xử lý row này
+            }
+
             if ($generation->credits_cost > 0) {
                 $generation->user?->increment('credits_balance', $generation->credits_cost);
             }
