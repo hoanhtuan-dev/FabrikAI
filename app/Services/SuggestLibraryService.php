@@ -264,11 +264,11 @@ class SuggestLibraryService
         if ($url === '' || str_starts_with($url, 'data:') || str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
             return null;
         }
-        $rel = ltrim(str_replace('\\', '/', parse_url($url, PHP_URL_PATH) ?: $url), '/');
-        $rel = preg_replace('#^(storage/)+#', '', $rel) ?? $rel;
-
-        $path = \Illuminate\Support\Facades\Storage::disk('public')->path($rel);
-        return is_file($path) ? $path : null;
+        // N2: đi qua helper containment DÙNG CHUNG (chặn segment '..' + charset whitelist +
+        // realpath containment trong public/ hoặc storage/app/public). Bản cũ tự ghép
+        // Storage::disk('public')->path($rel) nên '../' vẫn đi qua — đây là resolver thứ hai
+        // lệch chuẩn so với S1 đã vá.
+        return studio_safe_public_file((string) parse_url($url, PHP_URL_PATH));
     }
 
     /**

@@ -324,6 +324,35 @@ if (! function_exists('studio_safe_public_file')) {
     }
 }
 
+if (! function_exists('studio_generation_error')) {
+    /**
+     * Thông điệp lỗi ghi vào cột Generation.error (N8/N10). Cột này TRẢ CHO CLIENT qua
+     * StudioController::show(), nên KHÔNG được chứa message thô của provider/DB.
+     *
+     * - Luôn log đầy đủ (class + message + file:line) ở server để còn chẩn đoán.
+     * - APP_DEBUG=true  → giữ nguyên văn (dev cần thấy lỗi thật).
+     * - Production      → chỉ trả câu chung, không lộ chi tiết nội bộ.
+     *
+     * @param  string  $prefix  tiền tố giữ nguyên cho user (vd 'Render bị ngắt: ')
+     */
+    function studio_generation_error(\Throwable $e, string $prefix = ''): string
+    {
+        \Illuminate\Support\Facades\Log::error('Generation failed'.($prefix !== '' ? ' — '.trim($prefix) : ''), [
+            'exception' => get_class($e),
+            'message' => $e->getMessage(),
+            'at' => $e->getFile().':'.$e->getLine(),
+        ]);
+
+        if (config('app.debug')) {
+            return $prefix.$e->getMessage();
+        }
+
+        return $prefix !== ''
+            ? $prefix.'Vui lòng thử lại.'
+            : 'Xử lý thất bại. Vui lòng thử lại hoặc kiểm tra cài đặt API/model.';
+    }
+}
+
 if (! function_exists('studio_fetch_remote_bytes')) {
     /**
      * Tải nội dung từ URL REMOTE với guard SSRF dùng chung cho toàn module (S3 · N1 · N4):

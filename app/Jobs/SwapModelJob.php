@@ -63,7 +63,7 @@ class SwapModelJob implements ShouldQueue
             logger()->error('Swap job failed', ['generation_id' => $this->generationId, 'error' => $e->getMessage()]);
             $generation->update([
                 'status' => 'failed',
-                'error' => $e->getMessage(),
+                'error' => studio_generation_error($e),
                 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
             ]);
             // Credit đã trừ lúc tạo generation — thất bại phải hoàn (parity với Render jobs).
@@ -86,7 +86,7 @@ class SwapModelJob implements ShouldQueue
 
         $generation->update([
             'status' => 'failed',
-            'error' => 'Swap bị ngắt (worker timeout/vào failed_jobs): '.$e->getMessage(),
+            'error' => studio_generation_error($e, 'Swap bị ngắt (worker timeout/vào failed_jobs): '),
         ]);
         $this->refund($generation);
         logger()->warning('Swap job crashed (job failed)', [

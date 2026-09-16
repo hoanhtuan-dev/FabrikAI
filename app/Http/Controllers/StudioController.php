@@ -1371,7 +1371,7 @@ RULES:
                         app(StudioController::class)->executeSwapFromGeneration($generation);
                     } catch (\Throwable $e) {
                         logger()->error('Lazy swap failed for generation #'.$generation->id.': '.$e->getMessage());
-                        $generation->update(['status' => 'failed', 'error' => $e->getMessage()]);
+                        $generation->update(['status' => 'failed', 'error' => studio_generation_error($e)]);
                     }
                 }
             } else {
@@ -1384,7 +1384,7 @@ RULES:
                     }
                 } catch (\Throwable $e) {
                     logger()->error('Lazy process failed for generation #'.$generation->id.': '.$e->getMessage());
-                    $generation->update(['status' => 'failed', 'error' => $e->getMessage()]);
+                    $generation->update(['status' => 'failed', 'error' => studio_generation_error($e)]);
                 }
             }
         }
@@ -3482,7 +3482,10 @@ RULES:
                 return null;
             }
         }
-        if (! preg_match('#\.(jpe?g|png|webp|gif|svg|avif|mp4|webm|mov)$#i', $path)) {
+        // N5: KHÔNG cho 'svg' — endpoint này là PUBLIC và phục vụ bằng response()->file()
+        // (mime suy từ đuôi) nên SVG sẽ được render như document cùng origin → stored XSS.
+        // Đã kiểm tra: storage/app/public hiện không có file .svg nào.
+        if (! preg_match('#\.(jpe?g|png|webp|gif|avif|mp4|webm|mov)$#i', $path)) {
             return null;
         }
 

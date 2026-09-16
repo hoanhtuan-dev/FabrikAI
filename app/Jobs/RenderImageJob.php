@@ -131,7 +131,7 @@ class RenderImageJob implements ShouldQueue
                 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
             ]);
         } catch (\Throwable $e) {
-            $generation->update(['status' => 'failed', 'error' => $e->getMessage(), 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000)]);
+            $generation->update(['status' => 'failed', 'error' => studio_generation_error($e), 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000)]);
             $this->refund($generation);
             logger()->warning('Image generation failed', [
                 'generation_id' => $generation->id, 'total_s' => round(microtime(true) - $t0, 2),
@@ -156,7 +156,7 @@ class RenderImageJob implements ShouldQueue
 
         $generation->update([
             'status' => 'failed',
-            'error' => 'Render bị ngắt (worker timeout/vào failed_jobs): '.$e->getMessage(),
+            'error' => studio_generation_error($e, 'Render bị ngắt (worker timeout/vào failed_jobs): '),
         ]);
         $this->refund($generation);
         logger()->warning('Image generation crashed (job failed)', [

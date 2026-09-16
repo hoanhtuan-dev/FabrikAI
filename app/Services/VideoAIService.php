@@ -39,8 +39,10 @@ class VideoAIService
             }
         }
 
-        // No key configured -> stub (bundled demo video).
-        return '/samples/studio-catwalk.mp4';
+        // N9: trước đây trả '/samples/studio-catwalk.mp4' — file này KHÔNG tồn tại
+        // (public_html/samples chỉ có .jpg) nên generation báo 'completed' với media_url 404.
+        // Không có khoá thì phải báo lỗi rõ ràng để job mark failed + hoàn credit.
+        throw new \RuntimeException('Chưa cấu hình khoá DashScope/Qwen cho tạo video. Vào Cài đặt → API keys để thêm khoá.');
     }
 
     protected function callDashscopeVideo(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution, ?string $duration, string $key, ?int $generationId = null, ?string $modelOverride = null, ?string $provider = null): string
