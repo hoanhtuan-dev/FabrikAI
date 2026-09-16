@@ -972,17 +972,30 @@ if (! function_exists('studio_models')) {
         // [HIỆU NĂNG — vòng 20] cache 1 lần cho cả request: hàm này nằm trong đường legacy của
         // studio_task_group_models() nên bị gọi lặp khi resolve nhiều nhóm công việc (mỗi lượt là
         // 1 query `select * from studio_models` không điều kiện).
-        $rows = \Illuminate\Support\Facades\Cache::remember(
+        // ⚠️ Cache MẢNG THUẦN, không cache Eloquent Collection.
+        // [BUG PRODUCTION — phát hiện 2026-09-17 khi deploy] Bản cũ cache thẳng kết quả ->get()
+        // (một Illuminate\Database\Eloquent\Collection chứa model). Laravel KHÔNG hỗ trợ cache
+        // model/collection: khi ghi thì được, nhưng lần ĐỌC lại ném
+        //   "The script tried to call a method on an incomplete object. Please ensure that the class
+        //    definition Illuminate\Database\Eloquent\Collection ... was loaded before unserialize()"
+        // => GET /api/defaults trả 500 ở MỌI lần gọi thứ hai trở đi.
+        // Bộ test KHÔNG bắt được vì phpunit.xml đặt CACHE_STORE=array — store array giữ giá trị trong
+        // bộ nhớ, không serialize. Đã thêm StudioCacheSerializationTest dùng store CÓ serialize
+        // (database) để lỗi này không quay lại.
+        $rows = collect(\Illuminate\Support\Facades\Cache::remember(
             App\Models\StudioModel::CACHE_KEY_ALL,
             60,
             function () {
                 try {
-                    return App\Models\StudioModel::query()->orderByDesc('priority')->orderBy('id')->get();
+                    return App\Models\StudioModel::query()->orderByDesc('priority')->orderBy('id')
+                        ->get()
+                        ->map(fn ($m) => $m->toArray())   // mảng thuần -> serialize an toàn
+                        ->all();
                 } catch (\Throwable $e) {
-                    return collect();   // chưa migrate -> rơi xuống catalog hardcode bên dưới
+                    return [];   // chưa migrate -> rơi xuống catalog hardcode bên dưới
                 }
             }
-        );
+        ));
 
         if ($rows->isEmpty()) {
             $rows = collect(studio_model_catalog());
@@ -1175,6 +1188,8 @@ if (! function_exists('studio_task_group_models')) {
      */
     function studio_models_enabled_by_group()
     {
+        // ⚠️ Cùng lý do như studio_models(): trả về MẢNG THUẦN, không trả Eloquent Collection
+        // (cache collection -> lần đọc thứ hai ném "incomplete object ... unserialize()").
         return \Illuminate\Support\Facades\Cache::remember(
             \App\Models\StudioModel::CACHE_KEY,
             60,
@@ -1184,9 +1199,11 @@ if (! function_exists('studio_task_group_models')) {
                         ->where('enabled', true)
                         ->orderByDesc('priority')->orderBy('id')
                         ->get()
-                        ->groupBy('group');
+                        ->groupBy('group')
+                        ->map(fn ($g) => $g->map(fn ($m) => $m->toArray())->all())
+                        ->all();
                 } catch (\Throwable $e) {
-                    return collect();   // chưa migrate studio_models -> đường legacy lo tiếp
+                    return [];   // chưa migrate studio_models -> đường legacy lo tiếp
                 }
             }
         );
@@ -1230,8 +1247,9 @@ if (! function_exists('studio_task_group_models')) {
 
         // 2. Model Registry của nhóm — hình thức chính: gán model vào đúng vai trò.
         // Nạp MỘT lần rồi lọc theo nhóm (trước đây query lại cho MỖI nhóm — 21 query/request).
+        // $row là MẢNG (cache trả mảng thuần) — dùng truy cập mảng, không dùng -> như bản cũ.
         foreach (studio_models_enabled_by_group()[$group] ?? [] as $row) {
-            $add($row->provider, $row->model_id, $row->id, false, $row->name);
+            $add($row['provider'] ?? null, $row['model_id'] ?? null, $row['id'] ?? null, false, $row['name'] ?? null);
         }
 
         // 3. Legacy kế thừa (nhóm chưa đăng ký model nào) — pipeline cũ tiếp tục chạy.
