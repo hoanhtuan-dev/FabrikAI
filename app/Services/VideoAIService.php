@@ -39,10 +39,12 @@ class VideoAIService
             }
         }
 
-        // N9: trước đây trả '/samples/studio-catwalk.mp4' — file này KHÔNG tồn tại
-        // (public_html/samples chỉ có .jpg) nên generation báo 'completed' với media_url 404.
-        // Không có khoá thì phải báo lỗi rõ ràng để job mark failed + hoàn credit.
-        throw new \RuntimeException('Chưa cấu hình khoá DashScope/Qwen cho tạo video. Vào Cài đặt → API keys để thêm khoá.');
+        // N9 (đã vá): stub DEMO MODE khi chưa cấu hình khoá — giữ đúng quy ước của module
+        // (ImageAIService cũng dùng samples/*.jpg làm ảnh demo khi không có key).
+        // Lỗi cũ: file demo CHƯA TỪNG tồn tại (không có trong git history TrillfaShop) nên
+        // generation báo 'completed' với media_url 404. Nay đã ship
+        // public_html/samples/studio-catwalk.mp4 (4,5s · 640×640 · 168 KB, sinh bằng ffmpeg).
+        return '/samples/studio-catwalk.mp4';
     }
 
     protected function callDashscopeVideo(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution, ?string $duration, string $key, ?int $generationId = null, ?string $modelOverride = null, ?string $provider = null): string

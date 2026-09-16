@@ -1381,7 +1381,10 @@ RULES:
                     }
                 }
             } else {
-                $generation->update(['status' => 'processing']);
+                // KHÔNG set 'processing' ở đây. RenderImageJob/RenderVideoJob TỰ CAS
+                // pending->processing (handle() dòng ~40). Set trước như bản cũ làm CAS của job
+                // thất bại -> job return ngay -> generation kẹt 'processing' VĨNH VIỄN (bug thật,
+                // do CAS được thêm vào job trong đợt tách app; StudioInpaintTest bắt được).
                 try {
                     if ($generation->type === 'video') {
                         RenderVideoJob::dispatchSync($generation->id);
@@ -3538,8 +3541,16 @@ RULES:
     {
         $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
 
-        if ($stripImageRoute && str_starts_with($path, 'studio/image/')) {
-            $path = substr($path, strlen('studio/image/'));
+        // BUG PORT: route đã đổi /studio/image/{path} -> /api/image/{path} (helpers.php phát ra
+        // '/api/image/...') nhưng chỗ strip này vẫn so tiền tố 'studio/image/' -> URL do chính app
+        // phát ra KHÔNG resolve ngược lại được (StudioLocalFileContainmentTest bắt được).
+        if ($stripImageRoute) {
+            foreach (['api/image/', 'studio/image/'] as $prefix) {
+                if (str_starts_with($path, $prefix)) {
+                    $path = substr($path, strlen($prefix));
+                    break;
+                }
+            }
         }
 
         return $this->safeLocalFile($path);
@@ -4656,8 +4667,10 @@ RULES:
     public function processQueue()
     {
         // Swap generations are handled by SwapModelJob via the queue worker, not by this sync path.
+        // Chỉ lấy 'pending': mỗi job TỰ CAS pending->processing, nên row đã ở 'processing' sẽ bị
+        // CAS từ chối (job return ngay) nhưng vẫn bị $n++ đếm nhầm là "đã xử lý".
         $pending = auth()->user()->generations()
-            ->whereIn('status', ['pending', 'processing'])
+            ->where('status', 'pending')
             ->orderBy('id')->limit(10)->get()
             ->reject(fn ($g) => ($g->meta['swap'] ?? false) === true)
             ->take(5)->values();

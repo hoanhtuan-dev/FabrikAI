@@ -546,9 +546,13 @@ if (! function_exists('studio_image_thumb_url')) {
             return preg_match('#^[a-zA-Z0-9/_.\-]+$#', $path) ? '/api/image-thumb/'.$path : studio_image_url($image);
         }
         $path = ltrim((string) parse_url($image, PHP_URL_PATH), '/');
-        if (str_starts_with($path, 'studio/image/')) {
-            $p = substr($path, strlen('studio/image/'));
-            return preg_match('#^[a-zA-Z0-9/_.\-]+$#', $p) ? '/api/image-thumb/'.$p : ($image ?: null);
+        // BUG PORT: nhận cả tiền tố MỚI '/api/image/' (app phát ra) lẫn tiền tố cũ '/studio/image/'
+        // còn sót trong dữ liệu đã lưu (media_url của generation cũ).
+        foreach (['api/image/', 'studio/image/'] as $prefix) {
+            if (str_starts_with($path, $prefix)) {
+                $p = substr($path, strlen($prefix));
+                return preg_match('#^[a-zA-Z0-9/_.\-]+$#', $p) ? '/api/image-thumb/'.$p : ($image ?: null);
+            }
         }
         return null;
     }
