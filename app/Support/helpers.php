@@ -545,7 +545,38 @@ if (! function_exists('studio_vision_image_url')) {
     function studio_vision_image_url(string $url): string
     {
         // API vision cần URL công khai (http/https) — chuyển /storage/... thành absolute URL.
-        return str_starts_with($url, 'http') ? $url : url($url);
+        if (! str_starts_with($url, 'http')) {
+            return url($url);
+        }
+
+        // M07: trước đây nhận MỌI chuỗi bắt đầu bằng 'http' rồi forward thẳng cho provider
+        // (provider tự đi fetch) — kể cả URL nội bộ/không mong muốn. Nay chỉ cho host của chính
+        // app hoặc host trong allowlist studio.remote_image_hosts (dùng CHUNG với guard SSRF S3/N1).
+        // Đường bình thường không đổi: mọi ảnh swap đều là '/storage/studio/...' cục bộ
+        // (editImage -> storeRemoteImage) nên nhánh này chỉ là fallback.
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $appHost = strtolower((string) parse_url((string) config('app.url'), PHP_URL_HOST));
+        $ok = $appHost !== '' && $host === $appHost;
+
+        if (! $ok) {
+            foreach (array_filter(array_map('trim', explode(',', (string) studio_config('remote_image_hosts', '')))) as $allowed) {
+                $allowed = strtolower(ltrim($allowed, '.'));
+                if ($host === $allowed || str_ends_with($host, '.'.$allowed)) {
+                    $ok = true;
+                    break;
+                }
+            }
+        }
+
+        if (! $ok) {
+            \Illuminate\Support\Facades\Log::warning('studio_vision_image_url: chặn host ngoài allowlist', ['host' => $host]);
+
+            $path = (string) parse_url($url, PHP_URL_PATH);
+
+            return url($path !== '' ? $path : '/');
+        }
+
+        return $url;
     }
 }
 

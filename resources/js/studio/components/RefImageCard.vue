@@ -112,10 +112,10 @@ const activeBgPrompt = computed(() => { const p = presets.find(x => x.id === act
 
 // ── Góc chụp: 4 hướng camera (chỉ chế độ "Tạo ảnh mới") ──
 const anglePresets = [
-  { id: 'angle-front',  label: 'Chính diện', similarity: 70, prompt: 'keep the subject, garment and styling unchanged; shoot from a straight-on front view, eye-level camera, symmetrical framing, flat even studio lighting', svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><circle cx="17" cy="10" r="0.6"/>' },
-  { id: 'angle-back',  label: 'Mặt sau', similarity: 65, prompt: 'keep the subject, garment and styling unchanged; shoot from directly behind the subject (back view), eye-level camera, same lighting, full back of garment visible', svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M10 11l4 4"/><path d="M14 11l-4 4"/>' },
-  { id: 'angle-left45',  label: 'Nghiêng 45° trái', similarity: 62, prompt: 'keep the subject, garment and styling unchanged; shoot from a 45-degree three-quarter front-left angle, camera slightly to the left and slightly above eye level, same lighting and framing', svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M6 6l4 4"/><path d="M6 10h4V6"/>' },
-  { id: 'angle-right45',  label: 'Nghiêng 45° phải', similarity: 62, prompt: 'keep the subject, garment and styling unchanged; shoot from a 45-degree three-quarter front-right angle, camera slightly to the right and slightly above eye level, same lighting and framing', svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M18 6l-4 4"/><path d="M18 10h-4V6"/>' },
+  { id: 'angle-front',  label: 'Chính diện', similarity: 70, prompt: 'keep the subject, garment and styling unchanged; shoot from a straight-on front view, eye-level camera, symmetrical framing, flat even studio lighting', svg: [['p', 'M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'], ['c', '12', '13', '3'], ['c', '17', '10', '0.6']] },
+  { id: 'angle-back',  label: 'Mặt sau', similarity: 65, prompt: 'keep the subject, garment and styling unchanged; shoot from directly behind the subject (back view), eye-level camera, same lighting, full back of garment visible', svg: [['p', 'M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'], ['c', '12', '13', '3'], ['p', 'M10 11l4 4'], ['p', 'M14 11l-4 4']] },
+  { id: 'angle-left45',  label: 'Nghiêng 45° trái', similarity: 62, prompt: 'keep the subject, garment and styling unchanged; shoot from a 45-degree three-quarter front-left angle, camera slightly to the left and slightly above eye level, same lighting and framing', svg: [['p', 'M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'], ['c', '12', '13', '3'], ['p', 'M6 6l4 4'], ['p', 'M6 10h4V6']] },
+  { id: 'angle-right45',  label: 'Nghiêng 45° phải', similarity: 62, prompt: 'keep the subject, garment and styling unchanged; shoot from a 45-degree three-quarter front-right angle, camera slightly to the right and slightly above eye level, same lighting and framing', svg: [['p', 'M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'], ['c', '12', '13', '3'], ['p', 'M18 6l-4 4'], ['p', 'M18 10h-4V6']] },
 ];
 const activeAngle = ref(null);
 // Chỉ lưu lựa chọn + thông báo cho người dùng — KHÔNG nối text góc chụp vào ô prompt.
@@ -226,7 +226,15 @@ async function runRefgen() {
         <button v-for="a in anglePresets" :key="a.id" @click="applyAngle(a)"
                 class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
                 :class="activeAngle === a.id ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
-          <svg class="h-4 w-4 shrink-0 text-brand-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="a.svg"></svg>
+          <!-- M18: render primitives có cấu trúc thay vì v-html. a.svg trước đây là chuỗi markup
+               thô (hôm nay là hằng số trong file, nhưng thành XSS sink ngay khi dữ liệu này đến từ
+               API). Dạng mảng giữ ĐÚNG thứ tự hình vẽ nên hiển thị không đổi. -->
+          <svg class="h-4 w-4 shrink-0 text-brand-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <template v-for="(s, i) in a.svg" :key="i">
+              <path v-if="s[0] === 'p'" :d="s[1]" />
+              <circle v-else :cx="s[1]" :cy="s[2]" :r="s[3]" />
+            </template>
+          </svg>
           <span class="truncate">{{ a.label }}</span>
         </button>
       </div>
