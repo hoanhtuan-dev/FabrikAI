@@ -1130,10 +1130,25 @@ if (! function_exists('studio_model_catalog')) {
 if (! function_exists('studio_models')) {
     function studio_models(?string $group = null)
     {
-        $rows = App\Models\StudioModel::query()->get();
+        // [HIỆU NĂNG — vòng 20] cache 1 lần cho cả request: hàm này nằm trong đường legacy của
+        // studio_task_group_models() nên bị gọi lặp khi resolve nhiều nhóm công việc (mỗi lượt là
+        // 1 query `select * from studio_models` không điều kiện).
+        $rows = \Illuminate\Support\Facades\Cache::remember(
+            App\Models\StudioModel::CACHE_KEY_ALL,
+            60,
+            function () {
+                try {
+                    return App\Models\StudioModel::query()->orderByDesc('priority')->orderBy('id')->get();
+                } catch (\Throwable $e) {
+                    return collect();   // chưa migrate -> rơi xuống catalog hardcode bên dưới
+                }
+            }
+        );
+
         if ($rows->isEmpty()) {
             $rows = collect(studio_model_catalog());
         }
+
         return $group ? $rows->where('group', $group)->values() : $rows;
     }
 }
@@ -1319,6 +1334,25 @@ if (! function_exists('studio_task_group_models')) {
      *      (giữ mọi pipeline hiện có hoạt động nguyên vẹn).
      * Dedup theo provider:model. Trả về [] = [['provider','model','label','default','registry_id'], …]
      */
+    function studio_models_enabled_by_group()
+    {
+        return \Illuminate\Support\Facades\Cache::remember(
+            \App\Models\StudioModel::CACHE_KEY,
+            60,
+            function () {
+                try {
+                    return \App\Models\StudioModel::query()
+                        ->where('enabled', true)
+                        ->orderByDesc('priority')->orderBy('id')
+                        ->get()
+                        ->groupBy('group');
+                } catch (\Throwable $e) {
+                    return collect();   // chưa migrate studio_models -> đường legacy lo tiếp
+                }
+            }
+        );
+    }
+
     function studio_task_group_models(string $group): array
     {
         $groups = studio_task_groups();
@@ -1356,14 +1390,9 @@ if (! function_exists('studio_task_group_models')) {
         }
 
         // 2. Model Registry của nhóm — hình thức chính: gán model vào đúng vai trò.
-        try {
-            foreach (\App\Models\StudioModel::where('group', $group)->where('enabled', true)
-                ->orderByDesc('priority')->orderBy('id')->get() as $row
-            ) {
-                $add($row->provider, $row->model_id, $row->id, false, $row->name);
-            }
-        } catch (\Throwable $e) {
-            // Chưa migrate studio_models — bỏ qua, dùng legacy.
+        // Nạp MỘT lần rồi lọc theo nhóm (trước đây query lại cho MỖI nhóm — 21 query/request).
+        foreach (studio_models_enabled_by_group()[$group] ?? [] as $row) {
+            $add($row->provider, $row->model_id, $row->id, false, $row->name);
         }
 
         // 3. Legacy kế thừa (nhóm chưa đăng ký model nào) — pipeline cũ tiếp tục chạy.
