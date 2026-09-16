@@ -670,6 +670,11 @@ if (! function_exists('studio_api_key')) {
      */
     function studio_api_keys_for(?string $provider = null, ?string $model_id = null, ?string $group = null)
     {
+        // M17: lọc theo 'scopes' (mảng JSON) diễn ra TRONG BỘ NHỚ sau khi nạp hết key enabled.
+        // Chấp nhận có chủ đích: bảng studio_api_keys chỉ có vài chục dòng (mỗi provider 1-3 key),
+        // và đẩy điều kiện này xuống SQL sẽ cần JSON_CONTAINS (MySQL) hoặc json_each (SQLite) —
+        // phức tạp + khác hành vi giữa 2 hệ, không tương xứng với lợi ích ở quy mô này.
+        // Mở lại nếu số key vượt ~50 (khi đó nên thêm index đa trị cho scopes).
         $q = \App\Models\StudioApiKey::query()->where('enabled', true);
         if ($provider) $q->where('provider', $provider);
         $rows = $q->orderByDesc('priority')->orderBy('id')->get();
