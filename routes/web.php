@@ -18,9 +18,11 @@ use Illuminate\Support\Facades\Route;
 
 // ── Auth ──
 Route::get('/dang-nhap', [AuthController::class, 'showLogin'])->name('login');
-Route::post('/dang-nhap', [AuthController::class, 'login'])->name('login.store');
+// throttle:login — chống brute-force (5 lần/phút theo email+IP; xem AppServiceProvider).
+Route::post('/dang-nhap', [AuthController::class, 'login'])->middleware('throttle:login')->name('login.store');
 Route::get('/dang-ky', [AuthController::class, 'showRegister'])->name('register');
-Route::post('/dang-ky', [AuthController::class, 'register'])->name('register.store');
+// throttle:register — chống spam tạo tài khoản (5 lần/phút theo IP).
+Route::post('/dang-ky', [AuthController::class, 'register'])->middleware('throttle:register')->name('register.store');
 Route::post('/dang-xuat', [AuthController::class, 'logout'])->name('logout');
 
 // ── SPA pages (Blade shells) ──

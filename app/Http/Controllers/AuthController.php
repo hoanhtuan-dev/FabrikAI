@@ -28,8 +28,17 @@ class AuthController extends Controller
         ]);
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            // Không cần hit() thủ công: middleware throttle:login đã đếm MỌI request tới route này.
             return back()->withErrors(['email' => 'Thông tin đăng nhập không chính xác.']);
         }
+
+        // CỐ Ý KHÔNG "clear bộ đếm khi đăng nhập đúng" ở đây.
+        // Đã thử và ĐO LẠI: middleware throttle:login lưu bộ đếm dưới khoá
+        // md5($limiterName.$limitKey) (ThrottleRequests.php:134 — self::$shouldHashKeys), còn
+        // RateLimiter::clear(auth_throttle_key($request)) lại tra khoá THÔ -> xoá một khoá không tồn
+        // tại, tức bản "xoá bộ đếm" chỉ là no-op trang trí (và test đọc khoá thô nên PASS RỖNG).
+        // Muốn xoá đúng phải bám công thức md5 nội bộ — giòn theo phiên bản framework.
+        // Cửa sổ 5 lần/phút đã đủ rộng: gõ sai 3 lần rồi gõ đúng vẫn vào được (có test quan sát được).
 
         $request->session()->regenerate();
 

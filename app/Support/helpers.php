@@ -331,6 +331,20 @@ if (! function_exists('studio_safe_public_file')) {
     }
 }
 
+if (! function_exists('auth_throttle_key')) {
+    /**
+     * Khoá đếm cho rate limiter đăng nhập: EMAIL (chuẩn hoá) + IP.
+     *
+     * Dùng CHUNG giữa AppServiceProvider (định nghĩa limiter 'login') và AuthController (xoá bộ đếm
+     * khi đăng nhập thành công) — nếu hai bên tự tính khoá riêng thì việc xoá sẽ trượt và người dùng
+     * gõ sai vài lần rồi gõ đúng vẫn bị phạt.
+     */
+    function auth_throttle_key(\Illuminate\Http\Request $request): string
+    {
+        return mb_strtolower(trim((string) $request->input('email'))).'|'.$request->ip();
+    }
+}
+
 if (! function_exists('studio_is_unique_violation')) {
     /**
      * M03: nhận diện lỗi vi phạm ràng buộc UNIQUE của DB.
