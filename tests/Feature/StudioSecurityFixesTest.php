@@ -133,6 +133,51 @@ class StudioSecurityFixesTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_store_remote_image_enforces_host_allowlist(): void
+    {
+        Storage::fake('public');
+        set_setting('studio_remote_image_hosts', 'cdn.provider.example');
+        Http::fake(['*' => Http::response('bytes', 200)]);
+
+        // Host trong allowlist -> lưu được.
+        $this->assertNotNull($this->invokeStoreRemote('https://cdn.provider.example/a.png'));
+        // Subdomain của host trong allowlist cũng được.
+        $this->assertNotNull($this->invokeStoreRemote('https://img.cdn.provider.example/b.png'));
+        // Host ngoài allowlist -> null, và KHÔNG được gọi ra ngoài.
+        $this->assertNull($this->invokeStoreRemote('https://evil.example.org/c.png'));
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_store_remote_image_picks_extension_from_magic_bytes(): void
+    {
+        Storage::fake('public');
+
+        // storeRemoteImage lưu NGUYÊN định dạng provider trả về, chọn đuôi theo magic bytes —
+        // đuôi sai sẽ làm endpoint ảnh (whitelist theo đuôi) hoặc trình duyệt xử lý nhầm.
+        $png = "\x89PNG\r\n\x1a\n" . 'payload';
+        $jpg = "\xFF\xD8\xFF" . 'payload';
+
+        Http::fake(['*' => Http::sequence()->push($png, 200)->push($jpg, 200)]);
+
+        $a = $this->invokeStoreRemote('https://cdn.provider.example/a');
+        $b = $this->invokeStoreRemote('https://cdn.provider.example/b');
+
+        $this->assertNotNull($a);
+        $this->assertNotNull($b);
+        $this->assertStringEndsWith('.png', $a);
+        $this->assertStringEndsWith('.jpg', $b);
+
+        // Phải nằm dưới studio/ và file THẬT SỰ tồn tại trên disk.
+        $this->assertStringStartsWith('/storage/studio/', $a);
+        Storage::disk('public')->assertExists('studio/'.basename($a));
+        Storage::disk('public')->assertExists('studio/'.basename($b));
+    }
+
+    // (Cap 50 MiB của storeRemoteImage KHÔNG test ở đây: nó uỷ quyền cho studio_fetch_remote_bytes()
+    //  với tham số mặc định, và việc tạo chuỗi >50 MiB trong test rất tốn RAM. Hành vi cap đã được
+    //  phủ ở StudioRegressionFixesTest::test_fetch_remote_bytes_caps_size với ngưỡng nhỏ.)
+
     // ── S4: escape stub HTML ──────────────────────────────────────────────
 
     public function test_stub_description_escapes_user_and_ai_fields(): void
