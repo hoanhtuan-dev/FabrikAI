@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from './store.js';
 import { thumbUrl, onThumbError } from './composables/useStudioThumb.js';
 import GalleryModal from './components/GalleryModal.vue';
@@ -85,6 +85,9 @@ function ask(action) {
   confirmTimer = setTimeout(() => { confirmAction.value = ''; }, 5000);
 }
 function cancelConfirm() { confirmAction.value = ''; clearTimeout(confirmTimer); }
+// §5.2: trước đây KHÔNG clear timer khi unmount -> callback 5s còn sống sau khi rời trang
+// (gán vào ref của component đã hủy). GalleryModal đã làm đúng, LibraryApp thì chưa.
+onBeforeUnmount(() => clearTimeout(confirmTimer));
 async function runConfirm() {
   const a = confirmAction.value;
   confirmAction.value = '';

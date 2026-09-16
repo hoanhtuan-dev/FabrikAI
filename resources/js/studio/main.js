@@ -19,7 +19,14 @@ async function start() {
   // Nạp boot payload (user + trạng thái project) từ Laravel API TRƯỚC khi mount,
   // để store.js đọc window.__STUDIO_BOOT__ đồng bộ như ở bản Laravel cũ.
   await boot();
-  createApp(StudioApp).use(createPinia()).mount('#studio-root');
+  // §5.2: guard element — trước đây mount() vào selector không tồn tại sẽ ném lỗi khó đọc và
+  // không nói rõ nguyên nhân (blade thiếu #studio-root).
+  const el = document.querySelector('#studio-root');
+  if (!el) {
+    console.error('FabrikAI: không tìm thấy #studio-root — kiểm tra resources/views/studio/index.blade.php');
+    return;
+  }
+  createApp(StudioApp).use(createPinia()).mount(el);
 }
 
 start();

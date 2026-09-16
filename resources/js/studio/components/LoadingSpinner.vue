@@ -22,9 +22,13 @@ const hasProgress = computed(() => props.progress != null);
   <div :class="['flex select-none flex-col items-center', center ? 'absolute inset-0 justify-center' : 'py-4', sizeClasses.wrapper]">
     <!-- Dot-pulse: 3 dots với animation delay khác nhau -->
     <div class="flex items-center gap-1.5">
+      <!-- §5.2: animation TRƯỚC ĐÂY khai trong inline style trỏ tới keyframe ở <style scoped>.
+           Vue chỉ rewrite TÊN keyframe trong CSS declaration (postcss walkDecls), không đụng inline
+           style -> tên không khớp -> animation KHÔNG chạy. Dùng class (được rewrite đồng bộ), chỉ
+           để animationDelay inline. -->
       <span v-for="i in 3" :key="i" :class="[sizeClasses.dot]"
-            class="rounded-full bg-brand-400"
-            :style="{ animation: 'loadingPulse 1.4s ease-in-out infinite', animationDelay: (i - 1) * 0.2 + 's' }"></span>
+            class="dot-pulse rounded-full bg-brand-400"
+            :style="{ animationDelay: (i - 1) * 0.2 + 's' }"></span>
     </div>
 
     <!-- Text chính với shimmer effect -->
@@ -43,6 +47,10 @@ const hasProgress = computed(() => props.progress != null);
 </template>
 
 <style scoped>
+.dot-pulse {
+  animation: loadingPulse 1.4s ease-in-out infinite;
+}
+
 @keyframes loadingPulse {
   0%, 80%, 100% { opacity: 0.3; transform: scale(0.7); }
   40% { opacity: 1; transform: scale(1); }

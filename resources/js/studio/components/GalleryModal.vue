@@ -265,7 +265,9 @@ const filteredProjects = computed(() => {
 // ── Keyboard: Esc đóng · ←/→ chuyển ảnh (capture để ưu tiên khi modal mở) ──
 function onKey(e) {
   const t = e.target;
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  // §5.2: thiếu VIDEO -> khi ảnh tiêu điểm là video, ArrowLeft/Right bị preventDefault nên người
+  // dùng không tua được video trong modal.
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'VIDEO' || t.isContentEditable)) return;
   e.stopImmediatePropagation();
   if (e.key === 'Escape') {
     e.preventDefault();

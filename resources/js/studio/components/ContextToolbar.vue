@@ -1,12 +1,12 @@
 <script setup>
-import { computed } from 'vue';
+// §5.2: file không dùng API Vue nào trực tiếp (mọi state qua store) — bỏ import 'vue' thừa.
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
 
 const reframeRatios = ['1:1','3:4','4:5','9:16','16:9','2:3'];
 const looks = [['studio','Studio'],['warm','Ấm'],['cool','Lạnh'],['cinematic','Điện ảnh'],['dramatic','Dramatic'],['retro','Retro'],['mono','Mono']];
-const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.inpaintMaskBox.h || 0) >= 0.02);
+// §5.2: đã xóa computed hasBox — nó không được template dùng ở đâu (grep = 1, chính dòng khai báo).
 
 // ── Chuyên nghiệp: từng thông số = "pill" (icon + nhãn + slider + giá trị), giống Krita/PS ──
 const I = 'h-3.5 w-3.5';

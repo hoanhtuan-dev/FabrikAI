@@ -30,7 +30,9 @@ const statuses = computed(() => store.projectStatuses || {});
 const statusOrder = ['draft', 'in_progress', 'review', 'approved', 'archived'];
 
 const grouped = computed(() => {
-  const map = {};
+  // §5.2: object thường -> status '__proto__'/'constructor' là truthy nên map[key] trỏ vào
+  // prototype và .push() ném lỗi, vỡ cả board. Object.create(null) bỏ hẳn prototype.
+  const map = Object.create(null);
   for (const s of statusOrder) map[s] = [];
   for (const p of store.projects) {
     const key = map[p.status] ? p.status : 'draft';

@@ -17,7 +17,14 @@ async function runUpscale() {
       refine: Number(store.upscaleRefine) || 0,
       vibrance: Number(store.vibrance) || 0,
     });
-    store.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'upscale', provider: 'upscale', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa nâng cấp' });
+    // §5.2: trước đây hardcode status:'completed' + credits_cost:0, bỏ qua trạng thái/chi phí thật
+    // từ response -> item hiện "Hoàn tất" kể cả khi server trả trạng thái khác.
+    store.addGen({
+      id: d.generation_id, type: 'image', status: d.status || 'completed',
+      model: d.model || 'upscale', provider: d.provider || 'upscale',
+      media_url: d.media_url, error: d.error || null,
+      credits_cost: Number(d.credits_cost ?? 0), created_at: 'Vừa nâng cấp',
+    });
     afterUrl.value = d.media_url || '';
     store.toast('Đã nâng cấp ảnh (' + store.upscaleScale + 'x).');
   } catch (e) { store.toast(e.message || 'Lỗi nâng cấp ảnh.', 'error'); }

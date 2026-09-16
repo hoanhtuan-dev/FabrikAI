@@ -364,13 +364,15 @@ export const useStudioStore = defineStore('studio', {
       if (window.Alpine?.store?.('toast')) window.Alpine.store('toast').show(msg, type);
     },
     async loadDefaults() {
+      // §5.2: trước đây catch nuốt lỗi hoàn toàn (không log) -> /api/defaults fail thì người dùng
+      // chỉ thấy giá trị mặc định mà không có dấu vết nào để chẩn đoán.
       try {
         const cfg = await fetch('/api/defaults', { headers: { Accept: 'application/json' } });
         const defaults = await cfg.json();
         this._applyDefaultValues(defaults);
         this.defaultsLoaded = true;
         return defaults;
-      } catch (e) { /* keep current values */ return null; }
+      } catch (e) { console.error('studio loadDefaults failed', e); return null; }
       finally {
         // ƯU TIÊN local (luôn chạy, kể cả khi fetch defaults lỗi): khôi phục cài đặt prompt
         // người dùng đã lưu — ghi đè giá trị từ database.
@@ -443,7 +445,7 @@ export const useStudioStore = defineStore('studio', {
           const target = this.generations.find(g => g.id === idParam);
           if (target) this.select(target);
         }
-      } catch (e) { /* app data loads via Alpine too */ }
+      } catch (e) { console.error('studio load failed', e); }
     },
     select(g) { if (!g) return; this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; if (g.media_url) { this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id); this.setActiveLayer(String(g.id)); } },
     // Đảm bảo một kết quả swap được "in" vào layer canvas (id duy nhất, không trùng).
@@ -1959,7 +1961,19 @@ export const useStudioStore = defineStore('studio', {
       if (l.kind === 'gen' && l.genId) {
         const g = this.generations.find((x) => x.id === l.genId);
         if (g) { g.meta = Object.assign({}, g.meta || {}, { name: n }); }
-        fetch('/api/generations/' + l.genId + '/rename', { method: 'POST', headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ name: n }) }).catch(() => {});
+        // §5.2: trước đây .catch(() => {}) nuốt lỗi rồi VẪN toast "Đã đổi tên layer." — UI báo
+        // thành công kể cả khi server không lưu (hết phiên / 500). Nay phản ánh đúng kết quả.
+        fetch('/api/generations/' + l.genId + '/rename', { method: 'POST', headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ name: n }) })
+          .then((r) => {
+            this.saveLayerLayout();
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            this.toast('Đã đổi tên layer.');
+          })
+          .catch((e) => {
+            console.error('studio rename generation failed', e);
+            this.toast('Đã đổi tên trên canvas nhưng CHƯA lưu được lên máy chủ — thử lại sau khi tải lại trang.', 'error');
+          });
+        return;
       }
       this.saveLayerLayout();
       this.toast('Đã đổi tên layer.');
@@ -2838,7 +2852,18 @@ export const useStudioStore = defineStore('studio', {
     pollGeneration(id, opts = {}) {
       const autoSelect = opts.select !== false;
       if (this._pollTimers[id]) return;
+      // §5.2: trước đây poll 500ms KHÔNG có trần — generation kẹt 'processing' (job bị giết,
+      // worker không chạy) sẽ poll vô hạn, tốn request và không bao giờ dừng. Nay có trần 10 phút
+      // (backend tự "heal" job kẹt sau 6-8 phút, nên 10 phút là đủ rộng).
+      const startedAt = Date.now();
+      const MAX_POLL_MS = 10 * 60 * 1000;
       const tick = async () => {
+        if (Date.now() - startedAt > MAX_POLL_MS) {
+          delete this._pollTimers[id];
+          console.error('studio pollGeneration: quá thời gian theo dõi', id);
+          this.toast('Quá 10 phút chưa có kết quả — đã dừng theo dõi. Bấm "Xử lý ngay" hoặc tải lại trang để cập nhật.', 'error');
+          return;
+        }
         try {
           const res = await fetch('/api/generations/' + id, { headers: { Accept: 'application/json' } });
           if (!res.ok) { delete this._pollTimers[id]; return; }
