@@ -39,7 +39,11 @@ class CleanStudioStorage extends Command
         $disk = Storage::disk('public');
         $dir = 'studio';
         $protectedDirs = ['studio/dang-nguoi-mau', 'studio/khuon-mat', 'studio/assets', 'studio/ref', 'studio/logo'];
-        $protectedPrefixes = ['background-', 'ref/'];
+        // Tiền tố được so với basename() nên CHỈ dùng được loại "tên file bắt đầu bằng ...".
+        // Trước đây danh sách có thêm 'ref/' — mục này KHÔNG BAO GIỜ khớp vì basename() đã bỏ phần
+        // thư mục (không còn '/'), tức một lớp bảo vệ chết gây hiểu nhầm. Việc bảo vệ studio/ref/
+        // đã do $protectedDirs đảm nhiệm (so trên ĐƯỜNG DẪN ĐẦY ĐỦ).
+        $protectedPrefixes = ['background-'];
 
         $deleted = 0; $bytes = 0; $orphan = 0; $skipped = 0;
         $files = $disk->allFiles($dir);
