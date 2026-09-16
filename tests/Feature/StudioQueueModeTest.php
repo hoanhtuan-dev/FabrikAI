@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Jobs\RenderImageJob;
 use App\Jobs\RenderVideoJob;
-use App\Jobs\SwapModelJob;
 use App\Models\Generation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -110,20 +109,8 @@ class StudioQueueModeTest extends TestCase
         $this->assertSame('pending', $g->fresh()->status);
     }
 
-    public function test_queue_worker_mode_enqueues_the_swap_job_for_swap_generations(): void
-    {
-        config(['studio.queue_worker' => true]);
-        Queue::fake();
-
-        // Swap đi đường riêng (SwapModelJob), không qua RenderImageJob.
-        $g = $this->generation(['status' => 'pending', 'meta' => ['swap' => true]]);
-
-        $this->actingAs($this->admin())->getJson('/api/generations/'.$g->id)->assertOk();
-
-        Queue::assertPushed(SwapModelJob::class);
-        Queue::assertNotPushed(RenderImageJob::class);
-        $this->assertSame('pending', $g->fresh()->status);
-    }
+    // (test_queue_worker_mode_enqueues_the_swap_job_for_swap_generations đã bị GỠ 2026-09-17 cùng
+    //  card "Thay người mẫu": SwapModelJob và đường swap không còn tồn tại.)
 
     public function test_generation_is_enqueued_at_creation_not_only_on_poll(): void
     {
@@ -164,16 +151,16 @@ class StudioQueueModeTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    public function test_video_and_swap_generations_are_enqueued_at_creation_too(): void
+    public function test_video_generations_are_enqueued_at_creation_too(): void
     {
         config(['studio.queue_worker' => true]);
         Queue::fake();
 
         $this->generation(['type' => 'video', 'status' => 'pending']);
-        $this->generation(['type' => 'image', 'status' => 'pending', 'meta' => ['swap' => true]]);
+        $this->generation(['type' => 'image', 'status' => 'pending']);
 
         Queue::assertPushed(RenderVideoJob::class, 1);
-        Queue::assertPushed(SwapModelJob::class, 1);
+        Queue::assertPushed(RenderImageJob::class, 1);
     }
 
     public function test_fresh_pending_generation_is_not_processed_inline_in_queue_mode(): void

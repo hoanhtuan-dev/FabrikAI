@@ -49,16 +49,14 @@ return [
     'stylist_model' => env('STUDIO_STYLIST_MODEL', 'qwen3.8-flash'), // Model ✨ Thuật sỹ ảo (Qwen multimodal trước)
     'swap_model' => env('STUDIO_SWAP_MODEL', ''), // '' = dùng chung qwen_edit_model (giống Inpaint: qwen-image-edit-max)
     'swap_candidates' => (int) env('STUDIO_SWAP_CANDIDATES', 1), // 1 = nhanh; 2-3 = chọn bản đẹp nhất (chậm hơn)
-    'swap_superres_scale' => (int) env('STUDIO_SWAP_SUPERRES_SCALE', 2), // upscale 2x/4x trước khi trả kết quả
     'swap_pose_image' => (bool) env('STUDIO_SWAP_POSE_IMAGE', false), // pose dùng MÔ TẢ (không gửi ảnh) — tránh crop/biến dạng
     'swap_face_inline' => (bool) env('STUDIO_SWAP_FACE_INLINE', true),  // true = 1 pass (mặt + đồ, 2 ảnh) — ổn định, mặc đúng mẫu
-    'swap_superres' => (bool) env('STUDIO_SWAP_SUPERRES', false),          // upscale image-super-resolution (KHÔNG có trên host intl => mặc định tắt)
-    'swap_face_enhance' => (bool) env('STUDIO_SWAP_FACE_ENHANCE', false),  // face-image-enhance (mặc định tắt)
-    'swap_moderation' => (bool) env('STUDIO_SWAP_MODERATION', false),      // image-moderation (mặc định tắt)
-    'swap_qa' => (bool) env('STUDIO_SWAP_QA', true),                        // QA scoring (qwen3.8-flash — bật mặc định, fail êm khi rate-limit)
-    'swap_enabled' => (bool) env('STUDIO_SWAP_ENABLED', false),          // TẠM ẨN tính năng Thay Đổi Người Mẫu (chưa hiệu quả, tốn nguồn lực)
+    // (Đã gỡ 2026-09-17 cùng card "Thay người mẫu": swap_superres_scale · swap_superres ·
+    //  swap_face_enhance · swap_moderation · swap_qa · swap_enabled · swap_brighten — chúng chỉ được
+    //  đọc trong swapModel()/executeSwapFromGeneration() vừa bị xoá. Các key swap_model ·
+    //  swap_candidates · swap_pose_image · swap_face_inline VẪN DÙNG vì VirtualTryOnService (đường
+    //  refgen/try-on của Fitting Room) đọc chúng.)
     'faceswap_prompt' => env('STUDIO_FACESWAP_PROMPT', 'Face swap (NOT a photo overlay): replace the face of @image1 with the face in @image2. Generate a NEW natural face matching @image2 identity, hairstyle, facial features, ears and head proportions — do NOT paste/overlay the photo. Make the new head about 80% the size of the original head — smaller and naturally proportionate, never enlarged or distorted. Blend skin tone, hairline and lighting seamlessly. Keep garment, pose, body, background unchanged.'),
-    'swap_brighten' => (bool) env('STUDIO_SWAP_BRIGHTEN', false),          // kéo sáng chủ thể tối (có thể lệch màu đồ) → mặc định TẮT
     'image_model' => env('STUDIO_IMAGE_MODEL', 'flux-1.1-schnell'),
     'wan_model' => env('STUDIO_WAN_MODEL', 'wan2.7-image-pro'),
     'qwen_model' => env('STUDIO_QWEN_MODEL', 'qwen-image-3.0-pro'),

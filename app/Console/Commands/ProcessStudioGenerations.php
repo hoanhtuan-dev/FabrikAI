@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Jobs\RenderImageJob;
 use App\Jobs\RenderVideoJob;
-use App\Jobs\SwapModelJob;
 use App\Models\Generation;
 use Illuminate\Console\Command;
 
@@ -77,10 +76,7 @@ class ProcessStudioGenerations extends Command
 
         $n = 0;
         foreach ($pending as $generation) {
-            if (($generation->meta['swap'] ?? false) === true) {
-                // Swap cũng là job CAS-claim pending→processing — dispatchSync chạy inline an toàn.
-                SwapModelJob::dispatchSync($generation->id);
-            } elseif ($generation->type === 'video') {
+            if ($generation->type === 'video') {
                 RenderVideoJob::dispatchSync($generation->id);
             } else {
                 RenderImageJob::dispatchSync($generation->id);

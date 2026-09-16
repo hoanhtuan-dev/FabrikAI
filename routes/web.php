@@ -62,7 +62,6 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->gr
     // Generation pipelines
     Route::post('/generate', [StudioController::class, 'generate'])->name('generate');
     Route::post('/video', [StudioController::class, 'renderVideo'])->name('video');
-    Route::post('/swap-model', [StudioController::class, 'swapModel'])->name('swapModel');
     Route::get('/swap-models', [StudioController::class, 'swapCatalog'])->defaults('kind', 'models')->name('swap-models');
     Route::get('/swap-poses', [StudioController::class, 'swapCatalog'])->defaults('kind', 'poses')->name('swap-poses');
     Route::get('/swap-backgrounds', [StudioController::class, 'swapBackgrounds'])->name('swap-backgrounds');
@@ -86,11 +85,8 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->gr
     Route::get('/outfit-settings', [StudioController::class, 'outfitSettings'])->name('outfit-settings');
     Route::post('/outfit-settings', [StudioController::class, 'saveOutfitSettings'])->name('outfit-settings.save');
     Route::post('/remove-bg', [StudioController::class, 'removeBackground'])->name('remove-bg');
-    Route::post('/face-swap', [StudioController::class, 'faceSwap'])->name('face-swap');
     Route::post('/generations/{generation}/region', [StudioController::class, 'regionEdit'])->name('region');
     Route::post('/process', [StudioController::class, 'processQueue'])->name('process');
-    Route::post('/pattern', [StudioController::class, 'pattern'])->name('pattern.generate');
-    Route::post('/tryon', [StudioController::class, 'tryon'])->name('tryon.generate');
     // Library (generated assets) + uploads
     Route::get('/library/data', [StudioController::class, 'libraryData'])->name('library.data');
     Route::post('/library/scan', [StudioController::class, 'libraryScan'])->name('library.scan');

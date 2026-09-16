@@ -152,7 +152,7 @@ const modelForm = ref({ group: 'image', name: '', provider: '', model_id: '', ap
 const modelSaving = ref(false);
 const editingModel = ref(null);
 const modelEdit = ref(null);
-const groupLabels = { image: 'Tạo ảnh 2D', edit: 'Sửa ảnh (edit)', video: 'Video', swap: 'Thay người mẫu', vision: 'Đọc ảnh (vision)', prompt: 'Suy luận prompt', translate: 'Dịch prompt', inference: 'Suy luận (cũ)', text: 'Ngôn ngữ (cũ)' };
+const groupLabels = { image: 'Tạo ảnh 2D', edit: 'Sửa ảnh (edit)', video: 'Video', swap: 'Thử đồ (Fitting Room)', vision: 'Đọc ảnh (vision)', prompt: 'Suy luận prompt', translate: 'Dịch prompt', inference: 'Suy luận (cũ)', text: 'Ngôn ngữ (cũ)' };
 const taskGroups = computed(() => data.value?.task_groups || {});
 const taskGroupKeys = computed(() => Object.keys(taskGroups.value));
 const modelsByGroup = computed(() => {
@@ -414,7 +414,7 @@ async function clearTaskDefault(g) {
             <h2 class="font-display text-base font-semibold text-ink-900">🤖 Model Registry</h2>
             <p class="text-xs text-ink-500">{{ models.length }} model. <b>Vai trò (group)</b> quyết định model thuộc nhóm công việc nào — xem tab 🎯 Nhóm công việc.</p>
           </div>
-          <p class="mt-1 text-xs text-ink-500">Vai trò: <b>image</b> = tạo ảnh · <b>edit</b> = sửa ảnh · <b>video</b> · <b>swap</b> = thay người mẫu · <b>vision</b> = đọc ảnh · <b>prompt</b> = suy luận · <b>translate</b> = dịch. Thứ tự dùng: default nhóm (tab 🎯) → model theo ưu tiên giảm dần.</p>
+          <p class="mt-1 text-xs text-ink-500">Vai trò: <b>image</b> = tạo ảnh · <b>edit</b> = sửa ảnh · <b>video</b> · <b>swap</b> = thử đồ / ghép người mẫu · <b>vision</b> = đọc ảnh · <b>prompt</b> = suy luận · <b>translate</b> = dịch. Thứ tự dùng: default nhóm (tab 🎯) → model theo ưu tiên giảm dần.</p>
 
           <div class="mt-4 space-y-4">
             <div v-for="(rows, g) in modelsByGroup" :key="g">

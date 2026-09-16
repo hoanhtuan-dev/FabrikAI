@@ -522,8 +522,7 @@ class ProjectControllerTest extends TestCase
         $endpoints = [
             ['/api/generate', ['prompt' => 'test', 'project_id' => $foreign->id]],
             ['/api/video', ['prompt' => 'test', 'project_id' => $foreign->id]],
-            ['/api/pattern', ['prompt' => 'test', 'project_id' => $foreign->id]],
-            ['/api/tryon', ['prompt' => 'test', 'project_id' => $foreign->id]],
+            // (/api/pattern và /api/tryon đã bị gỡ 2026-09-17 cùng 2 card Pattern Maker và Try-On.)
         ];
         foreach ($endpoints as [$url, $payload]) {
             $res = $this->postJson($url, $payload);

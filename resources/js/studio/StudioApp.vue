@@ -5,7 +5,6 @@ import SuggestCard from './components/SuggestCard.vue';
 import ConceptCard from './components/ConceptCard.vue';
 import StylistCard from './components/StylistCard.vue';
 import UpscaleCard from './components/UpscaleCard.vue';
-import SwapCard from './components/SwapCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
 import ComposeCard from './components/ComposeCard.vue';
 import RefImageCard from './components/RefImageCard.vue';
@@ -13,8 +12,6 @@ import RegionTools from './components/RegionTools.vue';
 import CanvasMaskTools from './components/CanvasMaskTools.vue';
 import ContextToolbar from './components/ContextToolbar.vue';
 import DirectorCard from './components/DirectorCard.vue';
-import PatternCard from './components/PatternCard.vue';
-import TryOnCard from './components/TryOnCard.vue';
 import SourcePanel from './components/SourcePanel.vue';
 import SourcePickerPopup from './components/SourcePickerPopup.vue';
 import OutputModule from './components/OutputModule.vue';
@@ -44,9 +41,9 @@ const activityNav = [
   { id: 'compose', icon: 'layers', label: 'Ghép ảnh', cards: [ComposeCard] },
   { id: 'upscale', icon: 'maximize', label: 'Upscale', cards: [UpscaleCard] },
   { id: 'director', icon: 'film', label: 'Kịch bản quay', cards: [DirectorCard] },
-  { id: 'pattern', icon: 'grid', label: 'Pattern', cards: [PatternCard] },
-  { id: 'tryon', icon: 'user', label: 'Try-On', cards: [TryOnCard] },
-  { id: 'swap', icon: 'swapHorizontal', label: 'Thay người mẫu', cards: [SwapCard] },
+  // (Đã gỡ 3 activity 2026-09-17: 'pattern' Pattern Maker · 'tryon' Virtual Try-On ·
+  //  'swap' Thay người mẫu — xem STUDIO_REVIEW_PROGRESS.md. Chip "thay khuôn mặt" trong
+  //  ComposeCard cũng đã gỡ theo.)
 ];
 const activeActivity = ref('concept');
 const menuOpen = ref(false);

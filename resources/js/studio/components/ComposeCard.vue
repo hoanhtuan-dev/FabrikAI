@@ -20,7 +20,9 @@ const previewDirty = ref(false);
 const previewAxes = ref([]);
 const stylePresets = ref([]);   // preset phong cách (lưu database theo tài khoản)
 const presetName = ref('');
-const mode = ref('compose'); // 'compose' | 'faceswap' | 'outfit'
+// 'compose' = ghép tự do · 'outfit' = ghép trang phục.
+// (Chế độ 'faceswap' — chip "Thay mặt" — đã bị GỠ 2026-09-17 theo yêu cầu; card vẫn giữ nguyên.)
+const mode = ref('compose');
 const open = ref(false);
 const selected = ref([null, null, null]); // 3 slot cố định: image object hoặc null
 const targetSlot = ref(0);  // slot đang chọn trong popup
@@ -80,11 +82,9 @@ function makeBase(i) {
 function roleLabel(i) { return '@image' + (i + 1); }
 
 // Vai trò slot theo chế độ
-const slotRoles = computed(() => mode.value === 'faceswap'
-  ? ['Người mẫu', 'Khuôn mặt', 'Ảnh ghép (tùy chọn)']
-  : mode.value === 'outfit'
-    ? ['Trang phục 1', 'Trang phục 2', 'Bối cảnh (tùy chọn)']
-    : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
+const slotRoles = computed(() => mode.value === 'outfit'
+  ? ['Trang phục 1', 'Trang phục 2', 'Bối cảnh (tùy chọn)']
+  : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
 
 // Vòng viền màu theo vai trò slot
 const slotRingClass = 'border-brand-500';
@@ -92,21 +92,13 @@ const slotRingEmptyClass = 'border-dashed border-ink-700 hover:border-brand-400'
 
 const promptPlaceholder = computed(() => mode.value === 'outfit'
   ? 'VD: lai tạo trang phục từ phom dáng của @image1 và màu sắc của @image2…'
-  : mode.value === 'faceswap'
-    ? 'VD: thay khuôn mặt @image2 vào người mẫu @image1…'
-    : 'VD: giữ nguyên @image1, đặt cô gái trong @image2 vào nền studio…');
+  : 'VD: giữ nguyên @image1, đặt cô gái trong @image2 vào nền studio…');
 
 function setMode(m) {
-  if (m === 'faceswap') setFaceSwap();
-  else if (m === 'outfit') setOutfit();
+  if (m === 'outfit') setOutfit();
   else setCompose();
 }
 
-function setFaceSwap() {
-  mode.value = 'faceswap';
-  prompt.value = 'thay khuôn mặt của @image1 bằng khuôn mặt trong @image2, giữ nguyên dáng, trang phục, bối cảnh';
-  store.toast('Thay khuôn mặt: @image1 = người mẫu, @image2 = khuôn mặt, @image3 = ảnh ghép (tùy chọn).');
-}
 function setOutfit() {
   mode.value = 'outfit';
   prompt.value = 'lai tạo trang phục mới từ @image1 và @image2: hòa trộn các đặc điểm nổi bật của cả hai (phom dáng, chất liệu, màu sắc, chi tiết) thành biến thể thời trang mới, đúng chuẩn thiết kế thời trang chuyên nghiệp';
@@ -228,16 +220,11 @@ function saveSettings() {
     <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="puzzle" /> Ghép ảnh</h2>
 
     <!-- Chọn chế độ: segmented tabs 1 hàng (lean) -->
-    <div class="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-white/10 bg-ink-900/60 p-1">
+    <div class="mt-3 grid grid-cols-2 gap-1 rounded-lg border border-white/10 bg-ink-900/60 p-1">
       <button @click="setMode('compose')" title="Ghép tự do: hòa trộn nhiều ảnh"
               :class="mode === 'compose' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
               class="flex flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
         <StudioIcon name="layers" size="h-4 w-4" /> Ghép tự do
-      </button>
-      <button @click="setMode('faceswap')" title="Thay khuôn mặt người mẫu"
-              :class="mode === 'faceswap' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
-              class="flex flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
-        <StudioIcon name="user" size="h-4 w-4" /> Thay mặt
       </button>
       <button @click="setMode('outfit')" title="Ghép Trang Phục: lai tạo biến thể từ 2 trang phục"
               :class="mode === 'outfit' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
@@ -247,9 +234,6 @@ function saveSettings() {
     </div>
 
     <!-- Hướng dẫn slot theo chế độ -->
-    <p v-if="mode === 'faceswap'" class="mt-2 rounded-md border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
-      @image1 = người mẫu · @image2 = khuôn mặt · @image3 = ảnh ghép (tùy chọn)
-    </p>
     <p v-if="mode === 'outfit'" class="mt-2 rounded-md border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
       @image1 + @image2 = trang phục nguồn · @image3 = bối cảnh (tùy chọn) — lai tạo biến thể mới
     </p>

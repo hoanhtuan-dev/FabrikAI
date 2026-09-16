@@ -77,7 +77,6 @@ class StudioController extends Controller
     public function stylistDataPage() { return view('studio.stylist-data'); }
 
 
-
     // storeProject() đã bị loại bỏ (finding: duplicate endpoint với validation yếu hơn
     // ProjectController::store). Route POST /studio/projects nay trỏ về ProjectController::store.
 
@@ -442,32 +441,7 @@ class StudioController extends Controller
         return '/storage/'.$name;
     }
 
-    /**
-     * i2i — Ghép (thay thế) khuôn mặt cho người mẫu.
-     * Ảnh gốc (image) + ảnh khuôn mặt tham chiếu (face) → editImage dùng face_ref.
-     */
-    public function faceSwap(Request $request)
-    {
-        $data = $request->validate([
-            'image' => ['required', 'string', 'max:2048'],
-            'face' => ['required', 'string', 'max:2048'],
-        ]);
-
-        $finalPrompt = 'Swap the ENTIRE head — face, hairstyle, ears, forehead, jawline and neck — with the reference face photo. '
-            .'Match the reference face\'s identity, hairstyle, facial features, ears and head proportions exactly. '
-            .'Scale the new head/face to fit the ORIGINAL head size and body proportions naturally — do NOT enlarge, stretch or distort the head/face. '
-            .'Blend skin tone, hairline and lighting seamlessly with the original body and background. '
-            .'Keep the garment, pose, body, background and composition exactly unchanged. Sharp, realistic, no blur, no artifacts, no distortion.';
-
-        $cost = (int) studio_config('image_credits', 1);
-
-        return $this->queueGeneration('image', [
-            'prompt' => $finalPrompt,
-            'base_image' => $this->downscaleSource((string) $data['image'], 1600),
-            'edit' => true,
-            'face_ref' => (string) $data['face'],
-        ], $cost);
-    }
+    
 
     /**
      * Đọc ảnh khuôn mặt bằng vision model → mô tả chi tiết (hỗ trợ face swap).
@@ -1380,21 +1354,6 @@ RULES:
     {
         set_time_limit(600);
         ignore_user_abort(true);
-
-        if (($generation->meta['swap'] ?? false) === true) {
-            // Swap: CAS claim pending->processing rồi chạy pipeline inline — không phụ thuộc queue worker.
-            $claimed = Generation::where('id', $generation->id)->where('status', 'pending')->update(['status' => 'processing']);
-            if ($claimed) {
-                try {
-                    app(StudioController::class)->executeSwapFromGeneration($generation);
-                } catch (\Throwable $e) {
-                    logger()->error('Lazy swap failed for generation #'.$generation->id.': '.$e->getMessage());
-                    $generation->update(['status' => 'failed', 'error' => studio_generation_error($e)]);
-                }
-            }
-
-            return;
-        }
 
         // KHÔNG set 'processing' ở đây. RenderImageJob/RenderVideoJob TỰ CAS pending->processing
         // (handle() dòng ~40). Set trước như bản cũ làm CAS của job thất bại -> job return ngay ->
@@ -3293,189 +3252,9 @@ RULES:
         return '/storage/'.$name;
     }
 
-    /**
-     * "Thay Đổi Người Mẫu" (Click-to-Swap) — virtual try-on with a chosen model + pose.
-     */
-    public function swapModel(Request $request)
-    {
-        if (! studio_config('swap_enabled', false)) {
-            return response()->json(['message' => 'Tính năng Thay Đổi Người Mẫu đang tạm tắt.'], 403);
-        }
+    
 
-        $data = $request->validate([
-            'image' => ['required', 'string', 'max:2048'],   // design image URL (generation media_url or /storage)
-            'model_id' => ['nullable', 'string', 'max:80'],   // bắt buộc khi change_face=true
-            'change_face' => ['nullable', 'boolean'],            // true = đổi khuôn mặt theo người mẫu; false/mặc định = giữ khuôn mặt gốc
-            'pose_id' => ['required', 'string', 'max:80'],
-            'background' => ['nullable', 'string', 'max:400'],
-            'tone' => ['nullable', 'string', 'max:20'],     // Hiệu ứng tông màu (auto/warm/cool/film/cinematic/dramatic/mono/none)
-            'pose_ref' => ['nullable', 'string', 'max:2048'], // pose reference image URL (picker thumbnail; not sent to the model)
-        ]);
-
-        $svc = app(\App\Services\VirtualTryOnService::class);
-        $changeFace = (bool) ($data['change_face'] ?? false);
-        $model = $changeFace ? $svc->pickModel((string) $data['model_id']) : null;
-        $pose = $svc->pickPose($data['pose_id']);
-        if ($changeFace && ! $model) {
-            return response()->json(['message' => 'Không tìm thấy người mẫu.'], 422);
-        }
-        if (! $pose) {
-            return response()->json(['message' => 'Không tìm thấy dáng.'], 422);
-        }
-        if ($model) {
-            logger()->info('Swap face resolved', ['model_id' => $data['model_id'], 'name' => $model['name'], 'image' => $model['image'] ?? null]);
-        }
-
-        // Pose reference image: prefer the client-sent one, fall back to the pose catalog image
-        // (custom asset / DB preset / built-in sample) so the model can actually replicate the pose.
-        $poseRefUrl = (string) ($data['pose_ref'] ?? '') ?: (string) ($pose['image'] ?? '');
-        $swapModel = studio_swap_model();
-
-        // The long AI pipeline (try-on + optional face-swap, ~1-3 min per pose) runs in the background
-        // queue (SwapModelJob) so this request returns immediately — a synchronous 2-pass swap gets
-        // cut by the hosting proxy timeout ("chạy lâu không thấy kết quả").
-        $gen = auth()->user()->generations()->create([
-            'type' => 'image', 'status' => 'pending',
-            'prompt' => 'Thay đổi người mẫu · '.($changeFace ? ($model['name'] ?? 'model') : 'giữ nguyên khuôn mặt').' · '.($pose['name'] ?? 'pose'),
-            'model' => $swapModel, 'provider' => 'qwen', 'credits_cost' => 1,
-            'meta' => [
-                'swap' => true,
-                'image' => $data['image'],
-                'model_id' => $data['model_id'],
-                'pose_id' => $data['pose_id'],
-                'model_name' => $model['name'] ?? null,
-                'pose_name' => $pose['name'] ?? null,
-                'change_face' => $changeFace,
-                'face_ref' => $changeFace && (bool) ($model['image'] ?? null),
-                'pose_ref' => $poseRefUrl,
-                'background' => (string) ($data['background'] ?? ''),
-                'tone' => (string) ($data['tone'] ?? 'none'),
-            ],
-        ]);
-
-        // M01: trừ credit ngay lúc tạo — SwapModelJob giả định đúng điều này khi hoàn tiền
-        // ("Credit đã trừ lúc tạo generation — thất bại phải hoàn", SwapModelJob.php:69).
-        // Trước đây swapModel() KHÔNG đi qua queueGeneration() và KHÔNG trừ gì, nên hoàn tiền khi
-        // lỗi là CỘNG THÊM credit, còn credits_left/studio_usage() thì báo thiếu.
-        // Giữ đúng chính sách của queueGeneration(): tool nội bộ, không chặn cứng theo credit,
-        // chỉ trừ để theo dõi (số dư có thể âm).
-        auth()->user()->decrement('credits_balance', (int) ($gen->credits_cost ?: 1));
-
-        \App\Jobs\SwapModelJob::dispatch($gen->id);
-
-        return response()->json(['generation_id' => $gen->id, 'status' => 'pending', 'provider' => 'qwen', 'model' => $swapModel, 'task_id' => null]);
-    }
-
-    /**
-     * Run the swap AI pipeline for a queued generation (called by SwapModelJob in the background).
-     * Validates the references, runs try-on (+ optional face-swap), post-process, tone, then stores
-     * the finished result on the generation row.
-     */
-    public function executeSwapFromGeneration(\App\Models\Generation $gen): void
-    {
-        $meta = (array) ($gen->meta ?? []);
-        $svc = app(\App\Services\VirtualTryOnService::class);
-        $changeFace = (bool) ($meta['change_face'] ?? false);
-        $model = $changeFace ? $svc->pickModel((string) ($meta['model_id'] ?? '')) : null;
-        $pose = $svc->pickPose((string) ($meta['pose_id'] ?? ''));
-        if (($changeFace && ! $model) || ! $pose) {
-            $gen->update(['status' => 'failed', 'error' => $changeFace ? 'Không tìm thấy người mẫu hoặc dáng.' : 'Không tìm thấy dáng.']);
-            return;
-        }
-
-        $fallback = $svc->fallbackEdit(
-            (string) ($meta['image'] ?? ''),
-            $changeFace ? ($model['desc'] ?? ($model['ethnicity'] ?? 'a model')) : '',
-            $pose['skeleton'] ?? ($pose['name'] ?? 'standing'),
-            (string) ($meta['background'] ?? ''),
-            $changeFace ? ($model['image'] ?? null) : null, // face reference only khi bật đổi khuôn mặt
-            (string) ($meta['tone'] ?? 'none'),
-            (string) ($meta['pose_ref'] ?? ''),
-            $changeFace,
-        );
-        if (! $fallback) {
-            $gen->update(['status' => 'failed', 'error' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.studio_swap_model().'” và key Qwen Edit (Pay-As-You-Go).']);
-            return;
-        }
-
-        // Safety net (TẮT mặc định): kéo sáng chủ thể tối. Có thể làm lệch màu trang phục nên chỉ bật
-        // khi cần chống hiện tượng silhouette đen — cấu hình STUDIO_SWAP_BRIGHTEN=true.
-        if (studio_config('swap_brighten', false)) {
-            $bright = $this->brightenDarkSubject($fallback);
-            if ($bright) { $fallback = $bright; }
-        }
-
-        // "Tách nền + hiệu ứng + gộp": mode = removebg | bokeh | off (default removebg).
-        //  removebg: segment the person with remove.bg (accurate alpha), blur the background, then
-        //            recomposite the SHARP person on top — subject never blurred. If no remove.bg key
-        //            is configured (studio.removebg_key) the call is skipped and the raw result kept.
-        //  bokeh:    deterministic depth-of-field on the original frame.
-        //  off:      no background post-processing (the raw swap result).
-        $mode = (string) studio_config('swap_portrait_depth', 'removebg');
-        if ($mode === 'removebg') {
-            $seg = $this->applySegmentComposite($fallback);
-            if ($seg) { $fallback = $seg; }
-        } elseif ($mode === 'bokeh') {
-            $portrait = $this->applyPortraitDepth($fallback);
-            if ($portrait) { $fallback = $portrait; }
-        }
-
-        // Làm nhỏ nhân vật một chút (mặc định ~10%) — mở rộng nền nhẹ (không mirror), người giữ nét.
-        // Config swap_scale: 0.90 = nhỏ hơn 10%, 1 = tắt.
-        $scale = (float) studio_config('swap_scale', 0.90);
-        if ($scale > 0.05 && $scale < 1.0) {
-            $scaled = $this->applyScaleDown($fallback, $scale);
-            if ($scaled) { $fallback = $scaled; }
-        }
-
-        // Post-process: upscale (model image-super-resolution — KHÔNG có trên host intl, tắt mặc định).
-        if (studio_config('swap_superres', false)) {
-            $upscaled = $this->applySuperResolution($fallback, (int) studio_config('swap_superres_scale', 2));
-            if ($upscaled) { $fallback = $upscaled; }
-        }
-
-        // Post-process: face-enhance khi đổi mặt (model face-image-enhance — KHÔNG có trên host intl, tắt mặc định).
-        if ($changeFace && studio_config('swap_face_enhance', false)) {
-            $enhanced = $this->applyFaceEnhance($fallback);
-            if ($enhanced) { $fallback = $enhanced; }
-        }
-
-        // Safety: moderate (model image-moderation — KHÔNG có trên host intl, tắt mặc định).
-        if (studio_config('swap_moderation', false)) {
-            if (! $this->moderateImage($fallback)) {
-                logger()->warning('Swap result flagged by moderation, replacing with fallback');
-                $gen->update(['status' => 'failed', 'error' => 'Kết quả không đạt kiểm duyệt nội dung. Vui lòng thử lại với ảnh khác.']);
-                return;
-            }
-        }
-
-        // QA: score the final result (qwen3.8-flash / qwen-vl — bật mặc định, fail êm nếu rate-limit).
-        $qaScores = studio_config('swap_qa', true) ? $this->scoreSwapResult($fallback, (string) ($meta['image'] ?? '')) : null;
-
-        $swapModel = studio_swap_model();
-        $actualModel = $svc->lastModel() ?: $swapModel;
-        $credits = max(1, $svc->calls()); // 2-3 (edit: try-on + face-swap + background)
-
-        // M01: lúc tạo generation mới trừ 1 credit; pipeline thực tế tốn 2-3 lượt gọi (try-on +
-        // face-swap + background) nên credits_cost được nâng lên $credits. Phải trừ THÊM phần chênh,
-        // nếu không thì credits_balance thấp hơn credits_cost và mọi đường hoàn tiền (SwapModelJob:refund
-        // dùng chính credits_cost) sẽ hoàn nhiều hơn số đã trừ = credit sinh ra từ hư không.
-        $alreadyCharged = (int) ($gen->credits_cost ?: 0);
-
-        $gen->update([
-            'status' => 'completed', 'media_url' => $fallback,
-            'model' => $actualModel, 'credits_cost' => $credits,
-            'meta' => array_merge($meta, [
-                'type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel,
-                'steps' => $credits,
-                'qa' => $qaScores,
-            ]),
-        ]);
-
-        if ($credits > $alreadyCharged) {
-            $gen->user?->decrement('credits_balance', $credits - $alreadyCharged);
-        }
-    }
+    
 
     public function translate(Request $request)
     {
@@ -4555,38 +4334,7 @@ RULES:
     }
 
 
-    public function pattern(Request $request)
-    {
-        $data = $request->validate([
-            'prompt' => ['required', 'string', 'max:2000'],
-            'project_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('projects', 'id')->where('user_id', $request->user()->id)],
-            'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
-        ]);
-        $data['prompt'] = 'Seamless textile fabric pattern, '.$data['prompt'].', high detail, repeatable tile, premium fashion, 4k';
-        $cost = (int) studio_config('image_credits', 1);
-
-        return $this->queueGeneration('image', $data, $cost);
-    }
-
-    /**
-     * Virtual Try-On — best-effort try-on using the image provider (upload a person photo).
-     */
-    public function tryon(Request $request)
-    {
-        $data = $request->validate([
-            'prompt' => ['required', 'string', 'max:2000'],
-            'image' => ['nullable', 'image', 'max:8192'],
-            'project_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('projects', 'id')->where('user_id', $request->user()->id)],
-            'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
-        ]);
-        $cost = (int) studio_config('image_credits', 1);
-
-        if ($request->hasFile('image') && $request->file('image')->isValid()) {
-            $data['base_image'] = '/storage/'.$request->file('image')->store('studio/ref', 'public');
-        }
-
-        return $this->queueGeneration('image', $data, $cost);
-    }
+    
 
     /**
      * Latest generations (JSON) — used to re-sync the Studio output grid reliably.
@@ -4698,13 +4446,11 @@ RULES:
      */
     public function processQueue()
     {
-        // Swap generations are handled by SwapModelJob via the queue worker, not by this sync path.
         // Chỉ lấy 'pending': mỗi job TỰ CAS pending->processing, nên row đã ở 'processing' sẽ bị
         // CAS từ chối (job return ngay) nhưng vẫn bị $n++ đếm nhầm là "đã xử lý".
         $pending = auth()->user()->generations()
             ->where('status', 'pending')
             ->orderBy('id')->limit(10)->get()
-            ->reject(fn ($g) => ($g->meta['swap'] ?? false) === true)
             ->take(5)->values();
 
         // N11/M13 (T7): có worker nền thì chỉ enqueue (nút trả về ngay); chưa có thì chạy inline như cũ.

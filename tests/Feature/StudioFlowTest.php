@@ -247,25 +247,9 @@ class StudioFlowTest extends TestCase
         $this->actingAs($this->admin())->getJson('/api/latest')->assertOk()->assertJsonStructure(['items' => []]);
     }
 
-    public function test_studio_pattern_and_tryon_endpoints(): void
-    {
-        // Hai trang HTML /studio/pattern + /studio/tryon đã bị bỏ ở FabrikAI — chỉ còn API.
-        $admin = $this->admin();
-        $this->actingAs($admin);
-
-        $p = $this->postJson('/api/pattern', ['prompt' => 'floral toile vintage'])->assertOk();
-        $this->assertNotEmpty($p->json('generation_id'));
-        $pg = Generation::find($p->json('generation_id'));
-        $this->assertSame('pending', $pg->status);
-        $this->getJson('/api/generations/'.$pg->id)->assertOk();
-        $this->assertSame('completed', $pg->fresh()->status);
-
-        $t = $this->postJson('/api/tryon', ['prompt' => 'silk a-line dress'])->assertOk();
-        $this->assertNotEmpty($t->json('generation_id'));
-        $tg = Generation::find($t->json('generation_id'));
-        $this->getJson('/api/generations/'.$tg->id)->assertOk();
-        $this->assertSame('completed', $tg->fresh()->status);
-    }
+    // (test_studio_pattern_and_tryon_endpoints đã bị GỠ 2026-09-17: cả 2 endpoint /api/pattern và
+    //  /api/tryon bị xoá cùng card Pattern Maker và Try-On. Pattern nay làm qua "Tạo ảnh"/"Ghép ảnh";
+    //  try-on còn đường chính thức trong Fitting Room — chế độ "Thử đồ" của RefImageCard → /api/refgen.)
 
     public function test_studio_compose_rejects_tryon_mode(): void
     {

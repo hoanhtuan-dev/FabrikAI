@@ -1026,9 +1026,7 @@ if (! function_exists('studio_dispatch_generation')) {
             return false;   // đã đẩy cho generation này rồi
         }
 
-        if (($generation->meta['swap'] ?? false) === true) {
-            \App\Jobs\SwapModelJob::dispatch($generation->id);
-        } elseif ($generation->type === 'video') {
+        if ($generation->type === 'video') {
             \App\Jobs\RenderVideoJob::dispatch($generation->id);
         } else {
             \App\Jobs\RenderImageJob::dispatch($generation->id);
@@ -1235,7 +1233,10 @@ if (! function_exists('studio_task_groups')) {
             }],
             'edit' => ['label' => 'Sửa ảnh / Inpaint (chỉnh sửa theo vùng, reimagine)', 'legacy_default' => fn () => 'qwen:'.(string) studio_config('qwen_edit_model', 'qwen-image-edit')],
             'video' => ['label' => 'Video catwalk (Kịch bản quay)', 'legacy_default' => fn () => 'wan:'.(string) studio_config('video_model', 'wan2.5-t2v')],
-            'swap' => ['label' => 'Thay đổi người mẫu (Try-on)', 'legacy_default' => fn () => 'qwen:'.studio_swap_model()],
+            // Nhóm 'swap' giữ nguyên KEY (nhiều nơi đọc) nhưng ĐỔI NHÃN: từ 2026-09-17 card "Thay
+            // người mẫu" đã bị gỡ, nhóm này chỉ còn phục vụ đường thử đồ của Fitting Room
+            // (VirtualTryOnService) và swapEdit (remove-bg / xoá người khỏi ảnh).
+            'swap' => ['label' => 'Thử đồ / ghép người mẫu (Fitting Room)', 'legacy_default' => fn () => 'qwen:'.studio_swap_model()],
             'vision' => ['label' => 'Đọc ảnh (mô tả khuôn mặt / dáng / phân tích)', 'legacy_default' => fn () => 'qwen:'.(string) studio_config('qwen_vision_model', 'qwen3.8-flash')],
             'prompt' => ['label' => 'Suy luận prompt (Giám đốc sáng tạo / Thuật sỹ ảo)', 'legacy_default' => function () {
                 $p = (string) studio_config('prompt_provider', 'gemini');

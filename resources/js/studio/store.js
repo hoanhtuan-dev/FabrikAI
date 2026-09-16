@@ -32,7 +32,7 @@ export const useStudioStore = defineStore('studio', {
     generations: [],
     creditsLeft: (bootUser() && Number(bootUser().credits_balance)) || 0,
     imageCreditCost: 1,  // chi phí credit cho 1 ảnh (load từ defaults)
-    // film / reframe / swap share the source image (editSource || preview)
+    // film / reframe share the source image (editSource || preview)
     editSource: null,
     texture: 5,
     // upscale params (fabric-weave slider removed — it affected dark skin & detail edges)
@@ -139,19 +139,6 @@ export const useStudioStore = defineStore('studio', {
     videoPromptEn: '',
     videoBusy: false,
     videoSourceId: null,
-    // swap (try-on)
-    swapModelIds: [],
-    swapPoseIds: [],
-    swapLoading: false,
-    swapDone: 0,      // poses completed (for progress UI)
-    swapTotal: 0,     // total poses in the current run
-    swapAbort: null,  // AbortController for cancel
-    swapProcessing: false, // true while polling the background queue results
-    _swapStop: false,     // flag to stop the background-result polling
-    swapStage: '',        // '' | 'send' | 'processing' | 'done' | 'error' | 'cancelled' (giống Inpaint)
-    swapError: '',        // lỗi cuối của swap
-    swapStartTs: 0,       // timestamp bắt đầu (đếm thời gian)
-    swapGenIds: [],       // generation ids của lần chạy hiện tại
     // Compose progress (giống Inpaint)
     composeStage: '',     // '' | 'send' | 'processing' | 'done' | 'error' | 'cancelled'
     composeError: '',
@@ -168,7 +155,7 @@ export const useStudioStore = defineStore('studio', {
     inpaintPreserveFace: true,// giữ nguyên khuôn mặt
     inpaintModels: [],        // các model chỉnh sửa được phép chọn (load từ /api/defaults)
     inpaintModel: '',         // model đang chọn cho card Sửa ảnh — '' = mặc định (Qwen Edit cấu hình)
-    taskGroups: {},            // model theo nhóm công việc (image/edit/video/swap/vision/prompt/translate) — load từ /api/defaults
+    taskGroups: {},            // model theo nhóm công việc (image/edit/video/vision/prompt/translate) — load từ /api/defaults
     imageModelSel: '',         // model đang chọn cho Tạo Ảnh 2D + Ảnh mới từ ảnh mẫu ('' = default nhóm image)
     videoModelSel: '',         // model đang chọn cho Kịch bản quay ('' = default nhóm video)
     // ── Inpaint Mask (tích hợp region selection vào Inpaint) ──
@@ -432,8 +419,8 @@ export const useStudioStore = defineStore('studio', {
         if (Array.isArray(items)) this.generations = items;
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
         // Khôi phục bố cục layer đã lưu (chỉ giữ layer còn hợp lệ) — thay cho việc tự chọn ảnh kết quả cũ.
-        // KHÔNG tự in lại các kết quả swap vào layer nữa: việc này làm layer "sống lại" sau mỗi lần tải lại
-        // và khiến người dùng không thể xóa chúng khỏi canvas. Kết quả swap vẫn hiển thị ở Output/Thư viện.
+        // KHÔNG tự in lại các kết quả cũ vào layer: việc này làm layer "sống lại" sau mỗi lần tải lại
+        // và khiến người dùng không thể xóa chúng khỏi canvas. Kết quả vẫn hiển thị ở Output/Thư viện.
         this.restoreLayerLayout();
         this.restoreBarSettings();
         // Deep-link từ Studio Library: /studio?step=2|3&id=<genId> — khôi phục đúng bước + ảnh.
@@ -448,7 +435,7 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { console.error('studio load failed', e); }
     },
     select(g) { if (!g) return; this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; if (g.media_url) { this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id); this.setActiveLayer(String(g.id)); } },
-    // Đảm bảo một kết quả swap được "in" vào layer canvas (id duy nhất, không trùng).
+    // Đảm bảo một ảnh kết quả được "in" vào layer canvas (id duy nhất, không trùng).
     syncLayerForGen(id, mediaUrl, name, setActive) {
       if (!id || !mediaUrl) return;
       const lid = String(id);
@@ -601,19 +588,6 @@ export const useStudioStore = defineStore('studio', {
         }
         return d;
       } catch (e) { this.toast(e.message || 'Lỗi xóa nền.', 'error'); return null; }
-    },
-    // i2i — Ghép (thay thế) khuôn mặt cho người mẫu
-    async faceSwap(image, face) {
-      if (!image || !face) { this.toast('Chọn ảnh người mẫu + ảnh khuôn mặt.', 'error'); return null; }
-      try {
-        const d = await this.api('/api/face-swap', { image, face });
-        if (d.generation_id) {
-          this.addGen({ id: d.generation_id, type: 'image', status: d.status || 'pending', model: d.model || 'faceswap', provider: d.provider || 'qwen', media_url: d.media_url, error: d.error, credits_cost: d.credits_cost ?? 1, created_at: 'Vừa thay khuôn mặt' });
-          if (d.credits_left != null) this.creditsLeft = d.credits_left;
-          this.pollGeneration(d.generation_id);
-        }
-        return d;
-      } catch (e) { this.toast(e.message || 'Lỗi thay khuôn mặt.', 'error'); return null; }
     },
     // i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend).
     async compose(images, prompt, variants = 1, mode = 'compose', creativeLevel = 6, style = '', ornamentLevel = 3, overridePrompt = '') {
@@ -4009,123 +3983,5 @@ export const useStudioStore = defineStore('studio', {
       this._restoreSnapshot(snap);
       this.toast('Đã làm lại.');
     },
-    async runSwap(opts = {}) {
-      const src = this.upscaleSrc; if (!src || this.swapLoading) { this.toast('Chọn ảnh thiết kế để áp dụng.', 'error'); return; }
-      // change_face=false (mặc định): giữ nguyên khuôn mặt gốc, chỉ cần pose.
-      // change_face=true: 1 face reference + 1 or MORE poses -> one result per pose.
-      const changeFace = !!opts.change_face;
-      if (changeFace && !this.swapModelIds.length) { this.toast('Chọn 1 khuôn mặt để đổi.', 'error'); return; }
-      if (!this.swapPoseIds.length) { this.toast('Chọn ít nhất 1 dáng trước.', 'error'); return; }
-      const face = changeFace ? this.swapModelIds[0] : '';
-      const poses = [...this.swapPoseIds];
-      // Trạng thái hoạt động (giống Inpaint) — hiển thị tiến trình trong card.
-      this.swapStage = 'send';
-      this.swapError = '';
-      this.swapStartTs = Date.now();
-      this.swapGenIds = [];
-      // P0: keep explicit 0 values (slider minimums) — never coerce 0 back into a default.
-      const toInt = (v, dflt) => (v != null && Number.isFinite(Number(v)) ? Number(v) : dflt);
-
-      // Progress + cancel: each pose is one request; user can abort mid-run.
-      const abort = new AbortController();
-      this.swapAbort = abort;
-      this.swapTotal = poses.length;
-      this.swapDone = 0;
-      this.swapLoading = true;
-      let n = 0; let lastErr = '';
-      const createdIds = [];
-      for (const poseId of poses) {
-        if (abort.signal.aborted) { lastErr = 'Đã hủy.'; break; }
-        try {
-          const d = await this.api('/api/swap-model', { image: src, model_id: face, pose_id: poseId, background: opts.background || '', tone: opts.tone ?? 'none', change_face: changeFace }, abort.signal);
-          // Swap now runs in the background queue (SwapModelJob) — the response is async (pending).
-          if (d.generation_id) {
-            createdIds.push(d.generation_id);
-            this.addGen({ id: d.generation_id, type: 'image', status: d.status || 'processing', model: d.model || 'swap', provider: d.provider || 'swap', media_url: null, error: null, credits_cost: 1, created_at: 'Đang xử lý' });
-            n++;
-          } else if (d.message) { lastErr = d.message; }
-        } catch (e) {
-          if (e && e.name === 'AbortError') { lastErr = 'Đã hủy.'; break; }
-          lastErr = e.message || 'Lỗi thay đổi người mẫu.';
-        } finally {
-          this.swapDone++;
-        }
-      }
-      this.swapLoading = false;
-      this.swapAbort = null;
-      this.swapDone = 0; this.swapTotal = 0;
-      if (abort.signal.aborted) {
-        this.swapStage = 'cancelled';
-      } else if (n > 0) {
-        this.swapGenIds = createdIds;
-        this.swapStage = 'processing';
-        this.toast('Đã gửi ' + n + ' dáng vào hàng đợi xử lý…');
-        this.refreshSwapResults(createdIds);
-      } else {
-        this.swapStage = 'error';
-        this.swapError = lastErr || 'Lỗi thay đổi người mẫu.';
-        this.toast(this.swapError, 'error');
-      }
-    },
-    // Poll từng generation qua /api/generations/{id} (show) — GIỐNG Inpaint: vừa trả trạng thái
-    // vừa kích lazy xử lý nếu còn pending, nên swap không còn phụ thuộc duy nhất vào queue worker.
-    async refreshSwapResults(ids) {
-      this.swapProcessing = true;
-      this._swapStop = false;
-      this.swapStage = 'processing';
-      const pending = new Set(ids.map(String));
-      const deadline = Date.now() + 300000; // tối đa 5 phút
-      while (pending.size > 0 && Date.now() < deadline) {
-        if (this._swapStop) break;
-        await new Promise((r) => setTimeout(r, 3000));
-        for (const id of [...pending]) {
-          if (this._swapStop) break;
-          try {
-            const res = await fetch('/api/generations/' + id, { headers: { Accept: 'application/json' } });
-            if (!res.ok) continue;
-            const g = await res.json();
-            const idx = this.generations.findIndex((x) => String(x.id) === String(id));
-            if (idx >= 0) {
-              this.generations[idx] = { ...this.generations[idx], status: g.status, media_url: g.media_url, error: g.error, model: g.model || this.generations[idx].model };
-            }
-            if (g.status === 'completed' && g.media_url) {
-              this.previewId = g.id;
-              this.preview = { id: g.id, media_url: g.media_url, type: 'image', status: 'completed' };
-              this.syncLayerForGen(g.id, g.media_url, 'Ảnh #' + g.id, true);
-              pending.delete(id);
-            } else if (['failed', 'cancelled'].includes(g.status)) {
-              pending.delete(id);
-              if (g.status === 'failed' && g.error && !this.swapError) this.swapError = g.error;
-            }
-          } catch (e) { /* transient */ }
-        }
-      }
-      const statusOf = (id) => { const g = this.generations.find((x) => String(x.id) === String(id)); return g ? g.status : null; };
-      const allDone = ids.every((id) => { const s = statusOf(id); return !s || ['completed', 'failed', 'cancelled'].includes(s); });
-      const anyOk = ids.some((id) => statusOf(id) === 'completed');
-      if (allDone) {
-        if (anyOk) {
-          this.swapStage = 'done';
-          this.toast('Đã xong thay đổi người mẫu.');
-        } else {
-          this.swapStage = 'error';
-          if (!this.swapError) this.swapError = 'Không tạo được phiên bản người mẫu nào.';
-          this.toast(this.swapError, 'error');
-        }
-      } else if (!this._swapStop) {
-        // Hết thời gian poll nhưng vẫn còn chạy → không ép lỗi, kết quả sẽ về qua load()/click Output.
-        this.toast('Còn dáng đang xử lý — theo dõi trong Outputs.');
-      }
-      this.swapProcessing = false;
-      this._swapStop = false;
-    },
-    cancelSwap() {
-      if (this.swapAbort) { this.swapAbort.abort(); }
-      if (this.swapProcessing) { this._swapStop = true; this.swapProcessing = false; }
-      this.swapLoading = false;
-      this.swapStage = 'cancelled';
-      this.toast('Đã hủy.');
-    },
-    clearSwapStatus() { this.swapStage = ''; this.swapError = ''; this.swapGenIds = []; this.swapStartTs = 0; },
   },
 });
