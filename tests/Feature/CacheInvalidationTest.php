@@ -66,20 +66,50 @@ class CacheInvalidationTest extends TestCase
         $this->assertLessThanOrEqual(1, $settingsQueries, "Đọc 3 key (2 key khác nhau) tốn {$settingsQueries} query settings — phải là 1.");
     }
 
-    public function test_seeder_refreshes_settings_cache(): void
+    public function test_direct_model_write_invalidates_settings_cache(): void
     {
-        // Seeder là đường ghi DUY NHẤT không đi qua Setting::set(). Nếu nó không xoá cache thì sau khi
-        // re-seed (máy chủ đang chạy) app vẫn đọc giá trị cũ.
-        set_setting('site_name', 'GIÁ TRỊ SAI DO TEST ĐẶT');
-        $this->assertSame('GIÁ TRỊ SAI DO TEST ĐẶT', setting('site_name'));   // làm ấm cache
+        // Đây là dạng lỗi đã xảy ra THẬT: cache "cả bảng" chỉ được xoá bởi Setting::set(), nên mọi
+        // đường ghi KHÁC (seeder updateOrCreate hàng loạt, console command, DB seeder sau này…) đều
+        // để lại cache cũ. Nay model event ở Setting::booted() tự xoá ở mọi đường ghi qua Eloquent,
+        // nên test này ghi thẳng bằng updateOrCreate() — cố tình KHÔNG đi qua set().
+        set_setting('cache_probe', 'GIÁ TRỊ CŨ');
+        $this->assertSame('GIÁ TRỊ CŨ', setting('cache_probe'));   // làm ấm cache
 
-        $this->seed();   // seeder ghi lại giá trị chuẩn qua set_setting()
+        Setting::updateOrCreate(['key' => 'cache_probe'], ['value' => 'GIÁ TRỊ MỚI']);
 
-        $this->assertNotSame(
-            'GIÁ TRỊ SAI DO TEST ĐẶT',
-            setting('site_name'),
-            'Sau khi seed lại, cache vẫn phục vụ giá trị cũ -> seeder chưa xoá cache.'
-        );
+        $this->assertSame('GIÁ TRỊ MỚI', setting('cache_probe'),
+            'Ghi thẳng qua model mà cache vẫn phục vụ giá trị cũ -> Setting::booted() chưa xoá cache.');
+    }
+
+    public function test_model_delete_invalidates_cache(): void
+    {
+        set_setting('cache_probe_del', 'CÓ MẶT');
+        $this->assertSame('CÓ MẶT', setting('cache_probe_del'));
+
+        Setting::where('key', 'cache_probe_del')->first()->delete();   // xoá qua INSTANCE -> có event
+
+        $this->assertNull(setting('cache_probe_del'), 'Xoá setting (instance) mà cache vẫn còn giá trị cũ.');
+    }
+
+    public function test_bulk_query_builder_writes_bypass_events_and_need_explicit_flush(): void
+    {
+        // GIỚI HẠN ĐÃ BIẾT của Eloquent (không phải bug của repo): ghi/xoá HÀNG LOẠT qua query
+        // builder KHÔNG kích hoạt model event, nên Setting::booted() không chạy.
+        // Test này ghi nhận đúng hành vi đó để lần sau không ai tưởng "đã an toàn tuyệt đối",
+        // đồng thời chỉ ra cách xử lý: gọi Setting::flushCache() tường minh.
+        set_setting('cache_probe_bulk', 'CŨ');
+        $this->assertSame('CŨ', setting('cache_probe_bulk'));
+
+        Setting::where('key', 'cache_probe_bulk')->update(['value' => 'MỚI-QUA-QUERY-BUILDER']);
+
+        $this->assertSame('CŨ', setting('cache_probe_bulk'),
+            'Nếu assertion này ĐỔI thành MỚI thì Eloquent đã bắt đầu bắn event cho bulk update — '
+            .'khi đó cập nhật lại ghi chú này.');
+
+        Setting::flushCache();
+
+        $this->assertSame('MỚI-QUA-QUERY-BUILDER', setting('cache_probe_bulk'),
+            'flushCache() phải là cách xử lý cho đường ghi hàng loạt.');
     }
 
     // ── model registry ────────────────────────────────────────────────────

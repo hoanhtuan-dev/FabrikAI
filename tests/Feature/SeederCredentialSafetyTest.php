@@ -10,7 +10,7 @@ use Tests\TestCase;
 /**
  * Seeder là chỗ dễ lộ quyền nhất: một tài khoản quyền cao nhất với mật khẩu hardcode nằm trong
  * repo PUBLIC nghĩa là **ai đọc repo cũng vào được**. Bản cũ đúng như vậy:
- * §BT§tuan.ho.designer@gmail.com§BT§ / mật khẩu hardcode, VÀ dùng §BT§updateOrCreate§BT§ nên mỗi lần
+ * §BT§owner@fabrikai.shop§BT§ / mật khẩu hardcode, VÀ dùng §BT§updateOrCreate§BT§ nên mỗi lần
  * chạy lại seeder là **ghi đè** mật khẩu về giá trị đã lộ — người vận hành đổi mật khẩu xong vẫn bị reset.
  *
  * File này khoá 4 bất biến:
@@ -45,7 +45,7 @@ class SeederCredentialSafetyTest extends TestCase
         $src = (string) file_get_contents(database_path('seeders/DatabaseSeeder.php'));
 
         // updateOrCreate trên tài khoản quản trị = ghi đè mật khẩu mỗi lần seed (đúng lỗi cũ).
-        foreach (['tuan.ho.designer@gmail.com', 'admin@trillfa.com'] as $email) {
+        foreach (['owner@fabrikai.shop', 'admin@fabrikai.shop'] as $email) {
             $this->assertDoesNotMatchRegularExpression(
                 "/updateOrCreate\(\['email' => '".preg_quote($email, '/')."'/",
                 $src,
@@ -60,7 +60,7 @@ class SeederCredentialSafetyTest extends TestCase
     {
         $this->seed();
 
-        $admin = User::where('email', 'admin@trillfa.com')->firstOrFail();
+        $admin = User::where('email', 'admin@fabrikai.shop')->firstOrFail();
         $admin->password = Hash::make('mat-khau-rieng-cua-toi');
         $admin->save();
 
@@ -74,7 +74,7 @@ class SeederCredentialSafetyTest extends TestCase
     {
         $this->seed();
 
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->firstOrFail();
+        $super = User::where('email', 'owner@fabrikai.shop')->firstOrFail();
         $super->password = Hash::make('mat-khau-super-rieng');
         $super->save();
 
@@ -103,8 +103,8 @@ class SeederCredentialSafetyTest extends TestCase
         $this->assertStringContainsString('SEED_SUPER_ADMIN_PASSWORD', $caught->getMessage());
 
         // Và tuyệt đối KHÔNG được tạo tài khoản quản trị nào.
-        $this->assertSame(0, User::where('email', 'admin@trillfa.com')->count());
-        $this->assertSame(0, User::where('email', 'tuan.ho.designer@gmail.com')->count());
+        $this->assertSame(0, User::where('email', 'admin@fabrikai.shop')->count());
+        $this->assertSame(0, User::where('email', 'owner@fabrikai.shop')->count());
     }
 
     public function test_production_seeding_uses_the_env_password_when_provided(): void
@@ -118,11 +118,11 @@ class SeederCredentialSafetyTest extends TestCase
         try {
             $this->artisan('db:seed', ['--force' => true]);
 
-            $super = User::where('email', 'tuan.ho.designer@gmail.com')->firstOrFail();
+            $super = User::where('email', 'owner@fabrikai.shop')->firstOrFail();
             $this->assertTrue(Hash::check('mat-khau-production-rat-manh', $super->password));
 
             // Không đổ dữ liệu demo vào production.
-            $this->assertSame(0, User::where('email', 'customer@trillfa.com')->count());
+            $this->assertSame(0, User::where('email', 'user@fabrikai.shop')->count());
             $this->assertNotContains(self::LEAKED_PASSWORD, [$super->password]);
         } finally {
             putenv('SEED_SUPER_ADMIN_PASSWORD');
@@ -138,8 +138,8 @@ class SeederCredentialSafetyTest extends TestCase
     {
         $this->seed();
 
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->firstOrFail();
-        $admin = User::where('email', 'admin@trillfa.com')->firstOrFail();
+        $super = User::where('email', 'owner@fabrikai.shop')->firstOrFail();
+        $admin = User::where('email', 'admin@fabrikai.shop')->firstOrFail();
 
         $this->assertSame(User::ROLE_SUPER_ADMIN, $super->role);
         $this->assertSame(User::ROLE_ADMIN, $admin->role);

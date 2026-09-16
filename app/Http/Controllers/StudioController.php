@@ -6,7 +6,6 @@ use App\Jobs\RenderImageJob;
 use App\Jobs\RenderVideoJob;
 use App\Models\Generation;
 use App\Models\Preset;
-use App\Models\Product;
 use App\Services\GeminiService;
 use App\Services\StyleSuggestService;
 use Illuminate\Http\Request;
@@ -4357,47 +4356,6 @@ RULES:
         return back()->with('success', 'Đã lưu cấu hình "Gợi ý từ ảnh".');
     }
 
-    /**
-     * Cấu hình RIÊNG cho "🧠 AI Sản phẩm" — trợ lý content + SEO trong form sản phẩm.
-     * Tách khỏi cấu hình chung; ưu tiên Qwen trước rồi mới Gemini. Mọi model/key/timeout
-     * đều lưu ở đây để nâng cấp model sau này mà không cần sửa code.
-     */
-    public function updateProductAiSettings(Request $request)
-    {
-        $data = $request->validate([
-            'pai_enabled' => ['nullable', 'string', 'in:1'],
-            'pai_provider_order' => ['required', 'string', 'max:100'],
-            'pai_qwen_text_models' => ['nullable', 'string', 'max:1000'],
-            'pai_qwen_vision_models' => ['nullable', 'string', 'max:1000'],
-            'pai_gemini_text_model' => ['nullable', 'string', 'max:255'],
-            'pai_gemini_vision_model' => ['nullable', 'string', 'max:255'],
-            'pai_timeout_seconds' => ['nullable', 'integer', 'min:1', 'max:120'],
-            'pai_total_budget_seconds' => ['nullable', 'integer', 'min:5', 'max:120'],
-            'pai_max_models' => ['nullable', 'integer', 'min:1', 'max:10'],
-            'pai_max_keys' => ['nullable', 'integer', 'min:1', 'max:10'],
-            'pai_downscale_max' => ['nullable', 'integer', 'min:64', 'max:4096'],
-            'pai_cache_ttl_hours' => ['nullable', 'integer', 'min:0', 'max:8760'],
-            'pai_temperature' => ['nullable', 'numeric', 'min:0', 'max:2'],
-            'pai_max_tokens' => ['nullable', 'integer', 'min:128', 'max:8192'],
-        ]);
-
-        set_setting('product_ai_enabled', ! empty($data['pai_enabled']) ? '1' : '0');
-        set_setting('product_ai_provider_order', $data['pai_provider_order']);
-        set_setting('product_ai_qwen_text_models', $data['pai_qwen_text_models'] ?? '');
-        set_setting('product_ai_qwen_vision_models', $data['pai_qwen_vision_models'] ?? '');
-        set_setting('product_ai_gemini_text_model', $data['pai_gemini_text_model'] ?? '');
-        set_setting('product_ai_gemini_vision_model', $data['pai_gemini_vision_model'] ?? '');
-        if (isset($data['pai_timeout_seconds'])) set_setting('product_ai_timeout_seconds', (string) $data['pai_timeout_seconds']);
-        if (isset($data['pai_total_budget_seconds'])) set_setting('product_ai_total_budget_seconds', (string) $data['pai_total_budget_seconds']);
-        if (isset($data['pai_max_models'])) set_setting('product_ai_max_models', (string) $data['pai_max_models']);
-        if (isset($data['pai_max_keys'])) set_setting('product_ai_max_keys', (string) $data['pai_max_keys']);
-        if (isset($data['pai_downscale_max'])) set_setting('product_ai_downscale_max', (string) $data['pai_downscale_max']);
-        if (isset($data['pai_cache_ttl_hours'])) set_setting('product_ai_cache_ttl_hours', (string) $data['pai_cache_ttl_hours']);
-        if (isset($data['pai_temperature'])) set_setting('product_ai_temperature', (string) $data['pai_temperature']);
-        if (isset($data['pai_max_tokens'])) set_setting('product_ai_max_tokens', (string) $data['pai_max_tokens']);
-
-        return back()->with('success', 'Đã lưu cấu hình "AI Sản phẩm".');
-    }
 
     public function updateSettings(Request $request)
     {
@@ -4524,19 +4482,6 @@ RULES:
     /**
      * Active products with an image — used as reference-image sources in Studio.
      */
-    public function references()
-    {
-        $items = Product::where('is_active', true)->whereNotNull('image')
-            ->latest()->limit(40)->get(['id', 'name', 'image'])
-            // URL TƯƠNG ĐỐI (không dùng asset() tuyệt đối) — ảnh tải được từ mọi host
-            // (localhost/127.0.0.1/IP…) giống convention /studio/ref-images.
-            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'url' => rel_image_url($p->image)])
-            ->filter(fn ($i) => ! empty($i['url']))
-            ->values();
-
-        return response()->json(['items' => $items]);
-    }
-
     /**
      * Prompt template (preset) manager — admin CRUD.
      */

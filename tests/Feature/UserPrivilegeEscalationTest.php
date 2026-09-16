@@ -78,9 +78,9 @@ class UserPrivilegeEscalationTest extends TestCase
         // Seeder ghi role/credits bằng forceFill sau khi siết $fillable — test này bảo vệ chính
         // thay đổi đó (nếu seeder quay lại mass-assign, admin sẽ thành 'customer' và toàn bộ route
         // admin sẽ 403).
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
-        $admin = User::where('email', 'admin@trillfa.com')->first();
-        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
+        $customer = User::where('email', 'user@fabrikai.shop')->first();
 
         $this->assertNotNull($super);
         $this->assertTrue($super->isSuperAdmin());

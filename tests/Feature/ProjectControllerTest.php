@@ -36,14 +36,14 @@ class ProjectControllerTest extends TestCase
 
     public function test_customer_cannot_access_projects(): void
     {
-        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $customer = User::where('email', 'user@fabrikai.shop')->first();
         $this->actingAs($customer);
         $this->getJson('/api/projects')->assertStatus(403);
     }
 
     public function test_admin_can_list_their_projects(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         // Seed d\u1ef1 \u00e1n thu\u1ed9c admin (StudioProjectSeeder g\u00e1n cho super ho\u1eb7c admin).
         Project::factory()->create(['user_id' => $admin->id, 'name' => 'D\u1ef1 \u00e1n ri\u00eang A']);
         $this->actingAs($admin);
@@ -57,7 +57,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_index_filters_archived_projects(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         Project::factory()->create(['user_id' => $admin->id, 'name' => 'Active A', 'archived' => false]);
         Project::factory()->create(['user_id' => $admin->id, 'name' => 'Old B', 'archived' => true]);
         $this->actingAs($admin);
@@ -75,8 +75,8 @@ class ProjectControllerTest extends TestCase
 
     public function test_user_cannot_see_other_users_projects(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
         Project::factory()->create(['user_id' => $super->id, 'name' => 'Secret super']);
         $this->actingAs($admin);
 
@@ -87,7 +87,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_store_creates_project_in_draft_status(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
 
         $res = $this->postJson('/api/projects/new', [
@@ -105,7 +105,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_store_requires_name(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
 
         $this->postJson('/api/projects/new', ['name' => ''])->assertStatus(422);
@@ -113,7 +113,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_show_returns_project_with_generations_metadata(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $project = Project::factory()->create([
             'user_id' => $admin->id,
             'name' => 'Show A',
@@ -130,8 +130,8 @@ class ProjectControllerTest extends TestCase
 
     public function test_user_cannot_show_other_users_project(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
         $project = Project::factory()->create(['user_id' => $super->id]);
         $this->actingAs($admin);
 
@@ -140,7 +140,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_update_changes_metadata_without_touching_status(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $project = Project::factory()->create([
             'user_id' => $admin->id,
             'status' => Project::STATUS_REVIEW,
@@ -159,7 +159,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_destroy_detaches_generations_and_keeps_them(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $project = Project::factory()->create(['user_id' => $admin->id]);
         $gen = Generation::factory()->create([
             'user_id' => $admin->id,
@@ -177,7 +177,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_transition_moves_project_along_workflow(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $project = Project::factory()->create([
             'user_id' => $admin->id,
             'status' => Project::STATUS_IN_PROGRESS,
@@ -196,7 +196,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_transition_returns_422_on_invalid_path(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $project = Project::factory()->create([
             'user_id' => $admin->id,
             'status' => Project::STATUS_DRAFT,
@@ -213,7 +213,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_transition_reviewer_gate_blocks_admin_from_approving(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $project = Project::factory()->create([
             'user_id' => $admin->id,
             'status' => Project::STATUS_REVIEW,
@@ -229,7 +229,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_transition_reviewer_gate_allows_super_admin_to_approve(): void
     {
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
         $project = Project::factory()->create([
             'user_id' => $super->id,
             'status' => Project::STATUS_REVIEW,
@@ -248,7 +248,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_attach_generation_links_output_to_project(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $project = Project::factory()->create(['user_id' => $admin->id]);
         $gen = Generation::factory()->create([
             'user_id' => $admin->id,
@@ -268,7 +268,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_detach_generation_unlinks_output_from_project(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $project = Project::factory()->create(['user_id' => $admin->id]);
         $gen = Generation::factory()->create([
             'user_id' => $admin->id,
@@ -288,8 +288,8 @@ class ProjectControllerTest extends TestCase
 
     public function test_cannot_attach_generation_owned_by_other_user(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
         $project = Project::factory()->create(['user_id' => $admin->id]);
         // Generation thu\u1ed9c super, kh\u00f4ng thu\u1ed9c admin.
         $gen = Generation::factory()->create([
@@ -309,8 +309,8 @@ class ProjectControllerTest extends TestCase
 
     public function test_super_admin_can_approve_other_users_project(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
         $project = Project::factory()->create([
             'user_id' => $admin->id,
             'status' => Project::STATUS_REVIEW,
@@ -328,8 +328,8 @@ class ProjectControllerTest extends TestCase
 
     public function test_admin_cannot_transition_other_users_project(): void
     {
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $project = Project::factory()->create([
             'user_id' => $super->id,
             'status' => Project::STATUS_REVIEW,
@@ -343,7 +343,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_super_admin_cannot_self_approve_when_second_super_exists(): void
     {
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
         User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]); // Super Admin thứ hai
         $project = Project::factory()->create([
             'user_id' => $super->id,
@@ -360,8 +360,8 @@ class ProjectControllerTest extends TestCase
 
     public function test_super_admin_can_show_other_users_project_with_owner_name(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
         $project = Project::factory()->create(['user_id' => $admin->id, 'name' => 'Dự án của admin']);
         $this->actingAs($super);
 
@@ -372,7 +372,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_transition_rejects_unknown_status_with_422_validation(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $project = Project::factory()->create(['user_id' => $admin->id, 'status' => Project::STATUS_DRAFT]);
         $this->actingAs($admin);
 
@@ -386,8 +386,8 @@ class ProjectControllerTest extends TestCase
 
     public function test_pending_scope_lists_review_projects_of_all_users_for_super(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
         Project::factory()->create([
             'user_id' => $admin->id, 'name' => 'Chờ duyệt A',
             'status' => Project::STATUS_REVIEW, 'archived' => false,
@@ -409,7 +409,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_pending_scope_forbidden_for_regular_admin(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
 
         $this->getJson('/api/projects?scope=pending')->assertStatus(403);
@@ -417,13 +417,13 @@ class ProjectControllerTest extends TestCase
 
     public function test_own_scope_reports_can_review_flag(): void
     {
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
         $this->actingAs($super);
         $this->getJson('/api/projects')->assertOk()
             ->assertJsonPath('can_review', true)
             ->assertJsonPath('scope', 'own');
 
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
         $this->getJson('/api/projects')->assertOk()
             ->assertJsonPath('can_review', false)
@@ -436,7 +436,7 @@ class ProjectControllerTest extends TestCase
     {
         // Regression: generation MỚI NHẤT đang render (media_url NULL) không được
         // che mất ảnh thành công gần nhất — cả eager (index) lẫn lazy (accessor fallback).
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $project = Project::factory()->create([
             'user_id' => $admin->id,
             'thumbnail_url' => null,
@@ -461,7 +461,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_index_avoids_n_plus_one_queries(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
 
         $countFor = function (int $n) use ($admin) {
@@ -492,7 +492,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_legacy_store_route_uses_full_project_validation(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
 
         // POST /api/projects (route cũ projects.store) nay trỏ về
@@ -514,8 +514,8 @@ class ProjectControllerTest extends TestCase
     // ── Backend hardening: project_id bắt buộc phải thuộc về user (Phần K.8) ──
     public function test_generation_endpoints_reject_foreign_project_id(): void
     {
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $foreign = Project::factory()->create(['user_id' => $super->id]);
         $this->actingAs($admin);
 

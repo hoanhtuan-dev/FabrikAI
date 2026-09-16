@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
- * Trillfa Studio — Project Controller.
+ * FabrikAI Studio — Project Controller.
  *
  * Cung cấp CRUD + luồng công việc (workflow transitions) + gán generations/assets
  * cho bảng "Dự án thiết kế" của Designer. Mọi thao tác scoped theo user hiện tại

@@ -30,7 +30,7 @@ class StudioLibraryProjectTest extends TestCase
         parent::setUp();
         $this->seed();
         Storage::fake('public'); // cô lập quét file mồ côi khỏi storage thật
-        $this->admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->project = Project::factory()->create(['user_id' => $this->admin->id, 'name' => 'BST Test']);
     }
 

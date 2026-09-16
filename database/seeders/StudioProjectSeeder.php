@@ -14,8 +14,8 @@ class StudioProjectSeeder extends Seeder
 {
     public function run(): void
     {
-        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $super = User::where('email', 'owner@fabrikai.shop')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         if (! $super && ! $admin) {
             return;
         }

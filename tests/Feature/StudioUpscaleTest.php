@@ -18,7 +18,7 @@ class StudioUpscaleTest extends TestCase
     {
         parent::setUp();
         $this->seed();
-        $this->actingAs(User::where('email', 'admin@trillfa.com')->firstOrFail());
+        $this->actingAs(User::where('email', 'admin@fabrikai.shop')->firstOrFail());
     }
 
     private function ctrl(): \App\Http\Controllers\StudioController

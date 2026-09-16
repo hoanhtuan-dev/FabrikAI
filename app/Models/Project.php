@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * Trillfa Studio — Project (Design Board).
+ * FabrikAI Studio — Project (Design Board).
  *
  * Mỗi Project là một "bảng thiết kế" của Designer: gom generations/assets
  * thành một luồng công việc có trạng thái (Draft → In Progress → Review →

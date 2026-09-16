@@ -14,7 +14,7 @@ use Tests\TestCase;
 /**
  * Test HỒI QUY cho các vá của vòng 1–6 (STUDIO_REVIEW.md §1/§3) — những fix CHƯA có test phủ.
  *
- * Bối cảnh: bộ test port từ TrillfaShop phủ các vá cũ (S1–S11). Các lỗi phát hiện SAU đó —
+ * Bối cảnh: bộ test port từ app cũ phủ các vá cũ (S1–S11). Các lỗi phát hiện SAU đó —
  * N1 (bypass SSRF), N5 (svg), N6 (IDOR suggest-library), N7 (ghi DB ẩn danh), N8 (rò exception),
  * N15 (route chết), M02 (double-refund), M07 (forward URL vision), M16 (LIKE wildcard) — chỉ được
  * xác minh bằng script một lần. File này khoá chúng lại để không tái phát âm thầm.
@@ -31,7 +31,7 @@ class StudioRegressionFixesTest extends TestCase
 
     private function admin(): User
     {
-        return User::where('email', 'admin@trillfa.com')->firstOrFail();
+        return User::where('email', 'admin@fabrikai.shop')->firstOrFail();
     }
 
     // ── N1/N4: helper SSRF dùng chung ────────────────────────────────────

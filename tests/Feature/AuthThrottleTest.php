@@ -31,7 +31,7 @@ class AuthThrottleTest extends TestCase
         // rate limiter luôn bắt đầu từ 0.
     }
 
-    private function attemptLogin(string $password, string $email = 'admin@trillfa.com'): int
+    private function attemptLogin(string $password, string $email = 'admin@fabrikai.shop'): int
     {
         return $this->post('/dang-nhap', ['email' => $email, 'password' => $password])->getStatusCode();
     }
@@ -53,7 +53,7 @@ class AuthThrottleTest extends TestCase
     public function test_correct_login_still_works(): void
     {
         // Chống siết quá tay: nếu giới hạn làm người dùng thật không vào được thì bản vá hỏng.
-        $res = $this->post('/dang-nhap', ['email' => 'admin@trillfa.com', 'password' => 'password']);
+        $res = $this->post('/dang-nhap', ['email' => 'admin@fabrikai.shop', 'password' => 'password']);
         $this->assertSame(302, $res->getStatusCode(), 'Đăng nhập ĐÚNG phải thành công (302).');
         $this->assertAuthenticated();
     }
@@ -71,7 +71,7 @@ class AuthThrottleTest extends TestCase
             $this->attemptLogin('sai-'.$i);
         }
 
-        $this->post('/dang-nhap', ['email' => 'admin@trillfa.com', 'password' => 'password'])
+        $this->post('/dang-nhap', ['email' => 'admin@fabrikai.shop', 'password' => 'password'])
             ->assertStatus(302);
 
         $this->assertAuthenticated('web');

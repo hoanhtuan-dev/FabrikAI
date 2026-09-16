@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Carbon;
 
 /**
- * Trillfa Studio — Project Workflow engine.
+ * FabrikAI Studio — Project Workflow engine.
  *
  * Định nghĩa luồng công việc chuẩn cho Designer:
  *

@@ -11,5 +11,5 @@
     <circle cx="270" cy="340" r="16"/>
     <path d="M222 410l48-48c8-8 20-8 28 0l70 70"/>
   </g>
-  <text x="300" y="500" text-anchor="middle" font-family="'Inter',system-ui,sans-serif" font-size="28" font-weight="600" fill="#33674d">Trillfa Fa</text>
+  <text x="300" y="500" text-anchor="middle" font-family="'Inter',system-ui,sans-serif" font-size="28" font-weight="600" fill="#33674d">FabrikAI</text>
 </svg>

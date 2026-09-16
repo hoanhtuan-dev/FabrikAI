@@ -37,7 +37,7 @@ class StudioQueueModeTest extends TestCase
 
     private function admin(): User
     {
-        return User::where('email', 'admin@trillfa.com')->firstOrFail();
+        return User::where('email', 'admin@fabrikai.shop')->firstOrFail();
     }
 
     private function generation(array $attrs = []): Generation

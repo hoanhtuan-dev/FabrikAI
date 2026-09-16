@@ -23,12 +23,33 @@ class Setting extends Model
     public const CACHE_ALL = 'settings:all';
 
     /**
-     * Xoá cache settings. Dùng cho đường ghi KHÔNG đi qua set() (ví dụ seeder dùng
-     * updateOrCreate hàng loạt) — nếu quên, cache 'settings:all' vẫn phục vụ giá trị cũ sau khi ghi.
+     * Xoá cache settings.
+     *
+     * KHÔNG cần gọi tay trong đa số trường hợp: model event bên dưới tự xoá ở MỌI đường ghi
+     * (create/update/save/delete/updateOrCreate…). Hàm này giữ lại cho đường ghi hàng loạt không
+     * kích hoạt model event (ví dụ \Illuminate\Support\Facades\DB::table('settings')->update(...)).
      */
     public static function flushCache(): void
     {
         Cache::forget(self::CACHE_ALL);
+    }
+
+    /**
+     * Tự xoá cache ở MỌI đường ghi qua Eloquent — không phụ thuộc việc người viết có nhớ gọi set()
+     * hay flushCache() hay không.
+     *
+     * [BUG THẬT đã xảy ra — vòng 21] Cache "cả bảng" được thêm ở vòng 20, nhưng chỉ set() xoá nó.
+     * Seeder khi đó ghi thẳng \Illuminate\Database\Eloquent\Model::updateOrCreate() cho 40+ key ⇒
+     * re-seed trên máy chủ đang chạy KHÔNG có hiệu lực cho tới khi cache hết hạn. Đã vá bằng cách
+     * cho seeder đi qua set_setting(), nhưng cách đó vẫn phụ thuộc vào việc NHỚ. Model event dưới
+     * đây bịt hẳn lỗ đó — cùng cách StudioModel đã làm cho registry.
+     */
+    protected static function booted(): void
+    {
+        $forget = static fn () => static::flushCache();
+
+        static::saved($forget);
+        static::deleted($forget);
     }
 
     /** @return array<string, mixed> */
@@ -49,7 +70,8 @@ class Setting extends Model
     public static function set(string $key, $value): void
     {
         static::updateOrCreate(['key' => $key], ['value' => $value]);
-        Cache::forget(self::CACHE_ALL);
+        // Cache đã được model event ở booted() xoá; xoá thêm ở đây cho chắc (idempotent, không tốn gì).
+        self::flushCache();
         // Dọn luôn khoá per-key của bản cũ (nếu cache còn sót từ trước khi nâng cấp).
         Cache::forget('setting:'.$key);
     }

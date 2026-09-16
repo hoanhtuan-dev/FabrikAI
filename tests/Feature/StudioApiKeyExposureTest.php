@@ -37,7 +37,7 @@ class StudioApiKeyExposureTest extends TestCase
 
     private function admin(): User
     {
-        return User::where('email', 'admin@trillfa.com')->firstOrFail();
+        return User::where('email', 'admin@fabrikai.shop')->firstOrFail();
     }
 
     /** Tạo một key với giá trị nhận dạng được; trả [model, ciphertext thô]. */

@@ -13,7 +13,7 @@ class StylistDataTest extends TestCase
     public function test_stylist_data_endpoints_return_seeded_data_for_admin(): void
     {
         $this->seed();
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->assertNotNull($admin, 'admin user should be seeded');
         $this->assertTrue($admin->isAdmin());
 
@@ -54,7 +54,7 @@ class StylistDataTest extends TestCase
     public function test_customer_cannot_write_stylist_data(): void
     {
         $this->seed();
-        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $customer = User::where('email', 'user@fabrikai.shop')->first();
         $this->actingAs($customer);
 
         $this->postJson('/api/stylist-data/types', [
@@ -65,7 +65,7 @@ class StylistDataTest extends TestCase
     public function test_admin_can_write_stylist_data(): void
     {
         $this->seed();
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
 
         $this->postJson('/api/stylist-data/types', [

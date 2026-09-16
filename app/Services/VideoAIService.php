@@ -41,7 +41,7 @@ class VideoAIService
 
         // N9 (đã vá): stub DEMO MODE khi chưa cấu hình khoá — giữ đúng quy ước của module
         // (ImageAIService cũng dùng samples/*.jpg làm ảnh demo khi không có key).
-        // Lỗi cũ: file demo CHƯA TỪNG tồn tại (không có trong git history TrillfaShop) nên
+        // Lỗi cũ: file demo CHƯA TỪNG tồn tại (không có trong git history của app cũ) nên
         // generation báo 'completed' với media_url 404. Nay đã ship
         // public_html/samples/studio-catwalk.mp4 (4,5s · 640×640 · 168 KB, sinh bằng ffmpeg).
         return '/samples/studio-catwalk.mp4';

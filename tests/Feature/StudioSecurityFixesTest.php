@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\ImageAIService;
-use App\Services\ProductAIService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -15,7 +14,6 @@ use Tests\TestCase;
  *  - S1 [critical] traversal ở 3 resolver ImageAIService → helper studio_safe_public_file()
  *  - S2 pixel cap (decompression bomb) trong studio_image_decode()
  *  - S3 SSRF guard trong storeRemoteImage()
- *  - S4 stored XSS — escape e() trong stub HTML ProductAIService
  *  - S8 whitelist scope cleanup (422 thay vì ok giả)
  *  - (S5 đã gỡ cùng AdminProductController ở T8 — xem ghi chú trong file)
  */
@@ -178,36 +176,18 @@ class StudioSecurityFixesTest extends TestCase
     //  với tham số mặc định, và việc tạo chuỗi >50 MiB trong test rất tốn RAM. Hành vi cap đã được
     //  phủ ở StudioRegressionFixesTest::test_fetch_remote_bytes_caps_size với ngưỡng nhỏ.)
 
-    // ── S4: escape stub HTML ──────────────────────────────────────────────
-
-    public function test_stub_description_escapes_user_and_ai_fields(): void
-    {
-        $svc = app(ProductAIService::class);
-        $m = new \ReflectionMethod($svc, 'stubDescription');
-        $m->setAccessible(true);
-        $html = $m->invoke($svc, '<script>alert(1)</script>', ['category' => '<b>cat</b>'], ['fabric' => '<i>f</i>', 'colors' => '', 'styles' => '']);
-        $this->assertStringNotContainsString('<script>alert(1)</script>', $html);
-        $this->assertStringContainsString('&lt;script&gt;', $html);
-        $this->assertStringNotContainsString('<b>cat</b>', $html);
-        $this->assertStringContainsString('&lt;b&gt;cat&lt;/b&gt;', $html);
-    }
-
-    public function test_stub_refine_escapes_ai_fabric_in_html_variant(): void
-    {
-        $svc = app(ProductAIService::class);
-        $m = new \ReflectionMethod($svc, 'stubRefine');
-        $m->setAccessible(true);
-        $r = $m->invoke($svc, ['name' => 'Váy test'], ['fabric' => '<img src=x onerror=alert(1)>'], 'desc_variants');
-        $html = $r['variants'][1]['description'] ?? '';
-        $this->assertStringNotContainsString('<img src=x', $html);
-        $this->assertStringContainsString('&lt;img', $html);
-    }
+    // ── S4 (2 test escape stub HTML của ProductAIService) đã GỠ cùng service ──────────
+    // ProductAIService + job GenerateProductSuggestion + 18 helper product_ai_* là phần "trợ lý
+    // viết mô tả/SEO cho form sản phẩm" của module thương mại điện tử cũ. Cả nó lẫn endpoint
+    // POST /api/settings/product-ai đều KHÔNG được nối vào app này (0 tham chiếu trong resources/js)
+    // nên đã gỡ bỏ. Bỏ code chết thì bỏ luôn test của nó — nếu sau này dựng lại tính năng mô tả
+    // sản phẩm, nhớ port lại 2 test escape này.
 
     // ── S8: cleanup scope whitelist ───────────────────────────────────────
 
     public function test_library_cleanup_rejects_unknown_scope_with_422(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
         $this->postJson('/api/library/cleanup', ['scope' => 'everything'])->assertStatus(422);
         $this->postJson('/api/library/cleanup', ['scope' => 'junk'])->assertOk()->assertJsonPath('ok', true);

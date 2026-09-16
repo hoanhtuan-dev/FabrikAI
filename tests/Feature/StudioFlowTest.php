@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
- * Studio flow tests — tách nhóm test_studio_* ra khỏi ShopFlowTest của TrillfaShop
+ * Studio flow tests — tách nhóm test_studio_* ra khỏi file test dùng chung của app cũ
  * (storefront đã bị bỏ ở FabrikAI nên phần shop/cart/checkout không còn port được).
  *
  * URL đã đổi tiền tố theo FabrikAI: /studio/* -> /api/*, SPA /studio -> /.
@@ -35,7 +35,7 @@ class StudioFlowTest extends TestCase
 
     private function admin(): User
     {
-        return User::where('email', 'admin@trillfa.com')->firstOrFail();
+        return User::where('email', 'admin@fabrikai.shop')->firstOrFail();
     }
 
     public function test_studio_spa_shell_is_public_but_api_requires_auth(): void
@@ -51,17 +51,15 @@ class StudioFlowTest extends TestCase
     {
         $this->get('/')->assertOk()->assertSee('studio-root');
 
-        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $customer = User::where('email', 'user@fabrikai.shop')->first();
         $this->actingAs($customer)->getJson('/api/latest')->assertForbidden();
 
         $this->actingAs($this->admin())->get('/')->assertOk();
     }
 
-    public function test_studio_library_redirects_to_studio_spa(): void
+    public function test_root_serves_the_spa_shell(): void
     {
-        // /studio/library (legacy) -> SPA gốc; dữ liệu thư viện vẫn admin-only qua /api/library/*.
-        $this->get('/studio/library')->assertRedirect('/');
-
+        // SPA gốc; dữ liệu thư viện vẫn admin-only qua /api/library/*.
         $this->actingAs($this->admin())->get('/')->assertOk()->assertSee('studio-root');
     }
 
@@ -346,22 +344,18 @@ class StudioFlowTest extends TestCase
             'style' => 'x', 'presets' => [['style' => 'no-name']],
         ])->assertStatus(422);
 
-        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $customer = User::where('email', 'user@fabrikai.shop')->first();
         $this->actingAs($customer)->getJson('/api/outfit-settings')->assertForbidden();
     }
 
     public function test_studio_preset_manager_and_references(): void
     {
         // Trang HTML /presets là shell công khai; dữ liệu preset vẫn admin-only.
-        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $customer = User::where('email', 'user@fabrikai.shop')->first();
         $this->actingAs($customer)->getJson('/api/presets')->assertForbidden();
 
         $admin = $this->admin();
         $this->actingAs($admin)->getJson('/api/presets')->assertOk()->assertJsonStructure(['items']);
-
-        $this->actingAs($admin)->getJson('/api/references')
-            ->assertOk()
-            ->assertJsonStructure(['items' => []]);
 
         $this->actingAs($admin)->postJson('/api/presets', [
             'category' => 'style',
@@ -377,7 +371,7 @@ class StudioFlowTest extends TestCase
     {
         $this->getJson('/api/settings-vue/data')->assertStatus(401);
 
-        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $customer = User::where('email', 'user@fabrikai.shop')->first();
         $this->actingAs($customer)->getJson('/api/settings-vue/data')->assertForbidden();
 
         $this->actingAs($this->admin())->getJson('/api/settings-vue/data')->assertOk();

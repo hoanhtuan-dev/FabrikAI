@@ -129,7 +129,7 @@ class ImageFallbackTest extends TestCase
             'provider' => 'qwen', 'label' => 'paygo', 'value' => 'sk-ws-TESTPAYGO', 'priority' => 5, 'enabled' => true, 'scopes' => ['*'],
         ]);
 
-        $admin = \App\Models\User::where('email', 'admin@trillfa.com')->first();
+        $admin = \App\Models\User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
 
         $model = \App\Models\StudioModel::first();
@@ -155,7 +155,7 @@ class ImageFallbackTest extends TestCase
             'provider' => 'qwen', 'label' => 'plan', 'value' => 'sk-sp-TESTPLANKEY', 'priority' => 10, 'enabled' => true, 'scopes' => ['*'],
         ]);
 
-        $admin = \App\Models\User::where('email', 'admin@trillfa.com')->first();
+        $admin = \App\Models\User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
 
         $model = \App\Models\StudioModel::first();

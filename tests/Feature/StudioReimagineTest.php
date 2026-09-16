@@ -22,7 +22,7 @@ class StudioReimagineTest extends TestCase
     {
         parent::setUp();
         $this->seed();
-        $this->actingAs(User::where('email', 'admin@trillfa.com')->firstOrFail());
+        $this->actingAs(User::where('email', 'admin@fabrikai.shop')->firstOrFail());
 
         // Fixture ảnh THẬT trên public disk — refgen giờ pre-validate ảnh tham chiếu
         // resolve được (422 nếu không), nên URL /storage/test-src.png phải tồn tại.

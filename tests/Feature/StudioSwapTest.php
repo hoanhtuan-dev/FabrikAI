@@ -58,7 +58,7 @@ class StudioSwapTest extends TestCase
 
     public function test_swap_model_requires_both_face_and_pose(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
 
         // Missing pose -> 422 validation (P2: pose is required).
@@ -70,7 +70,7 @@ class StudioSwapTest extends TestCase
     public function test_swap_model_keep_face_by_default_without_model(): void
     {
         \Illuminate\Support\Facades\Queue::fake();
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
 
         // Mặc định giữ nguyên khuôn mặt: model_id có thể bỏ trống, vẫn tạo generation + dispatch job.
@@ -90,7 +90,7 @@ class StudioSwapTest extends TestCase
     public function test_swap_model_change_face_stores_meta_and_prompt(): void
     {
         \Illuminate\Support\Facades\Queue::fake();
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
 
         $res = $this->postJson('/api/swap-model', [
@@ -107,7 +107,7 @@ class StudioSwapTest extends TestCase
 
     public function test_swap_model_change_face_requires_model(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $admin = User::where('email', 'admin@fabrikai.shop')->first();
         $this->actingAs($admin);
 
         // Bật đổi khuôn mặt nhưng model_id trống -> 422 (không tìm thấy người mẫu).

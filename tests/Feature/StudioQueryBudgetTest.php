@@ -32,7 +32,7 @@ class StudioQueryBudgetTest extends TestCase
 
     private function admin(): User
     {
-        return User::where('email', 'admin@trillfa.com')->firstOrFail();
+        return User::where('email', 'admin@fabrikai.shop')->firstOrFail();
     }
 
     /** Đo một request: trả [tổng query, số query chạm bảng settings]. */

@@ -1,11 +1,10 @@
 <script setup>
-// SourcePickerPopup — popup GỘP 2 nguồn ảnh (Thư viện ảnh đã tải lên + Sản phẩm) thành
-// MỘT modal 2 tab riêng, giữ nguyên ngữ nghĩa "chọn nhiều → thêm các layer ảnh lên canvas"
-// (store.addImagesToCanvas). Logic từng tab giữ y hệt popup cũ:
-//   - Tab Thư viện: copy logic SourceLibraryPicker (mode multi) — /api/ref-images,
-//     upload /api/upload-ref (uploadRef), sort/search/cols, xóa ảnh, output library.
-//   - Tab Sản phẩm: copy logic popup sản phẩm cũ trong SourcePanel — /api/references.
-// Footer chung: cộng dồn lựa chọn ở CẢ 2 tab rồi "Thêm vào canvas (n)".
+// SourcePickerPopup — popup chọn ảnh nguồn đưa lên canvas: "chọn nhiều → thêm các layer ảnh"
+// (store.addImagesToCanvas). Nguồn ảnh:
+//   - Thư viện ảnh đã tải lên: /api/ref-images, upload /api/upload-ref (uploadRef),
+//     sort/search/cols, xóa ảnh.
+//   - Ảnh kết quả (output library) — lấy từ store.generations.
+// Footer: "Thêm vào canvas (n)".
 import { ref, computed, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
@@ -18,14 +17,12 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue']);
 const close = () => emit('update:modelValue', false);
 
-// Tab đang mở: 'lib' = Thư viện ảnh · 'prod' = Sản phẩm (giữ tab cuối cùng trong phiên).
-const tab = ref('lib');
 const CSRF = () => {
   const m = (typeof document !== 'undefined' && document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/)) || null;
   return m ? decodeURIComponent(m[1]) : '';
 };
 
-// ── Tab 1: Thư viện ảnh đã tải lên (+ output library) — logic y hệt SourceLibraryPicker ──
+// ── Thư viện ảnh đã tải lên (+ ảnh kết quả) ──
 const refs = ref([]);
 const query = ref('');
 const sortKey = ref('newest');
@@ -133,57 +130,11 @@ const sortedRefs = computed(() => {
 });
 const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(0) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; };
 
-// ── Tab 2: Sản phẩm — logic y hệt popup sản phẩm cũ trong SourcePanel ──
-const products = ref([]);
-const pquery = ref('');
-const pCols = ref(4);
-const pSort = ref('newest');
-const selProds = ref([]);
-
-// §5.2: trước đây lỗi tải chỉ được console.error rồi render empty state "Chưa có sản phẩm." —
-// người dùng tưởng thật sự không có sản phẩm và không có cách thử lại.
-const productsError = ref('');
-async function loadProducts() {
-  productsError.value = '';
-  try {
-    const r = await fetch('/api/references?_=' + Date.now(), { headers: { Accept: 'application/json' } });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const d = await r.json();
-    products.value = d.items || [];
-  } catch (e) {
-    console.error('studio request failed', e);
-    products.value = [];
-    productsError.value = e.message || 'Không tải được danh sách sản phẩm.';
-  }
-}
-
-function toggleProd(p) {
-  const i = selProds.value.findIndex((x) => x.id === p.id);
-  if (i >= 0) selProds.value.splice(i, 1);
-  else selProds.value.push(p);
-}
-const isSelProd = (p) => selProds.value.some((x) => x.id === p.id);
-
-const productSortOptions = [
-  { value: 'newest', label: 'Mới nhất' },
-  { value: 'name_asc', label: 'Tên A→Z' },
-  { value: 'name_desc', label: 'Tên Z→A' },
-];
-const sortedProducts = computed(() => {
-  const q = pquery.value.trim().toLowerCase();
-  let list = products.value.slice();
-  if (q) list = list.filter((p) => (p.name || '').toLowerCase().includes(q));
-  const k = pSort.value;
-  if (k === 'name_asc') list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  else if (k === 'name_desc') list.sort((b, a) => (a.name || '').localeCompare(b.name || ''));
-  return list;
-});
-
-// ── Footer chung: cộng dồn lựa chọn cả 2 tab ──
-const totalSel = computed(() => selRefs.value.length + selOutput.value.length + selProds.value.length);
+// ── Footer ──
+const totalSel = computed(() => selRefs.value.length + selOutput.value.length);
 
 function confirmAdd() {
-  const all = [...selRefs.value, ...selOutput.value, ...selProds.value].filter((it) => it && it.url);
+  const all = [...selRefs.value, ...selOutput.value].filter((it) => it && it.url);
   if (!all.length) return;
   store.addImagesToCanvas(all); // thêm layer + tự toast "Đã thêm N ảnh vào canvas."
   close();
@@ -191,11 +142,9 @@ function confirmAdd() {
 
 watch(() => props.modelValue, (open) => {
   if (open) {
-    // Reset bộ lọc + lựa chọn mỗi lần mở (y hệt các picker cũ) — giữ tab cuối cùng.
+    // Reset bộ lọc + lựa chọn mỗi lần mở (y hệt các picker cũ).
     query.value = ''; sortKey.value = 'newest'; selRefs.value = []; selOutput.value = [];
-    pquery.value = ''; pSort.value = 'newest'; selProds.value = [];
     loadRefs();
-    loadProducts();
   }
 });
 </script>
@@ -209,26 +158,15 @@ watch(() => props.modelValue, (open) => {
           <div class="grid h-9 w-9 place-items-center rounded-md bg-brand-600/15 text-brand-300"><StudioIcon name="layers" size="h-4.5 w-4.5"/></div>
           <div>
             <p class="text-sm font-semibold text-cream-100">Thêm ảnh nguồn</p>
-            <p class="text-[11px] text-cream-300/60">Thư viện {{ refs.length + output.length }} ảnh · {{ products.length }} sản phẩm — nhấn chọn nhiều rồi thêm vào canvas</p>
+            <p class="text-[11px] text-cream-300/60">Thư viện {{ refs.length + output.length }} ảnh — nhấn chọn nhiều rồi thêm vào canvas</p>
           </div>
         </div>
         <button @click="close" class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink-800 text-cream-300 transition-colors hover:bg-ink-700 hover:text-white" title="Đóng" :aria-label="'Đóng'"><StudioIcon name="x" size="h-4 w-4"/></button>
       </div>
 
-      <!-- ══ Tab bar: 2 nguồn trong 1 popup ══ -->
-      <div class="mb-3 seg">
-        <button class="seg-btn" :class="tab === 'lib' ? 'is-active' : ''" @click="tab = 'lib'" title="Ảnh đã tải lên (và ảnh kết quả)">
-          <StudioIcon name="imagePlus" size="h-4 w-4"/> Thư viện ảnh
-        </button>
-        <button class="seg-btn" :class="tab === 'prod' ? 'is-active' : ''" @click="tab = 'prod'" title="Chọn ảnh từ sản phẩm">
-          <StudioIcon name="shirt" size="h-4 w-4"/> Sản phẩm
-        </button>
-      </div>
-
       <!-- ══ Thân popup ══ -->
       <div class="flex min-h-0 flex-1 flex-col">
-        <!-- ── Tab 1: Thư viện ảnh đã tải lên ── -->
-        <template v-if="tab === 'lib'">
+        <template>
           <label class="mb-3 flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ink-600 bg-ink-800/40 text-xs font-medium text-cream-200 transition-colors hover:border-brand-500 hover:bg-brand-600/10 hover:text-brand-200" :title="'Tải ảnh mới lên thư viện'">
             <StudioIcon name="imagePlus" size="h-4 w-4"/>
             {{ uploading ? 'Đang tải lên…' : 'Tải ảnh mới' }}<span class="text-cream-300/50">(chọn nhiều file được)</span>
@@ -285,46 +223,12 @@ watch(() => props.modelValue, (open) => {
             </div>
           </div>
         </template>
-
-        <!-- ── Tab 2: Sản phẩm ── -->
-        <template v-else>
-          <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div class="relative flex-1">
-              <StudioIcon name="search" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-300/50"/>
-              <input v-model="pquery" placeholder="Tìm sản phẩm…" class="h-9 w-full rounded-md border border-ink-700 bg-ink-800/60 pl-9 pr-3 text-xs text-cream-100 placeholder:text-cream-300/40 focus:border-brand-500 focus:outline-none">
-            </div>
-            <div class="relative">
-              <StudioIcon name="sliders" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-300/50"/>
-              <select v-model="pSort" class="h-9 w-full appearance-none rounded-md border border-ink-700 bg-ink-800/60 pl-9 pr-8 text-xs text-cream-100 focus:border-brand-500 focus:outline-none sm:w-40">
-                <option v-for="o in productSortOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-              </select>
-              <StudioIcon name="chevronDown" size="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-300/50"/>
-            </div>
-            <div class="flex h-9 items-center gap-2 rounded-md border border-ink-700 bg-ink-800/60 px-3" title="Kích thước ô ảnh">
-              <StudioIcon name="grid" size="h-4 w-4 shrink-0 text-cream-300/50"/>
-              <input type="range" min="2" max="8" step="1" v-model.number="pCols" class="h-1.5 w-24 cursor-pointer accent-brand-500">
-            </div>
-          </div>
-
-          <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto overscroll-contain pr-1" :style="{ gridTemplateColumns: 'repeat(' + pCols + ', minmax(0, 1fr))' }">
-            <div v-for="p in sortedProducts" :key="p.id" class="group relative cursor-pointer overflow-hidden rounded-md border transition-colors" :class="isSelProd(p) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" :title="p.name" style="padding-bottom: 100%" @click="toggleProd(p)">
-              <img :src="thumbUrl(p.url)" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt="" @error="onThumbError($event, p.url)">
-              <span v-if="isSelProd(p)" class="pointer-events-none absolute inset-0 grid place-items-center bg-brand-500/15"><span class="grid h-9 w-9 place-items-center rounded-full bg-brand-500 text-white shadow-lg ring-2 ring-white/50"><StudioIcon name="check" size="h-5 w-5"/></span></span>
-              <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span>
-            </div>
-            <div v-if="!sortedProducts.length" class="col-span-full py-10 text-center">
-              <p v-if="productsError" class="text-xs text-red-300">Không tải được danh sách sản phẩm: {{ productsError }}</p>
-              <p v-else class="text-xs text-cream-300/50">{{ products.length ? 'Không có sản phẩm khớp tìm kiếm.' : 'Chưa có sản phẩm.' }}</p>
-              <button v-if="productsError" @click="loadProducts" class="mt-2 rounded-full border border-ink-600 bg-ink-800 px-3 py-1 text-xs font-semibold text-cream-200 transition hover:bg-ink-700">Thử lại</button>
-            </div>
-          </div>
-        </template>
       </div>
 
-      <!-- ══ Footer chung (cộng dồn cả 2 tab) ══ -->
+      <!-- ══ Footer ══ -->
       <div class="mt-3 flex shrink-0 items-center justify-between gap-2">
         <span class="text-[11px] text-cream-300/70">
-          {{ totalSel ? 'Đã chọn ' + totalSel + ' ảnh (' + (selRefs.length + selOutput.length) + ' thư viện · ' + selProds.length + ' sản phẩm)' : 'Nhấn chọn 1 hoặc nhiều ảnh ở 2 tab để thêm vào canvas' }}
+          {{ totalSel ? 'Đã chọn ' + totalSel + ' ảnh' : 'Nhấn chọn 1 hoặc nhiều ảnh để thêm vào canvas' }}
         </span>
         <button @click="confirmAdd" :disabled="!totalSel" class="flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-40" title="Thêm ảnh đã chọn vào canvas (không xóa ảnh cũ)">
           <StudioIcon name="plus" size="h-4 w-4"/>Thêm vào canvas ({{ totalSel }})

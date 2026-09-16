@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| FabrikAI — AI fashion design studio (app độc lập, tách từ TrillfaShop).
+| FabrikAI — AI fashion design studio (fabrikai.shop).
 |--------------------------------------------------------------------------
 | - SPA Vue: / (StudioApp), /settings, /presets, /stylist-data.
 | - API JSON: /api/* (auth+admin), public read/image ở /api/*.
@@ -30,10 +30,6 @@ Route::get('/', [StudioController::class, 'appIndex'])->name('home');
 Route::get('/settings', [StudioController::class, 'settingsPage'])->name('settings.page');
 Route::get('/presets', [StudioController::class, 'presetsPage'])->name('presets.page');
 Route::get('/stylist-data', [StudioController::class, 'stylistDataPage'])->name('stylist-data.page');
-
-// Legacy redirects (đường /studio cũ của TrillfaShop)
-Route::redirect('/studio', '/');
-Route::redirect('/studio/library', '/');
 
 // ── FabrikAI API (auth + admin + no-store) ──
 Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->group(function () {
@@ -119,7 +115,6 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->gr
     Route::delete('/generations/{generation}', [StudioController::class, 'destroy'])->name('generations.destroy');
     Route::post('/generations/{generation}/rename', [StudioController::class, 'renameGeneration'])->name('generations.rename');
     // References / presets / defaults
-    Route::get('/references', [StudioController::class, 'references'])->name('references');
     Route::get('/latest', [StudioController::class, 'latest'])->name('latest');
     Route::get('/presets', [StudioController::class, 'presets'])->name('presets');
     Route::post('/presets', [StudioController::class, 'storePreset'])->name('presets.store');
@@ -156,7 +151,6 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->gr
     Route::post('/settings', [StudioController::class, 'updateSettings'])->name('settings.update');
     Route::post('/settings/models', [StudioController::class, 'updateModelSettings'])->name('settings.models');
     Route::post('/settings/suggest', [StudioController::class, 'updateSuggestSettings'])->name('settings.suggest');
-    Route::post('/settings/product-ai', [StudioController::class, 'updateProductAiSettings'])->name('settings.product-ai');
     Route::post('/settings/faceswap', [StudioController::class, 'saveFaceswapPrompt'])->name('settings.faceswap');
     // Stylist data (Trợ lý thiết kế) — CRUD (admin)
     Route::post('/stylist-data/types', [StylistDataController::class, 'saveType'])->name('stylist.data.types.save');

@@ -114,37 +114,6 @@ return [
     | Cấu hình RIÊNG cho trợ lý viết mô tả / SEO ở trang tạo-sửa sản phẩm (admin).
     | Ưu tiên Qwen trước (qwen3.8-flash …) rồi mới Gemini; mọi model/key đều đọc
     | từ đây (DB Settings → env → config) nên nâng cấp model sau này không cần sửa code.
-    */
-    'product_ai' => [
-        'enabled' => (bool) env('STUDIO_PRODUCT_AI_ENABLED', true),
-        'provider_order' => env('STUDIO_PRODUCT_AI_PROVIDER_ORDER', 'qwen,gemini,deepseek'), // qwen trước, deepseek cuối (text)
-        'qwen_text_models' => env('STUDIO_PRODUCT_AI_QWEN_TEXT_MODELS', ''), // '' = theo studio_qwen_text_models
-        'qwen_vision_models' => env('STUDIO_PRODUCT_AI_QWEN_VISION_MODELS', ''), // '' = theo studio_suggest_qwen_models
-        'qwen_paygo_text_models' => env('STUDIO_PRODUCT_AI_QWEN_PAYGO_TEXT_MODELS', ''), // '' = qwen-plus,turbo (dashscope-intl)
-        'qwen_paygo_vision_models' => env('STUDIO_PRODUCT_AI_QWEN_PAYGO_VISION_MODELS', ''), // '' = qwen-vl-max,plus
-        'gemini_text_model' => env('STUDIO_PRODUCT_AI_GEMINI_TEXT_MODEL', 'gemini-2.5-flash'),
-        'gemini_vision_model' => env('STUDIO_PRODUCT_AI_GEMINI_VISION_MODEL', 'gemini-2.5-flash'),
-        'deepseek_model' => env('STUDIO_PRODUCT_AI_DEEPSEEK_MODEL', 'deepseek-chat'),
-        'timeout_seconds' => (int) env('STUDIO_PRODUCT_AI_TIMEOUT', 90), // 1 call đa phương thức (giống "Gợi ý từ ảnh") cần ~30-90s
-        'total_budget_seconds' => (int) env('STUDIO_PRODUCT_AI_TOTAL_BUDGET', 90), // trần tổng cho một lần bấm AI
-        'max_models' => (int) env('STUDIO_PRODUCT_AI_MAX_MODELS', 1), // chỉ qwen3.8-flash — giảm thời gian, không thử model dự phòng
-        'max_keys' => (int) env('STUDIO_PRODUCT_AI_MAX_KEYS', 3),
-        'downscale_max' => (int) env('STUDIO_PRODUCT_AI_DOWNSCALE_MAX', 640),
-        'cache_ttl_hours' => (int) env('STUDIO_PRODUCT_AI_CACHE_TTL_HOURS', 720), // 30 ngày
-        'temperature' => (float) env('STUDIO_PRODUCT_AI_TEMPERATURE', 0.7),
-        'max_tokens' => (int) env('STUDIO_PRODUCT_AI_MAX_TOKENS', 700), // output vừa phải để host token-plan/paygo trả về kịp (không timeout)
-        'vision_max_tokens' => (int) env('STUDIO_PRODUCT_AI_VISION_MAX_TOKENS', 400), // VISION (chỉ hiểu ảnh — rẻ & nhanh)
-
-        // Ngân sách token theo hạng mục tinh chỉnh — càng ít càng nhanh
-        'refine_names_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_NAMES_TOKENS', 500),
-        'refine_name_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_NAME_TOKENS', 350),
-        'refine_seo_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_SEO_TOKENS', 650),
-        'refine_desc_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_DESC_TOKENS', 1500),
-        'refine_desc_variants_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_DESC_VARIANTS_TOKENS', 4000),
-
-        // Cache kết quả tinh chỉnh (giây) — gọi lại chip cùng dữ liệu → tức thì
-        'refine_cache_ttl' => (int) env('STUDIO_PRODUCT_AI_REFINE_CACHE_TTL', 600),
-    ],
 
     /*
     |--------------------------------------------------------------------------

@@ -18,7 +18,7 @@ class StudioInpaintTest extends TestCase
     {
         parent::setUp();
         $this->seed();
-        $this->actingAs(User::where('email', 'admin@trillfa.com')->firstOrFail());
+        $this->actingAs(User::where('email', 'admin@fabrikai.shop')->firstOrFail());
     }
 
     private function makeSourceGen(): Generation

@@ -151,31 +151,25 @@ class StaticIntegrityTest extends TestCase
     }
 
     /**
-     * 9 tham chiếu hỏng DUY NHẤT còn lại, tất cả nằm trong tàn dư storefront mà T8 giữ lại có chủ đích.
-     * Đã xác minh chúng KHÔNG reachable: 0 route trỏ tới các class này, 0 blade gọi helper của chúng,
-     * nên không đường chạy nào chạm tới `route()` hỏng ⇒ không có 500 nào xảy ra hôm nay.
+     * RỖNG — và phải giữ nguyên như vậy.
      *
-     * Bất biến: danh sách này chỉ được PHÉP NGẮN ĐI, không được dài ra. Mục mới xuất hiện = có dead
-     * code mới lọt vào (hoặc một route sống vừa bị xoá mà còn người gọi).
+     * Trước đây có 9 mục ở đây: tàn dư storefront (CustomPage · MenuItem · CartService · Seo ·
+     * menu_items()) trỏ tới các route thuộc nhóm shop / product / blog không hề tồn tại. Khi đó chúng được
+     * khai báo tường minh vì đã xác minh là KHÔNG reachable.
+     *
+     * Toàn bộ module thương mại điện tử đã được GỠ khỏi app (2026-09-17) nên 9 tham chiếu đó biến mất
+     * cùng nó. Danh sách này chỉ được phép NGẮN ĐI; thêm mục mới nghĩa là vừa có dead code mới lọt vào
+     * (hoặc một route sống bị xoá mà vẫn còn người gọi) — cả hai đều phải sửa, không phải khai báo.
      */
-    private const DEAD_ROUTE_REFS = [
-        'app/Models/CustomPage.php|page.show',
-        'app/Models/CustomPage.php|shop.category',
-        'app/Models/CustomPage.php|shop.index',
-        'app/Models/MenuItem.php|shop.category',
-        'app/Services/CartService.php|product.show',
-        'app/Support/Seo.php|blog.show',
-        'app/Support/Seo.php|product.show',
-        'app/Support/Seo.php|shop.index',
-        'app/Support/helpers.php|shop.category',
-    ];
+    private const DEAD_ROUTE_REFS = [];
 
-    public function test_storefront_dead_code_is_not_reachable_from_live_entry_points(): void
+    public function test_storefront_module_is_gone_for_good(): void
     {
-        // "Dead code ở lại phải ở yên đó." Nếu một trong các class này được nối vào app/Http (controller,
-        // middleware), routes/ (route sống) hoặc resources/views (blade render được), thì các route()
-        // hỏng ở trên trở thành 500 THẬT. Test này chặn đúng bước nối dây đó.
-        $symbols = ['CustomPage', 'MenuItem', 'CartService', 'App\\Support\\Seo', 'menu_items(', 'seo()', 'cart_count('];
+        // Bất biến NGƯỢC với trước đây: module thương mại điện tử phải ở yên trong quá khứ.
+        // Nếu một trong các tên này quay lại app/Http, routes/ hoặc resources/views thì hoặc là
+        // code chết vừa được nối lại, hoặc ai đó đang port storefront ngược vào app studio.
+        $symbols = ['CustomPage', 'MenuItem', 'CartService', 'CheckoutService', 'App\\Support\\Seo',
+                    'menu_items(', 'seo()', 'cart_count(', 'App\\Models\\Product', 'App\\Models\\Order'];
         $liveDirs = ['app/Http', 'routes', 'resources/views'];
 
         $leaks = [];
