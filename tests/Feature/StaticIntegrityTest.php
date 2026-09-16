@@ -118,6 +118,90 @@ class StaticIntegrityTest extends TestCase
         $this->assertSame([], $broken, "Asset tĩnh trong blade không có trên disk:\n".implode("\n", $broken));
     }
 
+    public function test_route_references_resolve_to_registered_names(): void
+    {
+        $names = [];
+        foreach (Route::getRoutes() as $route) {
+            if ($name = $route->getName()) {
+                $names[] = $name;
+            }
+        }
+
+        $broken = [];
+        // Quét cả blade: `{{ route('login.store') }}` là chỗ dùng route() phổ biến thứ hai sau controller.
+        foreach (array_merge($this->sourceFiles(['php']), $this->bladeFiles()) as $file) {
+            $rel = $this->rel($file);
+            preg_match_all("/route\(\s*'([a-zA-Z0-9_.\-]+)'/", (string) file_get_contents($file), $m);
+            foreach (array_unique($m[1]) as $name) {
+                if (in_array($name, $names, true)) {
+                    continue;
+                }
+                if (in_array($rel.'|'.$name, self::DEAD_ROUTE_REFS, true)) {
+                    continue;
+                }
+                $broken[] = "{$rel} -> route('{$name}')";
+            }
+        }
+
+        $this->assertSame([], $broken,
+            "route('...') trỏ tới route name KHÔNG đăng ký — gọi tới sẽ ném RouteNotFoundException (500):\n"
+            .implode("\n", $broken)
+            ."\n\nNếu đây là dead code mới: xoá nó, hoặc khai vào DEAD_ROUTE_REFS kèm lý do."
+        );
+    }
+
+    /**
+     * 9 tham chiếu hỏng DUY NHẤT còn lại, tất cả nằm trong tàn dư storefront mà T8 giữ lại có chủ đích.
+     * Đã xác minh chúng KHÔNG reachable: 0 route trỏ tới các class này, 0 blade gọi helper của chúng,
+     * nên không đường chạy nào chạm tới `route()` hỏng ⇒ không có 500 nào xảy ra hôm nay.
+     *
+     * Bất biến: danh sách này chỉ được PHÉP NGẮN ĐI, không được dài ra. Mục mới xuất hiện = có dead
+     * code mới lọt vào (hoặc một route sống vừa bị xoá mà còn người gọi).
+     */
+    private const DEAD_ROUTE_REFS = [
+        'app/Models/CustomPage.php|page.show',
+        'app/Models/CustomPage.php|shop.category',
+        'app/Models/CustomPage.php|shop.index',
+        'app/Models/MenuItem.php|shop.category',
+        'app/Services/CartService.php|product.show',
+        'app/Support/Seo.php|blog.show',
+        'app/Support/Seo.php|product.show',
+        'app/Support/Seo.php|shop.index',
+        'app/Support/helpers.php|shop.category',
+    ];
+
+    public function test_storefront_dead_code_is_not_reachable_from_live_entry_points(): void
+    {
+        // "Dead code ở lại phải ở yên đó." Nếu một trong các class này được nối vào app/Http (controller,
+        // middleware), routes/ (route sống) hoặc resources/views (blade render được), thì các route()
+        // hỏng ở trên trở thành 500 THẬT. Test này chặn đúng bước nối dây đó.
+        $symbols = ['CustomPage', 'MenuItem', 'CartService', 'App\\Support\\Seo', 'menu_items(', 'seo()', 'cart_count('];
+        $liveDirs = ['app/Http', 'routes', 'resources/views'];
+
+        $leaks = [];
+        foreach ($liveDirs as $dir) {
+            $path = base_path($dir);
+            if (! is_dir($path)) {
+                continue;
+            }
+            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path)) as $f) {
+                if (! $f->isFile()) {
+                    continue;
+                }
+                $src = (string) file_get_contents($f->getPathname());
+                foreach ($symbols as $sym) {
+                    if (str_contains($src, $sym)) {
+                        $leaks[] = $this->rel($f->getPathname()).' -> '.$sym;
+                    }
+                }
+            }
+        }
+
+        $this->assertSame([], $leaks,
+            "Tàn dư storefront bị nối vào đường chạy SỐNG (sẽ kéo theo route() hỏng):\n".implode("\n", $leaks)
+        );
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     /** @return string[] */
