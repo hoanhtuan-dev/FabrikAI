@@ -1347,6 +1347,75 @@ RULES:
     /**
      * Polling endpoint for a single generation.
      */
+    /**
+     * Đẩy generation còn 'pending' sang QUEUE cho worker nền xử lý (chế độ production, N11/M13).
+     *
+     * Vì sao KHÔNG xử lý inline ở đây: các service phải sleep() chờ provider (ảnh ~3 phút,
+     * video tới ~8 phút). Chạy trong request ⇒ giữ chặt một tiến trình PHP-FPM suốt thời gian đó;
+     * vài request đồng thời là cạn pool ⇒ sập site. Job nền mới là chỗ đúng để sleep().
+     *
+     * Chống dội queue: client poll mỗi ~1 giây, nếu enqueue mọi lần thì 5 phút = ~300 job cho CÙNG
+     * một generation. Dùng `Cache::add` (chỉ true ở lần đặt khoá ĐẦU TIÊN) làm chốt chặn; các job
+     * trùng dù có lọt cũng vô hại vì job TỰ CAS pending->processing rồi return ngay.
+     */
+    protected function enqueuePending(Generation $generation): void
+    {
+        if (! \Illuminate\Support\Facades\Cache::add('studio:queued:'.$generation->id, 1, now()->addMinutes(10))) {
+            return; // đã enqueue cho generation này rồi
+        }
+
+        if (($generation->meta['swap'] ?? false) === true) {
+            \App\Jobs\SwapModelJob::dispatch($generation->id);
+        } elseif ($generation->type === 'video') {
+            RenderVideoJob::dispatch($generation->id);
+        } else {
+            RenderImageJob::dispatch($generation->id);
+        }
+    }
+
+    /**
+     * "Lazy worker" — request hiện tại tự xử lý generation còn 'pending' (máy chủ CHƯA có worker nền).
+     *
+     * Giữ chạy tiếp cả khi client ngắt kết nối (ignore_user_abort) để không giết provider đang chạy dở.
+     * ⚠️ Chế độ này giữ request tới vài phút — chỉ dùng cho dev / máy chủ nhỏ; production nên bật
+     * STUDIO_QUEUE_WORKER=true và chạy `php artisan queue:work`.
+     */
+    protected function processPendingInline(Generation $generation): void
+    {
+        set_time_limit(600);
+        ignore_user_abort(true);
+
+        if (($generation->meta['swap'] ?? false) === true) {
+            // Swap: CAS claim pending->processing rồi chạy pipeline inline — không phụ thuộc queue worker.
+            $claimed = Generation::where('id', $generation->id)->where('status', 'pending')->update(['status' => 'processing']);
+            if ($claimed) {
+                try {
+                    app(StudioController::class)->executeSwapFromGeneration($generation);
+                } catch (\Throwable $e) {
+                    logger()->error('Lazy swap failed for generation #'.$generation->id.': '.$e->getMessage());
+                    $generation->update(['status' => 'failed', 'error' => studio_generation_error($e)]);
+                }
+            }
+
+            return;
+        }
+
+        // KHÔNG set 'processing' ở đây. RenderImageJob/RenderVideoJob TỰ CAS pending->processing
+        // (handle() dòng ~40). Set trước như bản cũ làm CAS của job thất bại -> job return ngay ->
+        // generation kẹt 'processing' VĨNH VIỄN (bug thật, do CAS được thêm vào job trong đợt tách
+        // app; StudioInpaintTest bắt được).
+        try {
+            if ($generation->type === 'video') {
+                RenderVideoJob::dispatchSync($generation->id);
+            } else {
+                RenderImageJob::dispatchSync($generation->id);
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Lazy process failed for generation #'.$generation->id.': '.$e->getMessage());
+            $generation->update(['status' => 'failed', 'error' => studio_generation_error($e)]);
+        }
+    }
+
     public function show(Generation $generation)
     {
         abort_unless($generation->user_id === auth()->id(), 403);
@@ -1358,37 +1427,12 @@ RULES:
             && $generation->updated_at->lt(now()->subMinutes($stuckWindow))) {
             $this->failStuck($generation, 'Hết thời gian xử lý (có thể request đã bị ngắt). Đã hoàn tiền vào tài khoản. Vui lòng thử lại bằng cách tạo mới, hoặc bấm “Xử lý ngay” ở thanh công cụ nếu còn nhiệm vụ chờ.');
         } elseif ($generation->status === 'pending') {
-            // Lazy worker: if this generation is still pending (not picked up by a worker), process it
-            // inline now so the polling request returns the completed result. Keep running even if the
-            // polling client disconnects (ignore_user_abort) so a slow provider isn't killed mid-run.
-            set_time_limit(600);
-            ignore_user_abort(true);
-            if (($generation->meta['swap'] ?? false) === true) {
-                // Swap: CAS claim pending->processing rồi chạy pipeline inline — không phụ thuộc queue worker.
-                $claimed = \App\Models\Generation::where('id', $generation->id)->where('status', 'pending')->update(['status' => 'processing']);
-                if ($claimed) {
-                    try {
-                        app(StudioController::class)->executeSwapFromGeneration($generation);
-                    } catch (\Throwable $e) {
-                        logger()->error('Lazy swap failed for generation #'.$generation->id.': '.$e->getMessage());
-                        $generation->update(['status' => 'failed', 'error' => studio_generation_error($e)]);
-                    }
-                }
+            // N11/M13 (T7): máy chủ có worker nền thì request chỉ ENQUEUE rồi trả về ngay.
+            // Máy chủ chưa có worker thì giữ "lazy worker" xử lý inline như trước.
+            if (config('studio.queue_worker')) {
+                $this->enqueuePending($generation);
             } else {
-                // KHÔNG set 'processing' ở đây. RenderImageJob/RenderVideoJob TỰ CAS
-                // pending->processing (handle() dòng ~40). Set trước như bản cũ làm CAS của job
-                // thất bại -> job return ngay -> generation kẹt 'processing' VĨNH VIỄN (bug thật,
-                // do CAS được thêm vào job trong đợt tách app; StudioInpaintTest bắt được).
-                try {
-                    if ($generation->type === 'video') {
-                        RenderVideoJob::dispatchSync($generation->id);
-                    } else {
-                        RenderImageJob::dispatchSync($generation->id);
-                    }
-                } catch (\Throwable $e) {
-                    logger()->error('Lazy process failed for generation #'.$generation->id.': '.$e->getMessage());
-                    $generation->update(['status' => 'failed', 'error' => studio_generation_error($e)]);
-                }
+                $this->processPendingInline($generation);
             }
         }
 
@@ -4697,10 +4741,15 @@ RULES:
             ->reject(fn ($g) => ($g->meta['swap'] ?? false) === true)
             ->take(5)->values();
 
+        // N11/M13 (T7): có worker nền thì chỉ enqueue (nút trả về ngay); chưa có thì chạy inline như cũ.
+        $useQueue = (bool) config('studio.queue_worker');
+
         $n = 0;
         foreach ($pending as $gen) {
             try {
-                if ($gen->type === 'video') {
+                if ($useQueue) {
+                    $this->enqueuePending($gen);
+                } elseif ($gen->type === 'video') {
                     RenderVideoJob::dispatchSync($gen->id);
                 } else {
                     RenderImageJob::dispatchSync($gen->id);
@@ -4711,7 +4760,13 @@ RULES:
             }
         }
 
-        return response()->json(['processed' => $n, 'message' => 'Đã xử lý '.$n.' công việc đang chờ.']);
+        return response()->json([
+            'processed' => $n,
+            'queued' => $useQueue,
+            'message' => $useQueue
+                ? 'Đã đưa '.$n.' công việc đang chờ vào hàng đợi — worker nền sẽ xử lý.'
+                : 'Đã xử lý '.$n.' công việc đang chờ.',
+        ]);
     }
 
     /**

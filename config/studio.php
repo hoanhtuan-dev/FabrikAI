@@ -148,6 +148,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Queue worker — quyết định REQUEST có bị giữ lâu hay không (N11/M13)
+    |--------------------------------------------------------------------------
+    | Máy chủ này có `php artisan queue:work` chạy nền hay không?
+    |
+    |  false (MẶC ĐỊNH) — "lazy worker": khi client poll một generation còn 'pending',
+    |      chính REQUEST đó xử lý inline để trả kết quả ngay. Tiện cho dev và cho máy
+    |      chủ chưa dựng worker, NHƯNG request có thể bị giữ tới ~8 phút vì các service
+    |      phải sleep() chờ provider (ảnh ~3 phút, video tới ~8 phút — xem N11/M13).
+    |      Vài request đồng thời là cạn pool PHP-FPM ⇒ sập cả site.
+    |
+    |  true — production CÓ worker: request chỉ ENQUEUE rồi trả về ngay, job nền mới
+    |      là chỗ sleep(). Đây là chế độ ĐÚNG cho production.
+    |
+    | ⚠️ Bật cờ này mà KHÔNG chạy worker ⇒ generation không bao giờ được xử lý (bộ
+    | "heal" sẽ đánh dấu thất bại + hoàn credit sau 6–8 phút). Chạy kèm:
+    |     php artisan queue:work --timeout=900 --tries=1
+    |
+    | Lưu ý: đọc thẳng từ config (KHÔNG qua studio_config()) để tránh việc một setting
+    | trong DB vô tình lật chế độ của cả máy chủ.
+    */
+    'queue_worker' => (bool) env('STUDIO_QUEUE_WORKER', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | AI providers (optional)
     |--------------------------------------------------------------------------
     | Set these in .env when you have real API keys. When empty the services
