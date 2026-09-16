@@ -1,6 +1,6 @@
 {
-  "_StylistDataManager-Cbnjyw_u.js": {
-    "file": "assets/StylistDataManager-Cbnjyw_u.js",
+  "_StylistDataManager-CrA6GmQ6.js": {
+    "file": "assets/StylistDataManager-CrA6GmQ6.js",
     "name": "StylistDataManager",
     "imports": [
       "_pageBoot-CSiB9QwX.js"
@@ -99,7 +99,7 @@
     "isEntry": true
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-BO6adxbu.js",
+    "file": "assets/main-CkaN_lPx.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -107,10 +107,10 @@
       "_pageBoot-CSiB9QwX.js",
       "_pinia-CrfKN_W_.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_StylistDataManager-Cbnjyw_u.js"
+      "_StylistDataManager-CrA6GmQ6.js"
     ],
     "css": [
-      "assets/main-4xM86ml2.css"
+      "assets/main-CgHGKauf.css"
     ]
   },
   "resources/js/studio/presets.js": {
@@ -137,14 +137,14 @@
     ]
   },
   "resources/js/studio/stylist-data.js": {
-    "file": "assets/stylist-data-CNc5JsIH.js",
+    "file": "assets/stylist-data-CCQMfr-7.js",
     "name": "stylist-data",
     "src": "resources/js/studio/stylist-data.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-CSiB9QwX.js",
       "_pinia-CrfKN_W_.js",
-      "_StylistDataManager-Cbnjyw_u.js"
+      "_StylistDataManager-CrA6GmQ6.js"
     ]
   }
 }

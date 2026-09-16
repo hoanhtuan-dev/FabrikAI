@@ -12,6 +12,11 @@ const current = computed(() => items.value[idx.value] || store.viewer);
 const isVideo = computed(() => current.value?.type === 'video');
 const imgError = ref(false);
 
+// §5.2 (a11y): modal này đã có Esc + khóa scroll nền + cleanup, nhưng thiếu role/aria-modal và không
+// nhận focus -> trình đọc màn hình không biết đây là hộp thoại và Tab vẫn đi xuyên ra sau lớp phủ.
+// Theo đúng mẫu đã áp ở BaseModal.vue.
+const rootEl = ref(null);
+
 // ── Bảng "thông tin ảnh" thu gọn / mở rộng ──
 const infoOpen = ref(true);
 const fieldsOpen = ref(true); // lưới "Thông tin ảnh" (Dự án · Model · Provider …) thu gọn được
@@ -289,6 +294,7 @@ onMounted(() => {
   window.addEventListener('keydown', onKey, true);
   document.body.style.overflow = 'hidden'; // khóa scroll nền khi modal mở
   nextTick(scrollStripToActive);
+  nextTick(() => rootEl.value?.focus?.());
   prefetchNeighbors();
 });
 onBeforeUnmount(() => {
@@ -299,7 +305,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-2 backdrop-blur-sm sm:p-5" @click.self="close">
+  <div ref="rootEl" tabindex="-1" role="dialog" aria-modal="true" aria-label="Xem ảnh" class="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-2 outline-none backdrop-blur-sm sm:p-5" @click.self="close">
     <!-- Đóng -->
     <button @click="close" class="absolute right-4 top-4 z-30 grid h-10 w-10 place-items-center rounded-full bg-ink-900/90 text-cream-200 transition hover:bg-ink-700 hover:text-white" title="Đóng (Esc)" aria-label="Đóng">
       <StudioIcon name="x" size="h-5 w-5" />

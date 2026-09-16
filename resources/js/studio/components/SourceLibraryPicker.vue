@@ -143,7 +143,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
 </script>
 
 <template>
-  <div v-if="modelValue" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" @click.self="close">
+  <div v-if="modelValue" role="dialog" aria-modal="true" aria-label="Chọn từ thư viện" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" @click.self="close">
     <div class="flex h-[82vh] w-full max-w-3xl flex-col rounded-lg border border-ink-700 bg-ink-900 p-4 shadow-2xl" style="height: min(82vh, 760px)">
       <div class="mb-3 flex items-start justify-between">
         <div class="flex items-center gap-2.5">

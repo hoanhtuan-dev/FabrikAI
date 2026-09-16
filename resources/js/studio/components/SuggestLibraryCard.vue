@@ -164,7 +164,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
     </div>
 
     <!-- Detail modal -->
-    <div v-if="showDetail" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="closeDetail">
+    <div v-if="showDetail" role="dialog" aria-modal="true" aria-label="Chi tiết prompt" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="closeDetail">
       <div class="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-lg border border-brand-500/40 bg-ink-900 shadow-2xl" @click.stop>
         <template v-for="item in store.suggestLibItems.filter(x => x.id === showDetail)" :key="item.id">
           <div class="flex items-center justify-between border-b border-ink-700 px-4 py-3">

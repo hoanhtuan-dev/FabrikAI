@@ -326,7 +326,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
     </div>
 
     <!-- ══ Modal chi tiết ══ -->
-    <div v-if="showDetail" class="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4" @click.self="closeDetail">
+    <div v-if="showDetail" role="dialog" aria-modal="true" aria-label="Chi tiết prompt" class="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4" @click.self="closeDetail">
       <div class="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-lg border border-brand-500/40 bg-ink-900 shadow-2xl" @click.stop>
         <template v-for="item in store.suggestLibItems.filter(x => x.id === showDetail)" :key="item.id">
           <div class="flex items-center justify-between border-b border-ink-700 px-4 py-3">
@@ -401,7 +401,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
     </div>
 
     <!-- ══ Modal thêm / sửa prompt (CRUD) ══ -->
-    <div v-if="editorOpen" class="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4" @click.self="closeEditor">
+    <div v-if="editorOpen" role="dialog" aria-modal="true" aria-label="Sửa prompt" class="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4" @click.self="closeEditor">
       <div class="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-lg border border-brand-500/40 bg-ink-900 shadow-2xl" @click.stop>
         <div class="flex items-center justify-between border-b border-ink-700 px-4 py-3">
           <h3 class="text-sm font-semibold text-brand-300">{{ editingId ? 'Sửa Prompt' : 'Thêm Prompt' }}</h3>

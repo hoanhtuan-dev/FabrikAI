@@ -167,7 +167,7 @@ Chiffon mỏng nhẹ"></textarea></div>
     </div>
 
     <!-- Confirm xóa (modal riêng, không dùng window.confirm) -->
-    <div v-if="confirmOpen" class="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4" @click.self="cancelConfirm">
+    <div v-if="confirmOpen" role="dialog" aria-modal="true" aria-label="Xác nhận xóa" class="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4" @click.self="cancelConfirm">
       <div class="w-full max-w-sm rounded-lg border border-red-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
         <p class="mb-2 text-sm font-semibold text-cream-100">⚠️ Xác nhận xóa</p>
         <p class="mb-4 text-xs leading-relaxed text-cream-200">{{ confirmMsg }}</p>

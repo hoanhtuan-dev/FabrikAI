@@ -248,6 +248,58 @@ class StaticIntegrityTest extends TestCase
         );
     }
 
+    public function test_full_screen_overlays_declare_their_role(): void
+    {
+        // §5.2/§5.3: vá a11y (`role="dialog"` + `aria-modal`) trước đây chỉ áp ở BaseModal.vue và
+        // ProjectWorkspace.vue; 12 overlay toàn màn hình khác bị bỏ sót — trình đọc màn hình không
+        // biết đó là hộp thoại và vẫn đọc nội dung phía sau lớp phủ.
+        //
+        // Bất biến: mọi lớp phủ `fixed inset-0` CÓ nội dung đều phải khai `role`.
+        // Miễn trừ hợp lệ (không phải hộp thoại):
+        //   • backdrop chỉ để bắt cú click ra ngoài (thẻ rỗng, hoặc có @pointerdown)
+        //   • dòng chú thích
+        $violations = [];
+
+        foreach ($this->vueFiles() as $file) {
+            $rel = $this->rel($file);
+            $src = (string) file_get_contents($file);
+
+            // Bỏ chú thích trước khi tách thẻ: dòng mô tả "fixed inset-0" trong chú thích không phải markup.
+            $src = preg_replace([
+                '/<!--.*?-->/s',
+                '/\{\{--.*?--\}\}/s',
+                '/\/\*.*?\*\//s',
+                '/^[ \t]*\/\/.*$/m',
+            ], '', $src);
+
+            // Tách THẺ THẬT (không phải từng dòng) — thẻ có thể trải nhiều dòng, và cách soi "cửa sổ
+            // lân cận" đã bị chứng minh là quá lỏng: một overlay KHÔNG role đặt ngay trước một thẻ có
+            // role sẽ được miễn trừ oan (mutation-test phát hiện).
+            preg_match_all('/<[a-zA-Z][^>]*>/s', (string) $src, $m, PREG_OFFSET_CAPTURE);
+
+            foreach ($m[0] as [$tag, $offset]) {
+                if (! str_contains($tag, 'fixed inset-0')) {
+                    continue;
+                }
+                if (str_contains($tag, '@pointerdown')) {
+                    continue;   // backdrop của menu: chỉ bắt pointerdown để đóng popup
+                }
+                $after = substr((string) $src, $offset + strlen($tag), 8);
+                if (str_starts_with($after, '</div>')) {
+                    continue;   // backdrop rỗng: chỉ để bắt cú click ra ngoài
+                }
+                if (! str_contains($tag, 'role=')) {
+                    $line = substr_count(substr((string) $src, 0, $offset), "\n") + 1;
+                    $violations[] = $rel.':'.$line.' — lớp phủ thiếu role="dialog"';
+                }
+            }
+        }
+
+        $this->assertSame([], $violations,
+            "Lớp phủ toàn màn hình thiếu role/aria-modal:\n".implode("\n", $violations)
+        );
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     /** @return string[] */
@@ -288,6 +340,19 @@ class StaticIntegrityTest extends TestCase
         $out = [];
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(resource_path('js'))) as $f) {
             if ($f->isFile() && $f->getExtension() === 'js') {
+                $out[] = $f->getPathname();
+            }
+        }
+
+        return $out;
+    }
+
+    /** @return string[] */
+    private function vueFiles(): array
+    {
+        $out = [];
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(resource_path('js/studio'))) as $f) {
+            if ($f->isFile() && $f->getExtension() === 'vue') {
                 $out[] = $f->getPathname();
             }
         }

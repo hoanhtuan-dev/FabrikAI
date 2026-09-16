@@ -201,7 +201,7 @@ watch(() => props.modelValue, (open) => {
 </script>
 
 <template>
-  <div v-if="modelValue" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" @click.self="close">
+  <div v-if="modelValue" role="dialog" aria-modal="true" aria-label="Chọn nguồn ảnh" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" @click.self="close">
     <div class="flex h-[82vh] w-full max-w-3xl flex-col rounded-lg border border-ink-700 bg-ink-900 p-4 shadow-2xl" style="height: min(82vh, 760px)">
       <!-- ══ Header ══ -->
       <div class="mb-3 flex items-start justify-between">

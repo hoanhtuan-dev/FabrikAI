@@ -600,7 +600,7 @@ const bodyHipsLabel = computed(() => {
           </div>
 
           <!-- Templates popup -->
-          <div v-if="showTemplates" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showTemplates = false">
+          <div v-if="showTemplates" role="dialog" aria-modal="true" aria-label="Mẫu phom dáng" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showTemplates = false">
             <div class="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-lg border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
               <div class="mb-3 flex items-center justify-between">
                 <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="template" /> Prompt Templates</span>
@@ -803,7 +803,7 @@ const bodyHipsLabel = computed(() => {
         </div>
 
         <!-- Enrich Preview popup -->
-        <div v-if="showEnrich" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showEnrich = false">
+        <div v-if="showEnrich" role="dialog" aria-modal="true" aria-label="Xem trước prompt đã làm giàu" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showEnrich = false">
           <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-emerald-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
             <div class="mb-3 flex items-center justify-between">
               <span class="flex items-center gap-2 text-sm font-semibold text-emerald-300"><StudioIcon name="wand" /> Prompt Enrich Preview</span>
@@ -831,7 +831,7 @@ const bodyHipsLabel = computed(() => {
         </div>
 
         <!-- Preset popup -->
-        <div v-if="showPresets" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showPresets = false">
+        <div v-if="showPresets" role="dialog" aria-modal="true" aria-label="Preset — Prompt đã lưu" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showPresets = false">
           <div class="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-lg border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
             <div class="mb-3 flex items-center justify-between">
               <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="sparkles" /> Preset — Prompt đã lưu</span>

@@ -283,7 +283,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
     </footer>
 
     <!-- Popup xác nhận xóa nền AI (markup y hệt StudioApp :542-551) -->
-    <div v-if="removeBgConfirmOpen" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="removeBgConfirmOpen = false">
+    <div v-if="removeBgConfirmOpen" role="dialog" aria-modal="true" aria-label="Xác nhận xóa nền AI" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="removeBgConfirmOpen = false">
       <div class="w-full max-w-xs rounded-lg border border-ink-700 bg-ink-900 p-4 shadow-2xl">
         <p class="text-sm font-semibold text-cream-100">Xóa nền AI?</p>
         <p class="mt-1 text-xs leading-relaxed text-cream-300/70">Nền sẽ được xóa thành <b>trong suốt</b> (PNG alpha). AI tự nhận diện chủ thể — <b>vẽ lasso quanh chủ thể</b> nếu muốn chính xác hơn. Tốn <b>1 credit</b>.</p>
@@ -295,7 +295,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
     </div>
     
     <!-- Popup xác nhận dọn canvas -->
-    <div v-if="store.confirmClearCanvasOpen" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="store.confirmClearCanvasOpen = false">
+    <div v-if="store.confirmClearCanvasOpen" role="dialog" aria-modal="true" aria-label="Xác nhận dọn canvas" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="store.confirmClearCanvasOpen = false">
       <div class="w-full max-w-xs rounded-lg border border-red-500/40 bg-ink-900 p-4 shadow-2xl">
         <p class="text-sm font-semibold text-cream-100">⚠️ Dọn toàn bộ canvas?</p>
         <p class="mt-1 text-xs leading-relaxed text-cream-300/70">Tất cả <b>{{ store.canvasLayers.length }} layer</b> và <b>{{ store.layerGroups.length }} nhóm</b> sẽ bị xóa khỏi canvas. Ảnh kết quả vẫn còn trong <b>Output/Thư viện</b>. Có thể hoàn tác (Ctrl+Z).</p>

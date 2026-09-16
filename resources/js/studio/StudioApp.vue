@@ -702,7 +702,7 @@ function onTouchEnd(e) {
     </div>
 
     <!-- Mobile menu overlay -->
-    <div v-if="menuOpen" class="fixed inset-0 z-50 lg:hidden" @click="menuOpen=false">
+    <div v-if="menuOpen" role="dialog" aria-modal="true" aria-label="Menu Studio" class="fixed inset-0 z-50 lg:hidden" @click="menuOpen=false">
       <div class="absolute inset-0 bg-black/60"></div>
       <div class="absolute left-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span><button @click="menuOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng menu" aria-label="Đóng menu"><StudioIcon name="x" size="h-4 w-4" /></button></div>
@@ -722,7 +722,7 @@ function onTouchEnd(e) {
       </div>
     </div>
     <!-- Mobile outputs overlay -->
-    <div v-if="outputOpen" class="fixed inset-0 z-50 lg:hidden">
+    <div v-if="outputOpen" role="dialog" aria-modal="true" aria-label="Kết quả tạo ảnh" class="fixed inset-0 z-50 lg:hidden">
       <div class="absolute inset-0 bg-black/60"></div>
       <div class="absolute right-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
       </div>
@@ -735,7 +735,7 @@ function onTouchEnd(e) {
     <ProjectWorkspace v-if="projectsOpen" v-model="projectsOpen" />
     <!-- Prompt Tạo Ảnh (ConceptCard): popup độc lập — nút sparkles ở right toolbar (dưới cùng) -->
     <!-- ══ Command Palette (VSCode-style) ══ -->
-    <div v-if="paletteOpen" class="fixed inset-0 z-[110] flex items-start justify-center pt-[12vh]" @click.self="paletteOpen = false">
+    <div v-if="paletteOpen" role="dialog" aria-modal="true" aria-label="Bảng lệnh" class="fixed inset-0 z-[110] flex items-start justify-center pt-[12vh]" @click.self="paletteOpen = false">
       <div class="w-full max-w-lg overflow-hidden rounded-xl border border-ink-600 bg-ink-900 shadow-2xl">
         <div class="flex items-center gap-2 border-b border-ink-700 px-3 py-2.5">
           <StudioIcon name="search" size="h-4 w-4" class="text-cream-300/60" />
