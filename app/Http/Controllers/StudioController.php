@@ -3961,7 +3961,10 @@ RULES:
     /**
      * JSON save for the Vue Settings page (add/update API key + model + config).
      */
-    public function settingsSave(Request $request): IlluminateHttpJsonResponse
+    // [BUG] Trước đây kiểu trả về ghi 'IlluminateHttpJsonResponse' — MẤT dấu '\' đầu nên PHP
+    // resolve nó thành App\Http\Controllers\IlluminateHttpJsonResponse (không tồn tại) và method
+    // LUÔN ném TypeError -> route trả 500 mọi lúc. Lỗi có từ trước khi tách app.
+    public function settingsSave(Request $request): \Illuminate\Http\JsonResponse
     {
         $d = $request->all();
         if (! empty($d['key_value'])) {
@@ -4005,7 +4008,8 @@ RULES:
         return back()->with('success', 'Đã lưu prompt thay khuôn mặt.');
     }
 
-    public function settingsData(): IlluminateHttpJsonResponse
+    // [BUG] Cùng lỗi mất dấu '\' như settingsSave() — xem chú thích ở đó.
+    public function settingsData(): \Illuminate\Http\JsonResponse
     {
         $providers = [
             'gemini' => ['label' => 'Gemini', 'configured' => (bool) studio_api_key('gemini')],
