@@ -20,7 +20,16 @@ class Setting extends Model
      * `select * from settings where key = ?`** (52 key khác nhau). Nạp cả bảng 1 lần -> 52 thành 1
      * lượt đọc cache (hit), áp dụng cho MỌI request vì setting() được gọi ở khắp nơi.
      */
-    private const CACHE_ALL = 'settings:all';
+    public const CACHE_ALL = 'settings:all';
+
+    /**
+     * Xoá cache settings. Dùng cho đường ghi KHÔNG đi qua set() (ví dụ seeder dùng
+     * updateOrCreate hàng loạt) — nếu quên, cache 'settings:all' vẫn phục vụ giá trị cũ sau khi ghi.
+     */
+    public static function flushCache(): void
+    {
+        Cache::forget(self::CACHE_ALL);
+    }
 
     /** @return array<string, mixed> */
     private static function map(): array

@@ -107,7 +107,10 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($settings as $key => $value) {
-            Setting::updateOrCreate(['key' => $key], ['value' => $value]);
+            // Đi qua set_setting() -> Setting::set() để XOÁ cache sau khi ghi. Bản cũ dùng thẳng
+            // Setting::updateOrCreate() nên cache 'settings:all' (thêm ở vòng 20) vẫn phục vụ giá trị
+            // CŨ nếu seeder chạy trong lúc cache đang ấm (vd re-seed trên máy chủ đang chạy).
+            set_setting($key, (string) $value);
         }
     }
 
