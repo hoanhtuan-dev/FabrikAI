@@ -105,7 +105,10 @@ class RenderImageJob implements ShouldQueue
             $usedProvider = $images->lastProvider() ?: $generation->provider;
             $usedModel = $images->lastModel() ?: $generation->model;
 
-            $generation->update([
+            // [M-d — 2026-09-17] CAS: nếu người dùng đã Huỷ trong lúc job chạy (hoặc đường khác đã
+            // kết thúc row) thì KHÔNG ghi đè 'completed'. Trước đây update() vô điều kiện làm "hồi
+            // sinh" row đã cancelled trong khi credit đã được hoàn ⇒ trạng thái và tiền lệch nhau.
+            $claimed = studio_claim_generation($generation, ['processing'], [
                 'status' => 'completed',
                 'media_url' => $url,
                 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
@@ -124,6 +127,16 @@ class RenderImageJob implements ShouldQueue
                     'negative_prompt' => $pr['negative_prompt'] ?? null,
                 ]),
             ]);
+
+            if (! $claimed) {
+                logger()->warning('Image generation finished but the row had already left processing — result discarded', [
+                    'generation_id' => $generation->id,
+                    'status_now' => $generation->fresh()?->status,
+                ]);
+
+                return; // credit đã được xử lý ở đường thắng CAS (cancel/failStuck/job khác)
+            }
+
             logger()->info('Image generation completed', [
                 'generation_id' => $generation->id, 'provider' => $usedProvider,
                 'model' => $usedModel, 'requested_provider' => $generation->provider,
@@ -131,8 +144,10 @@ class RenderImageJob implements ShouldQueue
                 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
             ]);
         } catch (\Throwable $e) {
-            $generation->update(['status' => 'failed', 'error' => studio_generation_error($e), 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000)]);
-            $this->refund($generation);
+            // [M-c/M-d] Một đường duy nhất: CAS + hoàn credit ĐÚNG MỘT LẦN (kể cả khi user vừa Huỷ).
+            studio_finalize_generation($generation, 'failed', ['processing'], studio_generation_error($e), [
+                'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
+            ]);
             logger()->warning('Image generation failed', [
                 'generation_id' => $generation->id, 'total_s' => round(microtime(true) - $t0, 2),
                 'error' => $e->getMessage(),
@@ -154,20 +169,12 @@ class RenderImageJob implements ShouldQueue
             return;
         }
 
-        $generation->update([
-            'status' => 'failed',
-            'error' => studio_generation_error($e, 'Render bị ngắt (worker timeout/vào failed_jobs): '),
-        ]);
-        $this->refund($generation);
+        studio_finalize_generation($generation, 'failed', ['pending', 'processing'], studio_generation_error($e, 'Render bị ngắt (worker timeout/vào failed_jobs): '));
         logger()->warning('Image generation crashed (job failed)', [
             'generation_id' => $this->generationId, 'error' => $e->getMessage(),
         ]);
     }
 
-    protected function refund(Generation $generation): void
-    {
-        if ($generation->credits_cost > 0) {
-            $generation->user?->increment('credits_balance', $generation->credits_cost);
-        }
-    }
+    // [M-c — 2026-09-17] refund() cục bộ đã bị GỠ: hoàn credit nay chỉ nằm trong
+    // studio_finalize_generation() (helpers.php) để không thể tồn tại đường hoàn thứ hai thiếu CAS.
 }

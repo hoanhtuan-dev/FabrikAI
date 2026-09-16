@@ -1314,13 +1314,7 @@ RULES:
         // M02: CAS (compare-and-swap) — chỉ request nào ĐỔI ĐƯỢC trạng thái khỏi 'processing'
         // mới được hoàn tiền. Trước đây update + increment không điều kiện nên 2 request đồng
         // thời (poll show() + reconcileStuckCredits) cùng hoàn tiền một generation = double refund.
-        $claimed = Generation::where('id', $generation->id)
-            ->where('status', 'processing')
-            ->update(['status' => 'failed', 'error' => $message]);
-
-        if ($claimed && $generation->credits_cost > 0) {
-            $generation->user?->increment('credits_balance', $generation->credits_cost);
-        }
+        studio_finalize_generation($generation, 'failed', ['processing'], $message);
     }
 
     /**
@@ -1367,7 +1361,9 @@ RULES:
             }
         } catch (\Throwable $e) {
             logger()->error('Lazy process failed for generation #'.$generation->id.': '.$e->getMessage());
-            $generation->update(['status' => 'failed', 'error' => studio_generation_error($e)]);
+            // [M-c — 2026-09-17] Trước đây chỉ set 'failed' mà KHÔNG hoàn credit; mà failStuck()/
+            // reconcileStuckCredits() chỉ quét 'processing' ⇒ row này vĩnh viễn không được hoàn.
+            studio_finalize_generation($generation, 'failed', ['pending', 'processing'], studio_generation_error($e));
         }
     }
 
@@ -1467,14 +1463,13 @@ RULES:
     {
         abort_unless($generation->user_id === auth()->id(), 403);
 
-        if (! in_array($generation->status, ['pending', 'processing'])) {
+        // [M-c — 2026-09-17] Trước đây: đọc trạng thái trên instance cũ rồi update + increment VÔ ĐIỀU
+        // KIỆN ⇒ cancel đua với failStuck()/reconcileStuckCredits() là HOÀN CREDIT 2 LẦN.
+        // Nay đi qua helper CAS duy nhất: chỉ request giành được row mới hoàn tiền.
+        $claimed = studio_finalize_generation($generation, Generation::STATUS_CANCELLED, ['pending', 'processing']);
+
+        if (! $claimed) {
             return response()->json(['message' => 'Nhiệm vụ đã kết thúc.'], 422);
-        }
-
-        $generation->update(['status' => Generation::STATUS_CANCELLED]);
-
-        if ($generation->credits_cost > 0) {
-            $generation->user?->increment('credits_balance', $generation->credits_cost);
         }
 
         return response()->json(['status' => 'cancelled']);
@@ -1507,13 +1502,7 @@ RULES:
         foreach ($stuck as $g) {
             // M02: CAS như failStuck() — hàm này chạy ở ĐẦU mỗi queueGeneration(), nên 2 request
             // đồng thời rất dễ cùng SELECT ra một generation kẹt và hoàn tiền 2 lần.
-            $claimed = Generation::where('id', $g->id)
-                ->where('status', 'processing')
-                ->update(['status' => 'failed', 'error' => 'Hết thời gian xử lý (job bị ngắt).']);
-
-            if ($claimed && $g->credits_cost > 0) {
-                $g->user?->increment('credits_balance', $g->credits_cost);
-            }
+            studio_finalize_generation($g, 'failed', ['processing'], 'Hết thời gian xử lý (job bị ngắt).');
         }
     }
 
@@ -1594,7 +1583,8 @@ RULES:
 
         // Internal admin tool: never hard-block on credits. Track usage (balance may go negative).
         $this->reconcileStuckCredits($user);
-        $user->decrement('credits_balance', $cost);
+        // (M-h — 2026-09-17) Việc TRỪ CREDIT đã chuyển xuống khối `DB::transaction` ngay dưới,
+        // nằm CÙNG transaction với `generations.create()`: create lỗi ⇒ rollback ⇒ không mất credit.
 
         if (! empty($data['edit'])) {
             // Per-request override from the Sửa ảnh card (e.g. qwen-image-3.0-pro). Only
@@ -1617,7 +1607,15 @@ RULES:
                 : $this->defaultProviderModel($type);
         }
 
-        $generation = $user->generations()->create([
+        // [M-h — 2026-09-17] Trừ credit + tạo row trong CÙNG một transaction. Trước đây decrement()
+        // chạy TRƯỚC create(); nếu create ném lỗi (DB/constraint/model event) thì người dùng mất
+        // credit mà không có generation nào để heal hay hoàn.
+        $generation = \Illuminate\Support\Facades\DB::transaction(function () use ($user, $cost, $type, $data, $source, $provider, $model) {
+            if ($cost > 0) {
+                $user->decrement('credits_balance', $cost);
+            }
+
+            return $user->generations()->create([
             'project_id' => $data['project_id'] ?? null,
             'prompts_history_id' => $data['history_id'] ?? null,
             'type' => $type,
@@ -1653,7 +1651,8 @@ RULES:
                 'style' => $data['style'] ?? null,
                 'ornament_level' => $data['ornament_level'] ?? null,
             ], fn ($v) => $v !== null && $v !== ''),
-        ]);
+            ]); // đóng create() trong closure
+        }); // đóng DB::transaction — create lỗi ⇒ decrement bị rollback theo
 
         // The job is processed lazily when the client polls this generation (show()), or via the
         // "Xử lý ngay" button / studio:process. The create request returns fast (pending) so the

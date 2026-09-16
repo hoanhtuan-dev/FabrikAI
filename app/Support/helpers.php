@@ -302,6 +302,65 @@ if (! function_exists('studio_generation_error')) {
     }
 }
 
+if (! function_exists('studio_claim_generation')) {
+    /**
+     * CAS: chỉ request nào ĐỔI ĐƯỢC trạng thái khỏi $from mới "giành" được row.
+     *
+     * [M-c · M-d — 2026-09-17] Trước đây các đường đổi trạng thái cuối tự làm
+     * `$generation->update([...])` VÔ ĐIỀU KIỆN, nên hai request đồng thời cùng "thắng":
+     *  · cancel() đua với failStuck()/reconcileStuckCredits() ⇒ HOÀN CREDIT 2 LẦN;
+     *  · job render xong sau khi user bấm Huỷ ⇒ "hồi sinh" row đã cancelled và hoàn tiền lần nữa.
+     * Mọi side-effect (hoàn tiền, ghi media_url…) CHỈ được chạy khi hàm này trả true.
+     *
+     * @param  array<int, string>  $from        trạng thái được phép claim
+     * @param  array<string, mixed>  $attributes  cột cần ghi khi claim thành công
+     * @return bool  true = request NÀY giành được row
+     */
+    function studio_claim_generation(\App\Models\Generation $generation, array $from, array $attributes): bool
+    {
+        return \App\Models\Generation::where('id', $generation->id)
+            ->whereIn('status', $from)
+            ->update($attributes) > 0;
+    }
+}
+
+if (! function_exists('studio_finalize_generation')) {
+    /**
+     * Đường DUY NHẤT được phép đặt TRẠNG THÁI CUỐI + HOÀN CREDIT cho một generation.
+     *
+     * Hoàn tiền nằm TRONG nhánh giành được row ⇒ không thể hoàn hai lần (kể cả khi request chạy
+     * song song). 'completed' KHÔNG hoàn; 'failed'/'cancelled' hoàn đúng một lần.
+     *
+     * @param  array<int, string>  $from  mặc định cả 'pending' lẫn 'processing'
+     * @return bool  true = đã claim (trạng thái + credit đã xử lý), false = người khác đã xử lý trước
+     */
+    function studio_finalize_generation(
+        \App\Models\Generation $generation,
+        string $to,
+        array $from = ['pending', 'processing'],
+        ?string $error = null,
+        array $extra = []
+    ): bool {
+        $attributes = ['status' => $to] + $extra;
+        if ($error !== null) {
+            $attributes['error'] = $error;
+        }
+
+        if (! studio_claim_generation($generation, $from, $attributes)) {
+            return false; // ai đó đã đổi trạng thái trước ⇒ KHÔNG hoàn tiền, KHÔNG ghi đè
+        }
+
+        if (in_array($to, ['failed', 'cancelled'], true) && (int) $generation->credits_cost > 0) {
+            $generation->user?->increment('credits_balance', (int) $generation->credits_cost);
+        }
+
+        // Giữ model trong bộ nhớ khớp DB để caller không đọc lại trạng thái cũ.
+        $generation->forceFill($attributes)->syncOriginal();
+
+        return true;
+    }
+}
+
 if (! function_exists('studio_fetch_remote_bytes')) {
     /**
      * Tải nội dung từ URL REMOTE với guard SSRF dùng chung cho toàn module (S3 · N1 · N4):

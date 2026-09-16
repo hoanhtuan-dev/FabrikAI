@@ -76,7 +76,8 @@ class RenderVideoJob implements ShouldQueue
             );
 
             $genMeta = (array) ($generation->meta ?? []);
-            $generation->update([
+            // [M-d — 2026-09-17] CAS: không hồi sinh row đã cancelled (xem RenderImageJob cùng lý do).
+            $claimed = studio_claim_generation($generation, ['processing'], [
                 'status' => 'completed',
                 'media_url' => $url,
                 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
@@ -95,14 +96,26 @@ class RenderVideoJob implements ShouldQueue
                     'base_image' => $generation->base_image,
                 ]),
             ]);
+
+            if (! $claimed) {
+                logger()->warning('Video generation finished but the row had already left processing — result discarded', [
+                    'generation_id' => $generation->id,
+                    'status_now' => $generation->fresh()?->status,
+                ]);
+
+                return;
+            }
+
             logger()->info('Video generation completed', [
                 'generation_id' => $generation->id, 'provider' => $generation->provider,
                 'model' => $generation->model, 'total_s' => round(microtime(true) - $t0, 2),
                 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
             ]);
         } catch (\Throwable $e) {
-            $generation->update(['status' => 'failed', 'error' => studio_generation_error($e), 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000)]);
-            $this->refund($generation);
+            // [M-c/M-d] Một đường duy nhất: CAS + hoàn credit ĐÚNG MỘT LẦN.
+            studio_finalize_generation($generation, 'failed', ['processing'], studio_generation_error($e), [
+                'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
+            ]);
         }
     }
 
@@ -119,20 +132,11 @@ class RenderVideoJob implements ShouldQueue
             return;
         }
 
-        $generation->update([
-            'status' => 'failed',
-            'error' => studio_generation_error($e, 'Render bị ngắt (worker timeout/vào failed_jobs): '),
-        ]);
-        $this->refund($generation);
+        studio_finalize_generation($generation, 'failed', ['pending', 'processing'], studio_generation_error($e, 'Render bị ngắt (worker timeout/vào failed_jobs): '));
         logger()->warning('Video generation crashed (job failed)', [
             'generation_id' => $this->generationId, 'error' => $e->getMessage(),
         ]);
     }
 
-    protected function refund(Generation $generation): void
-    {
-        if ($generation->credits_cost > 0) {
-            $generation->user?->increment('credits_balance', $generation->credits_cost);
-        }
-    }
+    // [M-c — 2026-09-17] refund() cục bộ đã bị GỠ — hoàn credit chỉ còn một đường có CAS.
 }
