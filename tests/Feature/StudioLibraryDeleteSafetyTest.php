@@ -95,6 +95,106 @@ class StudioLibraryDeleteSafetyTest extends TestCase
         Storage::disk('public')->assertExists('studio/ref/in-use.png');
     }
 
+    // ── Hai đường xoá còn lại cũng nhận đường dẫn: phải khoá cùng lớp bug ─
+    //
+    // Vòng 12 tìm ra traversal ở deleteUploadedFiles. Cùng LỚP bug đó đã được vá ở assetDestroy
+    // nhưng KHÔNG được vá ở safeUnlink — tức mẫu này phân kỳ giữa các chỗ trong cùng codebase.
+    // Vì vậy khoá luôn refImageDelete và assetDestroy, mỗi test đều có ASSERT TIỀN ĐỀ để không
+    // thể pass vì lý do sai (bài học vòng 12: thiếu thư mục -> is_file false -> code không chạy).
+
+    /**
+     * Sentinel nằm trong storage/app (NGOÀI disk public = storage/app/public).
+     * LƯU Ý: 2 test dưới KHÔNG dùng Storage::fake() vì code controller dùng storage_path('app/public')
+     * trực tiếp — trộn với disk đã fake sẽ khiến đường dẫn không khớp (lần đầu tôi viết vậy và
+     * chính ASSERT TIỀN ĐỀ đã bắt được). Chúng tôi tự tạo/ dọn thư mục thật.
+     */
+    private function sentinelPath(string $name): string
+    {
+        return storage_path('app/'.$name);
+    }
+
+    private function makeDirs(array $rels): void
+    {
+        foreach ($rels as $rel) {
+            $dir = storage_path('app/public/'.$rel);
+            if (! is_dir($dir)) {
+                mkdir($dir, 0775, true);
+            }
+        }
+    }
+
+    public function test_ref_image_delete_cannot_escape_ref_dir(): void
+    {
+        $this->makeDirs(['studio/ref']);
+        $sentinel = $this->sentinelPath('zz-sentinel-ref.png');
+        file_put_contents($sentinel, 'must survive');
+
+        // TIỀN ĐỀ — nếu không kiểm, test có thể pass vì thư mục thiếu (is_file false) chứ không
+        // phải vì guard hoạt động. Đây đúng là bẫy đã dính ở vòng 12.
+        $this->assertTrue(
+            is_file(storage_path('app/public/studio/ref/../../../zz-sentinel-ref.png')),
+            'Tiền đề: đường dẫn traversal phải resolve ra sentinel.'
+        );
+
+        try {
+            app(\App\Http\Controllers\StudioController::class)
+                ->refImageDelete(new \Illuminate\Http\Request(), '../../../zz-sentinel-ref.png');
+        } finally {
+            $exists = file_exists($sentinel);
+            @unlink($sentinel);
+        }
+
+        $this->assertTrue($exists, 'refImageDelete KHÔNG được xoá file ngoài studio/ref/.');
+    }
+
+    public function test_asset_destroy_with_poisoned_path_cannot_escape_root(): void
+    {
+        $this->makeDirs(['studio/assets']);
+        $sentinel = $this->sentinelPath('zz-sentinel-asset.png');
+        file_put_contents($sentinel, 'must survive');
+        $this->assertTrue(
+            is_file(storage_path('app/public/studio/assets/../../../zz-sentinel-asset.png')),
+            'Tiền đề: đường dẫn traversal phải resolve ra sentinel.'
+        );
+
+        // Dòng DB bị nhiễm (path chứa '..') — kịch bản mà containment phải chặn.
+        $asset = \App\Models\StudioAsset::create([
+            'type' => 'model', 'name' => 'poisoned', 'path' => '/storage/studio/assets/../../../zz-sentinel-asset.png', 'sort' => 1,
+        ]);
+
+        try {
+            app(\App\Http\Controllers\StudioController::class)->assetDestroy($asset);
+        } finally {
+            $exists = file_exists($sentinel);
+            @unlink($sentinel);
+        }
+
+        $this->assertTrue($exists, 'assetDestroy KHÔNG được xoá file ngoài storage root dù path trong DB bị nhiễm.');
+        $this->assertDatabaseMissing('studio_assets', ['id' => $asset->id]);
+    }
+
+    public function test_serve_path_guard_rejects_traversal_before_thumb_dir_is_computed(): void
+    {
+        // studioImageThumb() tính $thumbDir = storage_path('app/public/studio/thumb/'.$size.'/'.dirname($path))
+        // từ {path} của route (where('path','.*') nên CÓ THỂ chứa '/'). Guard studioServePath() phải
+        // chặn TRƯỚC đó, nếu không dirname() sẽ đưa thư mục thumbnail ra ngoài studio/thumb.
+        // Test gọi trực tiếp guard (không qua HTTP) vì HTTP client tự chuẩn hoá '..' trong URL.
+        $ctl = app(\App\Http\Controllers\StudioController::class);
+        $m = new \ReflectionMethod($ctl, 'studioServePath');
+        $m->setAccessible(true);
+
+        foreach ([
+            'studio/../../.env',
+            '../../.env',
+            '.env',
+            'studio/.htaccess',
+            'studio/ref/../../../etc/passwd',
+            'studio/shell.php',
+        ] as $bad) {
+            $this->assertNull($m->invoke($ctl, $bad), "studioServePath phải từ chối: $bad");
+        }
+    }
+
     // ── bulkDelete phải theo chủ sở hữu ──────────────────────────────────
 
     public function test_bulk_delete_is_owner_scoped(): void
