@@ -107,13 +107,9 @@ return [
         'default_lang' => env('STUDIO_SUGGEST_DEFAULT_LANG', 'en'), // en | vi
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | AI Sản phẩm (Product AI — content + SEO assistant trong form sản phẩm)
-    |--------------------------------------------------------------------------
-    | Cấu hình RIÊNG cho trợ lý viết mô tả / SEO ở trang tạo-sửa sản phẩm (admin).
-    | Ưu tiên Qwen trước (qwen3.8-flash …) rồi mới Gemini; mọi model/key đều đọc
-    | từ đây (DB Settings → env → config) nên nâng cấp model sau này không cần sửa code.
+    // (Khối cấu hình "AI Sản phẩm / Product AI" đã bị GỠ cùng module thương mại điện tử
+    //  2026-09-17. Trước đây khối comment của nó còn sót lại mà THIẾU dấu đóng, nên nuốt luôn
+    //  phần mô tả của 'queue_worker' bên dưới — đã sửa.)
 
     /*
     |--------------------------------------------------------------------------

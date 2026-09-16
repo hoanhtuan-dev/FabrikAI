@@ -64,8 +64,10 @@ class AuthController extends Controller
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'password' => $data['password'],
-            'role' => 'customer',
-        ]);
+            // KHÔNG truyền 'role' ở đây: `role` không nằm trong User::$fillable (cố ý — chống tự
+            // nâng quyền), nên truyền vào cũng bị bỏ qua im lặng. Mặc định 'customer' nay khai báo
+            // tường minh ở User::$attributes.
+        ]); 
 
         Auth::login($user);
         $request->session()->regenerate();

@@ -111,4 +111,35 @@ class UserPrivilegeEscalationTest extends TestCase
         $this->assertFalse($u->isAdmin());
         $this->assertNotSame(999999, (int) $u->credits_balance);
     }
+
+    public function test_role_default_is_declared_on_the_model_not_only_in_the_schema(): void
+    {
+        // [BUG ĐÃ SỬA 2026-09-17] AuthController::register() từng truyền 'role' => 'customer' trong
+        // User::create([...]). Nhưng 'role' KHÔNG nằm trong $fillable (cố ý chống leo quyền) nên dòng
+        // đó là NO-OP im lặng: nó chẳng set gì cả. Đăng ký ra đúng 'customer' CHỈ NHỜ default của cột
+        // DB — tức hành vi đúng đang phụ thuộc schema, không phụ thuộc code.
+        //
+        // Test này khoá mặc định ở TẦNG MODEL để nó không phụ thuộc cột DB nữa.
+        $fresh = new User();
+
+        $this->assertSame(User::ROLE_CUSTOMER, $fresh->role,
+            'Model phải tự khai báo role mặc định (User::$attributes), không dựa vào default cột DB.');
+    }
+
+    public function test_user_created_without_a_role_still_ends_up_as_customer(): void
+    {
+        // ⚠️ Ghi chú trung thực: test này KHÔNG chứng minh được điều tên nó từng nói ("không cần
+        // default của schema") — vì schema vẫn có default 'customer', nên nó XANH kể cả khi đã gỡ
+        // User::$attributes (mutation-test phát hiện: chỉ 1 test đỏ, không phải 2).
+        // Nó vẫn có giá trị như một khẳng định HÀNH VI đầu-cuối: tạo user không truyền role thì ra
+        // 'customer'. Việc khoá mặc định ở TẦNG MODEL do test phía trên đảm nhiệm.
+        $u = User::create([
+            'name' => 'Kiểm mặc định',
+            'email' => 'default-role@example.com',
+            'password' => 'matkhau123',
+        ]);
+
+        $this->assertSame(User::ROLE_CUSTOMER, $u->fresh()->role);
+        $this->assertFalse($u->fresh()->isAdmin());
+    }
 }

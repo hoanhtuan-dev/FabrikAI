@@ -35,6 +35,20 @@ class User extends Authenticatable
         'name', 'email', 'password', 'phone', 'avatar',
     ];
 
+    /**
+     * Mặc định ở tầng MODEL, không phụ thuộc default của cột trong DB.
+     *
+     * [BUG ĐÃ SỬA 2026-09-17] `AuthController::register()` có dòng `'role' => 'customer'` trong
+     * `User::create([...])` — nhưng `role` KHÔNG nằm trong `$fillable` (cố ý, chống leo quyền), nên
+     * dòng đó là **no-op**: nó im lặng bị bỏ qua. Đăng ký vẫn ra 'customer' **chỉ nhờ default của cột
+     * DB**, tức hành vi đúng đang phụ thuộc vào schema chứ không phải vào code.
+     * Nay khai báo tường minh ở đây để `User::create()` luôn có role đúng, và xoá dòng gây hiểu nhầm
+     * ở controller.
+     */
+    protected $attributes = [
+        'role' => self::ROLE_CUSTOMER,
+    ];
+
     protected $hidden = [
         'password', 'remember_token',
     ];
