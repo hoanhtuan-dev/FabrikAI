@@ -151,6 +151,10 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::get('/latest', [StudioController::class, 'latest'])->name('latest');
 
     // ── Đọc preset dùng chung (GET thôi — ghi/xoá ở nhóm ADMIN) ──
+    // [Yêu cầu 2026-09-17] Cấu hình giao diện (thanh công cụ trái) — MỌI người dùng Studio đọc
+    // được để render đúng; chỉ owner GHI được (nhóm ADMIN ở trên).
+    Route::get('/gui', [StudioController::class, 'gui'])->name('gui');
+
     Route::get('/presets', [StudioController::class, 'presets'])->name('presets');
 
     // ── Prompt helpers ──
@@ -240,6 +244,13 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api/admin')->name('api.
     Route::put('/plans/{plan}', [AdminController::class, 'updatePlan'])->name('plans.update');
     Route::delete('/plans/{plan}', [AdminController::class, 'destroyPlan'])->name('plans.destroy');
     Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');
+
+    // ── [Yêu cầu 2026-09-17] GIAO DIỆN do OWNER quản lý (thanh công cụ trái của Studio) ──
+    // Cấu hình TOÀN CỤC cho mọi người dùng Studio. Đặt ở đây (prefix api/admin) để KHÔNG trùng
+    // với `GET /api/gui` mà Studio đọc — bản đầu tôi đặt nhầm vào nhóm prefix 'api' nên trùng route.
+    Route::get('/gui', [AdminController::class, 'guiShow'])->name('gui.show');
+    Route::put('/gui/activity-bar', [AdminController::class, 'guiActivityBarSave'])->name('gui.activity-bar.save');
+    Route::post('/gui/activity-bar/reset', [AdminController::class, 'guiActivityBarReset'])->name('gui.activity-bar.reset');
 });
 
 Route::middleware(['auth', 'superadmin', 'nostore'])->prefix('api/admin')->name('api.admin.')->group(function () {

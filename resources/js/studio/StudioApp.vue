@@ -37,20 +37,66 @@ async function logout() {
   window.location.href = '/';
 }
 // Activity bar (VSCode-style): mỗi icon mở 1 nhóm card trong sidebar.
-const activityNav = [
-  { id: 'concept', icon: 'sparkles', label: 'Tạo ảnh', cards: [SuggestCard] },
-  // [Yêu cầu 2026-09-17] XOÁ nhóm "Fitting Room": 2 card nay là 2 MỤC RIÊNG trên thanh công cụ,
-  // mỗi mục có panel + tiêu đề + icon chuẩn ngành của chính nó (trước đây chung 1 nhóm).
-  { id: 'variation', icon: 'variations', label: 'Tạo biến thể ảnh', cards: [VariationCard] },
-  { id: 'tryon', icon: 'hanger', label: 'Mặc thử đồ', cards: [TryOnCard] },
-  { id: 'inpaint', icon: 'pencil', label: 'Sửa ảnh', cards: [InpaintCard] },
-  { id: 'compose', icon: 'layers', label: 'Ghép ảnh', cards: [ComposeCard] },
-  { id: 'upscale', icon: 'maximize', label: 'Upscale', cards: [UpscaleCard] },
-  { id: 'director', icon: 'film', label: 'Kịch bản quay', cards: [DirectorCard] },
-  // (Đã gỡ 3 activity 2026-09-17: 'pattern' Pattern Maker · 'tryon' Virtual Try-On ·
-  //  'swap' Thay người mẫu — xem STUDIO_REVIEW_PROGRESS.md. Chip "thay khuôn mặt" trong
-  //  ComposeCard cũng đã gỡ theo.)
+//
+// [Yêu cầu 2026-09-17] OWNER quản lý phần TRÌNH BÀY qua trang /admin → tab "Giao diện".
+//   · id → card là DÂY CỐ ĐỊNH trong code (không có card thì mục cũng chẳng có gì để hiện)
+//   · owner đổi được: THỨ TỰ · NHÃN · ICON · ẨN/HIỆN
+const ACTIVITY_CARDS = {
+  // (Đã gỡ 3 activity 2026-09-17: 'pattern' · 'tryon' cũ · 'swap' — xem STUDIO_REVIEW_PROGRESS.md.)
+  concept: [SuggestCard],
+  variation: [VariationCard],
+  tryon: [TryOnCard],
+  inpaint: [InpaintCard],
+  compose: [ComposeCard],
+  upscale: [UpscaleCard],
+  director: [DirectorCard],
+};
+
+// Bản GỐC — dùng khi chưa tải xong cấu hình hoặc API lỗi, để thanh công cụ không bao giờ trống.
+const ACTIVITY_FALLBACK = [
+  { id: 'concept', icon: 'sparkles', label: 'Tạo ảnh' },
+  { id: 'variation', icon: 'variations', label: 'Tạo biến thể ảnh' },
+  { id: 'tryon', icon: 'hanger', label: 'Mặc thử đồ' },
+  { id: 'inpaint', icon: 'pencil', label: 'Sửa ảnh' },
+  { id: 'compose', icon: 'layers', label: 'Ghép ảnh' },
+  { id: 'upscale', icon: 'maximize', label: 'Upscale' },
+  { id: 'director', icon: 'film', label: 'Kịch bản quay' },
 ];
+
+const activityCfg = ref(null); // [{ id, label, icon, visible }] từ /api/gui
+
+const activityNav = computed(() => {
+  const src = Array.isArray(activityCfg.value) && activityCfg.value.length
+    ? activityCfg.value
+    : ACTIVITY_FALLBACK;
+
+  return src
+    .filter((a) => a && a.visible !== false && ACTIVITY_CARDS[a.id]) // ẩn/hiện + chặn id lạ
+    .map((a) => ({ id: a.id, icon: a.icon || 'square', label: a.label || a.id, cards: ACTIVITY_CARDS[a.id] }));
+});
+
+// Owner ẩn đúng mục đang mở ⇒ nhảy về mục hiển thị đầu tiên, tránh panel rỗng không lối thoát.
+watch(activityNav, (list) => {
+  if (list.length && ! list.some((a) => a.id === activeActivity.value)) {
+    activeActivity.value = list[0].id;
+  }
+});
+
+/**
+ * Nạp cấu hình thanh công cụ do OWNER đặt (/admin → tab "Giao diện").
+ *
+ * Không chặn khởi động và KHÔNG được làm hỏng app: API lỗi ⇒ giữ bản gốc trong code.
+ * (Đọc được với mọi tài khoản Studio; chỉ owner ghi được.)
+ */
+async function loadGuiConfig() {
+  try {
+    const r = await fetch('/api/gui', { headers: { Accept: 'application/json' } });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (Array.isArray(d.activityBar) && d.activityBar.length) activityCfg.value = d.activityBar;
+  } catch (e) { /* giữ bản gốc */ }
+}
+
 const activeActivity = ref('concept');
 const menuOpen = ref(false);
 const outputOpen = ref(false);
@@ -84,7 +130,7 @@ function openApplyPopover() {
 }
 function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++; }); }
 function onBeforeUnload() { try { store.saveLayerLayout(); } catch (e) { /* bỏ qua */ } }
-onMounted(async () => { await store.load(); if (new URLSearchParams(window.location.search).get('view') === 'library') store.studioView = 'library'; activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'variation' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('keydown', onGlobalKey); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); });
+onMounted(async () => { loadGuiConfig(); await store.load(); if (new URLSearchParams(window.location.search).get('view') === 'library') store.studioView = 'library'; activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'variation' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('keydown', onGlobalKey); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); });
 onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); window.removeEventListener('resize', onCanvasResize); window.removeEventListener('beforeunload', onBeforeUnload); });
 // Palette bám ẢNH HIỆN TẠI (mọi nguồn: result/preview, ảnh tải lên, product, layer đang sửa…).
 watch(() => store.upscaleSrc, (url) => { store.loadPaletteFromImage(url); });
@@ -171,7 +217,7 @@ function onHistoryKeys(e) {
   else if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); store.redo(); }
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
-const activeActivityDef = computed(() => activityNav.find(a => a.id === activeActivity.value) || activityNav[0]);
+const activeActivityDef = computed(() => activityNav.value.find(a => a.id === activeActivity.value) || activityNav.value[0]);
 const panel = computed(() => activeActivityDef.value.cards);
 // Quản lý title cho /studio: cập nhật document.title theo activity + dự án đang áp dụng.
 watch([activeActivity, () => store.appliedProject?.name], () => {
@@ -205,7 +251,7 @@ watch(paletteOpen, (v) => { if (v) nextTick(() => paletteInput.value && paletteI
 const paletteCommands = computed(() => {
   const q = paletteQuery.value.trim().toLowerCase();
   const list = [
-    ...activityNav.map((a) => ({ id: 'act-' + a.id, label: 'Chuyển tới: ' + a.label, hint: a.id, icon: a.icon, run: () => selectActivity(a.id) })),
+    ...activityNav.value.map((a) => ({ id: 'act-' + a.id, label: 'Chuyển tới: ' + a.label, hint: a.id, icon: a.icon, run: () => selectActivity(a.id) })),
     { id: 'toggle-left', label: 'Bật/tắt panel trái', hint: 'explorer', icon: 'panelLeft', run: () => { store.leftPanelOpen = !store.leftPanelOpen; } },
     { id: 'toggle-layers', label: 'Bật/tắt panel Layers', hint: 'inspector', icon: 'layers', run: () => store.toggleInspector() },
     { id: 'toggle-outputs', label: 'Bật/tắt dock Outputs', hint: 'outputs', icon: 'grid', run: () => store.toggleOutputDock() },

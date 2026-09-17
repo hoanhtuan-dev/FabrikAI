@@ -2015,6 +2015,20 @@ RULES:
      * Translate a prompt between Vietnamese and English (used by the "Chỉnh sửa prompt tiếng Việt" popup).
      */
     /**
+     * [Yêu cầu 2026-09-17] Cấu hình GIAO DIỆN để Studio render (thanh công cụ trái).
+     *
+     * Mọi tài khoản Studio đọc được (cần để render đúng); chỉ owner GHI được — xem nhóm ADMIN.
+     * Kèm danh sách icon hợp lệ để owner có sẵn lựa chọn khi mở trang quản trị.
+     */
+    public function gui(): \Illuminate\Http\JsonResponse
+    {
+        return response()->json([
+            'activityBar' => app(\App\Services\StudioGuiConfig::class)->all(),
+            'icons' => \App\Services\StudioGuiConfig::ICONS,
+        ]);
+    }
+
+    /**
      * Custom Model/Pose library assets (uploaded by the user).
      */
     public function assetIndex(): \Illuminate\Http\JsonResponse

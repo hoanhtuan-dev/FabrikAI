@@ -6,6 +6,7 @@
  * mọi hành động phá hoại đều có bước xác nhận, toast phản hồi tức thì.
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import StudioIcon from './components/StudioIcon.vue';
 
 const BASE = '/api/admin';
 const csrf = (() => {
@@ -83,6 +84,52 @@ function goTab(t) {
   tab.value = t;
   if (t === 'users' && !usersData.value.users.length) loadUsers();
   if (t === 'ledger' && !ledgerData.value.transactions.length) loadLedger();
+  if (t === 'gui' && !guiItems.value.length) loadGui();
+}
+
+// ── Tab "Giao diện": owner quản lý thanh công cụ TRÁI của Studio ─────────
+// Thứ tự · nhãn · icon · ẩn/hiện. KHÔNG thêm/xoá mục được: mỗi id gắn cứng một bộ công cụ
+// trong code (xem StudioGuiConfig::DEFAULTS) — thêm id lạ thì không có gì để hiển thị.
+const guiItems = ref([]);
+const guiIcons = ref([]);
+const guiSaving = ref(false);
+const guiPreview = computed(() => guiItems.value.filter((i) => i.visible !== false));
+
+async function loadGui() {
+  try {
+    const d = await api('/gui');
+    guiItems.value = (d.activityBar || []).map((x) => ({ ...x }));
+    guiIcons.value = d.icons || [];
+  } catch (e) { flash(e.message, false); }
+}
+
+/** Đổi thứ tự: hoán vị với mục liền kề (không cần kéo-thả, dùng được cả trên bàn phím). */
+function moveGui(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= guiItems.value.length) return;
+  const arr = guiItems.value;
+  const t = arr[i];
+  arr[i] = arr[j];
+  arr[j] = t;
+}
+
+async function saveGui() {
+  guiSaving.value = true;
+  try {
+    const d = await api('/gui/activity-bar', 'PUT', { items: guiItems.value });
+    guiItems.value = (d.activityBar || []).map((x) => ({ ...x }));
+    flash('Đã lưu cấu hình giao diện.');
+  } catch (e) { flash(e.message, false); }
+  finally { guiSaving.value = false; }
+}
+
+async function resetGui() {
+  if (!confirm('Khôi phục thanh công cụ về mặc định của hệ thống?')) return;
+  try {
+    const d = await api('/gui/activity-bar/reset', 'POST');
+    guiItems.value = (d.activityBar || []).map((x) => ({ ...x }));
+    flash('Đã khôi phục mặc định.');
+  } catch (e) { flash(e.message, false); }
 }
 
 onMounted(async () => { await loadDashboard(); await loadPlans(); });
@@ -266,6 +313,7 @@ onMounted(async () => {
         <button @click="goTab('users')" :class="tab==='users' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors">👥 Người dùng</button>
         <button @click="goTab('plans')" :class="tab==='plans' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors">📦 Gói cước</button>
         <button @click="goTab('ledger')" :class="tab==='ledger' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors">🧾 Sổ credit</button>
+        <button @click="goTab('gui')" :class="tab==='gui' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors">🎨 Giao diện</button>
       </div>
 
       <div v-if="error" class="card p-6 text-sm text-red-400">{{ error }} — <button class="underline" @click="loadDashboard">thử lại</button></div>
@@ -506,6 +554,53 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- ════════════ TAB: Giao diện — thanh công cụ TRÁI của Studio ════════════ -->
+    <div v-show="tab==='gui'">
+      <div class="card p-4">
+        <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="font-display text-base font-semibold text-cream-50">🎨 Thanh công cụ trái của Studio</h2>
+          <div class="flex gap-2">
+            <button @click="resetGui" class="btn-ghost btn-sm">↺ Khôi phục mặc định</button>
+            <button @click="saveGui" :disabled="guiSaving" class="btn-brand btn-sm">{{ guiSaving ? 'Đang lưu…' : '💾 Lưu' }}</button>
+          </div>
+        </div>
+        <p class="mb-4 text-xs leading-relaxed text-cream-300/60">
+          Đổi <b class="text-cream-200">thứ tự</b> · <b class="text-cream-200">nhãn</b> · <b class="text-cream-200">icon</b> · <b class="text-cream-200">ẩn/hiện</b> từng mục — áp dụng cho MỌI người dùng Studio.
+          Không thêm/xoá được mục vì mỗi mục gắn cứng một bộ công cụ có sẵn trong code.
+        </p>
+
+        <!-- Xem trước đúng thứ tự & icon sẽ hiện trên thanh công cụ -->
+        <div class="mb-4 rounded-lg border border-ink-700 bg-ink-900 p-3">
+          <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">Xem trước</p>
+          <div class="flex items-center gap-1.5 overflow-x-auto">
+            <div v-for="it in guiPreview" :key="it.id" class="grid h-10 w-10 shrink-0 place-items-center rounded-lg" :class="it.visible ? 'bg-ink-800 text-brand-200' : 'bg-ink-800/40 text-cream-300/25'" :title="it.label">
+              <StudioIcon :name="it.icon" size="h-5 w-5" />
+            </div>
+            <span v-if="!guiPreview.length" class="text-xs text-cream-300/50">Chưa có mục nào được hiện.</span>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <div v-for="(it, i) in guiItems" :key="it.id" class="flex flex-wrap items-center gap-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5">
+            <span class="w-6 shrink-0 text-center text-[10px] font-semibold text-cream-300/40">{{ i + 1 }}</span>
+            <div class="flex shrink-0 gap-1">
+              <button @click="moveGui(i, -1)" :disabled="i === 0" class="grid h-7 w-7 place-items-center rounded-md bg-ink-700 text-cream-200 transition hover:bg-ink-600 disabled:opacity-30" title="Đưa lên" aria-label="Đưa lên">▲</button>
+              <button @click="moveGui(i, 1)" :disabled="i === guiItems.length - 1" class="grid h-7 w-7 place-items-center rounded-md bg-ink-700 text-cream-200 transition hover:bg-ink-600 disabled:opacity-30" title="Đưa xuống" aria-label="Đưa xuống">▼</button>
+            </div>
+            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-800 text-brand-200" title="Xem trước icon"><StudioIcon :name="it.icon" size="h-5 w-5" /></span>
+            <select v-model="it.icon" class="input !w-36 !py-1.5 text-xs" aria-label="Icon" title="Chọn icon">
+              <option v-for="n in guiIcons" :key="n" :value="n">{{ n }}</option>
+            </select>
+            <input v-model="it.label" type="text" maxlength="40" class="input !min-w-40 !flex-1 !py-1.5 text-xs" placeholder="Nhãn hiển thị" aria-label="Nhãn">
+            <span class="shrink-0 rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[10px] text-cream-300/50" title="Id — không đổi được">{{ it.id }}</span>
+            <label class="flex shrink-0 cursor-pointer items-center gap-1.5 text-[11px] text-cream-200">
+              <input type="checkbox" v-model="it.visible" class="h-3.5 w-3.5 accent-brand-500"> Hiện
+            </label>
+          </div>
+        </div>
+        <p v-if="!guiItems.length" class="py-8 text-center text-xs text-cream-300/50">Đang tải cấu hình…</p>
+      </div>
+    </div>
     <!-- ════════════ MODAL: credit adjust ════════════ -->
     <div v-if="creditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-label="Điều chỉnh credit">
       <div class="card w-full max-w-sm p-5">

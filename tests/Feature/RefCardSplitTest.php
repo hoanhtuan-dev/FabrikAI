@@ -54,16 +54,16 @@ class RefCardSplitTest extends TestCase
             'Nhóm "Fitting Room" phải bị xoá khỏi activityNav.');
         $this->assertStringNotContainsString("id: 'ref'", $nav, 'Activity id \'ref\' phải bị xoá.');
 
-        $this->assertStringContainsString(
-            "{ id: 'variation', icon: 'variations', label: 'Tạo biến thể ảnh', cards: [VariationCard] }",
-            $nav,
-            'Phải có MỤC RIÊNG "Tạo biến thể ảnh" với icon chuẩn ngành variations.'
-        );
-        $this->assertStringContainsString(
-            "{ id: 'tryon', icon: 'hanger', label: 'Mặc thử đồ', cards: [TryOnCard] }",
-            $nav,
-            'Phải có MỤC RIÊNG "Mặc thử đồ" với icon móc treo.'
-        );
+        // [Yêu cầu 2026-09-17] Sau đó thanh công cụ chuyển sang cấu hình được (ACTIVITY_CARDS +
+        // ACTIVITY_FALLBACK + computed). Mục vẫn phải TỒN TẠI với đúng nhãn + icon chuẩn ngành.
+        $this->assertStringContainsString('variation: [VariationCard]', $app,
+            'Mục "Tạo biến thể ảnh" phải gắn với VariationCard.');
+        $this->assertStringContainsString('tryon: [TryOnCard]', $app,
+            'Mục "Mặc thử đồ" phải gắn với TryOnCard.');
+        $this->assertStringContainsString("{ id: 'variation', icon: 'variations', label: 'Tạo biến thể ảnh' }", $app,
+            'Phải có mục "Tạo biến thể ảnh" với icon chuẩn ngành variations.');
+        $this->assertStringContainsString("{ id: 'tryon', icon: 'hanger', label: 'Mặc thử đồ' }", $app,
+            'Phải có mục "Mặc thử đồ" với icon móc treo.');
 
         $this->assertStringContainsString("import VariationCard from './components/VariationCard.vue'", $app);
         $this->assertStringContainsString("import TryOnCard from './components/TryOnCard.vue'", $app);

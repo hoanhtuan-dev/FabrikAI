@@ -32,6 +32,46 @@ class AdminController extends Controller
         return view('studio.admin');
     }
 
+    // ── [Yêu cầu 2026-09-17] Giao diện ─────────────────────────────────────
+
+    /** Cấu hình GUI hiện tại + danh sách icon hợp lệ (cho trang quản trị của owner). */
+    public function guiShow(): JsonResponse
+    {
+        return response()->json([
+            'activityBar' => app(\App\Services\StudioGuiConfig::class)->all(),
+            'icons' => \App\Services\StudioGuiConfig::ICONS,
+        ]);
+    }
+
+    /**
+     * Lưu cấu hình thanh công cụ TRÁI của Studio (thứ tự · nhãn · icon · ẩn/hiện).
+     *
+     * Cấu hình TOÀN CỤC cho mọi người dùng Studio nên chỉ owner ghi được. Lỗi dữ liệu trả 422
+     * kèm thông báo tiếng Việt cụ thể (id lạ · icon không tồn tại · nhãn quá dài) để owner biết
+     * đúng chỗ cần sửa thay vì "lưu thất bại" chung chung.
+     */
+    public function guiActivityBarSave(Request $request): JsonResponse
+    {
+        $items = $request->input('items');
+        if (! is_array($items)) {
+            return response()->json(['message' => 'Thiếu danh sách mục (items).'], 422);
+        }
+
+        try {
+            $saved = app(\App\Services\StudioGuiConfig::class)->save($items);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['ok' => true, 'activityBar' => $saved]);
+    }
+
+    /** Trả thanh công cụ về đúng bản gốc trong code (bỏ mọi tuỳ chỉnh của owner). */
+    public function guiActivityBarReset(): JsonResponse
+    {
+        return response()->json(['ok' => true, 'activityBar' => app(\App\Services\StudioGuiConfig::class)->reset()]);
+    }
+
     // ── Dashboard ──────────────────────────────────────────────────────────
 
     public function dashboard(): JsonResponse
