@@ -425,6 +425,8 @@ const paletteGroups = computed(() => {
   return order.filter((n) => map.has(n)).map((name) => ({ name, items: map.get(name) }));
 });
 function runCommand(cmd) { paletteOpen.value = false; paletteQuery.value = ''; cmd.run(); }
+/** Mở Bảng lệnh từ NÚT BẤM (không chỉ phím tắt) — xoá từ khoá cũ để lần mở nào cũng bắt đầu sạch. */
+function openPalette() { paletteQuery.value = ''; paletteOpen.value = true; }
 function onGlobalKey(e) {
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.shiftKey && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); paletteOpen.value = !paletteOpen.value; paletteQuery.value = ''; return; }
@@ -1119,7 +1121,9 @@ function onTouchEnd(e) {
         </div>
       </main>
       <!-- Right dock (desktop): chỉ hiển thị Outputs; Nguồn ảnh & Thư viện là nút HÀNH ĐỘNG ở rail -->
-      <aside v-if="store.outputDockOpen" class="scrollbar-hide hidden w-[115px] shrink-0 flex-col border-l border-ink-700 bg-ink-900/70 lg:flex">
+      <!-- [Yêu cầu 2026-09-20] Bề rộng dock Outputs +3%: 115px → 118px (làm tròn từ 118,45).
+           115 × 1,03 = 118,45 — không dùng số thập phân trong class Tailwind để tránh làm tròn lạ. -->
+      <aside v-if="store.outputDockOpen" class="scrollbar-hide hidden w-[118px] shrink-0 flex-col border-l border-ink-700 bg-ink-900/70 lg:flex">
         <div class="panel-head shrink-0 border-b border-ink-700">
           <span class="panel-title"><StudioIcon name="grid" size="h-3.5 w-3.5" class="text-brand-400" /> Outputs</span>
         </div>
@@ -1134,9 +1138,17 @@ function onTouchEnd(e) {
         <button @click="goLibrary" class="activity-btn" title="Thư viện — xem ảnh đã tạo & file tải lên" aria-label="Thư viện">
           <StudioIcon name="library" size="h-5 w-5" />
         </button>
+        <!-- [Yêu cầu 2026-09-20] mt-auto ghim nhóm dưới xuống đáy rail: Outputs rồi tới Bảng lệnh.
+             Trước đây chỉ Outputs nằm dưới; nay thêm nút Bảng lệnh NGAY DƯỚI Outputs, đúng yêu cầu
+             "thêm nút mở Command palette bên phải phía dưới". -->
         <button @click="store.toggleOutputDock()" class="activity-btn mt-auto" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">
           <StudioIcon name="grid" size="h-5 w-5" />
           <span v-if="store.generations.length" class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[8px] font-bold leading-none text-white">{{ store.generations.length }}</span>
+        </button>
+        <!-- Bảng lệnh (Ctrl+K / Ctrl+Shift+P / F1): nút hiện diện để người dùng KHÔNG cần biết phím tắt.
+             aria-keyshortcuts để trình đọc màn hình đọc được phím tắt kèm nút. -->
+        <button @click="openPalette()" class="activity-btn" aria-keyshortcuts="Control+K" title="Bảng lệnh (Ctrl+K) — tìm lệnh, dự án, mẫu việc, ảnh" aria-label="Bảng lệnh">
+          <StudioIcon name="search" size="h-5 w-5" />
         </button>
       </nav>
     </div>
