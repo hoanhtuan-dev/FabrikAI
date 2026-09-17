@@ -12,10 +12,10 @@ import RegionTools from './components/RegionTools.vue';
 import CanvasMaskTools from './components/CanvasMaskTools.vue';
 import ContextToolbar from './components/ContextToolbar.vue';
 import DirectorCard from './components/DirectorCard.vue';
-import SourcePanel from './components/SourcePanel.vue';
+// [Đợt 0.5] GỠ import chết: SourcePanel/LibraryCard từng được thay bằng SourcePickerPopup/LibraryApp
+// nhưng import còn sót — "card" cũ không render ở đâu, chỉ để lại ấn tượng mobile đang dùng chúng.
 import SourcePickerPopup from './components/SourcePickerPopup.vue';
 import OutputModule from './components/OutputModule.vue';
-import LibraryCard from './components/LibraryCard.vue';
 import LibraryApp from './LibraryApp.vue';
 // MultiSelectBar đã gộp vào ContextToolbar (layer selection bar).
 import GalleryModal from './components/GalleryModal.vue';
@@ -698,14 +698,30 @@ function onTouchEnd(e) {
           <button @click="stylistPopupOpen = true; menuOpen = false" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="stylistPopupOpen ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" title="Trợ lý thiết kế">
             <StudioIcon name="shirt" size="h-4 w-4" /> Trợ lý
           </button>
+          <!-- [Đợt 0.5] Nguồn ảnh + Thư viện: trước đây chỉ có nút ở rail hidden lg:flex (≥1024px),
+               nên người dùng điện thoại KHÔNG có cách mở. Nay cho vào drawer mobile. -->
+          <button @click="menuOpen = false; store.sourcePickerOpen = true" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="store.sourcePickerOpen ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm">
+            <StudioIcon name="imagePlus" size="h-4 w-4" /> Nguồn ảnh
+          </button>
+          <button @click="menuOpen = false; goLibrary()" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors bg-ink-800 text-cream-300/70" title="Thư viện — xem ảnh đã tạo & file tải lên">
+            <StudioIcon name="library" size="h-4 w-4" /> Thư viện
+          </button>
         </div>
         <div class="space-y-3"><component :is="c" v-for="(c,i) in panel" :key="i" /></div>
       </div>
     </div>
-    <!-- Mobile outputs overlay -->
+    <!-- Mobile outputs overlay: [Đợt 0.5] trước đây drawer này RỖNG (div trong suông) dù OutputModule
+         đã import sẵn — người dùng điện thoại bấm "Kết quả" nhận một ngăn trống. Nay render đúng lưới kết quả. -->
     <div v-if="outputOpen" role="dialog" aria-modal="true" aria-label="Kết quả tạo ảnh" class="fixed inset-0 z-50 lg:hidden">
       <div class="absolute inset-0 bg-black/60"></div>
-      <div class="absolute right-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
+      <div class="absolute right-0 top-0 flex h-full w-80 flex-col scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
+        <div class="panel-head -mx-3 mb-2 flex shrink-0 items-center justify-between border-b border-ink-700 px-3">
+          <span class="panel-title"><StudioIcon name="grid" size="h-3.5 w-3.5" class="text-brand-400" /> Kết quả</span>
+          <button @click="outputOpen = false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
+        </div>
+        <div class="min-h-0 flex-1">
+          <OutputModule />
+        </div>
       </div>
     </div>
     <!-- GalleryModal: xem ảnh lớn (bấm vào output trong dock phải) -->

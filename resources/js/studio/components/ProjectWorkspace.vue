@@ -301,10 +301,10 @@ watch(() => open.value, (v) => {
             </div>
           </div>
 
-          <!-- List view -->
+          <!-- List view: [Đợt 0.5] bọc overflow-x-auto để bảng dự án không tràn ngang trên điện thoại. -->
           <div v-else-if="store.projectView === 'list' && !store.activeProject" class="flex-1 overflow-y-auto p-4">
-            <div class="overflow-hidden rounded-md border border-ink-700">
-              <table class="w-full text-left text-xs">
+            <div class="overflow-x-auto rounded-md border border-ink-700">
+              <table class="w-full min-w-[560px] text-left text-xs">
                 <thead class="bg-ink-900 text-cream-300/70">
                   <tr>
                     <th class="px-3 py-2 font-semibold">Dự án</th>

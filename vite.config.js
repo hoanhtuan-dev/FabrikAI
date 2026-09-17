@@ -16,6 +16,7 @@ export default defineConfig({
                 'resources/js/studio/settings.js',
                 'resources/js/studio/presets.js',
                 'resources/js/studio/stylist-data.js',
+                'resources/js/studio/admin.js',
             ],
             refresh: true,
             publicDirectory: 'public_html',

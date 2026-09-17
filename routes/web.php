@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\StudioController;
@@ -44,6 +45,7 @@ Route::get('/', [StudioController::class, 'appIndex'])->name('home');
 Route::get('/settings', [StudioController::class, 'settingsPage'])->name('settings.page');
 Route::get('/presets', [StudioController::class, 'presetsPage'])->name('presets.page');
 Route::get('/stylist-data', [StudioController::class, 'stylistDataPage'])->name('stylist-data.page');
+Route::get('/admin', [AdminController::class, 'adminPage'])->name('admin.page');
 
 // ══════════════════════════════════════════════════════════════════════════════
 // NHÓM STUDIO — dùng được với MỌI tài khoản đã kích hoạt (admin + customer).
@@ -200,6 +202,28 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->gr
     Route::post('/stylist-data/questions', [StylistDataController::class, 'saveQuestion'])->name('stylist.data.questions.save');
     Route::delete('/stylist-data/questions/{id}', [StylistDataController::class, 'deleteQuestion'])->name('stylist.data.questions.delete');
     Route::delete('/stylist/presets/{id}', [StylistDataController::class, 'deletePreset'])->name('stylist.presets.delete');
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TRANG QUẢN TRỊ (/admin) — dành cho Owner. Dashboard/gói cước/sổ cái: admin + super_admin.
+// Thao tác trên TÀI KHOẢN người dùng: chỉ super_admin (đúng UserPolicy).
+// ══════════════════════════════════════════════════════════════════════════════
+Route::middleware(['auth', 'admin', 'nostore'])->prefix('api/admin')->name('api.admin.')->group(function () {
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+    Route::get('/plans', [AdminController::class, 'plans'])->name('plans');
+    Route::post('/plans', [AdminController::class, 'storePlan'])->name('plans.store');
+    Route::put('/plans/{plan}', [AdminController::class, 'updatePlan'])->name('plans.update');
+    Route::delete('/plans/{plan}', [AdminController::class, 'destroyPlan'])->name('plans.destroy');
+    Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');
+});
+
+Route::middleware(['auth', 'superadmin', 'nostore'])->prefix('api/admin')->name('api.admin.')->group(function () {
+    Route::get('/users', [AdminController::class, 'users'])->name('users');
+    Route::post('/users', [AdminController::class, 'storeUser'])->name('users.store');
+    Route::put('/users/{user}', [AdminController::class, 'updateUser'])->name('users.update');
+    Route::delete('/users/{user}', [AdminController::class, 'destroyUser'])->name('users.destroy');
+    Route::post('/users/{user}/credits', [AdminController::class, 'adjustCredits'])->name('users.credits');
+    Route::post('/users/{user}/reset-password', [AdminController::class, 'resetPassword'])->name('users.reset-password');
 });
 
 // ── Public FabrikAI API (read-only + images, no auth) ──

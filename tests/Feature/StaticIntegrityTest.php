@@ -359,6 +359,28 @@ class StaticIntegrityTest extends TestCase
         return $out;
     }
 
+    public function test_mobile_drawer_renders_outputs_sources_and_library(): void
+    {
+        // [Đợt 0.5 — Mobile dùng được]
+        //   Ba lỗi gốc: (a) drawer "Kết quả" trên điện thoại RỖNG — OutputModule đã import nhưng không
+        //   render; (b) "Nguồn ảnh"/"Thư viện" chỉ nằm ở rail hidden lg:flex (≥1024px) nên điện thoại
+        //   không có cách mở; (c) SourcePanel/LibraryCard import chết (đã bị thay bằng SourcePickerPopup/
+        //   LibraryApp) làm người đọc tưởng mobile đang dùng chúng.
+        $app = (string) file_get_contents(resource_path('js/studio/StudioApp.vue'));
+
+        // (a) OutputModule PHẢI được render bên trong drawer "Kết quả" mobile, không chỉ import.
+        $this->assertMatchesRegularExpression('/v-if="outputOpen"[^>]*>.*?<OutputModule \/>/s', $app,
+            'Drawer "Kết quả" mobile phải RENDER <OutputModule /> (trước đây rỗng trong suông).');
+
+        // (b) Nguồn ảnh + Thư viện phải mở được từ menu mobile (drawer), không chỉ từ rail desktop.
+        $this->assertMatchesRegularExpression('/menuOpen[^>]*>.*?sourcePickerOpen.*?goLibrary/s', $app,
+            'Menu mobile phải có "Nguồn ảnh" (sourcePickerOpen) và "Thư viện" (goLibrary).');
+
+        // (c) Không còn import chết SourcePanel / LibraryCard.
+        $this->assertStringNotContainsString("import SourcePanel", $app, 'Import chết SourcePanel phải bị gỡ.');
+        $this->assertStringNotContainsString("import LibraryCard", $app, 'Import chết LibraryCard phải bị gỡ.');
+    }
+
     public function test_dialogs_trap_focus_instead_of_letting_tab_escape(): void
     {
         // [Đợt 0.7 — focus trap]

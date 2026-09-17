@@ -90,7 +90,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-CoeoKgCB.css",
+    "file": "assets/app-C1XZeTUV.css",
     "name": "app",
     "names": [
       "app.css"
@@ -99,7 +99,7 @@
     "isEntry": true
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-CcWqMOvc.js",
+    "file": "assets/main-DTTVugpW.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -110,7 +110,7 @@
       "_StylistDataManager-CrA6GmQ6.js"
     ],
     "css": [
-      "assets/main-StDqDwY8.css"
+      "assets/main-BAm4LXrd.css"
     ]
   },
   "resources/js/studio/presets.js": {
