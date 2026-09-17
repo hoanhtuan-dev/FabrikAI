@@ -159,10 +159,23 @@
 - **Còn lại của đợt 3**: tiến trình theo từng ảnh trong lượt hàng loạt (hiện có % chung), phím tắt, và
   "chạy lại chỉ những mục lỗi".
 
-### Đợt 2 — Không gian làm việc theo nghề
-- Sidebar "Không gian làm việc": **Bộ sưu tập** (gom ảnh/biến thể theo mùa vụ, tái dùng ngữ cảnh), **Việc đang chạy**, **Thư viện**, **Duyệt**.
-- Preset theo ngành: lookbook · sàn TMĐT · mẫu kỹ thuật xưởng · catalogue.
-- Đo: số bước để ra 1 ảnh đăng bán ≤ 4; 0 lần nhập lại thông tin giữa các card.
+### Đợt 2 — Không gian làm việc theo nghề — ✅ PHẦN ĐẦU ĐÃ TRIỂN KHAI (2026-09-19)
+- ✅ **Panel "Bộ sưu tập"** (nhóm card MỚI, đứng đầu thanh công cụ trái) trả lời đúng 3 câu hỏi người làm
+  nghề tự hỏi mỗi phiên: **đang làm bộ nào** (áp dụng cho phiên tạo ảnh — đổi/bỏ trong 1 cú bấm) ·
+  **các bộ gần đây** kèm trạng thái (màu do máy chủ trả về) · số ảnh · **hạn chót đếm ngược** (quá hạn/còn N ngày) ·
+  **việc đang chạy** (chờ xử lý / đang tạo) + nút **Xử lý ngay**.
+- ✅ **Tạo bộ sưu tập ngay trong panel**: tên · mùa/vụ (→ tags) · hạn chót · brief ⇒ tạo xong **tự áp dụng**
+  cho phiên làm việc (không phải vào workspace rồi quay lại bật "áp dụng").
+- ✅ Panel **tự nạp dữ liệu** khi mở (trước đây dữ liệu dự án chỉ tải khi mở popover "Dự án" ⇒ vào panel sẽ thấy trống).
+- ✅ Nút **Mở workspace** hoạt động từ trong card (card render bằng `<component :is>` không nhận event ⇒
+  thêm cầu nối `store.requestWorkspace()` + StudioApp theo dõi).
+- **Đo được**: 4 test mới (`CollectionsHubTest`) + 2 test cũ cập nhật có ý thức (7 → 8 panel; panel Bộ sưu tập
+  đứng đầu thứ tự gốc) · **519 test xanh** · chạy thật trong Studio (Chrome CDP): **17/17 bước** — panel liệt kê
+  đúng bộ + số ảnh + hạn chót, chọn bộ thì áp dụng, tạo bộ mới gửi đúng payload (tên/brief/hạn/mùa vụ) và tự áp
+  dụng, mở được workspace.
+- **Còn lại của đợt 2**: preset theo ngành (lookbook · sàn TMĐT · mẫu kỹ thuật xưởng · catalogue), luồng **Duyệt**
+  cho chủ doanh nghiệp (hiện đã có trạng thái + transition ở workspace nhưng chưa có màn hình duyệt theo lô),
+  và báo cáo chi phí/tiến độ theo bộ sưu tập.
 
 ### Đợt 3 — Tối ưu thao tác
 - Tạo hàng loạt 1 cú bấm (N SKU × M bối cảnh), hàng đợi có tiến trình thật, so sánh trước/sau, phím tắt.

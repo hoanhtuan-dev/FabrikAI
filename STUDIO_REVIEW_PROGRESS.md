@@ -341,6 +341,14 @@ JS/Vue studio **51 file (38 .vue) / 14.239 dòng** · `public_html` **21 MB** ·
 - **Toàn bộ suite**: **515 test / 2.751 assert xanh** (trước 511).
 - Phát hiện & sửa trong vòng: bản vá "tách payload dùng chung" lần đầu **không áp được** (lỗi parse chặn cả chương trình) — test mới `substr_count(store, 'this.imagePayload(') === 2` đã bắt đúng và buộc hoàn tất việc tách.
 
+**Vòng 5 (2026-09-19) — PANEL "BỘ SƯU TẬP" (không gian làm việc theo nghề, Đợt 2):**
+- Lỗ hổng: người làm nghề nghĩ theo **bộ sưu tập/đơn hàng**, nhưng thông tin đó nằm rải rác — popover "Dự án" chỉ để ÁP DỤNG; tiến độ, hạn chót, việc đang chạy không thấy ở đâu ⇒ mỗi phiên phải tự nhớ đang ở bộ nào.
+- **Nhóm card MỚI `collections`** ("Bộ sưu tập") đứng đầu thanh công cụ trái: (1) **Đang làm** — bộ đang áp dụng + trạng thái + số ảnh + hạn chót đếm ngược + nút Mở workspace/Bỏ áp dụng; (2) **Tạo bộ sưu tập** ngay trong panel (tên · mùa/vụ → tags · hạn chót · brief) rồi **tự áp dụng**; (3) **Bộ sưu tập gần đây** (5 bộ, trạng thái màu theo máy chủ, số ảnh, hạn chót, bấm là làm việc trên bộ đó); (4) **Việc đang chạy** (chờ xử lý/đang tạo, nút Xử lý ngay).
+- **Sửa lỗi thật khi kiểm**: panel không tự nạp danh sách ⇒ vào panel thấy TRỐNG dù đã có bộ sưu tập. Nay gọi `loadProjects()` khi mount (cùng mẫu với LibraryApp/PromptLibraryTab).
+- **Cầu nối mới**: card render bằng `<component :is>` nên không nhận prop/event ⇒ `store.requestWorkspace()` + watcher ở StudioApp để nút "Mở workspace" chạy được từ trong card.
+- Cấu hình owner an toàn: `StudioGuiConfig::all()` nối id mới vào cuối bản đã lưu ⇒ không mất mục nào; 2 test cũ cập nhật **có ý thức** (7 → **8** panel; thứ tự gốc nay Bộ sưu tập → Tạo ảnh).
+- **Kiểm chứng**: `CollectionsHubTest` 4 test mới (hợp đồng API tạo bộ giữ brief/hạn/mùa vụ + danh sách trả đủ trường card dùng + wiring tĩnh + card chỉ dùng action có sẵn, không tự gọi endpoint) · **519 test / 2.789 assert xanh** (trước 515) · chạy thật trong Studio (Chrome CDP): **17/17 bước**.
+
 ### 3.6 Sửa lỗi / đồng bộ khác
 - `900f547` `studio_config()` bỏ qua empty string từ DB → fallback config default · `565c1a8` preview-enrich nhận body/hair từ tab Phom dáng · `6e16472` fix 500 image-thumb + popup GalleryModal/SourcePickerPopup không hiển thị trong StudioApp · `d6572a1` render ProjectWorkspace popup + gọn prompt `StylistService` · `d674560` fix **cross-world SW resource mismatch** cho modulepreload.
 - `e9ed8e5` khôi phục `settings.blade.php` bị cắt mất **184 dòng** · `c64ea21` fix CSS syntax + Vue missing closing tags · `1b804ed` + `e5175c6` bo góc **VSCode-style** toàn diện (card/input/btn/badge/chip + admin blade).

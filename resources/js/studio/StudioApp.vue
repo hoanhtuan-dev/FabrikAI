@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue';
 import { useStudioStore } from './store.js';
+import CollectionsCard from './components/CollectionsCard.vue';
 import SuggestCard from './components/SuggestCard.vue';
 import ConceptCard from './components/ConceptCard.vue';
 import StylistCard from './components/StylistCard.vue';
@@ -43,6 +44,8 @@ async function logout() {
 //   · owner đổi được: THỨ TỰ · NHÃN · ICON · ẨN/HIỆN
 const ACTIVITY_CARDS = {
   // (Đã gỡ 3 activity 2026-09-17: 'pattern' · 'tryon' cũ · 'swap' — xem STUDIO_REVIEW_PROGRESS.md.)
+  // [Đợt 2 — 2026-09-19] Không gian làm việc theo nghề: bộ sưu tập đang làm · các bộ gần đây · việc đang chạy.
+  collections: [CollectionsCard],
   concept: [SuggestCard],
   variation: [VariationCard],
   tryon: [TryOnCard],
@@ -55,6 +58,7 @@ const ACTIVITY_CARDS = {
 // Bản GỐC — dùng khi chưa tải xong cấu hình hoặc API lỗi, để thanh công cụ không bao giờ trống.
 // Phải khớp `StudioGuiConfig::DEFAULTS` (có test đối chiếu), gồm cả nút popup + menu Cài đặt.
 const ACTIVITY_FALLBACK = [
+  { id: 'collections', kind: 'panel', icon: 'folderOpen', label: 'Bộ sưu tập' },
   { id: 'concept', kind: 'panel', icon: 'sparkles', label: 'Tạo ảnh' },
   { id: 'variation', kind: 'panel', icon: 'variations', label: 'Tạo biến thể ảnh' },
   { id: 'tryon', kind: 'panel', icon: 'hanger', label: 'Mặc thử đồ' },
@@ -127,6 +131,9 @@ async function loadGuiConfig() {
     if (Array.isArray(d.activityBar) && d.activityBar.length) activityCfg.value = d.activityBar;
   } catch (e) { /* giữ bản gốc */ }
 }
+
+// [Đợt 2] Mở workspace Dự án khi card "Bộ sưu tập" yêu cầu (card không nhận được event).
+watch(() => store.workspaceOpenRequest, (n) => { if (n > 0) projectsOpen.value = true; });
 
 const activeActivity = ref('concept');
 const menuOpen = ref(false);

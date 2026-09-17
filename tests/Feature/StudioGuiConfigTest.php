@@ -179,8 +179,11 @@ class StudioGuiConfigTest extends TestCase
             $this->assertSame($kind, $row['kind'], "Mục '{$id}' phải có kind='{$kind}'.");
         }
 
-        // Nền tảng cũ (panel) vẫn nguyên vẹn.
-        $this->assertCount(7, StudioGuiConfig::panelIds(), 'Phải còn đủ 7 nhóm card.');
+        // Nền tảng cũ (panel) vẫn nguyên vẹn + panel MỚI của Đợt 2 (Bộ sưu tập — không gian làm việc
+        // theo nghề). Con số này là CHỦ ĐÍCH: thêm panel mới thì phải sửa test này một cách có ý thức
+        // (và thêm card tương ứng vào ACTIVITY_CARDS — có test riêng đối chiếu hai bên).
+        $this->assertCount(8, StudioGuiConfig::panelIds(), 'Phải còn đủ 8 nhóm card (7 cũ + Bộ sưu tập).');
+        $this->assertContains('collections', StudioGuiConfig::panelIds(), 'Panel Bộ sưu tập phải nằm trong cấu hình.');
         $this->assertSame(['settings'], StudioGuiConfig::PINNED_IDS);
     }
 
@@ -247,7 +250,10 @@ class StudioGuiConfigTest extends TestCase
     public function test_defaults_when_nothing_saved(): void
     {
         $this->assertSame(StudioGuiConfig::DEFAULTS, $this->svc()->all());
-        $this->assertSame('concept', $this->svc()->all()[0]['id'], 'Thứ tự gốc: Tạo ảnh đứng đầu.');
+        // [Đợt 2 — 2026-09-19] "Bộ sưu tập" đứng đầu thứ tự gốc: đó là điểm vào công việc hằng ngày
+        // (đang làm bộ nào · việc đang chạy), rồi mới tới các card tạo ảnh.
+        $this->assertSame('collections', $this->svc()->all()[0]['id'], 'Thứ tự gốc: Bộ sưu tập đứng đầu.');
+        $this->assertSame('concept', $this->svc()->all()[1]['id'], 'Sau Bộ sưu tập là Tạo ảnh.');
     }
 
     // ── Lưu ────────────────────────────────────────────────────────────────

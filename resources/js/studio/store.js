@@ -297,6 +297,9 @@ export const useStudioStore = defineStore('studio', {
     projectView: 'board',         // 'board' (kanban) | 'list'
     projectsArchived: false,      // lọc dự án đã lưu trữ
     projectScope: 'own',          // 'own' (dự án của mình) | 'pending' (hàng đợi duyệt — Super Admin)
+    // [Đợt 2] Card trong sidebar render bằng <component :is> nên KHÔNG nhận prop/event; muốn mở
+    // workspace Dự án từ card thì tăng bộ đếm này — StudioApp theo dõi và mở popup tương ứng.
+    workspaceOpenRequest: 0,
     projectCanReview: false,      // true khi user là Super Admin (được duyệt/lưu trữ dự án của người khác)
   }),
   getters: {
@@ -1641,6 +1644,8 @@ export const useStudioStore = defineStore('studio', {
         return d;
       } catch (e) { this.toast(e.message || 'Lỗi tải dự án.', 'error'); return null; }
     },
+    /** Yêu cầu StudioApp mở workspace Dự án/Bộ sưu tập (gọi từ card trong sidebar). */
+    requestWorkspace() { this.workspaceOpenRequest = (this.workspaceOpenRequest || 0) + 1; },
     async createProject(payload) {
       try {
         const d = await this.api('/api/projects/new', payload);

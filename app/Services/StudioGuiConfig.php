@@ -26,6 +26,10 @@ class StudioGuiConfig
     /** Bộ id HỢP LỆ + giá trị GỐC (thứ tự gốc = thứ tự ở đây). */
     public const DEFAULTS = [
         // kind='panel'  → mở NHÓM CARD ở sidebar trái (đổi activeActivity)
+        // [Đợt 2 — 2026-09-19] "Bộ sưu tập" = không gian làm việc theo NGHỀ: đang làm bộ nào · các bộ
+        // gần đây kèm trạng thái/hạn chót · việc đang chạy. Cấu hình cũ của owner KHÔNG mất mục nào:
+        // all() nối id mới vào cuối bản đã lưu (có test khoá bất biến đó).
+        ['id' => 'collections', 'kind' => 'panel', 'label' => 'Bộ sưu tập',     'icon' => 'folderOpen', 'visible' => true],
         ['id' => 'concept',   'kind' => 'panel',  'label' => 'Tạo ảnh',          'icon' => 'sparkles',   'visible' => true],
         ['id' => 'variation', 'kind' => 'panel',  'label' => 'Tạo biến thể ảnh', 'icon' => 'variations', 'visible' => true],
         ['id' => 'tryon',     'kind' => 'panel',  'label' => 'Mặc thử đồ',       'icon' => 'hanger',     'visible' => true],
