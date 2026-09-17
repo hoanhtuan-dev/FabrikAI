@@ -111,6 +111,14 @@ class RenderVideoJob implements ShouldQueue
                 'model' => $generation->model, 'total_s' => round(microtime(true) - $t0, 2),
                 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
             ]);
+
+            // [Đợt 1.5] Thông báo khi render xong. Chỉ gửi khi đường này giành CAS ($claimed)
+            // ⇒ mỗi generation đúng MỘT thông báo, không spam khi nhiều job/poll đua nhau.
+            try {
+                $generation->fresh()?->user?->notify(new \App\Notifications\GenerationCompleted($generation->fresh()));
+            } catch (\Throwable $e) {
+                logger()->warning('Failed to notify user of completed generation', ['generation_id' => $generation->id, 'error' => $e->getMessage()]);
+            }
         } catch (\Throwable $e) {
             // [M-c/M-d] Một đường duy nhất: CAS + hoàn credit ĐÚNG MỘT LẦN.
             studio_finalize_generation($generation, 'failed', ['processing'], studio_generation_error($e), [

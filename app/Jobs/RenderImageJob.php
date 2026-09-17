@@ -152,6 +152,15 @@ class RenderImageJob implements ShouldQueue
                 'requested_model' => $generation->model, 'total_s' => round(microtime(true) - $t0, 2),
                 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
             ]);
+
+            // [Đợt 1.5] Thông báo khi render xong — trước đây người dùng phải canh màn hình 3–8 phút.
+            // Chỉ gửi khi ĐƯỜNG NÀY giành CAS thành công ($claimed) ⇒ không spam khi nhiều poll/job đua nhau.
+            try {
+                $generation->fresh()?->user?->notify(new \App\Notifications\GenerationCompleted($generation->fresh()));
+            } catch (\Throwable $e) {
+                // Lỗi gửi thông báo KHÔNG được làm hỏng kết quả render đã xong.
+                logger()->warning('Failed to notify user of completed generation', ['generation_id' => $generation->id, 'error' => $e->getMessage()]);
+            }
         } catch (\Throwable $e) {
             // [M-c/M-d] Một đường duy nhất: CAS + hoàn credit ĐÚNG MỘT LẦN (kể cả khi user vừa Huỷ).
             studio_finalize_generation($generation, 'failed', ['processing'], studio_generation_error($e), [
