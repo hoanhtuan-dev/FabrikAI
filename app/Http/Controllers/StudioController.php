@@ -1818,8 +1818,12 @@ RULES:
         // studio_enforce_credits=0). Trả 402 có CẤU TRÚC thay vì chỉ một câu chữ: giao diện cần biết
         // thiếu bao nhiêu, còn bao nhiêu, và nâng cấp ở đâu — nếu không thì khách chỉ thấy "lỗi" mà
         // không biết làm gì tiếp, đúng thứ làm khách bỏ đi.
+        // Chủ hệ thống (Super Admin) KHÔNG bị chặn: đây là công cụ nội bộ của chính chủ dự án, khoá tài
+        // khoản owner khi credit = 0 là tự khoá mình khỏi sản phẩm (đo trên production 2026-09-19: tài
+        // khoản owner đang có 0 credit). Việc chặn nhằm bảo vệ DOANH THU từ khách, và khách vẫn bị chặn
+        // đúng như đã quyết — muốn thử trải nghiệm bị chặn thì dùng một tài khoản khách.
         $limits = studio_plan_limits($user);
-        if ($cost > 0 && $limits['enforce_credits'] && (int) $user->credits_balance < $cost) {
+        if ($cost > 0 && ! $user->isSuperAdmin() && $limits['enforce_credits'] && (int) $user->credits_balance < $cost) {
             $plan = $limits['plan'];
             abort(response()->json([
                 'code' => 'out_of_credits',

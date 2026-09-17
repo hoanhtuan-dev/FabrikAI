@@ -155,4 +155,20 @@ class PlanLimitsTest extends TestCase
     {
         $this->getJson('/api/plan/status')->assertStatus(401);
     }
+
+    public function test_super_admin_is_never_locked_out_by_credit_enforcement(): void
+    {
+        // Đo trên production 2026-09-19: tài khoản owner đang có 0 credit ⇒ nếu chặn cả owner thì chủ dự
+        // án tự khoá mình khỏi sản phẩm của mình. Việc chặn là để bảo vệ doanh thu từ KHÁCH.
+        $owner = User::where('email', 'owner@fabrikai.shop')->firstOrFail();
+        $owner->forceFill(['credits_balance' => 0])->save();
+
+        $this->assertTrue($owner->isSuperAdmin());
+
+        $this->actingAs($owner->fresh())
+            ->postJson('/api/generate', ['prompt' => 'áo sơ mi trắng', 'variants' => 1])
+            ->assertOk();
+
+        $this->assertSame(1, Generation::where('user_id', $owner->id)->count(), 'Owner vẫn tạo được ảnh.');
+    }
 }
