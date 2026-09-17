@@ -1,7 +1,7 @@
 {
-  "_StudioIcon-CkEVg32U.js": {
-    "file": "assets/StudioIcon-CkEVg32U.js",
-    "name": "StudioIcon",
+  "_BaseModal-Dk2tQi3x.js": {
+    "file": "assets/BaseModal-Dk2tQi3x.js",
+    "name": "BaseModal",
     "imports": [
       "_pageBoot-CmsEgZ-F.js"
     ]
@@ -14,9 +14,12 @@
       "_useLocalCatalog-BgZp4638.js"
     ]
   },
-  "__plugin-vue_export-helper-BDNMzG2s.js": {
-    "file": "assets/_plugin-vue_export-helper-BDNMzG2s.js",
-    "name": "_plugin-vue_export-helper"
+  "__plugin-vue_export-helper-B6v660QL.js": {
+    "file": "assets/_plugin-vue_export-helper-B6v660QL.js",
+    "name": "_plugin-vue_export-helper",
+    "imports": [
+      "_pageBoot-CmsEgZ-F.js"
+    ]
   },
   "_fonts-BRD9E1vz.css": {
     "file": "assets/fonts-BRD9E1vz.css",
@@ -102,7 +105,7 @@
     "name": "useLocalCatalog"
   },
   "resources/css/app.css": {
-    "file": "assets/app-Bdpk5AQ4.css",
+    "file": "assets/app-BDzsZ1Tz.css",
     "name": "app",
     "names": [
       "app.css"
@@ -111,30 +114,29 @@
     "isEntry": true
   },
   "resources/js/studio/admin.js": {
-    "file": "assets/admin-CwkKSD0D.js",
+    "file": "assets/admin-BNViqWV4.js",
     "name": "admin",
     "src": "resources/js/studio/admin.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-CmsEgZ-F.js",
       "_pinia-DNsqIwCQ.js",
-      "_StudioIcon-CkEVg32U.js",
-      "__plugin-vue_export-helper-BDNMzG2s.js"
+      "__plugin-vue_export-helper-B6v660QL.js"
     ],
     "css": [
       "assets/admin-DTBlMAPO.css"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-YmSyFMbB.js",
+    "file": "assets/main-DL01TVWJ.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-CmsEgZ-F.js",
       "_pinia-DNsqIwCQ.js",
-      "_StudioIcon-CkEVg32U.js",
-      "__plugin-vue_export-helper-BDNMzG2s.js",
+      "__plugin-vue_export-helper-B6v660QL.js",
+      "_BaseModal-Dk2tQi3x.js",
       "_StylistDataManager-Bx_sEmxf.js"
     ],
     "css": [
@@ -162,17 +164,18 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-CbQLP9xP.js",
+    "file": "assets/settings-HvQk71h8.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-CmsEgZ-F.js",
       "_pinia-DNsqIwCQ.js",
-      "__plugin-vue_export-helper-BDNMzG2s.js"
+      "__plugin-vue_export-helper-B6v660QL.js",
+      "_BaseModal-Dk2tQi3x.js"
     ],
     "css": [
-      "assets/settings-CjpUTG_g.css"
+      "assets/settings-CD0a66op.css"
     ]
   },
   "resources/js/studio/stylist-data.js": {
