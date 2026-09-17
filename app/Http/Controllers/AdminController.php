@@ -490,18 +490,34 @@ class AdminController extends Controller
             ]);
         }
 
+        // [Mở rộng quy mô] Module MỚI thêm vào bản khai mà chưa gói nào cấp ⇒ phải HIỆN RA cho chủ dự án
+        // biết, thay vì nằm im (quyền theo gói là dữ liệu tường minh, không tự cấp thêm cho ai).
+        $granted = [];
+        foreach ($plans as $p) {
+            $granted = array_merge($granted, $p->modules());
+        }
+        $ungranted = array_values(array_diff(ModuleRegistry::ids(), array_unique($granted)));
+
         return response()->json([
             'modules' => $rows,
-            'plans' => $plans->map(fn (Plan $p) => [
-                'id' => $p->id,
-                'slug' => $p->slug,
-                'name' => $p->name,
-                'price_label' => $p->priceLabel(),
-                'is_active' => (bool) $p->is_active,
-                'modules' => $p->modules(),
-                'modules_count' => $p->modulesCount(),
-                'suggested' => ModuleRegistry::suggestedForPlan((string) $p->slug),
-            ])->values(),
+            'ungranted' => $ungranted,
+            'plans' => $plans->map(function (Plan $p) {
+                $suggested = ModuleRegistry::suggestedForPlan((string) $p->slug);
+                $own = $p->modules();
+
+                return [
+                    'id' => $p->id,
+                    'slug' => $p->slug,
+                    'name' => $p->name,
+                    'price_label' => $p->priceLabel(),
+                    'is_active' => (bool) $p->is_active,
+                    'modules' => $own,
+                    'modules_count' => $p->modulesCount(),
+                    'suggested' => $suggested,
+                    // Đề xuất mà gói CHƯA cấp (gồm module mới thêm) — Quản trị hiện "thiếu N" + 1 nút áp.
+                    'missing_suggested' => array_values(array_diff($suggested, $own)),
+                ];
+            })->values(),
             'groups' => ModuleRegistry::groups(),
             'disabled' => ModuleRegistry::disabledGlobally(),
             'total_modules' => count(ModuleRegistry::all()),

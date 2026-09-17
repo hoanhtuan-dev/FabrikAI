@@ -160,6 +160,34 @@ class ModulesAdminTest extends TestCase
         $this->assertSame(['collections', 'upscale'], $plan->fresh()->modules());
     }
 
+    public function test_new_module_shows_up_as_not_yet_granted(): void
+    {
+        // Bất biến MỞ RỘNG QUY MÔ: thêm module vào bản khai thì nó phải xuất hiện ngay ở màn Quản trị và ở
+        // danh sách "chưa gói nào cấp" — quyền theo gói là dữ liệu tường minh nên KHÔNG tự cấp cho ai,
+        // nhưng cũng KHÔNG được nằm im không ai biết.
+        $pro = $this->plan('pro');
+        $before = $pro->modules();
+
+        // Giả lập "module mới": có trong bản khai (đã có sẵn) nhưng chưa gói nào cấp.
+        Plan::query()->get()->each(function (Plan $p) {
+            $p->forceFill(['modules' => array_values(array_diff($p->modules(), ['team_seats']))])->save();
+        });
+
+        $res = $this->actingAs($this->superAdmin())->getJson('/api/admin/modules')->assertOk();
+        $this->assertContains('team_seats', $res->json('ungranted'));
+
+        $planRow = collect($res->json('plans'))->firstWhere('slug', 'studio');
+        $this->assertContains('team_seats', $planRow['missing_suggested'], 'Gói nên có module này ⇒ phải hiện là thiếu so với đề xuất.');
+
+        // Bấm "áp đề xuất" ⇒ hết thiếu, và hết cảnh báo chưa-gói-nào-cấp.
+        $this->actingAs($this->superAdmin())->postJson('/api/admin/plans/'.$this->plan('studio')->id.'/modules/suggested')->assertOk();
+        $again = $this->actingAs($this->superAdmin())->getJson('/api/admin/modules')->assertOk();
+        $this->assertNotContains('team_seats', collect($again->json('plans'))->firstWhere('slug', 'studio')['missing_suggested']);
+        $this->assertNotContains('team_seats', $again->json('ungranted'));
+
+        $pro->forceFill(['modules' => $before])->save();
+    }
+
     public function test_admin_and_studio_surfaces_are_wired_to_the_registry(): void
     {
         // Chống "tính năng chết": API có mà giao diện không gọi thì chủ dự án không dùng được công tắc.

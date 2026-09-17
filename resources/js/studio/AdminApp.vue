@@ -1289,6 +1289,10 @@ onMounted(async () => {
                   <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
                     <StudioIcon name="puzzle" size="h-4 w-4" class="text-brand-300" /> Tính năng &amp; gói
                     <span :class="[BADGE, BADGE_TONE.neutral]">{{ modulesData.total_modules }} module</span>
+                    <span v-if="(modulesData.ungranted || []).length" :class="[BADGE, BADGE_TONE.warn]"
+                          :title="'Module chưa gói nào cấp: ' + (modulesData.ungranted || []).join(', ')">
+                      <StudioIcon name="alertTriangle" size="h-3 w-3" /> {{ modulesData.ungranted.length }} chưa gói nào cấp
+                    </span>
                   </h2>
                   <p class="mt-1 max-w-3xl text-xs text-cream-300/75">
                     Mọi tính năng của Studio được khai ở <b class="text-cream-100">một nguồn duy nhất</b> (module registry):
@@ -1371,6 +1375,10 @@ onMounted(async () => {
                       {{ (planModules[p.slug] || []).length }}/{{ modulesData.total_modules }} tính năng
                     </span>
                     <span v-if="!p.is_active" :class="[BADGE, BADGE_TONE.warn]">đang ẩn</span>
+                    <span v-if="(p.missing_suggested || []).length" :class="[BADGE, BADGE_TONE.info]"
+                          :title="'Đề xuất chưa cấp: ' + (p.missing_suggested || []).join(', ')">
+                      thiếu {{ p.missing_suggested.length }} so với đề xuất
+                    </span>
                     <div class="ml-auto flex gap-1.5">
                       <button class="tool-btn !py-1 text-[10px]" title="Áp đề xuất từ bản khai module" @click="applySuggested(p)">
                         <StudioIcon name="sparkles" size="h-3 w-3" /> Áp đề xuất
