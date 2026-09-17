@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\StudioController;
 use App\Http\Controllers\StudioSettingsController;
@@ -163,6 +164,9 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::get('/defaults', [StudioController::class, 'defaults'])->name('defaults');
     Route::get('/prompt-history', [StudioController::class, 'promptHistory'])->name('prompt-history');
     Route::post('/preview-enrich', [StudioController::class, 'previewEnrich'])->name('preview-enrich');
+
+    // ── Gói đăng ký: người dùng TỰ đăng ký một gói (auth + can-studio) ──
+    Route::post('/billing/subscribe', [BillingController::class, 'subscribe'])->name('billing.subscribe');
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -272,6 +276,8 @@ Route::prefix('api')->name('api.')->middleware('throttle:60,1')->group(function 
     Route::post('/stylist/prompt', [StudioController::class, 'stylistPrompt'])->name('stylist.prompt');
     Route::get('/stylist-data/data', [StylistDataController::class, 'data'])->name('stylist.data.json');
     Route::get('/stylist/presets', [StylistDataController::class, 'presets'])->name('stylist.presets');
+    // Danh mục gói đăng ký công khai (trang giá / đăng ký).
+    Route::get('/billing/plans', [BillingController::class, 'catalog'])->name('billing.plans');
 });
 
 // Public garment avatar + image serving (bypass auth, immutable cache)
