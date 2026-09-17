@@ -1,12 +1,21 @@
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useLocalCatalog, isAdminUser } from '../composables/useLocalCatalog.js';
 
 const CSRF = () => {
   const m = (typeof document !== 'undefined' && document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/)) || null;
   return m ? decodeURIComponent(m[1]) : '';
 };
 
+// [2026-09-17] Bản tùy chỉnh của RIÊNG user, lưu trong localStorage của máy khách.
+const typeCatalog = useLocalCatalog('stylist.types');
+const questionCatalog = useLocalCatalog('stylist.questions');
+const isAdmin = isAdminUser();
+const mode = ref('mine');
+
 const tab = ref('types');
+const baseTypes = ref([]);
+const baseQuestions = ref([]);
 const types = ref([]);
 const questions = ref([]);
 const loading = ref(false);
@@ -24,14 +33,20 @@ const confirmAction = ref(null);
 
 function flash(msg, type = 'info') { toast.value = msg; toastType.value = type; setTimeout(() => { toast.value = ''; }, 2400); }
 
+function recompute() {
+  types.value = typeCatalog.merge(baseTypes.value);
+  questions.value = questionCatalog.merge(baseQuestions.value);
+}
+
 async function load() {
   loading.value = true;
   try {
     const r = await fetch('/api/stylist-data/data', { headers: { Accept: 'application/json' } });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
-    types.value = d.types || [];
-    questions.value = d.questions || [];
+    baseTypes.value = d.types || [];
+    baseQuestions.value = d.questions || [];
+    recompute();
   } catch (e) { flash('Lỗi tải dữ liệu (' + e.message + ').', 'error'); }
   finally { loading.value = false; }
 }
@@ -54,41 +69,96 @@ function cancelConfirm() { confirmOpen.value = false; confirmAction.value = null
 function newType() { typeForm.value = { id: null, slug: '', name: '', emoji: '', color: '#4a7a90' }; editingType.value = true; tab.value = 'types'; }
 function editType(t) { typeForm.value = { id: t.id, slug: t.slug, name: t.name, emoji: t.emoji || '', color: t.color || '#4a7a90' }; editingType.value = true; tab.value = 'types'; }
 function cancelType() { editingType.value = false; typeForm.value = { id: null, slug: '', name: '', emoji: '', color: '#4a7a90' }; }
+
 async function saveType() {
   saving.value = true;
   try {
-    await postJson('/api/stylist-data/types', { id: typeForm.value.id, slug: typeForm.value.slug, name: typeForm.value.name, emoji: typeForm.value.emoji, color: typeForm.value.color });
-    flash('Đã lưu loại trang phục.'); cancelType(); await load();
+    const payload = { slug: typeForm.value.slug, name: typeForm.value.name, emoji: typeForm.value.emoji, color: typeForm.value.color };
+    if (mode.value === 'global') {
+      await postJson('/api/stylist-data/types', { id: typeForm.value.id, ...payload });
+      await load();
+      flash('Đã lưu loại trang phục dùng chung.');
+    } else {
+      if (typeForm.value.id) typeCatalog.update(typeForm.value.id, payload);
+      else typeCatalog.create(payload);
+      recompute();
+      flash('Đã lưu vào bản của bạn (trên máy này).');
+    }
+    cancelType();
   } catch (e) { flash(e.message, 'error'); }
   finally { saving.value = false; }
 }
+
 function deleteType(t) {
-  askConfirm('Xóa loại trang phục "' + t.name + '"? Thao tác này không thể hoàn tác.', async () => {
-    try { await del('/api/stylist-data/types/' + t.id); flash('Đã xóa.'); await load(); } catch (e) { flash(e.message, 'error'); }
+  askConfirm('Xóa loại trang phục "' + t.name + '"?', async () => {
+    try {
+      if (mode.value === 'global') { await del('/api/stylist-data/types/' + t.id); await load(); }
+      else { typeCatalog.remove(t.id); recompute(); }
+      flash('Đã xóa.');
+    } catch (e) { flash(e.message, 'error'); }
   });
 }
 
 function newQuestion() { qForm.value = { id: null, key: '', q: '', optsText: '' }; editingQuestion.value = true; tab.value = 'questions'; }
 function editQuestion(q) { qForm.value = { id: q.id, key: q.key, q: q.q, optsText: (q.opts || []).join('\n') }; editingQuestion.value = true; tab.value = 'questions'; }
 function cancelQuestion() { editingQuestion.value = false; qForm.value = { id: null, key: '', q: '', optsText: '' }; }
+
 async function saveQuestion() {
   saving.value = true;
   try {
     const opts = qForm.value.optsText.split('\n').map(s => s.trim()).filter(Boolean);
-    await postJson('/api/stylist-data/questions', { id: qForm.value.id, key: qForm.value.key, q: qForm.value.q, opts });
-    flash('Đã lưu câu hỏi.'); cancelQuestion(); await load();
+    const payload = { key: qForm.value.key, q: qForm.value.q, opts };
+    if (mode.value === 'global') {
+      await postJson('/api/stylist-data/questions', { id: qForm.value.id, ...payload });
+      await load();
+      flash('Đã lưu câu hỏi dùng chung.');
+    } else {
+      if (qForm.value.id) questionCatalog.update(qForm.value.id, payload);
+      else questionCatalog.create(payload);
+      recompute();
+      flash('Đã lưu vào bản của bạn (trên máy này).');
+    }
+    cancelQuestion();
   } catch (e) { flash(e.message, 'error'); }
   finally { saving.value = false; }
 }
+
 function deleteQuestion(q) {
-  askConfirm('Xóa câu hỏi "' + q.key + '"? Thao tác này không thể hoàn tác.', async () => {
-    try { await del('/api/stylist-data/questions/' + q.id); flash('Đã xóa.'); await load(); } catch (e) { flash(e.message, 'error'); }
+  askConfirm('Xóa câu hỏi "' + q.key + '"?', async () => {
+    try {
+      if (mode.value === 'global') { await del('/api/stylist-data/questions/' + q.id); await load(); }
+      else { questionCatalog.remove(q.id); recompute(); }
+      flash('Đã xóa.');
+    } catch (e) { flash(e.message, 'error'); }
   });
 }
+
+function resetMine() {
+  askConfirm('Khôi phục về bản mặc định? Mọi tùy chỉnh của bạn trên máy này sẽ mất.', () => {
+    typeCatalog.reset(); questionCatalog.reset(); recompute(); flash('Đã khôi phục bản mặc định.');
+  });
+}
+
+const hasOverrides = () => typeCatalog.hasOverrides() || questionCatalog.hasOverrides();
 </script>
+
 <template>
   <div>
     <div v-if="toast" class="pointer-events-none fixed left-1/2 top-4 z-[95] -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold shadow-2xl" :class="toastType === 'error' ? 'bg-red-600 text-white' : 'bg-ink-800 text-cream-100 border border-brand-500/40'">{{ toast }}</div>
+
+    <!-- Nói rõ tùy chỉnh lưu ở đâu — trước đây trang này sửa thẳng bảng toàn cục. -->
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ink-700 bg-ink-800/60 p-3">
+      <p class="text-xs text-cream-300/70">
+        <b class="text-cream-100">Bản của bạn</b> lưu ngay trên máy này, riêng cho tài khoản đang đăng nhập.
+      </p>
+      <div class="flex items-center gap-2">
+        <div v-if="isAdmin" class="flex overflow-hidden rounded-lg border border-ink-600">
+          <button @click="mode='mine'" :class="mode==='mine' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="px-2.5 py-1 text-[11px] font-semibold">Bản của tôi</button>
+          <button @click="mode='global'" :class="mode==='global' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="px-2.5 py-1 text-[11px] font-semibold">Bản dùng chung</button>
+        </div>
+        <button v-if="hasOverrides()" @click="resetMine" class="rounded-lg bg-ink-700 px-2.5 py-1 text-[11px] text-cream-200 hover:bg-ink-600">Khôi phục mặc định</button>
+      </div>
+    </div>
 
     <div class="mb-4 flex gap-1.5">
       <button @click="tab='types'" :class="tab==='types' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-lg px-3 py-1.5 text-xs font-semibold">👗 Loại trang phục ({{ types.length }})</button>
@@ -107,7 +177,7 @@ function deleteQuestion(q) {
         <div v-for="t in types" :key="t.slug" class="flex items-center gap-3 rounded-md border border-ink-700 bg-ink-900/60 p-2.5">
           <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-900 text-lg" :style="{ boxShadow: 'inset 0 0 0 1px ' + (t.color || '#4a7a90') }">{{ t.emoji || '👗' }}</span>
           <div class="min-w-0 flex-1">
-            <p class="truncate text-xs font-semibold text-cream-100">{{ t.name }}</p>
+            <p class="truncate text-xs font-semibold text-cream-100">{{ t.name }} <span v-if="t._local" class="ml-1 rounded bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">của bạn</span></p>
             <p class="truncate text-[10px] text-cream-300/50">slug: {{ t.slug }}</p>
           </div>
           <span class="h-5 w-5 shrink-0 rounded-full border border-white/20" :style="{ background: t.color || '#4a7a90' }"></span>
@@ -143,7 +213,7 @@ function deleteQuestion(q) {
         <div v-for="q in questions" :key="q.key" class="rounded-md border border-ink-700 bg-ink-900/60 p-3">
           <div class="flex items-start gap-3">
             <span class="mt-0.5 shrink-0 rounded bg-ink-900 px-1.5 py-0.5 font-mono text-[10px] text-brand-300">{{ q.key }}</span>
-            <p class="min-w-0 flex-1 text-xs font-semibold text-cream-100">{{ q.q }}</p>
+            <p class="min-w-0 flex-1 text-xs font-semibold text-cream-100">{{ q.q }} <span v-if="q._local" class="ml-1 rounded bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">của bạn</span></p>
             <button @click="editQuestion(q)" class="shrink-0 rounded-lg bg-ink-700 px-2 py-1 text-[11px] text-cream-200 hover:bg-brand-600 hover:text-white">Sửa</button>
             <button @click="deleteQuestion(q)" class="shrink-0 rounded-lg bg-red-600/25 px-2 py-1 text-[11px] text-red-200 hover:bg-red-600 hover:text-white">Xóa</button>
           </div>
@@ -157,8 +227,7 @@ function deleteQuestion(q) {
           <div><label class="label">Key (mã)</label><input v-model="qForm.key" class="input !py-2" placeholder="fabric"></div>
         </div>
         <div class="mt-2"><label class="label">Câu hỏi</label><input v-model="qForm.q" class="input !py-2" placeholder="Chất liệu (kỹ thuật dệt):"></div>
-        <div class="mt-2"><label class="label">Lựa chọn (mỗi dòng một lựa chọn)</label><textarea v-model="qForm.optsText" rows="5" class="input !text-xs" placeholder="Lụa satin mềm
-Chiffon mỏng nhẹ"></textarea></div>
+        <div class="mt-2"><label class="label">Lựa chọn (mỗi dòng một lựa chọn)</label><textarea v-model="qForm.optsText" rows="5" class="input !text-xs" placeholder="Lụa satin mềm&#10;Chiffon mỏng nhẹ"></textarea></div>
         <div class="mt-3 flex justify-end gap-2">
           <button @click="cancelQuestion" class="btn-outline btn-sm">Huỷ</button>
           <button @click="saveQuestion" :disabled="saving" class="btn-brand btn-sm">{{ saving ? 'Đang lưu…' : '💾 Lưu' }}</button>

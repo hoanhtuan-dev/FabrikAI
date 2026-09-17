@@ -9,6 +9,7 @@
     @vite(['resources/css/app.css', 'resources/js/studio/stylist-data.js'])
 </head>
 <body class="min-h-screen bg-ink-900 text-cream-100 antialiased">
-    <div id="stylist-data-root" class="w-full"></div>
+    {{-- data-user-id: khoá localStorage cho bản tùy chỉnh RIÊNG của từng user (xem useLocalCatalog.js). --}}
+    <div id="stylist-data-root" class="w-full" data-user-id="{{ auth()->id() }}" data-user-admin="{{ auth()->user()?->isAdmin() ? '1' : '0' }}"></div>
 </body>
 </html>

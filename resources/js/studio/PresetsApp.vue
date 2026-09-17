@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useLocalCatalog, isAdminUser } from './composables/useLocalCatalog.js';
 
 const CSRF = () => {
   const m = (typeof document !== 'undefined' && document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/)) || null;
@@ -11,13 +12,19 @@ const CAT_LABELS = {
   pose: 'Dáng đứng', camera: 'Góc máy', lens: 'Ống kính', video_scene: 'Kịch bản quay', inpaint: 'Sửa ảnh (Inpaint)',
 };
 
+// [2026-09-17] Bản tùy chỉnh của RIÊNG user, lưu trong localStorage của máy khách.
+const catalog = useLocalCatalog('presets');
+const isAdmin = isAdminUser();
+// Admin vẫn sửa được bản DÙNG CHUNG (mọi người thấy) — mặc định là sửa bản của mình.
+const mode = ref('mine');
+
 const categories = ref([]);
-const presets = ref({});     // { category: [ ...items ] }
+const baseline = ref([]);   // preset toàn cục (giá trị mặc định), đã làm phẳng + gắn category
+const merged = ref([]);     // baseline ⊕ bản tùy chỉnh của user
 const loading = ref(true);
 const error = ref('');
 const toast = ref(null);
 
-// form thêm mới
 const form = ref({ category: 'fabric', ui_label: '', prompt_injection: '', note: '', sort_order: 0 });
 const saving = ref(false);
 const editId = ref(null);
@@ -34,27 +41,42 @@ async function api(path, method = 'GET', body = null) {
   return d;
 }
 
+function recompute() { merged.value = catalog.merge(baseline.value); }
+
 async function load() {
   loading.value = true; error.value = '';
   try {
     const d = await api('');
     categories.value = Array.isArray(d.categories) ? d.categories : [];
-    presets.value = d.presets || {};
+    const flat = [];
+    const grouped = d.presets || {};
+    for (const cat of Object.keys(grouped)) {
+      for (const it of grouped[cat] || []) flat.push({ ...it, category: cat });
+    }
+    baseline.value = flat;
+    recompute();
     if (!form.value.category && categories.value.length) form.value.category = categories.value[0];
   } catch (e) { error.value = e.message; }
   finally { loading.value = false; }
 }
 onMounted(load);
 
+const presets = computed(() => {
+  const g = {};
+  for (const it of merged.value) (g[it.category] = g[it.category] || []).push(it);
+  return g;
+});
 const byCategory = computed(() => (cat) => presets.value[cat] || []);
 
 async function create() {
   if (!form.value.ui_label.trim() || !form.value.prompt_injection.trim()) { flash('Cần key (nhãn) và value (prompt).', false); return; }
   saving.value = true;
   try {
-    await api('', 'POST', { ...form.value, sort_order: Number(form.value.sort_order) || 0 });
+    const payload = { ...form.value, sort_order: Number(form.value.sort_order) || 0 };
+    if (mode.value === 'global') { await api('', 'POST', payload); await load(); }
+    else { catalog.create(payload); recompute(); }
     form.value = { ...form.value, ui_label: '', prompt_injection: '', note: '', sort_order: 0 };
-    flash('Đã thêm preset.'); await load();
+    flash(mode.value === 'global' ? 'Đã thêm preset dùng chung.' : 'Đã thêm vào bản của bạn (lưu trên máy này).');
   } catch (e) { flash(e.message, false); }
   finally { saving.value = false; }
 }
@@ -64,15 +86,26 @@ function cancelEdit() { editId.value = null; }
 
 async function saveEdit(id) {
   try {
-    await api('/' + id, 'PUT', { ...edit.value, sort_order: Number(edit.value.sort_order) || 0 });
-    editId.value = null; flash('Đã cập nhật preset.'); await load();
+    const payload = { ...edit.value, sort_order: Number(edit.value.sort_order) || 0 };
+    if (mode.value === 'global') { await api('/' + id, 'PUT', payload); await load(); }
+    else { catalog.update(id, payload); recompute(); }
+    editId.value = null;
+    flash(mode.value === 'global' ? 'Đã cập nhật preset dùng chung.' : 'Đã lưu vào bản của bạn.');
   } catch (e) { flash(e.message, false); }
 }
 
 async function remove(id) {
-  if (!confirm('Xóa preset này?')) return;
-  try { await api('/' + id, 'DELETE'); flash('Đã xóa preset.'); await load(); }
-  catch (e) { flash(e.message, false); }
+  if (!confirm(mode.value === 'global' ? 'Xóa preset DÙNG CHUNG này? Mọi người sẽ mất.' : 'Xóa preset này khỏi bản của bạn?')) return;
+  try {
+    if (mode.value === 'global') { await api('/' + id, 'DELETE'); await load(); }
+    else { catalog.remove(id); recompute(); }
+    flash(mode.value === 'global' ? 'Đã xóa preset dùng chung.' : 'Đã xóa khỏi bản của bạn.');
+  } catch (e) { flash(e.message, false); }
+}
+
+function resetMine() {
+  if (!confirm('Khôi phục về bản mặc định? Mọi tùy chỉnh của bạn trên máy này sẽ mất.')) return;
+  catalog.reset(); recompute(); flash('Đã khôi phục bản mặc định.');
 }
 </script>
 
@@ -83,15 +116,28 @@ async function remove(id) {
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="font-display text-xl font-semibold text-cream-50">🗂️ Prompt Templates</h1>
-        <p class="mt-0.5 text-xs text-ink-500">Quản lý mẫu prompt (preset) dùng trong Studio — mỗi preset là cặp <b>key: value</b>; value tự chèn vào câu lệnh khi chọn.</p>
+        <p class="mt-0.5 text-xs text-ink-500">Mẫu prompt (preset) dùng trong Studio — mỗi preset là cặp <b>key: value</b>; value tự chèn vào câu lệnh khi chọn.</p>
       </div>
       <a href="/" class="btn-outline btn-sm whitespace-nowrap">← Về FabrikAI</a>
+    </div>
+
+    <!-- Nói rõ tùy chỉnh lưu ở đâu — trước đây trang này sửa thẳng bảng toàn cục. -->
+    <div class="card mb-4 flex flex-wrap items-center justify-between gap-3 p-3">
+      <p class="text-xs text-ink-400">
+        <b class="text-cream-200">Bản của bạn</b> được lưu ngay trên máy này, riêng cho tài khoản đang đăng nhập — không ảnh hưởng người khác.
+      </p>
+      <div class="flex items-center gap-2">
+        <div v-if="isAdmin" class="flex overflow-hidden rounded-lg border border-ink-600">
+          <button @click="mode='mine'" :class="mode==='mine' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="px-2.5 py-1 text-[11px] font-semibold">Bản của tôi</button>
+          <button @click="mode='global'" :class="mode==='global' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="px-2.5 py-1 text-[11px] font-semibold">Bản dùng chung</button>
+        </div>
+        <button v-if="catalog.hasOverrides()" @click="resetMine" class="btn-outline btn-sm">Khôi phục mặc định</button>
+      </div>
     </div>
 
     <div v-if="loading" class="card p-10 text-center text-sm text-ink-500">Đang tải…</div>
     <div v-else-if="error" class="card border-red-300 p-6 text-sm text-red-600">{{ error }} — <button class="underline" @click="load">thử lại</button></div>
     <template v-else>
-      <!-- Thêm preset -->
       <div class="card p-5">
         <h2 class="mb-3 font-display text-base font-semibold text-cream-100">Thêm preset</h2>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -124,7 +170,6 @@ async function remove(id) {
         </div>
       </div>
 
-      <!-- Danh sách theo danh mục -->
       <div v-for="cat in categories" :key="cat" class="mt-8">
         <div class="mb-3 flex items-center gap-2">
           <span class="badge bg-cream-100 text-ink-700">{{ CAT_LABELS[cat] || cat }}</span>
@@ -150,6 +195,7 @@ async function remove(id) {
             <template v-else>
               <div class="flex items-center gap-2">
                 <span class="min-w-0 flex-1 truncate text-sm font-semibold text-cream-50">{{ p.ui_label }}</span>
+                <span v-if="p._local" class="badge bg-brand-600/30 text-brand-200">của bạn</span>
                 <span class="text-[10px] text-ink-500">#{{ p.id }}</span>
               </div>
               <p class="mt-1 line-clamp-2 text-xs text-ink-500">{{ p.prompt_injection }}</p>

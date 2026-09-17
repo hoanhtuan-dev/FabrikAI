@@ -42,9 +42,17 @@ Route::post('/dang-xuat', [AuthController::class, 'logout'])->name('logout');
 
 // ── SPA pages (Blade shells) ──
 Route::get('/', [StudioController::class, 'appIndex'])->name('home');
-Route::get('/settings', [StudioController::class, 'settingsPage'])->name('settings.page');
-Route::get('/presets', [StudioController::class, 'presetsPage'])->name('presets.page');
-Route::get('/stylist-data', [StudioController::class, 'stylistDataPage'])->name('stylist-data.page');
+// [Quyết định 2026-09-17] /settings là CÀI ĐẶT TOÀN CỤC (API key · model registry) ⇒ cấp OWNER.
+// Trước đây shell này công khai: khách tải được vỏ trang cấu hình (API của nó vốn đã ở nhóm ADMIN).
+Route::middleware(['auth', 'admin', 'nostore'])->get('/settings', [StudioController::class, 'settingsPage'])->name('settings.page');
+
+// [Quyết định 2026-09-17] /presets + /stylist-data là TÙY CHỈNH CẤP USER, lưu CỤC BỘ trên máy khách:
+// mỗi người có bản riêng (localStorage), bảng toàn cục chỉ còn là GIÁ TRỊ MẶC ĐỊNH. Vì vậy shell
+// mở cho MỌI tài khoản studio (auth + can-studio), không phải chỉ admin.
+Route::middleware(['auth', 'can-studio', 'nostore'])->group(function () {
+    Route::get('/presets', [StudioController::class, 'presetsPage'])->name('presets.page');
+    Route::get('/stylist-data', [StudioController::class, 'stylistDataPage'])->name('stylist-data.page');
+});
 // [Xác minh 2026-09-17] /admin là CONSOLE OWNER — KHÔNG được để chung nhóm shell công khai.
 // Trước đây ai cũng tải được vỏ quản trị (khách 200, customer 200), trái mô hình ở đầu file
 // ("ADMIN (auth + admin): cấu hình & quản trị TOÀN CỤC"); AdminApp.vue cũng không tự chặn.
