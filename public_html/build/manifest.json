@@ -1,9 +1,10 @@
 {
-  "_StylistDataManager-BsVOJCmz.js": {
-    "file": "assets/StylistDataManager-BsVOJCmz.js",
+  "_StylistDataManager-Bx_sEmxf.js": {
+    "file": "assets/StylistDataManager-Bx_sEmxf.js",
     "name": "StylistDataManager",
     "imports": [
-      "_pageBoot-CmsEgZ-F.js"
+      "_pageBoot-CmsEgZ-F.js",
+      "_useLocalCatalog-BgZp4638.js"
     ]
   },
   "__plugin-vue_export-helper-BDNMzG2s.js": {
@@ -89,8 +90,12 @@
       "_pageBoot-CmsEgZ-F.js"
     ]
   },
+  "_useLocalCatalog-BgZp4638.js": {
+    "file": "assets/useLocalCatalog-BgZp4638.js",
+    "name": "useLocalCatalog"
+  },
   "resources/css/app.css": {
-    "file": "assets/app-B9G9hwxt.css",
+    "file": "assets/app-DWQGtcTP.css",
     "name": "app",
     "names": [
       "app.css"
@@ -113,7 +118,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-BMmqmbd2.js",
+    "file": "assets/main-BcKieA9s.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -121,19 +126,20 @@
       "_pageBoot-CmsEgZ-F.js",
       "_pinia-DNsqIwCQ.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_StylistDataManager-BsVOJCmz.js"
+      "_StylistDataManager-Bx_sEmxf.js"
     ],
     "css": [
       "assets/main-BAm4LXrd.css"
     ]
   },
   "resources/js/studio/presets.js": {
-    "file": "assets/presets-CpRPZ8Hq.js",
+    "file": "assets/presets-DrzZfbac.js",
     "name": "presets",
     "src": "resources/js/studio/presets.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-CmsEgZ-F.js"
+      "_pageBoot-CmsEgZ-F.js",
+      "_useLocalCatalog-BgZp4638.js"
     ]
   },
   "resources/js/studio/settings.js": {
@@ -151,14 +157,14 @@
     ]
   },
   "resources/js/studio/stylist-data.js": {
-    "file": "assets/stylist-data-C35azi4L.js",
+    "file": "assets/stylist-data-DMKAzLXF.js",
     "name": "stylist-data",
     "src": "resources/js/studio/stylist-data.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-CmsEgZ-F.js",
       "_pinia-DNsqIwCQ.js",
-      "_StylistDataManager-BsVOJCmz.js"
+      "_StylistDataManager-Bx_sEmxf.js"
     ]
   }
 }
