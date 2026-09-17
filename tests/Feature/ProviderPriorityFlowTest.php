@@ -295,4 +295,56 @@ class ProviderPriorityFlowTest extends TestCase
         $this->assertSame('qwen', $qwen['family']);
         $this->assertSame(0, $qwen['rank']);
     }
+    // ── Lỗi thực tế: dán KHOÁ API vào ô 'key ref' (vốn là slug nhóm key) ──────
+
+    public function test_provider_rejects_real_api_key_in_key_ref_with_clear_message(): void
+    {
+        $this->actingAs($this->admin());
+
+        // Khoá thật dài > 60 ký tự từng gây lỗi khô khan:
+        // "The api key ref field must not be greater than 60 characters."
+        $key = 'sk-ws-'.str_repeat('a', 120);
+
+        $res = $this->postJson('/api/settings-vue/providers', [
+            'slug' => 'ckey',
+            'name' => 'CKEY',
+            'protocol' => 'openai',
+            'base_url' => 'https://api.xah.io/v1',
+            'api_key_ref' => $key,
+        ])->assertStatus(422);
+
+        $msg = (string) ($res->json('errors.api_key_ref.0') ?? $res->json('message'));
+        $this->assertStringContainsString('NHÓM KEY', $msg);
+        $this->assertStringContainsString('API Keys', $msg);
+        $this->assertDatabaseMissing('studio_providers', ['slug' => 'ckey']);
+    }
+
+    public function test_short_key_ref_with_invalid_slug_chars_is_rejected(): void
+    {
+        $this->actingAs($this->admin());
+
+        // Ky tu khong hop le voi slug nhom key (dau cham, khoang trang) → 422.
+        $this->postJson('/api/settings-vue/providers', [
+            'slug' => 'ckey',
+            'name' => 'CKEY',
+            'protocol' => 'openai',
+            'base_url' => 'https://api.xah.io/v1',
+            'api_key_ref' => 'ckey key',
+        ])->assertStatus(422);
+    }
+
+    public function test_provider_accepts_proper_slug_key_ref(): void
+    {
+        $this->actingAs($this->admin());
+
+        $this->postJson('/api/settings-vue/providers', [
+            'slug' => 'ckey',
+            'name' => 'CKEY',
+            'protocol' => 'openai',
+            'base_url' => 'https://api.xah.io/v1',
+            'api_key_ref' => 'ckey-gateway',
+        ])->assertStatus(201);
+
+        $this->assertDatabaseHas('studio_providers', ['slug' => 'ckey', 'api_key_ref' => 'ckey-gateway']);
+    }
 }

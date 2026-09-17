@@ -162,7 +162,7 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-D5IWs-Oc.js",
+    "file": "assets/settings-CbQLP9xP.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
@@ -172,7 +172,7 @@
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/settings-OYyT3wGQ.css"
+      "assets/settings-CjpUTG_g.css"
     ]
   },
   "resources/js/studio/stylist-data.js": {

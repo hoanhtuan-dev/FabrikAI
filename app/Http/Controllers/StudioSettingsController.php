@@ -275,8 +275,11 @@ class StudioSettingsController extends Controller
             'protocol' => ['required', 'string', 'in:openai,dashscope,gemini'],
             'base_url' => ['required', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+/'],
             'auth_style' => ['nullable', 'string', 'in:bearer,x-goog-api-key'],
-            'api_key_ref' => ['nullable', 'string', 'max:60'],
+            'api_key_ref' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9][A-Za-z0-9_-]*$/'],
             'note' => ['nullable', 'string', 'max:255'],
+        ], [
+            'api_key_ref.max' => 'API key ref là TÊN NHÓM KEY (slug), không phải khoá API — tối đa 60 ký tự. Đăng ký khoá thật ở tab 🔑 API Keys với provider = slug này.',
+            'api_key_ref.regex' => 'API key ref chỉ nhận chữ, số, gạch ngang/gạch dưới (vd: ckey). Khoá API thật (sk-…, dài hàng trăm ký tự) KHÔNG nhập ở đây — hãy dán vào tab 🔑 API Keys.',
         ]);
 
         if (isset(studio_provider_catalog()[$data['slug']])) {
@@ -307,9 +310,12 @@ class StudioSettingsController extends Controller
             'protocol' => ['required', 'string', 'in:openai,dashscope,gemini'],
             'base_url' => ['required', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+/'],
             'auth_style' => ['nullable', 'string', 'in:bearer,x-goog-api-key'],
-            'api_key_ref' => ['nullable', 'string', 'max:60'],
+            'api_key_ref' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9][A-Za-z0-9_-]*$/'],
             'enabled' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:255'],
+        ], [
+            'api_key_ref.max' => 'API key ref là TÊN NHÓM KEY (slug), không phải khoá API — tối đa 60 ký tự. Đăng ký khoá thật ở tab 🔑 API Keys với provider = slug này.',
+            'api_key_ref.regex' => 'API key ref chỉ nhận chữ, số, gạch ngang/gạch dưới (vd: ckey). Khoá API thật (sk-…, dài hàng trăm ký tự) KHÔNG nhập ở đây — hãy dán vào tab 🔑 API Keys.',
         ]);
 
         // The Provider ID (slug) stays fixed — it is the settings key every model
@@ -342,10 +348,13 @@ class StudioSettingsController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'provider' => ['required', 'string', 'max:60'],
             'model_id' => ['required', 'string', 'max:255'],
-            'api_key_ref' => ['nullable', 'string', 'max:60'],
+            'api_key_ref' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9][A-Za-z0-9_-]*$/'],
             'priority' => ['nullable', 'integer', 'min:0', 'max:100'],
             'enabled' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:255'],
+        ], [
+            'api_key_ref.max' => 'Key ref là TÊN NHÓM KEY, không phải khoá API — tối đa 60 ký tự.',
+            'api_key_ref.regex' => 'Key ref chỉ nhận chữ, số, gạch ngang/gạch dưới (vd: qwen). Khoá API thật không nhập ở đây — dán vào tab 🔑 API Keys.',
         ]);
 
         $m = StudioModel::create([
@@ -369,10 +378,13 @@ class StudioSettingsController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'provider' => ['required', 'string', 'max:60'],
             'model_id' => ['required', 'string', 'max:255'],
-            'api_key_ref' => ['nullable', 'string', 'max:60'],
+            'api_key_ref' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9][A-Za-z0-9_-]*$/'],
             'priority' => ['nullable', 'integer', 'min:0', 'max:100'],
             'enabled' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:255'],
+        ], [
+            'api_key_ref.max' => 'Key ref là TÊN NHÓM KEY, không phải khoá API — tối đa 60 ký tự.',
+            'api_key_ref.regex' => 'Key ref chỉ nhận chữ, số, gạch ngang/gạch dưới (vd: qwen). Khoá API thật không nhập ở đây — dán vào tab 🔑 API Keys.',
         ]);
 
         $model->update([
@@ -441,8 +453,13 @@ class StudioSettingsController extends Controller
 
     protected function modelRows()
     {
-        return StudioModel::orderByDesc('priority')->orderBy('id')->get()
-            ->map(fn ($m) => $this->mapModel($m))->values();
+        // Xếp theo LUỒNG ƯU TIÊN provider (qwen → custom → flux → gemini, rồi priority
+        // giảm dần) — trùng ĐÚNG thứ tự runtime dùng khi gọi model, để tab Models hiển
+        // thị đúng thứ tự fallback thực tế (DB chỉ sort được priority, không sort rank).
+        $rows = StudioModel::orderByDesc('priority')->orderBy('id')->get()
+            ->map(fn ($m) => $this->mapModel($m))->values()->all();
+
+        return studio_sort_by_provider_rank($rows);
     }
 
     protected function mapKey(StudioApiKey $k): array

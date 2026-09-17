@@ -135,6 +135,7 @@ async function saveProvider() {
   if (!provForm.value.slug.trim()) return flash('Nhập Provider ID (slug).', false);
   if (!provForm.value.name.trim()) return flash('Nhập tên hiển thị.', false);
   if (!/^https?:\/\/[^\/]+/.test(provForm.value.base_url.trim())) return flash('Base URL phải bắt đầu bằng http(s):// và có host.', false);
+  if (blockKeyRef(provForm.value.api_key_ref, provForm.value.slug.trim())) return;
   provSaving.value = true;
   const ok = await run(async () => {
     await api('/providers', 'POST', { ...provForm.value, api_key_ref: provForm.value.api_key_ref || provForm.value.slug });
@@ -147,6 +148,7 @@ function startEditProv(p) {
   provEdit.value = { name: p.name, protocol: p.protocol, base_url: p.base_url, auth_style: p.auth_style, api_key_ref: p.api_key_ref, enabled: p.enabled, note: p.note || '' };
 }
 async function saveEditedProv() {
+  if (blockKeyRef(provEdit.value.api_key_ref, provEdit.value.api_key_ref)) return;
   await run(async () => {
     await api('/providers/' + editingProv.value, 'PUT', provEdit.value);
   }, 'Đã cập nhật custom provider.');
@@ -157,7 +159,44 @@ async function removeProvider(p) {
   await run(async () => { await api('/providers/' + p.id, 'DELETE'); }, 'Đã xóa custom provider.');
 }
 
+// ── Key ref guard ────────────────────────────────────────────────────────
+// "Key ref" là TÊN NHÓM KEY (slug, vd 'qwen'/'ckey') — tra trong studio_api_keys.provider,
+// KHÔNG phải khoá API. Người dùng hay dán khoá thật vào đây (sk-…, dài hàng trăm ký tự)
+// rồi gặp lỗi validate khó hiểu. Phát hiện sớm và chỉ đúng chỗ cần dán.
+const KEY_PREFIX = /^(sk-|sk_|sk-ws-|sk-or-|AIza|xai-|gsk_|fal-|Bearer\s)/i;
+function looksLikeApiKey(v) {
+  const s = String(v || '').trim();
+  if (!s) return false;
+  return s.length > 60 || KEY_PREFIX.test(s);
+}
+function keyRefWarning(v) {
+  if (!looksLikeApiKey(v)) return '';
+  return 'Đây là ô TÊN NHÓM KEY (vd: ckey), không phải khoá API. Khoá thật dán ở tab 🔑 API Keys với provider = slug của provider này.';
+}
+function blockKeyRef(v, slug) {
+  if (!looksLikeApiKey(v)) return false;
+  flash('Ô "Key ref" chỉ nhận TÊN NHÓM KEY (vd: ' + (slug || 'ckey') + '). Khoá API thật hãy dán ở tab 🔑 API Keys, chọn provider = ' + (slug || 'slug') + '.', false);
+  return true;
+}
+
 // ── Tab: Models ──────────────────────────────────────────────────────────
+// Provider trong các select sắp theo LUỒNG ƯU TIÊN (qwen trước, custom, flux, gemini)
+// — reinforce thứ tự fallback ngay tại lúc nhập liệu.
+const sortedProviders = computed(() => [...providers.value].sort((a, b) => (a.rank ?? 990) - (b.rank ?? 990) || String(a.name).localeCompare(String(b.name))));
+
+// Cài đặt sẵn khi đổi provider trong form Thêm model: key ref mặc định = slug provider,
+// priority gợi ý theo nhóm luồng (qwen 10 · custom 5 · flux 3 · gemini 1) — trùng convention
+// của catalog tích hợp, admin đổi tay được sau đó.
+const FAMILY_PRIORITY = { qwen: 10, custom: 5, flux: 3, gemini: 1, other: 2 };
+function onModelProviderChange() {
+  const p = modelForm.value.provider;
+  if (!p) return;
+  if (!String(modelForm.value.api_key_ref || '').trim()) {
+    modelForm.value.api_key_ref = p;
+  }
+  modelForm.value.priority = FAMILY_PRIORITY[providerFamily(p)] ?? 5;
+}
+
 const modelForm = ref({ group: 'image', name: '', provider: '', model_id: '', api_key_ref: '', priority: 5, note: '' });
 const modelSaving = ref(false);
 const editingModel = ref(null);
@@ -176,11 +215,12 @@ async function saveModel() {
   if (!modelForm.value.name.trim()) return flash('Nhập tên model.', false);
   if (!modelForm.value.provider) return flash('Chọn provider.', false);
   if (!modelForm.value.model_id.trim()) return flash('Nhập Model ID.', false);
+  if (blockKeyRef(modelForm.value.api_key_ref, modelForm.value.provider)) return;
   modelSaving.value = true;
   const ok = await run(async () => {
     await api('/models', 'POST', { ...modelForm.value, priority: Number(modelForm.value.priority) || 0 });
   }, 'Đã thêm model.');
-  if (ok) modelForm.value = { group: 'image', name: '', provider: '', model_id: '', api_key_ref: '', priority: 5, note: '' };
+  if (ok) modelForm.value = { group: modelForm.value.group, provider: modelForm.value.provider, name: '', model_id: '', api_key_ref: modelForm.value.provider || '', priority: modelForm.value.priority, note: '' };
   modelSaving.value = false;
 }
 function startEditModel(m) {
@@ -188,6 +228,7 @@ function startEditModel(m) {
   modelEdit.value = { group: m.group, name: m.name, provider: m.provider, model_id: m.model_id, api_key_ref: m.api_key_ref || '', priority: m.priority, enabled: m.enabled, note: m.note || '' };
 }
 async function saveEditedModel() {
+  if (blockKeyRef(modelEdit.value.api_key_ref, modelEdit.value.provider)) return;
   await run(async () => {
     await api('/models/' + editingModel.value, 'PUT', { ...modelEdit.value, priority: Number(modelEdit.value.priority) || 0 });
   }, 'Đã cập nhật model.');
@@ -234,11 +275,19 @@ async function syncModels() {
   }, 'Đã đồng bộ model QwenCloud mới nhất vào Model Registry.');
   syncSaving.value = false;
 }
-// Preset CKEY (ckey.vn/docs): OpenAI-compatible gateway api.xah.io/v1 — base của bước 2.
+// Luồng 2 bước (provider → key): (1) khai báo custom provider (protocol + base URL + key ref slug)
+// → (2) đăng ký KHOÁ THẬT ở tab API Keys với provider = slug đó. Hàm này nối bước 2 và
+// chọn sẵn provider, để khoá API không bị dán nhầm vào ô "key ref" (lỗi validate max:60).
+function gotoAddKey(slug) {
+  keyForm.value = { ...keyForm.value, provider: slug || '' };
+  tab.value = 'keys';
+  flash('Đã chuyển sang tab 🔑 API Keys với provider « ' + slug + ' ». Dán khoá API thật vào ô Key.');
+}
+// Preset CKEY (ckey.vn/docs): [OI]-compatible gateway api.xah.io/v1 — bước 1.
 function applyCkeyPreset() {
   provForm.value = { slug: 'ckey', name: 'CKEY — gateway VN (api.xah.io)', protocol: 'openai', base_url: 'https://api.xah.io/v1', auth_style: 'bearer', api_key_ref: 'ckey', note: 'https://ckey.vn/docs · ảnh: /v1/images/generations · chat: /v1/chat/completions · giá VND' };
   tab.value = 'providers';
-  flash('Đã điền sẵn preset CKEY — nhập API key (lấy tại ckey.vn/llm-api) rồi bấm "➕ Thêm provider".');
+  flash('Đã điền sẵn preset CKEY — nhập API key (lấy tại ckey.vn/llm-api) rồi bấm "➕ Thêm provider" — KHÔNG dán khoá API vào ô Key ref.');
 }
 
 // ── Tab: General config ──────────────────────────────────────────────────
@@ -429,7 +478,7 @@ async function clearTaskDefault(g) {
                   <div v-else class="space-y-2">
                     <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                       <div><label class="label">Provider</label>
-                        <select v-model="keyEdit.provider" class="input !py-1.5"><option v-for="p in providers" :key="p.slug" :value="p.slug">{{ p.slug }}</option></select>
+                        <select v-model="keyEdit.provider" class="input !py-1.5"><option v-for="p in sortedProviders" :key="p.slug" :value="p.slug">{{ p.slug }}</option></select>
                       </div>
                       <div><label class="label">Nhãn</label><input v-model="keyEdit.label" class="input !py-1.5"></div>
                       <div><label class="label">Loại</label><input v-model="keyEdit.kind" class="input !py-1.5" placeholder="plan / paygo"></div>
@@ -456,7 +505,7 @@ async function clearTaskDefault(g) {
             <div><label class="label">Provider</label>
               <select v-model="keyForm.provider" class="input !py-2">
                 <option value="">— Chọn —</option>
-                <option v-for="p in providers" :key="p.slug" :value="p.slug">{{ p.name }}</option>
+                <option v-for="p in sortedProviders" :key="p.slug" :value="p.slug">{{ p.name }}</option>
               </select>
             </div>
             <div><label class="label">Nhãn</label><input v-model="keyForm.label" class="input !py-2" placeholder="VD: Qwen Token-Plan"></div>
@@ -490,6 +539,7 @@ async function clearTaskDefault(g) {
                 <span class="text-ink-500">{{ p.base_url }}</span>
                 <span v-if="!p.configured" class="text-amber-600">⚠ Chưa có key</span>
                 <span class="ml-auto flex items-center gap-1.5">
+                  <button @click="gotoAddKey(p.slug)" class="btn-outline btn-sm">🔑 Thêm key</button>
                   <button @click="startEditProv(p)" class="btn-outline btn-sm">✏️ Sửa</button>
                   <button @click="removeProvider(p)" class="btn-outline btn-sm text-red-600">Xóa</button>
                 </span>
@@ -504,7 +554,10 @@ async function clearTaskDefault(g) {
                     <select v-model="provEdit.auth_style" class="input !py-1.5"><option value="bearer">Bearer</option><option value="x-goog-api-key">x-goog-api-key</option></select>
                   </div>
                   <div class="col-span-2"><label class="label">Base URL</label><input v-model="provEdit.base_url" class="input !py-1.5"></div>
-                  <div><label class="label">API key ref</label><input v-model="provEdit.api_key_ref" class="input !py-1.5" placeholder="slug của key"></div>
+                  <div><label class="label">Key ref <span class="font-normal text-ink-500">(tên nhóm key)</span></label>
+                    <input v-model="provEdit.api_key_ref" class="input !py-1.5" placeholder="vd: ckey — KHÔNG dán khoá API">
+                    <p v-if="keyRefWarning(provEdit.api_key_ref)" class="mt-1 text-[11px] text-red-600">⛔ {{ keyRefWarning(provEdit.api_key_ref) }}</p>
+                  </div>
                 </div>
                 <label class="flex items-center gap-1.5 text-ink-700"><input type="checkbox" v-model="provEdit.enabled" class="h-4 w-4 accent-brand-600"> Bật</label>
                 <div class="flex gap-2">
@@ -530,10 +583,15 @@ async function clearTaskDefault(g) {
             <div><label class="label">Auth</label>
               <select v-model="provForm.auth_style" class="input !py-2"><option value="bearer">Bearer</option><option value="x-goog-api-key">x-goog-api-key</option></select>
             </div>
-            <div class="col-span-2 sm:col-span-3"><label class="label">API key ref (slug nhóm key)</label><input v-model="provForm.api_key_ref" class="input !py-2" placeholder="mặc định = Provider ID"></div>
+            <div class="col-span-2 sm:col-span-3">
+              <label class="label">Key ref — tên nhóm key <span class="font-normal text-ink-500">(bỏ trống = dùng Provider ID)</span></label>
+              <input v-model="provForm.api_key_ref" class="input !py-2" placeholder="vd: ckey — KHÔNG dán khoá API vào đây">
+              <p v-if="keyRefWarning(provForm.api_key_ref)" class="mt-1 text-[11px] text-red-600">⛔ {{ keyRefWarning(provForm.api_key_ref) }}</p>
+            </div>
           </div>
           <p class="mt-2 text-[11px] text-ink-500">🔌 {{ protocolHint }}</p>
           <p class="mt-1 text-[11px] text-ink-500">Provider ID cố định sau khi tạo — mọi model và generation tham chiếu theo slug này. Key đăng ký ở tab <b>API Keys</b> với provider = slug.</p>
+          <p class="mt-1 rounded-lg bg-cream-100 p-2 text-[11px] text-ink-600">🔑 <b>Luồng 2 bước:</b> (1) tạo provider ở đây — ô <b>Key ref</b> chỉ là <b>tên nhóm key</b> (ví dụ <code>ckey</code>), <b>KHÔNG</b> dán khoá API vào; (2) sang tab <b>API Keys</b> thêm khoá thật với provider = slug. Sau khi tạo provider, bấm nút <b>🔑 Thêm key</b> trên dòng của nó để nhảy sang bước 2.</p>
           <button @click="saveProvider" :disabled="provSaving" class="btn-brand btn-sm mt-3">{{ provSaving ? 'Đang lưu…' : '➕ Thêm provider' }}</button>
         </div>
       </div>
@@ -545,7 +603,7 @@ async function clearTaskDefault(g) {
             <h2 class="font-display text-base font-semibold text-ink-900">🤖 Model Registry</h2>
             <p class="text-xs text-ink-500">{{ models.length }} model. <b>Vai trò (group)</b> quyết định model thuộc nhóm công việc nào — xem tab 🎯 Nhóm công việc.</p>
           </div>
-          <p class="mt-1 text-xs text-ink-500">Vai trò: <b>image</b> = tạo ảnh · <b>edit</b> = sửa ảnh · <b>video</b> · <b>swap</b> = thử đồ / ghép người mẫu · <b>vision</b> = đọc ảnh · <b>prompt</b> = suy luận · <b>translate</b> = dịch. Thứ tự dùng: default nhóm (tab 🎯) → model theo ưu tiên giảm dần.</p>
+          <p class="mt-1 text-xs text-ink-500">Vai trò: <b>image</b> = tạo ảnh · <b>edit</b> = sửa ảnh · <b>video</b> · <b>swap</b> = thử đồ / ghép người mẫu · <b>vision</b> = đọc ảnh · <b>prompt</b> = suy luận · <b>translate</b> = dịch. Danh sách dưới đây đã xếp đúng <b>thứ tự runtime</b>: default nhóm (tab 🎯) → luồng ưu tiên provider (qwen → custom → flux → gemini, tab 🔥) → Ưu tiên model giảm dần.</p>
 
           <div class="mt-4 space-y-4">
             <div v-for="(rows, g) in modelsByGroup" :key="g">
@@ -564,18 +622,23 @@ async function clearTaskDefault(g) {
                       <button @click="removeModel(m)" class="btn-outline btn-sm text-red-600">Xóa</button>
                     </span>
                   </div>
-                  <div v-else class="space-y-2">
+                  <p v-if="m.note && editingModel !== m.id" class="mt-1 text-[11px] text-ink-500">{{ m.note }}</p>
+                  <div v-if="editingModel === m.id" class="space-y-2">
                     <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                       <div><label class="label">Vai trò (nhóm)</label>
                         <select v-model="modelEdit.group" class="input !py-1.5"><option v-for="(l, gv) in groupLabels" :key="gv" :value="gv">{{ l }} ({{ gv }})</option></select>
                       </div>
                       <div><label class="label">Tên</label><input v-model="modelEdit.name" class="input !py-1.5"></div>
                       <div><label class="label">Provider</label>
-                        <select v-model="modelEdit.provider" class="input !py-1.5"><option v-for="p in providers" :key="p.slug" :value="p.slug">{{ p.slug }}</option></select>
+                        <select v-model="modelEdit.provider" class="input !py-1.5"><option v-for="p in sortedProviders" :key="p.slug" :value="p.slug">{{ p.slug }}</option></select>
                       </div>
                       <div><label class="label">Model ID</label><input v-model="modelEdit.model_id" class="input !py-1.5"></div>
-                      <div><label class="label">Key ref</label><input v-model="modelEdit.api_key_ref" class="input !py-1.5" placeholder="mặc định = provider"></div>
-                      <div><label class="label">Ưu tiên</label><input type="number" v-model.number="modelEdit.priority" min="0" max="100" class="input !py-1.5"></div>
+                      <div><label class="label">Key ref <span class="font-normal text-ink-500">(nhóm key)</span></label>
+                        <input v-model="modelEdit.api_key_ref" class="input !py-1.5" placeholder="mặc định = provider">
+                        <p v-if="keyRefWarning(modelEdit.api_key_ref)" class="mt-1 text-[11px] text-red-600">⛔ {{ keyRefWarning(modelEdit.api_key_ref) }}</p>
+                      </div>
+                      <div><label class="label">Ưu tiên</label><input type="number" v-model.number="modelEdit.priority" min="0" max="100" class="input !py-1.5" title="Cùng nhóm provider mới xét tới priority — xem tab 🔥"></div>
+                      <div class="col-span-2 sm:col-span-3"><label class="label">Ghi chú</label><input v-model="modelEdit.note" class="input !py-1.5" placeholder="vd: QwenCloud 2026 · fallback khi Qwen hết hạn mức"></div>
                     </div>
                     <label class="flex items-center gap-1.5 text-ink-700"><input type="checkbox" v-model="modelEdit.enabled" class="h-4 w-4 accent-brand-600"> Bật</label>
                     <div class="flex gap-2">
@@ -598,15 +661,20 @@ async function clearTaskDefault(g) {
                 <option v-for="(l, gv) in groupLabels" :key="gv" :value="gv">{{ l }} ({{ gv }})</option>
               </select>
             </div>
-            <div><label class="label">Tên</label><input v-model="modelForm.name" class="input !py-2" placeholder="VD: Wan 2.2 i2v"></div>
+            <div><label class="label">Tên</label><input v-model="modelForm.name" class="input !py-2" placeholder="VD: Qwen Image 3.0 Pro"></div>
             <div><label class="label">Provider</label>
-              <select v-model="modelForm.provider" class="input !py-2"><option value="">— Chọn —</option><option v-for="p in providers" :key="p.slug" :value="p.slug">{{ p.name }}</option></select>
+              <select v-model="modelForm.provider" @change="onModelProviderChange" class="input !py-2"><option value="">— Chọn —</option><option v-for="p in sortedProviders" :key="p.slug" :value="p.slug">{{ p.name }}</option></select>
             </div>
-            <div><label class="label">Model ID</label><input v-model="modelForm.model_id" class="input !py-2" placeholder="wan2.2-i2v"></div>
-            <div><label class="label">Key ref</label><input v-model="modelForm.api_key_ref" class="input !py-2" placeholder="mặc định = provider"></div>
-            <div><label class="label">Ưu tiên</label><input type="number" v-model.number="modelForm.priority" min="0" max="100" class="input !py-2"></div>
+            <div><label class="label">Model ID</label><input v-model="modelForm.model_id" class="input !py-2" placeholder="qwen-image-3.0-pro"></div>
+            <div><label class="label">Key ref <span class="font-normal text-ink-500">(nhóm key)</span></label>
+              <input v-model="modelForm.api_key_ref" class="input !py-2" placeholder="mặc định = provider">
+              <p v-if="keyRefWarning(modelForm.api_key_ref)" class="mt-1 text-[11px] text-red-600">⛔ {{ keyRefWarning(modelForm.api_key_ref) }}</p>
+            </div>
+            <div><label class="label">Ưu tiên</label><input type="number" v-model.number="modelForm.priority" min="0" max="100" class="input !py-2" title="Cùng nhóm provider mới xét tới priority — xem tab 🔥"></div>
+            <div class="col-span-2 sm:col-span-3"><label class="label">Ghi chú</label><input v-model="modelForm.note" class="input !py-2" placeholder="vd: QwenCloud 2026 · chữ dày đặc · ~$0.02/MP"></div>
           </div>
           <button @click="saveModel" :disabled="modelSaving" class="btn-brand btn-sm mt-3">{{ modelSaving ? 'Đang lưu…' : '➕ Thêm model' }}</button>
+          <p class="mt-2 text-[11px] text-ink-500">💡 Chọn provider xong sẽ tự điền <b>Key ref</b> + gợi ý <b>Ưu tiên</b> theo nhóm luồng (qwen 10 · custom 5 · flux 3 · gemini 1). Thêm nhanh cả bộ model QwenCloud mới nhất bằng nút 🔄 Đồng bộ ở tab 🔥 Luồng ưu tiên.</p>
         </div>
       </div>
 
