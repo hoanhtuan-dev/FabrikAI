@@ -46,9 +46,17 @@ JS/Vue studio **42 file (33 .vue) / 12.828 dòng** · `public_html` **21 MB** ·
 | 1.2 | `Run` (lô) | ⬜ CHƯA | — | bảng `runs` + API; lô N ảnh = 1 lô, trừ credit cả lô 1 lần, resume không trừ 2 lần |
 | 1.3 | `ExportBundle` | ⬜ CHƯA | — | zip `{sku}-{channel}-{n}.jpg` theo preset kênh + caption.txt |
 | 1.4 | Channel Validator | ⬜ CHƯA | — | pre-flight: cạnh ≥ ngưỡng · dung lượng · nền #FFFFFF · watermark · sản phẩm ≥70% khung |
-| 1.5 | Thông báo khi render xong | ⬜ CHƯA | — | Notification::fake ⇒ đúng 1 lần/lô, không spam từng ảnh |
+| 1.5 | Thông báo khi render xong | ✅ XONG | `745832b` | `GenerationCompleted` (mail, nói thật khi ảnh DEMO); `RenderImageJob` + `RenderVideoJob` notify SAU guard CAS ⇒ đúng 1 thông báo/generation, chạy lại job không spam |
 | 1.6 | Mô tả + caption + hashtag | ⬜ CHƯA | — | XÂY MỚI (ProductAIService đã bị gỡ ở 729ceb0) |
 | 1.7 | `prompt_templates` | ✅ XONG | `f44f6c0` | bảng `prompt_templates` + `studio_prompt_template()` (chọn version cao nhất active, placeholder, fallback); `garment.lock` ở StudioController nay resolve từ DB, chuỗi cũ giữ làm fallback |
+
+### XÁC MINH CHÉO 2026-09-17 (đối chiếu việc song song)
+
+| Phát hiện | Trạng thái | Commit | Ghi chú |
+|---|---|---|---|
+| `/admin` là console Owner nhưng KHÔNG middleware — khách 200 · customer 200 | ✅ ĐÃ VÁ | `3acf968` | nay `['auth','admin','nostore']`; `AdminConsoleAccessTest` (3 test) khoá bất biến |
+| Việc song song (gói cước · sổ cái credit · quản trị user) | ✅ ĐÃ ĐỐI CHIẾU | (commit riêng) | 21 test (4+6+11) chạy xanh; **mutation-test lại**: bỏ guard tự-hạ-quyền ⇒ RED ⇒ test thật sự bắt lỗi. Hạ tầng (`Plan`·`CreditTransaction`·`PlanService`·`CreditService`·`AdminController`·`AdminApp.vue`·`admin.js`) đã có sẵn và nhất quán (vite input · manifest · blade · route) |
+| Shell `/settings` · `/presets` · `/stylist-data` vẫn công khai | ⚠️ GHI SỢ NỢ | — | Cũng là console quản trị (API ghi toàn cục đã ở nhóm ADMIN). **Chưa siết** vì `ConceptCard.vue` (khách dùng) có link `/settings` KHÔNG gate `is_admin` ⇒ cần quyết định sản phẩm: ẩn link cho customer, hay tách cài đặt theo user |
 
 > 🛑 **BẢNG DƯỚI ĐÂY LÀ ẢNH CHỤP 2026-09-16 — ĐÃ SAI HOÀN TOÀN, CHỈ GIỮ ĐỂ ĐỐI CHIẾU LỊCH SỬ.**
 > Nó nói *"KHÔNG có `.git`"*, *"KHÔNG có `tests/`"*, *"chưa có deploy"* — cả ba đều **SAI** kể từ 2026-09-17.
