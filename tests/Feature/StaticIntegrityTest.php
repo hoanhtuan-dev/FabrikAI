@@ -359,6 +359,40 @@ class StaticIntegrityTest extends TestCase
         return $out;
     }
 
+    public function test_auth_state_flags_are_rendered_not_just_stored(): void
+    {
+        // [Đợt 0.1 — chống lớp bug "cờ được SET nhưng không ai RENDER"]
+        //
+        // store.js đặt `needsLogin` ở 5 chỗ, nhưng grep cả resources/js thì cờ đó CHỈ xuất hiện
+        // trong store.js — không template nào đọc ⇒ người tự đăng ký nhận 403 và KHÔNG được bảo gì
+        // ngoài toast lỗi nguyên văn của backend. Đây là bug "im lặng", không phải bug logic:
+        // không test nào bắt được vì mọi thứ vẫn "chạy đúng".
+        //
+        // Bất biến: trạng thái xác thực của store phải được TIÊU THỤ ở tầng view.
+        // `needsLogin` cũ đã bị KHAI TỬ trong bản vá này (thay bằng `authState`), nên nó không
+        // còn là trạng thái sống — chỉ còn trong chú thích giải thích lịch sử.
+        $store = (string) file_get_contents(resource_path('js/studio/store.js'));
+        $views = '';
+        foreach ($this->vueFiles() as $f) {
+            $views .= (string) file_get_contents($f);
+        }
+
+        $this->assertStringContainsString('authState', $store, "store.js phải khai báo trạng thái 'authState'.");
+        $this->assertStringContainsString('authState', $views,
+            'authState được set trong store.js nhưng KHÔNG template .vue nào render — đúng lớp bug 403 im lặng.');
+
+        // Ba trạng thái phải phân biệt được với người dùng, không gộp thành một thông báo chung.
+        $notice = (string) file_get_contents(resource_path('js/studio/components/AuthNotice.vue'));
+        foreach (['guest', 'expired', 'unauthorized'] as $state) {
+            $this->assertStringContainsString($state, $notice,
+                "AuthNotice.vue phải xử lý riêng trạng thái '$state' (chưa đăng nhập ≠ hết phiên ≠ thiếu quyền).");
+        }
+
+        // Và thông báo của backend dành cho QUẢN TRỊ không được lộ ra như thể là lỗi của người dùng.
+        $this->assertStringNotContainsString('khu vực quản trị', $notice,
+            'Banner KHÔNG được lặp lại thông báo "khu vực quản trị" — đó là ngôn ngữ của backend dành cho admin.');
+    }
+
     /** @return string[] */
     private function bladeFiles(): array
     {

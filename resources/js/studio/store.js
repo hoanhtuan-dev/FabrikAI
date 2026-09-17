@@ -24,7 +24,15 @@ export const useStudioStore = defineStore('studio', {
     step: 1,
     opening: false,
     defaultsLoaded: false,
-    needsLogin: !bootUser(),
+    // [2026-09-17 · Đợt 0.1 — Q1] Trạng thái xác thực TƯỜNG MINH, để UI nói được ĐÚNG chuyện
+    // đang xảy ra. Thay cho cờ `needsLogin` cũ — cờ đó KHÔNG được render ở đâu cả
+    // (grep toàn bộ resources/js chỉ ra store.js) ⇒ người dùng tự đăng ký chỉ thấy toast nguyên
+    // văn của backend "Bạn không có quyền truy cập khu vực quản trị."
+    //   'ok'           — gọi API bình thường
+    //   'guest'        — chưa đăng nhập (server không truyền user)
+    //   'expired'      — đã đăng nhập nhưng phiên hết (401 / bị đá về /dang-nhap)
+    //   'unauthorized' — đã đăng nhập nhưng KHÔNG đủ quyền (403)
+    authState: bootUser() ? 'ok' : 'guest',
     // Người dùng đã đăng nhập (server truyền qua window.__STUDIO_BOOT__ ở vue.blade.php).
     user: bootUser(),
     previewId: null,
@@ -321,6 +329,22 @@ export const useStudioStore = defineStore('studio', {
     },
   },
   actions: {
+    /**
+     * [Đợt 0.1] Cập nhật trạng thái xác thực từ mã HTTP. Một chỗ duy nhất để mọi đường
+     * gọi API cùng phân loại 401/403 giống nhau — tránh mỗi call-site đoán một kiểu.
+     * @param {number} status mã HTTP (hoặc 200 khi thành công)
+     */
+    setAuthStatus(status) {
+      if (status === 403) {
+        // Đã đăng nhập nhưng không đủ quyền — KHÁC hẳn "chưa đăng nhập".
+        this.authState = 'unauthorized';
+      } else if (status === 401) {
+        // Có user trong boot nhưng bị 401 ⇒ phiên đã hết. Không có user ⇒ khách.
+        this.authState = this.user ? 'expired' : 'guest';
+      } else if (status === 200) {
+        this.authState = 'ok';
+      }
+    },
     async api(url, body = {}, signal = null) {
       const res = await fetch(url, { method: 'POST', headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body), signal });
       const ct = res.headers.get('content-type') || '';
@@ -329,7 +353,9 @@ export const useStudioStore = defineStore('studio', {
       // HTML đó parse thành {} và MỌI caller mutation tưởng là thành công. Guard y như _libraryFetch
       // và deleteGen.
       if (!res.ok || res.redirected || !ct.includes('application/json')) {
-        if (res.redirected || (res.url && res.url.includes('/dang-nhap'))) this.needsLogin = true;
+        // redirected ⇒ Laravel đá về /dang-nhap và trả HTML ⇒ coi như HẾT PHIÊN, không phải 403.
+        if (res.redirected || (res.url && res.url.includes('/dang-nhap'))) this.setAuthStatus(401);
+        else this.setAuthStatus(res.status);
         throw new Error(data.message || 'Phiên đăng nhập đã hết hoặc máy chủ trả dữ liệu không hợp lệ — hãy tải lại trang.');
       }
       return data;
@@ -408,12 +434,13 @@ export const useStudioStore = defineStore('studio', {
       this.loadUpscaleMemory();
       // Load settings defaults from backend (set in Studio Settings page)
       await this.loadDefaults();
-      // Chưa có người dùng đăng nhập (server không truyền user) → dừng sớm, hiển thị nút Đăng nhập.
-      if (!this.user) { this.needsLogin = true; return; }
+      // Chưa có người dùng đăng nhập (server không truyền user) → dừng sớm, hiển thị banner Đăng nhập.
+      if (!this.user) { this.setAuthStatus(401); return; }
       try {
         const res = await fetch('/api/latest', { headers: { Accept: 'application/json' } });
-        if (res.status === 401 || res.status === 403 || res.redirected || (res.url && res.url.includes('/dang-nhap'))) { this.needsLogin = true; return; }
-        this.needsLogin = false;
+        if (res.status === 403) { this.setAuthStatus(403); return; }
+        if (res.status === 401 || res.redirected || (res.url && res.url.includes('/dang-nhap'))) { this.setAuthStatus(401); return; }
+        this.setAuthStatus(200);
         const d = await res.json();
         const items = d.items || d.generations || [];
         if (Array.isArray(items)) this.generations = items;
@@ -1457,7 +1484,7 @@ export const useStudioStore = defineStore('studio', {
           this.toast(msg, 'error');
           res = await fetch('/api/projects?' + mkQuery(), { headers: { Accept: 'application/json' } });
         }
-        if (res.status === 401 || res.status === 403) { this.needsLogin = true; return []; }
+        if (res.status === 401 || res.status === 403) { this.setAuthStatus(res.status); return []; }
         const d = await res.json();
         this.projects = Array.isArray(d.items) ? d.items : [];
         if (d.statuses) this.projectStatuses = d.statuses;

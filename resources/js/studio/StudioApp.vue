@@ -23,6 +23,7 @@ import ProjectWorkspace from './components/ProjectWorkspace.vue';
 import StudioIcon from './components/StudioIcon.vue';
 import LayersPanel from './components/LayersPanel.vue';
 import CanvasStatusBar from './components/CanvasStatusBar.vue';
+import AuthNotice from './components/AuthNotice.vue';
 const store = useStudioStore();
 // Đăng xuất qua fetch (route Laravel POST /dang-xuat) — dùng XSRF-TOKEN cookie cho CSRF.
 async function logout() {
@@ -442,6 +443,8 @@ function onTouchEnd(e) {
 </script>
 <template>
   <div class="studio-dark flex h-full w-full flex-col bg-ink-950 text-cream-100">
+    <!-- [Đợt 0.1] Banner 3 trạng thái xác thực — thay thế 403 im lặng bằng thông báo rõ ràng -->
+    <AuthNotice />
     <!-- ══ Top account bar: thông tin người dùng + đăng nhập/đăng xuất + điều hướng quản trị ══ -->
     <div class="flex items-center justify-between gap-3 border-b border-ink-700 bg-ink-900/90 px-3 py-2.5 sm:px-4">
       <div class="flex min-w-0 items-center gap-2.5">
