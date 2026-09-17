@@ -23,6 +23,15 @@ JS/Vue studio **42 file (33 .vue) / 12.828 dòng** · `public_html` **21 MB** ·
 **production `fabrikai.shop` ĐANG CHẠY** (MySQL, 25 bảng).
 Điểm nóng monolith: `StudioController.php` **4.643** · `store.js` **3.987** · `helpers.php` **1.610**.
 
+### Tiến độ THỰC THI kế hoạch nâng cấp (STUDIO_REVIEW_PLAN.md)
+
+| # | Việc | Trạng thái | Commit / sổ | Ghi chú |
+|---|---|---|---|---|
+| 0.9 | scripts/measure.sh | ✅ XONG | `93dfd86` | nguồn số liệu chuẩn cho mọi vòng |
+| 0.1 | Mở studio cho customer (quyền hẹp) + banner 3 trạng thái | ✅ XONG | `4703b58` + `ce55a7d` | tách route 2 nhóm; 338 test |
+| 0.1b | Scope ảnh ref/uploads theo user | ⬜ CHƯA | — | 4 endpoint (/uploads*, /ref-images*) TẠM để ADMIN vì thư mục ref là kho chung — phải có cột user_id rồi mới chuyển về STUDIO. **Ưu tiên** vì khách cần xem/liệt kê ảnh tham chiếu của mình |
+| 0.2 | Tiến trình thật | 🔄 đang làm | — | — |
+
 > 🛑 **BẢNG DƯỚI ĐÂY LÀ ẢNH CHỤP 2026-09-16 — ĐÃ SAI HOÀN TOÀN, CHỈ GIỮ ĐỂ ĐỐI CHIẾU LỊCH SỬ.**
 > Nó nói *"KHÔNG có `.git`"*, *"KHÔNG có `tests/`"*, *"chưa có deploy"* — cả ba đều **SAI** kể từ 2026-09-17.
 > (Đây chính là lỗi mà `STUDIO_REVIEW_DEEPDIVE.md` §1.2 đã chỉ ra: §1/§2 nói ngược §2bis trong cùng file.)

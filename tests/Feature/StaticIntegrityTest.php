@@ -359,6 +359,28 @@ class StaticIntegrityTest extends TestCase
         return $out;
     }
 
+    public function test_generation_progress_is_real_not_simulated(): void
+    {
+        // [Đợt 0.2 — chống tái phát "thanh tiến trình mô phỏng"]
+        //   (a) trước đây generateImage() dùng setInterval cộng ngẫu nhiên 4–12%, khoá 90% rồi API
+        //       trả về là ép 100% + "Hoàn tất!" dù ảnh còn 'pending' ⇒ người dùng bị lừa.
+        //   (b) generateImage() còn KHÔNG gọi pollGeneration() ⇒ thumbnail kẹt "Đang chờ" tới khi F5.
+        $store = (string) file_get_contents(resource_path('js/studio/store.js'));
+
+        // Dùng 'setInterval(' (có ngoặc) để không khớp chính dòng chú thích giải thích lịch sử.
+        $this->assertStringNotContainsString('setInterval(', $store,
+            'Đợt 0.2: generateImage phải bỏ tiến trình mô phỏng (bộ đếm lặp cộng % ngẫu nhiên).');
+
+        // Thân hàm generateImage() phải THẬT SỰ theo dõi kết quả, không ép 100%.
+        if (preg_match('/async generateImage\(\) \{(.*?)\n    \}/s', $store, $m)) {
+            $this->assertStringContainsString('pollGeneration', $m[1], 'generateImage phải gọi pollGeneration cho từng ảnh.');
+            $this->assertStringContainsString('syncBatchProgress', $m[1], 'generateImage phải cập nhật tiến trình từ trạng thái thật.');
+        }
+
+        // syncBatchProgress phải tồn tại và đọc TRẠNG THÁI / tổng số (thước đo khách quan, không ngẫu nhiên).
+        $this->assertStringContainsString('syncBatchProgress()', $store);
+    }
+
     public function test_auth_state_flags_are_rendered_not_just_stored(): void
     {
         // [Đợt 0.1 — chống lớp bug "cờ được SET nhưng không ai RENDER"]

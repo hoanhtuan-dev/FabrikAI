@@ -481,16 +481,12 @@ export const useStudioStore = defineStore('studio', {
       this.generateProgress = 0;
       this.generateStage = 'preparing';
       this.generatedCount = 0;
+      this.lastBatch = [];
       const variants = Number(this.variantCount) || 1;
-      // Mô phỏng tiến trình hoạt ảnh
-      const progressTimer = setInterval(() => {
-        if (this.generateProgress < 90) {
-          this.generateProgress += Math.random() * 12 + 4;
-          if (this.generateProgress > 90) this.generateProgress = 90;
-        }
-        if (this.generateProgress > 30 && this.generateStage === 'preparing') this.generateStage = 'enriching';
-        if (this.generateProgress > 60 && this.generateStage === 'enriching') this.generateStage = 'rendering';
-      }, 400);
+      // [Đợt 0.2] BỎ tiến trình mô phỏng: thanh % trước đây là bộ đếm lặp cộng ngẫu nhiên 4–12%,
+      // khoá ở 90% rồi API trả về là set 100% + "Hoàn tất!" trong khi ảnh còn nằm 'pending' ở queue.
+      // Người dùng bị "lừa" đúng lúc dễ bỏ đi nhất (xem STUDIO_REVIEW_PLAN.md Đợt 0.2). Tiến trình
+      // BÂY GIỜ được cộng dồn từ TRẠNG THÁI THẬT của từng generation qua syncBatchProgress().
       try {
         const d = await this.api('/api/generate', {
           prompt: this.imagePromptEn,
@@ -525,14 +521,14 @@ export const useStudioStore = defineStore('studio', {
         this.setBatch(items.map(it => it.generation_id));
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
         this.processQueue();
-        this.generateProgress = 100;
-        this.generateStage = 'done';
+        // TIẾN TRÌNH THẬT: không tuyên bố "Hoàn tất!" khi backend mới trả 'pending' → theo dõi
+        // từng ảnh; mỗi lần trạng thái đổi, syncBatchProgress() cộng dồn % theo số ảnh ĐÃ XONG.
         this.generatedCount = items.length;
+        this.syncBatchProgress();
+        items.forEach((it) => { if (it.generation_id) this.pollGeneration(it.generation_id); });
       } catch (e) { this.toast(e.message || 'Lỗi tạo ảnh.', 'error'); }
       finally {
-        clearInterval(progressTimer);
         this.generating = false;
-        setTimeout(() => { this.generateProgress = 0; this.generateStage = ''; }, 1500);
       }
     },
     // i2i — Tạo lại ảnh từ ảnh cho trước (Reimagine / Variation)
@@ -2817,6 +2813,38 @@ export const useStudioStore = defineStore('studio', {
     },
     setBatch(ids) { this.lastBatch = (ids || []).filter(Boolean); this.showBatch = this.lastBatch.length > 1; },
     hideBatch() { this.showBatch = false; },
+    /**
+     * [Đợt 0.2] Tiến trình THẬT cho lô đang chạy — suy ra từ trạng thái THẬT của từng generation
+     * trong lô, KHÔNG phải hoạt ảnh. Được gọi mỗi khi trạng thái một ảnh trong lô đổi
+     * (pollGeneration) và ngay sau khi tạo lô.
+     *
+     * Quy ước hiển thị:
+     *   queued   — đã gửi, backend còn 'pending' (chưa tới lượt xử lý)
+     *   rendering— có ít nhất một ảnh đang 'processing'
+     *   done     — MỌI ảnh đã 'completed'
+     *   failed   — lô kết thúc mà tất cả đều lỗi/bị huỷ
+     * % = số ảnh ĐÃ KẾT THÚC (completed + failed/cancelled) / tổng số ảnh của lô.
+     */
+    syncBatchProgress() {
+      const ids = (this.lastBatch || []).map(Number).filter(Boolean);
+      if (!ids.length) return;
+      const items = ids.map((id) => this.generations.find((g) => Number(g.id) === id)).filter(Boolean);
+      if (!items.length) return;
+
+      const total = items.length;
+      const done = items.filter((g) => g.status === 'completed').length;
+      const dead = items.filter((g) => g.status === 'failed' || g.status === 'cancelled').length;
+      const processing = items.filter((g) => g.status === 'processing').length;
+      const settled = done + dead;
+
+      this.generateProgress = Math.round((settled / total) * 100);
+      this.generatedCount = done;
+
+      if (settled === total && done === 0) this.generateStage = 'failed';
+      else if (settled === total) this.generateStage = 'done';
+      else if (processing) this.generateStage = 'rendering';
+      else this.generateStage = 'queued';
+    },
     setSource(url, name) {
       this.editSource = { url, name: name || 'Ảnh nguồn' };
       // Bỏ layer 'source' CŨ trước khi thêm ảnh mới — nếu không pushCanvasLayer bị chặn
@@ -2914,6 +2942,8 @@ export const useStudioStore = defineStore('studio', {
           const g = await res.json();
           const item = this.generations.find(x => x.id === Number(g.id));
           if (item) { item.status = g.status; item.media_url = g.media_url; item.error = g.error; item.model = g.model; item.provider = g.provider; item.elapsed_ms = g.elapsed_ms; if (g.meta && typeof g.meta === 'object') item.meta = g.meta; }
+          // [Đợt 0.2] trạng thái THẬT vừa đổi ⇒ cập nhật thanh tiến trình của lô (không mô phỏng).
+          this.syncBatchProgress();
           if (['completed', 'failed', 'cancelled'].includes(g.status)) {
             delete this._pollTimers[id];
             const isInpaint = String(id) === String(this.inpaintGenId);
