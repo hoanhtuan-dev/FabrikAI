@@ -137,7 +137,7 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-DfNmYKEk.js",
+    "file": "assets/settings-BPBDoTk7.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
@@ -147,7 +147,7 @@
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/settings-B3NPEhJa.css"
+      "assets/settings-BNZFFOzI.css"
     ]
   },
   "resources/js/studio/stylist-data.js": {

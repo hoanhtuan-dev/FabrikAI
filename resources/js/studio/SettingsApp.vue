@@ -248,6 +248,7 @@ async function clearTaskDefault(g) {
       <div>
         <h1 class="font-display text-xl font-semibold text-cream-50">⚙️ Cài đặt Studio</h1>
         <p class="mt-0.5 text-xs text-ink-500">API keys · Custom providers · Model registry — một trang, một nguồn dữ liệu.</p>
+        <a href="/admin" class="mt-1 inline-block text-xs font-semibold text-brand-300 hover:text-brand-200">👑 Quản trị (Owner console) →</a>
       </div>
       <div class="flex flex-wrap gap-1.5">
         <button @click="tab='keys'" :class="tab==='keys' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors">🔑 API Keys</button>
