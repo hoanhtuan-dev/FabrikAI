@@ -76,6 +76,9 @@ class StudioController extends Controller
 
     public function stylistDataPage() { return view('studio.stylist-data'); }
 
+    /** [Yêu cầu 2026-09-17] Trang cài đặt Khuôn mặt (model) + Dáng pose (người mẫu) — cấp user. */
+    public function modelSettingsPage() { return view('studio.model-settings'); }
+
 
     // storeProject() đã bị loại bỏ (finding: duplicate endpoint với validation yếu hơn
     // ProjectController::store). Route POST /studio/projects nay trỏ về ProjectController::store.
@@ -2017,7 +2020,15 @@ RULES:
     public function assetIndex(): \Illuminate\Http\JsonResponse
     {
         try {
-            $assets = \App\Models\StudioAsset::orderBy('type')->orderBy('sort')->get(['id', 'type', 'name', 'path']);
+            $u = auth()->user();
+            $q = \App\Models\StudioAsset::orderBy('type')->orderBy('sort');
+            if ($u !== null && ! $u->isAdmin()) {
+                // [Yêu cầu 2026-09-17] Chỉ thấy tài nguyên CỦA MÌNH + tài nguyên DÙNG CHUNG
+                // (user_id NULL = dữ liệu có trước khi tách theo user). Owner thấy tất cả.
+                $q->where(fn ($w) => $w->whereNull('user_id')->orWhere('user_id', $u->id));
+            }
+            $assets = $q->get(['id', 'type', 'name', 'path', 'user_id']);
+
             return response()->json(['items' => $assets]);
         } catch (\Throwable $e) {
             logger()->warning('assetIndex failed: '.$e->getMessage());
@@ -2035,12 +2046,17 @@ RULES:
         $path = '/storage/'.$request->file('image')->store('studio/assets', 'public');
         $asset = \App\Models\StudioAsset::create([
             'type' => $data['type'], 'name' => $data['name'], 'path' => $path, 'sort' => 0,
+            // [Yêu cầu 2026-09-17] Gắn CHỦ SỞ HỮU: mặt/dáng do user thêm là của RIÊNG họ.
+            'user_id' => auth()->id(),
         ]);
-        return response()->json(['id' => $asset->id, 'type' => $asset->type, 'name' => $asset->name, 'path' => $asset->path]);
+        return response()->json(['id' => $asset->id, 'type' => $asset->type, 'name' => $asset->name, 'path' => $asset->path, 'user_id' => $asset->user_id]);
     }
 
     public function assetDestroy(\App\Models\StudioAsset $asset)
     {
+        // [Yêu cầu 2026-09-17] Chỉ chủ sở hữu (hoặc owner) được xoá mặt/dáng.
+        abort_unless($asset->visibleTo(auth()->user()), 403);
+
         // Xóa cả file vật lý để không để lại ảnh mồ côi trong studio/assets.
         if ($asset->path) {
             $rel = ltrim(str_replace('storage/', '', (string) parse_url($asset->path, PHP_URL_PATH)), '/');

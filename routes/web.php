@@ -52,6 +52,8 @@ Route::middleware(['auth', 'admin', 'nostore'])->get('/settings', [StudioControl
 Route::middleware(['auth', 'can-studio', 'nostore'])->group(function () {
     Route::get('/presets', [StudioController::class, 'presetsPage'])->name('presets.page');
     Route::get('/stylist-data', [StudioController::class, 'stylistDataPage'])->name('stylist-data.page');
+    // [Yêu cầu 2026-09-17] Cài đặt KHUÔN MẶT (model) + DÁNG POSE (người mẫu) — cấp USER, lưu cục bộ.
+    Route::get('/model-settings', [StudioController::class, 'modelSettingsPage'])->name('model-settings.page');
 });
 // [Xác minh 2026-09-17] /admin là CONSOLE OWNER — KHÔNG được để chung nhóm shell công khai.
 // Trước đây ai cũng tải được vỏ quản trị (khách 200, customer 200), trái mô hình ở đầu file
@@ -116,6 +118,14 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::post('/uploads/delete', [StudioController::class, 'uploadedFilesDelete'])->name('uploads.delete');
     Route::get('/ref-images', [StudioController::class, 'refImages'])->name('ref-images');
     Route::delete('/ref-images/{name}', [StudioController::class, 'refImageDelete'])->name('ref-images.delete');
+
+    // ── [Yêu cầu 2026-09-17] KHUÔN MẶT (model) + DÁNG POSE (người mẫu) — cấp USER ──
+    // `studio_assets` nay có `user_id`: user thêm mặt/dáng CỦA MÌNH (chỉ họ thấy; owner thấy tất cả);
+    // hàng có user_id NULL là catalog DÙNG CHUNG có từ trước. Lưu ở SERVER (không phải localStorage)
+    // vì lúc tạo ảnh studio gửi lên id và backend phải tra ra ảnh tham chiếu.
+    Route::get('/assets', [StudioController::class, 'assetIndex'])->name('assets');
+    Route::post('/assets', [StudioController::class, 'assetStore'])->name('assets.store');
+    Route::delete('/assets/{asset}', [StudioController::class, 'assetDestroy'])->name('assets.destroy');
     Route::post('/upload-ref', [StudioController::class, 'uploadRef'])->name('uploadRef');
 
     // ── Thư viện Prompt phân tích ("Gợi ý từ ảnh") — bảng `suggest_results` có user_id ──
@@ -176,10 +186,6 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->gr
     Route::put('/pose-presets/{preset}', [StudioController::class, 'posePresetUpdate'])->name('pose-presets.update');
     Route::delete('/pose-presets/{preset}', [StudioController::class, 'posePresetDestroy'])->name('pose-presets.destroy');
 
-    // ── Catalog ảnh assets (`studio_assets` TOÀN CỤC — xoá là xoá file vật lý dùng chung) ──
-    Route::get('/assets', [StudioController::class, 'assetIndex'])->name('assets');
-    Route::post('/assets', [StudioController::class, 'assetStore'])->name('assets.store');
-    Route::delete('/assets/{asset}', [StudioController::class, 'assetDestroy'])->name('assets.destroy');
 
     // ── DỌN file mồ côi: việc TOÀN CỤC ⇒ vẫn thuộc ADMIN ──
     // (endpoint liệt kê/xoá đã chuyển sang nhóm STUDIO ở mục 0.1b bên dưới.)

@@ -204,7 +204,7 @@ class StaticIntegrityTest extends TestCase
         // asset cũ, và blade thiếu element thì lỗi mount khó đọc.
         //
         // Bất biến: việc khởi động SPA chỉ được định nghĩa ở ĐÚNG MỘT file (pageBoot.js).
-        $entries = ['main.js', 'settings.js', 'presets.js', 'stylist-data.js', 'admin.js'];
+        $entries = ['main.js', 'settings.js', 'presets.js', 'stylist-data.js', 'admin.js', 'model-settings.js'];
         $jsFiles = $this->jsFiles();
         $violations = [];
 
