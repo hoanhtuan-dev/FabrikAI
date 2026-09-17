@@ -268,6 +268,12 @@ export const useStudioStore = defineStore('studio', {
     flashMsg: '',
     flashType: 'info',
     _flashTimer: null,
+    // [Trục 2 — 2026-09-20] Hàng đợi thông báo kiểu VSCode: nhiều thông báo cùng lúc, tự tắt theo
+    // loại (lỗi giữ lâu hơn), có thể đóng tay, và KHÔNG nuốt thông báo này khi thông báo khác tới.
+    // Trước đây flashMsg là MỘT ô duy nhất: toast sau ghi đè toast trước nên thông báo quan trọng
+    // (vd "mục 3 lỗi") có thể biến mất trước khi người dùng đọc.
+    notifications: [],
+    _notifSeq: 0,
     _highlightTimer: null,
     lastBatch: [],
     showBatch: false,
@@ -325,6 +331,10 @@ export const useStudioStore = defineStore('studio', {
     // [Đợt 2] Card trong sidebar render bằng <component :is> nên KHÔNG nhận prop/event; muốn mở
     // workspace Dự án từ card thì tăng bộ đếm này — StudioApp theo dõi và mở popup tương ứng.
     workspaceOpenRequest: 0,
+    // [Trục 3 — 2026-09-20] Yêu cầu chuyển nhóm công cụ (activity) — xem requestActivity().
+    activityRequest: { id: '', n: 0 },
+    // [Trục 1 — 2026-09-20] Yêu cầu đổ prompt vào tab "Hàng loạt" của ConceptCard.
+    batchFillRequest: { prompts: [], meta: null, n: 0 },
     // [Đợt 2] MẪU VIỆC THEO NGÀNH: danh sách mẫu (server là nguồn duy nhất) + mẫu đang chờ điền vào
     // gói xuất xưởng (bảng size/ghi chú kỹ thuật) khi người dùng mở khối "Xuất gói cho xưởng".
     jobTemplates: [],
@@ -622,13 +632,34 @@ export const useStudioStore = defineStore('studio', {
       const allowed = this.modulesStatus.filter((m) => m.allowed).length;
       return { allowed, total };
     },
-    toast(msg, type = 'info') {
+    toast(msg, type = 'info', opts = {}) {
       // Use the Vue studio's own toast (works standalone); fall back to Alpine if present.
       this.flashMsg = msg; this.flashType = type;
       if (this._flashTimer) clearTimeout(this._flashTimer);
       this._flashTimer = setTimeout(() => { this.flashMsg = ''; }, 2600);
       if (window.Alpine?.store?.('toast')) window.Alpine.store('toast').show(msg, type);
+      // [Trục 2] Đẩy vào hàng đợi thông báo. Lỗi giữ lâu hơn để kịp đọc và còn dấu vết sau khi tắt.
+      this.notify(msg, type, opts);
     },
+    /**
+     * [Trục 2 — 2026-09-20] Thông báo kiểu VSCode: xếp chồng ở góc phải-dưới, tự tắt theo loại,
+     * đóng tay được. Giữ tối đa 4 mục để không che canvas.
+     */
+    notify(msg, type = 'info', opts = {}) {
+      const text = String(msg == null ? '' : msg);
+      if (!text) return null;
+      const id = ++this._notifSeq;
+      const ttl = opts.sticky ? 0 : (opts.ttl != null ? opts.ttl : (type === 'error' ? 8000 : 4200));
+      this.notifications.push({ id, msg: text, type, ttl, action: opts.action || null, at: Date.now() });
+      // Giữ 4 mục gần nhất — mục cũ nhất tự rụng (không để hàng đợi phình vô hạn).
+      if (this.notifications.length > 4) this.notifications.splice(0, this.notifications.length - 4);
+      return id;
+    },
+    dismissNotification(id) {
+      const i = this.notifications.findIndex((n) => n.id === id);
+      if (i !== -1) this.notifications.splice(i, 1);
+    },
+    clearNotifications() { this.notifications = []; },
     async loadDefaults() {
       // §5.2: trước đây catch nuốt lỗi hoàn toàn (không log) -> /api/defaults fail thì người dùng
       // chỉ thấy giá trị mặc định mà không có dấu vết nào để chẩn đoán.
@@ -1996,6 +2027,30 @@ export const useStudioStore = defineStore('studio', {
     },
     /** Yêu cầu StudioApp mở workspace Dự án/Bộ sưu tập (gọi từ card trong sidebar). */
     requestWorkspace() { this.workspaceOpenRequest = (this.workspaceOpenRequest || 0) + 1; },
+    /**
+     * [Trục 3 — 2026-09-20] Yêu cầu StudioApp CHUYỂN sang một nhóm công cụ (activity).
+     *
+     * Vì sao cần: nút "Biến thể"/"Sửa ảnh" nằm ở dock Outputs (component riêng), mà activity lại do
+     * StudioApp quản lý — card render bằng <component :is> không nhận được event. Cùng cách đã dùng
+     * cho requestWorkspace(): đếm yêu cầu, StudioApp theo dõi và đổi panel.
+     */
+    requestActivity(id) {
+      if (!id) return;
+      this.activityRequest = { id, n: ((this.activityRequest && this.activityRequest.n) || 0) + 1 };
+    },
+    /**
+     * [Trục 1 — 2026-09-20] Đưa danh sách prompt của một MẪU VIỆC vào tab "Hàng loạt" của ConceptCard.
+     *
+     * Vì sao cần kênh riêng: màn hình canvas trống cho bấm mẫu việc, nhưng ô dán danh sách nằm trong
+     * state CỤC BỘ của ConceptCard. Trước đây không có cách nào với tới nó ngoài việc tự tìm DOM —
+     * cách đó vỡ ngay khi card đổi cấu trúc. Nay card tự đăng ký hàm nhận, ai cần thì gọi.
+     */
+    requestBatchPrompts(prompts, meta = {}) {
+      const list = (prompts || []).map((p) => String(p).trim()).filter(Boolean);
+      if (!list.length) return;
+      this.batchFillRequest = { prompts: list, meta, n: ((this.batchFillRequest && this.batchFillRequest.n) || 0) + 1 };
+      this.requestActivity('concept');
+    },
     async createProject(payload) {
       try {
         const d = await this.api('/api/projects/new', payload);

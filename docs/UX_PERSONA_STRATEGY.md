@@ -300,3 +300,63 @@ từng chặng với **bằng chứng đo được**, không phải mô tả ý 
   khách bấm "Duyệt" (hiện CỐ Ý chỉ ghi phản hồi — chuyển trạng thái là quyết định của chủ, có whitelist riêng);
   cron `studio:grant-plan-credits` trên hPanel (đường lazy đã chạy nên chưa gấp).
 
+---
+
+## 9. Đợt 5 — Tối ưu UX/UI theo ảnh hưởng VSCode + OpenArt.ai (2026-09-20)
+
+> Bối cảnh: Studio **đã có** xương sống kiểu VSCode từ trước (activity bar · command palette `Ctrl+K` ·
+> status bar · panel trái/phải · phím tắt canvas). Đợt này **không xây lại** phần đó — chỉ vá đúng bốn
+> chỗ mà người dùng vẫn phải "tự tìm đường", lấy cảm hứng từ **OpenArt.ai** (luồng tạo ảnh prompt-first,
+> kết quả có hành động ngay trên ảnh) và **VSCode** (thông báo xếp chồng, quick-open đa nguồn).
+
+### 9.1 Bốn việc đã làm
+
+| # | Việc | Ảnh hưởng từ | Trước đây | Nay |
+|---|---|---|---|---|
+| 1 | **Màn hình canvas trống giàu nội dung** (`CanvasEmptyState.vue`) | OpenArt | một dòng chữ *"Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc."* | thanh prompt tạo ảnh **ngay trên canvas** + chọn biến thể + 7 tỉ lệ + số credit còn lại + **4 mẫu việc theo ngành** + ảnh gần đây + gợi ý phím tắt |
+| 2 | **Trung tâm thông báo** (`NotificationCenter.vue`) | VSCode | `flashMsg` là **một ô duy nhất**: toast sau **ghi đè** toast trước, tự tắt sau 2,6s ⇒ thông báo *"mục 3 lỗi"* của lượt hàng loạt có thể biến mất trước khi đọc | hàng đợi **xếp chồng** góc phải-dưới (tối đa 4) · lỗi giữ **8s** (thường 4,2s) · đóng tay từng mục · nút **Xoá hết** · kèm **thẻ tiến trình** đọc số THẬT (`generateProgress` · `batchSend` · số ảnh đang chạy) |
+| 3 | **Hành động ngay trên ảnh kết quả** (`OutputModule.vue`) | OpenArt | thumbnail chỉ có **1** hành động (nhấn = mở viewer) + gợi ý kéo-thả | mỗi ảnh có thanh hành động hiện khi rê chuột **hoặc focus bàn phím**: **Canvas** (thành layer) · **Tải** · **Biến thể** · **Sửa** — đúng nguyên tắc 5 (*"kết quả luôn có bước tiếp theo"*) |
+| 4 | **Quick Open đa nguồn** (mở rộng palette) | VSCode | palette chỉ có **lệnh** | thêm 3 nguồn dữ liệu thật — **Bộ sưu tập & dự án** · **Mẫu việc theo ngành** · **Ảnh đã tạo** — hiện theo **nhóm có tiêu đề**, kèm tiền tố quen thuộc: `>` lệnh · `#` dự án · `@` ảnh |
+
+### 9.2 Nguyên tắc đã tuân thủ (mục 4.1)
+
+- **Nguyên tắc 3 — chi phí hiển thị TRƯỚC khi bấm**: màn hình trống hiện `~N credit` và **co giãn theo số biến thể**
+  (đo trên trình duyệt thật: 1 biến thể `~1` · 2 biến thể `~2` · 4 biến thể `~4`).
+- **Nguyên tắc 5 — kết quả luôn có bước tiếp theo**: 4 hành động một cú bấm ngay trên thumbnail.
+- **Nguyên tắc 6 — tái dùng là mặc định**: mẫu việc theo ngành đặt ngay chỗ bắt đầu, không phải vào card rồi mới tìm.
+- **Nguyên tắc 7 — trạng thái luôn nhìn thấy**: gói · credit · việc đang chạy nằm cùng chỗ với hành động.
+
+### 9.3 Ràng buộc đã giữ
+
+- **Không thêm endpoint nào.** Mọi nút đi qua API đã có của store (`select` · `openViewer` · `applyProject` ·
+  `applyJobTemplate` · `/api/generations/{id}/download`).
+- **Không đổi luồng generate.** `store.generateImage()` và `generateBatch()` giữ nguyên; màn hình trống chỉ gọi lại.
+- **`store.toast(msg, type)` vẫn là API duy nhất** các nơi khác gọi — chỉ đẩy thêm vào hàng đợi, không phá chỗ gọi cũ.
+- **Nối card ↔ màn hình bằng kênh store**, không đụng DOM: `requestActivity()` (đổi nhóm công cụ) và
+  `requestBatchPrompts()` (đổ prompt mẫu việc vào tab *Hàng loạt*) — cùng cách đã dùng cho `requestWorkspace()`.
+
+### 9.4 Đo được
+
+| Kiểm chứng | Kết quả |
+|---|---|
+| Test tự động | **614 test / 3.908 assert — XANH toàn bộ** (không sửa test nào) |
+| Build production | `npm run build` xanh, asset trong `public_html/build` |
+| Màn hình trống (Chrome CDP, đã đăng nhập) | thanh prompt + `~1 credit` + 4 mẫu việc đúng dữ liệu `/api/job-templates` (Lookbook · sàn TMĐT · mẫu kỹ thuật · catalogue) + ảnh gần đây + phím tắt |
+| Chi phí trước khi bấm | `1 → ~1` · `2 → ~2` · `4 → ~4` credit (**4/4 bước**) |
+| Thông báo xếp chồng | bắn 3 toast liên tiếp ⇒ **3 mục cùng sống** (trước đây chỉ 1) · nút Xoá hết hoạt động · tự tắt đúng hạn · đóng tay đúng 1 mục |
+| Hành động trên ảnh kết quả | 5 ảnh × 4 nút = **Canvas 10 · Tải 5 · Biến thể 5 · Sửa 6** (aria-label) · thanh hành động **ẩn mặc định** (opacity 0), hiện khi hover |
+| Luồng một cú bấm | bấm **Canvas** ⇒ số layer `0 → 1` và màn hình trống tự biến mất · bấm **Biến thể** ⇒ panel trái đổi sang *Tạo biến thể ảnh* |
+| Quick Open | mở bằng `Ctrl+K`: **4 nhóm** (Lệnh · Bộ sưu tập & dự án · Mẫu việc theo ngành · Ảnh đã tạo) · lọc `lookbook` ra đúng mẫu việc · tiền tố `#`/`@`/`>` lọc đúng nhóm |
+
+### 9.5 Bài học tự bắt được trong đợt này
+
+- **Kiểm chứng bằng mắt phải so khớp đúng thứ người dùng thấy, không phải thứ mình viết.** Hai lần test báo ĐỎ
+  trong khi tính năng CHẠY ĐÚNG: (a) CSS `uppercase` biến `Bắt đầu từ mẫu việc` thành `BẮT ĐẦU TỪ MẪU VIỆC`;
+  (b) icon SVG chèn giữa chuỗi nên `innerText` trả `"Canva"` thay vì `"Canvas"`. Cả hai lần đều **phải sửa TEST**,
+  không phải sửa sản phẩm — nếu tin ngay vào test đỏ thì đã "sửa" một thứ đang đúng.
+- **Test cũng có bug escape:** regex `\d` viết trong template literal bị JS nuốt thành `d` ⇒ test báo "không tìm thấy
+  chi phí credit" trong khi chuỗi `~1 credit` nằm ngay đó. Đổi sang `[0-9]` là xanh.
+- **Không tự ý sửa DOM của component khác.** Bản đầu của màn hình trống tự `querySelector` ô prompt của ConceptCard
+  để điền chữ — cách đó vỡ ngay khi card đổi bố cục. Đã thay bằng kênh store `requestBatchPrompts()`.
+
+

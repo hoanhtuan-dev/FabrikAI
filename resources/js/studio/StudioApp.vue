@@ -27,6 +27,8 @@ import StudioIcon from './components/StudioIcon.vue';
 import LayersPanel from './components/LayersPanel.vue';
 import CanvasStatusBar from './components/CanvasStatusBar.vue';
 import AuthNotice from './components/AuthNotice.vue';
+import CanvasEmptyState from './components/CanvasEmptyState.vue';
+import NotificationCenter from './components/NotificationCenter.vue';
 const store = useStudioStore();
 
 // [Q3 — 2026-09-19] GÓI THEO MÙA VỤ: mốc mua của gói xưởng là số VỤ (1 vụ = 3 tháng), không phải số
@@ -168,6 +170,13 @@ function openUpgradeFor(id) {
 
 // [Đợt 2] Mở workspace Dự án khi card "Bộ sưu tập" yêu cầu (card không nhận được event).
 watch(() => store.workspaceOpenRequest, (n) => { if (n > 0) projectsOpen.value = true; });
+// [Trục 3 — 2026-09-20] Dock Outputs xin chuyển nhóm công cụ (vd "Sửa ảnh" từ ảnh kết quả):
+// ảnh đã được đưa lên canvas trước đó bằng store.select(g) nên card sẽ thấy đúng ảnh nguồn.
+watch(() => store.activityRequest && store.activityRequest.n, (n) => {
+  const id = store.activityRequest && store.activityRequest.id;
+  if (!n || !id) return;
+  if (activityNav.value.some((a) => a.id === id)) selectActivity(id);
+});
 
 const activeActivity = ref('concept');
 const menuOpen = ref(false);
@@ -319,29 +328,101 @@ function goLibrary() { store.exitCanvasTools(); store.studioView = 'library'; }
 const paletteOpen = ref(false);
 const paletteQuery = ref('');
 const paletteInput = ref(null);
-watch(paletteOpen, (v) => { if (v) nextTick(() => paletteInput.value && paletteInput.value.focus()); });
-const paletteCommands = computed(() => {
-  const q = paletteQuery.value.trim().toLowerCase();
-  const list = [
-    ...activityNav.value.map((a) => ({ id: 'act-' + a.id, label: 'Chuyển tới: ' + a.label, hint: a.id, icon: a.icon, run: () => selectActivity(a.id) })),
-    { id: 'toggle-left', label: 'Bật/tắt panel trái', hint: 'explorer', icon: 'panelLeft', run: () => { store.leftPanelOpen = !store.leftPanelOpen; } },
-    { id: 'toggle-layers', label: 'Bật/tắt panel Layers', hint: 'inspector', icon: 'layers', run: () => store.toggleInspector() },
-    { id: 'toggle-outputs', label: 'Bật/tắt dock Outputs', hint: 'outputs', icon: 'grid', run: () => store.toggleOutputDock() },
-    { id: 'library', label: 'Mở Thư viện', hint: 'library', icon: 'library', run: () => goLibrary() },
-    { id: 'projects', label: 'Mở workspace Dự án', hint: 'projects', icon: 'kanban', run: () => { projectsOpen.value = true; } },
-    { id: 'prompt', label: 'Mở Prompt Tạo Ảnh', hint: 'prompt', icon: 'sparkles', run: () => { store.promptOpen = true; } },
-    { id: 'stylist', label: 'Mở Trợ lý thiết kế', hint: 'stylist', icon: 'shirt', run: () => { stylistPopupOpen.value = true; } },
-    { id: 'source', label: 'Mở Nguồn ảnh', hint: 'source', icon: 'imagePlus', run: () => { store.sourcePickerOpen = true; } },
-    { id: 'settings', label: 'Mở Cài đặt', hint: 'settings', icon: 'gear', run: () => { window.location.href = '/settings'; } },
-    { id: 'presets', label: 'Mở Prompt Templates', hint: 'presets', icon: 'template', run: () => { window.location.href = '/presets'; } },
-    { id: 'zoom-in', label: 'Phóng to canvas', hint: 'zoomIn', icon: 'zoomIn', run: () => store.zoomIn() },
-    { id: 'zoom-out', label: 'Thu nhỏ canvas', hint: 'zoomOut', icon: 'zoomOut', run: () => store.zoomOut() },
-    { id: 'zoom-fit', label: 'Vừa khung hình', hint: 'zoomFit', icon: 'maximize', run: () => store.zoomFit() },
-    { id: 'undo', label: 'Hoàn tác', hint: 'Ctrl+Z', icon: 'undo', run: () => store.undo() },
-    { id: 'redo', label: 'Làm lại', hint: 'Ctrl+Y', icon: 'redo', run: () => store.redo() },
-  ];
-  if (!q) return list;
-  return list.filter((c) => c.label.toLowerCase().includes(q) || c.hint.includes(q));
+watch(paletteOpen, (v) => {
+  if (!v) return;
+  nextTick(() => paletteInput.value && paletteInput.value.focus());
+  // [Trục 4] Nạp sẵn 2 nguồn dữ liệu cho Quick Open (dự án + mẫu việc) để gõ là có ngay.
+  // Cả hai đều là hàm ĐỌC đã có sẵn và tự bỏ qua khi đã nạp — mở palette không sinh request thừa.
+  if (!store.projectLoaded) store.loadProjects();
+  if (!store.jobTemplatesLoaded) store.loadJobTemplates();
+});
+// [Trục 4 — 2026-09-20] QUICK OPEN đa nguồn kiểu VSCode.
+//
+// Trước đây palette chỉ có LỆNH. Nay gộp thêm 3 nguồn dữ liệu thật của Studio (bộ sưu tập/dự án ·
+// mẫu việc theo ngành · ảnh vừa tạo) và hiện theo NHÓM có tiêu đề — đúng cách VSCode phân nhóm
+// kết quả. Giữ nguyên tiền tố quen thuộc của VSCode:
+//   · '>'  → chỉ tìm LỆNH            (Ctrl+Shift+P)
+//   · '#'  → chỉ tìm DỰ ÁN/BỘ SƯU TẬP
+//   · '@'  → chỉ tìm ẢNH ĐÃ TẠO
+// Không tiền tố → tìm trong TẤT CẢ nhóm.
+const paletteMode = ref('all'); // 'all' | 'commands' | 'open'
+const baseCommands = computed(() => ([
+  ...activityNav.value.map((a) => ({ id: 'act-' + a.id, label: 'Chuyển tới: ' + a.label, hint: a.id, icon: a.icon, run: () => selectActivity(a.id) })),
+  { id: 'toggle-left', label: 'Bật/tắt panel trái', hint: 'explorer', icon: 'panelLeft', run: () => { store.leftPanelOpen = !store.leftPanelOpen; } },
+  { id: 'toggle-layers', label: 'Bật/tắt panel Layers', hint: 'inspector', icon: 'layers', run: () => store.toggleInspector() },
+  { id: 'toggle-outputs', label: 'Bật/tắt dock Outputs', hint: 'outputs', icon: 'grid', run: () => store.toggleOutputDock() },
+  { id: 'library', label: 'Mở Thư viện', hint: 'library', icon: 'library', run: () => goLibrary() },
+  { id: 'projects', label: 'Mở workspace Dự án', hint: 'projects', icon: 'kanban', run: () => { projectsOpen.value = true; } },
+  { id: 'prompt', label: 'Mở Prompt Tạo Ảnh', hint: 'prompt', icon: 'sparkles', run: () => { store.promptOpen = true; } },
+  { id: 'stylist', label: 'Mở Trợ lý thiết kế', hint: 'stylist', icon: 'shirt', run: () => { stylistPopupOpen.value = true; } },
+  { id: 'source', label: 'Mở Nguồn ảnh', hint: 'source', icon: 'imagePlus', run: () => { store.sourcePickerOpen = true; } },
+  { id: 'settings', label: 'Mở Cài đặt', hint: 'settings', icon: 'gear', run: () => { window.location.href = '/settings'; } },
+  { id: 'presets', label: 'Mở Prompt Templates', hint: 'presets', icon: 'template', run: () => { window.location.href = '/presets'; } },
+  { id: 'zoom-in', label: 'Phóng to canvas', hint: 'zoomIn', icon: 'zoomIn', run: () => store.zoomIn() },
+  { id: 'zoom-out', label: 'Thu nhỏ canvas', hint: 'zoomOut', icon: 'zoomOut', run: () => store.zoomOut() },
+  { id: 'zoom-fit', label: 'Vừa khung hình', hint: 'zoomFit', icon: 'maximize', run: () => store.zoomFit() },
+  { id: 'undo', label: 'Hoàn tác', hint: 'Ctrl+Z', icon: 'undo', run: () => store.undo() },
+  { id: 'redo', label: 'Làm lại', hint: 'Ctrl+Y', icon: 'redo', run: () => store.redo() },
+]));
+
+/** Nguồn dữ liệu "mở nhanh": dự án/bộ sưu tập · mẫu việc · ảnh đã tạo. */
+const quickOpenSources = computed(() => ({
+  projects: (store.projects || []).map((p) => ({
+    id: 'proj-' + p.id,
+    label: p.name,
+    hint: p.status || '',
+    icon: 'kanban',
+    group: 'Bộ sưu tập & dự án',
+    run: () => { store.applyProject(p); },
+  })),
+  templates: (store.jobTemplates || []).map((t) => ({
+    id: 'tpl-' + t.id,
+    label: t.title,
+    hint: (t.prompts || []).length + ' prompt',
+    icon: 'template',
+    group: 'Mẫu việc theo ngành',
+    run: () => { const ps = store.applyJobTemplate(t); if (ps.length) store.promptOpen = true; },
+  })),
+  gens: (store.generations || []).filter((g) => g.media_url).slice(0, 40).map((g) => ({
+    id: 'gen-' + g.id,
+    label: store.genName(g),
+    hint: g.created_at || '',
+    icon: 'image',
+    group: 'Ảnh đã tạo',
+    run: () => store.openViewer(g),
+  })),
+}));
+
+const paletteItems = computed(() => {
+  const raw = paletteQuery.value.trim().toLowerCase();
+  // Tiền tố VSCode: '>' lệnh · '#' dự án · '@' ảnh.
+  let mode = paletteMode.value;
+  let term = raw;
+  if (raw.startsWith('>')) { mode = 'commands'; term = raw.slice(1).trim(); }
+  else if (raw.startsWith('#') || raw.startsWith('@')) { mode = 'open'; term = raw.slice(1).trim(); }
+
+  const out = [];
+  if (mode !== 'open') baseCommands.value.forEach((c) => out.push({ ...c, group: 'Lệnh' }));
+  if (mode !== 'commands') {
+    const src = quickOpenSources.value;
+    src.projects.forEach((c) => out.push(c));
+    src.templates.forEach((c) => out.push(c));
+    src.gens.forEach((c) => out.push(c));
+  }
+  if (!term) return out;
+  return out.filter((c) => (c.label + ' ' + (c.hint || '')).toLowerCase().includes(term));
+});
+
+/** Gom kết quả thành nhóm để hiện tiêu đề (giữ nguyên thứ tự nhóm khai báo ở trên). */
+const paletteGroups = computed(() => {
+  const order = ['Lệnh', 'Bộ sưu tập & dự án', 'Mẫu việc theo ngành', 'Ảnh đã tạo'];
+  const map = new Map();
+  paletteItems.value.forEach((c) => {
+    const g = c.group || 'Khác';
+    if (!map.has(g)) map.set(g, []);
+    map.get(g).push(c);
+  });
+  return order.filter((n) => map.has(n)).map((name) => ({ name, items: map.get(name) }));
 });
 function runCommand(cmd) { paletteOpen.value = false; paletteQuery.value = ''; cmd.run(); }
 function onGlobalKey(e) {
@@ -836,8 +917,9 @@ function onTouchEnd(e) {
         <a v-else href="/dang-nhap?redirect=/" class="rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-amber-400">Đăng nhập</a>
       </div>
     </div>
-    <!-- toast (copy/status) -->
-    <div v-if="store.flashMsg" class="pointer-events-none fixed left-1/2 bottom-5 z-[90] -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold shadow-2xl" :class="store.flashType === 'error' ? 'bg-red-600 text-white' : 'bg-ink-800 text-cream-100 border border-brand-500/40'">{{ store.flashMsg }}</div>
+    <!-- [Trục 2 — 2026-09-20] Trung tâm thông báo kiểu VSCode (thay ô flashMsg đơn lẻ):
+         xếp chồng · tự tắt theo loại · đóng tay được · kèm thẻ tiến trình việc đang chạy. -->
+    <NotificationCenter />
     <!-- ══ Thư viện (SPA view nhúng trong /studio — thay thế trang riêng /api/library) ══ -->
     <LibraryApp v-if="store.studioView === 'library'" embedded @back="store.studioView = 'studio'" />
     <!-- [Đợt 0.6] Đã gỡ banner "Cài đặt FabrikAI" (PWA) — Chốt Q4 bỏ PWA hoàn toàn, nên không còn gì
@@ -965,7 +1047,7 @@ function onTouchEnd(e) {
                   </template>
                 </div>
               </div>
-              <p v-if="!store.visibleLayers.length" class="absolute inset-0 grid place-items-center text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
+              <CanvasEmptyState v-if="!store.visibleLayers.length && !store.generating" />
             </div>
             <!-- Overlay canvas xóa: bám đúng vùng ảnh hiển thị (chịu zoom/pan) -->
             <canvas v-if="store.eraseMode" ref="eraseOverlay" class="absolute z-30 cursor-crosshair rounded bg-red-500/10" :style="eraseOverlayStyle" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
@@ -1126,16 +1208,25 @@ function onTouchEnd(e) {
       <div class="w-full max-w-lg overflow-hidden rounded-xl border border-ink-600 bg-ink-900 shadow-2xl">
         <div class="flex items-center gap-2 border-b border-ink-700 px-3 py-2.5">
           <StudioIcon name="search" size="h-4 w-4" class="text-cream-300/60" />
-          <input ref="paletteInput" v-model="paletteQuery" class="min-w-0 flex-1 bg-transparent text-sm text-cream-100 placeholder:text-cream-300/40 focus:outline-none" placeholder="Nhập lệnh…" @keydown.esc="paletteOpen = false" />
+          <input ref="paletteInput" v-model="paletteQuery" class="min-w-0 flex-1 bg-transparent text-sm text-cream-100 placeholder:text-cream-300/40 focus:outline-none" placeholder="Tìm lệnh, dự án, mẫu việc, ảnh…  ( > lệnh · # dự án · @ ảnh )" @keydown.esc="paletteOpen = false" />
           <span class="rounded border border-ink-700 px-1.5 py-0.5 text-[10px] text-cream-300/40">esc</span>
         </div>
         <div class="max-h-[50vh] overflow-y-auto p-1.5">
-          <button v-for="cmd in paletteCommands" :key="cmd.id" @click="runCommand(cmd)" class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm text-cream-100 transition hover:bg-brand-600/25">
-            <StudioIcon :name="cmd.icon" size="h-4 w-4" class="shrink-0 text-brand-300" />
-            <span class="min-w-0 flex-1 truncate">{{ cmd.label }}</span>
-            <span class="shrink-0 text-[10px] text-cream-300/40">{{ cmd.hint }}</span>
-          </button>
-          <p v-if="!paletteCommands.length" class="px-2.5 py-6 text-center text-xs text-cream-300/50">Không tìm thấy lệnh.</p>
+          <!-- [Trục 4] Kết quả theo NHÓM (Lệnh · Bộ sưu tập & dự án · Mẫu việc · Ảnh đã tạo) -->
+          <template v-for="grp in paletteGroups" :key="grp.name">
+            <p class="px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">{{ grp.name }}</p>
+            <button v-for="cmd in grp.items" :key="cmd.id" @click="runCommand(cmd)" class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm text-cream-100 transition hover:bg-brand-600/25">
+              <StudioIcon :name="cmd.icon" size="h-4 w-4" class="shrink-0 text-brand-300" />
+              <span class="min-w-0 flex-1 truncate">{{ cmd.label }}</span>
+              <span class="shrink-0 text-[10px] text-cream-300/40">{{ cmd.hint }}</span>
+            </button>
+          </template>
+          <p v-if="!paletteItems.length" class="px-2.5 py-6 text-center text-xs text-cream-300/50">Không tìm thấy kết quả.</p>
+        </div>
+        <div class="flex items-center gap-3 border-t border-ink-700 px-3 py-1.5 text-[10px] text-cream-300/40">
+          <span><b class="text-cream-300/70">&gt;</b> lệnh</span>
+          <span><b class="text-cream-300/70">#</b> dự án</span>
+          <span><b class="text-cream-300/70">@</b> ảnh đã tạo</span>
         </div>
       </div>
     </div>

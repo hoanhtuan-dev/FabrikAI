@@ -1,4 +1,20 @@
 <script setup>
+/**
+ * [Trục 3 — 2026-09-20] Dock Outputs — lưới kết quả có HÀNH ĐỘNG NGAY TRÊN ẢNH (kiểu OpenArt).
+ *
+ * Nguyên tắc 5 của UX_PERSONA_STRATEGY: "Kết quả luôn có bước tiếp theo — Biến thể · Sửa · Ghép ·
+ * Tải · Gửi duyệt, một cú bấm". Trước đây thumbnail chỉ có 1 hành động (nhấn = mở viewer) và một
+ * gợi ý kéo-thả; muốn biến thể/sửa/tải thì phải mở viewer rồi tự tìm đường.
+ *
+ * Nay mỗi ảnh hoàn tất có thanh hành động hiện khi rê chuột (và khi focus bàn phím — không có
+ * hành động nào chỉ dùng được bằng chuột):
+ *   · Thêm vào canvas  → store.select(g)  (đẩy layer + chọn làm ảnh đang làm việc)
+ *   · Biến thể         → select(g) + requestActivity(variation)
+ *   · Sửa ảnh          → select(g) + requestActivity(inpaint)
+ *   · Tải xuống        → /api/generations/{id}/download
+ *
+ * KHÔNG thêm endpoint, KHÔNG đổi luồng generate — mọi nút đi qua API đã có của store.
+ */
 import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import StudioIcon from './StudioIcon.vue';
@@ -21,6 +37,17 @@ function projectName(pid, fallback) {
   const p = store.projects.find(p => Number(p.id) === Number(pid));
   return p ? p.name : '#' + pid;
 }
+
+// ── [Trục 3] Hành động trên từng ảnh kết quả ──
+/** Đưa ảnh lên canvas (thêm layer + chọn làm ảnh đang làm việc). */
+function toCanvas(g) { store.select(g); }
+/** Mở công cụ với CHÍNH ảnh này làm ảnh nguồn: đưa lên canvas trước, rồi xin đổi nhóm công cụ. */
+function useIn(g, activity) { store.select(g); store.requestActivity(activity); }
+/** Tải ảnh gốc qua endpoint download đã có (không tự dựng link tải mới). */
+function download(g) {
+  if (!g || !g.id) return;
+  window.location.href = '/api/generations/' + g.id + '/download';
+}
 </script>
 <template>
   <div class="card flex flex-1 flex-col overflow-hidden" style="min-height:0">
@@ -39,12 +66,27 @@ function projectName(pid, fallback) {
         <!-- Badge dự án -->
         <span v-if="g.project_id" class="absolute top-1 left-1 z-10 h-2.5 w-2.5 rounded-full ring-1 ring-black/40" :style="{ background: projectColor(g.project_id) }" :title="'Dự án: ' + projectName(g.project_id, g.project)"></span>
         <!-- [Đợt 0.3] Nhãn DEMO: ảnh này KHÔNG do AI tạo (chưa có API key) — ảnh mẫu hoặc chính ảnh gốc.
-             Trước đây những ảnh này được báo 'Hoàn tất' im lặng, người dùng tưởng AI đã xử lý. -->
+             Trước đây những ảnh này được báo Hoàn tất im lặng, người dùng tưởng AI đã xử lý. -->
         <span v-if="g.is_demo" class="absolute right-1 top-1 z-10 rounded-full bg-amber-500 px-1.5 py-0.5 text-[8px] font-bold uppercase leading-none text-black" :title="g.demo_reason || 'Ảnh mẫu — chưa cấu hình API key'">DEMO</span>
         <!-- Ảnh hoàn tất -->
         <template v-if="g.status === 'completed' && g.media_url">
           <button @click="store.openViewer(g)" draggable="true" @dragstart="onThumbDrag($event, g)" class="absolute inset-0 cursor-grab active:cursor-grabbing" :title="'Kéo thả vào canvas để thêm · nhấn để xem lớn'"><img :src="thumbUrl(g.media_url)" class="pointer-events-none h-full w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)"></button>
           <span class="pointer-events-none absolute left-1/2 top-1 z-10 hidden -translate-x-1/2 items-center gap-1 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold text-cream-100 transition group-hover:flex"><StudioIcon name="download" size="h-2.5 w-2.5" class="text-brand-300"/>Kéo thả</span>
+          <!-- [Trục 3] Thanh hành động: hiện khi rê chuột HOẶC khi có nút được focus (bàn phím dùng được). -->
+          <div class="pointer-events-none absolute inset-x-0 bottom-0 z-20 grid grid-cols-2 gap-0.5 bg-black/80 p-0.5 opacity-0 backdrop-blur-sm transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-ink-800/90 text-[9px] font-semibold text-cream-100 transition hover:bg-brand-600 hover:text-white" title="Thêm vào canvas (thành layer để ghép/sửa)" :aria-label="'Thêm ' + store.genName(g) + ' vào canvas'" @click.stop="toCanvas(g)">
+              <StudioIcon name="plus" size="h-3 w-3" /> Canvas
+            </button>
+            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-ink-800/90 text-[9px] font-semibold text-cream-100 transition hover:bg-brand-600 hover:text-white" title="Tải ảnh gốc về máy" :aria-label="'Tải ' + store.genName(g)" @click.stop="download(g)">
+              <StudioIcon name="download" size="h-3 w-3" /> Tải
+            </button>
+            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-ink-800/90 text-[9px] font-semibold text-cream-100 transition hover:bg-brand-600 hover:text-white" title="Tạo biến thể từ ảnh này (mở công cụ Biến thể)" :aria-label="'Tạo biến thể từ ' + store.genName(g)" @click.stop="useIn(g, 'variation')">
+              <StudioIcon name="variations" size="h-3 w-3" /> Biến thể
+            </button>
+            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-ink-800/90 text-[9px] font-semibold text-cream-100 transition hover:bg-brand-600 hover:text-white" title="Sửa ảnh này (mở công cụ Sửa ảnh)" :aria-label="'Sửa ' + store.genName(g)" @click.stop="useIn(g, 'inpaint')">
+              <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
+            </button>
+          </div>
         </template>
         <!-- Đang xử lý / chờ: skeleton shimmer + overlay tiến độ -->
         <template v-else>
@@ -59,7 +101,7 @@ function projectName(pid, fallback) {
             </span>
           </div>
         </template>
-        <span v-if="g.media_url" class="absolute bottom-1 left-1 max-w-[92%] truncate rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] text-cream-100">{{ store.genName(g) }}</span>
+        <span v-if="g.media_url" class="absolute bottom-1 left-1 max-w-[92%] truncate rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] text-cream-100 transition group-hover:opacity-0">{{ store.genName(g) }}</span>
       </div>
     </div>
     <p v-if="store.appliedProject && store.outputFilterProject && !store.visibleGenerations.length" class="mt-2 text-center text-[10px] text-cream-300/40">Chưa có output nào thuộc dự án này.</p>

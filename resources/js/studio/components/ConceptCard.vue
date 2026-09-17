@@ -31,6 +31,19 @@ function useTemplate(tpl) {
   const prompts = store.applyJobTemplate(tpl);
   if (prompts.length) batchText.value = prompts.join('\n');
 }
+/**
+ * [Trục 1 — 2026-09-20] Nhận mẫu việc từ MÀN HÌNH CANVAS TRỐNG (CanvasEmptyState).
+ *
+ * CanvasEmptyState không sở hữu ô dán danh sách (state cục bộ ở đây), nên nó gọi
+ * store.requestBatchPrompts() và card tự đổ vào — không đụng DOM, không vỡ khi đổi bố cục.
+ */
+watch(() => store.batchFillRequest && store.batchFillRequest.n, (n) => {
+  const req = store.batchFillRequest;
+  if (!n || !req || !req.prompts || !req.prompts.length) return;
+  batchText.value = req.prompts.join('\n');
+  activeTab.value = 'batch';
+  store.promptOpen = true;
+});
 const BATCH_MAX_ITEMS = 12;
 const batchItems = computed(() => batchText.value.split('\n').map((s) => s.trim()).filter(Boolean));
 const batchOverLimit = computed(() => batchItems.value.length > BATCH_MAX_ITEMS);
