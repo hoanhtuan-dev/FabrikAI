@@ -45,7 +45,11 @@ Route::get('/', [StudioController::class, 'appIndex'])->name('home');
 Route::get('/settings', [StudioController::class, 'settingsPage'])->name('settings.page');
 Route::get('/presets', [StudioController::class, 'presetsPage'])->name('presets.page');
 Route::get('/stylist-data', [StudioController::class, 'stylistDataPage'])->name('stylist-data.page');
-Route::get('/admin', [AdminController::class, 'adminPage'])->name('admin.page');
+// [Xác minh 2026-09-17] /admin là CONSOLE OWNER — KHÔNG được để chung nhóm shell công khai.
+// Trước đây ai cũng tải được vỏ quản trị (khách 200, customer 200), trái mô hình ở đầu file
+// ("ADMIN (auth + admin): cấu hình & quản trị TOÀN CỤC"); AdminApp.vue cũng không tự chặn.
+// Nay: khách ⇒ về /dang-nhap · customer ⇒ 403 · admin ⇒ 200.
+Route::middleware(['auth', 'admin', 'nostore'])->get('/admin', [AdminController::class, 'adminPage'])->name('admin.page');
 
 // ══════════════════════════════════════════════════════════════════════════════
 // NHÓM STUDIO — dùng được với MỌI tài khoản đã kích hoạt (admin + customer).
