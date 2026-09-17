@@ -325,6 +325,35 @@ if (! function_exists('studio_generation_error')) {
     }
 }
 
+if (! function_exists('studio_prompt_template')) {
+    /**
+     * [Đợt 1.7 — 2026-09-17] Resolve prompt theo KEY từ bảng prompt_templates.
+     *
+     * Chọn phiên bản CAO NHẤT đang active cho key; thay placeholder {key}; nếu không có hàng
+     * nào thì trả $fallback (chuỗi hardcode cũ) — nên hành vi cũ được bảo toàn khi DB trống.
+     * Đổi template trong DB ⇒ nội dung gửi provider đổi KHÔNG cần deploy.
+     *
+     * @param  string  $key  vd 'garment.lock'
+     * @param  array<string, string>  $placeholders  vd ['name' => 'áo dài']
+     */
+    function studio_prompt_template(string $key, array $placeholders = [], ?string $fallback = null): string
+    {
+        $body = \App\Models\PromptTemplate::query()
+            ->where('key', $key)
+            ->where('is_active', true)
+            ->orderByDesc('version')
+            ->value('body');
+
+        $body = $body !== null ? $body : ($fallback ?? '');
+
+        foreach ($placeholders as $k => $v) {
+            $body = str_replace('{'.$k.'}', (string) $v, $body);
+        }
+
+        return $body;
+    }
+}
+
 if (! function_exists('studio_claim_generation')) {
     /**
      * CAS: chỉ request nào ĐỔI ĐƯỢC trạng thái khỏi $from mới "giành" được row.

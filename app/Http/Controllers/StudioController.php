@@ -686,13 +686,17 @@ class StudioController extends Controller
             if ($bgTryonPrompt !== '') {
                 $bgTryonPrompt = trim((string) preg_replace('/^keep the subject unchanged;\s*replace the background with\s*/i', '', $bgTryonPrompt));
             }
-            $finalPrompt = 'Create a brand-new photorealistic fashion photo of a model WEARING THE EXACT GARMENT shown in the reference image. '
+            // [Đợt 1.7] prompt 'garment.lock' (bám mẫu) nay resolve từ bảng prompt_templates.
+            // Chuỗi hardcode cũ giữ làm FALLBACK — khi DB chưa có hàng thì hành vi y hệt trước đây.
+            // Đổi nội dung trong DB (key='garment.lock') ⇒ prompt gửi provider đổi KHÔNG cần deploy.
+            $garmentLockFallback = 'Create a brand-new photorealistic fashion photo of a model WEARING THE EXACT GARMENT shown in the reference image. '
                 .'The reference image is a commercial product photo of a garment — reproduce this IDENTICAL garment on a new model: identical color, identical fabric, identical pattern/print, identical cut, identical length, identical neckline, identical sleeves, identical fit (tight stays tight, loose stays loose), identical buttons/zippers/belt/bow/brooch, identical stitching and seams. Copy the garment as-is from the reference photo; do not redesign, restyle, recolor, simplify, or invent any detail. '
                 .'Wear every accessory visible in the reference identically too — same shoes, bag, belt, hat, jewelry, scarf — identical color, size, placement. Do not add items not in the reference; do not drop items that are in it. '
                 .'Full body head to toe, not cropped. Standard anatomically correct human proportions: head-to-body about 1:7.5, shoulders and hips symmetric, spine aligned, arms reaching mid-thigh, 5 fingers per hand, correct shoulders/elbows/wrists/hips/knees/ankles. '
                 .'Single clean body — one model, one pose, no double exposure, no ghost, no overlapping or duplicated limbs. '
                 .'The model fills about 75-80% of the frame height with small headroom and footroom. '
-                .'Sharp, in-focus, photorealistic, clean high-resolution fashion photo, even studio lighting. No blur, no noise, no banding, no artifacts, no text, no watermark.'
+                .'Sharp, in-focus, photorealistic, clean high-resolution fashion photo, even studio lighting. No blur, no noise, no banding, no artifacts, no text, no watermark.';
+            $finalPrompt = studio_prompt_template('garment.lock', [], $garmentLockFallback)
                 .($faceDesc !== null && $faceDesc !== '' ? ' Model face: '.$faceDesc.'. ' : '')
                 .($bodyDirective !== '' ? $bodyDirective : '')
                 .($poseDirective !== '' ? ' Model pose: '.$poseDirective.'. ' : '')
