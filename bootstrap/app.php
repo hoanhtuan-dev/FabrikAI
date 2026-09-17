@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\ProcessStudioGenerations;
+use App\Http\Middleware\EnsureUserCanUseStudio;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -17,6 +18,8 @@ $app = Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
+            // [2026-09-17 · Đợt 0.1] Cổng vào nhóm API STUDIO — admin + customer đang hoạt động.
+            'can-studio' => EnsureUserCanUseStudio::class,
             'superadmin' => \App\Http\Middleware\EnsureUserIsSuperAdmin::class,
             'nostore' => \App\Http\Middleware\NoStoreCache::class,
         ]);

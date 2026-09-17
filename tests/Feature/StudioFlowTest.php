@@ -47,12 +47,31 @@ class StudioFlowTest extends TestCase
         $this->getJson('/api/latest')->assertStatus(401);
     }
 
-    public function test_studio_is_admin_only(): void
+    /**
+     * [CẬP NHẬT KỲ VỌNG 2026-09-17 · Đợt 0.1 — quyết định Q1: "mở studio cho customer quyền hẹp"]
+     *
+     * Bất biến MỚI (thay cho "studio là admin-only"):
+     *   - khách CHƯA đăng nhập    → 401
+     *   - customer đang hoạt động → VÀO ĐƯỢC phần xưởng (/api/latest)
+     *   - customer                → VẪN 403 ở phần quản trị
+     *   - tài khoản bị khoá (is_active=false) → 403 dù role là admin
+     */
+    public function test_studio_is_open_to_active_users_but_admin_area_is_not(): void
     {
         $this->get('/')->assertOk()->assertSee('studio-root');
 
         $customer = User::where('email', 'user@fabrikai.shop')->first();
-        $this->actingAs($customer)->getJson('/api/latest')->assertForbidden();
+
+        // Xưởng: customer dùng được.
+        $this->actingAs($customer)->getJson('/api/latest')->assertOk();
+        // Quản trị: customer vẫn bị chặn.
+        $this->actingAs($customer)->getJson('/api/settings-vue/data')->assertForbidden();
+        $this->actingAs($customer)->postJson('/api/models', ['name' => 'x'])->assertForbidden();
+
+        // Bị khoá thì mất quyền vào xưởng, kể cả admin.
+        $blocked = $this->admin();
+        $blocked->forceFill(['is_active' => false])->save();
+        $this->actingAs($blocked->fresh())->getJson('/api/latest')->assertForbidden();
 
         $this->actingAs($this->admin())->get('/')->assertOk();
     }
@@ -328,15 +347,26 @@ class StudioFlowTest extends TestCase
             'style' => 'x', 'presets' => [['style' => 'no-name']],
         ])->assertStatus(422);
 
+        // [CẬP NHẬT KỲ VỌNG 2026-09-17 · Đợt 0.1] `studio_outfit_settings` CÓ cột user_id ⇒
+        // customer dùng được cài đặt Ghép Trang Phục CỦA CHÍNH MÌNH (trước đây bị 403 vì
+        // toàn bộ /api/* nằm sau middleware admin). Bất biến thật là CÔ LẬP giữa các user —
+        // đã có test riêng: StudioResourceOwnershipTest::test_outfit_settings_are_isolated_per_user.
         $customer = User::where('email', 'user@fabrikai.shop')->first();
-        $this->actingAs($customer)->getJson('/api/outfit-settings')->assertForbidden();
+        $this->actingAs($customer)->getJson('/api/outfit-settings')->assertOk()
+            ->assertJson(['style' => '', 'ornament_level' => 0, 'creative_level' => 8, 'presets' => []]);
     }
 
     public function test_studio_preset_manager_and_references(): void
     {
-        // Trang HTML /presets là shell công khai; dữ liệu preset vẫn admin-only.
+        // [CẬP NHẬT KỲ VỌNG 2026-09-17 · Đợt 0.1] bảng `presets` là TOÀN CỤC (không user_id):
+        //   - ĐỌC  (GET /api/presets)  → customer ĐƯỢC đọc, vì UI cần preset để dựng prompt
+        //   - GHI  (POST/PUT/DELETE)   → vẫn ADMIN-ONLY, vì sửa là ảnh hưởng MỌI người dùng.
         $customer = User::where('email', 'user@fabrikai.shop')->first();
-        $this->actingAs($customer)->getJson('/api/presets')->assertForbidden();
+        $this->actingAs($customer)->getJson('/api/presets')->assertOk()->assertJsonStructure(['items']);
+        $this->actingAs($customer)->postJson('/api/presets', [
+            'category' => 'style', 'ui_label' => 'Customer không được ghi', 'prompt_injection' => 'x',
+        ])->assertForbidden();
+        $this->assertDatabaseMissing('presets', ['ui_label' => 'Customer không được ghi']);
 
         $admin = $this->admin();
         $this->actingAs($admin)->getJson('/api/presets')->assertOk()->assertJsonStructure(['items']);

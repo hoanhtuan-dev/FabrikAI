@@ -34,11 +34,29 @@ class ProjectControllerTest extends TestCase
         $this->getJson('/api/projects')->assertStatus(401);
     }
 
-    public function test_customer_cannot_access_projects(): void
+    /**
+     * [CẬP NHẬT KỲ VỌNG 2026-09-17 · kế hoạch Đợt 0.1 — quyết định Q1]
+     *
+     * TRƯỚC: `customer` bị 403 vì TOÀN BỘ /api/* nằm sau middleware `admin`.
+     * NAY  : nhóm STUDIO dùng middleware `can-studio` (admin + customer đang hoạt động),
+     *        nên customer PHẢI vào được — nhưng chỉ thấy dự án CỦA CHÍNH MÌNH.
+     *
+     * Đây là thay đổi kỳ vọng CÓ CHỦ Ý, không phải nới lỏng bảo mật: phần QUẢN TRỊ
+     * (settings-vue, models, ghi presets…) vẫn ở nhóm `admin` — xem StudioCustomerAccessTest.
+     */
+    public function test_customer_can_access_own_projects(): void
     {
         $customer = User::where('email', 'user@fabrikai.shop')->first();
-        $this->actingAs($customer);
-        $this->getJson('/api/projects')->assertStatus(403);
+        $adminId = User::where('email', 'admin@fabrikai.shop')->first()->id;
+        Project::factory()->create(['user_id' => $customer->id, 'name' => 'Dự án của tôi']);
+        Project::factory()->create(['user_id' => $adminId, 'name' => 'Dự án của admin']);
+
+        $res = $this->actingAs($customer)->getJson('/api/projects');
+        $res->assertOk();
+
+        $names = array_column($res->json('items'), 'name');
+        $this->assertContains('Dự án của tôi', $names);
+        $this->assertNotContains('Dự án của admin', $names, 'customer KHÔNG được thấy dự án của người khác.');
     }
 
     public function test_admin_can_list_their_projects(): void

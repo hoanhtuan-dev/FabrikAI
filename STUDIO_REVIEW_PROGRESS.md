@@ -7,11 +7,25 @@
 
 ---
 
-## 1. TRẠNG THÁI HIỆN TẠI — **NEO ĐO CHUẨN: `eee1bba` (2026-09-17)**
+## 1. TRẠNG THÁI HIỆN TẠI — **LUÔN ĐO LẠI BẰNG `bash scripts/measure.sh`**
 
-**Nguồn số liệu duy nhất — đo lại, dùng số này:** `HEAD eee1bba` · **47 commit** · **127 route** (`php artisan route:list`) · **309 test / 1.629 assertion · 35 file test** (`vendor/bin/phpunit` chạy OK) · PHP `app/` **47 file / 13.777 dòng** · `app/Models` 17 · `app/Services` 11 · migrations 27 · blade 12 · JS/Vue studio **42 file (33 .vue)** · `public_html` **21 MB** · **production `fabrikai.shop` ĐANG CHẠY** (MySQL, 25 bảng).
+> **QUY ƯỚC TÀI LIỆU (chốt 2026-09-17 — lý do ở `STUDIO_REVIEW_PLAN.md` §6):**
+> - **File này = SỔ TRẠNG THÁI DUY NHẤT.** Chỉ sửa file này khi đóng một việc.
+> - **`STUDIO_REVIEW_PLAN.md` = BẢNG VIỆC DUY NHẤT** (lộ trình 4 đợt, có DoD).
+> - `STUDIO_REVIEW.md` · `STUDIO_REVIEW_DEEPDIVE.md` · `STUDIO_REVIEW_PRODUCT.md` = **KHO BẰNG CHỨNG LỊCH SỬ**.
+>   Đọc để tra cứu; **KHÔNG trích số trực tiếp** (cả 3 đã lệch neo ít nhất một lần, có file tự mâu thuẫn).
+> - Mở **mỗi vòng** bằng `bash scripts/measure.sh` rồi dán output vào đây.
 
-> ⚠️ **Bảng dưới là ảnh chụp 2026-09-16** (trước `git init` và trước khi deploy) — giữ để đối chiếu lịch sử, **KHÔNG dùng làm trạng thái hiện tại**.
+**Neo đo 2026-09-17 (commit `93dfd86` — chạy `scripts/measure.sh`):**
+`HEAD 93dfd86` · **50 commit** · **127 route** · **309 test / 1.629 assertion XANH · 35 file test** ·
+PHP `app/` **47 file / 13.839 dòng** · `app/Services` 11 · `app/Models` 17 · migrations 27 ·
+JS/Vue studio **42 file (33 .vue) / 12.828 dòng** · `public_html` **21 MB** ·
+**production `fabrikai.shop` ĐANG CHẠY** (MySQL, 25 bảng).
+Điểm nóng monolith: `StudioController.php` **4.643** · `store.js` **3.987** · `helpers.php` **1.610**.
+
+> 🛑 **BẢNG DƯỚI ĐÂY LÀ ẢNH CHỤP 2026-09-16 — ĐÃ SAI HOÀN TOÀN, CHỈ GIỮ ĐỂ ĐỐI CHIẾU LỊCH SỬ.**
+> Nó nói *"KHÔNG có `.git`"*, *"KHÔNG có `tests/`"*, *"chưa có deploy"* — cả ba đều **SAI** kể từ 2026-09-17.
+> (Đây chính là lỗi mà `STUDIO_REVIEW_DEEPDIVE.md` §1.2 đã chỉ ra: §1/§2 nói ngược §2bis trong cùng file.)
 
 **Code hiện hành KHÔNG còn ở TrillfaShop.** Module studio đã **tách sang app standalone `/home/anhtuan/DEV/FabrikAI`** (Laravel 13.26.1 · Vue 3.5.42 · PHP 8.3.6), ghi rõ trong `routes/web.php`: *"FabrikAI — AI fashion design studio (app độc lập, tách từ TrillfaShop)"*.
 
@@ -66,7 +80,7 @@
 | ~~**M-h**~~ ✅ **ĐÃ VÁ 66023d7** — trừ credit + tạo row trong cùng `DB::transaction`; create lỗi thì rollback. | ~~`queueGeneration()` **trừ credit TRƯỚC** khi tạo row generation; nếu create ném lỗi ⇒ mất credit, không có generation, không hoàn | `StudioController.php:1597` → `:1620` | vừa |
 | **M-i** | `onBeforeUnmount` **thiếu** `removeEventListener('keydown', onGlobalKey)` (đăng ký 4, gỡ 3) ⇒ rò listener | `StudioApp.vue:83` vs `:84` | thấp |
 
-> ⚠️ **BẢNG CŨ (2026-09-16) — giữ để đối chiếu lịch sử, đã bị thay bởi bảng trên:**
+> 🛑 **BẢNG CŨ (2026-09-16) — ĐÃ BỊ THAY HOÀN TOÀN bởi bảng T1–T17 + §2ter ở trên. ĐỪNG DÙNG.**
 
 | # | Việc | Ưu tiên |
 |---|---|---|
