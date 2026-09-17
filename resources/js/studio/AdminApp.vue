@@ -1,12 +1,25 @@
 <script setup>
 /**
- * AdminApp — Trang Quản trị cho Owner (FabrikAI).
- * 4 khu vực: Tổng quan · Người dùng · Gói cước · Sổ credit.
- * Chuẩn UX: KPI rõ ràng, bảng có tìm kiếm/lọc/phân trang, modal có role/aria + Esc,
- * mọi hành động phá hoại đều có bước xác nhận, toast phản hồi tức thì.
+ * AdminApp — CONSOLE OWNER của FabrikAI (/admin) — bản thiết kế lại UX/UI (2026-09-18).
+ *
+ * VẤN ĐỀ CỦA BẢN CŨ (715 dòng, 5 tab pill ngang):
+ *   · Tab nằm ngang hàng tiêu đề, không nhóm, không mang thông tin; tab "Giao diện" bị đặt
+ *     LẠC CHỖ trong template (nằm giữa các hộp thoại) nên rất khó lần ra khi đọc code.
+ *   · Hộp thoại tự viết tay (\`fixed inset-0\` + role) nhưng KHÔNG giữ focus: bấm Tab vài lần là
+ *     bàn phím đi xuyên ra sau lớp phủ. Bản này dùng chung BaseModal (đã có focus trap + Esc).
+ *   · Mọi nút dùng emoji (✏️ 💰 🔑 🗑 ➕ 💾) — không có nhãn chữ, không screen-reader đọc được.
+ *   · Người có vai trò Quản trị (không phải Owner) vẫn thấy tab Người dùng, bấm vào chỉ nhận
+ *     lỗi 403 khô khan. Nay phân quyền được HIỂN THỊ rõ (ẩn mục + nói vì sao).
+ *   · Dữ liệu server trả về nhưng bị bỏ: type_label, admin (ai điều chỉnh), users_count của gói,
+ *     role_label, is_subscribed, phone, và tham số lọc user_id của sổ cái.
+ *   · Xoá/khôi phục mặc định dùng confirm() của trình duyệt; xoá người dùng không nhắc lại email.
+ *
+ * GIỮ NGUYÊN HỢP ĐỒNG DỮ LIỆU: đúng bộ endpoint /api/admin/* + /api/boot, đúng payload,
+ * đúng phân quyền 2 tầng (admin cho dashboard/plans/ledger/gui, super_admin cho users).
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import StudioIcon from './components/StudioIcon.vue';
+import BaseModal from './components/BaseModal.vue';
 
 const BASE = '/api/admin';
 const csrf = (() => {
@@ -15,23 +28,6 @@ const csrf = (() => {
   return m ? decodeURIComponent(m[1]) : '';
 })();
 
-const tab = ref('dashboard');
-const toast = ref(null);
-const error = ref('');
-const busy = ref(false);
-
-const dashboard = ref(null);
-const usersData = ref({ users: [], total: 0, page: 1, last_page: 1 });
-const plansData = ref([]);
-const ledgerData = ref({ transactions: [], total: 0, page: 1, last_page: 1 });
-
-const userSearch = ref('');
-const userRole = ref('');
-const userStatus = ref('');
-const ledgerType = ref('');
-const ledgerSearch = ref('');
-
-// ── API helpers ──────────────────────────────────────────────────────────
 async function api(path, method = 'GET', body = null) {
   const opts = { method, headers: { 'X-XSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } };
   if (body !== null) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
@@ -41,127 +37,19 @@ async function api(path, method = 'GET', body = null) {
   return d;
 }
 
-function flash(msg, ok = true) { toast.value = { msg, ok }; setTimeout(() => { if (toast.value && toast.value.msg === msg) toast.value = null; }, 3000); }
-
-async function run(fn, okMsg) {
-  try { const r = await fn(); if (okMsg) flash(okMsg); return r; }
-  catch (e) { flash(e.message, false); return null; }
-}
-
-async function loadDashboard() {
-  error.value = '';
-  try { dashboard.value = await api('/dashboard'); }
-  catch (e) { error.value = e.message; }
-}
-async function loadPlans() {
-  try { plansData.value = (await api('/plans')).plans; } catch (e) { flash(e.message, false); }
-}
-async function loadUsers() {
-  busy.value = true;
-  try {
-    const q = new URLSearchParams();
-    if (userSearch.value) q.set('search', userSearch.value);
-    if (userRole.value) q.set('role', userRole.value);
-    if (userStatus.value) q.set('status', userStatus.value);
-    q.set('per_page', 20);
-    usersData.value = await api('/users?' + q.toString());
-  } catch (e) { flash(e.message, false); }
-  finally { busy.value = false; }
-}
-async function loadLedger() {
-  busy.value = true;
-  try {
-    const q = new URLSearchParams();
-    if (ledgerType.value) q.set('type', ledgerType.value);
-    if (ledgerSearch.value) q.set('search', ledgerSearch.value);
-    q.set('per_page', 20);
-    ledgerData.value = await api('/transactions?' + q.toString());
-  } catch (e) { flash(e.message, false); }
-  finally { busy.value = false; }
-}
-
-function goTab(t) {
-  tab.value = t;
-  if (t === 'users' && !usersData.value.users.length) loadUsers();
-  if (t === 'ledger' && !ledgerData.value.transactions.length) loadLedger();
-  if (t === 'gui' && !guiItems.value.length) loadGui();
-}
-
-// ── Tab "Giao diện": owner quản lý thanh công cụ TRÁI của Studio ─────────
-// Thứ tự · nhãn · icon · ẩn/hiện. KHÔNG thêm/xoá mục được: mỗi id gắn cứng một bộ công cụ
-// trong code (xem StudioGuiConfig::DEFAULTS) — thêm id lạ thì không có gì để hiển thị.
-const guiItems = ref([]);
-const guiIcons = ref([]);
-const guiSaving = ref(false);
-const guiPreview = computed(() => guiItems.value.filter((i) => i.visible !== false));
-
-// Id LUÔN ghim ở đáy thanh công cụ — đổi được nhãn/icon/ẩn-hiện nhưng KHÔNG đổi được vị trí.
-// Phải khớp StudioGuiConfig::PINNED_IDS (có test đối chiếu).
-const GUI_PINNED = ['settings'];
-
-const GUI_KIND = {
-  panel: { label: 'Nhóm card', hint: 'Mở nhóm card ở sidebar trái' },
-  action: { label: 'Popup', hint: 'Mở popup riêng (không đổi sidebar)' },
-  menu: { label: 'Menu (ghim đáy)', hint: 'Menu Cài đặt — luôn nằm ở đáy thanh công cụ' },
-};
-
-function isGuiPinned(it) { return GUI_PINNED.includes(it.id); }
-
-async function loadGui() {
-  try {
-    const d = await api('/gui');
-    guiItems.value = (d.activityBar || []).map((x) => ({ ...x }));
-    guiIcons.value = d.icons || [];
-  } catch (e) { flash(e.message, false); }
-}
-
-/** Đổi thứ tự: hoán vị với mục liền kề (không cần kéo-thả, dùng được cả trên bàn phím). */
-function moveGui(i, dir) {
-  const j = i + dir;
-  if (j < 0 || j >= guiItems.value.length) return;
-  const arr = guiItems.value;
-  const t = arr[i];
-  arr[i] = arr[j];
-  arr[j] = t;
-}
-
-async function saveGui() {
-  guiSaving.value = true;
-  try {
-    const d = await api('/gui/activity-bar', 'PUT', { items: guiItems.value });
-    guiItems.value = (d.activityBar || []).map((x) => ({ ...x }));
-    flash('Đã lưu cấu hình giao diện.');
-  } catch (e) { flash(e.message, false); }
-  finally { guiSaving.value = false; }
-}
-
-async function resetGui() {
-  if (!confirm('Khôi phục thanh công cụ về mặc định của hệ thống?')) return;
-  try {
-    const d = await api('/gui/activity-bar/reset', 'POST');
-    guiItems.value = (d.activityBar || []).map((x) => ({ ...x }));
-    flash('Đã khôi phục mặc định.');
-  } catch (e) { flash(e.message, false); }
-}
-
-onMounted(async () => { await loadDashboard(); await loadPlans(); });
-
-// Esc đóng modal đang mở.
-function onKey(e) {
-  if (e.key !== 'Escape') return;
-  userModal.value = null; creditModal.value = null; pwdModal.value = null;
-  planModal.value = null; deleteUserTarget.value = null; deletePlanTarget.value = null;
-}
-onMounted(() => window.addEventListener('keydown', onKey));
-onUnmounted(() => window.removeEventListener('keydown', onKey));
-
-// ── Format helpers ───────────────────────────────────────────────────────
-const fmtNum = (n) => (Number(n) || 0).toLocaleString('vi-VN');
-const fmtVnd = (n) => (Number(n) || 0).toLocaleString('vi-VN') + ' ₫';
+// ─────────────────────────── Điều hướng ───────────────────────────
+const SECTIONS = [
+  { id: 'dashboard', group: 'Bắt đầu',        label: 'Tổng quan',        icon: 'activity', superOnly: false },
+  { id: 'users',     group: 'Người & credit', label: 'Người dùng',       icon: 'users',    superOnly: true },
+  { id: 'plans',     group: 'Người & credit', label: 'Gói cước',         icon: 'package',  superOnly: false },
+  { id: 'ledger',    group: 'Người & credit', label: 'Sổ credit',        icon: 'receipt',  superOnly: false },
+  { id: 'gui',       group: 'Hệ thống',       label: 'Giao diện Studio', icon: 'palette',  superOnly: false },
+];
+const SECTION_GROUPS = ['Bắt đầu', 'Người & credit', 'Hệ thống'];
 
 const ROLE_META = {
   super_admin: { label: 'Owner', cls: 'bg-gold-400/15 text-gold-400' },
-  admin: { label: 'Quản trị', cls: 'bg-brand-600/25 text-brand-200' },
+  admin: { label: 'Quản trị', cls: 'bg-brand-600/25 text-brand-100' },
   customer: { label: 'Khách hàng', cls: 'bg-ink-700 text-cream-300' },
 };
 const roleMeta = (r) => ROLE_META[r] || { label: r, cls: 'bg-ink-700 text-cream-300' };
@@ -170,546 +58,1223 @@ const TYPE_META = {
   spend: { label: 'Tiêu credit', cls: 'bg-red-500/15 text-red-300' },
   refund: { label: 'Hoàn credit', cls: 'bg-emerald-500/15 text-emerald-300' },
   grant: { label: 'Tặng credit', cls: 'bg-emerald-500/15 text-emerald-300' },
-  purchase: { label: 'Nạp gói', cls: 'bg-brand-600/25 text-brand-200' },
-  renew: { label: 'Gia hạn', cls: 'bg-brand-600/25 text-brand-200' },
+  purchase: { label: 'Nạp gói', cls: 'bg-brand-600/25 text-brand-100' },
+  renew: { label: 'Gia hạn', cls: 'bg-brand-600/25 text-brand-100' },
   signup: { label: 'Đăng ký', cls: 'bg-sky-500/15 text-sky-300' },
   adjust: { label: 'Điều chỉnh', cls: 'bg-amber-500/15 text-amber-300' },
 };
 const typeMeta = (t) => TYPE_META[t] || { label: t, cls: 'bg-ink-700 text-cream-300' };
 
-// ── Users ────────────────────────────────────────────────────────────────
-const userModal = ref(null); // null | { mode, user }
-const userForm = ref({ name: '', email: '', phone: '', password: '', role: 'customer', plan_id: '', is_active: true });
-const creditModal = ref(null); // { user }
-const creditForm = ref({ amount: '', note: '' });
-const pwdModal = ref(null); // { user }
-const pwdForm = ref({ password: '' });
-const deleteUserTarget = ref(null);
+// Id LUÔN ghim ở đáy thanh công cụ Studio — đổi nhãn/icon/ẩn-hiện được, KHÔNG đổi vị trí.
+// Phải khớp StudioGuiConfig::PINNED_IDS (có test đối chiếu).
+const GUI_PINNED = ['settings'];
+const GUI_KIND = {
+  panel: { label: 'Nhóm card', cls: 'bg-brand-600/25 text-brand-100', hint: 'Mở nhóm card ở sidebar trái' },
+  action: { label: 'Popup', cls: 'bg-amber-500/20 text-amber-200', hint: 'Mở popup riêng (không đổi sidebar)' },
+  menu: { label: 'Menu (ghim đáy)', cls: 'bg-ink-700 text-cream-300', hint: 'Menu Cài đặt — luôn nằm ở đáy thanh công cụ' },
+};
+const isGuiPinned = (it) => GUI_PINNED.indexOf(it.id) !== -1;
 
-function openCreateUser() {
-  userForm.value = { name: '', email: '', phone: '', password: '', role: 'customer', plan_id: '', is_active: true };
-  userModal.value = { mode: 'create' };
+const BADGE = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold';
+const BADGE_TONE = {
+  neutral: 'bg-ink-700 text-cream-300',
+  ok: 'bg-emerald-500/15 text-emerald-300',
+  warn: 'bg-amber-500/15 text-amber-300',
+  danger: 'bg-red-500/15 text-red-300',
+  brand: 'bg-brand-600/25 text-brand-100',
+  info: 'bg-sky-500/15 text-sky-300',
+  gold: 'bg-gold-400/15 text-gold-400',
+};
+
+// ─────────────────────────── Trạng thái ───────────────────────────
+const me = ref(null);
+const section = ref('dashboard');
+const toast = ref(null);
+const loading = reactive({ dashboard: true, plans: false, users: false, ledger: false, gui: false });
+
+const dashboard = ref(null);
+const plansData = ref([]);
+const usersData = ref({ users: [], total: 0, page: 1, last_page: 1 });
+const ledgerData = ref({ transactions: [], total: 0, page: 1, last_page: 1 });
+const guiItems = ref([]);
+const guiIcons = ref([]);
+const guiSnapshot = ref('');
+
+const f = reactive({ userSearch: '', userRole: '', userStatus: '', userPerPage: 20 });
+const l = reactive({ search: '', type: '', userId: null, userName: '', perPage: 20 });
+const planSearch = ref('');
+const guiSearch = ref('');
+
+const isSuper = computed(() => !!(me.value && me.value.is_super_admin));
+const navSections = computed(() => SECTIONS.filter((s) => !s.superOnly || isSuper.value));
+
+const kpis = computed(() => (dashboard.value ? dashboard.value.kpis : null));
+const dashboardPlans = computed(() => (dashboard.value ? dashboard.value.plans || [] : []));
+const maxPlanCount = computed(() => {
+  const v = dashboardPlans.value.map((p) => Number(p.users_count) || 0);
+  return v.length ? Math.max(1, Math.max.apply(null, v)) : 1;
+});
+const totalPlanUsers = computed(() => dashboardPlans.value.reduce((n, p) => n + (Number(p.users_count) || 0), 0));
+const planShare = (n) => (totalPlanUsers.value ? Math.round(((Number(n) || 0) / totalPlanUsers.value) * 100) : 0);
+
+const activePlans = computed(() => plansData.value.filter((p) => p.is_active));
+const defaultPlan = computed(() => plansData.value.find((p) => p.is_default) || null);
+const filteredPlans = computed(() => {
+  const n = planSearch.value.trim().toLowerCase();
+  if (!n) return plansData.value;
+  return plansData.value.filter((p) => (p.name + ' ' + p.slug + ' ' + (p.tagline || '')).toLowerCase().includes(n));
+});
+const filteredGui = computed(() => {
+  const n = guiSearch.value.trim().toLowerCase();
+  if (!n) return guiItems.value;
+  return guiItems.value.filter((it) => (it.id + ' ' + it.label + ' ' + it.icon).toLowerCase().includes(n));
+});
+const guiPreview = computed(() => guiItems.value.filter((i) => i.visible !== false));
+const guiDirty = computed(() => JSON.stringify(guiItems.value) !== guiSnapshot.value);
+const guiHiddenCount = computed(() => guiItems.value.filter((i) => i.visible === false).length);
+
+const fmtNum = (n) => (Number(n) || 0).toLocaleString('vi-VN');
+const fmtVnd = (n) => (Number(n) || 0).toLocaleString('vi-VN') + ' ₫';
+const planPrice = (p) => p.price_label || fmtVnd(p.price_vnd);
+const pageInfo = (d) => 'Trang ' + d.page + ' / ' + (d.last_page || 1) + ' · ' + fmtNum(d.total) + ' dòng';
+const canPrev = (d) => d.page > 1;
+const canNext = (d) => d.page < (d.last_page || 1);
+const countText = (shown, total, unit) => (shown === total ? total + ' ' + unit : 'Hiện ' + shown + '/' + total + ' ' + unit);
+
+function flash(msg, ok = true) { toast.value = { msg, ok }; setTimeout(() => { if (toast.value && toast.value.msg === msg) toast.value = null; }, ok ? 3000 : 5200); }
+function goTo(id) {
+  section.value = id;
+  ensureLoaded(id);
 }
+/**
+ * Chạy một thao tác ghi. Trả về true/false (KHÔNG trả dữ liệu): bản cũ trả giá trị của fn nên
+ * `ok` là undefined với closure không return → hộp thoại không đóng và danh sách không nạp lại
+ * dù máy chủ đã lưu thành công (lỗi bắt được khi kiểm thử thao tác tạo người dùng).
+ */
+async function run(fn, okMsg) {
+  try { await fn(); if (okMsg) flash(okMsg); return true; }
+  catch (e) { flash(e.message, false); return false; }
+}
+
+// ─────────────────────────── Nạp dữ liệu ───────────────────────────
+async function loadDashboard() {
+  loading.dashboard = true;
+  try { dashboard.value = await api('/dashboard'); }
+  catch (e) { flash(e.message, false); }
+  finally { loading.dashboard = false; }
+}
+async function loadPlans() {
+  loading.plans = true;
+  try { plansData.value = (await api('/plans')).plans || []; }
+  catch (e) { flash(e.message, false); }
+  finally { loading.plans = false; }
+}
+async function loadUsers() {
+  if (!isSuper.value) return;
+  loading.users = true;
+  try {
+    const q = new URLSearchParams();
+    if (f.userSearch) q.set('search', f.userSearch);
+    if (f.userRole) q.set('role', f.userRole);
+    if (f.userStatus) q.set('status', f.userStatus);
+    q.set('per_page', f.userPerPage);
+    q.set('page', usersData.value.page || 1);
+    usersData.value = await api('/users?' + q.toString());
+  } catch (e) { flash(e.message, false); }
+  finally { loading.users = false; }
+}
+async function loadLedger() {
+  loading.ledger = true;
+  try {
+    const q = new URLSearchParams();
+    if (l.type) q.set('type', l.type);
+    if (l.search) q.set('search', l.search);
+    if (l.userId) q.set('user_id', l.userId);
+    q.set('per_page', l.perPage);
+    q.set('page', ledgerData.value.page || 1);
+    ledgerData.value = await api('/transactions?' + q.toString());
+  } catch (e) { flash(e.message, false); }
+  finally { loading.ledger = false; }
+}
+async function loadGui() {
+  loading.gui = true;
+  try {
+    const d = await api('/gui');
+    guiItems.value = (d.activityBar || []).map((x) => Object.assign({}, x));
+    guiIcons.value = d.icons || [];
+    guiSnapshot.value = JSON.stringify(guiItems.value);
+  } catch (e) { flash(e.message, false); }
+  finally { loading.gui = false; }
+}
+function ensureLoaded(id) {
+  if (id === 'users' && isSuper.value && !usersData.value.users.length) loadUsers();
+  if (id === 'ledger' && !ledgerData.value.transactions.length) loadLedger();
+  if (id === 'gui' && !guiItems.value.length) loadGui();
+  if (id === 'plans' && !plansData.value.length) loadPlans();
+}
+
+// ─────────────────────────── Việc cần xử lý (tổng quan) ───────────────────────────
+const attention = computed(() => {
+  const out = [];
+  if (!isSuper.value) {
+    out.push({ icon: 'shieldCheck', tone: 'info', title: 'Không có quyền quản lý tài khoản', detail: 'Bạn đang là «' + ((me.value && me.value.role_label) || 'Quản trị') + '». Chỉ Owner (super admin) tạo/sửa/khoá được người dùng — các mục còn lại vẫn dùng bình thường.', action: 'Cài đặt AI', run: () => { window.location.href = '/settings'; } });
+  }
+  if (plansData.value.length && !defaultPlan.value) {
+    out.push({ icon: 'package', tone: 'warn', title: 'Chưa có gói mặc định', detail: 'Người dùng mới sẽ không được gán gói nào. Đặt một gói làm mặc định để luồng đăng ký tự phục vụ hoạt động.', action: 'Xem gói cước', run: () => goTo('plans') });
+  }
+  if (plansData.value.length && !activePlans.value.length) {
+    out.push({ icon: 'eyeOff', tone: 'warn', title: 'Tất cả gói đang bị ẩn', detail: 'Không gói nào đang mở bán — trang giá sẽ trống với khách.', action: 'Xem gói cước', run: () => goTo('plans') });
+  } else if (plansData.value.filter((p) => !p.is_active).length) {
+    const n = plansData.value.filter((p) => !p.is_active).length;
+    out.push({ icon: 'eyeOff', tone: 'info', title: n + ' gói đang ẩn', detail: 'Gói ẩn không hiện cho khách nhưng vẫn giữ người dùng cũ: ' + plansData.value.filter((p) => !p.is_active).map((p) => p.name).join(' · '), action: 'Xem gói cước', run: () => goTo('plans') });
+  }
+  const emptyPlans = activePlans.value.filter((p) => !(Number(p.users_count) > 0));
+  if (activePlans.value.length && emptyPlans.length === activePlans.value.length && kpis.value && kpis.value.total_users) {
+    out.push({ icon: 'info', tone: 'info', title: 'Chưa ai đăng ký gói trả phí', detail: emptyPlans.length + ' gói đang mở bán nhưng 0 người dùng: ' + emptyPlans.map((p) => p.name).join(' · '), action: '', run: null });
+  }
+  if (kpis.value && !kpis.value.credits_spent_30d) {
+    out.push({ icon: 'receipt', tone: 'info', title: 'Chưa phát sinh tiêu credit trong 30 ngày', detail: 'Sổ credit chỉ có giao dịch tặng/điều chỉnh. Kiểm tra key/provider ở Cài đặt nếu người dùng không tạo được ảnh.', action: 'Mở Cài đặt', run: () => { window.location.href = '/settings'; } });
+  }
+  if (kpis.value && !kpis.value.paying_subscribers && kpis.value.total_users) {
+    out.push({ icon: 'coins', tone: 'info', title: 'Không có người dùng trả phí', detail: 'Người dùng đang dùng gói miễn phí hoặc chưa gán gói.', action: 'Xem người dùng', run: () => { if (isSuper.value) goTo('users'); } });
+  }
+  if (guiHiddenCount.value) {
+    out.push({ icon: 'palette', tone: 'info', title: guiHiddenCount.value + ' nút đang bị ẩn trên thanh công cụ', detail: 'Người dùng Studio không thấy các mục này.', action: 'Xem giao diện', run: () => goTo('gui') });
+  }
+  if (!out.length) {
+    out.push({ icon: 'checkSquare', tone: 'ok', title: 'Không có việc nào đang chờ', detail: 'Gói cước, sổ credit và giao diện đều đang ở trạng thái bình thường.', action: '', run: null });
+  }
+  return out;
+});
+const attentionTone = (tone) => ({
+  danger: 'text-red-300 bg-red-500/10 border-red-500/30',
+  warn: 'text-amber-300 bg-amber-500/10 border-amber-500/30',
+  info: 'text-sky-300 bg-sky-500/10 border-sky-500/30',
+  ok: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30',
+}[tone] || 'text-cream-300 bg-ink-700 border-ink-700');
+
+// ─────────────────────────── Hộp thoại: người dùng ───────────────────────────
+const userModal = reactive({ open: false, mode: 'create', row: null, form: blankUser(), errors: {}, saving: false });
+const creditModal = reactive({ open: false, row: null, form: { amount: '', note: '' }, errors: {}, saving: false });
+const pwdModal = reactive({ open: false, row: null, form: { password: '' }, errors: {}, saving: false });
+const planModal = reactive({ open: false, mode: 'create', row: null, form: blankPlan(), errors: {}, saving: false, featureText: '' });
+
+function blankUser() { return { name: '', email: '', phone: '', password: '', role: 'customer', plan_id: '', is_active: true }; }
+function blankPlan() {
+  return { name: '', slug: '', tagline: '', price_vnd: 0, credits_per_month: 0, bonus_credits: 0, image_credit_cost: 1, video_credit_cost: 10, resolution_cap: '2K', features: [], is_active: true, is_default: false, sort: 0 };
+}
+function openCreateUser() { Object.assign(userModal, { open: true, mode: 'create', row: null, form: blankUser(), errors: {}, saving: false }); }
 function openEditUser(u) {
-  userForm.value = { name: u.name, email: u.email, phone: u.phone || '', password: '', role: u.role, plan_id: u.plan ? u.plan.id : '', is_active: u.is_active };
-  userModal.value = { mode: 'edit', user: u };
+  Object.assign(userModal, {
+    open: true, mode: 'edit', row: u, errors: {}, saving: false,
+    form: { name: u.name, email: u.email, phone: u.phone || '', password: '', role: u.role, plan_id: u.plan ? u.plan.id : '', is_active: !!u.is_active },
+  });
+}
+function openCredit(u) { Object.assign(creditModal, { open: true, row: u, form: { amount: '', note: '' }, errors: {}, saving: false }); }
+function openPwd(u) { Object.assign(pwdModal, { open: true, row: u, form: { password: '' }, errors: {}, saving: false }); }
+
+function validateUser() {
+  const v = userModal.form;
+  const e = {};
+  if (!String(v.name).trim()) e.name = 'Nhập tên người dùng.';
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(v.email).trim())) e.email = 'Email không hợp lệ.';
+  if (userModal.mode === 'create' && String(v.password).length < 8) e.password = 'Mật khẩu tối thiểu 8 ký tự.';
+  if (userModal.row && userModal.row.id === (me.value && me.value.id) && v.role !== 'super_admin') e.role = 'Không thể tự hạ quyền chính mình.';
+  if (userModal.row && userModal.row.id === (me.value && me.value.id) && !v.is_active) e.is_active = 'Không thể tự khoá chính mình.';
+  userModal.errors = e;
+  return !Object.keys(e).length;
 }
 async function saveUser() {
-  const isEdit = userModal.value.mode === 'edit';
+  if (!validateUser()) return;
+  userModal.saving = true;
+  const v = userModal.form;
   const payload = {
-    name: userForm.value.name, email: userForm.value.email, phone: userForm.value.phone || null,
-    role: userForm.value.role, is_active: !!userForm.value.is_active,
-    plan_id: userForm.value.plan_id === '' ? null : Number(userForm.value.plan_id),
+    name: v.name.trim(), email: v.email.trim(), phone: v.phone || null, role: v.role,
+    is_active: !!v.is_active, plan_id: v.plan_id === '' ? null : Number(v.plan_id),
   };
-  if (!isEdit) {
-    if (!userForm.value.password || userForm.value.password.length < 8) return flash('Mật khẩu tối thiểu 8 ký tự.', false);
-    payload.password = userForm.value.password;
-  }
+  if (userModal.mode === 'create') payload.password = v.password;
   const ok = await run(async () => {
-    if (isEdit) await api('/users/' + userModal.value.user.id, 'PUT', payload);
+    if (userModal.mode === 'edit') await api('/users/' + userModal.row.id, 'PUT', payload);
     else await api('/users', 'POST', payload);
-  }, isEdit ? 'Đã cập nhật người dùng.' : 'Đã tạo người dùng.');
-  if (ok) { userModal.value = null; await loadUsers(); await loadDashboard(); }
+  }, userModal.mode === 'edit' ? 'Đã cập nhật người dùng.' : 'Đã tạo người dùng.');
+  userModal.saving = false;
+  if (ok) { userModal.open = false; await loadUsers(); await loadDashboard(); }
 }
-function openCredit(u) { creditModal.value = { user: u }; creditForm.value = { amount: '', note: '' }; }
+/** Khoá / mở khoá nhanh: dùng lại PUT /users/{id} với đầy đủ trường bắt buộc. */
+async function toggleUserActive(u, active) {
+  const payload = { name: u.name, email: u.email, phone: u.phone || null, role: u.role, is_active: active, plan_id: u.plan ? u.plan.id : null };
+  const ok = await run(() => api('/users/' + u.id, 'PUT', payload), active ? 'Đã mở khoá «' + u.name + '».' : 'Đã khoá «' + u.name + '».');
+  if (ok) { await loadUsers(); await loadDashboard(); }
+}
 async function saveCredit() {
-  const amt = Number(creditForm.value.amount);
-  if (!amt) return flash('Nhập số credit cần cộng/trừ.', false);
-  const ok = await run(async () => {
-    await api('/users/' + creditModal.value.user.id + '/credits', 'POST', { amount: amt, note: creditForm.value.note || null });
-  }, 'Đã cập nhật credit.');
-  if (ok) { creditModal.value = null; await loadUsers(); await loadLedger(); await loadDashboard(); }
+  const amt = Number(creditModal.form.amount);
+  const e = {};
+  if (!Number.isInteger(amt) || amt === 0) e.amount = 'Nhập số nguyên khác 0 (dương = cộng, âm = trừ).';
+  creditModal.errors = e;
+  if (Object.keys(e).length) return;
+  creditModal.saving = true;
+  const ok = await run(() => api('/users/' + creditModal.row.id + '/credits', 'POST', { amount: amt, note: creditModal.form.note || null }), 'Đã cập nhật credit.');
+  creditModal.saving = false;
+  if (ok) { creditModal.open = false; await loadUsers(); await loadLedger(); await loadDashboard(); }
 }
-function openResetPwd(u) { pwdModal.value = { user: u }; pwdForm.value = { password: '' }; }
-async function saveResetPwd() {
-  if (!pwdForm.value.password || pwdForm.value.password.length < 8) return flash('Mật khẩu tối thiểu 8 ký tự.', false);
-  const ok = await run(async () => { await api('/users/' + pwdModal.value.user.id + '/reset-password', 'POST', { password: pwdForm.value.password }); }, 'Đã đặt lại mật khẩu.');
-  if (ok) pwdModal.value = null;
+async function savePwd() {
+  const e = {};
+  if (String(pwdModal.form.password).length < 8) e.password = 'Mật khẩu tối thiểu 8 ký tự.';
+  pwdModal.errors = e;
+  if (Object.keys(e).length) return;
+  pwdModal.saving = true;
+  const ok = await run(() => api('/users/' + pwdModal.row.id + '/reset-password', 'POST', { password: pwdModal.form.password }), 'Đã đặt lại mật khẩu cho «' + pwdModal.row.name + '».');
+  pwdModal.saving = false;
+  if (ok) { pwdModal.open = false; }
 }
-function askDeleteUser(u) { deleteUserTarget.value = u; }
-async function confirmDeleteUser() {
-  const ok = await run(async () => { await api('/users/' + deleteUserTarget.value.id, 'DELETE'); }, 'Đã xóa người dùng.');
-  if (ok) { deleteUserTarget.value = null; await loadUsers(); await loadDashboard(); }
+/** Nhảy sang Sổ credit và lọc đúng người này — dùng tham số user_id có sẵn của endpoint. */
+function openUserLedger(u) {
+  l.userId = u.id; l.userName = u.name;
+  ledgerData.value = { transactions: [], total: 0, page: 1, last_page: 1 };
+  goTo('ledger');
 }
 
-// ── Plans ────────────────────────────────────────────────────────────────
-const planModal = ref(null); // null | { mode, plan }
-const planForm = ref({ name: '', slug: '', tagline: '', price_vnd: 0, credits_per_month: 0, bonus_credits: 0, image_credit_cost: 1, video_credit_cost: 10, resolution_cap: '2K', features: [], is_active: true, is_default: false, sort: 0 });
-const featureText = ref('');
-const deletePlanTarget = ref(null);
-
-function openCreatePlan() {
-  planForm.value = { name: '', slug: '', tagline: '', price_vnd: 0, credits_per_month: 0, bonus_credits: 0, image_credit_cost: 1, video_credit_cost: 10, resolution_cap: '2K', features: [], is_active: true, is_default: false, sort: 0 };
-  featureText.value = '';
-  planModal.value = { mode: 'create' };
-}
+// ─────────────────────────── Hộp thoại: gói cước ───────────────────────────
+function openCreatePlan() { Object.assign(planModal, { open: true, mode: 'create', row: null, form: blankPlan(), errors: {}, saving: false, featureText: '' }); }
 function openEditPlan(p) {
-  planForm.value = { name: p.name, slug: p.slug, tagline: p.tagline || '', price_vnd: p.price_vnd, credits_per_month: p.credits_per_month, bonus_credits: p.bonus_credits, image_credit_cost: p.image_credit_cost, video_credit_cost: p.video_credit_cost, resolution_cap: p.resolution_cap, features: (p.features || []).slice(), is_active: p.is_active, is_default: p.is_default, sort: p.sort };
-  featureText.value = '';
-  planModal.value = { mode: 'edit', plan: p };
+  const form = blankPlan();
+  Object.keys(form).forEach((k) => { if (k in p) form[k] = k === 'features' ? (p.features || []).slice() : p[k]; });
+  Object.assign(planModal, { open: true, mode: 'edit', row: p, form, errors: {}, saving: false, featureText: '' });
 }
 function addFeature() {
-  const t = featureText.value.trim();
-  if (t && !planForm.value.features.includes(t)) planForm.value.features.push(t);
-  featureText.value = '';
+  const t = planModal.featureText.trim();
+  if (t && planModal.form.features.indexOf(t) === -1) planModal.form.features.push(t);
+  planModal.featureText = '';
 }
-function removeFeature(i) { planForm.value.features.splice(i, 1); }
+function removeFeature(i) { planModal.form.features.splice(i, 1); }
+
+function validatePlan() {
+  const v = planModal.form;
+  const e = {};
+  if (!String(v.name).trim()) e.name = 'Nhập tên gói.';
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(String(v.slug).trim())) e.slug = 'Slug: chữ thường/số, bắt đầu bằng chữ hoặc số (vd: pro, studio-2026).';
+  if (!Number.isFinite(Number(v.price_vnd)) || Number(v.price_vnd) < 0) e.price_vnd = 'Giá không hợp lệ.';
+  if (!Number.isFinite(Number(v.credits_per_month)) || Number(v.credits_per_month) < 0) e.credits_per_month = 'Credit/tháng không hợp lệ.';
+  if (Number(v.image_credit_cost) < 1) e.image_credit_cost = 'Tối thiểu 1 credit/ảnh.';
+  if (Number(v.video_credit_cost) < 1) e.video_credit_cost = 'Tối thiểu 1 credit/video.';
+  planModal.errors = e;
+  return !Object.keys(e).length;
+}
 async function savePlan() {
-  const isEdit = planModal.value.mode === 'edit';
-  const payload = { ...planForm.value, price_vnd: Number(planForm.value.price_vnd) || 0, credits_per_month: Number(planForm.value.credits_per_month) || 0, bonus_credits: Number(planForm.value.bonus_credits) || 0, image_credit_cost: Number(planForm.value.image_credit_cost) || 1, video_credit_cost: Number(planForm.value.video_credit_cost) || 10, sort: Number(planForm.value.sort) || 0 };
+  if (!validatePlan()) return;
+  planModal.saving = true;
+  const v = planModal.form;
+  const payload = Object.assign({}, v, {
+    name: v.name.trim(), slug: v.slug.trim(), tagline: v.tagline || null,
+    price_vnd: Number(v.price_vnd) || 0, credits_per_month: Number(v.credits_per_month) || 0,
+    bonus_credits: Number(v.bonus_credits) || 0, image_credit_cost: Number(v.image_credit_cost) || 1,
+    video_credit_cost: Number(v.video_credit_cost) || 10, sort: Number(v.sort) || 0,
+  });
   const ok = await run(async () => {
-    if (isEdit) await api('/plans/' + planModal.value.plan.id, 'PUT', payload);
+    if (planModal.mode === 'edit') await api('/plans/' + planModal.row.id, 'PUT', payload);
     else await api('/plans', 'POST', payload);
-  }, isEdit ? 'Đã cập nhật gói.' : 'Đã tạo gói.');
-  if (ok) { planModal.value = null; await loadPlans(); await loadDashboard(); }
+  }, planModal.mode === 'edit' ? 'Đã cập nhật gói.' : 'Đã tạo gói.');
+  planModal.saving = false;
+  if (ok) { planModal.open = false; await loadPlans(); await loadDashboard(); }
 }
-function askDeletePlan(p) { deletePlanTarget.value = p; }
-async function confirmDeletePlan() {
-  const ok = await run(async () => { await api('/plans/' + deletePlanTarget.value.id, 'DELETE'); }, 'Đã xóa gói.');
-  if (ok) { deletePlanTarget.value = null; await loadPlans(); await loadDashboard(); }
+/** Ẩn/hiện gói = PUT đầy đủ trường bắt buộc (giữ nguyên phần còn lại). */
+async function togglePlanActive(p, active) {
+  const payload = Object.assign({}, p, { is_active: active, tagline: p.tagline || null, features: p.features || [] });
+  const ok = await run(() => api('/plans/' + p.id, 'PUT', payload), active ? 'Đã mở bán gói «' + p.name + '».' : 'Đã ẩn gói «' + p.name + '».');
+  if (ok) { await loadPlans(); await loadDashboard(); }
 }
 
-// ── Pagination helpers ────────────────────────────────────────────────────
-function pageInfo(d) { return 'Trang ' + d.page + ' / ' + (d.last_page || 1) + ' · ' + fmtNum(d.total) + ' dòng'; }
-function canPrev(d) { return d.page > 1; }
-function canNext(d) { return d.page < (d.last_page || 1); }
+// ─────────────────────────── Xác nhận thao tác phá huỷ ───────────────────────────
+const confirmBox = reactive({ open: false, title: '', message: '', label: 'Xác nhận', busy: false, run: null });
+function askConfirm(title, message, label, fn) { Object.assign(confirmBox, { open: true, title, message, label, busy: false, run: fn }); }
+async function confirmRun() {
+  if (!confirmBox.run) return;
+  confirmBox.busy = true;
+  await confirmBox.run();
+  confirmBox.busy = false;
+  confirmBox.open = false;
+}
+const askDeleteUser = (u) => askConfirm(
+  'Xoá người dùng?',
+  'Xoá «' + u.name + '» (' + u.email + ') sẽ mất toàn bộ dự án, ảnh và lịch sử credit. Hành động này KHÔNG hoàn tác được. Nếu chỉ muốn chặn đăng nhập, hãy dùng nút Khoá.',
+  'Xoá vĩnh viễn',
+  async () => { const ok = await run(() => api('/users/' + u.id, 'DELETE'), 'Đã xoá người dùng.'); if (ok) { await loadUsers(); await loadDashboard(); } },
+);
+const askBanUser = (u) => askConfirm(
+  'Khoá tài khoản?',
+  '«' + u.name + '» sẽ không đăng nhập được cho tới khi bạn mở khoá. Dữ liệu (dự án, ảnh, credit) vẫn giữ nguyên.',
+  'Khoá tài khoản',
+  async () => { await toggleUserActive(u, false); },
+);
+const askTogglePlan = (p, active) => askConfirm(
+  active ? 'Mở bán lại gói?' : 'Ẩn gói khỏi trang giá?',
+  active
+    ? 'Gói «' + p.name + '» sẽ hiện lại cho khách đăng ký.'
+    : 'Gói «' + p.name + '» sẽ không còn hiện cho khách. Người dùng đang dùng gói này KHÔNG bị ảnh hưởng — muốn xoá hẳn thì dùng nút Xoá.',
+  active ? 'Mở bán' : 'Ẩn gói',
+  async () => { await togglePlanActive(p, active); },
+);
+const askDeletePlan = (p) => askConfirm(
+  'Xoá gói cước?',
+  'Xoá gói «' + p.name + '» (' + p.slug + '). Gói đang có người dùng hoặc đang là gói mặc định sẽ bị máy chủ từ chối — khi đó hãy ẨN gói thay vì xoá.',
+  'Xoá gói',
+  async () => { const ok = await run(() => api('/plans/' + p.id, 'DELETE'), 'Đã xoá gói.'); if (ok) { await loadPlans(); await loadDashboard(); } },
+);
+const askResetGui = () => askConfirm(
+  'Khôi phục thanh công cụ?',
+  'Toàn bộ tuỳ chỉnh (thứ tự · nhãn · icon · ẩn/hiện) sẽ bị bỏ và trở về bản gốc trong mã nguồn. Thay đổi này áp dụng cho MỌI người dùng Studio.',
+  'Khôi phục mặc định',
+  async () => {
+    // Khôi phục trả về DANH SÁCH MỚI nên không dùng run() (run chỉ trả true/false).
+    try {
+      const d = await api('/gui/activity-bar/reset', 'POST');
+      guiItems.value = (d.activityBar || []).map((x) => Object.assign({}, x));
+      guiSnapshot.value = JSON.stringify(guiItems.value);
+      flash('Đã khôi phục mặc định.');
+    } catch (e) { flash(e.message, false); }
+  },
+);
 
-const kpis = computed(() => dashboard.value ? dashboard.value.kpis : null);
-const planDistribution = computed(() => dashboard.value ? dashboard.value.plan_distribution : {});
-const maxPlanCount = computed(() => {
-  const v = Object.values(planDistribution.value);
-  return v.length ? Math.max(...v.map(Number)) : 1;
+// ─────────────────────────── Giao diện Studio (thanh công cụ trái) ───────────────────────────
+const guiSaving = ref(false);
+function moveGui(item, dir) {
+  const arr = guiItems.value;
+  const i = arr.indexOf(item);
+  const j = i + dir;
+  if (i === -1 || j < 0 || j >= arr.length) return;
+  const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+}
+async function saveGui() {
+  guiSaving.value = true;
+  try {
+    const d = await api('/gui/activity-bar', 'PUT', { items: guiItems.value });
+    guiItems.value = (d.activityBar || []).map((x) => Object.assign({}, x));
+    guiSnapshot.value = JSON.stringify(guiItems.value);
+    flash('Đã lưu cấu hình giao diện.');
+  } catch (e) { flash(e.message, false); }
+  guiSaving.value = false;
+}
+
+// ─────────────────────────── Khởi động & URL ───────────────────────────
+function sectionFromUrl() {
+  const raw = new URLSearchParams(window.location.search).get('tab') || window.location.hash.replace('#', '');
+  return SECTIONS.some((s) => s.id === raw) ? raw : 'dashboard';
+}
+watch(section, (v) => {
+  try {
+    const url = new URL(window.location.href);
+    if (v === 'dashboard') url.searchParams.delete('tab'); else url.searchParams.set('tab', v);
+    history.replaceState(history.state, '', url);
+  } catch (e) { /* môi trường không cho sửa URL — không được làm hỏng trang */ }
 });
+function navKey(e, i) {
+  const list = navSections.value;
+  let next = -1;
+  if (e.key === 'ArrowDown') next = (i + 1) % list.length;
+  else if (e.key === 'ArrowUp') next = (i - 1 + list.length) % list.length;
+  else if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = list.length - 1;
+  if (next === -1) return;
+  e.preventDefault();
+  goTo(list[next].id);
+  const el = document.querySelector('[data-nav="' + list[next].id + '"]');
+  if (el) el.focus();
+}
+function navBadge(id) {
+  const map = {
+    users: usersData.value.total ? fmtNum(usersData.value.total) : (isSuper.value ? '' : ''),
+    plans: plansData.value.length || '',
+    ledger: ledgerData.value.total ? fmtNum(ledgerData.value.total) : '',
+    gui: guiItems.value.length ? (guiHiddenCount.value ? guiHiddenCount.value + ' ẩn' : String(guiItems.value.length)) : '',
+    dashboard: attention.value[0] && attention.value[0].tone !== 'ok' ? attention.value.length : '',
+  };
+  return map[id] == null ? '' : map[id];
+}
 
-const currentUser = ref(null);
 onMounted(async () => {
-  try { const r = await fetch('/api/boot', { headers: { Accept: 'application/json' } }); if (r.ok) currentUser.value = (await r.json()).user; } catch (e) {}
+  section.value = sectionFromUrl();
+  // /api/boot cho biết vai trò thật (is_super_admin) — dùng để ẩn/hiện phần Người dùng.
+  try {
+    const r = await fetch('/api/boot', { headers: { Accept: 'application/json' } });
+    if (r.ok) me.value = (await r.json()).user;
+  } catch (e) { /* không lấy được danh tính: vẫn hiển thị phần không cần quyền */ }
+  await loadDashboard();
+  await loadPlans();
+  ensureLoaded(section.value);
 });
 </script>
 
 <template>
   <div class="studio-dark min-h-screen w-full">
-    <!-- Toast -->
-    <transition name="fade">
-      <div v-if="toast" :class="toast.ok ? 'bg-emerald-600' : 'bg-red-600'" class="fixed bottom-5 right-5 z-[60] rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-xl">{{ toast.msg }}</div>
-    </transition>
-
-    <!-- Header -->
-    <header class="sticky top-0 z-40 border-b border-ink-700 bg-ink-900/90 backdrop-blur">
-      <div class="container-x flex items-center justify-between gap-3 py-3.5">
-        <div class="flex items-center gap-3">
-          <div class="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-lg font-bold text-white">F</div>
-          <div>
-            <h1 class="font-display text-lg font-semibold leading-tight text-cream-50">Quản trị FabrikAI</h1>
-            <p class="text-xs text-cream-300/60">Owner console · quản lý người dùng, gói cước &amp; credit</p>
-          </div>
+    <!-- Thông báo: aria-live để trình đọc màn hình đọc được kết quả thao tác -->
+    <div class="pointer-events-none fixed bottom-5 right-5 z-[80] flex w-[min(92vw,26rem)] flex-col gap-2">
+      <transition name="fade">
+        <div v-if="toast" role="status" aria-live="polite"
+             :class="toast.ok ? 'border-emerald-500/40 bg-emerald-950/95 text-emerald-100' : 'border-red-500/50 bg-red-950/95 text-red-100'"
+             class="pointer-events-auto flex items-start gap-2 rounded-lg border px-3.5 py-2.5 text-xs font-semibold shadow-2xl backdrop-blur">
+          <StudioIcon :name="toast.ok ? 'check' : 'alertTriangle'" size="h-4 w-4 shrink-0" class="mt-px" />
+          <span>{{ toast.msg }}</span>
         </div>
-        <div class="flex items-center gap-2">
-          <a href="/" class="btn-outline btn-sm">← Studio</a>
-          <a href="/settings" class="btn-outline btn-sm">⚙️ Cài đặt</a>
-          <div v-if="currentUser" class="hidden items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3 py-1.5 sm:flex">
-            <span class="grid h-6 w-6 place-items-center rounded-full bg-brand-600 text-[11px] font-bold text-white">{{ (currentUser.name || '?').charAt(0).toUpperCase() }}</span>
-            <div class="leading-tight">
-              <p class="text-xs font-semibold text-cream-100">{{ currentUser.name }}</p>
-              <p class="text-[10px] text-cream-300/60">{{ currentUser.role_label }}</p>
-            </div>
-          </div>
+      </transition>
+    </div>
+
+    <!-- ═════════ Thanh tiêu đề ═════════ -->
+    <header class="sticky top-0 z-40 border-b border-ink-700 bg-ink-900/95 backdrop-blur">
+      <div class="mx-auto flex w-full max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5 lg:px-6">
+        <a href="/" class="tool-btn shrink-0" title="Về Studio">
+          <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" />
+          <span class="hidden sm:inline">Studio</span>
+        </a>
+        <div class="min-w-0 flex-1">
+          <h1 class="flex items-center gap-2 font-display text-lg font-semibold text-cream-50">
+            <span class="grid h-6 w-6 place-items-center rounded-md bg-brand-600 text-[11px] font-bold text-white">F</span>
+            Quản trị FabrikAI
+          </h1>
+          <p class="mt-0.5 hidden truncate text-[11px] text-cream-300/75 sm:block">
+            Người dùng · gói cước · sổ credit · giao diện Studio — thao tác ở đây ảnh hưởng toàn hệ thống.
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span v-if="me" :class="[BADGE, isSuper ? BADGE_TONE.gold : BADGE_TONE.brand]" :title="me.email">
+            <StudioIcon :name="isSuper ? 'shieldCheck' : 'users'" size="h-3 w-3" />
+            {{ me.name }} · {{ me.role_label }}
+          </span>
+          <span v-if="me && !isSuper" :class="[BADGE, BADGE_TONE.warn]" title="Chỉ Owner (super admin) quản lý được tài khoản người dùng">
+            <StudioIcon name="info" size="h-3 w-3" /> không quản lý người dùng
+          </span>
+          <a href="/settings" class="tool-btn" title="Cài đặt AI: API key · provider · model">
+            <StudioIcon name="gear" size="h-3.5 w-3.5" />
+            <span class="hidden sm:inline">Cài đặt</span>
+          </a>
+          <button class="tool-btn" :disabled="loading.dashboard" title="Nạp lại dữ liệu" @click="loadDashboard(); if (section==='users') loadUsers(); if (section==='ledger') loadLedger(); if (section==='gui') loadGui(); if (section==='plans') loadPlans()">
+            <StudioIcon name="refresh" size="h-3.5 w-3.5" :class="{ 'animate-spin': loading.dashboard }" />
+            <span class="hidden sm:inline">Tải lại</span>
+          </button>
         </div>
       </div>
     </header>
 
-    <main class="container-x py-6">
-      <!-- Tab nav -->
-      <div class="mb-5 flex flex-wrap gap-1.5">
-        <button @click="goTab('dashboard')" :class="tab==='dashboard' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors">📊 Tổng quan</button>
-        <button @click="goTab('users')" :class="tab==='users' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors">👥 Người dùng</button>
-        <button @click="goTab('plans')" :class="tab==='plans' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors">📦 Gói cước</button>
-        <button @click="goTab('ledger')" :class="tab==='ledger' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors">🧾 Sổ credit</button>
-        <button @click="goTab('gui')" :class="tab==='gui' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors">🎨 Giao diện</button>
-      </div>
-
-      <div v-if="error" class="card p-6 text-sm text-red-400">{{ error }} — <button class="underline" @click="loadDashboard">thử lại</button></div>
-
-      <!-- ════════════ DASHBOARD ════════════ -->
-      <div v-show="tab==='dashboard'">
-        <template v-if="kpis">
-          <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <div class="card p-4">
-              <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/70">Người dùng</p>
-              <p class="mt-1.5 font-display text-3xl font-semibold text-cream-50">{{ fmtNum(kpis.total_users) }}</p>
-              <p class="mt-1 text-[11px] text-emerald-300">+{{ fmtNum(kpis.new_users_7d) }} trong 7 ngày</p>
-            </div>
-            <div class="card p-4">
-              <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/70">Đang trả phí</p>
-              <p class="mt-1.5 font-display text-3xl font-semibold text-cream-50">{{ fmtNum(kpis.paying_subscribers) }}</p>
-              <p class="mt-1 text-[11px] text-cream-300/60">gói active</p>
-            </div>
-            <div class="card p-4">
-              <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/70">Ảnh đã tạo</p>
-              <p class="mt-1.5 font-display text-3xl font-semibold text-cream-50">{{ fmtNum(kpis.generations_total) }}</p>
-              <p class="mt-1 text-[11px] text-cream-300/60">+{{ fmtNum(kpis.generations_today) }} hôm nay</p>
-            </div>
-            <div class="card p-4">
-              <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/70">Credit tiêu (30 ngày)</p>
-              <p class="mt-1.5 font-display text-3xl font-semibold text-cream-50">{{ fmtNum(kpis.credits_spent_30d) }}</p>
-              <p class="mt-1 text-[11px] text-cream-300/60">dư hệ thống: {{ fmtNum(kpis.credits_balance_total) }}</p>
-            </div>
+    <div class="mx-auto w-full max-w-[1400px] px-4 py-4 sm:px-5 lg:px-6 lg:py-6">
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-[15.5rem_minmax(0,1fr)]">
+        <!-- ═════════ Danh mục (desktop) ═════════ -->
+        <nav class="hidden lg:sticky lg:top-[4.75rem] lg:block lg:self-start" aria-label="Mục quản trị">
+          <div v-for="group in SECTION_GROUPS" :key="group" class="mb-4">
+            <p class="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-cream-300/75">{{ group }}</p>
+            <ul class="space-y-0.5">
+              <li v-for="s in navSections.filter(x => x.group === group)" :key="s.id">
+                <button :data-nav="s.id" @click="goTo(s.id)" @keydown="navKey($event, navSections.indexOf(s))"
+                        :aria-current="section === s.id ? 'true' : undefined"
+                        :class="section === s.id ? 'bg-brand-600/20 text-cream-50 ring-1 ring-inset ring-brand-500/40' : 'text-cream-200 hover:bg-ink-800'"
+                        class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors">
+                  <StudioIcon :name="s.icon" size="h-4 w-4" :class="section === s.id ? 'text-brand-300' : 'text-cream-300/75'" />
+                  <span class="min-w-0 flex-1 truncate">{{ s.label }}</span>
+                  <span v-if="navBadge(s.id)" :class="[BADGE, section === s.id ? BADGE_TONE.brand : BADGE_TONE.neutral]" class="!px-1.5">{{ navBadge(s.id) }}</span>
+                </button>
+              </li>
+            </ul>
           </div>
+          <p v-if="!isSuper" class="mx-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[10px] leading-relaxed text-amber-200">
+            Vai trò của bạn không có quyền quản lý tài khoản người dùng (chỉ Owner). Các mục còn lại vẫn dùng bình thường.
+          </p>
+          <p class="mt-3 px-3 text-[10px] leading-relaxed text-cream-300/75">
+            Cấu hình AI (API key · provider · model) nằm ở <a href="/settings" class="link">Cài đặt</a>.
+          </p>
+        </nav>
 
-          <div class="card mt-5 p-5">
-            <h2 class="font-display text-base font-semibold text-cream-50">Phân bố gói cước</h2>
-            <p class="mt-0.5 text-xs text-cream-300/60">Số người dùng theo từng gói hiện tại.</p>
-            <div class="mt-4 space-y-3">
-              <div v-for="p in dashboard.plans" :key="p.id" class="flex items-center gap-3">
-                <span class="w-28 shrink-0 truncate text-xs text-cream-200">{{ p.name }}</span>
-                <div class="h-2.5 flex-1 overflow-hidden rounded-full bg-ink-700">
-                  <div class="h-full rounded-full bg-brand-500" :style="{ width: (p.users_count / maxPlanCount * 100) + '%' }"></div>
+        <!-- ═════════ Danh mục (màn hẹp) ═════════ -->
+        <div class="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:hidden scrollbar-hide" role="tablist" aria-label="Mục quản trị">
+          <button v-for="s in navSections" :key="s.id" role="tab" :aria-selected="section === s.id"
+                  @click="goTo(s.id)"
+                  :class="section === s.id ? 'border-brand-500/50 bg-brand-600/20 text-cream-50' : 'border-ink-700 bg-ink-800 text-cream-300'"
+                  class="flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold">
+            <StudioIcon :name="s.icon" size="h-3.5 w-3.5" />
+            {{ s.label }}
+            <span v-if="navBadge(s.id)" class="rounded-full bg-ink-900/60 px-1.5 text-[10px]">{{ navBadge(s.id) }}</span>
+          </button>
+        </div>
+
+        <!-- ═════════ Nội dung ═════════ -->
+        <main class="min-w-0 space-y-5">
+          <!-- ───── TỔNG QUAN ───── -->
+          <section v-show="section === 'dashboard'" class="space-y-5">
+            <div v-if="!kpis" class="space-y-3">
+              <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div v-for="i in 4" :key="i" class="card h-24 animate-pulse"></div>
+              </div>
+              <p class="text-center text-xs text-cream-300/75">Đang tải dữ liệu tổng quan…</p>
+            </div>
+
+            <template v-else>
+              <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <button class="card p-4 text-left transition-colors hover:border-brand-500/40" @click="isSuper && goTo('users')">
+                  <div class="flex items-start justify-between gap-2">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Người dùng</p>
+                    <StudioIcon name="users" size="h-4 w-4" class="text-brand-300/80" />
+                  </div>
+                  <p class="mt-1.5 font-display text-2xl font-semibold text-cream-50">{{ fmtNum(kpis.total_users) }}</p>
+                  <p class="mt-0.5 text-[11px] text-emerald-300">+{{ fmtNum(kpis.new_users_7d) }} trong 7 ngày</p>
+                </button>
+                <button class="card p-4 text-left transition-colors hover:border-brand-500/40" @click="goTo('plans')">
+                  <div class="flex items-start justify-between gap-2">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Đang trả phí</p>
+                    <StudioIcon name="coins" size="h-4 w-4" class="text-brand-300/80" />
+                  </div>
+                  <p class="mt-1.5 font-display text-2xl font-semibold text-cream-50">{{ fmtNum(kpis.paying_subscribers) }}</p>
+                  <p class="mt-0.5 text-[11px] text-cream-300/75">{{ activePlans.length }} gói đang mở bán</p>
+                </button>
+                <div class="card p-4">
+                  <div class="flex items-start justify-between gap-2">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Ảnh đã tạo</p>
+                    <StudioIcon name="image" size="h-4 w-4" class="text-brand-300/80" />
+                  </div>
+                  <p class="mt-1.5 font-display text-2xl font-semibold text-cream-50">{{ fmtNum(kpis.generations_total) }}</p>
+                  <p class="mt-0.5 text-[11px] text-cream-300/75">+{{ fmtNum(kpis.generations_today) }} hôm nay</p>
                 </div>
-                <span class="w-10 shrink-0 text-right text-xs font-semibold text-cream-100">{{ fmtNum(p.users_count) }}</span>
+                <button class="card p-4 text-left transition-colors hover:border-brand-500/40" @click="goTo('ledger')">
+                  <div class="flex items-start justify-between gap-2">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Credit tiêu (30 ngày)</p>
+                    <StudioIcon name="receipt" size="h-4 w-4" class="text-brand-300/80" />
+                  </div>
+                  <p class="mt-1.5 font-display text-2xl font-semibold text-cream-50">{{ fmtNum(kpis.credits_spent_30d) }}</p>
+                  <p class="mt-0.5 text-[11px] text-cream-300/75">dư hệ thống: {{ fmtNum(kpis.credits_balance_total) }}</p>
+                </button>
+              </div>
+
+              <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div class="card p-4">
+                  <h2 class="flex items-center gap-2 text-sm font-semibold text-cream-50">
+                    <StudioIcon name="alertTriangle" size="h-4 w-4" class="text-amber-300" />
+                    Việc cần xử lý
+                  </h2>
+                  <ul class="mt-3 space-y-2">
+                    <li v-for="(item, i) in attention" :key="i" :class="attentionTone(item.tone)"
+                        class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border px-3 py-2.5">
+                      <StudioIcon :name="item.icon" size="h-4 w-4 shrink-0" />
+                      <div class="min-w-0 flex-1">
+                        <p class="text-xs font-semibold">{{ item.title }}</p>
+                        <p class="mt-0.5 text-[11px] font-normal opacity-80">{{ item.detail }}</p>
+                      </div>
+                      <button v-if="item.run" class="tool-btn shrink-0" @click="item.run()">
+                        {{ item.action }}
+                        <StudioIcon name="arrowRight" size="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="card p-4">
+                  <h2 class="flex items-center gap-2 text-sm font-semibold text-cream-50">
+                    <StudioIcon name="package" size="h-4 w-4" class="text-brand-300" />
+                    Phân bố gói cước
+                    <button class="tool-btn ml-auto" @click="goTo('plans')">Quản lý gói</button>
+                  </h2>
+                  <p class="mt-1 text-[11px] text-cream-300/75">{{ fmtNum(totalPlanUsers) }} người dùng đã được gán gói.</p>
+                  <ul class="mt-3 space-y-3">
+                    <li v-for="p in dashboardPlans" :key="p.id">
+                      <div class="flex items-center gap-2 text-[11px]">
+                        <span class="min-w-0 flex-1 truncate font-semibold text-cream-100">{{ p.name }}</span>
+                        <span class="text-cream-300/75">{{ fmtNum(p.users_count) }} người · {{ planShare(p.users_count) }}%</span>
+                      </div>
+                      <div class="mt-1 h-2 overflow-hidden rounded-full bg-ink-700">
+                        <div class="h-full rounded-full bg-brand-500" :style="{ width: (Number(p.users_count) || 0) / maxPlanCount * 100 + '%' }"></div>
+                      </div>
+                    </li>
+                    <li v-if="!dashboardPlans.length" class="text-xs text-cream-300/75">Chưa có gói cước nào — tạo gói đầu tiên ở mục Gói cước.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="card flex flex-wrap items-center gap-2 p-4">
+                <p class="mr-auto text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Thao tác nhanh</p>
+                <button v-if="isSuper" class="btn-brand btn-sm" @click="openCreateUser()"><StudioIcon name="plus" size="h-3.5 w-3.5" /> Thêm người dùng</button>
+                <button class="btn-outline btn-sm" @click="openCreatePlan()"><StudioIcon name="package" size="h-3.5 w-3.5" /> Thêm gói cước</button>
+                <button class="btn-outline btn-sm" @click="goTo('ledger')"><StudioIcon name="receipt" size="h-3.5 w-3.5" /> Xem sổ credit</button>
+                <button class="btn-outline btn-sm" @click="goTo('gui')"><StudioIcon name="palette" size="h-3.5 w-3.5" /> Thanh công cụ Studio</button>
+              </div>
+            </template>
+          </section>
+
+          <!-- ───── NGƯỜI DÙNG ───── -->
+          <section v-show="section === 'users'" class="space-y-5">
+            <div v-if="!isSuper" class="card flex flex-col items-center gap-2 p-8 text-center">
+              <StudioIcon name="shieldCheck" size="h-6 w-6" class="text-amber-300" />
+              <p class="text-sm font-semibold text-cream-100">Không có quyền quản lý tài khoản</p>
+              <p class="max-w-md text-[11px] text-cream-300/75">
+                Danh sách và thao tác trên người dùng chỉ dành cho Owner (super admin) — máy chủ trả 403 cho vai trò
+                «{{ (me && me.role_label) || 'Quản trị' }}». Bạn vẫn xem được Tổng quan · Gói cước · Sổ credit · Giao diện.
+              </p>
+              <button class="btn-outline btn-sm mt-1" @click="goTo('dashboard')">Về Tổng quan</button>
+            </div>
+
+            <template v-else>
+              <div class="card p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
+                      <StudioIcon name="users" size="h-4 w-4" class="text-brand-300" /> Người dùng
+                      <span :class="[BADGE, BADGE_TONE.neutral]">{{ fmtNum(usersData.total) }}</span>
+                    </h2>
+                    <p class="mt-1 max-w-2xl text-xs text-cream-300/75">
+                      Tạo · sửa · khoá · cấp credit · đặt lại mật khẩu. Mọi biến động credit đều ghi vào Sổ credit.
+                    </p>
+                  </div>
+                  <button class="btn-brand btn-sm" @click="openCreateUser()"><StudioIcon name="plus" size="h-3.5 w-3.5" /> Thêm người dùng</button>
+                </div>
+
+                <form class="mt-4 flex flex-wrap items-center gap-2" @submit.prevent="usersData.page = 1; loadUsers()">
+                  <div class="relative min-w-[13rem] flex-1">
+                    <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                    <input v-model="f.userSearch" type="search" aria-label="Tìm người dùng" class="input !py-2 !pl-9 text-xs" placeholder="Tìm theo tên, email hoặc SĐT…">
+                  </div>
+                  <select v-model="f.userRole" aria-label="Lọc theo vai trò" class="input !w-auto !py-2 text-xs" @change="usersData.page = 1; loadUsers()">
+                    <option value="">Mọi vai trò</option>
+                    <option value="super_admin">Owner</option>
+                    <option value="admin">Quản trị</option>
+                    <option value="customer">Khách hàng</option>
+                  </select>
+                  <select v-model="f.userStatus" aria-label="Lọc theo trạng thái" class="input !w-auto !py-2 text-xs" @change="usersData.page = 1; loadUsers()">
+                    <option value="">Mọi trạng thái</option>
+                    <option value="active">Đang hoạt động</option>
+                    <option value="inactive">Bị khoá</option>
+                  </select>
+                  <select v-model.number="f.userPerPage" aria-label="Số dòng mỗi trang" class="input !w-auto !py-2 text-xs" @change="usersData.page = 1; loadUsers()">
+                    <option :value="20">20 dòng</option>
+                    <option :value="50">50 dòng</option>
+                    <option :value="100">100 dòng</option>
+                  </select>
+                  <button type="submit" class="tool-btn"><StudioIcon name="search" size="h-3.5 w-3.5" /> Tìm</button>
+                </form>
+              </div>
+
+              <div class="card overflow-hidden">
+                <div class="overflow-x-auto">
+                  <table class="w-full min-w-[900px] text-left text-xs">
+                    <thead>
+                      <tr class="border-b border-ink-700 text-cream-300/75">
+                        <th class="px-4 py-3 font-semibold">Người dùng</th>
+                        <th class="px-3 py-3 font-semibold">Vai trò</th>
+                        <th class="px-3 py-3 text-right font-semibold">Credit</th>
+                        <th class="px-3 py-3 font-semibold">Gói</th>
+                        <th class="px-3 py-3 text-right font-semibold">Ảnh</th>
+                        <th class="px-3 py-3 font-semibold">Ngày tạo</th>
+                        <th class="px-4 py-3 text-right font-semibold">Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-ink-700/60">
+                      <tr v-for="u in usersData.users" :key="u.id" class="hover:bg-ink-800/50">
+                        <td class="px-4 py-3">
+                          <div class="flex items-center gap-2.5">
+                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-600/25 text-xs font-bold text-brand-100">{{ (u.name || '?').charAt(0).toUpperCase() }}</span>
+                            <div class="min-w-0 leading-tight">
+                              <p class="flex items-center gap-1.5 font-semibold text-cream-50">
+                                {{ u.name }}
+                                <span v-if="u.id === (me && me.id)" :class="[BADGE, BADGE_TONE.info]">bạn</span>
+                                <span v-if="!u.is_active" :class="[BADGE, BADGE_TONE.danger]">đã khoá</span>
+                              </p>
+                              <p class="truncate text-[11px] text-cream-300/75">{{ u.email }}<span v-if="u.phone"> · {{ u.phone }}</span></p>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="px-3 py-3"><span :class="roleMeta(u.role).cls" class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :title="'role: ' + u.role">{{ u.role_label || roleMeta(u.role).label }}</span></td>
+                        <td class="px-3 py-3 text-right font-semibold text-cream-50">{{ fmtNum(u.credits_balance) }}</td>
+                        <td class="px-3 py-3">
+                          <span v-if="u.plan" class="text-cream-200">{{ u.plan.name }}</span>
+                          <span v-else class="text-cream-300/75">— chưa gán —</span>
+                        </td>
+                        <td class="px-3 py-3 text-right text-cream-200">{{ fmtNum(u.generations_count) }}</td>
+                        <td class="px-3 py-3 text-cream-300/75">{{ u.created_at }}</td>
+                        <td class="px-4 py-3">
+                          <div class="flex flex-wrap items-center justify-end gap-1.5">
+                            <button class="tool-btn" @click="openEditUser(u)"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa</button>
+                            <button class="icon-btn" title="Cộng / trừ credit" :aria-label="'Cộng trừ credit cho ' + u.name" @click="openCredit(u)"><StudioIcon name="coins" size="h-4 w-4" /></button>
+                            <button class="icon-btn" title="Đặt lại mật khẩu" :aria-label="'Đặt lại mật khẩu cho ' + u.name" @click="openPwd(u)"><StudioIcon name="key" size="h-4 w-4" /></button>
+                            <button class="icon-btn" title="Xem sổ credit của người này" :aria-label="'Xem sổ credit của ' + u.name" @click="openUserLedger(u)"><StudioIcon name="receipt" size="h-4 w-4" /></button>
+                            <button v-if="u.is_active" class="icon-btn" title="Khoá tài khoản" :aria-label="'Khoá tài khoản ' + u.name" :disabled="u.id === (me && me.id)" @click="askBanUser(u)"><StudioIcon name="lock" size="h-4 w-4" /></button>
+                            <button v-else class="icon-btn !text-emerald-300" title="Mở khoá tài khoản" :aria-label="'Mở khoá tài khoản ' + u.name" @click="toggleUserActive(u, true)"><StudioIcon name="lockOpen" size="h-4 w-4" /></button>
+                            <button class="icon-btn !text-red-300 hover:!bg-red-500/15" title="Xoá người dùng" :aria-label="'Xoá người dùng ' + u.name" :disabled="u.id === (me && me.id)" @click="askDeleteUser(u)"><StudioIcon name="userX" size="h-4 w-4" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr v-if="!usersData.users.length && !loading.users">
+                        <td colspan="7" class="px-4 py-10 text-center text-xs text-cream-300/75">
+                          Không có người dùng nào khớp bộ lọc.
+                          <button class="ml-1 underline" @click="f.userSearch = ''; f.userRole = ''; f.userStatus = ''; usersData.page = 1; loadUsers()">Xoá bộ lọc</button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-ink-700 px-4 py-3">
+                  <span class="text-[11px] text-cream-300/75">{{ pageInfo(usersData) }}<span v-if="loading.users" class="ml-1">· đang tải…</span></span>
+                  <div class="flex gap-1.5">
+                    <button :disabled="!canPrev(usersData) || loading.users" class="tool-btn" @click="usersData.page--; loadUsers()"><StudioIcon name="chevronLeft" size="h-3.5 w-3.5" /> Trước</button>
+                    <button :disabled="!canNext(usersData) || loading.users" class="tool-btn" @click="usersData.page++; loadUsers()">Sau <StudioIcon name="chevronRight" size="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </section>
+
+          <!-- ───── GÓI CƯỚC ───── -->
+          <section v-show="section === 'plans'" class="space-y-5">
+            <div class="card p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
+                    <StudioIcon name="package" size="h-4 w-4" class="text-brand-300" /> Gói cước
+                    <span :class="[BADGE, BADGE_TONE.neutral]">{{ plansData.length }}</span>
+                  </h2>
+                  <p class="mt-1 max-w-2xl text-xs text-cream-300/75">
+                    Giá VNĐ, credit theo tháng, chi phí credit mỗi ảnh/video. Gói đang có người dùng thì nên ẨN thay vì xoá để giữ lịch sử.
+                  </p>
+                </div>
+                <button class="btn-brand btn-sm" @click="openCreatePlan()"><StudioIcon name="plus" size="h-3.5 w-3.5" /> Thêm gói</button>
+              </div>
+              <div class="mt-4 flex flex-wrap items-center gap-2">
+                <div class="relative min-w-[13rem] flex-1">
+                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                  <input v-model="planSearch" type="search" aria-label="Tìm gói cước" class="input !py-2 !pl-9 text-xs" placeholder="Tìm theo tên, slug hoặc mô tả…">
+                </div>
+                <span class="text-[11px] text-cream-300/75">{{ countText(filteredPlans.length, plansData.length, 'gói') }}</span>
               </div>
             </div>
-          </div>
-        </template>
-        <div v-else class="card p-10 text-center text-sm text-cream-300/60">Đang tải dữ liệu tổng quan…</div>
+
+            <div v-if="loading.plans && !plansData.length" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div v-for="i in 4" :key="i" class="card h-56 animate-pulse"></div>
+            </div>
+            <div v-else-if="!plansData.length" class="card flex flex-col items-center gap-2 p-10 text-center">
+              <StudioIcon name="package" size="h-6 w-6" class="text-cream-300/75" />
+              <p class="text-sm font-semibold text-cream-100">Chưa có gói cước nào</p>
+              <p class="max-w-md text-[11px] text-cream-300/75">Tạo gói đầu tiên để người dùng tự đăng ký. Gói mặc định được gán cho tài khoản mới.</p>
+              <button class="btn-brand btn-sm mt-1" @click="openCreatePlan()">Thêm gói cước</button>
+            </div>
+            <div v-else-if="!filteredPlans.length" class="card p-8 text-center text-xs text-cream-300/75">
+              Không có gói nào khớp « {{ planSearch }} ».
+              <button class="ml-1 underline" @click="planSearch = ''">Xoá tìm kiếm</button>
+            </div>
+
+            <div v-else class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <article v-for="p in filteredPlans" :key="p.id" class="card flex flex-col p-5" :class="p.is_active ? '' : 'border-dashed'">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="font-display text-base font-semibold text-cream-50">{{ p.name }}</h3>
+                  <span v-if="p.is_default" :class="[BADGE, BADGE_TONE.warn]"><StudioIcon name="target" size="h-3 w-3" /> Mặc định</span>
+                  <span :class="[BADGE, p.is_active ? BADGE_TONE.ok : BADGE_TONE.neutral]">{{ p.is_active ? 'Đang mở bán' : 'Đang ẩn' }}</span>
+                  <span :class="[BADGE, BADGE_TONE.info]" :title="'Số người dùng đang gán gói này'">{{ fmtNum(p.users_count) }} người</span>
+                </div>
+                <p class="mt-1 min-h-[2rem] text-xs text-cream-300/85">{{ p.tagline || '—' }}</p>
+                <div class="mt-2 flex items-baseline gap-1.5">
+                  <span class="font-display text-2xl font-semibold text-cream-50">{{ planPrice(p) }}</span>
+                  <span v-if="p.price_vnd > 0" class="text-[11px] text-cream-300/75">/ tháng</span>
+                </div>
+                <p class="mt-1.5 text-sm font-semibold text-brand-200">
+                  {{ fmtNum(p.credits_per_month) }} credit / tháng
+                  <span v-if="p.bonus_credits" class="text-[11px] font-normal text-cream-300/85">(+{{ fmtNum(p.bonus_credits) }} tặng lần đầu)</span>
+                </p>
+                <ul class="mt-3 flex-1 space-y-1.5">
+                  <li v-for="(ft, i) in p.features" :key="i" class="flex items-start gap-1.5 text-[12px] text-cream-200">
+                    <StudioIcon name="check" size="h-3.5 w-3.5" class="mt-0.5 shrink-0 text-emerald-400" />{{ ft }}
+                  </li>
+                  <li v-if="!p.features || !p.features.length" class="text-[11px] text-cream-300/75">Chưa khai đặc quyền.</li>
+                </ul>
+                <div class="mt-3 flex flex-wrap gap-1.5 border-t border-ink-700 pt-3 text-[10px] text-cream-300/85">
+                  <span :class="[BADGE, BADGE_TONE.neutral]"><StudioIcon name="image" size="h-3 w-3" /> {{ p.image_credit_cost }} credit/ảnh</span>
+                  <span :class="[BADGE, BADGE_TONE.neutral]"><StudioIcon name="film" size="h-3 w-3" /> {{ p.video_credit_cost }} credit/video</span>
+                  <span :class="[BADGE, BADGE_TONE.neutral]">{{ p.resolution_cap }}</span>
+                  <span :class="[BADGE, BADGE_TONE.neutral]" title="Thứ tự sắp xếp">#{{ p.sort }}</span>
+                </div>
+                <div class="mt-3 flex flex-wrap gap-1.5">
+                  <button class="tool-btn" @click="openEditPlan(p)"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa</button>
+                  <button v-if="p.is_active" class="tool-btn" @click="askTogglePlan(p, false)"><StudioIcon name="eyeOff" size="h-3.5 w-3.5" /> Ẩn gói</button>
+                  <button v-else class="tool-btn" @click="askTogglePlan(p, true)"><StudioIcon name="eye" size="h-3.5 w-3.5" /> Mở bán</button>
+                  <button class="tool-btn !text-red-300 hover:!bg-red-500/15" @click="askDeletePlan(p)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <!-- ───── SỔ CREDIT ───── -->
+          <section v-show="section === 'ledger'" class="space-y-5">
+            <div class="card p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
+                    <StudioIcon name="receipt" size="h-4 w-4" class="text-brand-300" /> Sổ credit
+                    <span :class="[BADGE, BADGE_TONE.neutral]">{{ fmtNum(ledgerData.total) }}</span>
+                  </h2>
+                  <p class="mt-1 max-w-2xl text-xs text-cream-300/75">
+                    Mọi biến động credit (tiêu · hoàn · tặng · điều chỉnh · nạp gói) đều ghi ở đây, kèm người thực hiện.
+                  </p>
+                </div>
+                <span v-if="l.userId" :class="[BADGE, BADGE_TONE.brand]">
+                  <StudioIcon name="filter" size="h-3 w-3" /> đang lọc: {{ l.userName }}
+                  <button class="ml-1 underline" @click="l.userId = null; l.userName = ''; ledgerData.page = 1; loadLedger()">bỏ lọc</button>
+                </span>
+              </div>
+              <form class="mt-4 flex flex-wrap items-center gap-2" @submit.prevent="ledgerData.page = 1; loadLedger()">
+                <div class="relative min-w-[13rem] flex-1">
+                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                  <input v-model="l.search" type="search" aria-label="Tìm theo người dùng" class="input !py-2 !pl-9 text-xs" placeholder="Tìm theo tên hoặc email người dùng…">
+                </div>
+                <select v-model="l.type" aria-label="Lọc theo loại giao dịch" class="input !w-auto !py-2 text-xs" @change="ledgerData.page = 1; loadLedger()">
+                  <option value="">Mọi loại</option>
+                  <option v-for="(m, k) in TYPE_META" :key="k" :value="k">{{ m.label }}</option>
+                </select>
+                <select v-model.number="l.perPage" aria-label="Số dòng mỗi trang" class="input !w-auto !py-2 text-xs" @change="ledgerData.page = 1; loadLedger()">
+                  <option :value="20">20 dòng</option>
+                  <option :value="50">50 dòng</option>
+                  <option :value="100">100 dòng</option>
+                </select>
+                <button type="submit" class="tool-btn"><StudioIcon name="search" size="h-3.5 w-3.5" /> Tìm</button>
+              </form>
+            </div>
+
+            <div class="card overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full min-w-[880px] text-left text-xs">
+                  <thead>
+                    <tr class="border-b border-ink-700 text-cream-300/75">
+                      <th class="px-4 py-3 font-semibold">Thời gian</th>
+                      <th class="px-3 py-3 font-semibold">Người dùng</th>
+                      <th class="px-3 py-3 font-semibold">Loại</th>
+                      <th class="px-3 py-3 text-right font-semibold">Số credit</th>
+                      <th class="px-3 py-3 text-right font-semibold">Số dư sau</th>
+                      <th class="px-3 py-3 font-semibold">Thực hiện bởi</th>
+                      <th class="px-3 py-3 font-semibold">Ghi chú</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-ink-700/60">
+                    <tr v-for="t in ledgerData.transactions" :key="t.id" class="hover:bg-ink-800/50">
+                      <td class="px-4 py-2.5 whitespace-nowrap text-cream-300/85">{{ t.created_at }}</td>
+                      <td class="px-3 py-2.5">
+                        <p class="font-semibold text-cream-50">{{ t.user ? t.user.name : '—' }}</p>
+                        <p v-if="t.user" class="text-[10px] text-cream-300/75">{{ t.user.email }}</p>
+                      </td>
+                      <td class="px-3 py-2.5"><span :class="typeMeta(t.type).cls" class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :title="'type: ' + t.type">{{ t.type_label || typeMeta(t.type).label }}</span></td>
+                      <td class="px-3 py-2.5 text-right font-semibold" :class="t.amount > 0 ? 'text-emerald-300' : 'text-red-300'">{{ t.amount > 0 ? '+' : '' }}{{ fmtNum(t.amount) }}</td>
+                      <td class="px-3 py-2.5 text-right text-cream-200">{{ fmtNum(t.balance_after) }}</td>
+                      <td class="px-3 py-2.5 text-cream-200">
+                        <span v-if="t.admin" class="flex items-center gap-1.5"><StudioIcon name="shieldCheck" size="h-3.5 w-3.5" class="text-gold-400" /> {{ t.admin.name }}</span>
+                        <span v-else class="text-cream-300/75">Hệ thống</span>
+                      </td>
+                      <td class="px-3 py-2.5 text-cream-300/85">{{ t.note || '—' }}</td>
+                    </tr>
+                    <tr v-if="!ledgerData.transactions.length && !loading.ledger">
+                      <td colspan="7" class="px-4 py-10 text-center text-xs text-cream-300/75">
+                        Chưa có giao dịch nào khớp bộ lọc.
+                        <button v-if="l.search || l.type || l.userId" class="ml-1 underline" @click="l.search = ''; l.type = ''; l.userId = null; l.userName = ''; ledgerData.page = 1; loadLedger()">Xoá bộ lọc</button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-2 border-t border-ink-700 px-4 py-3">
+                <span class="text-[11px] text-cream-300/75">{{ pageInfo(ledgerData) }}<span v-if="loading.ledger" class="ml-1">· đang tải…</span></span>
+                <div class="flex gap-1.5">
+                  <button :disabled="!canPrev(ledgerData) || loading.ledger" class="tool-btn" @click="ledgerData.page--; loadLedger()"><StudioIcon name="chevronLeft" size="h-3.5 w-3.5" /> Trước</button>
+                  <button :disabled="!canNext(ledgerData) || loading.ledger" class="tool-btn" @click="ledgerData.page++; loadLedger()">Sau <StudioIcon name="chevronRight" size="h-3.5 w-3.5" /></button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ───── GIAO DIỆN STUDIO ───── -->
+          <section v-show="section === 'gui'" class="space-y-5">
+            <div class="card p-5">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
+                    <StudioIcon name="palette" size="h-4 w-4" class="text-brand-300" /> Thanh công cụ trái của Studio
+                    <span :class="[BADGE, BADGE_TONE.neutral]">{{ guiItems.length }}</span>
+                    <span v-if="guiHiddenCount" :class="[BADGE, BADGE_TONE.warn]">{{ guiHiddenCount }} đang ẩn</span>
+                  </h2>
+                  <p class="mt-1 max-w-2xl text-xs text-cream-300/75">
+                    Đổi thứ tự · nhãn · icon · ẩn/hiện từng mục — áp dụng cho MỌI người dùng Studio.
+                    Không thêm/xoá được mục vì mỗi mục gắn cứng một chức năng trong mã nguồn.
+                  </p>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                  <button class="tool-btn" :disabled="guiSaving" @click="askResetGui()"><StudioIcon name="undo" size="h-3.5 w-3.5" /> Khôi phục mặc định</button>
+                  <button class="btn-brand btn-sm" :disabled="guiSaving || !guiDirty" @click="saveGui()">
+                    <StudioIcon name="save" size="h-3.5 w-3.5" /> {{ guiSaving ? 'Đang lưu…' : 'Lưu thay đổi' }}
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="guiItems.length" class="mt-4 rounded-lg border border-ink-700 bg-ink-900/60 p-3">
+                <p class="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/75">
+                  Xem trước thứ tự &amp; icon
+                  <span v-if="guiDirty" class="text-amber-300">· có thay đổi chưa lưu</span>
+                </p>
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1">
+                  <span v-for="it in guiPreview" :key="it.id"
+                        class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-ink-800 text-brand-200"
+                        :title="it.label + ' (' + it.id + ')'">
+                    <StudioIcon :name="it.icon" size="h-5 w-5" />
+                  </span>
+                  <span v-if="!guiPreview.length" class="text-xs text-cream-300/75">Tất cả mục đang bị ẩn — thanh công cụ sẽ trống.</span>
+                </div>
+              </div>
+
+              <div class="mt-4 flex flex-wrap items-center gap-2">
+                <div class="relative min-w-[13rem] flex-1">
+                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                  <input v-model="guiSearch" type="search" aria-label="Tìm mục" class="input !py-2 !pl-9 text-xs" placeholder="Tìm theo id, nhãn hoặc icon…">
+                </div>
+                <span class="text-[11px] text-cream-300/75">{{ countText(filteredGui.length, guiItems.length, 'mục') }}</span>
+              </div>
+
+              <ul class="mt-3 space-y-2">
+                <li v-for="it in filteredGui" :key="it.id" class="flex flex-wrap items-center gap-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5">
+                  <span class="w-6 shrink-0 text-center text-[10px] font-semibold text-cream-300/75">{{ guiItems.indexOf(it) + 1 }}</span>
+                  <span class="flex shrink-0 gap-1">
+                    <button class="icon-btn" :disabled="guiItems.indexOf(it) === 0 || isGuiPinned(it)" title="Đưa lên" :aria-label="'Đưa ' + it.label + ' lên'" @click="moveGui(it, -1)"><StudioIcon name="chevronUp" size="h-4 w-4" /></button>
+                    <button class="icon-btn" :disabled="guiItems.indexOf(it) === guiItems.length - 1 || isGuiPinned(it)" :title="isGuiPinned(it) ? 'Mục này luôn ở đáy thanh công cụ' : 'Đưa xuống'" :aria-label="'Đưa ' + it.label + ' xuống'" @click="moveGui(it, 1)"><StudioIcon name="chevronDown" size="h-4 w-4" /></button>
+                  </span>
+                  <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-800 text-brand-200" title="Icon hiện tại"><StudioIcon :name="it.icon" size="h-5 w-5" /></span>
+                  <select v-model="it.icon" class="input !w-44 !py-1.5 text-xs" :aria-label="'Icon cho ' + it.label" title="Chọn icon — danh sách lấy từ registry chung">
+                    <option v-for="ic in guiIcons" :key="ic.name" :value="ic.name" :title="ic.note || ic.name">{{ ic.name }}</option>
+                  </select>
+                  <input v-model="it.label" type="text" maxlength="40" class="input !min-w-40 !flex-1 !py-1.5 text-xs" placeholder="Nhãn hiển thị" :aria-label="'Nhãn cho ' + it.id">
+                  <code class="shrink-0 rounded bg-ink-800 px-1.5 py-0.5 text-[10px] text-cream-300/85" title="Id — không đổi được">{{ it.id }}</code>
+                  <span class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" :class="(GUI_KIND[it.kind] || {}).cls || 'bg-ink-700 text-cream-300'" :title="(GUI_KIND[it.kind] || {}).hint || ''">{{ (GUI_KIND[it.kind] || {}).label || it.kind }}</span>
+                  <span v-if="isGuiPinned(it)" :class="[BADGE, BADGE_TONE.info]" title="Luôn nằm ở đáy thanh công cụ">ghim đáy</span>
+                  <label class="flex shrink-0 cursor-pointer items-center gap-1.5 text-[11px] text-cream-200">
+                    <input type="checkbox" v-model="it.visible" class="h-3.5 w-3.5 accent-brand-500"> Hiện
+                  </label>
+                </li>
+                <li v-if="!guiItems.length" class="py-8 text-center text-xs text-cream-300/75">Đang tải cấu hình…</li>
+                <li v-else-if="!filteredGui.length" class="py-8 text-center text-xs text-cream-300/75">
+                  Không có mục nào khớp « {{ guiSearch }} ».
+                  <button class="ml-1 underline" @click="guiSearch = ''">Xoá tìm kiếm</button>
+                </li>
+              </ul>
+
+              <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-ink-700 pt-3">
+                <button class="btn-brand btn-sm" :disabled="guiSaving || !guiDirty" @click="saveGui()">
+                  <StudioIcon name="save" size="h-3.5 w-3.5" /> {{ guiSaving ? 'Đang lưu…' : 'Lưu thay đổi' }}
+                </button>
+                <button class="tool-btn" :disabled="!guiDirty || guiSaving" @click="loadGui()"><StudioIcon name="undo" size="h-3.5 w-3.5" /> Hoàn tác</button>
+                <span v-if="guiDirty" class="flex items-center gap-1.5 text-[11px] text-amber-300"><StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> Có thay đổi chưa lưu</span>
+                <span v-else class="flex items-center gap-1.5 text-[11px] text-cream-300/75"><StudioIcon name="check" size="h-3.5 w-3.5" /> Đã lưu</span>
+              </div>
+            </div>
+
+            <details class="card p-4">
+              <summary class="cursor-pointer text-sm font-semibold text-cream-100">Trợ giúp · Ý nghĩa các loại mục</summary>
+              <div class="mt-2 space-y-1.5 text-[11px] text-cream-300/85">
+                <p v-for="(m, k) in GUI_KIND" :key="k">· <b class="text-cream-100">{{ m.label }}</b> — {{ m.hint }}. Mục «ghim đáy» luôn nằm dưới cùng, không đổi được vị trí.</p>
+                <p>· Nhãn tối đa 40 ký tự. Icon lấy từ registry dùng chung (thêm icon mới = thêm một khoá vào <code class="rounded bg-ink-800 px-1">resources/js/studio/icons.json</code>).</p>
+                <p>· Lưu xong, người dùng Studio thấy thay đổi ở lần tải trang kế tiếp.</p>
+              </div>
+            </details>
+          </section>
+        </main>
       </div>
+    </div>
 
-      <!-- ════════════ USERS ════════════ -->
-      <div v-show="tab==='users'">
-        <div class="card p-4">
-          <div class="flex flex-wrap items-center gap-2">
-            <div class="flex min-w-[220px] flex-1 items-center gap-2">
-              <input v-model="userSearch" @keyup.enter="loadUsers" placeholder="Tìm theo tên / email / SĐT…" class="input !py-2">
-              <select v-model="userRole" @change="loadUsers" class="input w-36 !py-2">
-                <option value="">Mọi vai trò</option>
-                <option value="super_admin">Owner</option>
-                <option value="admin">Quản trị</option>
-                <option value="customer">Khách hàng</option>
-              </select>
-              <select v-model="userStatus" @change="loadUsers" class="input w-36 !py-2">
-                <option value="">Mọi trạng thái</option>
-                <option value="active">Đang hoạt động</option>
-                <option value="inactive">Bị khóa</option>
-              </select>
-              <button @click="loadUsers" class="btn-outline btn-sm">Tìm</button>
-            </div>
-            <button @click="openCreateUser" class="btn-brand btn-sm">➕ Thêm người dùng</button>
+    <!-- ═════════ Hộp thoại: người dùng ═════════ -->
+    <BaseModal :model-value="userModal.open" :title="userModal.mode === 'create' ? 'Thêm người dùng' : 'Sửa người dùng'" @update:model-value="userModal.open = false">
+      <form class="space-y-3" @submit.prevent="saveUser">
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div class="sm:col-span-2">
+            <label class="label" for="u-name">Tên</label>
+            <input id="u-name" v-model="userModal.form.name" class="input !py-2" :class="userModal.errors.name ? '!border-red-500/70' : ''" placeholder="VD: Nguyễn Văn A">
+            <p v-if="userModal.errors.name" class="mt-1 text-[11px] text-red-300">{{ userModal.errors.name }}</p>
           </div>
-        </div>
-
-        <div class="card mt-4 overflow-x-auto">
-          <table class="w-full min-w-[760px] text-left text-xs">
-            <thead>
-              <tr class="border-b border-ink-700 text-cream-300/70">
-                <th class="px-4 py-3 font-semibold">Người dùng</th>
-                <th class="px-3 py-3 font-semibold">Vai trò</th>
-                <th class="px-3 py-3 font-semibold text-right">Credit</th>
-                <th class="px-3 py-3 font-semibold">Gói</th>
-                <th class="px-3 py-3 font-semibold text-right">Ảnh</th>
-                <th class="px-3 py-3 font-semibold">Ngày tạo</th>
-                <th class="px-3 py-3 text-right font-semibold">Hành động</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-ink-800">
-              <tr v-for="u in usersData.users" :key="u.id" class="hover:bg-ink-800/50">
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-2.5">
-                    <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-600/25 text-xs font-bold text-brand-200">{{ (u.name || '?').charAt(0).toUpperCase() }}</span>
-                    <div class="leading-tight">
-                      <p class="font-semibold text-cream-50">{{ u.name }}</p>
-                      <p class="text-[11px] text-cream-300/60">{{ u.email }}</p>
-                    </div>
-                  </div>
-                </td>
-                <td class="px-3 py-3"><span :class="roleMeta(u.role).cls" class="rounded-full px-2 py-0.5 text-[10px] font-semibold">{{ roleMeta(u.role).label }}</span></td>
-                <td class="px-3 py-3 text-right font-semibold text-cream-50">{{ fmtNum(u.credits_balance) }}</td>
-                <td class="px-3 py-3">
-                  <span v-if="u.plan" class="text-cream-200">{{ u.plan.name }}</span>
-                  <span v-else class="text-cream-300/50">—</span>
-                  <span v-if="!u.is_active" class="ml-1 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-red-300">khóa</span>
-                </td>
-                <td class="px-3 py-3 text-right text-cream-200">{{ fmtNum(u.generations_count) }}</td>
-                <td class="px-3 py-3 text-cream-300/70">{{ u.created_at }}</td>
-                <td class="px-3 py-3">
-                  <div class="flex justify-end gap-1">
-                    <button @click="openEditUser(u)" class="icon-btn" title="Sửa">✏️</button>
-                    <button @click="openCredit(u)" class="icon-btn" title="Cộng/trừ credit">💰</button>
-                    <button @click="openResetPwd(u)" class="icon-btn" title="Đặt lại mật khẩu">🔑</button>
-                    <button @click="askDeleteUser(u)" class="icon-btn hover:!bg-red-500/20" title="Xóa">🗑</button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="!usersData.users.length"><td colspan="7" class="px-4 py-8 text-center text-cream-300/50">Không có người dùng nào.</td></tr>
-            </tbody>
-          </table>
-          <div class="flex items-center justify-between border-t border-ink-700 px-4 py-3">
-            <span class="text-[11px] text-cream-300/60">{{ pageInfo(usersData) }}</span>
-            <div class="flex gap-1.5">
-              <button :disabled="!canPrev(usersData)" @click="usersData.page--; loadUsers()" class="btn-outline btn-sm">← Trước</button>
-              <button :disabled="!canNext(usersData)" @click="usersData.page++; loadUsers()" class="btn-outline btn-sm">Sau →</button>
-            </div>
+          <div>
+            <label class="label" for="u-email">Email</label>
+            <input id="u-email" v-model="userModal.form.email" type="email" class="input !py-2" :class="userModal.errors.email ? '!border-red-500/70' : ''" placeholder="email@example.com">
+            <p v-if="userModal.errors.email" class="mt-1 text-[11px] text-red-300">{{ userModal.errors.email }}</p>
           </div>
-        </div>
-      </div>
-
-      <!-- ════════════ PLANS ════════════ -->
-      <div v-show="tab==='plans'">
-        <div class="mb-4 flex items-center justify-between">
-          <p class="text-xs text-cream-300/60">{{ plansData.length }} gói · giá VNĐ, credit theo tháng.</p>
-          <button @click="openCreatePlan" class="btn-brand btn-sm">➕ Thêm gói</button>
-        </div>
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div v-for="p in plansData" :key="p.id" class="card flex flex-col p-5" :class="p.is_active ? '' : 'opacity-60'">
-            <div class="flex items-center justify-between">
-              <h3 class="font-display text-base font-semibold text-cream-50">{{ p.name }}</h3>
-              <span v-if="p.is_default" class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">Mặc định</span>
-              <span v-else-if="!p.is_active" class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] font-semibold text-cream-300/70">Ẩn</span>
-            </div>
-            <p class="mt-0.5 text-xs text-cream-300/60">{{ p.tagline }}</p>
-            <div class="mt-3 flex items-baseline gap-1">
-              <span class="font-display text-3xl font-semibold text-cream-50">{{ fmtVnd(p.price_vnd) }}</span>
-              <span v-if="p.price_vnd > 0" class="text-xs text-cream-300/60">/tháng</span>
-            </div>
-            <p class="mt-2 text-sm font-semibold text-brand-200">{{ fmtNum(p.credits_per_month) }} credit/tháng <span v-if="p.bonus_credits" class="text-cream-300/60">(+{{ fmtNum(p.bonus_credits) }} tặng)</span></p>
-            <ul class="mt-3 flex-1 space-y-1.5">
-              <li v-for="(f, i) in p.features" :key="i" class="flex items-start gap-1.5 text-[12px] text-cream-200"><span class="mt-0.5 text-emerald-400">✓</span>{{ f }}</li>
-            </ul>
-            <div class="mt-4 flex gap-1.5">
-              <button @click="openEditPlan(p)" class="btn-outline btn-sm flex-1">✏️ Sửa</button>
-              <button @click="askDeletePlan(p)" class="btn-outline btn-sm text-red-400">🗑</button>
-            </div>
+          <div>
+            <label class="label" for="u-phone">Số điện thoại</label>
+            <input id="u-phone" v-model="userModal.form.phone" class="input !py-2" placeholder="(tuỳ chọn)">
           </div>
-        </div>
-      </div>
-
-      <!-- ════════════ LEDGER ════════════ -->
-      <div v-show="tab==='ledger'">
-        <div class="card p-4">
-          <div class="flex flex-wrap items-center gap-2">
-            <input v-model="ledgerSearch" @keyup.enter="loadLedger" placeholder="Tìm người dùng…" class="input max-w-xs !py-2">
-            <select v-model="ledgerType" @change="loadLedger" class="input w-44 !py-2">
-              <option value="">Mọi loại</option>
-              <option value="spend">Tiêu credit</option>
-              <option value="refund">Hoàn credit</option>
-              <option value="grant">Tặng credit</option>
-              <option value="adjust">Điều chỉnh</option>
-              <option value="purchase">Nạp gói</option>
-              <option value="renew">Gia hạn</option>
-              <option value="signup">Đăng ký</option>
-            </select>
-            <button @click="loadLedger" class="btn-outline btn-sm">Tìm</button>
-          </div>
-        </div>
-
-        <div class="card mt-4 overflow-x-auto">
-          <table class="w-full min-w-[720px] text-left text-xs">
-            <thead>
-              <tr class="border-b border-ink-700 text-cream-300/70">
-                <th class="px-4 py-3 font-semibold">Thời gian</th>
-                <th class="px-3 py-3 font-semibold">Người dùng</th>
-                <th class="px-3 py-3 font-semibold">Loại</th>
-                <th class="px-3 py-3 text-right font-semibold">Số credit</th>
-                <th class="px-3 py-3 text-right font-semibold">Số dư sau</th>
-                <th class="px-3 py-3 font-semibold">Ghi chú</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-ink-800">
-              <tr v-for="t in ledgerData.transactions" :key="t.id" class="hover:bg-ink-800/50">
-                <td class="px-4 py-2.5 whitespace-nowrap text-cream-300/70">{{ t.created_at }}</td>
-                <td class="px-3 py-2.5 font-semibold text-cream-50">{{ t.user ? t.user.name : '—' }}</td>
-                <td class="px-3 py-2.5"><span :class="typeMeta(t.type).cls" class="rounded-full px-2 py-0.5 text-[10px] font-semibold">{{ typeMeta(t.type).label }}</span></td>
-                <td class="px-3 py-2.5 text-right font-semibold" :class="t.amount > 0 ? 'text-emerald-300' : 'text-red-300'">{{ t.amount > 0 ? '+' : '' }}{{ fmtNum(t.amount) }}</td>
-                <td class="px-3 py-2.5 text-right text-cream-200">{{ fmtNum(t.balance_after) }}</td>
-                <td class="px-3 py-2.5 text-cream-300/70">{{ t.note }}</td>
-              </tr>
-              <tr v-if="!ledgerData.transactions.length"><td colspan="6" class="px-4 py-8 text-center text-cream-300/50">Chưa có giao dịch nào.</td></tr>
-            </tbody>
-          </table>
-          <div class="flex items-center justify-between border-t border-ink-700 px-4 py-3">
-            <span class="text-[11px] text-cream-300/60">{{ pageInfo(ledgerData) }}</span>
-            <div class="flex gap-1.5">
-              <button :disabled="!canPrev(ledgerData)" @click="ledgerData.page--; loadLedger()" class="btn-outline btn-sm">← Trước</button>
-              <button :disabled="!canNext(ledgerData)" @click="ledgerData.page++; loadLedger()" class="btn-outline btn-sm">Sau →</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-
-    <!-- ════════════ MODAL: create/edit user ════════════ -->
-    <div v-if="userModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-label="Người dùng">
-      <div class="card w-full max-w-lg p-5">
-        <h3 class="font-display text-base font-semibold text-cream-50">{{ userModal.mode === 'create' ? 'Thêm người dùng' : 'Sửa người dùng' }}</h3>
-        <div class="mt-4 grid grid-cols-2 gap-3">
-          <div class="col-span-2"><label class="label">Tên</label><input v-model="userForm.name" class="input !py-2"></div>
-          <div class="col-span-2"><label class="label">Email</label><input v-model="userForm.email" type="email" class="input !py-2"></div>
-          <div><label class="label">SĐT</label><input v-model="userForm.phone" class="input !py-2"></div>
-          <div><label class="label">Vai trò</label>
-            <select v-model="userForm.role" class="input !py-2">
+          <div>
+            <label class="label" for="u-role">Vai trò</label>
+            <select id="u-role" v-model="userModal.form.role" class="input !py-2" :class="userModal.errors.role ? '!border-red-500/70' : ''">
               <option value="customer">Khách hàng</option>
               <option value="admin">Quản trị</option>
-              <option value="super_admin">Owner</option>
+              <option value="super_admin">Owner (super admin)</option>
             </select>
+            <p v-if="userModal.errors.role" class="mt-1 text-[11px] text-red-300">{{ userModal.errors.role }}</p>
           </div>
-          <div v-if="userModal.mode === 'create'"><label class="label">Mật khẩu</label><input v-model="userForm.password" type="password" autocomplete="new-password" class="input !py-2"></div>
-          <div><label class="label">Gói cước</label>
-            <select v-model="userForm.plan_id" class="input !py-2">
+          <div>
+            <label class="label" for="u-plan">Gói cước</label>
+            <select id="u-plan" v-model="userModal.form.plan_id" class="input !py-2">
               <option value="">— Không gán —</option>
               <option v-for="p in plansData" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
           </div>
-          <label class="col-span-2 flex items-center gap-2 text-sm text-cream-200"><input type="checkbox" v-model="userForm.is_active" class="h-4 w-4 accent-brand-500"> Tài khoản đang hoạt động</label>
-        </div>
-        <div class="mt-4 flex justify-end gap-2">
-          <button @click="userModal = null" class="btn-ghost btn-sm">Hủy</button>
-          <button @click="saveUser" class="btn-brand btn-sm">💾 Lưu</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ════════════ TAB: Giao diện — thanh công cụ TRÁI của Studio ════════════ -->
-    <div v-show="tab==='gui'">
-      <div class="card p-4">
-        <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <h2 class="font-display text-base font-semibold text-cream-50">🎨 Thanh công cụ trái của Studio</h2>
-          <div class="flex gap-2">
-            <button @click="resetGui" class="btn-ghost btn-sm">↺ Khôi phục mặc định</button>
-            <button @click="saveGui" :disabled="guiSaving" class="btn-brand btn-sm">{{ guiSaving ? 'Đang lưu…' : '💾 Lưu' }}</button>
+          <div v-if="userModal.mode === 'create'" class="sm:col-span-2">
+            <label class="label" for="u-pwd">Mật khẩu (tối thiểu 8 ký tự)</label>
+            <input id="u-pwd" v-model="userModal.form.password" type="password" autocomplete="new-password" class="input !py-2 font-mono text-xs" :class="userModal.errors.password ? '!border-red-500/70' : ''">
+            <p v-if="userModal.errors.password" class="mt-1 text-[11px] text-red-300">{{ userModal.errors.password }}</p>
           </div>
         </div>
-        <p class="mb-4 text-xs leading-relaxed text-cream-300/60">
-          Đổi <b class="text-cream-200">thứ tự</b> · <b class="text-cream-200">nhãn</b> · <b class="text-cream-200">icon</b> · <b class="text-cream-200">ẩn/hiện</b> từng mục — áp dụng cho MỌI người dùng Studio.
-          Danh sách này gồm <b class="text-cream-200">toàn bộ nút trên thanh công cụ trái</b>: nhóm card
-          (<span class="text-brand-200">Nhóm card</span>), nút mở popup như Prompt Tạo Ảnh · Trợ lý thiết kế
-          (<span class="text-amber-200">Popup</span>) và menu Cài đặt (<span class="text-cream-300">ghim đáy</span>).
-          Không thêm/xoá được mục vì mỗi mục gắn cứng một chức năng có sẵn trong code.
+        <div>
+          <label class="flex items-center gap-2 text-xs text-cream-200">
+            <input type="checkbox" v-model="userModal.form.is_active" class="h-4 w-4 accent-brand-500"> Tài khoản đang hoạt động
+          </label>
+          <p v-if="userModal.errors.is_active" class="mt-1 text-[11px] text-red-300">{{ userModal.errors.is_active }}</p>
+        </div>
+        <div class="flex items-center justify-end gap-2 border-t border-ink-700 pt-3">
+          <button type="button" class="tool-btn" @click="userModal.open = false">Huỷ</button>
+          <button type="submit" class="btn-brand btn-sm" :disabled="userModal.saving">
+            <StudioIcon name="save" size="h-3.5 w-3.5" /> {{ userModal.saving ? 'Đang lưu…' : (userModal.mode === 'create' ? 'Tạo người dùng' : 'Lưu thay đổi') }}
+          </button>
+        </div>
+      </form>
+    </BaseModal>
+
+    <!-- ═════════ Hộp thoại: cộng/trừ credit ═════════ -->
+    <BaseModal :model-value="creditModal.open" title="Điều chỉnh credit" @update:model-value="creditModal.open = false">
+      <form class="space-y-3" @submit.prevent="saveCredit">
+        <p v-if="creditModal.row" class="rounded-lg border border-ink-700 bg-ink-900/60 p-2.5 text-xs text-cream-200">
+          {{ creditModal.row.name }} · {{ creditModal.row.email }}<br>
+          Số dư hiện tại: <b class="text-cream-50">{{ fmtNum(creditModal.row.credits_balance) }}</b>
         </p>
-
-        <!-- Xem trước đúng thứ tự & icon sẽ hiện trên thanh công cụ -->
-        <div class="mb-4 rounded-lg border border-ink-700 bg-ink-900 p-3">
-          <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">Xem trước</p>
-          <div class="flex items-center gap-1.5 overflow-x-auto">
-            <div v-for="it in guiPreview" :key="it.id" class="grid h-10 w-10 shrink-0 place-items-center rounded-lg" :class="it.visible ? 'bg-ink-800 text-brand-200' : 'bg-ink-800/40 text-cream-300/25'" :title="it.label">
-              <StudioIcon :name="it.icon" size="h-5 w-5" />
-            </div>
-            <span v-if="!guiPreview.length" class="text-xs text-cream-300/50">Chưa có mục nào được hiện.</span>
-          </div>
+        <div>
+          <label class="label" for="c-amount">Số credit (dương = cộng, âm = trừ)</label>
+          <input id="c-amount" v-model.number="creditModal.form.amount" type="number" step="1" class="input !py-2" :class="creditModal.errors.amount ? '!border-red-500/70' : ''" placeholder="vd: 500 hoặc -100">
+          <p v-if="creditModal.errors.amount" class="mt-1 text-[11px] text-red-300">{{ creditModal.errors.amount }}</p>
         </div>
+        <div>
+          <label class="label" for="c-note">Ghi chú</label>
+          <input id="c-note" v-model="creditModal.form.note" class="input !py-2" placeholder="Lý do điều chỉnh (hiện trong Sổ credit)">
+        </div>
+        <p class="text-[11px] text-cream-300/75">Giao dịch được ghi vào Sổ credit kèm tên bạn là người thực hiện.</p>
+        <div class="flex items-center justify-end gap-2 border-t border-ink-700 pt-3">
+          <button type="button" class="tool-btn" @click="creditModal.open = false">Huỷ</button>
+          <button type="submit" class="btn-brand btn-sm" :disabled="creditModal.saving">
+            <StudioIcon name="save" size="h-3.5 w-3.5" /> {{ creditModal.saving ? 'Đang áp dụng…' : 'Áp dụng' }}
+          </button>
+        </div>
+      </form>
+    </BaseModal>
 
-        <div class="space-y-2">
-          <div v-for="(it, i) in guiItems" :key="it.id" class="flex flex-wrap items-center gap-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5">
-            <span class="w-6 shrink-0 text-center text-[10px] font-semibold text-cream-300/40">{{ i + 1 }}</span>
-            <div class="flex shrink-0 gap-1">
-              <button @click="moveGui(i, -1)" :disabled="i === 0 || isGuiPinned(it)" class="grid h-7 w-7 place-items-center rounded-md bg-ink-700 text-cream-200 transition hover:bg-ink-600 disabled:opacity-30" title="Đưa lên" aria-label="Đưa lên">▲</button>
-              <button @click="moveGui(i, 1)" :disabled="i === guiItems.length - 1 || isGuiPinned(it)" class="grid h-7 w-7 place-items-center rounded-md bg-ink-700 text-cream-200 transition hover:bg-ink-600 disabled:opacity-30" :title="isGuiPinned(it) ? 'Mục này luôn ở đáy' : 'Đưa xuống'" aria-label="Đưa xuống">▼</button>
-            </div>
-            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-800 text-brand-200" title="Xem trước icon"><StudioIcon :name="it.icon" size="h-5 w-5" /></span>
-            <select v-model="it.icon" class="input !w-40 !py-1.5 text-xs" aria-label="Icon" title="Chọn icon — danh sách lấy từ registry chung">
-              <option v-for="ic in guiIcons" :key="ic.name" :value="ic.name" :title="ic.note || ic.name">{{ ic.name }}</option>
+    <!-- ═════════ Hộp thoại: đặt lại mật khẩu ═════════ -->
+    <BaseModal :model-value="pwdModal.open" title="Đặt lại mật khẩu" @update:model-value="pwdModal.open = false">
+      <form class="space-y-3" @submit.prevent="savePwd">
+        <p v-if="pwdModal.row" class="text-xs text-cream-200">Đặt mật khẩu mới cho <b class="text-cream-50">{{ pwdModal.row.name }}</b> ({{ pwdModal.row.email }}).</p>
+        <div>
+          <label class="label" for="p-pwd">Mật khẩu mới (tối thiểu 8 ký tự)</label>
+          <input id="p-pwd" v-model="pwdModal.form.password" type="password" autocomplete="new-password" class="input !py-2 font-mono text-xs" :class="pwdModal.errors.password ? '!border-red-500/70' : ''">
+          <p v-if="pwdModal.errors.password" class="mt-1 text-[11px] text-red-300">{{ pwdModal.errors.password }}</p>
+        </div>
+        <div class="flex items-center justify-end gap-2 border-t border-ink-700 pt-3">
+          <button type="button" class="tool-btn" @click="pwdModal.open = false">Huỷ</button>
+          <button type="submit" class="btn-brand btn-sm" :disabled="pwdModal.saving">
+            <StudioIcon name="key" size="h-3.5 w-3.5" /> {{ pwdModal.saving ? 'Đang đặt…' : 'Đặt lại mật khẩu' }}
+          </button>
+        </div>
+      </form>
+    </BaseModal>
+
+    <!-- ═════════ Hộp thoại: gói cước ═════════ -->
+    <BaseModal :model-value="planModal.open" :title="planModal.mode === 'create' ? 'Thêm gói cước' : 'Sửa gói cước'" wide @update:model-value="planModal.open = false">
+      <form class="space-y-3" @submit.prevent="savePlan">
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="label" for="pl-name">Tên gói</label>
+            <input id="pl-name" v-model="planModal.form.name" class="input !py-2" :class="planModal.errors.name ? '!border-red-500/70' : ''" placeholder="VD: Chuyên nghiệp">
+            <p v-if="planModal.errors.name" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.name }}</p>
+          </div>
+          <div>
+            <label class="label" for="pl-slug">Slug</label>
+            <input id="pl-slug" v-model="planModal.form.slug" class="input !py-2 font-mono text-xs" :class="planModal.errors.slug ? '!border-red-500/70' : ''" placeholder="vd: pro">
+            <p v-if="planModal.errors.slug" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.slug }}</p>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="label" for="pl-tagline">Mô tả ngắn (tagline)</label>
+            <input id="pl-tagline" v-model="planModal.form.tagline" class="input !py-2" placeholder="Hiện trên trang giá">
+          </div>
+          <div>
+            <label class="label" for="pl-price">Giá VNĐ / tháng (0 = miễn phí)</label>
+            <input id="pl-price" v-model.number="planModal.form.price_vnd" type="number" min="0" class="input !py-2" :class="planModal.errors.price_vnd ? '!border-red-500/70' : ''">
+            <p v-if="planModal.errors.price_vnd" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.price_vnd }}</p>
+          </div>
+          <div>
+            <label class="label" for="pl-credits">Credit / tháng</label>
+            <input id="pl-credits" v-model.number="planModal.form.credits_per_month" type="number" min="0" class="input !py-2" :class="planModal.errors.credits_per_month ? '!border-red-500/70' : ''">
+            <p v-if="planModal.errors.credits_per_month" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.credits_per_month }}</p>
+          </div>
+          <div>
+            <label class="label" for="pl-bonus">Credit tặng lần đầu</label>
+            <input id="pl-bonus" v-model.number="planModal.form.bonus_credits" type="number" min="0" class="input !py-2">
+          </div>
+          <div>
+            <label class="label" for="pl-res">Độ phân giải tối đa</label>
+            <select id="pl-res" v-model="planModal.form.resolution_cap" class="input !py-2">
+              <option value="1K">1K</option>
+              <option value="2K">2K</option>
             </select>
-            <input v-model="it.label" type="text" maxlength="40" class="input !min-w-40 !flex-1 !py-1.5 text-xs" placeholder="Nhãn hiển thị" aria-label="Nhãn">
-            <span class="shrink-0 rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[10px] text-cream-300/50" title="Id — không đổi được">{{ it.id }}</span>
-            <span class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" :class="it.kind === 'panel' ? 'bg-brand-600/25 text-brand-200' : it.kind === 'action' ? 'bg-amber-500/20 text-amber-200' : 'bg-ink-700 text-cream-300/70'" :title="GUI_KIND[it.kind]?.hint || ''">{{ GUI_KIND[it.kind]?.label || it.kind }}</span>
-            <label class="flex shrink-0 cursor-pointer items-center gap-1.5 text-[11px] text-cream-200">
-              <input type="checkbox" v-model="it.visible" class="h-3.5 w-3.5 accent-brand-500"> Hiện
-            </label>
+          </div>
+          <div>
+            <label class="label" for="pl-img">Credit / ảnh</label>
+            <input id="pl-img" v-model.number="planModal.form.image_credit_cost" type="number" min="1" class="input !py-2" :class="planModal.errors.image_credit_cost ? '!border-red-500/70' : ''">
+            <p v-if="planModal.errors.image_credit_cost" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.image_credit_cost }}</p>
+          </div>
+          <div>
+            <label class="label" for="pl-vid">Credit / video</label>
+            <input id="pl-vid" v-model.number="planModal.form.video_credit_cost" type="number" min="1" class="input !py-2" :class="planModal.errors.video_credit_cost ? '!border-red-500/70' : ''">
+            <p v-if="planModal.errors.video_credit_cost" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.video_credit_cost }}</p>
+          </div>
+          <div>
+            <label class="label" for="pl-sort">Thứ tự hiển thị</label>
+            <input id="pl-sort" v-model.number="planModal.form.sort" type="number" min="0" class="input !py-2">
           </div>
         </div>
-        <p v-if="!guiItems.length" class="py-8 text-center text-xs text-cream-300/50">Đang tải cấu hình…</p>
-      </div>
-    </div>
-    <!-- ════════════ MODAL: credit adjust ════════════ -->
-    <div v-if="creditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-label="Điều chỉnh credit">
-      <div class="card w-full max-w-sm p-5">
-        <h3 class="font-display text-base font-semibold text-cream-50">Điều chỉnh credit</h3>
-        <p class="mt-1 text-xs text-cream-300/60">{{ creditModal.user.name }} · số dư <b class="text-cream-100">{{ fmtNum(creditModal.user.credits_balance) }}</b></p>
-        <div class="mt-4 space-y-3">
-          <div><label class="label">Số credit (dương = cộng, âm = trừ)</label><input v-model.number="creditForm.amount" type="number" step="1" class="input !py-2" placeholder="vd: 500 hoặc -100"></div>
-          <div><label class="label">Ghi chú</label><input v-model="creditForm.note" class="input !py-2" placeholder="Lý do điều chỉnh (tùy chọn)"></div>
-        </div>
-        <div class="mt-4 flex justify-end gap-2">
-          <button @click="creditModal = null" class="btn-ghost btn-sm">Hủy</button>
-          <button @click="saveCredit" class="btn-brand btn-sm">💾 Áp dụng</button>
-        </div>
-      </div>
-    </div>
 
-    <!-- ════════════ MODAL: reset password ════════════ -->
-    <div v-if="pwdModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-label="Đặt lại mật khẩu">
-      <div class="card w-full max-w-sm p-5">
-        <h3 class="font-display text-base font-semibold text-cream-50">Đặt lại mật khẩu</h3>
-        <p class="mt-1 text-xs text-cream-300/60">{{ pwdModal.user.name }}</p>
-        <div class="mt-4"><label class="label">Mật khẩu mới</label><input v-model="pwdForm.password" type="password" autocomplete="new-password" class="input !py-2"></div>
-        <div class="mt-4 flex justify-end gap-2">
-          <button @click="pwdModal = null" class="btn-ghost btn-sm">Hủy</button>
-          <button @click="saveResetPwd" class="btn-brand btn-sm">🔑 Đặt lại</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ════════════ MODAL: create/edit plan ════════════ -->
-    <div v-if="planModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-label="Gói cước">
-      <div class="card max-h-[90vh] w-full max-w-xl overflow-y-auto p-5">
-        <h3 class="font-display text-base font-semibold text-cream-50">{{ planModal.mode === 'create' ? 'Thêm gói cước' : 'Sửa gói cước' }}</h3>
-        <div class="mt-4 grid grid-cols-2 gap-3">
-          <div><label class="label">Tên gói</label><input v-model="planForm.name" class="input !py-2"></div>
-          <div><label class="label">Slug</label><input v-model="planForm.slug" class="input !py-2" placeholder="vd: pro"></div>
-          <div class="col-span-2"><label class="label">Tagline</label><input v-model="planForm.tagline" class="input !py-2"></div>
-          <div><label class="label">Giá VNĐ/tháng (0 = miễn phí)</label><input v-model.number="planForm.price_vnd" type="number" min="0" class="input !py-2"></div>
-          <div><label class="label">Credit / tháng</label><input v-model.number="planForm.credits_per_month" type="number" min="0" class="input !py-2"></div>
-          <div><label class="label">Credit tặng lần đầu</label><input v-model.number="planForm.bonus_credits" type="number" min="0" class="input !py-2"></div>
-          <div><label class="label">Độ phân giải</label>
-            <select v-model="planForm.resolution_cap" class="input !py-2"><option value="1K">1K</option><option value="2K">2K</option></select>
+        <div>
+          <label class="label" for="pl-feature">Đặc quyền (Enter để thêm từng mục)</label>
+          <div class="flex gap-2">
+            <input id="pl-feature" v-model="planModal.featureText" class="input flex-1 !py-2" placeholder="VD: Tạo ảnh 2K không giới hạn" @keyup.enter.prevent="addFeature">
+            <button type="button" class="tool-btn" @click="addFeature"><StudioIcon name="plus" size="h-3.5 w-3.5" /> Thêm</button>
           </div>
-          <div><label class="label">Credit / ảnh</label><input v-model.number="planForm.image_credit_cost" type="number" min="1" class="input !py-2"></div>
-          <div><label class="label">Credit / video</label><input v-model.number="planForm.video_credit_cost" type="number" min="1" class="input !py-2"></div>
-          <div><label class="label">Thứ tự</label><input v-model.number="planForm.sort" type="number" min="0" class="input !py-2"></div>
-          <div class="col-span-2">
-            <label class="label">Đặc quyền (mỗi dòng một mục)</label>
-            <div class="flex gap-2">
-              <input v-model="featureText" @keyup.enter.prevent="addFeature" class="input flex-1 !py-2" placeholder="Nhập đặc quyền rồi Enter">
-              <button @click="addFeature" class="btn-outline btn-sm">Thêm</button>
-            </div>
-            <div class="mt-2 flex flex-wrap gap-1.5">
-              <span v-for="(f, i) in planForm.features" :key="i" class="inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-1 text-[11px] text-cream-100">{{ f }} <button @click="removeFeature(i)" class="text-cream-300/60 hover:text-red-300">✕</button></span>
-            </div>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <span v-for="(ft, i) in planModal.form.features" :key="i" class="inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-1 text-[11px] text-cream-100">
+              {{ ft }}
+              <button type="button" class="text-cream-300/85 hover:text-red-300" :aria-label="'Xoá đặc quyền ' + ft" @click="removeFeature(i)"><StudioIcon name="x" size="h-3 w-3" /></button>
+            </span>
+            <span v-if="!planModal.form.features.length" class="text-[11px] text-cream-300/75">Chưa có đặc quyền nào.</span>
           </div>
-          <label class="flex items-center gap-2 text-sm text-cream-200"><input type="checkbox" v-model="planForm.is_active" class="h-4 w-4 accent-brand-500"> Đang mở bán</label>
-          <label class="flex items-center gap-2 text-sm text-cream-200"><input type="checkbox" v-model="planForm.is_default" class="h-4 w-4 accent-brand-500"> Gói mặc định</label>
         </div>
-        <div class="mt-4 flex justify-end gap-2">
-          <button @click="planModal = null" class="btn-ghost btn-sm">Hủy</button>
-          <button @click="savePlan" class="btn-brand btn-sm">💾 Lưu</button>
-        </div>
-      </div>
-    </div>
 
-    <!-- ════════════ MODAL: confirm delete user ════════════ -->
-    <div v-if="deleteUserTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-label="Xác nhận xóa">
-      <div class="card w-full max-w-sm p-5">
-        <h3 class="font-display text-base font-semibold text-red-300">Xóa người dùng?</h3>
-        <p class="mt-2 text-sm text-cream-200">Xóa <b>{{ deleteUserTarget.name }}</b> ({{ deleteUserTarget.email }}) sẽ mất toàn bộ dự án, ảnh và lịch sử credit. Hành động này không thể hoàn tác.</p>
-        <div class="mt-4 flex justify-end gap-2">
-          <button @click="deleteUserTarget = null" class="btn-ghost btn-sm">Hủy</button>
-          <button @click="confirmDeleteUser" class="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700">🗑 Xóa vĩnh viễn</button>
+        <div class="flex flex-wrap gap-4">
+          <label class="flex items-center gap-2 text-xs text-cream-200"><input type="checkbox" v-model="planModal.form.is_active" class="h-4 w-4 accent-brand-500"> Đang mở bán</label>
+          <label class="flex items-center gap-2 text-xs text-cream-200"><input type="checkbox" v-model="planModal.form.is_default" class="h-4 w-4 accent-brand-500"> Gói mặc định cho tài khoản mới</label>
         </div>
-      </div>
-    </div>
+        <p class="text-[11px] text-cream-300/75">Đặt gói này làm mặc định sẽ tự bỏ mặc định ở gói khác.</p>
 
-    <!-- ════════════ MODAL: confirm delete plan ════════════ -->
-    <div v-if="deletePlanTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-label="Xác nhận xóa gói">
-      <div class="card w-full max-w-sm p-5">
-        <h3 class="font-display text-base font-semibold text-red-300">Xóa gói cước?</h3>
-        <p class="mt-2 text-sm text-cream-200">Xóa gói <b>{{ deletePlanTarget.name }}</b>. Gói đang có người dùng sẽ không thể xóa — hãy ẩn gói thay vì xóa.</p>
-        <div class="mt-4 flex justify-end gap-2">
-          <button @click="deletePlanTarget = null" class="btn-ghost btn-sm">Hủy</button>
-          <button @click="confirmDeletePlan" class="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700">🗑 Xóa</button>
+        <div class="flex items-center justify-end gap-2 border-t border-ink-700 pt-3">
+          <button type="button" class="tool-btn" @click="planModal.open = false">Huỷ</button>
+          <button type="submit" class="btn-brand btn-sm" :disabled="planModal.saving">
+            <StudioIcon name="save" size="h-3.5 w-3.5" /> {{ planModal.saving ? 'Đang lưu…' : (planModal.mode === 'create' ? 'Tạo gói' : 'Lưu thay đổi') }}
+          </button>
         </div>
+      </form>
+    </BaseModal>
+
+    <!-- ═════════ Hộp thoại: xác nhận ═════════ -->
+    <BaseModal :model-value="confirmBox.open" :title="confirmBox.title" @update:model-value="confirmBox.open = false">
+      <p class="text-xs leading-relaxed text-cream-200">{{ confirmBox.message }}</p>
+      <div class="mt-4 flex items-center justify-end gap-2 border-t border-ink-700 pt-3">
+        <button class="tool-btn" @click="confirmBox.open = false">Huỷ</button>
+        <button class="btn-sm inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-500 disabled:opacity-60"
+                :disabled="confirmBox.busy" @click="confirmRun">
+          <StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> {{ confirmBox.busy ? 'Đang xử lý…' : confirmBox.label }}
+        </button>
       </div>
-    </div>
+    </BaseModal>
   </div>
 </template>
 
 <style scoped>
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .fade-enter-active, .fade-leave-active { transition: none; }
+}
 </style>
+
