@@ -29,11 +29,14 @@ class UpgradeRequest extends Model
 
     public const STATUSES = [self::STATUS_PENDING, self::STATUS_CONTACTED, self::STATUS_ACTIVATED, self::STATUS_CANCELLED];
 
-    /** Số tháng cho phép: 1 tháng · 1 vụ (3) · nửa năm (6) · cả năm (12). */
+    /**
+     * Mốc mua mặc định khi gói KHÔNG khai báo gì: 1 tháng · 1 vụ (3) · nửa năm (6) · cả năm (12).
+     * Gói theo vụ (Q3) khai báo {{B}}plans.units{{B}} = [1,2,4] (số VỤ) và dùng đúng danh sách đó.
+     */
     public const MONTHS = [1, 3, 6, 12];
 
     protected $fillable = [
-        'code', 'user_id', 'plan_id', 'months', 'amount_vnd', 'method',
+        'code', 'user_id', 'plan_id', 'months', 'units', 'amount_vnd', 'method',
         'contact_name', 'contact_phone', 'note', 'status', 'handled_by', 'handled_at', 'admin_note',
     ];
 
@@ -41,6 +44,7 @@ class UpgradeRequest extends Model
     {
         return [
             'months' => 'integer',
+            'units' => 'integer',
             'amount_vnd' => 'integer',
             'handled_at' => 'datetime',
         ];

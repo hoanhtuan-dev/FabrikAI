@@ -304,6 +304,8 @@ class AdminController extends Controller
                 'user' => $r->user ? ['id' => $r->user->id, 'name' => $r->user->name, 'email' => $r->user->email] : null,
                 'plan' => $r->plan ? ['id' => $r->plan->id, 'name' => $r->plan->name, 'slug' => $r->plan->slug] : null,
                 'months' => $r->months,
+                'units' => $r->units,
+                'unit_label' => $r->plan ? $r->plan->unitLabel() : 'tháng',
                 'amount_vnd' => $r->amount_vnd,
                 'amount_label' => $r->amountLabel(),
                 'method' => $r->method,
@@ -403,10 +405,11 @@ class AdminController extends Controller
             return response()->json(['message' => 'Không tìm thấy tài khoản của yêu cầu này.', 'code' => 'user_missing'], 422);
         }
 
+        // [Q3] Số ĐƠN VỊ khách đã mua (tháng với gói tháng, VỤ với gói xưởng) — hạn gói do gói quyết định.
         app(PlanService::class)->assign(
             $user,
             $plan,
-            (int) $upgradeRequest->months,
+            max(1, (int) $upgradeRequest->units),
             'Kích hoạt theo yêu cầu '.$upgradeRequest->code.' ('.$upgradeRequest->methodLabel().')'
         );
 
@@ -425,9 +428,11 @@ class AdminController extends Controller
             'user' => ['id' => $fresh->id, 'name' => $fresh->name, 'email' => $fresh->email],
             'plan' => ['id' => $plan->id, 'name' => $plan->name],
             'months' => (int) $upgradeRequest->months,
+            'units' => (int) $upgradeRequest->units,
             'plan_expires_at' => $fresh->plan_expires_at?->format('d/m/Y'),
             'credits_balance' => (int) $fresh->credits_balance,
-            'message' => 'Đã kích hoạt gói '.$plan->name.' cho '.$fresh->name.' ('.$upgradeRequest->months.' tháng).',
+            'message' => 'Đã kích hoạt gói '.$plan->name.' cho '.$fresh->name.' ('
+                .(int) $upgradeRequest->units.' '.$plan->unitLabel().').',
         ]);
     }
 

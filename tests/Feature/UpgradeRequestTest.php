@@ -51,7 +51,7 @@ class UpgradeRequestTest extends TestCase
     {
         return array_merge([
             'plan_id' => $this->plan('pro')->id,
-            'months' => 1,
+            'units' => 1,
             'method' => UpgradeRequest::METHOD_BANK,
             'contact_name' => 'Chị Hương',
             'contact_phone' => '0901 234 567',
@@ -97,7 +97,7 @@ class UpgradeRequestTest extends TestCase
         $u = $this->customer();
         $pro = $this->plan('pro');
 
-        $res = $this->actingAs($u)->postJson('/api/billing/upgrade-request', $this->payload(['months' => 3]))
+        $res = $this->actingAs($u)->postJson('/api/billing/upgrade-request', $this->payload(['units' => 3]))
             ->assertStatus(201);
 
         $res->assertJsonPath('ok', true)
@@ -111,6 +111,8 @@ class UpgradeRequestTest extends TestCase
         $this->assertMatchesRegularExpression('/^UP-\d{4}-\d{4}$/', $row->code, 'Mã theo dõi phải đọc được qua điện thoại.');
         $this->assertSame($u->id, $row->user_id);
         $this->assertSame($pro->id, $row->plan_id);
+        $this->assertSame(3, $row->units);
+        $this->assertSame(3, $row->months, 'Gói theo tháng: 3 đơn vị = 3 tháng.');
         $this->assertSame((int) $pro->price_vnd * 3, $row->amount_vnd, 'Số tiền chốt tại thời điểm gửi (giá có thể đổi sau).');
         $this->assertSame('0901234567', $row->contact_phone, 'SĐT được chuẩn hoá bỏ khoảng trắng.');
         $this->assertSame('Chị Hương', $row->contact_name);
@@ -140,7 +142,7 @@ class UpgradeRequestTest extends TestCase
         $this->actingAs($u)->postJson('/api/billing/upgrade-request', $this->payload(['plan_id' => $this->plan('free')->id]))
             ->assertStatus(422)->assertJsonPath('code', 'plan_is_free');
 
-        $this->actingAs($u)->postJson('/api/billing/upgrade-request', $this->payload(['months' => 2]))
+        $this->actingAs($u)->postJson('/api/billing/upgrade-request', $this->payload(['units' => 2]))
             ->assertStatus(422);
 
         $this->actingAs($u)->postJson('/api/billing/upgrade-request', $this->payload(['method' => 'bitcoin']))
@@ -149,7 +151,7 @@ class UpgradeRequestTest extends TestCase
         $this->actingAs($u)->postJson('/api/billing/upgrade-request', $this->payload(['contact_phone' => '123']))
             ->assertStatus(422)->assertJsonPath('code', 'phone_invalid');
 
-        $this->actingAs($u)->postJson('/api/billing/upgrade-request', $this->payload(['months' => 12, 'contact_phone' => '+84 901 234 567']))
+        $this->actingAs($u)->postJson('/api/billing/upgrade-request', $this->payload(['units' => 12, 'contact_phone' => '+84 901 234 567']))
             ->assertStatus(422);
 
         $this->assertSame(0, UpgradeRequest::count(), 'Dữ liệu sai thì không được tạo yêu cầu nào.');
@@ -193,7 +195,7 @@ class UpgradeRequestTest extends TestCase
         $pro = $this->plan('pro');
         $before = (int) $u->credits_balance;
 
-        $this->actingAs($u)->postJson('/api/billing/upgrade-request', $this->payload(['months' => 3]))->assertStatus(201);
+        $this->actingAs($u)->postJson('/api/billing/upgrade-request', $this->payload(['units' => 3]))->assertStatus(201);
         $row = UpgradeRequest::firstOrFail();
 
         $res = $this->actingAs($this->superAdmin())

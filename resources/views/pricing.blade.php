@@ -142,11 +142,14 @@
                         <p class="mt-1 min-h-[2.25rem] text-xs text-cream-300">{{ $plan->tagline }}</p>
                     @endif
                     <p class="mt-3 font-display text-3xl font-semibold text-cream-50">{{ $plan->priceLabel() }}</p>
-                    <p class="text-[11px] text-cream-300">{{ $plan->isFree() ? 'không giới hạn thời gian' : 'mỗi tháng' }}</p>
+                    {{-- [Q3] Gói xưởng bán theo VỤ (3 tháng), không phải theo tháng: nhãn phải nói đúng. --}}
+                    <p class="text-[11px] text-cream-300">
+                        {{ $plan->isFree() ? 'không giới hạn thời gian' : ('mỗi '.$plan->unitLabel().($plan->isSeasonal() ? ' ('.$plan->unitMonths().' tháng)' : '')) }}
+                    </p>
 
                     <dl class="mt-4 space-y-1.5 text-xs">
                         <div class="flex items-baseline justify-between gap-2">
-                            <dt class="text-cream-300">Credit mỗi tháng</dt>
+                            <dt class="text-cream-300">Credit mỗi {{ $plan->unitLabel() }}</dt>
                             <dd class="font-semibold text-cream-50">{{ $vn((int) $plan->credits_per_month) }}</dd>
                         </div>
                         @if((int) $plan->bonus_credits > 0)
@@ -241,15 +244,15 @@
                     </thead>
                     <tbody class="text-cream-200">
                         <tr class="border-b border-ink-800">
-                            <td class="py-2.5 pr-4 text-cream-300">Giá mỗi tháng</td>
+                            <td class="py-2.5 pr-4 text-cream-300">Giá mỗi kỳ thanh toán</td>
                             @foreach($plans as $plan)
                                 <td class="py-2.5 pr-4 font-semibold text-cream-50">{{ $plan->priceLabel() }}</td>
                             @endforeach
                         </tr>
                         <tr class="border-b border-ink-800">
-                            <td class="py-2.5 pr-4 text-cream-300">Credit mỗi tháng</td>
+                            <td class="py-2.5 pr-4 text-cream-300">Credit mỗi kỳ <span class="text-cream-300/70">(tháng · vụ)</span></td>
                             @foreach($plans as $plan)
-                                <td class="py-2.5 pr-4">{{ $vn((int) $plan->credits_per_month) }}</td>
+                                <td class="py-2.5 pr-4">{{ $vn((int) $plan->credits_per_month) }}<span class="text-cream-300/70">/{{ $plan->unitLabel() }}</span></td>
                             @endforeach
                         </tr>
                         <tr class="border-b border-ink-800">

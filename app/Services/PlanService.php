@@ -25,9 +25,10 @@ class PlanService
     public function __construct(private CreditService $credit) {}
 
     /**
-     * @param  int  $months  số chu kỳ gia hạn (mặc định 1). Gói miễn phí bỏ qua.
+     * @param  int  $units  SỐ ĐƠN VỊ MUA: gói tháng ⇒ số tháng, gói theo vụ ⇒ số vụ (Q3, 2026-09-19).
+     *                      Hạn gói = units × plans.unit_months. Gói miễn phí bỏ qua.
      */
-    public function assign(User $user, Plan $plan, int $months = 1, ?string $note = null): void
+    public function assign(User $user, Plan $plan, int $units = 1, ?string $note = null): void
     {
         $isRenewal = $user->plan_id === $plan->id && ! $plan->isFree();
         $isFirstTime = $user->plan_id !== $plan->id;
@@ -40,7 +41,8 @@ class PlanService
             $base = ($isRenewal && $user->plan_expires_at && $user->plan_expires_at->isFuture())
                 ? $user->plan_expires_at
                 : now();
-            $fill['plan_expires_at'] = $base->copy()->addMonths(max(1, $months));
+            // Gói theo VỤ: một đơn vị = 3 tháng ⇒ mua 1 vụ là hạn +3 tháng, không phải +1 tháng.
+            $fill['plan_expires_at'] = $base->copy()->addMonths($plan->monthsFor($units));
         }
 
         $user->forceFill($fill)->save();
@@ -71,10 +73,14 @@ class PlanService
      *   ⇒ gia hạn làm mốc này tiến lên, nên chu kỳ mới được cấp credit mới.
      * · Gói miễn phí / gán vĩnh viễn: chu kỳ = tháng dương lịch (cấp đầu mỗi tháng).
      */
-    public function cycleStartFor(User $user): Carbon
+    public function cycleStartFor(User $user, ?Plan $plan = null): Carbon
     {
         if ($user->plan_expires_at) {
-            return $user->plan_expires_at->copy()->subMonth();
+            // Chu kỳ = độ dài CỦA GÓI: gói tháng trừ 1 tháng, gói theo vụ trừ 3 tháng ⇒ credit của cả
+            // vụ được cấp MỘT LẦN (một bể dùng cho cả vụ), không nhỏ giọt theo tháng.
+            $plan = $plan ?? $user->activePlan();
+
+            return $user->plan_expires_at->copy()->subMonths($plan?->cycleMonths() ?? 1);
         }
 
         return now()->startOfMonth();
@@ -97,7 +103,7 @@ class PlanService
             return null;
         }
 
-        $cycleStart = $this->cycleStartFor($user);
+        $cycleStart = $this->cycleStartFor($user, $plan);
         $grantedAt = $user->plan_credits_granted_at;
 
         if ($grantedAt && $grantedAt->greaterThanOrEqualTo($cycleStart)) {

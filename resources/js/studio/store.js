@@ -63,7 +63,7 @@ export const useStudioStore = defineStore('studio', {
     upgradePlanId: null,
     upgradeBusy: false,
     upgradeResult: null,    // yêu cầu vừa gửi: { code, amount_label, method_label, ... }
-    upgradeForm: { months: 1, method: 'bank_transfer', phone: '', name: '', note: '' },
+    upgradeForm: { units: 1, method: 'bank_transfer', phone: '', name: '', note: '' },
     // film / reframe share the source image (editSource || preview)
     editSource: null,
     texture: 5,
@@ -454,7 +454,8 @@ export const useStudioStore = defineStore('studio', {
       this.upgradeResult = null;
       this.upgradeOpen = true;
       if (!this.upgradeForm.name) this.upgradeForm.name = this.user?.name || '';
-      this.upgradeForm.months = 1;
+      // Mốc mua đầu tiên của CHÍNH GÓI đó (gói tháng ⇒ 1 tháng, gói xưởng ⇒ 1 vụ).
+      this.upgradeForm.units = (plan.units && plan.units.length) ? Number(plan.units[0]) : 1;
       this.upgradeForm.method = 'bank_transfer';
     },
     closeUpgrade() { this.upgradeOpen = false; this.upgradePlanId = null; },
@@ -468,7 +469,7 @@ export const useStudioStore = defineStore('studio', {
       try {
         const d = await this.api('/api/billing/upgrade-request', {
           plan_id: this.upgradePlanId,
-          months: Number(this.upgradeForm.months) || 1,
+          units: Number(this.upgradeForm.units) || 1,
           method: this.upgradeForm.method,
           contact_name: this.upgradeForm.name || null,
           contact_phone: this.upgradeForm.phone,

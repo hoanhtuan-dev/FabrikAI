@@ -28,6 +28,15 @@ import LayersPanel from './components/LayersPanel.vue';
 import CanvasStatusBar from './components/CanvasStatusBar.vue';
 import AuthNotice from './components/AuthNotice.vue';
 const store = useStudioStore();
+
+// [Q3 — 2026-09-19] GÓI THEO MÙA VỤ: mốc mua của gói xưởng là số VỤ (1 vụ = 3 tháng), không phải số
+// tháng. Form yêu cầu nâng cấp đọc mốc + nhãn từ CHÍNH gói đang chọn để không tự bịa đơn vị.
+const upgradePlan = computed(() => ((store.planStatus && store.planStatus.catalog) || []).find((p) => Number(p.id) === Number(store.upgradePlanId)) || null);
+const upgradeUnits = computed(() => {
+  const u = upgradePlan.value && upgradePlan.value.units;
+  return (Array.isArray(u) && u.length) ? u : [1, 3, 6, 12];
+});
+const upgradeUnitLabel = computed(() => (upgradePlan.value && upgradePlan.value.unit_label) || 'tháng');
 // Đăng xuất qua fetch (route Laravel POST /dang-xuat) — dùng XSRF-TOKEN cookie cho CSRF.
 async function logout() {
   const m = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
@@ -636,7 +645,8 @@ function onTouchEnd(e) {
                     {{ p.name }}
                     <span class="ml-auto text-cream-300/85">{{ p.price_label }}</span>
                   </p>
-                  <p class="mt-0.5 text-[10px] text-cream-300/85">{{ p.credits_per_month }} credit/tháng · tối đa {{ p.resolution_cap }}<span v-if="p.bonus_credits"> · +{{ p.bonus_credits }} tặng lần đầu</span></p>
+                  <p class="mt-0.5 text-[10px] text-cream-300/85">{{ p.credits_label || (p.credits_per_month + ' credit/tháng') }} · tối đa {{ p.resolution_cap }}<span v-if="p.bonus_credits"> · +{{ p.bonus_credits }} tặng lần đầu</span></p>
+                  <p v-if="p.is_seasonal" class="mt-0.5 text-[10px] text-amber-200/85">Gói theo vụ: mua 1 {{ p.unit_label }} = {{ p.unit_months }} tháng, credit cấp MỘT LẦN cho cả vụ.</p>
                   <p v-if="p.tagline" class="mt-0.5 text-[10px] text-cream-300/75">{{ p.tagline }}</p>
                   <!-- Nút của gói ĐANG DÙNG phải ĐỌC ĐƯỢC. Hai lần đo trên trình duyệt thật mới ra đúng
                        cách sửa: (1) bg-brand + opacity-50 ⇒ chữ trắng trên nền sáng, tương phản 1:1;
@@ -660,9 +670,9 @@ function onTouchEnd(e) {
                   <button type="button" class="icon-btn ml-auto !h-5 !w-5" title="Đóng form" aria-label="Đóng form yêu cầu nâng cấp" @click="store.closeUpgrade()"><StudioIcon name="x" size="h-3 w-3" /></button>
                 </p>
                 <template v-if="!store.upgradeResult">
-                  <label class="block text-[10px] text-cream-300/85">Số tháng
-                    <select v-model.number="store.upgradeForm.months" class="input mt-0.5 !py-1 text-[11px]">
-                      <option v-for="m in (store.planStatus.upgrade ? store.planStatus.upgrade.months : [1])" :key="m" :value="m">{{ m }} tháng<span v-if="m === 3"> (một vụ)</span></option>
+                  <label class="block text-[10px] text-cream-300/85">Số kỳ mua (tháng/vụ)
+                    <select v-model.number="store.upgradeForm.units" class="input mt-0.5 !py-1 text-[11px]">
+                      <option v-for="u in upgradeUnits" :key="u" :value="u">{{ u }} {{ upgradeUnitLabel }}</option>
                     </select>
                   </label>
                   <label class="block text-[10px] text-cream-300/85">Cách thanh toán
@@ -688,7 +698,7 @@ function onTouchEnd(e) {
                 <template v-else>
                   <p class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[10px] text-emerald-200">
                     Đã gửi yêu cầu <b>{{ store.upgradeResult.code }}</b> — {{ store.upgradeResult.plan.name }} ·
-                    {{ store.upgradeResult.months }} tháng · {{ store.upgradeResult.amount_label }} · {{ store.upgradeResult.method_label }}.
+                    {{ store.upgradeResult.units }} {{ store.upgradeResult.unit_label }}<span v-if="store.upgradeResult.unit_label !== 'tháng'"> ({{ store.upgradeResult.months }} tháng)</span> · {{ store.upgradeResult.amount_label }} · {{ store.upgradeResult.method_label }}.
                   </p>
                   <div v-if="store.planStatus.payment && store.planStatus.payment.bank.account" class="rounded bg-ink-800 px-2 py-1.5 text-[10px] text-cream-200">
                     <p><b class="text-cream-50">{{ store.planStatus.payment.bank.name }}</b></p>

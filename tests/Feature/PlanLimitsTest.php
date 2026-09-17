@@ -148,7 +148,7 @@ class PlanLimitsTest extends TestCase
             ->assertJsonPath('limits.enforce_credits', true)
             ->assertJsonPath('costs.image', 1)
             ->assertJsonPath('costs.video', 10)
-            ->assertJsonCount(4, 'catalog');
+            ->assertJsonCount(5, 'catalog', 'Có thêm gói "Xưởng theo vụ" (Q3).');
     }
 
     public function test_plan_status_requires_authentication(): void

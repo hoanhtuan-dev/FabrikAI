@@ -30,7 +30,7 @@ class BillingSubscribeTest extends TestCase
     {
         $this->getJson('/api/billing/plans')
             ->assertOk()
-            ->assertJsonCount(4, 'plans')
+            ->assertJsonCount(5, 'plans', 'Có thêm gói "Xưởng theo vụ" (Q3).')
             ->assertJsonPath('plans.0.slug', 'free');
     }
 

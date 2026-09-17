@@ -102,6 +102,13 @@ class BillingController extends Controller
                 'tagline' => $p->tagline,
                 'price_vnd' => (int) $p->price_vnd,
                 'price_label' => $p->priceLabel(),
+                // [Q3] Đơn vị mua: gói tháng bán theo tháng, gói xưởng bán theo VỤ (1 vụ = 3 tháng).
+                'unit_label' => $p->unitLabel(),
+                'unit_months' => $p->unitMonths(),
+                'units' => $p->allowedUnits(),
+                'price_per_unit_label' => $p->pricePerUnitLabel(),
+                'credits_label' => $p->creditsLabel(),
+                'is_seasonal' => $p->isSeasonal(),
                 'credits_per_month' => (int) $p->credits_per_month,
                 'bonus_credits' => (int) $p->bonus_credits,
                 'resolution_cap' => $p->resolution_cap,
@@ -157,6 +164,8 @@ class BillingController extends Controller
             'is_open' => $r->isOpen(),
             'plan' => $r->plan ? ['id' => $r->plan->id, 'name' => $r->plan->name, 'slug' => $r->plan->slug] : null,
             'months' => $r->months,
+            'units' => $r->units,
+            'unit_label' => $r->plan ? $r->plan->unitLabel() : 'tháng',
             'amount_vnd' => $r->amount_vnd,
             'amount_label' => $r->amountLabel(),
             'method' => $r->method,
@@ -182,7 +191,9 @@ class BillingController extends Controller
     {
         $data = $request->validate([
             'plan_id' => ['required', 'integer', 'exists:plans,id'],
-            'months' => ['required', 'integer', 'in:'.implode(',', UpgradeRequest::MONTHS)],
+            // units = SỐ ĐƠN VỊ MUA (tháng với gói tháng, VỤ với gói theo vụ — Q3). Danh sách hợp lệ do
+            // TỪNG GÓI khai báo (plans.units), nên kiểm ở dưới thay vì nhận mọi số.
+            'units' => ['required', 'integer', 'min:1', 'max:24'],
             'method' => ['required', 'string', 'in:'.implode(',', UpgradeRequest::METHODS)],
             'contact_name' => ['nullable', 'string', 'max:120'],
             'contact_phone' => ['required', 'string', 'max:32'],
@@ -191,6 +202,17 @@ class BillingController extends Controller
 
         $plan = Plan::query()->where('is_active', true)->findOrFail((int) $data['plan_id']);
         $user = $request->user();
+
+        $units = (int) $data['units'];
+        if (! in_array($units, $plan->allowedUnits(), true)) {
+            return response()->json([
+                'message' => 'Gói '.$plan->name.' chỉ mua được '.implode(' · ', array_map(
+                    fn ($u) => $u.' '.$plan->unitLabel(), $plan->allowedUnits()
+                )).'.',
+                'code' => 'units_invalid',
+                'allowed_units' => $plan->allowedUnits(),
+            ], 422);
+        }
 
         if ($plan->isFree()) {
             return response()->json([
@@ -208,7 +230,7 @@ class BillingController extends Controller
             ], 422);
         }
 
-        $months = (int) $data['months'];
+        $months = $plan->monthsFor($units);
         $existing = UpgradeRequest::query()
             ->where('user_id', $user->id)
             ->where('plan_id', $plan->id)
@@ -226,13 +248,16 @@ class BillingController extends Controller
             ]);
         }
 
-        $created = DB::transaction(function () use ($user, $plan, $months, $phone, $data) {
+        $created = DB::transaction(function () use ($user, $plan, $months, $units, $phone, $data) {
             return UpgradeRequest::create([
                 'code' => UpgradeRequest::nextCode(),
                 'user_id' => $user->id,
                 'plan_id' => $plan->id,
+                // months = tổng số tháng (để hoá đơn/kích hoạt không phải suy diễn lại từ đơn vị).
                 'months' => $months,
-                'amount_vnd' => (int) $plan->price_vnd * $months,
+                'units' => $units,
+                // Số tiền = giá MỘT đơn vị × số đơn vị (gói vụ: 1 vụ = 1 lần giá, không phải ×3).
+                'amount_vnd' => $plan->amountFor($units),
                 'method' => $data['method'],
                 'contact_name' => $data['contact_name'] ?? $user->name,
                 'contact_phone' => $phone,
@@ -283,6 +308,8 @@ class BillingController extends Controller
             'months' => UpgradeRequest::MONTHS,
             'payment' => self::paymentInfo(),
         ]);
+        // (mốc mua theo TỪNG GÓI nằm trong catalog: plans.units + unit_label — gói tháng là số tháng,
+        // gói theo vụ là số VỤ.)
     }
 
     /**
