@@ -242,7 +242,7 @@
 |---|---|---|
 | Q1 | ~~Bật chặn khi hết credit?~~ **✅ ĐÃ QUYẾT: BẬT (2026-09-19)** | Mặc định nay là BẬT (`config/studio.php` + `studio_plan_limits()`); tắt lại bằng setting `studio_enforce_credits=0`. 402 có cấu trúc + tự mở bảng nâng cấp; Super Admin được miễn chặn để không tự khoá mình |
 | Q2 | ~~Cổng thanh toán~~ **✅ ĐÃ QUYẾT: chuyển khoản + hỗ trợ trước, VNPay sau (2026-09-19)** | Nút "Nâng cấp" nay là **yêu cầu có mã theo dõi** ({{B}}upgrade_requests{{B}}); khách chuyển khoản theo mã, Super Admin kích hoạt. Lỗ hổng "khách tự kích hoạt gói trả phí miễn phí" đã đóng |
-| Q3 | **Gói theo mùa vụ/xưởng** (bán theo đơn hàng thay vì theo tháng) | Chủ xưởng may mua theo vụ, không mua theo tháng |
+| Q3 | ~~Gói theo mùa vụ/xưởng~~ **✅ ĐÃ QUYẾT + ĐÃ LÀM: bán theo VỤ (2026-09-19)** | Gói "Xưởng theo vụ": 3.290.000 ₫/vụ (3 tháng) · 3.000 credit cấp MỘT LẦN cho cả vụ · mốc mua 1/2/4 vụ; `plans.unit_months · cycle_months · units` + `upgrade_requests.units` cho phép mọi gói khai báo đơn vị bán của mình |
 | Q4 | **Số ghế theo gói** | Cần cho chủ doanh nghiệp; hiện mỗi tài khoản là một người dùng riêng |
 
 ---
