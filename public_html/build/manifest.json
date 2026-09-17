@@ -1,9 +1,9 @@
 {
-  "_StylistDataManager-CrA6GmQ6.js": {
-    "file": "assets/StylistDataManager-CrA6GmQ6.js",
+  "_StylistDataManager-BsVOJCmz.js": {
+    "file": "assets/StylistDataManager-BsVOJCmz.js",
     "name": "StylistDataManager",
     "imports": [
-      "_pageBoot-CSiB9QwX.js"
+      "_pageBoot-CmsEgZ-F.js"
     ]
   },
   "__plugin-vue_export-helper-BDNMzG2s.js": {
@@ -78,19 +78,19 @@
     "file": "assets/inter-700-normal-Yt3aPRUw.woff2",
     "src": "_inter-700-normal-Yt3aPRUw.woff2"
   },
-  "_pageBoot-CSiB9QwX.js": {
-    "file": "assets/pageBoot-CSiB9QwX.js",
+  "_pageBoot-CmsEgZ-F.js": {
+    "file": "assets/pageBoot-CmsEgZ-F.js",
     "name": "pageBoot"
   },
-  "_pinia-CrfKN_W_.js": {
-    "file": "assets/pinia-CrfKN_W_.js",
+  "_pinia-DNsqIwCQ.js": {
+    "file": "assets/pinia-DNsqIwCQ.js",
     "name": "pinia",
     "imports": [
-      "_pageBoot-CSiB9QwX.js"
+      "_pageBoot-CmsEgZ-F.js"
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-C1XZeTUV.css",
+    "file": "assets/app-B9G9hwxt.css",
     "name": "app",
     "names": [
       "app.css"
@@ -98,38 +98,52 @@
     "src": "resources/css/app.css",
     "isEntry": true
   },
+  "resources/js/studio/admin.js": {
+    "file": "assets/admin-yo_8v3kj.js",
+    "name": "admin",
+    "src": "resources/js/studio/admin.js",
+    "isEntry": true,
+    "imports": [
+      "_pageBoot-CmsEgZ-F.js",
+      "_pinia-DNsqIwCQ.js",
+      "__plugin-vue_export-helper-BDNMzG2s.js"
+    ],
+    "css": [
+      "assets/admin-pHxspv4H.css"
+    ]
+  },
   "resources/js/studio/main.js": {
-    "file": "assets/main-DTTVugpW.js",
+    "file": "assets/main-BMmqmbd2.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-CSiB9QwX.js",
-      "_pinia-CrfKN_W_.js",
+      "_pageBoot-CmsEgZ-F.js",
+      "_pinia-DNsqIwCQ.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_StylistDataManager-CrA6GmQ6.js"
+      "_StylistDataManager-BsVOJCmz.js"
     ],
     "css": [
       "assets/main-BAm4LXrd.css"
     ]
   },
   "resources/js/studio/presets.js": {
-    "file": "assets/presets-Bp0opHRO.js",
+    "file": "assets/presets-CpRPZ8Hq.js",
     "name": "presets",
     "src": "resources/js/studio/presets.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-CSiB9QwX.js"
+      "_pageBoot-CmsEgZ-F.js"
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-Cn564noH.js",
+    "file": "assets/settings-DfNmYKEk.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-CSiB9QwX.js",
-      "_pinia-CrfKN_W_.js",
+      "_pageBoot-CmsEgZ-F.js",
+      "_pinia-DNsqIwCQ.js",
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
@@ -137,14 +151,14 @@
     ]
   },
   "resources/js/studio/stylist-data.js": {
-    "file": "assets/stylist-data-CCQMfr-7.js",
+    "file": "assets/stylist-data-C35azi4L.js",
     "name": "stylist-data",
     "src": "resources/js/studio/stylist-data.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-CSiB9QwX.js",
-      "_pinia-CrfKN_W_.js",
-      "_StylistDataManager-CrA6GmQ6.js"
+      "_pageBoot-CmsEgZ-F.js",
+      "_pinia-DNsqIwCQ.js",
+      "_StylistDataManager-BsVOJCmz.js"
     ]
   }
 }
