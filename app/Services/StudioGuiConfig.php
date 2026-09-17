@@ -23,28 +23,27 @@ class StudioGuiConfig
     /** Nhãn dài nhất cho phép — thanh công cụ chỉ rộng 56px, nhãn chỉ dùng làm tooltip/aria-label. */
     public const LABEL_MAX = 40;
 
-    /** Bộ id HỢP LỆ + giá trị GỐC (thứ tự gốc = thứ tự ở đây). */
-    public const DEFAULTS = [
-        // kind='panel'  → mở NHÓM CARD ở sidebar trái (đổi activeActivity)
-        // [Đợt 2 — 2026-09-19] "Bộ sưu tập" = không gian làm việc theo NGHỀ: đang làm bộ nào · các bộ
-        // gần đây kèm trạng thái/hạn chót · việc đang chạy. Cấu hình cũ của owner KHÔNG mất mục nào:
-        // all() nối id mới vào cuối bản đã lưu (có test khoá bất biến đó).
-        ['id' => 'collections', 'kind' => 'panel', 'label' => 'Bộ sưu tập',     'icon' => 'folderOpen', 'visible' => true],
-        ['id' => 'concept',   'kind' => 'panel',  'label' => 'Tạo ảnh',          'icon' => 'sparkles',   'visible' => true],
-        ['id' => 'variation', 'kind' => 'panel',  'label' => 'Tạo biến thể ảnh', 'icon' => 'variations', 'visible' => true],
-        ['id' => 'tryon',     'kind' => 'panel',  'label' => 'Mặc thử đồ',       'icon' => 'hanger',     'visible' => true],
-        ['id' => 'inpaint',   'kind' => 'panel',  'label' => 'Sửa ảnh',          'icon' => 'pencil',     'visible' => true],
-        ['id' => 'compose',   'kind' => 'panel',  'label' => 'Ghép ảnh',         'icon' => 'layers',     'visible' => true],
-        ['id' => 'upscale',   'kind' => 'panel',  'label' => 'Upscale',          'icon' => 'maximize',   'visible' => true],
-        ['id' => 'director',  'kind' => 'panel',  'label' => 'Kịch bản quay',    'icon' => 'film',       'visible' => true],
-        // kind='action' → mở POPUP độc lập (không đổi panel). Hai nút này TRƯỚC ĐÂY bị bỏ sót
-        // khỏi danh sách nên owner không đổi được nhãn/icon/thứ tự của chúng.
-        ['id' => 'prompt',    'kind' => 'action', 'label' => 'Prompt Tạo Ảnh',   'icon' => 'sparkles',   'visible' => true],
-        ['id' => 'stylist',   'kind' => 'action', 'label' => 'Trợ lý thiết kế',  'icon' => 'shirt',      'visible' => true],
-        // kind='menu' → menu Cài đặt, LUÔN ghim ở ĐÁY thanh công cụ (đổi được nhãn/icon/ẩn-hiện,
-        // KHÔNG đổi được vị trí — xem StudioGuiConfig::isPinned()).
-        ['id' => 'settings',  'kind' => 'menu',   'label' => 'Cài đặt',          'icon' => 'gear',       'visible' => true],
-    ];
+    /**
+     * Bộ mục GỐC của thanh công cụ — SINH TỪ `ModuleRegistry` (một nguồn duy nhất, 2026-09-19).
+     *
+     * Trước đây nhãn/icon được khai lại ở đây ⇒ thêm/đổi tên một tính năng phải sửa cả hai chỗ và rất dễ
+     * lệch (khách thấy nhãn cũ trong khi bản khai module đã đổi). Nay mọi thứ về module nằm ở
+     * `App\Support\ModuleRegistry`; lớp này CHỈ giữ phần TRÌNH BÀY do owner chỉnh (thứ tự · nhãn ·
+     * icon · ẩn/hiện) trong setting `studio_gui_activity_bar`.
+     *
+     * kind='panel' → mở NHÓM CARD ở sidebar trái · kind='action' → mở POPUP độc lập ·
+     * kind='menu' → menu Cài đặt, LUÔN ghim ở ĐÁY (xem PINNED_IDS).
+     */
+    public static function defaults(): array
+    {
+        return array_map(fn (array $m) => [
+            'id' => $m['id'],
+            'kind' => $m['kind'],
+            'label' => $m['name'],
+            'icon' => $m['icon'] ?? 'square',
+            'visible' => true,
+        ], array_values(array_filter(\App\Support\ModuleRegistry::all(), fn (array $m) => ! empty($m['gui']))));
+    }
 
     /** Id LUÔN ghim ở đáy thanh công cụ — owner đổi được nhãn/icon/ẩn-hiện nhưng không đổi vị trí. */
     public const PINNED_IDS = ['settings'];
@@ -53,7 +52,7 @@ class StudioGuiConfig
     /** @return array<int, string> */
     public static function defaultIds(): array
     {
-        return array_column(self::DEFAULTS, 'id');
+        return array_column(self::defaults(), 'id');
     }
 
     /**
@@ -64,7 +63,7 @@ class StudioGuiConfig
      */
     public static function panelIds(): array
     {
-        return array_column(array_values(array_filter(self::DEFAULTS, fn ($d) => $d['kind'] === 'panel')), 'id');
+        return array_column(array_values(array_filter(self::defaults(), fn ($d) => $d['kind'] === 'panel')), 'id');
     }
 
     /**
@@ -78,11 +77,11 @@ class StudioGuiConfig
         $saved = $this->saved();
 
         if ($saved === []) {
-            return $this->pinnedLast(self::DEFAULTS);
+            return $this->pinnedLast(self::defaults());
         }
 
         $byId = [];
-        foreach (self::DEFAULTS as $d) {
+        foreach (self::defaults() as $d) {
             $byId[$d['id']] = $d;
         }
 
@@ -104,7 +103,7 @@ class StudioGuiConfig
             ];
         }
 
-        foreach (self::DEFAULTS as $d) {
+        foreach (self::defaults() as $d) {
             if (! isset($seen[$d['id']])) {
                 $out[] = $d;
             }
@@ -145,7 +144,7 @@ class StudioGuiConfig
     {
         $valid = self::defaultIds();
         $byId = [];
-        foreach (self::DEFAULTS as $d) {
+        foreach (self::defaults() as $d) {
             $byId[$d['id']] = $d;
         }
 
@@ -200,7 +199,7 @@ class StudioGuiConfig
         }
 
         // Id không được gửi lên (owner chỉ gửi một phần) vẫn phải còn ⇒ nối vào cuối.
-        foreach (self::DEFAULTS as $d) {
+        foreach (self::defaults() as $d) {
             if (! isset($seen[$d['id']])) {
                 $clean[] = $d;
             }
@@ -216,7 +215,7 @@ class StudioGuiConfig
     {
         set_setting(self::SETTING_KEY, '');
 
-        return self::DEFAULTS;
+        return self::defaults();
     }
 
     /** @return array<int, array<string, mixed>> */

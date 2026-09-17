@@ -175,7 +175,7 @@ class StudioGuiConfigTest extends TestCase
 
         foreach (['prompt' => 'action', 'stylist' => 'action', 'settings' => 'menu'] as $id => $kind) {
             $this->assertContains($id, $ids, "Nút '{$id}' KHÔNG có trong cấu hình ⇒ owner không quản lý được.");
-            $row = collect(StudioGuiConfig::DEFAULTS)->firstWhere('id', $id);
+            $row = collect(StudioGuiConfig::defaults())->firstWhere('id', $id);
             $this->assertSame($kind, $row['kind'], "Mục '{$id}' phải có kind='{$kind}'.");
         }
 
@@ -206,7 +206,7 @@ class StudioGuiConfigTest extends TestCase
         foreach ($m as $row) {
             $fallback[$row[1]] = $row[2];
         }
-        foreach (StudioGuiConfig::DEFAULTS as $d) {
+        foreach (StudioGuiConfig::defaults() as $d) {
             $this->assertSame($d['kind'], $fallback[$d['id']] ?? null,
                 "Fallback JS thiếu hoặc sai kind cho '{$d['id']}'.");
         }
@@ -249,7 +249,7 @@ class StudioGuiConfigTest extends TestCase
 
     public function test_defaults_when_nothing_saved(): void
     {
-        $this->assertSame(StudioGuiConfig::DEFAULTS, $this->svc()->all());
+        $this->assertSame(StudioGuiConfig::defaults(), $this->svc()->all());
         // [Đợt 2 — 2026-09-19] "Bộ sưu tập" đứng đầu thứ tự gốc: đó là điểm vào công việc hằng ngày
         // (đang làm bộ nào · việc đang chạy), rồi mới tới các card tạo ảnh.
         $this->assertSame('collections', $this->svc()->all()[0]['id'], 'Thứ tự gốc: Bộ sưu tập đứng đầu.');
@@ -331,7 +331,7 @@ class StudioGuiConfigTest extends TestCase
 
         $ids = array_column($saved, 'id');
         $this->assertSame('tryon', $ids[0], 'Mục owner gửi phải giữ vị trí đầu.');
-        $this->assertCount(count(StudioGuiConfig::DEFAULTS), $ids, 'Không được mất mục nào.');
+        $this->assertCount(count(StudioGuiConfig::defaults()), $ids, 'Không được mất mục nào.');
         foreach (StudioGuiConfig::defaultIds() as $id) {
             $this->assertContains($id, $ids, "Mục '{$id}' bị mất sau khi lưu cấu hình một phần.");
         }
@@ -343,8 +343,8 @@ class StudioGuiConfigTest extends TestCase
         $items[0]['label'] = 'Đổi rồi';
         $this->svc()->save($items);
 
-        $this->assertSame(StudioGuiConfig::DEFAULTS, $this->svc()->reset());
-        $this->assertSame(StudioGuiConfig::DEFAULTS, $this->svc()->all());
+        $this->assertSame(StudioGuiConfig::defaults(), $this->svc()->reset());
+        $this->assertSame(StudioGuiConfig::defaults(), $this->svc()->all());
     }
 
     // ── (a) phân quyền ─────────────────────────────────────────────────────
@@ -365,7 +365,7 @@ class StudioGuiConfigTest extends TestCase
         $this->getJson('/api/gui')->assertUnauthorized();
 
         $resp = $this->actingAs($this->customer())->getJson('/api/gui')->assertOk();
-        $this->assertCount(count(StudioGuiConfig::DEFAULTS), $resp->json('activityBar'));
+        $this->assertCount(count(StudioGuiConfig::defaults()), $resp->json('activityBar'));
         $iconNames = array_column($resp->json('icons'), 'name');
         $this->assertContains('hanger', $iconNames, 'Phải kèm danh sách icon cho trang quản trị.');
     }

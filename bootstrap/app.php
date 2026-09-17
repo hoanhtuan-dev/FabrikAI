@@ -27,6 +27,9 @@ $app = Application::configure(basePath: dirname(__DIR__))
         // Apply no-store to ALL web responses so the browser never caches any auth/redirect
         // (definitively fixes ERR_TOO_MANY_REDIRECTS from stale cached redirects).
         $middleware->web(append: [\App\Http\Middleware\NoStoreCache::class]);
+        // [Modules 2026-09-19] CÔNG TẮC MODULE: chặn ở backend theo bản khai ModuleRegistry (gói nào cấp
+        // module nào · module bị tắt toàn cục). Đặt SAU auth trong chuỗi nên chỉ chạy khi đã biết người dùng.
+        $middleware->web(append: [\App\Http\Middleware\EnforceModules::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

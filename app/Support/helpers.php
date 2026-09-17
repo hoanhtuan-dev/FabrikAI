@@ -1320,6 +1320,111 @@ if (! function_exists('studio_plan_limits')) {
     }
 }
 
+if (! function_exists('module_enabled')) {
+    /** [Modules 2026-09-19] Module có đang BẬT toàn cục không (chủ dự án tắt được trong Quản trị). */
+    function module_enabled(string $id): bool
+    {
+        return \App\Support\ModuleRegistry::enabledGlobally($id);
+    }
+}
+
+if (! function_exists('module_allowed')) {
+    /**
+     * [Modules 2026-09-19] Người dùng này CÓ QUYỀN dùng module không? Đây là chỗ DUY NHẤT quyết định:
+     *   1) module phải đang bật toàn cục, và
+     *   2) module phải nằm trong `plans.modules` của gói người dùng đang có, và
+     *   3) các module nó phụ thuộc cũng phải được cấp (vd 'batch' cần 'prompt').
+     *
+     * Super Admin được coi là có mọi module đang bật: đây là tài khoản của chính chủ dự án, và các module
+     * còn là công cụ nội bộ (cùng lý do đã miễn chặn credit cho owner — xem queueGeneration).
+     */
+    function module_allowed($user, string $id): bool
+    {
+        $registry = \App\Support\ModuleRegistry::class;
+
+        if (! $registry::has($id) || ! $registry::enabledGlobally($id)) {
+            return false;
+        }
+
+        $user = $user ?? auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        // Tài khoản NỘI BỘ (admin/super admin) không bị công tắc gói chặn: quyền theo gói là chuyện của
+        // KHÁCH mua gói, còn nhân sự vận hành cần vào được mọi màn để hỗ trợ khách.
+        if (method_exists($user, 'isAdmin') && $user->isAdmin()) {
+            return true;
+        }
+
+        foreach ($registry::get($id)['depends_on'] as $parent) {
+            if (! module_allowed($user, (string) $parent)) {
+                return false;
+            }
+        }
+
+        // Không có gói (tài khoản cũ / chưa gán) ⇒ dùng GÓI MẶC ĐỊNH (thường là Miễn phí) thay vì khoá
+        // sạch tính năng — xem Plan::defaultPlan().
+        $plan = $user->activePlan() ?? \App\Models\Plan::defaultPlan();
+
+        return $plan !== null && $plan->grantsModule($id);
+    }
+}
+
+if (! function_exists('user_modules')) {
+    /** @return array<int, string> id các module người dùng được dùng (đã tính bật/tắt + phụ thuộc). */
+    function user_modules($user = null): array
+    {
+        $user = $user ?? auth()->user();
+
+        return array_values(array_filter(\App\Support\ModuleRegistry::ids(), fn ($id) => module_allowed($user, $id)));
+    }
+}
+
+if (! function_exists('modules_status')) {
+    /**
+     * Trạng thái TỪNG module cho giao diện: được dùng hay bị khoá, và vì sao.
+     * Trả đủ cả module bị khoá để Studio hiện ổ khóa + gợi ý nâng cấp thay vì giấu đi (khách cần biết
+     * gói cao hơn có gì mới mua).
+     */
+    function modules_status($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $plan = $user?->activePlan() ?? \App\Models\Plan::defaultPlan();
+        $disabled = \App\Support\ModuleRegistry::disabledGlobally();
+
+        return array_map(function (array $m) use ($user, $plan, $disabled) {
+            $id = $m['id'];
+            $allowed = module_allowed($user, $id);
+            $reason = null;
+            if (! $allowed) {
+                if (in_array($id, $disabled, true)) {
+                    $reason = 'disabled';
+                } elseif ($plan === null) {
+                    $reason = 'no_plan';
+                } elseif (! $plan->grantsModule($id)) {
+                    $reason = 'plan';
+                } else {
+                    $reason = 'dependency';
+                }
+            }
+
+            return [
+                'id' => $id,
+                'name' => $m['name'],
+                'group' => $m['group'],
+                'kind' => $m['kind'],
+                'gui' => ! empty($m['gui']),
+                'icon' => $m['icon'] ?? 'square',
+                'allowed' => $allowed,
+                'reason' => $reason,
+                'depends_on' => $m['depends_on'] ?? [],
+                'in_plan' => $plan ? $plan->grantsModule($id) : false,
+            ];
+        }, \App\Support\ModuleRegistry::all());
+    }
+}
+
 if (! function_exists('team_can_view_project')) {
     /**
      * [Q4 — 2026-09-19] Ai được XEM/LÀM VIỆC trên một bộ sưu tập: chủ bộ sưu tập · thành viên trong

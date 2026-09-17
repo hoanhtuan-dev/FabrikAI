@@ -88,6 +88,8 @@ class StudioController extends Controller
                 'team' => array_merge(studio_team_seats($user), [
                     'is_owner' => ! $user->isTeamMember(),
                 ]),
+                // [Modules 2026-09-19] Quyền module theo GÓI — giao diện dùng ngay từ lần boot đầu tiên.
+                'modules' => user_modules($user),
             ] : null,
             'project_statuses' => app(\App\Services\ProjectWorkflowService::class)->states(),
         ]);
@@ -1765,6 +1767,13 @@ RULES:
                 'used_total' => (int) $usage['used_total'],
                 'used_today' => (int) $usage['used_today'],
             ],
+            // [Modules 2026-09-19] Gói = công tắc cấp phát tính năng: gói hiện tại cấp module nào, và
+            // module nào đang bị khoá (kèm lý do) để popup gợi ý nâng cấp đúng gói.
+            'modules' => [
+                'allowed' => user_modules($user),
+                'status' => modules_status($user),
+                'catalog' => \App\Support\ModuleRegistry::catalog(),
+            ],
             // Ghế: gói này cho bao nhiêu người · đã dùng mấy · còn mấy (Q4).
             'seats' => array_merge(studio_team_seats($user), [
                 'limit' => $plan ? $plan->seats() : 1,
@@ -2293,10 +2302,18 @@ RULES:
      */
     public function gui(): \Illuminate\Http\JsonResponse
     {
+        $user = auth()->user();
+        $status = modules_status($user);
+
         return response()->json([
             'activityBar' => app(\App\Services\StudioGuiConfig::class)->all(),
             // Nguồn DUY NHẤT: resources/js/studio/icons.json (cùng file StudioIcon.vue import).
             'icons' => \App\Support\IconRegistry::catalog(),
+            // [Modules 2026-09-19] MODULE nào được dùng theo GÓI + cái nào bị khoá và vì sao. Studio dùng
+            // đúng danh sách này để vẽ ổ khoá/nâng cấp — giao diện KHÔNG tự suy luận quyền.
+            'modules' => $status,
+            'modules_allowed' => array_values(array_map(fn ($m) => $m['id'], array_filter($status, fn ($m) => $m['allowed']))),
+            'modules_catalog' => \App\Support\ModuleRegistry::catalog(),
         ]);
     }
 
