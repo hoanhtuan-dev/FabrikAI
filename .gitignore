@@ -34,8 +34,10 @@ Thumbs.db
 /database/*.sqlite
 /database/*.sqlite-journal
 
-# ── Tài liệu nội bộ (repo PUBLIC — báo cáo chứa chi tiết lỗ hổng CHƯA vá) ──
-STUDIO_REVIEW*.md
+# ── Tài liệu nội bộ ──
+# STUDIO_REVIEW*.md NAY ĐƯỢC COMMIT (quyết định người dùng 2026-09-17) — đây là kế hoạch + sổ trạng thái
+# của dự án, cần đi theo repo. LƯU Ý: các file này mô tả lỗ hổng; trước khi push phải rà lại xem còn
+# mục CHƯA VÁ nào không (xem STUDIO_REVIEW_PLAN.md §3 — nợ kỹ thuật đã biết).
 STUDIO_UI_REDESIGN.md
 DELEGATION_PLAYBOOK.md
 DEPLOY.md
