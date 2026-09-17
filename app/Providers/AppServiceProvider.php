@@ -34,5 +34,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('register', function (Request $request) {
             return Limit::perMinute(5)->by((string) $request->ip());
         });
+
+        // [Đợt 4 — 2026-09-19] Phản hồi trên LINK CHIA SẺ công khai: người gửi không có tài khoản nên
+        // chỉ khoá được theo IP. 10 lần/phút đủ rộng cho người dùng thật mà vẫn chặn spam vào sổ phản hồi.
+        RateLimiter::for('share-feedback', function (Request $request) {
+            return Limit::perMinute(10)->by((string) $request->ip());
+        });
     }
 }

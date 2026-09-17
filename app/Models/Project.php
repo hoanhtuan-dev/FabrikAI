@@ -83,6 +83,18 @@ class Project extends Model
         return $this->belongsTo(User::class);
     }
 
+    /** [Đợt 4 — 2026-09-19] Link chia sẻ công khai cho khách duyệt (có hạn, thu hồi được). */
+    public function shares(): HasMany
+    {
+        return $this->hasMany(ProjectShare::class);
+    }
+
+    /** [Đợt 4] Phản hồi của người xem link chia sẻ (Duyệt / Yêu cầu sửa). */
+    public function feedback(): HasMany
+    {
+        return $this->hasMany(ProjectFeedback::class);
+    }
+
     public function generations(): HasMany
     {
         return $this->hasMany(Generation::class);

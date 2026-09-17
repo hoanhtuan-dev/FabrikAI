@@ -39,6 +39,42 @@ const applied = computed(() => store.appliedProject || null);
 // mỗi trường ở phía máy chủ).
 const exportOpen = ref(false);
 const exportForm = ref({ sizes: '', note: '' });
+
+// ── Chia sẻ cho khách duyệt (Đợt 4) ────────────────────────────────────────────────
+// Khách/nhân viên duyệt KHÔNG có tài khoản FabrikAI: tạo link công khai (có hạn, thu hồi được) để họ
+// xem ảnh + brief và gửi phản hồi Duyệt/Yêu cầu sửa. Phản hồi lưu vào bộ sưu tập để designer thấy ngay.
+const shareOpen = ref(false);
+const shareBusy = ref(false);
+const shareInfo = ref(null);   // { share: {url, expires_at, views} | null, feedback: [...] }
+const shareDays = ref(30);
+async function loadShare() {
+  if (!applied.value) return;
+  shareInfo.value = null;
+  shareInfo.value = await store.loadShareStatus(applied.value.id);
+}
+async function toggleShare() {
+  shareOpen.value = !shareOpen.value;
+  if (shareOpen.value) await loadShare();
+}
+async function createShare() {
+  if (!applied.value || shareBusy.value) return;
+  shareBusy.value = true;
+  const created = await store.createShare(applied.value.id, shareDays.value);
+  if (created) await loadShare();
+  shareBusy.value = false;
+}
+async function revokeShare() {
+  if (!applied.value || !shareInfo.value?.share || shareBusy.value) return;
+  shareBusy.value = true;
+  const ok = await store.revokeShare(applied.value.id, shareInfo.value.share.token);
+  if (ok) await loadShare();
+  shareBusy.value = false;
+}
+function copyShare() {
+  const url = shareInfo.value?.share?.url;
+  if (!url) return;
+  navigator.clipboard?.writeText(url).then(() => store.toast('Đã copy link chia sẻ.')).catch(() => store.toast('Không copy được — hãy chọn và copy thủ công.', 'error'));
+}
 function startExport() {
   if (!applied.value) { store.toast('Chọn bộ sưu tập trước khi xuất gói.', 'error'); return; }
   const q = new URLSearchParams();
@@ -145,7 +181,62 @@ async function submit() {
         <button class="tool-btn" :class="exportOpen ? 'is-active' : ''" title="Đóng gói ảnh + phiếu kỹ thuật + bảng size thành 1 file ZIP để gửi xưởng may" @click="exportOpen = !exportOpen">
           <StudioIcon name="download" size="h-3.5 w-3.5" /> Xuất gói cho xưởng
         </button>
+        <button class="tool-btn" :class="shareOpen ? 'is-active' : ''" title="Gửi link cho khách/nhân viên duyệt (không cần tài khoản FabrikAI)" @click="toggleShare()">
+          <StudioIcon name="link" size="h-3.5 w-3.5" /> Chia sẻ cho khách
+        </button>
         <button class="tool-btn" title="Không gắn ảnh mới vào bộ này nữa" @click="store.unapplyProject()"><StudioIcon name="pinOff" size="h-3.5 w-3.5" /> Bỏ áp dụng</button>
+      </div>
+
+      <!-- Chia sẻ cho khách duyệt: link công khai có hạn, thu hồi được, kèm phản hồi của khách -->
+      <div v-if="shareOpen" class="mt-2 space-y-2 rounded-lg border border-ink-700 bg-ink-900/70 p-2.5">
+        <p v-if="!shareInfo" class="text-[11px] text-cream-300">Đang tải trạng thái chia sẻ…</p>
+        <template v-else>
+          <div v-if="shareInfo.share" class="space-y-1.5">
+            <p class="text-[11px] font-semibold text-cream-100">Link đang hiệu lực</p>
+            <input :value="shareInfo.share.url" readonly class="input !py-1.5 text-[10px]" @focus="$event.target.select()">
+            <div class="flex flex-wrap items-center gap-1.5 text-[10px] text-cream-300">
+              <span class="rounded-full bg-ink-700 px-2 py-0.5">{{ shareInfo.share.views }} lượt xem</span>
+              <span v-if="shareInfo.share.expires_at" class="rounded-full bg-ink-700 px-2 py-0.5">hết hạn {{ shareInfo.share.expires_at }}</span>
+              <span v-if="shareInfo.share.last_viewed_at" class="rounded-full bg-ink-700 px-2 py-0.5">xem gần nhất {{ shareInfo.share.last_viewed_at }}</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <button class="tool-btn" @click="copyShare()"><StudioIcon name="copy" size="h-3.5 w-3.5" /> Copy link</button>
+              <button class="tool-btn !text-red-300 hover:!bg-red-500/15" :disabled="shareBusy" @click="revokeShare()"><StudioIcon name="ban" size="h-3.5 w-3.5" /> Thu hồi</button>
+            </div>
+          </div>
+          <div v-else class="space-y-2">
+            <p class="text-[11px] leading-relaxed text-cream-300">
+              Tạo link công khai để khách (hoặc người duyệt nội bộ) xem ảnh + yêu cầu và bấm <b class="text-cream-100">Duyệt</b>
+              hoặc <b class="text-cream-100">Yêu cầu sửa</b> — <b>không cần tài khoản FabrikAI</b>. Link có hạn và thu hồi được bất cứ lúc nào.
+            </p>
+            <div class="flex flex-wrap items-end gap-2">
+              <div class="w-32">
+                <label class="label" for="sh-days">Hiệu lực</label>
+                <select id="sh-days" v-model.number="shareDays" class="input !py-1.5 text-xs">
+                  <option :value="7">7 ngày</option>
+                  <option :value="30">30 ngày</option>
+                  <option :value="90">90 ngày</option>
+                </select>
+              </div>
+              <button class="btn-brand btn-sm flex-1" :disabled="shareBusy" @click="createShare()">
+                <StudioIcon name="link" size="h-3.5 w-3.5" /> {{ shareBusy ? 'Đang tạo…' : 'Tạo link chia sẻ' }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="shareInfo.feedback && shareInfo.feedback.length" class="rounded-lg border border-brand-500/25 bg-brand-600/10 p-2">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-200">Phản hồi của khách</p>
+            <ul class="mt-1 space-y-1.5">
+              <li v-for="fb in shareInfo.feedback.slice(0, 3)" :key="fb.id" class="text-[11px]">
+                <span class="font-semibold text-cream-100">{{ fb.author_name }}</span>
+                <span class="ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'">{{ fb.decision_label }}</span>
+                <span class="ml-1 text-cream-300">{{ fb.created_at }}</span>
+                <p v-if="fb.message" class="mt-0.5 whitespace-pre-line text-cream-200">{{ fb.message }}</p>
+              </li>
+            </ul>
+          </div>
+          <p v-else class="text-[10px] text-cream-300">Chưa có phản hồi nào từ khách.</p>
+        </template>
       </div>
 
       <!-- Xuất gói cho xưởng: gói ZIP gồm ảnh tham chiếu + phiếu kỹ thuật + bảng size + manifest -->

@@ -1644,6 +1644,39 @@ export const useStudioStore = defineStore('studio', {
         return d;
       } catch (e) { this.toast(e.message || 'Lỗi tải dự án.', 'error'); return null; }
     },
+    // ── Chia sẻ bộ sưu tập cho khách duyệt (Đợt 4) ────────────────────────────────────────
+    // Card trong sidebar KHÔNG tự gọi API (bất biến: một đường dữ liệu đi qua store) — ba action dưới
+    // đây là đường duy nhất tới /api/projects/{id}/share.
+    async loadShareStatus(projectId) {
+      try {
+        const r = await fetch('/api/projects/' + projectId + '/share', { headers: { Accept: 'application/json' } });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return await r.json();
+      } catch (e) {
+        this.toast('Không tải được trạng thái chia sẻ: ' + e.message, 'error');
+        return null;
+      }
+    },
+    async createShare(projectId, days = 30) {
+      try {
+        const d = await this.api('/api/projects/' + projectId + '/share', { days: Number(days) || 30 });
+        await navigator.clipboard?.writeText(d.url).then(() => this.toast('Đã tạo link chia sẻ và copy vào bộ nhớ tạm.')).catch(() => this.toast('Đã tạo link chia sẻ — bấm «Copy link» để lấy.'));
+        return d;
+      } catch (e) {
+        this.toast('Không tạo được link: ' + e.message, 'error');
+        return null;
+      }
+    },
+    async revokeShare(projectId, token) {
+      try {
+        await this.api('/api/projects/' + projectId + '/share/' + token, { _method: 'DELETE' });
+        this.toast('Đã thu hồi link — khách mở lại sẽ không xem được nữa.');
+        return true;
+      } catch (e) {
+        this.toast('Không thu hồi được: ' + e.message, 'error');
+        return false;
+      }
+    },
     /** Yêu cầu StudioApp mở workspace Dự án/Bộ sưu tập (gọi từ card trong sidebar). */
     requestWorkspace() { this.workspaceOpenRequest = (this.workspaceOpenRequest || 0) + 1; },
     async createProject(payload) {

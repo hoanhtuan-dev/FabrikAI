@@ -196,8 +196,14 @@
   ảnh lỗi được báo trong gói · bộ chưa có ảnh vẫn xuất được) · **524 test xanh** · UI kiểm bằng Chrome CDP
   **12/12 bước** (URL tải gói đúng endpoint + mang đúng bảng size/ghi chú đã mã hoá) · chạy thật trên
   production (tinker: tạo bộ tạm → dựng ZIP → đọc lại nội dung → xoá bộ tạm).
-- **Còn lại của đợt 4**: **chia sẻ link cho khách duyệt** (token công khai + nút Duyệt/Yêu cầu sửa) ·
-  phân quyền nhân viên theo gói (số ghế) · preset kênh bán (sàn TMĐT/catalogue) cho tên file ảnh.
+- ✅ **Chia sẻ link cho khách duyệt** (`/chia-se/{token}`): khách/nhân viên duyệt **KHÔNG cần tài khoản
+  FabrikAI** vẫn xem được ảnh + brief + hạn chót và bấm **Duyệt / Yêu cầu sửa** kèm ghi chú; phản hồi được
+  **lưu vào bộ sưu tập** (tên · quyết định · nội dung · thời điểm) và hiện ngay trong panel "Bộ sưu tập"
+  cho designer. Link **có hạn** (7/30/90 ngày), **thu hồi được**, đếm lượt xem; hết hạn/thu hồi ⇒ 404
+  (không dò được token); trang công khai **noindex**; gửi phản hồi có throttle theo IP.
+- **Còn lại của đợt 4**: phân quyền nhân viên theo gói (số ghế) · preset kênh bán (sàn TMĐT/catalogue)
+  cho tên file ảnh · tự động chuyển trạng thái bộ sưu tập khi khách bấm "Duyệt" (hiện CỐ Ý chỉ ghi phản hồi,
+  không tự đổi trạng thái — chuyển trạng thái là quyết định của chủ, có whitelist riêng).
 
 ---
 

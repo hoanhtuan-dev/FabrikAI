@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectShareController;
 use App\Http\Controllers\StudioController;
 use App\Http\Controllers\StudioSettingsController;
 use App\Http\Controllers\StylistDataController;
@@ -43,6 +44,14 @@ Route::get('/dang-ky', [AuthController::class, 'showRegister'])->name('register'
 // pricing, trang đăng ký không nhắc gói nào) ⇒ phải tạo tài khoản mới biết. Trang render phía máy
 // chủ; giá/credit đọc từ bảng plans đang mở bán nên không bao giờ lệch với hệ thống.
 Route::get('/bang-gia', [BillingController::class, 'pricingPage'])->name('pricing.page');
+
+// ── Link CHIA SẺ cho KHÁCH DUYỆT (không cần đăng nhập) ──
+// [Đợt 4 — 2026-09-19] Khách/nhân viên duyệt nội bộ mở link là xem được ảnh + brief và gửi phản hồi
+// (Duyệt / Yêu cầu sửa). Token 48 ký tự ngẫu nhiên; hết hạn hoặc bị thu hồi ⇒ 404.
+// throttle:share-feedback — chống spam phản hồi từ một IP (xem AppServiceProvider).
+Route::get('/chia-se/{token}', [ProjectShareController::class, 'show'])->name('share.show');
+Route::post('/chia-se/{token}/phan-hoi', [ProjectShareController::class, 'submitFeedback'])
+    ->middleware('throttle:share-feedback')->name('share.feedback');
 // throttle:register — chống spam tạo tài khoản (5 lần/phút theo IP).
 Route::post('/dang-ky', [AuthController::class, 'register'])->middleware('throttle:register')->name('register.store');
 Route::post('/dang-xuat', [AuthController::class, 'logout'])->name('logout');
@@ -86,6 +95,11 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     // [Đợt 4 — 2026-09-19] XUẤT GÓI CHO XƯỞNG: ảnh tham chiếu + phiếu kỹ thuật + bảng size + manifest,
     // đóng thành 1 file ZIP. Chủ xưởng may cần "gói đủ để cắt may", không chỉ một tấm ảnh.
     Route::get('/projects/{project}/export', [ProjectController::class, 'exportBundle'])->name('projects.export');
+
+    // [Đợt 4 — 2026-09-19] CHIA SẺ CHO KHÁCH DUYỆT: tạo link công khai (có hạn) + thu hồi.
+    Route::get('/projects/{project}/share', [ProjectShareController::class, 'status'])->name('projects.share.status');
+    Route::post('/projects/{project}/share', [ProjectShareController::class, 'create'])->name('projects.share.create');
+    Route::delete('/projects/{project}/share/{share}', [ProjectShareController::class, 'revoke'])->name('projects.share.revoke');
 
     // ── Generation pipelines (mọi thứ tạo ra ảnh/video của chính user) ──
     Route::post('/generate', [StudioController::class, 'generate'])->name('generate');
