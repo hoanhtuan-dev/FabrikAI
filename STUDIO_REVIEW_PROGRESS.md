@@ -284,7 +284,7 @@ JS/Vue studio **51 file (38 .vue) / 14.239 dòng** · `public_html` **21 MB** ·
 
 ### 3.5bis Quản trị /admin (thiết kế lại UX/UI, 2026-09-18)
 
-- **[CHƯA COMMIT] Thiết kế lại UX/UI trang `/admin`**: `resources/js/studio/AdminApp.vue` viết lại (715 → 1.270 dòng), `icons.json` +2 icon (`package`, `receipt`). **Không đổi backend** — vẫn đúng bộ endpoint `/api/admin/*` + `/api/boot` và phân quyền 2 tầng (admin cho dashboard/plans/ledger/gui; super_admin cho users).
+- `d4817bb` **Thiết kế lại UX/UI trang `/admin`** (đã deploy 2026-09-18 — xem `DEPLOY.md` §9.1septies): `resources/js/studio/AdminApp.vue` viết lại (715 → 1.270 dòng), `icons.json` +2 icon (`package`, `receipt`). **Không đổi backend** — vẫn đúng bộ endpoint `/api/admin/*` + `/api/boot` và phân quyền 2 tầng (admin cho dashboard/plans/ledger/gui; super_admin cho users).
 - Cấu trúc mới: danh mục dọc theo 3 nhóm (Bắt đầu · Người & credit · Hệ thống) có badge trạng thái; màn < 1024px gom thành dải cuộn ngang; mục **Tổng quan** có "Việc cần xử lý" (chưa có gói mặc định · tất cả gói bị ẩn · chưa ai trả phí · chưa phát sinh tiêu credit 30 ngày · nút đang bị ẩn) + phân bố gói kèm số người và %; deep-link `?tab=`.
 - **Phân quyền được HIỂN THỊ**: vai trò không phải Owner không còn thấy mục Người dùng rồi nhận 403 khô khan — mục bị ẩn, có băng cảnh báo và bảng giải thích khi vào thẳng `?tab=users`. Đã đối chiếu với máy chủ: `/api/boot.is_super_admin=false` ⇒ `GET /api/admin/users` = **403** (khớp đúng UI).
 - Hộp thoại chuyển sang `BaseModal` (focus trap + Esc + `aria-modal`) thay cho 6 lớp phủ tự viết tay không giữ focus; xoá/khôi phục mặc định qua hộp thoại xác nhận nói rõ hậu quả (thay `confirm()`); mọi nút đổi từ emoji sang `StudioIcon` + nhãn chữ/`aria-label`.
