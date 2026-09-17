@@ -131,6 +131,10 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     // trả gói và không có UI gói cước nào (grep 'billing' trong resources/js = 0).
     Route::get('/plan/status', [StudioController::class, 'planStatus'])->name('plan.status');
 
+    // [Đợt 2 — 2026-09-19] Mẫu việc theo ngành (lookbook · sàn TMĐT · mẫu kỹ thuật xưởng · catalogue):
+    // đổ sẵn danh sách prompt + tỉ lệ + độ phân giải + bảng size cho tab "Hàng loạt" và gói xuất xưởng.
+    Route::get('/job-templates', [StudioController::class, 'jobTemplates'])->name('job-templates');
+
     // ── Cài đặt Ghép Trang Phục — theo TỪNG user (`studio_outfit_settings.user_id`) ──
     Route::get('/outfit-settings', [StudioController::class, 'outfitSettings'])->name('outfit-settings');
     Route::post('/outfit-settings', [StudioController::class, 'saveOutfitSettings'])->name('outfit-settings.save');

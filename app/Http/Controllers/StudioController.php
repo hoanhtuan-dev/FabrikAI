@@ -1690,6 +1690,20 @@ RULES:
     }
 
     /**
+     * GET /api/job-templates — MẪU VIỆC THEO NGÀNH (Đợt 2).
+     *
+     * Người mới gặp ô prompt trống và tab "Hàng loạt" trống: họ biết việc cần làm ("chụp lookbook cho bộ
+     * Thu Đông") nhưng không biết gõ gì, chọn tỉ lệ nào, cần mấy kiểu ảnh. Endpoint này trả các mẫu việc
+     * điền sẵn (prompt · tỉ lệ · độ phân giải · bảng size cho xưởng) để giao diện đổ vào một cú bấm.
+     */
+    public function jobTemplates(): \Illuminate\Http\JsonResponse
+    {
+        return response()->json([
+            'templates' => \App\Support\IndustryTemplates::all(),
+        ]);
+    }
+
+    /**
      * GET /api/plan/status — gói hiện tại · hạn mức · chi phí · danh mục gói đang mở bán.
      *
      * Một chỗ để giao diện nói đúng: "bạn ở gói nào, còn bao nhiêu credit, mỗi ảnh/video tốn bao

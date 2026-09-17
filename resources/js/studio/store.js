@@ -300,6 +300,11 @@ export const useStudioStore = defineStore('studio', {
     // [Đợt 2] Card trong sidebar render bằng <component :is> nên KHÔNG nhận prop/event; muốn mở
     // workspace Dự án từ card thì tăng bộ đếm này — StudioApp theo dõi và mở popup tương ứng.
     workspaceOpenRequest: 0,
+    // [Đợt 2] MẪU VIỆC THEO NGÀNH: danh sách mẫu (server là nguồn duy nhất) + mẫu đang chờ điền vào
+    // gói xuất xưởng (bảng size/ghi chú kỹ thuật) khi người dùng mở khối "Xuất gói cho xưởng".
+    jobTemplates: [],
+    jobTemplatesLoaded: false,
+    pendingExport: null,
     projectCanReview: false,      // true khi user là Super Admin (được duyệt/lưu trữ dự án của người khác)
   }),
   getters: {
@@ -1676,6 +1681,34 @@ export const useStudioStore = defineStore('studio', {
         this.toast('Không thu hồi được: ' + e.message, 'error');
         return false;
       }
+    },
+    // ── Mẫu việc theo ngành (Đợt 2) ───────────────────────────────────────────────────────
+    async loadJobTemplates() {
+      if (this.jobTemplatesLoaded) return this.jobTemplates;
+      try {
+        const r = await fetch('/api/job-templates', { headers: { Accept: 'application/json' } });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        this.jobTemplates = Array.isArray(d.templates) ? d.templates : [];
+        this.jobTemplatesLoaded = true;
+      } catch (e) { console.error('loadJobTemplates failed', e); }
+      return this.jobTemplates;
+    },
+    /**
+     * Áp một MẪU VIỆC: đặt tỉ lệ + độ phân giải, giữ bảng size/ghi chú cho gói xuất xưởng,
+     * và trả về danh sách prompt để card đổ vào ô "Hàng loạt".
+     */
+    applyJobTemplate(tpl) {
+      if (!tpl) return [];
+      if (tpl.ratio) this.imageRatio = tpl.ratio;
+      if (tpl.resolution) this.imageRes = tpl.resolution;
+      this.pendingExport = tpl.export
+        ? { from: tpl.title, sizes: tpl.export.sizes || '', note: tpl.export.note || '' }
+        : null;
+      const n = (tpl.prompts || []).length;
+      this.toast('Đã áp mẫu «' + tpl.title + '»: ' + n + ' mục · tỉ lệ ' + tpl.ratio + ' · ' + tpl.resolution
+        + (tpl.export ? ' · kèm bảng size cho xưởng' : ''));
+      return tpl.prompts || [];
     },
     /** Yêu cầu StudioApp mở workspace Dự án/Bộ sưu tập (gọi từ card trong sidebar). */
     requestWorkspace() { this.workspaceOpenRequest = (this.workspaceOpenRequest || 0) + 1; },

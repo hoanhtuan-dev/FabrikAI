@@ -173,9 +173,14 @@
   đứng đầu thứ tự gốc) · **519 test xanh** · chạy thật trong Studio (Chrome CDP): **17/17 bước** — panel liệt kê
   đúng bộ + số ảnh + hạn chót, chọn bộ thì áp dụng, tạo bộ mới gửi đúng payload (tên/brief/hạn/mùa vụ) và tự áp
   dụng, mở được workspace.
-- **Còn lại của đợt 2**: preset theo ngành (lookbook · sàn TMĐT · mẫu kỹ thuật xưởng · catalogue), luồng **Duyệt**
-  cho chủ doanh nghiệp (hiện đã có trạng thái + transition ở workspace nhưng chưa có màn hình duyệt theo lô),
-  và báo cáo chi phí/tiến độ theo bộ sưu tập.
+- ✅ **Mẫu việc theo ngành** (`GET /api/job-templates` + khối "Bắt đầu từ mẫu việc" trong tab **Hàng loạt**):
+  bốn mẫu trọn vẹn — **Lookbook bộ sưu tập** (6 kiểu ảnh) · **Ảnh đăng sàn TMĐT** (4 kiểu, 1:1 nền sạch) ·
+  **Mẫu kỹ thuật gửi xưởng** (4 kiểu + **bảng size và ghi chú kỹ thuật điền sẵn cho gói xuất**) ·
+  **Catalogue nhiều SKU**. Bấm một mẫu là có ngay: danh sách prompt cho tạo hàng loạt + tỉ lệ + độ phân giải;
+  mẫu của xưởng còn **điền sẵn khối "Xuất gói cho xưởng"** (không bắt gõ lại bảng size).
+  Nguồn dữ liệu ở **một chỗ duy nhất** (PHP) — JS đọc qua API, có test cấm chép prompt vào JS.
+- **Còn lại của đợt 2**: màn **Duyệt theo lô** cho chủ doanh nghiệp (nền `?scope=pending` + transition đã có,
+  chưa có màn hình gọn) và **báo cáo chi phí/tiến độ theo bộ sưu tập** (số ảnh · credit đã dùng · ảnh lỗi).
 
 ### Đợt 3 — Tối ưu thao tác
 - Tạo hàng loạt 1 cú bấm (N SKU × M bối cảnh), hàng đợi có tiến trình thật, so sánh trước/sau, phím tắt.

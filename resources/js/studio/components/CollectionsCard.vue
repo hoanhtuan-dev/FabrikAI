@@ -75,6 +75,19 @@ function copyShare() {
   if (!url) return;
   navigator.clipboard?.writeText(url).then(() => store.toast('Đã copy link chia sẻ.')).catch(() => store.toast('Không copy được — hãy chọn và copy thủ công.', 'error'));
 }
+/**
+ * Mở/đóng khối xuất gói. Nếu người dùng vừa áp MẪU VIỆC có kèm bảng size (vd "Mẫu kỹ thuật gửi xưởng"),
+ * điền sẵn vào form — nhưng KHÔNG ghi đè nội dung người dùng đã tự nhập.
+ */
+function toggleExport() {
+  exportOpen.value = !exportOpen.value;
+  if (!exportOpen.value) return;
+  const tpl = store.pendingExport;
+  if (!tpl) return;
+  if (!exportForm.value.sizes.trim() && tpl.sizes) exportForm.value.sizes = tpl.sizes;
+  if (!exportForm.value.note.trim() && tpl.note) exportForm.value.note = tpl.note;
+  if (tpl.sizes || tpl.note) store.toast('Đã điền sẵn bảng size/ghi chú từ mẫu «' + tpl.from + '» — kiểm tra rồi tải gói.');
+}
 function startExport() {
   if (!applied.value) { store.toast('Chọn bộ sưu tập trước khi xuất gói.', 'error'); return; }
   const q = new URLSearchParams();
@@ -178,7 +191,7 @@ async function submit() {
       <p v-if="applied.brief" class="mt-1.5 line-clamp-2 text-[11px] text-cream-300">{{ applied.brief }}</p>
       <div class="mt-2 flex flex-wrap gap-1.5">
         <button class="tool-btn" @click="openWorkspace(applied)"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> Mở workspace</button>
-        <button class="tool-btn" :class="exportOpen ? 'is-active' : ''" title="Đóng gói ảnh + phiếu kỹ thuật + bảng size thành 1 file ZIP để gửi xưởng may" @click="exportOpen = !exportOpen">
+        <button class="tool-btn" :class="exportOpen ? 'is-active' : ''" title="Đóng gói ảnh + phiếu kỹ thuật + bảng size thành 1 file ZIP để gửi xưởng may" @click="toggleExport()">
           <StudioIcon name="download" size="h-3.5 w-3.5" /> Xuất gói cho xưởng
         </button>
         <button class="tool-btn" :class="shareOpen ? 'is-active' : ''" title="Gửi link cho khách/nhân viên duyệt (không cần tài khoản FabrikAI)" @click="toggleShare()">

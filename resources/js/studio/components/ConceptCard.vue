@@ -19,6 +19,18 @@ const activeTab = ref('prompt'); // 'prompt' | 'body' | 'hair' | 'pose' | 'advan
 // phải sửa prompt rồi bấm tạo từng lần. Nay dán danh sách (mỗi dòng một mục) → MỘT lần bấm.
 const batchText = ref('');
 const batchVariants = ref(1);
+// Mẫu việc theo ngành: nạp 1 lần khi mở tab Hàng loạt (server là nguồn duy nhất của dữ liệu mẫu).
+const templatesLoading = ref(false);
+async function ensureTemplates() {
+  if (store.jobTemplatesLoaded || templatesLoading.value) return;
+  templatesLoading.value = true;
+  await store.loadJobTemplates();
+  templatesLoading.value = false;
+}
+function useTemplate(tpl) {
+  const prompts = store.applyJobTemplate(tpl);
+  if (prompts.length) batchText.value = prompts.join('\n');
+}
 const BATCH_MAX_ITEMS = 12;
 const batchItems = computed(() => batchText.value.split('\n').map((s) => s.trim()).filter(Boolean));
 const batchOverLimit = computed(() => batchItems.value.length > BATCH_MAX_ITEMS);
@@ -282,7 +294,11 @@ async function loadImagePoses() {
   } catch (e) { /* giữ mặc định */ }
 }
 // Watch tab switch để load poses khi vào tab Tư thế
-watch(activeTab, (tab) => { if (tab === 'pose') loadImagePoses(); });
+watch(activeTab, (tab) => {
+  if (tab === 'pose') loadImagePoses();
+  // Mẫu việc chỉ cần khi người dùng vào tab Hàng loạt (không tốn request lúc mở Studio).
+  if (tab === 'batch') ensureTemplates();
+});
 
 // ── Draft state ──
 const showDraftNotice = ref(false);
@@ -892,6 +908,23 @@ const bodyHipsLabel = computed(() => {
             <p class="mt-1 text-[11px] leading-relaxed text-cream-200">
               Mỗi dòng là một sản phẩm / ý tưởng. Hệ thống dùng ĐÚNG cài đặt đang chọn: tỉ lệ, độ phân giải,
               phom dáng, kiểu tóc, prompt prefix/suffix và dự án đang áp dụng.
+            </p>
+          </div>
+
+          <!-- Mẫu việc theo ngành: người mới không phải nghĩ xem gõ gì (Đợt 2) -->
+          <div class="rounded-lg border border-ink-700 bg-ink-900/60 p-2.5">
+            <p class="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300">Bắt đầu từ mẫu việc</p>
+            <div class="flex flex-wrap gap-1.5">
+              <button v-for="tpl in store.jobTemplates" :key="tpl.id" type="button" class="tool-btn" :title="tpl.hint + ' (' + tpl.prompts.length + ' mục · ' + tpl.ratio + ' · ' + tpl.resolution + ')'" @click="useTemplate(tpl)">
+                <StudioIcon :name="tpl.icon" size="h-3.5 w-3.5" /> {{ tpl.title }}
+                <span class="text-[9px] text-cream-300">· {{ tpl.for }}</span>
+              </button>
+              <button v-if="!store.jobTemplates.length" type="button" class="tool-btn" :disabled="templatesLoading" @click="ensureTemplates()">
+                <StudioIcon name="refresh" size="h-3.5 w-3.5" :class="{ 'animate-spin': templatesLoading }" /> Tải mẫu việc
+              </button>
+            </div>
+            <p v-if="store.jobTemplates.length" class="mt-1.5 text-[10px] text-cream-300">
+              Bấm một mẫu để điền sẵn danh sách prompt + tỉ lệ + độ phân giải. Mẫu «Mẫu kỹ thuật gửi xưởng» còn điền sẵn bảng size cho gói xuất.
             </p>
           </div>
 
