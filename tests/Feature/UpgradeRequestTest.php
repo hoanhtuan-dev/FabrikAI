@@ -272,4 +272,23 @@ class UpgradeRequestTest extends TestCase
             ->assertJsonPath('payment.bank.account', '0123456789')
             ->assertJsonPath('payment.support.phone', '0901234567');
     }
+
+    public function test_admin_ui_actually_drives_the_upgrade_queue(): void
+    {
+        // Bất biến chống "tính năng chết" (đã gặp một lần với vòng đời duyệt ảnh): API có mà giao diện
+        // không gọi thì coi như không có. Màn Quản trị PHẢI: có mục trong menu, nạp hàng đợi, hiện số
+        // việc đang chờ, gửi đúng 3 lời gọi (đổi trạng thái · kích hoạt · lưu thông tin nhận tiền), và
+        // CHỈ hiện nút kích hoạt cho Super Admin.
+        $ui = (string) file_get_contents(resource_path('js/studio/AdminApp.vue'));
+
+        $this->assertStringContainsString("{ id: 'upgrades'", $ui, 'Phải có mục «Yêu cầu nâng cấp» trong menu Quản trị.');
+        $this->assertStringContainsString("api('/upgrade-requests'", $ui, 'Phải nạp hàng đợi từ API quản trị.');
+        $this->assertStringContainsString("api('/upgrade-requests/' + row.id + '/activate'", $ui, 'Nút kích hoạt phải gọi đúng endpoint.');
+        $this->assertStringContainsString("api('/payment-info', 'POST'", $ui, 'Phải lưu được thông tin nhận tiền.');
+        $this->assertStringContainsString('v-if="isSuper"', $ui, 'Nút kích hoạt chỉ dành cho Super Admin.');
+        $this->assertStringContainsString('pendingUpgrades', $ui, 'Menu phải hiện số yêu cầu đang chờ.');
+        $this->assertStringContainsString('await loadUpgrades();', $ui, 'Phải nạp hàng đợi ngay khi mở trang Quản trị.');
+        // Không tự gọi API bằng fetch thô trong màn này (giữ một đường dữ liệu qua api()).
+        $this->assertStringNotContainsString("fetch('/api/admin", $ui, 'Không gọi API quản trị bằng fetch thô.');
+    }
 }

@@ -43,6 +43,8 @@ const SECTIONS = [
   { id: 'users',     group: 'Người & credit', label: 'Người dùng',       icon: 'users',    superOnly: true },
   { id: 'plans',     group: 'Người & credit', label: 'Gói cước',         icon: 'package',  superOnly: false },
   { id: 'ledger',    group: 'Người & credit', label: 'Sổ credit',        icon: 'receipt',  superOnly: false },
+  // [Q2 — 2026-09-19] Hàng đợi YÊU CẦU NÂNG CẤP: khách gửi yêu cầu (có mã) → xác nhận tiền → kích hoạt.
+  { id: 'upgrades',  group: 'Người & credit', label: 'Yêu cầu nâng cấp', icon: 'coins',    superOnly: false },
   { id: 'gui',       group: 'Hệ thống',       label: 'Giao diện Studio', icon: 'palette',  superOnly: false },
 ];
 const SECTION_GROUPS = ['Bắt đầu', 'Người & credit', 'Hệ thống'];
@@ -93,7 +95,7 @@ const BADGE_TONE = {
 const me = ref(null);
 const section = ref('dashboard');
 const toast = ref(null);
-const loading = reactive({ dashboard: true, plans: false, users: false, ledger: false, gui: false });
+const loading = reactive({ dashboard: true, plans: false, users: false, ledger: false, gui: false, upgrades: false });
 
 const dashboard = ref(null);
 const plansData = ref([]);
@@ -102,6 +104,15 @@ const ledgerData = ref({ transactions: [], total: 0, page: 1, last_page: 1 });
 const guiItems = ref([]);
 const guiIcons = ref([]);
 const guiSnapshot = ref('');
+
+// [Q2 — 2026-09-19] Yêu cầu nâng cấp + thông tin nhận tiền
+const upgradesData = ref({ requests: [], counts: {}, statuses: [], payment: null });
+const upFilter = ref('');
+const paymentForm = reactive({
+  bank_name: '', bank_account: '', bank_holder: '', bank_branch: '',
+  support_phone: '', support_email: '', support_zalo: '', support_hours: '',
+});
+const pendingUpgrades = computed(() => Number(upgradesData.value.counts.pending || 0) + Number(upgradesData.value.counts.contacted || 0));
 
 const f = reactive({ userSearch: '', userRole: '', userStatus: '', userPerPage: 20 });
 const l = reactive({ search: '', type: '', userId: null, userName: '', perPage: 20 });
@@ -209,11 +220,47 @@ async function loadGui() {
   } catch (e) { flash(e.message, false); }
   finally { loading.gui = false; }
 }
+// ─────────────────────────── Yêu cầu nâng cấp (Q2) ───────────────────────────
+// Hàng đợi để chủ dự án xử lý: xác nhận đã liên hệ khách, huỷ nếu khách đổi ý, và KÍCH HOẠT khi tiền
+// đã về. Kích hoạt đi qua API riêng (chỉ Super Admin) — giao diện không tự gán gói.
+async function loadUpgrades() {
+  loading.upgrades = true;
+  try {
+    const q = upFilter.value ? '?status=' + encodeURIComponent(upFilter.value) : '';
+    const d = await api('/upgrade-requests' + q);
+    upgradesData.value = d;
+    const bank = (d.payment && d.payment.bank) || {};
+    const sup = (d.payment && d.payment.support) || {};
+    Object.assign(paymentForm, {
+      bank_name: bank.name || '', bank_account: bank.account || '', bank_holder: bank.holder || '', bank_branch: bank.branch || '',
+      support_phone: sup.phone || '', support_email: sup.email || '', support_zalo: sup.zalo || '', support_hours: sup.hours || '',
+    });
+  } catch (e) { flash(e.message, false); }
+  finally { loading.upgrades = false; }
+}
+async function setUpgradeStatus(row, status) {
+  const ok = await run(() => api('/upgrade-requests/' + row.id, 'POST', { status }), 'Đã cập nhật ' + row.code);
+  if (ok) loadUpgrades();
+}
+async function activateUpgrade(row) {
+  const ok = await run(
+    () => api('/upgrade-requests/' + row.id + '/activate', 'POST', {}),
+    'Đã kích hoạt gói cho ' + (row.user ? row.user.name : row.code),
+  );
+  if (ok) loadUpgrades();
+}
+async function savePayment() {
+  const ok = await run(() => api('/payment-info', 'POST', Object.assign({}, paymentForm)), 'Đã lưu thông tin nhận tiền');
+  if (ok) loadUpgrades();
+}
+const upgradeTone = (s) => (s === 'pending' ? 'warn' : s === 'contacted' ? 'info' : s === 'activated' ? 'ok' : 'neutral');
+
 function ensureLoaded(id) {
   if (id === 'users' && isSuper.value && !usersData.value.users.length) loadUsers();
   if (id === 'ledger' && !ledgerData.value.transactions.length) loadLedger();
   if (id === 'gui' && !guiItems.value.length) loadGui();
   if (id === 'plans' && !plansData.value.length) loadPlans();
+  if (id === 'upgrades' && !upgradesData.value.requests.length) loadUpgrades();
 }
 
 // ─────────────────────────── Việc cần xử lý (tổng quan) ───────────────────────────
@@ -240,6 +287,15 @@ const attention = computed(() => {
   }
   if (kpis.value && !kpis.value.paying_subscribers && kpis.value.total_users) {
     out.push({ icon: 'coins', tone: 'info', title: 'Không có người dùng trả phí', detail: 'Người dùng đang dùng gói miễn phí hoặc chưa gán gói.', action: 'Xem người dùng', run: () => { if (isSuper.value) goTo('users'); } });
+  }
+  // [Q2] Yêu cầu nâng cấp đang chờ = TIỀN đang chờ thu: phải nằm trong danh sách việc cần xử lý.
+  if (pendingUpgrades.value) {
+    out.push({
+      icon: 'coins', tone: 'warn',
+      title: pendingUpgrades.value + ' yêu cầu nâng cấp đang chờ xử lý',
+      detail: 'Khách đã để lại số điện thoại và chọn gói: xác nhận đã liên hệ, và kích hoạt gói ngay khi tiền về.',
+      action: 'Xử lý ngay', run: () => goTo('upgrades'),
+    });
   }
   if (guiHiddenCount.value) {
     out.push({ icon: 'palette', tone: 'info', title: guiHiddenCount.value + ' nút đang bị ẩn trên thanh công cụ', detail: 'Người dùng Studio không thấy các mục này.', action: 'Xem giao diện', run: () => goTo('gui') });
@@ -490,6 +546,8 @@ function navBadge(id) {
     ledger: ledgerData.value.total ? fmtNum(ledgerData.value.total) : '',
     gui: guiItems.value.length ? (guiHiddenCount.value ? guiHiddenCount.value + ' ẩn' : String(guiItems.value.length)) : '',
     dashboard: attention.value[0] && attention.value[0].tone !== 'ok' ? attention.value.length : '',
+    // [Q2] Số yêu cầu nâng cấp CHƯA xong — đây là việc chủ dự án cần xử lý, nên phải thấy ngay ở menu.
+    upgrades: pendingUpgrades.value ? String(pendingUpgrades.value) : '',
   };
   return map[id] == null ? '' : map[id];
 }
@@ -503,6 +561,8 @@ onMounted(async () => {
   } catch (e) { /* không lấy được danh tính: vẫn hiển thị phần không cần quyền */ }
   await loadDashboard();
   await loadPlans();
+  // [Q2] Nạp luôn hàng đợi nâng cấp: menu hiện số việc đang chờ ngay khi mở trang Quản trị.
+  await loadUpgrades();
   ensureLoaded(section.value);
 });
 </script>
@@ -549,7 +609,7 @@ onMounted(async () => {
             <StudioIcon name="gear" size="h-3.5 w-3.5" />
             <span class="hidden sm:inline">Cài đặt</span>
           </a>
-          <button class="tool-btn" :disabled="loading.dashboard" title="Nạp lại dữ liệu" @click="loadDashboard(); if (section==='users') loadUsers(); if (section==='ledger') loadLedger(); if (section==='gui') loadGui(); if (section==='plans') loadPlans()">
+          <button class="tool-btn" :disabled="loading.dashboard" title="Nạp lại dữ liệu" @click="loadDashboard(); if (section==='users') loadUsers(); if (section==='ledger') loadLedger(); if (section==='gui') loadGui(); if (section==='plans') loadPlans(); if (section==='upgrades') loadUpgrades()">
             <StudioIcon name="refresh" size="h-3.5 w-3.5" :class="{ 'animate-spin': loading.dashboard }" />
             <span class="hidden sm:inline">Tải lại</span>
           </button>
@@ -981,6 +1041,165 @@ onMounted(async () => {
           </section>
 
           <!-- ───── GIAO DIỆN STUDIO ───── -->
+          <!-- ═════════ YÊU CẦU NÂNG CẤP (Q2) ═════════ -->
+          <section v-show="section === 'upgrades'" class="space-y-5">
+            <div class="card p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
+                    <StudioIcon name="coins" size="h-4 w-4" class="text-brand-300" /> Yêu cầu nâng cấp gói
+                    <span :class="[BADGE, pendingUpgrades ? BADGE_TONE.warn : BADGE_TONE.neutral]">{{ pendingUpgrades }} đang chờ</span>
+                  </h2>
+                  <p class="mt-1 max-w-3xl text-xs text-cream-300/75">
+                    Hệ thống chưa có cổng thanh toán: khách gửi yêu cầu (nhận MÃ như <span class="font-mono">UP-2609-0001</span>), chuyển khoản theo mã đó,
+                    rồi bạn <b class="text-cream-100">kích hoạt gói</b> ở đây. Chỉ Owner kích hoạt được — người khác vẫn đánh dấu «đã liên hệ» để cả nhóm biết ai đang chăm khách.
+                  </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <button v-for="st in [['', 'Tất cả'], ['pending', 'Chờ xử lý'], ['contacted', 'Đã liên hệ'], ['activated', 'Đã kích hoạt'], ['cancelled', 'Đã huỷ']]"
+                          :key="st[0]" class="tool-btn" :class="upFilter === st[0] ? 'is-active' : ''"
+                          @click="upFilter = st[0]; loadUpgrades()">
+                    {{ st[1] }}
+                  </button>
+                  <button class="tool-btn" :disabled="loading.upgrades" title="Nạp lại hàng đợi" @click="loadUpgrades()">
+                    <StudioIcon name="refresh" size="h-3.5 w-3.5" /> Nạp lại
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Thông tin nhận tiền: MỘT nguồn cho trang giá + popup Studio + hoá đơn -->
+            <div class="card p-4">
+              <h3 class="flex items-center gap-2 text-sm font-semibold text-cream-50">
+                <StudioIcon name="receipt" size="h-4 w-4" class="text-brand-300" /> Thông tin nhận tiền &amp; hỗ trợ
+                <span v-if="!paymentForm.bank_account" :class="[BADGE, BADGE_TONE.warn]">chưa điền STK</span>
+              </h3>
+              <p class="mt-1 text-xs text-cream-300/75">
+                Thông tin này hiện ở <a href="/bang-gia" class="link" target="_blank" rel="noopener">trang giá</a> và trong popup «Gói &amp; credit» của Studio.
+                Để trống thì hệ thống <b class="text-cream-100">không bịa số tài khoản</b> — chỉ báo «FabrikAI sẽ gửi thông tin thanh toán».
+              </p>
+              <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <label class="block text-[10px] font-semibold uppercase tracking-wide text-cream-300">
+                  Ngân hàng
+                  <input v-model="paymentForm.bank_name" maxlength="120" class="input mt-1 !py-2 text-xs" placeholder="Vietcombank">
+                </label>
+                <label class="block text-[10px] font-semibold uppercase tracking-wide text-cream-300">
+                  Số tài khoản
+                  <input v-model="paymentForm.bank_account" maxlength="60" class="input mt-1 !py-2 text-xs" placeholder="0123456789">
+                </label>
+                <label class="block text-[10px] font-semibold uppercase tracking-wide text-cream-300">
+                  Chủ tài khoản
+                  <input v-model="paymentForm.bank_holder" maxlength="120" class="input mt-1 !py-2 text-xs" placeholder="CONG TY FABRIKAI">
+                </label>
+                <label class="block text-[10px] font-semibold uppercase tracking-wide text-cream-300">
+                  Chi nhánh
+                  <input v-model="paymentForm.bank_branch" maxlength="120" class="input mt-1 !py-2 text-xs" placeholder="CN Sài Gòn">
+                </label>
+                <label class="block text-[10px] font-semibold uppercase tracking-wide text-cream-300">
+                  Hotline
+                  <input v-model="paymentForm.support_phone" maxlength="32" class="input mt-1 !py-2 text-xs" placeholder="0901234567">
+                </label>
+                <label class="block text-[10px] font-semibold uppercase tracking-wide text-cream-300">
+                  Email hỗ trợ
+                  <input v-model="paymentForm.support_email" maxlength="120" class="input mt-1 !py-2 text-xs" placeholder="hotro@fabrikai.shop">
+                </label>
+                <label class="block text-[10px] font-semibold uppercase tracking-wide text-cream-300">
+                  Zalo
+                  <input v-model="paymentForm.support_zalo" maxlength="120" class="input mt-1 !py-2 text-xs" placeholder="0901234567">
+                </label>
+                <label class="block text-[10px] font-semibold uppercase tracking-wide text-cream-300">
+                  Giờ làm việc
+                  <input v-model="paymentForm.support_hours" maxlength="120" class="input mt-1 !py-2 text-xs" placeholder="8h30 – 18h, thứ 2 – thứ 7">
+                </label>
+              </div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button class="btn-brand btn-sm" :disabled="loading.upgrades" @click="savePayment()">
+                  <StudioIcon name="save" size="h-3.5 w-3.5" /> Lưu thông tin nhận tiền
+                </button>
+              </div>
+            </div>
+
+            <div class="card overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full min-w-[960px] text-left text-xs">
+                  <thead>
+                    <tr class="border-b border-ink-700 text-cream-300/75">
+                      <th class="px-4 py-3 font-semibold">Mã · thời gian</th>
+                      <th class="px-3 py-3 font-semibold">Khách</th>
+                      <th class="px-3 py-3 font-semibold">Gói · số tháng</th>
+                      <th class="px-3 py-3 text-right font-semibold">Số tiền</th>
+                      <th class="px-3 py-3 font-semibold">Thanh toán</th>
+                      <th class="px-3 py-3 font-semibold">Trạng thái</th>
+                      <th class="px-3 py-3 text-right font-semibold">Xử lý</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-ink-700/60">
+                    <tr v-for="r in upgradesData.requests" :key="r.id" class="align-top hover:bg-ink-800/40">
+                      <td class="px-4 py-3">
+                        <span class="font-mono text-[11px] font-semibold text-cream-100">{{ r.code }}</span>
+                        <span class="mt-0.5 block text-[10px] text-cream-300/75">{{ r.created_at }}</span>
+                        <span v-if="r.status === 'pending' && r.age_hours >= 24" :class="[BADGE, BADGE_TONE.danger]" class="mt-1">chờ {{ r.age_hours }} giờ</span>
+                      </td>
+                      <td class="px-3 py-3">
+                        <span class="block font-semibold text-cream-100">{{ r.user ? r.user.name : '—' }}</span>
+                        <span class="block text-[10px] text-cream-300/75">{{ r.user ? r.user.email : '' }}</span>
+                        <a v-if="r.contact_phone" :href="'tel:' + r.contact_phone" class="mt-0.5 inline-flex items-center gap-1 text-[10px] text-brand-200 hover:underline">
+                          <StudioIcon name="user" size="h-3 w-3" /> {{ r.contact_name || r.user?.name }} · {{ r.contact_phone }}
+                        </a>
+                      </td>
+                      <td class="px-3 py-3">
+                        <span class="block text-cream-100">{{ r.plan ? r.plan.name : '—' }}</span>
+                        <span class="block text-[10px] text-cream-300/75">{{ r.months }} tháng</span>
+                      </td>
+                      <td class="px-3 py-3 text-right font-semibold text-cream-50">{{ r.amount_label }}</td>
+                      <td class="px-3 py-3">
+                        <span class="block text-cream-200">{{ r.method_label }}</span>
+                        <span v-if="r.note" class="mt-0.5 block max-w-[16rem] whitespace-pre-line text-[10px] text-cream-300/75">{{ r.note }}</span>
+                      </td>
+                      <td class="px-3 py-3">
+                        <span :class="[BADGE, BADGE_TONE[upgradeTone(r.status)]]">{{ r.status_label }}</span>
+                        <span v-if="r.handler" class="mt-1 block text-[10px] text-cream-300/75">{{ r.handler }} · {{ r.handled_at }}</span>
+                        <span v-if="r.admin_note" class="mt-1 block max-w-[14rem] text-[10px] italic text-cream-300/75">{{ r.admin_note }}</span>
+                      </td>
+                      <td class="px-3 py-3">
+                        <div class="flex flex-wrap justify-end gap-1.5">
+                          <template v-if="r.status === 'activated'">
+                            <span :class="[BADGE, BADGE_TONE.ok]"><StudioIcon name="check" size="h-3 w-3" /> đã cấp gói</span>
+                          </template>
+                          <template v-else>
+                            <!-- Nhãn KHÁC nút lọc cùng tên ("Đã liên hệ" ở thanh lọc) để không nhầm khi bấm
+                                 và để người dùng biết đây là thao tác trên khách, không phải bộ lọc. -->
+                            <button v-if="r.status === 'pending'" class="tool-btn" @click="setUpgradeStatus(r, 'contacted')"
+                                    title="Đánh dấu là đã gọi/zalo cho khách này">
+                              <StudioIcon name="user" size="h-3.5 w-3.5" /> Đã liên hệ khách
+                            </button>
+                            <button v-if="isSuper" class="btn-brand btn-sm" @click="activateUpgrade(r)"
+                                    :title="'Kích hoạt gói ' + (r.plan ? r.plan.name : '') + ' cho ' + (r.user ? r.user.name : '') + ' sau khi đã nhận ' + r.amount_label">
+                              <StudioIcon name="check" size="h-3.5 w-3.5" /> Kích hoạt
+                            </button>
+                            <button class="tool-btn !text-red-300 hover:!bg-red-500/15" @click="setUpgradeStatus(r, 'cancelled')" title="Huỷ yêu cầu (khách đổi ý / trùng)">
+                              <StudioIcon name="ban" size="h-3.5 w-3.5" /> Huỷ
+                            </button>
+                          </template>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p v-if="loading.upgrades" class="px-4 py-4 text-xs text-cream-300/75">Đang nạp yêu cầu…</p>
+              <p v-else-if="!upgradesData.requests.length" class="px-4 py-4 text-xs text-cream-300/75">
+                Chưa có yêu cầu nâng cấp nào{{ upFilter ? ' ở trạng thái này' : '' }}. Khi khách bấm «Yêu cầu nâng cấp» trong Studio, yêu cầu sẽ hiện ở đây kèm số điện thoại liên hệ.
+              </p>
+            </div>
+
+            <p class="rounded-lg border border-ink-700 bg-ink-900/60 p-3 text-[11px] leading-relaxed text-cream-300">
+              <b class="text-cream-100">Quy trình chuẩn:</b> nhận yêu cầu → gọi/zalo theo số khách để lại → khách chuyển khoản với nội dung là <b class="text-cream-100">mã yêu cầu</b> →
+              đối chiếu sao kê → bấm <b class="text-cream-100">Kích hoạt</b> (hệ thống tự gán gói, đúng số tháng, cấp bonus lần đầu và credit của chu kỳ đầu, có ghi vết ai kích hoạt).
+              Khách gửi lại cùng một gói thì hệ thống dùng lại yêu cầu cũ nên không có yêu cầu trùng.
+            </p>
+          </section>
+
           <section v-show="section === 'gui'" class="space-y-5">
             <div class="card p-5">
               <div class="flex flex-wrap items-start justify-between gap-3">
