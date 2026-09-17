@@ -38,6 +38,18 @@ JS/Vue studio **42 file (33 .vue) / 12.828 dòng** · `public_html` **21 MB** ·
 | 0.7 | a11y focus trap | ✅ XONG | `b93ad2b` | Thêm `useFocusTrap` composable (giữ Tab vòng trong hộp thoại + trả focus khi đóng + gỡ listener khi unmount); nối vào BaseModal (đế chung 5 component) + ProjectWorkspace. 14/19 lớp phủ còn lại có role=dialog nhưng chưa trap — ghi nhận cho vòng sau |
 | 0.8 | 3 nợ bảo mật vừa | ✅ XONG | `54bbf2f` | (a) cấm DDL trên GET công khai — `ensureTables` chỉ còn ở đường GHI; thêm migration `stylist_presets`. (b) `counts()` gom 4 COUNT → 1 aggregate. (c) `studio_sanitize_error()` lọc path/SQL kể cả khi debug |
 
+### ĐỢT 1 — Giá trị rời khỏi app
+
+| # | Việc | Trạng thái | Commit | Ghi chú |
+|---|---|---|---|---|
+| 1.1 | `Shot.state` + `is_selected` | ✅ XONG | `1763714` | thêm `shot_state` (idea→drafted→selected→fitted→campaign_ready→approved·rejected) + `is_selected`/`note`/`sort`; whitelist chặn nhảy cóc; chỉ owner/admin; `show()`/`latest()` trả ra cho UI |
+| 1.2 | `Run` (lô) | ⬜ CHƯA | — | bảng `runs` + API; lô N ảnh = 1 lô, trừ credit cả lô 1 lần, resume không trừ 2 lần |
+| 1.3 | `ExportBundle` | ⬜ CHƯA | — | zip `{sku}-{channel}-{n}.jpg` theo preset kênh + caption.txt |
+| 1.4 | Channel Validator | ⬜ CHƯA | — | pre-flight: cạnh ≥ ngưỡng · dung lượng · nền #FFFFFF · watermark · sản phẩm ≥70% khung |
+| 1.5 | Thông báo khi render xong | ⬜ CHƯA | — | Notification::fake ⇒ đúng 1 lần/lô, không spam từng ảnh |
+| 1.6 | Mô tả + caption + hashtag | ⬜ CHƯA | — | XÂY MỚI (ProductAIService đã bị gỡ ở 729ceb0) |
+| 1.7 | `prompt_templates` | ⬜ CHƯA | — | bắt đầu bằng `garment.lock` |
+
 > 🛑 **BẢNG DƯỚI ĐÂY LÀ ẢNH CHỤP 2026-09-16 — ĐÃ SAI HOÀN TOÀN, CHỈ GIỮ ĐỂ ĐỐI CHIẾU LỊCH SỬ.**
 > Nó nói *"KHÔNG có `.git`"*, *"KHÔNG có `tests/`"*, *"chưa có deploy"* — cả ba đều **SAI** kể từ 2026-09-17.
 > (Đây chính là lỗi mà `STUDIO_REVIEW_DEEPDIVE.md` §1.2 đã chỉ ra: §1/§2 nói ngược §2bis trong cùng file.)
