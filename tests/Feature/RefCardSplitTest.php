@@ -69,6 +69,24 @@ class RefCardSplitTest extends TestCase
         $this->assertStringContainsString("import TryOnCard from './components/TryOnCard.vue'", $app);
     }
 
+    /**
+     * Nhãn hiển thị cũ có thể sống sót ở NƠI KHÁC (không chỉ activityNav) — sự cố thật: nút trong
+     * GalleryModal vẫn ghi "Chỉnh sửa → Fitting Room" sau khi nhóm đã bị xoá. Guard này soi
+     * CHÍNH BUNDLE ĐÃ BUILD nên bắt được cả nhãn sót lẫn bundle cũ chưa rebuild.
+     */
+    public function test_shipped_bundle_has_no_stale_fitting_room_label(): void
+    {
+        $manifest = json_decode((string) file_get_contents(public_path('build/manifest.json')), true);
+        $file = $manifest['resources/js/studio/main.js']['file'] ?? null;
+        $this->assertNotNull($file, 'Không tìm thấy entry main trong manifest.');
+
+        $js = (string) file_get_contents(public_path('build/'.$file));
+        $this->assertStringNotContainsString('Fitting Room', $js,
+            'Bundle đã build còn nhãn "Fitting Room" cũ — sửa nốt chuỗi hiển thị và build lại.');
+        $this->assertStringContainsString('Tạo biến thể ảnh', $js, 'Bundle phải có mục "Tạo biến thể ảnh".');
+        $this->assertStringContainsString('Mặc thử đồ', $js, 'Bundle phải có mục "Mặc thử đồ".');
+    }
+
     public function test_no_activity_points_at_a_removed_id(): void
     {
         // Bẫy thật đã gặp: xoá activity 'ref' nhưng còn chỗ gán activeActivity = 'ref' ⇒ panel

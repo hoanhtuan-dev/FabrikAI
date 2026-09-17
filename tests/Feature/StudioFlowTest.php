@@ -268,7 +268,7 @@ class StudioFlowTest extends TestCase
 
     // (test_studio_pattern_and_tryon_endpoints đã bị GỠ 2026-09-17: cả 2 endpoint /api/pattern và
     //  /api/tryon bị xoá cùng card Pattern Maker và Try-On. Pattern nay làm qua "Tạo ảnh"/"Ghép ảnh";
-    //  try-on còn đường chính thức trong Fitting Room — chế độ "Thử đồ" của RefImageCard → /api/refgen.)
+    //  try-on còn đường chính thức ở card "Mặc thử đồ" (trước gọi là Fitting Room) → /api/refgen.)
 
     public function test_studio_compose_rejects_tryon_mode(): void
     {

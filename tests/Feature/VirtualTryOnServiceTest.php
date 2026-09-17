@@ -12,7 +12,7 @@ use Tests\TestCase;
  *
  * ⚠️ Lịch sử: file này tên cũ là StudioSwapTest. Ngày 2026-09-17 card "Thay người mẫu" bị gỡ, kéo
  * theo swapModel() + SwapModelJob + executeSwapFromGeneration() ⇒ 4 test endpoint swap đã bị xoá.
- * Service VirtualTryOnService VẪN ĐƯỢC DÙNG (đường Fitting Room → /api/refgen chế độ "Thử đồ", và
+ * Service VirtualTryOnService VẪN ĐƯỢC DÙNG (đường "Mặc thử đồ" → /api/refgen, và
  * swapEdit dùng cho remove-bg/remove-person) nên 2 test dưới đây được giữ lại và đổi tên file cho
  * đúng nội dung.
  */

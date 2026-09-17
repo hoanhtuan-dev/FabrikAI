@@ -152,7 +152,8 @@ const modelForm = ref({ group: 'image', name: '', provider: '', model_id: '', ap
 const modelSaving = ref(false);
 const editingModel = ref(null);
 const modelEdit = ref(null);
-const groupLabels = { image: 'Tạo ảnh 2D', edit: 'Sửa ảnh (edit)', video: 'Video', swap: 'Thử đồ (Fitting Room)', vision: 'Đọc ảnh (vision)', prompt: 'Suy luận prompt', translate: 'Dịch prompt', inference: 'Suy luận (cũ)', text: 'Ngôn ngữ (cũ)' };
+// [Yêu cầu 2026-09-17] Nhóm "Fitting Room" đã bị xoá — nhãn 'swap' nay gọi đúng tên chức năng.
+const groupLabels = { image: 'Tạo ảnh 2D', edit: 'Sửa ảnh (edit)', video: 'Video', swap: 'Mặc thử đồ', vision: 'Đọc ảnh (vision)', prompt: 'Suy luận prompt', translate: 'Dịch prompt', inference: 'Suy luận (cũ)', text: 'Ngôn ngữ (cũ)' };
 const taskGroups = computed(() => data.value?.task_groups || {});
 const taskGroupKeys = computed(() => Object.keys(taskGroups.value));
 const modelsByGroup = computed(() => {

@@ -118,7 +118,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-Cl-o6hm7.js",
+    "file": "assets/main-hENYwB8b.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -129,7 +129,7 @@
       "_StylistDataManager-Bx_sEmxf.js"
     ],
     "css": [
-      "assets/main-BAm4LXrd.css"
+      "assets/main-B_af9EZc.css"
     ]
   },
   "resources/js/studio/model-settings.js": {
@@ -153,7 +153,7 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-BPBDoTk7.js",
+    "file": "assets/settings-BU7E_uJ0.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
@@ -163,7 +163,7 @@
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/settings-BNZFFOzI.css"
+      "assets/settings-DtwNsAIq.css"
     ]
   },
   "resources/js/studio/stylist-data.js": {

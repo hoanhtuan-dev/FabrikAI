@@ -477,10 +477,12 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <!-- Nút Sử dụng: copy prompt → mở popup Prompt Tạo Ảnh để tạo ảnh mới -->
-        <!-- Nhóm primary: Chỉnh sửa → Fitting Room (hành động chính, tô xanh ưu tiên) -->
+        <!-- Nhóm primary: tạo biến thể từ ảnh này (hành động chính, tô xanh ưu tiên).
+             [Yêu cầu 2026-09-17] Nhóm "Fitting Room" đã bị xoá; goEdit() đi tới bước 2 = mục
+             "Tạo biến thể ảnh" nên nhãn phải khớp đích thật, không giữ tên nhóm cũ. -->
         <button v-if="!isVideo" @click="store.goEdit(current)" class="btn-brand btn-sm inline-flex items-center justify-center gap-1 w-full !py-2.5">
-          <StudioIcon name="pencil" size="h-3.5 w-3.5" />
-          Chỉnh sửa → Fitting Room
+          <StudioIcon name="variations" size="h-3.5 w-3.5" />
+          Tạo biến thể từ ảnh này
         </button>
 
         <!-- Nút Sử dụng: copy prompt → mở popup Prompt Tạo Ảnh để tạo ảnh mới -->
