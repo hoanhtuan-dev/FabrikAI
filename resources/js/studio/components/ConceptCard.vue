@@ -12,7 +12,27 @@ const CSRF = () => {
 defineProps({ popup: { type: Boolean, default: false } });
 
 // ── Tab navigation trong modal ──
-const activeTab = ref('prompt'); // 'prompt' | 'body' | 'hair' | 'pose' | 'advanced'
+const activeTab = ref('prompt'); // 'prompt' | 'body' | 'hair' | 'pose' | 'advanced' | 'batch'
+
+// ── Tạo HÀNG LOẠT (Đợt 3 — 2026-09-19) ─────────────────────────────────────────────
+// Việc thật của nhà thiết kế/chủ shop là ra ảnh cho CẢ BỘ: nhiều SKU × vài biến thể. Trước đây
+// phải sửa prompt rồi bấm tạo từng lần. Nay dán danh sách (mỗi dòng một mục) → MỘT lần bấm.
+const batchText = ref('');
+const batchVariants = ref(1);
+const BATCH_MAX_ITEMS = 12;
+const batchItems = computed(() => batchText.value.split('\n').map((s) => s.trim()).filter(Boolean));
+const batchOverLimit = computed(() => batchItems.value.length > BATCH_MAX_ITEMS);
+const batchItemsUsed = computed(() => batchItems.value.slice(0, BATCH_MAX_ITEMS));
+const batchImages = computed(() => batchItemsUsed.value.length * Math.max(1, Math.min(4, Number(batchVariants.value) || 1)));
+const batchCredits = computed(() => batchImages.value * (store.planCostImage || 1));
+const batchShort = computed(() => batchCredits.value > store.creditsLeft);
+function runBatch() {
+  if (!batchItemsUsed.value.length || store.generating) return;
+  const items = batchItemsUsed.value.slice();
+  const per = batchVariants.value;
+  clearDraft();
+  store.generateBatch(items, per);
+}
 
 // ── Sub-panels ──
 const showAdvanced = ref(false);
@@ -560,6 +580,7 @@ const bodyHipsLabel = computed(() => {
               { id: 'hair', icon: 'hair', label: 'Kiểu tóc', tooltip: 'Chọn kiểu tóc và màu tóc thời thượng' },
               { id: 'pose', icon: 'pose', label: 'Tư thế', tooltip: 'Chọn tư thế người mẫu (kế thừa từ chip Thử đồ)' },
               { id: 'advanced', icon: 'gear', label: 'Nâng cao', tooltip: 'Negative prompt và các tùy chọn nâng cao' },
+              { id: 'batch', icon: 'layers', label: 'Hàng loạt', tooltip: 'Tạo ảnh cho nhiều sản phẩm trong MỘT lần bấm — mỗi dòng một sản phẩm/ý tưởng' },
             ]" :key="tab.id" @click="activeTab = tab.id" :title="tab.tooltip" class="seg-btn"
               :class="activeTab === tab.id ? 'is-active' : ''">
               <StudioIcon :name="tab.icon" size="h-3.5 w-3.5" />
@@ -860,6 +881,56 @@ const bodyHipsLabel = computed(() => {
               </button>
             </div>
           </div>
+        </div>
+
+        <!-- ===== TAB: HÀNG LOẠT (Đợt 3 — 2026-09-19) ===== -->
+        <div v-show="activeTab === 'batch'" class="space-y-3">
+          <div class="rounded-lg border border-brand-500/25 bg-brand-600/10 p-3">
+            <p class="flex items-center gap-2 text-xs font-semibold text-brand-100">
+              <StudioIcon name="layers" size="h-4 w-4" /> Tạo ảnh cho cả bộ trong MỘT lần bấm
+            </p>
+            <p class="mt-1 text-[11px] leading-relaxed text-cream-200">
+              Mỗi dòng là một sản phẩm / ý tưởng. Hệ thống dùng ĐÚNG cài đặt đang chọn: tỉ lệ, độ phân giải,
+              phom dáng, kiểu tóc, prompt prefix/suffix và dự án đang áp dụng.
+            </p>
+          </div>
+
+          <div>
+            <label class="label" for="batch-prompts">Danh sách sản phẩm / ý tưởng (tối đa {{ BATCH_MAX_ITEMS }} dòng)</label>
+            <textarea id="batch-prompts" v-model="batchText" rows="7" class="input !text-sm !py-2 !rounded-md" :disabled="store.generating"
+                      placeholder="Áo sơ mi linen trắng form rộng&#10;Quần tây ống suông đen&#10;Váy midi hoa nhí"></textarea>
+            <p class="mt-1 flex flex-wrap items-center gap-x-2 text-[11px]" :class="batchShort ? 'text-amber-300' : 'text-cream-300/85'">
+              <span>{{ batchItemsUsed.length }} mục × {{ batchVariants }} biến thể = <b class="text-cream-100">{{ batchImages }} ảnh</b></span>
+              <span>· ~{{ batchCredits }} credit (gói của bạn: {{ store.planCostImage }} credit/ảnh)</span>
+              <span>· còn {{ store.creditsLeft }} credit</span>
+            </p>
+            <p v-if="batchOverLimit" class="mt-1 text-[11px] text-amber-300">Chỉ {{ BATCH_MAX_ITEMS }} mục đầu được gửi (còn {{ batchItems.length - BATCH_MAX_ITEMS }} mục nữa) — chia thành nhiều lượt để an toàn.</p>
+            <p v-if="batchShort && batchItemsUsed.length" class="mt-1 text-[11px] text-amber-300">Không đủ credit cho cả lượt — nạp thêm trong «Gói &amp; credit» hoặc giảm số mục.</p>
+          </div>
+
+          <div class="flex flex-wrap items-end gap-3">
+            <div class="w-40">
+              <label class="label" for="batch-variants">Biến thể mỗi mục</label>
+              <input id="batch-variants" v-model.number="batchVariants" type="number" min="1" max="4" class="input !py-2" :disabled="store.generating">
+            </div>
+            <button type="button" class="btn-brand flex-1 !py-3" :disabled="store.generating || !batchItemsUsed.length" @click="runBatch()">
+              <span v-if="store.generating" class="flex items-center justify-center gap-2">
+                <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                Đang gửi {{ store.batchSend ? store.batchSend.done + '/' + store.batchSend.total : '' }}…
+              </span>
+              <span v-else class="flex items-center justify-center gap-2"><StudioIcon name="zap" size="h-4 w-4" /> Tạo {{ batchImages || 0 }} ảnh hàng loạt</span>
+            </button>
+          </div>
+
+          <div v-if="store.batchSend" class="rounded-lg border border-ink-700 bg-ink-900/60 p-2.5">
+            <p class="text-[11px] font-semibold text-cream-100">Đang gửi {{ store.batchSend.done }}/{{ store.batchSend.total }} mục · {{ store.batchSend.images }} ảnh đã xếp hàng<span v-if="store.batchSend.failed"> · {{ store.batchSend.failed }} mục lỗi</span></p>
+            <p class="mt-0.5 truncate text-[10px] text-cream-300/85">{{ store.batchSend.current }}</p>
+          </div>
+
+          <p class="text-[11px] leading-relaxed text-cream-300/85">
+            Mẹo tiết kiệm thời gian: dán danh sách SKU của cả bộ, chọn số biến thể, bấm một lần — ảnh xếp hàng
+            chạy lần lượt và tự gắn vào dự án đang áp dụng. Mục nào lỗi sẽ được báo riêng, không làm hỏng cả lượt.
+          </p>
         </div>
 
         <!-- Draft restore notice -->

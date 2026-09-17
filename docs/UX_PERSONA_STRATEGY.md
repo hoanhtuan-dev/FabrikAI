@@ -146,6 +146,19 @@
   chưa có cổng thanh toán. Link tới trang giá được thêm ở trang Đăng nhập và Đăng ký.
 - **Đợt 1 đã ĐÓNG** (trừ 2 việc phụ thuộc quyết định của chủ dự án: **bật** cờ enforce và **cổng thanh toán** — Q1/Q2).
 
+### Đợt 3 — Tối ưu thao tác — ✅ PHẦN ĐẦU ĐÃ TRIỂN KHAI (2026-09-19)
+- ✅ **Tạo hàng loạt trong card Tạo ảnh** (tab mới "Hàng loạt"): dán danh sách sản phẩm/ý tưởng (mỗi dòng một mục,
+  tối đa 12) × số biến thể (1–4) → **một lần bấm** ra cả bộ ảnh; hiển thị trước **số ảnh và credit ước tính theo
+  gói**, cảnh báo khi không đủ credit, tiến trình gửi từng mục, và **mục lỗi không làm hỏng cả lượt**.
+  Không thêm endpoint mới — mỗi mục vẫn đi đúng đường `/api/generate` cũ (trừ credit theo gói, ghi sổ cái,
+  hạ cap độ phân giải theo gói); tạo lẻ và tạo hàng loạt dùng **chung một bộ dựng payload** (`imagePayload()`)
+  nên không bao giờ lệch cấu hình.
+- **Đo được**: 4 test mới (`BatchGenerationTest`) · 515 test xanh · chạy thật trong Studio (Chrome CDP):
+  **24/24 bước** — tạo lẻ 1 lần gọi đúng payload; hàng loạt 3 mục × 2 biến thể = 3 lần gọi, đúng prompt từng
+  dòng, đúng số biến thể, credit trừ đúng 6 (200 → 194), có tiến trình + toast tổng kết.
+- **Còn lại của đợt 3**: tiến trình theo từng ảnh trong lượt hàng loạt (hiện có % chung), phím tắt, và
+  "chạy lại chỉ những mục lỗi".
+
 ### Đợt 2 — Không gian làm việc theo nghề
 - Sidebar "Không gian làm việc": **Bộ sưu tập** (gom ảnh/biến thể theo mùa vụ, tái dùng ngữ cảnh), **Việc đang chạy**, **Thư viện**, **Duyệt**.
 - Preset theo ngành: lookbook · sàn TMĐT · mẫu kỹ thuật xưởng · catalogue.

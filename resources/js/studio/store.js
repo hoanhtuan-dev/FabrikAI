@@ -45,6 +45,8 @@ export const useStudioStore = defineStore('studio', {
     // nhiêu, được tối đa độ phân giải nào, và không có đường nâng cấp (grep 'billing' = 0).
     // planStatus nạp từ GET /api/plan/status — MỘT chỗ để UI nói đúng mọi thứ về gói.
     planStatus: null,
+    // Tiến trình GỬI của lượt tạo hàng loạt (khác generateProgress = % RENDER thật của từng ảnh).
+    batchSend: null,
     planOpen: false,        // popup "Gói & credit" ở thanh công cụ
     planCatalogOpen: false, // mở danh mục gói bên trong popup
     planBusy: false,
@@ -531,6 +533,103 @@ export const useStudioStore = defineStore('studio', {
       // refresh the generations so the processed images appear
       try { const res = await fetch('/api/latest', { headers: { Accept: 'application/json' } }); const d = await res.json(); const items = d.items || d.generations || []; if (Array.isArray(items)) this.generations = items; } catch (e) { console.error('studio operation failed', e); }
     },
+    /**
+     * Bộ dựng payload cho MỘT lần tạo ảnh 2D — dùng CHUNG cho tạo lẻ (generateImage) và tạo HÀNG LOẠT
+     * (generateBatch). Tách ra để hai đường không bao giờ lệch cấu hình (tỉ lệ, độ phân giải, phom
+     * dáng, prefix/suffix, dự án đang áp dụng, model đang chọn…).
+     */
+    /**
+     * TẠO HÀNG LOẠT — mỗi dòng là một sản phẩm/ý tưởng, dùng CHUNG cài đặt đang chọn trên card.
+     *
+     * Vì sao cần (tiết kiệm thời gian): việc thật của nhà thiết kế/chủ shop là ra ảnh cho CẢ BỘ —
+     * 8 SKU × 2 bối cảnh = 16 ảnh. Trước đây phải sửa prompt rồi bấm tạo 16 lần.
+     *
+     * Cách làm: gọi tuần tự /api/generate cho từng mục (KHÔNG thêm endpoint mới) — nhờ vậy mỗi ảnh
+     * vẫn đi đúng đường cũ: trừ credit THEO GÓI, ghi sổ cái, hạ độ phân giải theo cap của gói (trả
+     * `notice`), và mục lỗi KHÔNG làm hỏng cả lượt (báo rõ mục nào lỗi).
+     */
+    async generateBatch(prompts, variantsPerItem = 1) {
+      const list = (prompts || []).map((p) => String(p).trim()).filter(Boolean).slice(0, 12);
+      if (!list.length || this.generating) return null;
+
+      const per = Math.max(1, Math.min(4, Number(variantsPerItem) || 1));
+      let sent = 0;
+      let failed = 0;
+      const allIds = [];
+      let noticeShown = false;
+
+      this.generating = true;
+      this.generateStage = 'preparing';
+      this.lastBatch = [];
+      this.batchSend = { total: list.length, done: 0, failed: 0, current: list[0], images: 0 };
+
+      try {
+        for (let i = 0; i < list.length; i++) {
+          this.batchSend.current = list[i];
+          try {
+            const d = await this.api('/api/generate', this.imagePayload(list[i], per));
+            const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
+            items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Hàng loạt' }));
+            items.forEach((it) => { if (it.generation_id) allIds.push(it.generation_id); });
+            sent++;
+            // Nói thật khi gói giới hạn độ phân giải (backend hạ cap) — chỉ báo MỘT lần cho cả lượt.
+            if (!noticeShown && d.notice) { noticeShown = true; this.toast(d.notice, 'info'); }
+            if (d.credit_warning) this.toast(d.credit_warning, 'error');
+            if (d.credits_left != null) this.creditsLeft = d.credits_left;
+          } catch (e) {
+            failed++;
+            this.toast('Mục ' + (i + 1) + ' lỗi: ' + (e.message || 'không rõ nguyên nhân'), 'error');
+          }
+          this.batchSend.done = i + 1;
+          this.batchSend.failed = failed;
+          this.batchSend.images = allIds.length;
+        }
+
+        if (allIds.length) {
+          this.setBatch(allIds);
+          this.processQueue();
+          this.generatedCount = allIds.length;
+          this.syncBatchProgress();
+          allIds.forEach((id) => this.pollGeneration(id));
+        }
+      } finally {
+        this.generating = false;
+        this.toast('Đã gửi ' + sent + '/' + list.length + ' mục · ' + allIds.length + ' ảnh đang tạo' + (failed ? ' · ' + failed + ' mục lỗi' : ''), failed && !sent ? 'error' : 'info');
+        setTimeout(() => { this.batchSend = null; }, 5000);
+      }
+
+      return allIds;
+    },
+    imagePayload(prompt, variants = 1) {
+      return {
+        prompt,
+        creative_level: this.creativeLevel,
+        texture: this.texture,
+        // Model do người dùng chọn trên card ('' = default nhóm image — Cài đặt → 🎯 Nhóm công việc).
+        ...(this.selectedTaskModel('image') ? { provider: this.selectedTaskModel('image').provider, model: this.selectedTaskModel('image').model } : {}),
+        // Tôn trọng checkbox: tắt → gửi rỗng → backend bỏ qua prefix/suffix/negative.
+        negative_prompt: this.promptUseNegative ? (this.negativePromptEn || '') : '',
+        prompt_prefix: this.promptUsePrefix ? (this.promptPrefix || '') : '',
+        prompt_suffix: this.promptUseSuffix ? (this.promptSuffix || '') : '',
+        resolution: this.imageRes,
+        ratio: this.imageRatio,
+        variants: Math.max(1, Math.min(4, Number(variants) || 1)),
+        // Phom dáng + tóc
+        body_height: this.bodyHeight,
+        body_build: this.bodyBuild,
+        body_waist: this.bodyWaist,
+        body_shoulders: this.bodyShoulders,
+        body_hips: this.bodyHips,
+        hair_style: this.hairStyle || '',
+        hair_color: this.hairColor || '',
+        pose_id: this.imagePoseId || '',
+        // "Dự án hiện tại": ảnh tạo ra sẽ tự gắn vào dự án đang áp dụng
+        // (null khi đang ở chế độ duyệt → không gắn vào dự án người khác).
+        project_id: this.appliedProjectId(),
+        // Gieo quẻ (seed): nếu có → gửi lên backend để tạo ảnh nhất quán
+        seed: this.imageSeed || null,
+      };
+    },
     async generateImage() {
       if (!this.imagePromptEn || this.generating) return;
       this.generating = true;
@@ -544,34 +643,9 @@ export const useStudioStore = defineStore('studio', {
       // Người dùng bị "lừa" đúng lúc dễ bỏ đi nhất (xem STUDIO_REVIEW_PLAN.md Đợt 0.2). Tiến trình
       // BÂY GIỜ được cộng dồn từ TRẠNG THÁI THẬT của từng generation qua syncBatchProgress().
       try {
-        const d = await this.api('/api/generate', {
-          prompt: this.imagePromptEn,
-          creative_level: this.creativeLevel,
-          texture: this.texture,
-          // Model do người dùng chọn trên card ('' = default nhóm image — Cài đặt → 🎯 Nhóm công việc).
-          ...(this.selectedTaskModel('image') ? { provider: this.selectedTaskModel('image').provider, model: this.selectedTaskModel('image').model } : {}),
-          // Tôn trọng checkbox: tắt → gửi rỗng → backend bỏ qua prefix/suffix/negative.
-          negative_prompt: this.promptUseNegative ? (this.negativePromptEn || '') : '',
-          prompt_prefix: this.promptUsePrefix ? (this.promptPrefix || '') : '',
-          prompt_suffix: this.promptUseSuffix ? (this.promptSuffix || '') : '',
-          resolution: this.imageRes,
-          ratio: this.imageRatio,
-          variants,
-          // Phom dáng + tóc
-          body_height: this.bodyHeight,
-          body_build: this.bodyBuild,
-          body_waist: this.bodyWaist,
-          body_shoulders: this.bodyShoulders,
-          body_hips: this.bodyHips,
-          hair_style: this.hairStyle || '',
-          hair_color: this.hairColor || '',
-          pose_id: this.imagePoseId || '',
-          // "Dự án hiện tại": ảnh tạo ra sẽ tự gắn vào dự án đang áp dụng
-          // (null khi đang ở chế độ duyệt → không gắn vào dự án người khác).
-          project_id: this.appliedProjectId(),
-          // Gieo quẻ (seed): nếu có → gửi lên backend để tạo ảnh nhất quán
-          seed: this.imageSeed || null,
-        });
+        // Payload dựng qua imagePayload() — DÙNG CHUNG với tạo hàng loạt, để hai đường không lệch
+        // cấu hình (tỉ lệ, độ phân giải, phom dáng, prefix/suffix, dự án đang áp dụng, model đang chọn).
+        const d = await this.api('/api/generate', this.imagePayload(this.imagePromptEn, variants));
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
         items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Vừa gửi' }));
         this.setBatch(items.map(it => it.generation_id));
