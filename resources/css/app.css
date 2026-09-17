@@ -1,7 +1,13 @@
 @import 'tailwindcss';
 
+// Pagination của Laravel render từ vendor nên phải trỏ thẳng vào blade nguồn.
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
+// [Xác minh 2026-09-17] ĐÃ GỠ: @source '../../storage/framework/views/*.php';
+//  Thư mục đó chứa view ĐÃ BIÊN DỊCH (sinh ra lúc chạy), không phải nguồn. Quét nó làm
+//  CSS build KHÔNG TẤT ĐỊNH: chỉ cần chạy test (render mail ⇒ biên dịch `mail::message`)
+//  là Tailwind nhặt thêm class của mail ⇒ hash CSS đổi dù không sửa dòng CSS/JS nào.
+//  Phần hợp lệ duy nhất (pagination) đã trỏ thẳng blade nguồn ở dòng trên; blade app đã có
+//  `@source '../views'`. Đã kiểm chứng: xoá view cache rồi build ⇒ ra ĐÚNG hash đã commit.
 @source '../views';
 @source '../js/studio';
 
