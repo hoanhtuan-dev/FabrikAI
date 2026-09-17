@@ -156,8 +156,13 @@
 - **Đo được**: 4 test mới (`BatchGenerationTest`) · 515 test xanh · chạy thật trong Studio (Chrome CDP):
   **24/24 bước** — tạo lẻ 1 lần gọi đúng payload; hàng loạt 3 mục × 2 biến thể = 3 lần gọi, đúng prompt từng
   dòng, đúng số biến thể, credit trừ đúng 6 (200 → 194), có tiến trình + toast tổng kết.
-- **Còn lại của đợt 3**: tiến trình theo từng ảnh trong lượt hàng loạt (hiện có % chung), phím tắt, và
-  "chạy lại chỉ những mục lỗi".
+- ✅ **Tiến trình theo TỪNG MỤC** trong lượt hàng loạt (`batchSend.items`) + nút **"Chạy lại N mục lỗi"**
+  (danh sách prompt lỗi được GIỮ LẠI sau khi lượt kết thúc — trước đây chỉ hiện toast rồi mất).
+- ✅ **PHÍM TẮT cho khối duyệt mẫu**: `S` chọn ảnh chờ duyệt · `N` chuyển bước tiếp · `A` duyệt · `R` loại ·
+  `Esc` đóng. Ba chốt an toàn: chỉ chạy khi khối duyệt đang mở · **không cướp phím khi đang gõ** (ô prompt,
+  ô ghi chú duyệt…) · **nhường phím khi modal/công cụ canvas đang chạy** (Esc của modal vẫn phải đóng modal).
+  Phím tắt được nhắc ngay trong khối và trong `title` từng nút (không có phím tắt "ẩn").
+- **Đợt 3 đã ĐÓNG.**
 
 ### Đợt 2 — Không gian làm việc theo nghề — ✅ PHẦN ĐẦU ĐÃ TRIỂN KHAI (2026-09-19)
 - ✅ **Panel "Bộ sưu tập"** (nhóm card MỚI, đứng đầu thanh công cụ trái) trả lời đúng 3 câu hỏi người làm
@@ -184,7 +189,11 @@
   của khách**. Số liệu lấy trực tiếp từ bảng `generations` (không đếm lại ở client) nên không lệch.
 - ✅ **Chạy lại CHỈ mục lỗi** trong lượt tạo hàng loạt (kèm tiến trình từng mục): một lượt 12 mục mà 2 mục lỗi
   thì không phải làm lại cả lượt — danh sách prompt lỗi được giữ lại và chạy lại bằng một cú bấm.
-- **Còn lại của đợt 2**: màn **Duyệt theo lô** cho owner (nền `?scope=pending` + transition đã có, chưa có màn hình gọn).
+- ✅ **Duyệt mẫu theo lô** (`POST /api/projects/{id}/shots/review` + khối "Duyệt mẫu" trong panel Bộ sưu tập):
+  chốt / loại / **đẩy lên bước kế tiếp** cho NHIỀU ảnh trong một lượt, trả **kết quả TỪNG ẢNH**. Trước đó vòng đời
+  duyệt ảnh (đã có từ Đợt 1.1) là **tính năng chết**: `grep -rn 'shot-state' resources/js` = 0 và `show()`
+  không trả `shot_state`. Hàng đợi duyệt chéo của Super Admin vẫn dùng `?scope=pending` + `transition` sẵn có.
+- **Đợt 2 đã ĐÓNG** (quy trình duyệt nay có cả nền lẫn giao diện).
 
 ### Đợt 3 — Tối ưu thao tác
 - Tạo hàng loạt 1 cú bấm (N SKU × M bối cảnh), hàng đợi có tiến trình thật, so sánh trước/sau, phím tắt.
@@ -235,3 +244,59 @@
 | Q2 | **Cổng thanh toán** (VNPay/MoMo/chuyển khoản) | Chưa có ⇒ nút "Nâng cấp" chỉ được nói thật là "kích hoạt ngay, thanh toán sau" |
 | Q3 | **Gói theo mùa vụ/xưởng** (bán theo đơn hàng thay vì theo tháng) | Chủ xưởng may mua theo vụ, không mua theo tháng |
 | Q4 | **Số ghế theo gói** | Cần cho chủ doanh nghiệp; hiện mỗi tài khoản là một người dùng riêng |
+
+---
+
+## 8. KẾT QUẢ ĐÃ TRIỂN KHAI (đóng goal — 2026-09-19)
+
+Mục tiêu: *TIÊN TIẾN – THUẬN TIỆN – TỐI ƯU – TIẾT KIỆM THỜI GIAN* cho 3 nhóm khách. Dưới đây là đối chiếu
+từng chặng với **bằng chứng đo được**, không phải mô tả ý định.
+
+### 8.1 Bốn chặng — trạng thái
+
+| Chặng | Nội dung | Trạng thái | Bằng chứng |
+|---|---|---|---|
+| 1 | Phân tích sâu dự án (kiến trúc · luồng thật · điểm nghẽn · số liệu) | ✅ | §1 tài liệu này — mọi kết luận kèm `file:line` |
+| 2 | Phân tích + thiết kế lại gói cước | ✅ | §3 (6 lỗ hổng có bằng chứng) + Đợt 1 (đã bỏ hẳn 3 lỗ hổng: credit không được cấp · chi phí theo gói không dùng · cap không thực thi) |
+| 3 | Tài liệu chiến lược UX/UI/workflow theo persona + roadmap có tiêu chí đo | ✅ | §2 · §4 · §5 (4 đợt, mỗi đợt có số đo) |
+| 4 | Triển khai cải tiến giá trị cao nhất + kiểm thử + đo + deploy | ✅ | 11 vòng deploy lên production (bảng dưới) |
+
+### 8.2 Đã giao cho từng persona (việc thật, không phải tính năng trang trí)
+
+**Nhà thiết kế** — *"ra ảnh cho cả bộ, không phải bấm 16 lần"*
+- Tạo **hàng loạt** (12 mục × 1–4 biến thể) trong một lượt, có **tiến trình từng mục** và **chạy lại chỉ mục lỗi**.
+- **Mẫu việc theo ngành** (4 mẫu: lookbook · sàn TMĐT · mẫu kỹ thuật gửi xưởng · catalogue) điền sẵn prompt + tỉ lệ + độ phân giải.
+- **Bộ sưu tập** là điểm vào công việc hằng ngày: đang làm bộ nào, còn bao nhiêu ảnh, hạn còn mấy ngày.
+- **Phím tắt duyệt mẫu** (`S/N/A/R/Esc`) — không phải rời bàn phím giữa buổi duyệt hàng chục ảnh.
+
+**Chủ doanh nghiệp / thương hiệu** — *"biết mình đang chi bao nhiêu, ai duyệt, khách nói gì"*
+- **Chi phí & tiến độ theo bộ sưu tập**: ảnh xong/đang chạy/lỗi · **credit đã dùng** · hạn còn lại · phản hồi mới nhất của khách.
+- **Chia sẻ link cho khách duyệt** (không cần tài khoản): có hạn · thu hồi được · đếm lượt xem · khách bấm Duyệt/Yêu cầu sửa và phản hồi lưu vào bộ.
+- **Trang giá công khai** đọc trực tiếp từ DB, nói thật về việc chưa có cổng thanh toán; gói & credit hiển thị ngay trong Studio.
+
+**Chủ xưởng may** — *"nhận được gói đủ nghĩa để cắt may"*
+- **Xuất gói cho xưởng**: 1 ZIP gồm ảnh tham chiếu đánh số + phiếu kỹ thuật + bảng size CSV + manifest + README;
+  ảnh nào không tải được thì **ghi rõ** trong gói (không im lặng bỏ qua); README nói rõ ảnh AI là **ảnh tham chiếu**.
+
+### 8.3 Số đo (trước → sau)
+
+| Chỉ số | Trước goal | Sau goal |
+|---|---|---|
+| Test tự động | 491 test / 2.657 assert | **554 test / 3.069 assert** (0 đỏ) |
+| Credit theo chu kỳ | **không bao giờ được cấp** (grep `Schedule::` = 0) | cấp idempotent (CAS) + lazy + lệnh cron |
+| Chi phí ảnh/video theo gói | **cột trang trí** (9 chỗ đọc setting toàn cục) | `studio_credit_cost()` — 8 chỗ trong pipeline dùng theo gói |
+| `resolution_cap` của gói | **không được kiểm ở đâu** | hạ xuống cap + trả `notice` nói rõ lý do |
+| Trang giá cho khách chưa đăng nhập | **không có** | `/bang-gia` render từ DB |
+| Vòng đời duyệt ảnh | có backend, **không giao diện nào gọi** | duyệt theo lô + phím tắt + nhãn trạng thái trên từng ảnh |
+| Số cú bấm cho một bộ 8 SKU × 2 bối cảnh | 16 lần sửa prompt + 16 lần bấm | **1 lần dán danh sách + 1 lần bấm** (12 mục × biến thể) |
+
+### 8.4 Việc còn lại (cần quyết định của chủ dự án, không phải việc kỹ thuật)
+
+- **Q1** bật chặn khi hết credit (`studio_enforce_credits`, hiện **TẮT**) — nên bật khi đã có thanh toán.
+- **Q2** cổng thanh toán (VNPay/MoMo/chuyển khoản) — hiện nút "Nâng cấp" nói thật là "kích hoạt, thanh toán sau".
+- **Q3** gói theo mùa vụ/xưởng (bán theo đơn thay vì theo tháng).
+- **Q4** số ghế theo gói (chủ doanh nghiệp cần nhiều người dùng chung một gói).
+- Việc kỹ thuật còn nợ (không chặn khách): preset tên file theo kênh bán; tự động chuyển trạng thái bộ sưu tập khi
+  khách bấm "Duyệt" (hiện CỐ Ý chỉ ghi phản hồi — chuyển trạng thái là quyết định của chủ, có whitelist riêng);
+  cron `studio:grant-plan-credits` trên hPanel (đường lazy đã chạy nên chưa gấp).
+
