@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Plan;
+use App\Models\UpgradeRequest;
 use App\Services\PlanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Gói đăng ký (billing) — cho NGƯỜI DÙNG tự chọn gói.
@@ -81,6 +83,9 @@ class BillingController extends Controller
             'recommended' => $recommended,
             'freePlan' => $plans->first(fn (Plan $p) => $p->isFree()),
             'cheapestPaid' => $plans->first(fn (Plan $p) => ! $p->isFree()),
+            // [Q2 — 2026-09-19] Cách thanh toán thật (chuyển khoản + kênh hỗ trợ) để trang giá nói được
+            // bước tiếp theo thay vì chỉ "chưa có cổng thanh toán". Cùng nguồn với popup trong Studio.
+            'payment' => self::paymentInfo(),
         ]);
     }
 
@@ -107,7 +112,187 @@ class BillingController extends Controller
         ]);
     }
 
-    /** POST /api/billing/subscribe — tự đăng ký gói. */
+
+    /**
+     * THÔNG TIN THANH TOÁN + HỖ TRỢ (Q2 — 2026-09-19) — một nguồn duy nhất.
+     *
+     * Vì sao để ở controller chứ không viết thẳng vào blade/JS: cùng một thông tin được dùng bởi
+     * trang giá công khai, popup "Gói & credit" trong Studio và màn hình Quản trị. Ba chỗ chép tay
+     * là ba chỗ lệch nhau khi chủ dự án đổi số tài khoản.
+     *
+     * Giá trị do chủ dự án đặt trong Quản trị (`studio_config`); chưa đặt thì trả rỗng và giao diện
+     * phải nói thật là "chưa cấu hình" chứ KHÔNG bịa số tài khoản.
+     */
+    public static function paymentInfo(): array
+    {
+        return [
+            'bank' => [
+                'name' => (string) studio_config('bank_name', ''),
+                'account' => (string) studio_config('bank_account', ''),
+                'holder' => (string) studio_config('bank_holder', ''),
+                'branch' => (string) studio_config('bank_branch', ''),
+            ],
+            'support' => [
+                'phone' => (string) studio_config('support_phone', ''),
+                'email' => (string) studio_config('support_email', ''),
+                'zalo' => (string) studio_config('support_zalo', ''),
+                'hours' => (string) studio_config('support_hours', '8h30 – 18h, thứ 2 – thứ 7'),
+            ],
+            // VNPay cần mã đối tác + khoá bí mật của merchant; CHƯA có nên tuyệt đối không giả vờ đã có.
+            'vnpay' => [
+                'available' => filter_var(studio_config('vnpay_enabled', false), FILTER_VALIDATE_BOOLEAN),
+                'note' => 'VNPay chưa mở — để lại thông tin, FabrikAI sẽ liên hệ ngay khi kênh này hoạt động.',
+            ],
+        ];
+    }
+
+    /** Hình dạng một yêu cầu nâng cấp trả cho khách (không lộ ghi chú nội bộ của admin). */
+    protected function presentRequest(UpgradeRequest $r): array
+    {
+        return [
+            'id' => $r->id,
+            'code' => $r->code,
+            'status' => $r->status,
+            'status_label' => $r->statusLabel(),
+            'is_open' => $r->isOpen(),
+            'plan' => $r->plan ? ['id' => $r->plan->id, 'name' => $r->plan->name, 'slug' => $r->plan->slug] : null,
+            'months' => $r->months,
+            'amount_vnd' => $r->amount_vnd,
+            'amount_label' => $r->amountLabel(),
+            'method' => $r->method,
+            'method_label' => $r->methodLabel(),
+            'contact_phone' => $r->contact_phone,
+            'note' => $r->note,
+            'created_at' => $r->created_at?->format('d/m/Y H:i'),
+            'handled_at' => $r->handled_at?->format('d/m/Y H:i'),
+        ];
+    }
+
+    /**
+     * POST /api/billing/upgrade-request — khách GỬI YÊU CẦU NÂNG CẤP.
+     *
+     * Thay cho việc bấm một nút là gói trả phí tự kích hoạt (không có dấu vết thanh toán). Yêu cầu
+     * có MÃ theo dõi, chốt SỐ TIỀN tại thời điểm gửi, và đi kèm hướng dẫn chuyển khoản nếu khách
+     * chọn phương thức đó.
+     *
+     * Chống trùng: khách bấm gửi hai lần cho cùng một gói ⇒ trả lại yêu cầu đang mở (không rải
+     * nhiều yêu cầu rác cho chủ dự án phải xử lý).
+     */
+    public function upgradeRequest(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'plan_id' => ['required', 'integer', 'exists:plans,id'],
+            'months' => ['required', 'integer', 'in:'.implode(',', UpgradeRequest::MONTHS)],
+            'method' => ['required', 'string', 'in:'.implode(',', UpgradeRequest::METHODS)],
+            'contact_name' => ['nullable', 'string', 'max:120'],
+            'contact_phone' => ['required', 'string', 'max:32'],
+            'note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $plan = Plan::query()->where('is_active', true)->findOrFail((int) $data['plan_id']);
+        $user = $request->user();
+
+        if ($plan->isFree()) {
+            return response()->json([
+                'message' => 'Gói miễn phí không cần thanh toán — hãy chuyển thẳng bằng nút «Dùng gói miễn phí».',
+                'code' => 'plan_is_free',
+            ], 422);
+        }
+
+        // Số điện thoại Việt Nam: bỏ khoảng trắng/dấu chấm/gạch rồi kiểm 10–11 số bắt đầu bằng 0.
+        $phone = preg_replace('/[\s.\-()]/', '', (string) $data['contact_phone']);
+        if (! preg_match('/^0\d{9,10}$/', (string) $phone)) {
+            return response()->json([
+                'message' => 'Số điện thoại chưa hợp lệ — nhập số Việt Nam (vd 0901234567) để FabrikAI liên hệ được.',
+                'code' => 'phone_invalid',
+            ], 422);
+        }
+
+        $months = (int) $data['months'];
+        $existing = UpgradeRequest::query()
+            ->where('user_id', $user->id)
+            ->where('plan_id', $plan->id)
+            ->whereIn('status', [UpgradeRequest::STATUS_PENDING, UpgradeRequest::STATUS_CONTACTED])
+            ->latest('id')
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'ok' => true,
+                'reused' => true,
+                'request' => $this->presentRequest($existing),
+                'payment' => self::paymentInfo(),
+                'message' => 'Bạn đã có yêu cầu '.$existing->code.' đang chờ xử lý cho gói này — không cần gửi lại.',
+            ]);
+        }
+
+        $created = DB::transaction(function () use ($user, $plan, $months, $phone, $data) {
+            return UpgradeRequest::create([
+                'code' => UpgradeRequest::nextCode(),
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'months' => $months,
+                'amount_vnd' => (int) $plan->price_vnd * $months,
+                'method' => $data['method'],
+                'contact_name' => $data['contact_name'] ?? $user->name,
+                'contact_phone' => $phone,
+                'note' => $data['note'] ?? null,
+                'status' => UpgradeRequest::STATUS_PENDING,
+            ]);
+        });
+
+        return response()->json([
+            'ok' => true,
+            'reused' => false,
+            'request' => $this->presentRequest($created),
+            'payment' => self::paymentInfo(),
+            'message' => 'Đã gửi yêu cầu '.$created->code.' — FabrikAI sẽ liên hệ theo số '.$phone.' để xác nhận.',
+        ], 201);
+    }
+
+    /**
+     * GET /api/billing/upgrade-request — yêu cầu đang mở (nếu có) + hướng dẫn thanh toán.
+     * Dùng khi mở popup "Gói & credit": khách thấy ngay "đang chờ xử lý mã UP-…" thay vì gửi trùng.
+     */
+    public function upgradeStatus(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $open = UpgradeRequest::query()
+            ->where('user_id', $user->id)
+            ->whereIn('status', [UpgradeRequest::STATUS_PENDING, UpgradeRequest::STATUS_CONTACTED])
+            ->with('plan')
+            ->latest('id')
+            ->first();
+
+        $latestActivated = UpgradeRequest::query()
+            ->where('user_id', $user->id)
+            ->where('status', UpgradeRequest::STATUS_ACTIVATED)
+            ->with('plan')
+            ->latest('handled_at')
+            ->first();
+
+        return response()->json([
+            'open' => $open ? $this->presentRequest($open) : null,
+            'last_activated' => $latestActivated ? $this->presentRequest($latestActivated) : null,
+            'methods' => [
+                ['value' => UpgradeRequest::METHOD_BANK, 'label' => 'Chuyển khoản ngân hàng', 'hint' => 'Chuyển khoản rồi FabrikAI kích hoạt trong vài giờ làm việc.'],
+                ['value' => UpgradeRequest::METHOD_VNPAY, 'label' => 'VNPay (chưa mở)', 'hint' => 'Để lại thông tin — FabrikAI liên hệ ngay khi kênh VNPay hoạt động.'],
+                ['value' => UpgradeRequest::METHOD_SUPPORT, 'label' => 'Nhờ FabrikAI hỗ trợ', 'hint' => 'FabrikAI gọi lại tư vấn gói phù hợp với khối lượng thật của bạn.'],
+            ],
+            'months' => UpgradeRequest::MONTHS,
+            'payment' => self::paymentInfo(),
+        ]);
+    }
+
+    /**
+     * POST /api/billing/subscribe — tự đăng ký gói.
+     *
+     * [Q2 — 2026-09-19] CHỈ GÓI MIỄN PHÍ. Trước đây endpoint này gán được CẢ gói trả phí: khách bấm
+     * một nút trong Studio là có gói 499.000 ₫ mà không có cổng thanh toán, không dấu vết ai trả
+     * tiền, trả bao nhiêu. Nay gói trả phí phải đi qua YÊU CẦU NÂNG CẤP (có mã theo dõi) và chủ dự
+     * án kích hoạt sau khi nhận tiền — Super Admin vẫn gán trực tiếp được bằng đường quản trị.
+     */
     public function subscribe(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -117,6 +302,15 @@ class BillingController extends Controller
         // Chỉ cho đăng ký gói ĐANG MỞ BÁN (gói bị ẩn không chọn được).
         $plan = Plan::query()->where('is_active', true)->findOrFail((int) $data['plan_id']);
         $user = $request->user();
+
+        if (! $plan->isFree() && ! $user->isSuperAdmin()) {
+            return response()->json([
+                'message' => 'Gói trả phí cần xác nhận thanh toán. Hãy gửi «Yêu cầu nâng cấp» — '
+                    .'FabrikAI sẽ liên hệ và kích hoạt gói cho bạn.',
+                'code' => 'payment_required',
+                'redirect' => '/bang-gia',
+            ], 402);
+        }
 
         app(PlanService::class)->assign($user, $plan);
 

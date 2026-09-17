@@ -13,18 +13,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Chặn khi hết credit (mặc định TẮT)
+    | Chặn khi hết credit (mặc định BẬT — Q1 đã được chủ dự án quyết ngày 2026-09-19)
     |--------------------------------------------------------------------------
     | Từ trước tới nay pipeline KHÔNG chặn khi hết credit (ghi rõ trong queueGeneration:
     | "never hard-block on credits, track usage") — hợp lý khi công cụ còn nội bộ, nhưng là
     | lỗ hổng khi bán gói: khách vượt hạn mức vẫn tạo ảnh được.
     |
-    | Bật cờ này (setting DB studio_enforce_credits = 1, hoặc env STUDIO_ENFORCE_CREDITS=true)
-    | thì mỗi thao tác phải có đủ credit, nếu không trả 402 kèm thông báo nâng cấp.
-    | MẶC ĐỊNH TẮT để không phá trải nghiệm khách đang dùng — xem
-    | docs/UX_PERSONA_STRATEGY.md §7 Q1 trước khi bật trên production.
+    | Nay mỗi thao tác phải có đủ credit, thiếu thì trả 402 CÓ CẤU TRÚC (code=out_of_credits,
+    | needed, balance, upgrade_url) để giao diện mở thẳng bảng nâng cấp.
+    | Muốn tạm tắt (không cần sửa mã): setting DB studio_enforce_credits=0 hoặc env
+    | STUDIO_ENFORCE_CREDITS=false.
     */
-    'enforce_credits' => filter_var(env('STUDIO_ENFORCE_CREDITS', false), FILTER_VALIDATE_BOOLEAN),
+    // [Q1 — 2026-09-19] Chủ dự án đã quyết: BẬT chặn khi hết credit ⇒ mặc định nay là TRUE.
+    // Hai đường tắt KHÔNG cần sửa mã: setting DB studio_enforce_credits=0, hoặc env
+    // STUDIO_ENFORCE_CREDITS=false. Ghi chú: giá trị ở config này được ưu tiên hơn tham số mặc định
+    // truyền vào studio_config(), nên đổi mặc định phải đổi Ở ĐÂY (bài học từ lần sửa đầu bị vô hiệu).
+    'enforce_credits' => filter_var(env('STUDIO_ENFORCE_CREDITS', true), FILTER_VALIDATE_BOOLEAN),
 
     /*
     |--------------------------------------------------------------------------

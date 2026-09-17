@@ -189,16 +189,40 @@
                     @endif
 
                     <a href="{{ $ctaHref }}" class="btn-brand btn-sm mt-3 w-full justify-center">
-                        {{ $plan->isFree() ? 'Bắt đầu miễn phí' : ($loggedIn ? 'Kích hoạt trong Studio' : 'Đăng ký rồi kích hoạt') }}
+                        {{ $plan->isFree() ? 'Bắt đầu miễn phí' : ($loggedIn ? 'Gửi yêu cầu nâng cấp' : 'Đăng ký rồi gửi yêu cầu') }}
                     </a>
                 </article>
             @endforeach
         </div>
 
-        <p class="mt-4 rounded-lg border border-ink-700 bg-ink-900/60 p-3 text-[11px] leading-relaxed text-cream-300">
-            <b class="text-cream-100">Về thanh toán:</b> hệ thống chưa có cổng thanh toán trực tuyến. Bạn vẫn tạo được tài khoản và dùng
-            phần miễn phí ngay; với gói trả phí, đội ngũ FabrikAI sẽ liên hệ xác nhận và kích hoạt gói cho tài khoản của bạn.
-        </p>
+        <div class="mt-4 rounded-lg border border-ink-700 bg-ink-900/60 p-3 text-[11px] leading-relaxed text-cream-300">
+            <p>
+                <b class="text-cream-100">Thanh toán &amp; kích hoạt gói trả phí — 3 bước, không cần thẻ:</b>
+            </p>
+            <ol class="mt-2 list-decimal space-y-1 pl-5">
+                <li>Trong Studio, mở <b class="text-cream-100">«Gói &amp; credit» → Yêu cầu nâng cấp</b>: chọn gói, số tháng (1 · 3 · 6 · 12) và cách thanh toán.</li>
+                <li>Bạn nhận ngay một <b class="text-cream-100">MÃ YÊU CẦU</b> (dạng <span class="font-mono">UP-2609-0001</span>) — dùng mã này làm nội dung chuyển khoản.</li>
+                <li>FabrikAI xác nhận tiền rồi <b class="text-cream-100">kích hoạt gói</b> cho tài khoản của bạn (trong giờ làm việc{{ $payment['support']['hours'] ? ' · '.$payment['support']['hours'] : '' }}).</li>
+            </ol>
+            @if (! empty($payment['bank']['account']))
+                <p class="mt-2 rounded bg-ink-800 px-2 py-1.5">
+                    <b class="text-cream-100">Chuyển khoản:</b> {{ $payment['bank']['name'] }} · STK <b>{{ $payment['bank']['account'] }}</b>
+                    @if (! empty($payment['bank']['holder'])) — {{ $payment['bank']['holder'] }} @endif
+                    @if (! empty($payment['bank']['branch'])) ({{ $payment['bank']['branch'] }}) @endif
+                </p>
+            @endif
+            @if (! empty($payment['support']['phone']) || ! empty($payment['support']['email']))
+                <p class="mt-2">
+                    <b class="text-cream-100">Cần hỗ trợ:</b>
+                    @if (! empty($payment['support']['phone'])) {{ $payment['support']['phone'] }} @endif
+                    @if (! empty($payment['support']['email'])) · {{ $payment['support']['email'] }} @endif
+                    @if (! empty($payment['support']['zalo'])) · Zalo {{ $payment['support']['zalo'] }} @endif
+                </p>
+            @endif
+            <p class="mt-2 text-cream-300/85">
+                Cổng thanh toán trực tuyến (VNPay) {{ $payment['vnpay']['available'] ? 'đã hoạt động.' : 'chưa mở — bạn vẫn dùng phần miễn phí ngay hôm nay.' }}
+            </p>
+        </div>
     </section>
 
     {{-- ── So sánh ── --}}
@@ -291,7 +315,7 @@
                 @foreach([
                     ['Credit là gì?', 'Credit là đơn vị tính công việc. Mỗi ảnh tốn số credit ghi trên gói của bạn (thường 1 credit), mỗi video tốn nhiều hơn. Số credit còn lại luôn hiện ở góc phải Studio.'],
                     ['Tôi không biết gì về AI, có dùng được không?', 'Được. Bạn mô tả bằng tiếng Việt như đang trao đổi với thợ may hoặc nhiếp ảnh gia; hệ thống tự dịch thành câu lệnh cho model và gợi ý sẵn bố cục, dáng, bối cảnh.'],
-                    ['Thanh toán thế nào?', 'Hiện chưa có cổng thanh toán trực tuyến. Bạn dùng phần miễn phí ngay; với gói trả phí, FabrikAI liên hệ xác nhận rồi kích hoạt cho tài khoản của bạn.'],
+                    ['Thanh toán thế nào?', 'Chưa có cổng thanh toán trực tuyến: bạn gửi «Yêu cầu nâng cấp» trong Studio, nhận mã yêu cầu, chuyển khoản theo mã đó rồi FabrikAI kích hoạt gói. VNPay sẽ mở sau.'],
                     ['Hết credit giữa việc thì sao?', 'Hệ thống cảnh báo sớm khi credit sắp hết và cho bạn nạp/nâng gói ngay trong Studio. Bạn cũng xem được toàn bộ lịch sử trừ credit trong mục Sổ credit.'],
                     ['Ảnh dùng cho sàn thương mại điện tử và in ấn được không?', 'Được. Gói từ mức trả phí cho ảnh tới 2K; bạn chọn tỉ lệ khung (1:1, 4:5, 3:4, 16:9…) phù hợp từng kênh bán.'],
                     ['Dữ liệu và ảnh của tôi có riêng tư không?', 'Mỗi tài khoản có thư viện, dự án, khuôn mặt và dáng người mẫu riêng; người khác không thấy. Khoá API của hệ thống được mã hoá và không bao giờ hiển thị lại.'],

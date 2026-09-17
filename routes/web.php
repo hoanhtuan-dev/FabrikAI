@@ -210,6 +210,13 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
 
     // ── Gói đăng ký: người dùng TỰ đăng ký một gói (auth + can-studio) ──
     Route::post('/billing/subscribe', [BillingController::class, 'subscribe'])->name('billing.subscribe');
+
+// [Q2 — 2026-09-19] YÊU CẦU NÂNG CẤP GÓI: khách chọn gói + số tháng + cách thanh toán (chuyển khoản
+// ngân hàng / VNPay khi mở / nhờ hỗ trợ), nhận MÃ THEO DÕI; chủ dự án kích hoạt sau khi nhận tiền.
+// throttle:upgrade-request — chống spam gửi yêu cầu (xem AppServiceProvider).
+Route::post('/billing/upgrade-request', [BillingController::class, 'upgradeRequest'])
+    ->middleware('throttle:upgrade-request')->name('billing.upgrade.request');
+Route::get('/billing/upgrade-request', [BillingController::class, 'upgradeStatus'])->name('billing.upgrade.status');
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -296,6 +303,13 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api/admin')->name('api.
     Route::delete('/plans/{plan}', [AdminController::class, 'destroyPlan'])->name('plans.destroy');
     Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');
 
+    // ── [Q2 — 2026-09-19] YÊU CẦU NÂNG CẤP + THÔNG TIN THANH TOÁN ──
+    // Chủ dự án theo dõi yêu cầu của khách ở đây: xác nhận đã liên hệ, đánh dấu đã kích hoạt, huỷ.
+    Route::get('/upgrade-requests', [AdminController::class, 'upgradeRequests'])->name('upgrade.index');
+    Route::post('/upgrade-requests/{upgradeRequest}', [AdminController::class, 'updateUpgradeRequest'])->name('upgrade.update');
+    Route::get('/payment-info', [AdminController::class, 'paymentInfoShow'])->name('payment.show');
+    Route::post('/payment-info', [AdminController::class, 'paymentInfoSave'])->name('payment.save');
+
     // ── [Yêu cầu 2026-09-17] GIAO DIỆN do OWNER quản lý (thanh công cụ trái của Studio) ──
     // Cấu hình TOÀN CỤC cho mọi người dùng Studio. Đặt ở đây (prefix api/admin) để KHÔNG trùng
     // với `GET /api/gui` mà Studio đọc — bản đầu tôi đặt nhầm vào nhóm prefix 'api' nên trùng route.
@@ -311,6 +325,10 @@ Route::middleware(['auth', 'superadmin', 'nostore'])->prefix('api/admin')->name(
     Route::delete('/users/{user}', [AdminController::class, 'destroyUser'])->name('users.destroy');
     Route::post('/users/{user}/credits', [AdminController::class, 'adjustCredits'])->name('users.credits');
     Route::post('/users/{user}/reset-password', [AdminController::class, 'resetPassword'])->name('users.reset-password');
+
+    // Kích hoạt gói sau khi đã nhận tiền = cấp quyền lợi trả phí ⇒ chỉ Super Admin (cùng nhóm với
+    // thao tác trên tài khoản người dùng).
+    Route::post('/upgrade-requests/{upgradeRequest}/activate', [AdminController::class, 'activateUpgradeRequest'])->name('upgrade.activate');
 });
 
 // ── Public FabrikAI API (read-only + images, no auth) ──

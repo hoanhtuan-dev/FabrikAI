@@ -57,6 +57,13 @@ export const useStudioStore = defineStore('studio', {
     planOpen: false,        // popup "Gói & credit" ở thanh công cụ
     planCatalogOpen: false, // mở danh mục gói bên trong popup
     planBusy: false,
+    // [Q2] YÊU CẦU NÂNG CẤP GÓI: chưa có cổng thanh toán nên nâng cấp là một yêu cầu có mã theo dõi
+    // (chuyển khoản ngân hàng · VNPay khi mở · nhờ hỗ trợ), chủ dự án kích hoạt sau khi nhận tiền.
+    upgradeOpen: false,
+    upgradePlanId: null,
+    upgradeBusy: false,
+    upgradeResult: null,    // yêu cầu vừa gửi: { code, amount_label, method_label, ... }
+    upgradeForm: { months: 1, method: 'bank_transfer', phone: '', name: '', note: '' },
     // film / reframe share the source image (editSource || preview)
     editSource: null,
     texture: 5,
@@ -388,7 +395,20 @@ export const useStudioStore = defineStore('studio', {
         // redirected ⇒ Laravel đá về /dang-nhap và trả HTML ⇒ coi như HẾT PHIÊN, không phải 403.
         if (res.redirected || (res.url && res.url.includes('/dang-nhap'))) this.setAuthStatus(401);
         else this.setAuthStatus(res.status);
-        throw new Error(data.message || 'Phiên đăng nhập đã hết hoặc máy chủ trả dữ liệu không hợp lệ — hãy tải lại trang.');
+        // [Q1 — 2026-09-19] Hết credit (402 code=out_of_credits) ⇒ MỞ THẲNG bảng nâng cấp kèm danh mục
+        // gói, thay vì để khách đọc một câu lỗi rồi không biết bấm vào đâu. Xử lý ở MỘT chỗ này nên
+        // mọi đường tạo ảnh/video (8 endpoint) đều có cùng trải nghiệm.
+        if (res.status === 402 && data && data.code === 'out_of_credits') {
+          this.planOpen = true;
+          this.planCatalogOpen = true;
+          this.upgradeOpen = false;
+          this.loadPlanStatus(true);
+        }
+        const err = new Error(data.message || 'Phiên đăng nhập đã hết hoặc máy chủ trả dữ liệu không hợp lệ — hãy tải lại trang.');
+        err.status = res.status;
+        err.code = data && data.code;
+        err.data = data;
+        throw err;
       }
       return data;
     },
@@ -405,8 +425,10 @@ export const useStudioStore = defineStore('studio', {
      * Nạp trạng thái GÓI của chính người dùng: gói · hạn mức · chi phí · danh mục gói.
      * Server cũng cấp credit theo chu kỳ ở đây (idempotent) nên số dư trả về luôn là số thật.
      */
-    async loadPlanStatus() {
-      if (!this.user) return;
+    async loadPlanStatus(force = false) {
+      // force=true: gọi lại sau khi gửi yêu cầu nâng cấp (yêu cầu đang mở phải hiện ngay).
+      if (!this.user || (this._planLoading && !force)) return;
+      this._planLoading = true;
       try {
         const res = await fetch('/api/plan/status', { headers: { Accept: 'application/json' } });
         if (!res.ok) return;
@@ -415,13 +437,55 @@ export const useStudioStore = defineStore('studio', {
         if (d.credits && d.credits.balance != null) this.creditsLeft = Number(d.credits.balance);
         if (d.costs && d.costs.image) this.imageCreditCost = Number(d.costs.image);
       } catch (e) { console.error('loadPlanStatus failed', e); }
+      finally { this._planLoading = false; }
     },
     togglePlanPopover() {
       this.planOpen = !this.planOpen;
       if (this.planOpen) { this.loadPlanStatus(); }
       else { this.planCatalogOpen = false; }
     },
-    /** Tự đăng ký/đổi gói (dùng POST /api/billing/subscribe có sẵn của hệ thống). */
+    /**
+     * [Q2] Mở form YÊU CẦU NÂNG CẤP cho một gói (gói trả phí không tự kích hoạt được nữa).
+     * Điền sẵn tên/SĐT nếu đã biết để khách không phải gõ lại.
+     */
+    openUpgrade(plan) {
+      if (!plan) return;
+      this.upgradePlanId = plan.id;
+      this.upgradeResult = null;
+      this.upgradeOpen = true;
+      if (!this.upgradeForm.name) this.upgradeForm.name = this.user?.name || '';
+      this.upgradeForm.months = 1;
+      this.upgradeForm.method = 'bank_transfer';
+    },
+    closeUpgrade() { this.upgradeOpen = false; this.upgradePlanId = null; },
+    /**
+     * Gửi yêu cầu nâng cấp. Máy chủ kiểm gói/số tháng/phương thức/SĐT và trả MÃ THEO DÕI; ở đây chỉ
+     * hiển thị đúng những gì máy chủ trả về (không tự bịa mã, không tự bịa số tiền).
+     */
+    async submitUpgrade() {
+      if (this.upgradeBusy || !this.upgradePlanId) return null;
+      this.upgradeBusy = true;
+      try {
+        const d = await this.api('/api/billing/upgrade-request', {
+          plan_id: this.upgradePlanId,
+          months: Number(this.upgradeForm.months) || 1,
+          method: this.upgradeForm.method,
+          contact_name: this.upgradeForm.name || null,
+          contact_phone: this.upgradeForm.phone,
+          note: this.upgradeForm.note || null,
+        });
+        this.upgradeResult = d.request || null;
+        if (d.payment) this.planStatus = { ...(this.planStatus || {}), payment: d.payment };
+        await this.loadPlanStatus(true);
+        this.toast(d.message || ('Đã gửi yêu cầu ' + (d.request?.code || '')), d.reused ? 'info' : 'success');
+        return d;
+      } catch (e) {
+        this.toast(e.message || 'Không gửi được yêu cầu nâng cấp.', 'error');
+        return null;
+      } finally {
+        this.upgradeBusy = false;
+      }
+    },
     async subscribePlan(planId) {
       if (this.planBusy) return;
       this.planBusy = true;
@@ -432,8 +496,18 @@ export const useStudioStore = defineStore('studio', {
           body: JSON.stringify({ plan_id: planId }),
         });
         const d = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(d.message || ('HTTP ' + res.status));
-        await this.loadPlanStatus();
+        if (!res.ok) {
+          // [Q2] Gói trả phí không tự kích hoạt được nữa: máy chủ trả 402 payment_required ⇒ mở ngay
+          // form YÊU CẦU NÂNG CẤP cho đúng gói khách vừa chọn (không bắt họ đi tìm lại).
+          if (res.status === 402 && d.code === 'payment_required') {
+            const plan = (this.planStatus?.catalog || []).find((x) => Number(x.id) === Number(planId));
+            this.toast('Gói trả phí cần xác nhận thanh toán — điền thông tin để FabrikAI liên hệ.', 'info');
+            this.openUpgrade(plan || { id: planId });
+            return;
+          }
+          throw new Error(d.message || ('HTTP ' + res.status));
+        }
+        await this.loadPlanStatus(true);
         this.toast('Đã chuyển sang gói ' + ((d.plan && d.plan.name) || ''), 'info');
       } catch (e) {
         this.toast('Không đổi được gói: ' + e.message, 'error');

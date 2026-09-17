@@ -34,18 +34,36 @@ class BillingSubscribeTest extends TestCase
             ->assertJsonPath('plans.0.slug', 'free');
     }
 
-    public function test_customer_can_subscribe_to_paid_plan(): void
+    public function test_customer_cannot_self_activate_a_paid_plan(): void
     {
+        // [Q2 — 2026-09-19] Hợp đồng ĐỔI CÓ Ý THỨC: trước đây khách tự bấm là có gói trả phí (không có
+        // cổng thanh toán, không dấu vết ai trả tiền). Nay gói trả phí phải đi qua yêu cầu nâng cấp và
+        // Super Admin kích hoạt — xem UpgradeRequestTest.
         $u = $this->customer();
         $starter = Plan::where('slug', 'starter')->firstOrFail();
-        $before = (int) $u->fresh()->credits_balance;
+        $before = (int) $u->fresh()->plan_id;
 
-        $this->actingAs($u)
+        $r = $this->actingAs($u)
+            ->postJson('/api/billing/subscribe', ['plan_id' => $starter->id])
+            ->assertStatus(402);
+
+        $r->assertJsonPath('code', 'payment_required');
+        $this->assertSame($before, (int) $u->fresh()->plan_id, 'Không được đổi gói khi chưa thanh toán.');
+    }
+
+    public function test_super_admin_can_still_assign_a_paid_plan_directly(): void
+    {
+        // Đường quản trị: chủ dự án tự gán gói (khách đã chuyển khoản, hoặc tài khoản nội bộ).
+        $owner = User::where('email', 'owner@fabrikai.shop')->firstOrFail();
+        $starter = Plan::where('slug', 'starter')->firstOrFail();
+        $before = (int) $owner->fresh()->credits_balance;
+
+        $this->actingAs($owner)
             ->postJson('/api/billing/subscribe', ['plan_id' => $starter->id])
             ->assertOk()
             ->assertJsonPath('plan.slug', 'starter');
 
-        $fresh = $u->fresh();
+        $fresh = $owner->fresh();
         $this->assertSame($starter->id, (int) $fresh->plan_id);
         $this->assertNotNull($fresh->plan_expires_at);
         $this->assertTrue($fresh->plan_expires_at->isFuture());
@@ -92,7 +110,8 @@ class BillingSubscribeTest extends TestCase
         $u = $this->customer();
         $pro = Plan::where('slug', 'pro')->firstOrFail();
 
-        $this->actingAs($u)->postJson('/api/billing/subscribe', ['plan_id' => $pro->id])->assertOk();
+        // Gán gói đi qua đường quản trị (khách tự đăng ký gói trả phí đã bị chặn ở Q2).
+        app(\App\Services\PlanService::class)->assign($u, $pro);
 
         $this->assertDatabaseHas('credit_transactions', [
             'user_id' => $u->id,

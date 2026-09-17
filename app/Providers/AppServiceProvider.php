@@ -40,5 +40,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('share-feedback', function (Request $request) {
             return Limit::perMinute(10)->by((string) $request->ip());
         });
+
+        // [Q2 — 2026-09-19] Yêu cầu nâng cấp gói: chống spam gửi yêu cầu (khách bấm nhiều lần / bot).
+        // Khoá theo user (đã đăng nhập) — 5 yêu cầu/giờ là quá đủ cho nhu cầu thật.
+        RateLimiter::for('upgrade-request', function (Request $request) {
+            return Limit::perHour(5)->by('upgrade:'.($request->user()?->id ?? $request->ip()));
+        });
     }
 }

@@ -61,7 +61,11 @@ class PricingPageTest extends TestCase
     {
         $res = $this->get('/bang-gia')->assertOk();
 
-        $res->assertSee('chưa có cổng thanh toán trực tuyến', false);
+        // [Q2 — 2026-09-19] Trang giá nay nói được BƯỚC TIẾP THEO (gửi yêu cầu → mã → chuyển khoản →
+        // kích hoạt) và vẫn nói thật là cổng thanh toán trực tuyến chưa mở.
+        $res->assertSee('Yêu cầu nâng cấp', false);
+        $res->assertSee('MÃ YÊU CẦU', false);
+        $res->assertSee('chưa mở', false);
         $res->assertSee('Nhà thiết kế thời trang', false);
         $res->assertSee('Chủ doanh nghiệp', false);
         $res->assertSee('Chủ xưởng may', false);

@@ -1721,6 +1721,15 @@ RULES:
         $plan = $limits['plan'];
         $usage = studio_usage($user);
 
+        // Yêu cầu nâng cấp đang mở của chính người dùng (nếu có) — để popup nói "đang chờ xử lý mã UP-…"
+        // thay vì để khách bấm gửi trùng.
+        $openUpgrade = \App\Models\UpgradeRequest::query()
+            ->where('user_id', $user->id)
+            ->whereIn('status', [\App\Models\UpgradeRequest::STATUS_PENDING, \App\Models\UpgradeRequest::STATUS_CONTACTED])
+            ->with('plan')
+            ->latest('id')
+            ->first();
+
         return response()->json([
             'plan' => $plan ? [
                 'id' => $plan->id,
@@ -1752,6 +1761,24 @@ RULES:
                 'video' => studio_credit_cost('video', $user),
             ],
             'warning' => $this->creditWarning($user, studio_credit_cost('image', $user)),
+            // [Q2 — 2026-09-19] Nâng cấp gói nay là một YÊU CẦU có mã theo dõi (chưa có cổng thanh
+            // toán): popup cần biết hướng dẫn chuyển khoản, kênh hỗ trợ, và yêu cầu nào đang chờ.
+            'payment' => \App\Http\Controllers\BillingController::paymentInfo(),
+            'upgrade' => [
+                'months' => \App\Models\UpgradeRequest::MONTHS,
+                'methods' => [
+                    ['value' => \App\Models\UpgradeRequest::METHOD_BANK, 'label' => 'Chuyển khoản ngân hàng'],
+                    ['value' => \App\Models\UpgradeRequest::METHOD_VNPAY, 'label' => 'VNPay (chưa mở)'],
+                    ['value' => \App\Models\UpgradeRequest::METHOD_SUPPORT, 'label' => 'Nhờ FabrikAI hỗ trợ'],
+                ],
+                'open' => $openUpgrade ? [
+                    'code' => $openUpgrade->code,
+                    'status_label' => $openUpgrade->statusLabel(),
+                    'plan_name' => $openUpgrade->plan?->name,
+                    'amount_label' => $openUpgrade->amountLabel(),
+                    'created_at' => $openUpgrade->created_at?->format('d/m/Y H:i'),
+                ] : null,
+            ],
             // Danh mục để mở bảng "Nâng cấp gói" ngay trong Studio (không phải sang trang khác).
             'catalog' => \App\Models\Plan::query()->where('is_active', true)->orderBy('sort')->get()->map(fn (\App\Models\Plan $p) => [
                 'id' => $p->id,
@@ -1787,11 +1814,22 @@ RULES:
         // không được kiểm ở đâu ⇒ gói Miễn phí (1K) và gói Studio (2K) cho ra ảnh giống hệt nhau.
         $data = $this->clampResolutionToPlan($data);
 
-        // Chặn khi hết credit — CHỈ khi bật cờ studio_enforce_credits (MẶC ĐỊNH TẮT: giữ nguyên
-        // hành vi "never hard-block" cho tới khi có cổng thanh toán — docs/UX_PERSONA_STRATEGY.md Q1).
-        if ($cost > 0 && studio_plan_limits($user)['enforce_credits'] && (int) $user->credits_balance < $cost) {
-            abort(402, 'Bạn đã dùng hết credit của gói (thao tác này cần '.$cost.' credit, hiện còn '
-                .max(0, (int) $user->credits_balance).'). Mở «Gói & credit» để nạp thêm hoặc nâng cấp gói.');
+        // [Q1 — 2026-09-19] CHẶN khi hết credit (chủ dự án đã bật; tắt được bằng setting
+        // studio_enforce_credits=0). Trả 402 có CẤU TRÚC thay vì chỉ một câu chữ: giao diện cần biết
+        // thiếu bao nhiêu, còn bao nhiêu, và nâng cấp ở đâu — nếu không thì khách chỉ thấy "lỗi" mà
+        // không biết làm gì tiếp, đúng thứ làm khách bỏ đi.
+        $limits = studio_plan_limits($user);
+        if ($cost > 0 && $limits['enforce_credits'] && (int) $user->credits_balance < $cost) {
+            $plan = $limits['plan'];
+            abort(response()->json([
+                'code' => 'out_of_credits',
+                'message' => 'Bạn đã dùng hết credit của gói (thao tác này cần '.$cost.' credit, hiện còn '
+                    .max(0, (int) $user->credits_balance).'). Mở «Gói & credit» để nâng cấp gói.',
+                'needed' => $cost,
+                'balance' => max(0, (int) $user->credits_balance),
+                'plan' => $plan ? ['id' => $plan->id, 'name' => $plan->name, 'slug' => $plan->slug] : null,
+                'upgrade_url' => '/bang-gia',
+            ], 402));
         }
 
         // (M-h — 2026-09-17) Việc TRỪ CREDIT đã chuyển xuống khối `DB::transaction` ngay dưới,

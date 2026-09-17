@@ -19,7 +19,9 @@ use Tests\TestCase;
  *   (a) yêu cầu vượt cap của gói bị HẠ xuống cap (không chặn công việc) và có thông báo nói rõ;
  *   (b) trong cap thì giữ nguyên, không thông báo;
  *   (c) video suy cap từ cap ảnh (1K ⇒ 720p, 2K ⇒ 1080p);
- *   (d) MẶC ĐỊNH vẫn KHÔNG chặn khi hết credit; chỉ chặn khi bật cờ studio_enforce_credits;
+ *   (d) [Q1 — 2026-09-19] MẶC ĐỊNH nay CHẶN khi hết credit (chủ dự án đã quyết) và trả 402 CÓ CẤU
+ *       TRÚC (mã lỗi + thiếu bao nhiêu + còn bao nhiêu + đường nâng cấp); tắt lại được bằng setting
+ *       studio_enforce_credits=0;
  *   (e) /api/plan/status nói đúng gói/hạn mức/chi phí + danh mục gói đang mở bán.
  */
 class PlanLimitsTest extends TestCase
@@ -95,31 +97,41 @@ class PlanLimitsTest extends TestCase
         $this->assertSame('1080', $this->lastGeneration($u)->resolution, 'Gói 2K ⇒ video được 1080p.');
     }
 
-    public function test_credits_are_not_enforced_by_default(): void
+    public function test_credits_are_enforced_by_default_with_a_structured_402(): void
     {
+        // [Q1 — 2026-09-19] Chủ dự án đã quyết BẬT chặn. Hành vi cũ ("never hard-block") là chủ ý của
+        // giai đoạn chưa có thanh toán; nay khách hết credit phải được nói RÕ và có đường nâng cấp.
         $u = $this->customer();
         $u->forceFill(['credits_balance' => 0])->save();
-
-        $this->actingAs($u->fresh())
-            ->postJson('/api/generate', ['prompt' => 'áo sơ mi trắng', 'variants' => 1])
-            ->assertOk();
-
-        $this->assertLessThan(0, (int) $u->fresh()->credits_balance, 'Mặc định vẫn KHÔNG chặn (giữ hành vi cũ).');
-    }
-
-    public function test_credits_are_enforced_when_the_flag_is_on(): void
-    {
-        $u = $this->customer();
-        $u->forceFill(['credits_balance' => 0])->save();
-        set_setting('studio_enforce_credits', '1');
 
         $r = $this->actingAs($u->fresh())
             ->postJson('/api/generate', ['prompt' => 'áo sơ mi trắng', 'variants' => 1])
             ->assertStatus(402);
 
+        // Một câu "lỗi" chung chung là thứ làm khách bỏ đi: payload phải nói thiếu bao nhiêu, còn bao
+        // nhiêu, gói nào, và nâng cấp ở đâu — giao diện dùng đúng những trường này.
+        $r->assertJsonPath('code', 'out_of_credits')
+            ->assertJsonPath('needed', 1)
+            ->assertJsonPath('balance', 0)
+            ->assertJsonPath('upgrade_url', '/bang-gia');
         $this->assertStringContainsString('credit', (string) $r->json('message'));
+
         $this->assertSame(0, Generation::where('user_id', $u->id)->count(), 'Bị chặn thì KHÔNG được tạo generation nào.');
         $this->assertSame(0, (int) $u->fresh()->credits_balance, 'Bị chặn thì không được trừ credit.');
+    }
+
+    public function test_enforcement_can_still_be_turned_off_by_setting(): void
+    {
+        // Cần đường lùi KHÔNG phải sửa mã: chủ dự án tắt cờ trong Quản trị là hệ thống về hành vi cũ.
+        $u = $this->customer();
+        $u->forceFill(['credits_balance' => 0])->save();
+        set_setting('studio_enforce_credits', '0');
+
+        $this->actingAs($u->fresh())
+            ->postJson('/api/generate', ['prompt' => 'áo sơ mi trắng', 'variants' => 1])
+            ->assertOk();
+
+        $this->assertLessThan(0, (int) $u->fresh()->credits_balance, 'Tắt cờ ⇒ giữ hành vi cũ (không chặn).');
     }
 
     public function test_plan_status_endpoint_reports_limits_costs_and_catalog(): void
@@ -133,7 +145,7 @@ class PlanLimitsTest extends TestCase
             ->assertJsonPath('plan.slug', 'pro')
             ->assertJsonPath('limits.image_resolution_cap', '2K')
             ->assertJsonPath('limits.video_resolution_cap', '1080')
-            ->assertJsonPath('limits.enforce_credits', false)
+            ->assertJsonPath('limits.enforce_credits', true)
             ->assertJsonPath('costs.image', 1)
             ->assertJsonPath('costs.video', 10)
             ->assertJsonCount(4, 'catalog');

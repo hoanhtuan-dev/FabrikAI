@@ -1311,7 +1311,10 @@ if (! function_exists('studio_plan_limits')) {
             'plan' => $plan,
             'image_resolution_cap' => $imageCap,
             'video_resolution_cap' => $imageCap === '1K' ? '720' : '1080',
-            'enforce_credits' => filter_var(studio_config('enforce_credits', false), FILTER_VALIDATE_BOOLEAN),
+            // [Q1 — 2026-09-19] Chủ dự án đã quyết: BẬT chặn khi hết credit (mặc định nay là true).
+            // Đổi mặc định ở ĐÚNG MỘT CHỖ này; muốn tạm mở lại thì đặt setting studio_enforce_credits=0
+            // trong Quản trị (không cần sửa mã).
+            'enforce_credits' => filter_var(studio_config('enforce_credits', true), FILTER_VALIDATE_BOOLEAN),
         ];
     }
 }

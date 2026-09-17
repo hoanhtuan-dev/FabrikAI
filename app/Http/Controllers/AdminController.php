@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CreditTransaction;
 use App\Models\Generation;
 use App\Models\Plan;
+use App\Models\UpgradeRequest;
 use App\Models\User;
 use App\Services\CreditService;
 use App\Services\PlanService;
@@ -269,6 +270,194 @@ class AdminController extends Controller
     }
 
     // ── Plans ──────────────────────────────────────────────────────────────
+
+// ── [Q2 — 2026-09-19] YÊU CẦU NÂNG CẤP GÓI + THÔNG TIN THANH TOÁN ──────────────
+    //
+    // Vì sao có: hệ thống chưa có cổng thanh toán, nhưng khách vẫn cần một đường nâng cấp RÕ RÀNG.
+    // Trước đây nút "Nâng cấp" tự kích hoạt gói trả phí miễn phí (không dấu vết thanh toán). Nay:
+    // khách gửi yêu cầu (có mã) → chủ dự án xác nhận tiền → KÍCH HOẠT ở đây.
+
+    /** GET /api/admin/upgrade-requests — hàng đợi yêu cầu nâng cấp + số đếm theo trạng thái. */
+    public function upgradeRequests(Request $request): JsonResponse
+    {
+        $status = (string) $request->query('status', '');
+        $q = UpgradeRequest::query()->with(['user:id,name,email', 'plan:id,name,slug,price_vnd', 'handler:id,name']);
+
+        if ($status !== '' && in_array($status, UpgradeRequest::STATUSES, true)) {
+            $q->where('status', $status);
+        }
+
+        $counts = UpgradeRequest::query()
+            ->selectRaw('status, count(*) as n')
+            ->groupBy('status')
+            ->pluck('n', 'status');
+
+        $rows = $q->orderByRaw("case when status = 'pending' then 0 when status = 'contacted' then 1 else 2 end")
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get()
+            ->map(fn (UpgradeRequest $r) => [
+                'id' => $r->id,
+                'code' => $r->code,
+                'status' => $r->status,
+                'status_label' => $r->statusLabel(),
+                'user' => $r->user ? ['id' => $r->user->id, 'name' => $r->user->name, 'email' => $r->user->email] : null,
+                'plan' => $r->plan ? ['id' => $r->plan->id, 'name' => $r->plan->name, 'slug' => $r->plan->slug] : null,
+                'months' => $r->months,
+                'amount_vnd' => $r->amount_vnd,
+                'amount_label' => $r->amountLabel(),
+                'method' => $r->method,
+                'method_label' => $r->methodLabel(),
+                'contact_name' => $r->contact_name,
+                'contact_phone' => $r->contact_phone,
+                'note' => $r->note,
+                'admin_note' => $r->admin_note,
+                'handler' => $r->handler?->name,
+                'handled_at' => $r->handled_at?->format('d/m/Y H:i'),
+                'created_at' => $r->created_at?->format('d/m/Y H:i'),
+                'age_hours' => $r->created_at ? (int) $r->created_at->diffInHours(now()) : null,
+            ])
+            ->values();
+
+        return response()->json([
+            'requests' => $rows,
+            'counts' => [
+                'pending' => (int) ($counts[UpgradeRequest::STATUS_PENDING] ?? 0),
+                'contacted' => (int) ($counts[UpgradeRequest::STATUS_CONTACTED] ?? 0),
+                'activated' => (int) ($counts[UpgradeRequest::STATUS_ACTIVATED] ?? 0),
+                'cancelled' => (int) ($counts[UpgradeRequest::STATUS_CANCELLED] ?? 0),
+            ],
+            'statuses' => collect(UpgradeRequest::STATUSES)->map(fn ($s) => [
+                'value' => $s,
+                'label' => (new UpgradeRequest(['status' => $s]))->statusLabel(),
+            ])->values(),
+            'payment' => \App\Http\Controllers\BillingController::paymentInfo(),
+        ]);
+    }
+
+    /** POST /api/admin/upgrade-requests/{r} — đổi trạng thái (đã liên hệ / huỷ) + ghi chú nội bộ. */
+    public function updateUpgradeRequest(Request $request, UpgradeRequest $upgradeRequest): JsonResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', 'string', Rule::in([
+                UpgradeRequest::STATUS_PENDING,
+                UpgradeRequest::STATUS_CONTACTED,
+                UpgradeRequest::STATUS_CANCELLED,
+            ])],
+            'admin_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        // Không cho "hạ cấp" một yêu cầu đã kích hoạt về trạng thái chờ: tiền đã nhận, gói đã cấp.
+        if ($upgradeRequest->status === UpgradeRequest::STATUS_ACTIVATED) {
+            return response()->json([
+                'message' => 'Yêu cầu '.$upgradeRequest->code.' đã kích hoạt — không đổi trạng thái được nữa.',
+                'code' => 'already_activated',
+            ], 422);
+        }
+
+        $upgradeRequest->forceFill([
+            'status' => $data['status'],
+            'admin_note' => $data['admin_note'] ?? $upgradeRequest->admin_note,
+            'handled_by' => $request->user()->id,
+            'handled_at' => now(),
+        ])->save();
+
+        return response()->json(['ok' => true, 'request' => [
+            'id' => $upgradeRequest->id,
+            'code' => $upgradeRequest->code,
+            'status' => $upgradeRequest->status,
+            'status_label' => $upgradeRequest->statusLabel(),
+        ]]);
+    }
+
+    /**
+     * POST /api/admin/upgrade-requests/{r}/activate (Super Admin) — ĐÃ NHẬN TIỀN ⇒ KÍCH HOẠT GÓI.
+     *
+     * Gán gói đi qua App\Services\PlanService — đường DUY NHẤT đổi plan_id/plan_expires_at, tự cấp
+     * bonus (lần đầu) và credit của chu kỳ. Ở đây chỉ ghi thêm vết: ai kích hoạt, lúc nào, cho yêu
+     * cầu nào ⇒ sau này đối chiếu được tiền với quyền lợi đã cấp.
+     */
+    public function activateUpgradeRequest(Request $request, UpgradeRequest $upgradeRequest): JsonResponse
+    {
+        $data = $request->validate([
+            'admin_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if ($upgradeRequest->status === UpgradeRequest::STATUS_ACTIVATED) {
+            return response()->json([
+                'message' => 'Yêu cầu '.$upgradeRequest->code.' đã được kích hoạt trước đó.',
+                'code' => 'already_activated',
+            ], 422);
+        }
+
+        $plan = Plan::query()->where('is_active', true)->find($upgradeRequest->plan_id);
+        if (! $plan) {
+            return response()->json([
+                'message' => 'Gói của yêu cầu này không còn mở bán — hãy chọn gói khác cho khách.',
+                'code' => 'plan_unavailable',
+            ], 422);
+        }
+
+        $user = $upgradeRequest->user;
+        if (! $user) {
+            return response()->json(['message' => 'Không tìm thấy tài khoản của yêu cầu này.', 'code' => 'user_missing'], 422);
+        }
+
+        app(PlanService::class)->assign(
+            $user,
+            $plan,
+            (int) $upgradeRequest->months,
+            'Kích hoạt theo yêu cầu '.$upgradeRequest->code.' ('.$upgradeRequest->methodLabel().')'
+        );
+
+        $upgradeRequest->forceFill([
+            'status' => UpgradeRequest::STATUS_ACTIVATED,
+            'admin_note' => $data['admin_note'] ?? $upgradeRequest->admin_note,
+            'handled_by' => $request->user()->id,
+            'handled_at' => now(),
+        ])->save();
+
+        $fresh = $user->fresh();
+
+        return response()->json([
+            'ok' => true,
+            'request' => ['id' => $upgradeRequest->id, 'code' => $upgradeRequest->code, 'status' => $upgradeRequest->status],
+            'user' => ['id' => $fresh->id, 'name' => $fresh->name, 'email' => $fresh->email],
+            'plan' => ['id' => $plan->id, 'name' => $plan->name],
+            'months' => (int) $upgradeRequest->months,
+            'plan_expires_at' => $fresh->plan_expires_at?->format('d/m/Y'),
+            'credits_balance' => (int) $fresh->credits_balance,
+            'message' => 'Đã kích hoạt gói '.$plan->name.' cho '.$fresh->name.' ('.$upgradeRequest->months.' tháng).',
+        ]);
+    }
+
+    /** GET /api/admin/payment-info — thông tin nhận tiền + hỗ trợ đang cấu hình. */
+    public function paymentInfoShow(): JsonResponse
+    {
+        return response()->json(['payment' => \App\Http\Controllers\BillingController::paymentInfo()]);
+    }
+
+    /** POST /api/admin/payment-info — cập nhật thông tin nhận tiền + hỗ trợ (một nguồn cho mọi bề mặt). */
+    public function paymentInfoSave(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'bank_name' => ['nullable', 'string', 'max:120'],
+            'bank_account' => ['nullable', 'string', 'max:60'],
+            'bank_holder' => ['nullable', 'string', 'max:120'],
+            'bank_branch' => ['nullable', 'string', 'max:120'],
+            'support_phone' => ['nullable', 'string', 'max:32'],
+            'support_email' => ['nullable', 'string', 'max:120'],
+            'support_zalo' => ['nullable', 'string', 'max:120'],
+            'support_hours' => ['nullable', 'string', 'max:120'],
+            'vnpay_enabled' => ['nullable', 'boolean'],
+        ]);
+
+        foreach ($data as $key => $value) {
+            set_setting('studio_'.$key, is_bool($value) ? ($value ? '1' : '0') : (string) $value);
+        }
+
+        return response()->json(['ok' => true, 'payment' => \App\Http\Controllers\BillingController::paymentInfo()]);
+    }
 
     public function plans(): JsonResponse
     {

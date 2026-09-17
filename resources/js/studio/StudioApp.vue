@@ -615,11 +615,22 @@ function onTouchEnd(e) {
                 <span class="rounded bg-ink-800 px-2 py-1 text-cream-200">Video tối đa {{ store.planStatus.limits.video_resolution_cap }}p</span>
               </div>
               <p v-if="store.planStatus.warning" class="mt-2 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-200">{{ store.planStatus.warning }}</p>
+              <!-- [Q2] Yêu cầu nâng cấp đang chờ: nói ngay để khách không gửi trùng -->
+              <p v-if="store.planStatus.upgrade && store.planStatus.upgrade.open" class="mt-2 rounded border border-sky-500/30 bg-sky-500/10 px-2 py-1.5 text-[10px] text-sky-100">
+                Đang chờ xử lý: <b>{{ store.planStatus.upgrade.open.code }}</b> — gói {{ store.planStatus.upgrade.open.plan_name }}
+                · {{ store.planStatus.upgrade.open.amount_label }} · gửi {{ store.planStatus.upgrade.open.created_at }}
+                <span class="block text-sky-200/85">FabrikAI sẽ liên hệ theo số bạn đã để lại. Cần gấp? Gọi {{ store.planStatus.payment.support.phone || 'số hỗ trợ của FabrikAI' }}.</span>
+              </p>
+              <div v-if="store.planStatus.payment && store.planStatus.payment.bank.account" class="mt-2 rounded border border-ink-700 bg-ink-800/70 px-2 py-1.5 text-[10px] text-cream-200">
+                <b class="text-cream-50">Chuyển khoản:</b> {{ store.planStatus.payment.bank.name }} · STK {{ store.planStatus.payment.bank.account }}
+                <span v-if="store.planStatus.payment.bank.holder"> · {{ store.planStatus.payment.bank.holder }}</span>
+                <span class="block text-cream-300/85">Nội dung: mã yêu cầu (vd UP-2609-0001) + tên tài khoản FabrikAI của bạn.</span>
+              </div>
               <button type="button" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition hover:bg-ink-700" @click="store.planCatalogOpen = !store.planCatalogOpen">
                 <StudioIcon name="sparkles" size="h-3 w-3" /> {{ store.planCatalogOpen ? 'Thu gọn danh mục gói' : 'Xem gói khác / nâng cấp' }}
               </button>
               <div v-if="store.planCatalogOpen" class="mt-2 max-h-64 space-y-1.5 overflow-y-auto">
-                <p class="rounded bg-ink-800 px-2 py-1 text-[10px] text-cream-300/85">Hệ thống chưa có cổng thanh toán trực tuyến — gói trả phí được kích hoạt ngay, vui lòng thanh toán theo hướng dẫn của FabrikAI.</p>
+                <p class="rounded bg-ink-800 px-2 py-1 text-[10px] text-cream-300/85">Chưa có cổng thanh toán trực tuyến: bấm <b class="text-cream-100">Yêu cầu nâng cấp</b> để FabrikAI liên hệ, xác nhận thanh toán rồi kích hoạt gói cho bạn.</p>
                 <div v-for="p in store.planStatus.catalog" :key="p.id" class="rounded-lg border border-ink-700 bg-ink-900/60 p-2">
                   <p class="flex items-center gap-2 text-[11px] font-semibold text-cream-100">
                     {{ p.name }}
@@ -627,12 +638,69 @@ function onTouchEnd(e) {
                   </p>
                   <p class="mt-0.5 text-[10px] text-cream-300/85">{{ p.credits_per_month }} credit/tháng · tối đa {{ p.resolution_cap }}<span v-if="p.bonus_credits"> · +{{ p.bonus_credits }} tặng lần đầu</span></p>
                   <p v-if="p.tagline" class="mt-0.5 text-[10px] text-cream-300/75">{{ p.tagline }}</p>
-                  <button type="button" class="mt-1.5 w-full rounded bg-brand-600 px-2 py-1 text-[10px] font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                  <!-- Nút của gói ĐANG DÙNG phải ĐỌC ĐƯỢC. Hai lần đo trên trình duyệt thật mới ra đúng
+                       cách sửa: (1) bg-brand + opacity-50 ⇒ chữ trắng trên nền sáng, tương phản 1:1;
+                       (2) đổi sang class Tailwind vẫn KHÔNG ăn, vì trình duyệt áp style :disabled của
+                       chính nó và quy tắc KHÔNG nằm trong layer luôn thắng layer của Tailwind v4.
+                       ⇒ đặt màu bằng inline style (thắng mọi quy tắc ngoài layer). -->
+                  <button type="button"
+                          :style="p.is_current ? { background: '#26231d', color: '#e9e2d0', borderColor: '#3a352b' } : {}"
+                          :class="p.is_current ? 'border' : 'bg-brand-600 text-white hover:bg-brand-700'"
+                          class="mt-1.5 w-full rounded px-2 py-1 text-[10px] font-semibold transition"
                           :disabled="p.is_current || store.planBusy"
-                          @click="store.subscribePlan(p.id)">
-                    {{ p.is_current ? 'Đang dùng' : (p.is_free ? 'Chuyển sang gói này' : 'Kích hoạt gói này') }}
+                          @click="p.is_free ? store.subscribePlan(p.id) : store.openUpgrade(p)">
+                    {{ p.is_current ? 'Đang dùng' : (p.is_free ? 'Dùng gói miễn phí' : 'Yêu cầu nâng cấp') }}
                   </button>
                 </div>
+              </div>
+              <!-- [Q2] FORM YÊU CẦU NÂNG CẤP: gói trả phí không tự kích hoạt được nữa -->
+              <div v-if="store.upgradeOpen" class="mt-2 space-y-2 rounded-lg border border-brand-500/40 bg-brand-600/10 p-2">
+                <p class="flex items-center gap-1.5 text-[11px] font-semibold text-cream-50">
+                  <StudioIcon name="receipt" size="h-3.5 w-3.5" class="text-brand-300" /> Yêu cầu nâng cấp gói
+                  <button type="button" class="icon-btn ml-auto !h-5 !w-5" title="Đóng form" aria-label="Đóng form yêu cầu nâng cấp" @click="store.closeUpgrade()"><StudioIcon name="x" size="h-3 w-3" /></button>
+                </p>
+                <template v-if="!store.upgradeResult">
+                  <label class="block text-[10px] text-cream-300/85">Số tháng
+                    <select v-model.number="store.upgradeForm.months" class="input mt-0.5 !py-1 text-[11px]">
+                      <option v-for="m in (store.planStatus.upgrade ? store.planStatus.upgrade.months : [1])" :key="m" :value="m">{{ m }} tháng<span v-if="m === 3"> (một vụ)</span></option>
+                    </select>
+                  </label>
+                  <label class="block text-[10px] text-cream-300/85">Cách thanh toán
+                    <select v-model="store.upgradeForm.method" class="input mt-0.5 !py-1 text-[11px]">
+                      <option v-for="m in (store.planStatus.upgrade ? store.planStatus.upgrade.methods : [])" :key="m.value" :value="m.value">{{ m.label }}</option>
+                    </select>
+                  </label>
+                  <label class="block text-[10px] text-cream-300/85">Tên người liên hệ
+                    <input v-model="store.upgradeForm.name" maxlength="120" class="input mt-0.5 !py-1 text-[11px]" placeholder="Tên của bạn">
+                  </label>
+                  <label class="block text-[10px] text-cream-300/85">Số điện thoại (bắt buộc)
+                    <input v-model="store.upgradeForm.phone" maxlength="32" inputmode="tel" class="input mt-0.5 !py-1 text-[11px]" placeholder="0901234567">
+                  </label>
+                  <label class="block text-[10px] text-cream-300/85">Ghi chú
+                    <textarea v-model="store.upgradeForm.note" rows="2" maxlength="1000" class="input mt-0.5 !py-1 text-[11px]" placeholder="vd: cần cho bộ Thu Đông, xuất hoá đơn công ty"></textarea>
+                  </label>
+                  <button type="button" class="w-full rounded bg-brand-600 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                          :disabled="store.upgradeBusy" @click="store.submitUpgrade()">
+                    {{ store.upgradeBusy ? 'Đang gửi…' : 'Gửi yêu cầu nâng cấp' }}
+                  </button>
+                  <p class="text-[10px] leading-relaxed text-cream-300/85">FabrikAI sẽ liên hệ xác nhận trong giờ làm việc; gói chỉ được kích hoạt SAU khi thanh toán được xác nhận.</p>
+                </template>
+                <template v-else>
+                  <p class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[10px] text-emerald-200">
+                    Đã gửi yêu cầu <b>{{ store.upgradeResult.code }}</b> — {{ store.upgradeResult.plan.name }} ·
+                    {{ store.upgradeResult.months }} tháng · {{ store.upgradeResult.amount_label }} · {{ store.upgradeResult.method_label }}.
+                  </p>
+                  <div v-if="store.planStatus.payment && store.planStatus.payment.bank.account" class="rounded bg-ink-800 px-2 py-1.5 text-[10px] text-cream-200">
+                    <p><b class="text-cream-50">{{ store.planStatus.payment.bank.name }}</b></p>
+                    <p>STK: <b>{{ store.planStatus.payment.bank.account }}</b><span v-if="store.planStatus.payment.bank.holder"> — {{ store.planStatus.payment.bank.holder }}</span></p>
+                    <p class="mt-0.5 text-cream-300/85">Nội dung chuyển khoản: <b class="text-cream-100">{{ store.upgradeResult.code }}</b></p>
+                  </div>
+                  <p v-else class="rounded bg-ink-800 px-2 py-1.5 text-[10px] text-cream-300/85">FabrikAI sẽ gửi thông tin thanh toán cho bạn qua số điện thoại đã để lại.</p>
+                  <p v-if="store.planStatus.payment && store.planStatus.payment.support.phone" class="text-[10px] text-cream-300/85">
+                    Cần gấp: {{ store.planStatus.payment.support.phone }}<span v-if="store.planStatus.payment.support.email"> · {{ store.planStatus.payment.support.email }}</span>
+                  </p>
+                  <button type="button" class="w-full rounded border border-ink-700 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700" @click="store.closeUpgrade()">Đóng</button>
+                </template>
               </div>
             </template>
             <p v-else class="text-[11px] text-cream-300/85">Đang tải thông tin gói…</p>
