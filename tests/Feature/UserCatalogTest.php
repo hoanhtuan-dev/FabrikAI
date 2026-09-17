@@ -130,6 +130,21 @@ class UserCatalogTest extends TestCase
         $this->assertSame(0, $rc, "check-local-catalog.mjs thất bại:\n".implode("\n", $out));
     }
 
+    /**
+     * Hệ quả trực tiếp của việc /settings thành cấp OWNER: link tới nó ở trang KHÁCH dùng
+     * (ConceptCard) phải được gate `is_admin`, nếu không khách bấm vào chỉ nhận 403.
+     */
+    public function test_settings_link_is_gated_for_non_admins(): void
+    {
+        $src = (string) file_get_contents(resource_path('js/studio/components/ConceptCard.vue'));
+
+        $this->assertMatchesRegularExpression(
+            '#<a[^>]*v-if="store\.user && store\.user\.is_admin"[^>]*href="/settings"#',
+            $src,
+            'Link /settings trong ConceptCard phải gate is_admin — /settings nay là cấp owner.'
+        );
+    }
+
     public function test_both_pages_use_the_local_catalog(): void
     {
         $targets = [
