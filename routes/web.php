@@ -100,6 +100,11 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     // dùng · hạn còn lại · phản hồi mới nhất) — cho chủ doanh nghiệp kiểm soát chi phí theo bộ.
     Route::get('/projects/{project}/stats', [ProjectController::class, 'stats'])->name('projects.stats');
 
+    // [Đợt 2 — 2026-09-19] DUYỆT MẪU THEO LÔ: chốt/loại NHIỀU ảnh trong một lượt, trả kết quả từng ảnh.
+    // Dùng đúng máy trạng thái + whitelist của Đợt 1.1 (không mở đường tắt nào) — trước đây endpoint lẻ
+    // có mà không giao diện nào gọi, nên vòng đời duyệt ảnh là tính năng chết với người dùng.
+    Route::post('/projects/{project}/shots/review', [ProjectController::class, 'reviewShots'])->name('projects.shots.review');
+
     // [Đợt 4 — 2026-09-19] CHIA SẺ CHO KHÁCH DUYỆT: tạo link công khai (có hạn) + thu hồi.
     Route::get('/projects/{project}/share', [ProjectShareController::class, 'status'])->name('projects.share.status');
     Route::post('/projects/{project}/share', [ProjectShareController::class, 'create'])->name('projects.share.create');

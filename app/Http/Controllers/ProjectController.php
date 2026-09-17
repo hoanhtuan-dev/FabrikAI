@@ -152,6 +152,105 @@ class ProjectController extends Controller
     }
 
     /**
+     * POST /api/projects/{project}/shots/review — DUYỆT MẪU THEO LÔ (Đợt 2 — 2026-09-19).
+     *
+     * Vì sao có endpoint này: máy trạng thái của từng ảnh (idea → drafted → selected → fitted →
+     * campaign_ready → approved/rejected, whitelist ở App\Models\Generation::SHOT_TRANSITIONS) và
+     * endpoint lẻ POST /api/generations/{id}/shot-state đã có từ Đợt 1.1 — nhưng **không giao diện nào
+     * gọi tới** (grep 'shot-state' trong resources/js = 0) ⇒ vòng đời duyệt ảnh là tính năng CHẾT với
+     * người dùng: họ chỉ thấy ảnh, không biết ảnh nào đã chốt/loại.
+     *
+     * Một buổi duyệt thật là "xem 20 ảnh rồi chốt 12, loại 8" — gọi 20 request lẻ vừa chậm vừa không có
+     * chỗ để báo "3 ảnh không duyệt được vì lý do gì". Endpoint này trả về KẾT QUẢ TỪNG ẢNH nên giao
+     * diện nói thật được cái nào xong, cái nào hỏng và vì sao — KHÔNG im lặng bỏ qua.
+     *
+     * Quy tắc giữ nguyên của hệ thống (không nới ở đây):
+     *   - Quyền: chủ bộ sưu tập hoặc Super Admin (giống show/stats/export).
+     *   - Ảnh phải THUỘC bộ sưu tập này (id ngoài bộ ⇒ báo lỗi riêng, không đụng ảnh người khác).
+     *   - Chỉ ảnh đã tạo XONG mới duyệt được (ảnh pending/failed chưa có gì để duyệt).
+     *   - Bước chuyển phải hợp lệ theo whitelist ⇒ nhảy cóc (drafted → approved) bị từ chối kèm giải
+     *     thích, thay vì âm thầm đổi trạng thái. Ba thao tác: 'approved' (chốt) · 'rejected' (loại) ·
+     *     'next' (đẩy lên bước kế tiếp trên đường thuận).
+     *   - Tối đa 60 ảnh/lô (khớp đúng hạn mức generations mà show() trả về).
+     */
+    public function reviewShots(Request $request, Project $project): \Illuminate\Http\JsonResponse
+    {
+        $actor = $request->user();
+        abort_unless($project->user_id === $actor->id || $actor->isSuperAdmin(), 403);
+
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:60'],
+            'ids.*' => ['integer'],
+            // 'next' = đẩy lên BƯỚC KẾ TIẾP trên đường thuận (không nhảy cóc) — thao tác chính của một
+            // buổi duyệt: chọn ảnh đạt rồi đẩy lên bước sau thay vì bắt người dùng tự đi từng bước.
+            'state' => ['required', 'string', Rule::in([Generation::SHOT_APPROVED, Generation::SHOT_REJECTED, 'next'])],
+            'note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $data['ids'])));
+        $shots = $project->generations()->whereIn('id', $ids)->get()->keyBy('id');
+        $label = $data['state'] === Generation::SHOT_APPROVED ? 'duyệt'
+            : ($data['state'] === Generation::SHOT_REJECTED ? 'loại' : 'chuyển bước');
+
+        $results = [];
+        $done = 0;
+
+        foreach ($ids as $id) {
+            $shot = $shots->get($id);
+
+            if (! $shot) {
+                $results[] = ['id' => $id, 'ok' => false, 'error' => 'Ảnh không thuộc bộ sưu tập này.'];
+                continue;
+            }
+
+            if ($shot->status !== 'completed') {
+                $results[] = [
+                    'id' => $id,
+                    'ok' => false,
+                    'shot_state' => $shot->shot_state ?: 'drafted',
+                    'error' => 'Chỉ '.$label.' được ảnh đã tạo xong (ảnh này đang ở trạng thái tạo: '.$shot->status.').',
+                ];
+                continue;
+            }
+
+            $from = $shot->shot_state ?: 'drafted';
+
+            // 'next' được giải thành trạng thái cụ thể Ở ĐÂY rồi vẫn đi qua đúng whitelist bên dưới —
+            // không có đường tắt nào cho thao tác theo lô.
+            $target = (string) $data['state'];
+            if ($target === 'next') {
+                $target = Generation::nextShotState($from) ?? '';
+                if ($target === '') {
+                    $results[] = [
+                        'id' => $id, 'ok' => false, 'shot_state' => $from,
+                        'error' => 'Ảnh đã ở bước cuối (Đã duyệt) — không còn bước kế tiếp.',
+                    ];
+                    continue;
+                }
+            }
+
+            try {
+                $shot->transitionShotState($target, $data['note'] ?? null);
+            } catch (\InvalidArgumentException $e) {
+                // Whitelist từ chối: giữ nguyên ảnh, báo rõ vì sao (không "thử lại rồi tính").
+                $results[] = ['id' => $id, 'ok' => false, 'shot_state' => $from, 'error' => $e->getMessage()];
+                continue;
+            }
+
+            $done++;
+            $results[] = ['id' => $id, 'ok' => true, 'from' => $from, 'shot_state' => $shot->shot_state];
+        }
+
+        return response()->json([
+            'ok' => true,
+            'state' => $data['state'],
+            'reviewed' => $done,
+            'failed' => count($results) - $done,
+            'results' => $results,
+        ]);
+    }
+
+    /**
      * GET /api/projects/{project}/export — TẢI GÓI SẢN XUẤT CHO XƯỞNG (ZIP).
      *
      * Người nhận là XƯỞNG MAY (không dùng FabrikAI), nên gói phải tự đủ nghĩa: ảnh tham chiếu + phiếu
@@ -370,6 +469,12 @@ class ProjectController extends Controller
                 'model' => $g->model, 'provider' => $g->provider,
                 'project_id' => $g->project_id, 'project' => $project->name,
                 'created_at' => $g->created_at?->format('d/m H:i'),
+                // [Đợt 2] Vòng đời DUYỆT của ảnh — trước đây không trả về nên giao diện không thể biết
+                // ảnh nào chờ duyệt/đã chốt/đã loại, dù máy trạng thái đã có từ Đợt 1.1.
+                'shot_state' => $g->shot_state ?: 'drafted',
+                'shot_label' => Generation::SHOT_LABELS[$g->shot_state ?: 'drafted'] ?? 'Bản nháp',
+                'note' => $g->note,
+                'is_selected' => (bool) $g->is_selected,
             ])->values();
 
             $assets = $project->relationLoaded('assets')

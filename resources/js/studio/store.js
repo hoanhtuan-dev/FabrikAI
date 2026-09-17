@@ -51,6 +51,9 @@ export const useStudioStore = defineStore('studio', {
     batchFailed: [],
     // [Đợt 2] Thống kê chi phí/tiến độ theo từng bộ sưu tập (nạp khi cần, không nạp cả danh sách).
     projectStats: {},
+    // [Đợt 2] Danh sách ẢNH của từng bộ sưu tập kèm trạng thái DUYỆT (shot_state) — phục vụ màn
+    // "Duyệt mẫu theo lô". Nạp theo yêu cầu, nhớ theo id.
+    projectShots: {},
     planOpen: false,        // popup "Gói & credit" ở thanh công cụ
     planCatalogOpen: false, // mở danh mục gói bên trong popup
     planBusy: false,
@@ -1713,6 +1716,73 @@ export const useStudioStore = defineStore('studio', {
         console.error('loadProjectStats failed', e);
         return null;
       }
+    },
+    /**
+     * [Đợt 2] ẢNH của một bộ sưu tập kèm trạng thái duyệt — nguồn cho khối "Duyệt mẫu theo lô".
+     *
+     * Dùng lại GET /api/projects/{id} (đã trả generations) thay vì thêm endpoint đọc mới: dữ liệu
+     * vốn có, chỉ thiếu đường tới giao diện. Lọc bỏ ảnh chưa tạo xong vì chưa có gì để duyệt.
+     */
+    async loadProjectShots(projectId, force = false) {
+      if (!projectId) return [];
+      const cached = this.projectShots[projectId];
+      if (!force && cached && cached.items) return cached.items;
+      try {
+        const r = await fetch('/api/projects/' + projectId, { headers: { Accept: 'application/json' } });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        const items = (d.project?.generations || d.generations || [])
+          .filter((g) => g.status === 'completed')
+          .map((g) => ({
+            id: g.id,
+            thumb: g.media_url,
+            shot_state: g.shot_state || 'drafted',
+            shot_label: g.shot_label || 'Bản nháp',
+            prompt: (g.prompt || '').slice(0, 120),
+            created_at: g.created_at,
+          }));
+        this.projectShots = { ...this.projectShots, [projectId]: { items, loadedAt: Date.now() } };
+        return items;
+      } catch (e) {
+        console.error('loadProjectShots failed', e);
+        this.toast('Không nạp được danh sách ảnh của bộ sưu tập.', 'error');
+        return [];
+      }
+    },
+    /**
+     * [Đợt 2] Duyệt/loại NHIỀU ảnh trong một lượt — trả về { reviewed, failed, results }.
+     *
+     * Máy chủ là nơi quyết định (quyền · ảnh thuộc bộ · ảnh đã xong · whitelist trạng thái); ở đây chỉ
+     * cập nhật lại trạng thái của những ảnh ĐÃ đổi để giao diện khỏi phải nạp lại cả danh sách.
+     */
+    async reviewShots(projectId, ids, state, note = '') {
+      if (!projectId || !ids || !ids.length) return null;
+      try {
+        const d = await this.api('/api/projects/' + projectId + '/shots/review', { ids, state, note });
+        const entry = this.projectShots[projectId];
+        if (entry && Array.isArray(entry.items)) {
+          const changed = {};
+          (d.results || []).forEach((r) => { if (r.ok) changed[r.id] = r.shot_state; });
+          entry.items = entry.items.map((it) => (
+            changed[it.id]
+              ? { ...it, shot_state: changed[it.id], shot_label: this.shotLabel(changed[it.id]) }
+              : it
+          ));
+          this.projectShots = { ...this.projectShots, [projectId]: entry };
+        }
+        return d;
+      } catch (e) {
+        this.toast('Không duyệt được: ' + e.message, 'error');
+        return null;
+      }
+    },
+    /** Nhãn tiếng Việt của trạng thái duyệt ảnh — KHỚP Generation::SHOT_LABELS ở máy chủ. */
+    shotLabel(state) {
+      const map = {
+        idea: 'Ý tưởng', drafted: 'Bản nháp', selected: 'Đã chọn', fitted: 'Đã lên phom',
+        campaign_ready: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Đã loại',
+      };
+      return map[state] || 'Bản nháp';
     },
     // ── Mẫu việc theo ngành (Đợt 2) ───────────────────────────────────────────────────────
     async loadJobTemplates() {

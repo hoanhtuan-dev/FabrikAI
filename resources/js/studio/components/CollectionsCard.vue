@@ -26,7 +26,10 @@ const store = useStudioStore();
 // Cùng mẫu với LibraryApp/PromptLibraryTab: chưa có dữ liệu VÀ chưa từng nạp thì mới gọi.
 onMounted(() => {
   if (!store.projects.length && !store.projectLoaded) store.loadProjects();
-  if (store.appliedProject) store.loadProjectStats(store.appliedProject.id);
+  if (store.appliedProject) {
+    store.loadProjectStats(store.appliedProject.id);
+    store.loadProjectShots(store.appliedProject.id);   // để badge "chờ duyệt" đúng ngay khi mở panel
+  }
 });
 
 // Thống kê của bộ đang làm: ảnh xong/đang chạy/lỗi · credit đã dùng · hạn còn lại · phản hồi của khách.
@@ -37,6 +40,65 @@ function deadlineTone(days) {
   if (days < 0) return 'bg-red-500/15 text-red-300';
   if (days <= 3) return 'bg-amber-500/15 text-amber-300';
   return 'bg-emerald-500/15 text-emerald-300';
+}
+
+// ── Duyệt mẫu theo lô (Đợt 2) ─────────────────────────────────────────────────────
+// Vòng đời duyệt ảnh (idea → drafted → selected → fitted → campaign_ready → approved/rejected) đã có ở
+// máy chủ từ Đợt 1.1 nhưng KHÔNG giao diện nào gọi tới ⇒ với người dùng nó là tính năng chết. Khối này
+// là chỗ duyệt thật: xem ảnh, chọn nhiều ảnh, rồi chốt / loại / đẩy lên bước kế tiếp trong MỘT lượt.
+const reviewOpen = ref(false);
+const reviewBusy = ref(false);
+const reviewNote = ref('');
+const reviewErrors = ref([]);
+const shotsSel = ref([]);
+const shots = computed(() => (applied.value ? (store.projectShots[applied.value.id]?.items || []) : []));
+const awaiting = computed(() => shots.value.filter((s) => s.shot_state === 'campaign_ready'));
+const approvedCount = computed(() => shots.value.filter((s) => s.shot_state === 'approved').length);
+const rejectedCount = computed(() => shots.value.filter((s) => s.shot_state === 'rejected').length);
+const selectedCount = computed(() => shotsSel.value.length);
+/** Màu theo trạng thái duyệt — giữ đúng cách nói của máy chủ (nhãn lấy từ Generation::SHOT_LABELS). */
+function stateTone(state) {
+  if (state === 'approved') return 'bg-emerald-500/80 text-ink-900';
+  if (state === 'rejected') return 'bg-red-500/80 text-ink-900';
+  if (state === 'campaign_ready') return 'bg-amber-500/85 text-ink-900';
+  return 'bg-ink-800/85 text-cream-100';
+}
+async function loadShots() {
+  if (applied.value) await store.loadProjectShots(applied.value.id, true);
+}
+async function toggleReview() {
+  reviewOpen.value = !reviewOpen.value;
+  if (!reviewOpen.value) return;
+  reviewErrors.value = [];
+  await store.loadProjectShots(applied.value.id);
+  // Mặc định chọn sẵn những ảnh ĐANG CHỜ DUYỆT — đúng việc của một buổi duyệt.
+  if (!shotsSel.value.length) shotsSel.value = awaiting.value.map((s) => s.id);
+}
+function toggleShot(id) {
+  shotsSel.value = shotsSel.value.includes(id)
+    ? shotsSel.value.filter((x) => x !== id)
+    : shotsSel.value.concat([id]);
+}
+function selectAwaiting() { shotsSel.value = awaiting.value.map((s) => s.id); }
+/**
+ * Gửi một lượt duyệt. Máy chủ quyết định từng ảnh (quyền · ảnh thuộc bộ · ảnh đã xong · whitelist bước
+ * chuyển) và trả kết quả TỪNG ẢNH ⇒ ở đây nói thật cái nào đổi được, cái nào không và vì sao.
+ */
+async function reviewBatch(state) {
+  if (!applied.value || !shotsSel.value.length || reviewBusy.value) return;
+  reviewBusy.value = true;
+  const ids = shotsSel.value.slice();
+  const verb = state === 'approved' ? 'duyệt' : (state === 'rejected' ? 'loại' : 'chuyển bước cho');
+  const d = await store.reviewShots(applied.value.id, ids, state, reviewNote.value.trim());
+  reviewBusy.value = false;
+  if (!d) return;
+  reviewErrors.value = (d.results || []).filter((r) => !r.ok);
+  shotsSel.value = [];
+  store.toast('Đã ' + verb + ' ' + d.reviewed + '/' + ids.length + ' ảnh'
+    + (d.failed ? ' — ' + d.failed + ' ảnh không đổi được, xem lý do ngay dưới.' : '.'),
+  d.failed ? 'error' : 'success');
+  store.loadProjectStats(applied.value.id, true);
+  if (!d.failed) reviewNote.value = '';
 }
 
 // ── Form tạo bộ sưu tập mới ──
@@ -157,6 +219,9 @@ function statusStyle(p) {
 async function pick(p) {
   store.applyProject(p);
   store.loadProjectStats(p.id);   // nạp chi phí/tiến độ của bộ vừa chọn
+  shotsSel.value = [];            // đổi bộ thì bỏ lựa chọn duyệt của bộ cũ (tránh duyệt nhầm ảnh)
+  reviewErrors.value = [];
+  store.loadProjectShots(p.id);
   store.toast('Đang làm bộ sưu tập «' + p.name + '» — ảnh mới sẽ tự gắn vào đây.');
 }
 function openWorkspace(p) {
@@ -238,7 +303,62 @@ async function submit() {
         <button class="tool-btn" :class="shareOpen ? 'is-active' : ''" title="Gửi link cho khách/nhân viên duyệt (không cần tài khoản FabrikAI)" @click="toggleShare()">
           <StudioIcon name="link" size="h-3.5 w-3.5" /> Chia sẻ cho khách
         </button>
+        <button class="tool-btn" :class="reviewOpen ? 'is-active' : ''" title="Xem lại ảnh của bộ này rồi chốt / loại / đẩy lên bước kế tiếp — duyệt nhiều ảnh trong một lượt" @click="toggleReview()">
+          <StudioIcon name="checkSquare" size="h-3.5 w-3.5" /> Duyệt mẫu<span v-if="awaiting.length"> ({{ awaiting.length }})</span>
+        </button>
         <button class="tool-btn" title="Không gắn ảnh mới vào bộ này nữa" @click="store.unapplyProject()"><StudioIcon name="pinOff" size="h-3.5 w-3.5" /> Bỏ áp dụng</button>
+      </div>
+
+      <!-- Duyệt mẫu theo lô: chốt/loại/đẩy bước cho NHIỀU ảnh trong một lượt -->
+      <div v-if="reviewOpen" class="mt-2 rounded-lg border border-ink-700 bg-ink-900/70 p-2.5">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Duyệt mẫu</p>
+          <span class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200">{{ shots.length }} ảnh đã tạo xong</span>
+          <span v-if="awaiting.length" class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">{{ awaiting.length }} chờ duyệt</span>
+          <span v-if="approvedCount" class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">{{ approvedCount }} đã duyệt</span>
+          <span v-if="rejectedCount" class="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-300">{{ rejectedCount }} đã loại</span>
+          <button class="icon-btn ml-auto !h-5 !w-5" title="Nạp lại danh sách ảnh" aria-label="Nạp lại danh sách ảnh của bộ sưu tập" @click="loadShots()">
+            <StudioIcon name="refresh" size="h-3 w-3" />
+          </button>
+        </div>
+        <p v-if="!shots.length" class="mt-1 text-[10px] text-cream-300">Bộ này chưa có ảnh nào tạo xong — duyệt được ngay khi ảnh render xong.</p>
+        <template v-else>
+          <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <button class="tool-btn !py-1 text-[10px]" @click="selectAwaiting()"><StudioIcon name="selectAll" size="h-3 w-3" /> Chọn ảnh chờ duyệt</button>
+            <button class="tool-btn !py-1 text-[10px]" @click="shotsSel = []"><StudioIcon name="x" size="h-3 w-3" /> Bỏ chọn</button>
+            <span class="text-[10px] text-cream-300">đã chọn {{ selectedCount }}/{{ shots.length }}</span>
+          </div>
+          <div class="mt-1.5 grid max-h-60 grid-cols-3 gap-1.5 overflow-y-auto">
+            <button
+              v-for="s in shots"
+              :key="s.id"
+              class="relative overflow-hidden rounded-md border"
+              :class="shotsSel.includes(s.id) ? 'border-brand-400 ring-1 ring-brand-400' : 'border-ink-700'"
+              :title="'Ảnh #' + s.id + ' — ' + s.shot_label + (s.prompt ? ': ' + s.prompt : '')"
+              @click="toggleShot(s.id)"
+            >
+              <img v-if="s.thumb" :src="s.thumb" :alt="'Ảnh ' + s.id" class="h-16 w-full object-cover" loading="lazy">
+              <span v-else class="grid h-16 w-full place-items-center bg-ink-800 text-cream-300"><StudioIcon name="image" size="h-4 w-4" /></span>
+              <span class="absolute left-1 top-1 rounded px-1 text-[9px] font-semibold" :class="stateTone(s.shot_state)">{{ s.shot_label }}</span>
+              <span v-if="shotsSel.includes(s.id)" class="absolute right-1 top-1 rounded bg-brand-500 p-0.5 text-ink-900"><StudioIcon name="check" size="h-3 w-3" /></span>
+            </button>
+          </div>
+          <input v-model="reviewNote" class="input mt-1.5 !py-1 text-[10px]" maxlength="1000" placeholder="Ghi chú duyệt (tuỳ chọn) — vd: chốt 12 ảnh đợt 1, loại ảnh lệch màu">
+          <div class="mt-1.5 flex flex-wrap gap-1.5">
+            <button class="tool-btn" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('next')"><StudioIcon name="chevronRight" size="h-3.5 w-3.5" /> Chuyển bước tiếp</button>
+            <button class="tool-btn" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('approved')"><StudioIcon name="check" size="h-3.5 w-3.5" /> Duyệt {{ selectedCount }} ảnh</button>
+            <button class="tool-btn !text-red-300 hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('rejected')"><StudioIcon name="ban" size="h-3.5 w-3.5" /> Loại {{ selectedCount }} ảnh</button>
+          </div>
+          <p class="mt-1.5 text-[10px] leading-relaxed text-cream-300">
+            Ảnh đi theo từng bước: Bản nháp → Đã chọn → Đã lên phom → <b class="text-cream-100">Chờ duyệt</b> → <b class="text-cream-100">Đã duyệt</b>.
+            Ảnh chưa tới bước "Chờ duyệt" thì dùng <b class="text-cream-100">Chuyển bước tiếp</b> (không nhảy cóc) — máy chủ chặn mọi bước nhảy không hợp lệ và nói rõ lý do.
+          </p>
+          <ul v-if="reviewErrors.length" class="mt-1.5 space-y-1">
+            <li v-for="err in reviewErrors" :key="err.id" class="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] text-red-200">
+              Ảnh #{{ err.id }} ({{ store.shotLabel(err.shot_state) }}): {{ err.error }}
+            </li>
+          </ul>
+        </template>
       </div>
 
       <!-- Chia sẻ cho khách duyệt: link công khai có hạn, thu hồi được, kèm phản hồi của khách -->
