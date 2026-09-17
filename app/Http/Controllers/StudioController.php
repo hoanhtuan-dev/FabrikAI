@@ -1429,6 +1429,11 @@ RULES:
             // [Đợt 0.3] cờ DEMO ra tới client để UI nói thật thay vì báo "thành công" im lặng.
             'is_demo' => (bool) $g->is_demo,
             'demo_reason' => $g->demo_reason,
+            // [Đợt 1.1] vòng đời shot.
+            'shot_state' => $g->shot_state ?: 'drafted',
+            'is_selected' => (bool) $g->is_selected,
+            'note' => $g->note,
+            'sort' => (int) $g->sort,
             'meta' => $g->meta,
         ]);
     }
@@ -3736,6 +3741,47 @@ RULES:
     }
 
     /**
+     * [Đợt 1.1] Chuyển trạng thái vòng đời shot (idea → drafted → selected → fitted →
+     * campaign_ready → approved · rejected) + ghi chú review + cờ chọn / thứ tự.
+     *
+     * Quyền: chỉ chủ sở hữu (owner) hoặc admin. Bước chuyển phải nằm trong whitelist
+     * Generation::SHOT_TRANSITIONS — nhảy cóc (idea→approved) bị chặn bằng 422.
+     */
+    public function transitionShot(Request $request, Generation $generation)
+    {
+        abort_unless($generation->user_id === auth()->id() || auth()->user()->isAdmin(), 403);
+
+        $data = $request->validate([
+            'state' => ['required', 'string', \Illuminate\Validation\Rule::in(Generation::SHOT_STATES)],
+            'note' => ['nullable', 'string', 'max:1000'],
+            'is_selected' => ['nullable', 'boolean'],
+            'sort' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        try {
+            $generation->transitionShotState((string) $data['state'], $data['note'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        if (array_key_exists('is_selected', $data)) {
+            $generation->is_selected = (bool) $data['is_selected'];
+        }
+        if (array_key_exists('sort', $data)) {
+            $generation->sort = (int) $data['sort'];
+        }
+        $generation->save();
+
+        return response()->json([
+            'ok' => true,
+            'shot_state' => $generation->shot_state,
+            'note' => $generation->note,
+            'is_selected' => (bool) $generation->is_selected,
+            'sort' => (int) $generation->sort,
+        ]);
+    }
+
+    /**
      * Extract dominant colors from a generated image (for the color palette).
      */
     public function palette(Generation $generation)
@@ -4450,6 +4496,11 @@ RULES:
                 'elapsed_ms' => $g->elapsed_ms, 'meta' => $g->meta, 'prompt' => $g->prompt,
                 // [Đợt 0.3] để lưới Kết quả gắn nhãn "DEMO" lên đúng những ảnh không do AI tạo.
                 'is_demo' => (bool) $g->is_demo, 'demo_reason' => $g->demo_reason,
+                // [Đợt 1.1] vòng đời shot (để OutputModule đổi từ "xem" thành "chọn").
+                'shot_state' => $g->shot_state ?: 'drafted',
+                'is_selected' => (bool) $g->is_selected,
+                'note' => $g->note,
+                'sort' => (int) $g->sort,
             ])->values();
 
         return response()->json(['items' => $items]);

@@ -113,6 +113,8 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::post('/generations/{generation}/cancel', [StudioController::class, 'cancel'])->name('generations.cancel');
     Route::delete('/generations/{generation}', [StudioController::class, 'destroy'])->name('generations.destroy');
     Route::post('/generations/{generation}/rename', [StudioController::class, 'renameGeneration'])->name('generations.rename');
+    // [Đợt 1.1] vòng đời shot — chuyển trạng thái idea→…→approved theo whitelist (chỉ owner/admin).
+    Route::post('/generations/{generation}/shot-state', [StudioController::class, 'transitionShot'])->name('generations.shot-state');
 
     // ── Ảnh mới nhất của CHÍNH user (`auth()->user()->generations()`) ──
     Route::get('/latest', [StudioController::class, 'latest'])->name('latest');
