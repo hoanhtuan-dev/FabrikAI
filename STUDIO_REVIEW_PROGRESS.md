@@ -62,6 +62,14 @@ JS/Vue studio **42 file (33 .vue) / 12.828 dòng** · `public_html` **21 MB** ·
 | CSS build **phụ thuộc VĂN BẢN TÀI LIỆU** — chữ `break-all` trong ghi chú sinh utility trong CSS bán cho khách | ✅ ĐÃ VÁ | `560392f` | Tailwind v4 mặc định tự quét cả cây dự án (kể cả `.md`). Đã tắt bằng `source(none)` + `@source` tường minh; đo được **tất định hoàn toàn** (build sau khi chạy full test và sau khi sửa tài liệu đều ra cùng hash). 1492→1487 rule, mất đúng 5 rule rác từ tài liệu |
 | Ghi chú trong `app.css` dùng `//` (không phải cú pháp CSS) ⇒ `npm run build` ĐỎ, mà asset cũ còn sót nên dễ tưởng build xong | ✅ ĐÃ VÁ | `560392f` | Đổi sang comment khối CSS; thêm test **manifest phải trỏ tới file có thật trên đĩa** để chặn đúng cái bẫy “build đỏ mà `ls` vẫn thấy file” |
 
+### THƯ VIỆN RIÊNG THEO USER + SẮP XẾP UI (2026-09-17)
+
+| # | Việc | Trạng thái | Commit | Ghi chú |
+|---|---|---|---|---|
+| 0.1b | **Thư viện ảnh RIÊNG theo user** (nợ ghi sổ từ Đợt 0.1 — nay ĐÓNG) | ✅ XONG | `84bf377` | Ảnh mới lưu `studio/ref/u<id>/`; người dùng chỉ thấy/xoá ảnh của mình; **owner thấy & xoá TẤT CẢ**; kho phẳng cũ vẫn đọc được (không mất ảnh đã chèn vào dự án); `studio/assets` vẫn dùng chung. 4 route chuyển sang nhóm STUDIO (dọn mồ côi giữ ở ADMIN). `UserLibraryScopeTest` (9 test) + mutation-test RED |
+| — | **Sửa lỗi CÓ SẴN**: `refImages()` khai báo kiểu trả về `\Illuminate\JsonResponse` (class không tồn tại) | ✅ ĐÃ VÁ | `84bf377` | Mọi lời gọi thật đều TypeError/500; ẩn vì endpoint chỉ ở nhóm ADMIN và chưa test nào gọi tới đích |
+| — | **UI**: icon Cài đặt ở **góc trái dưới**; Prompt Tạo Ảnh + Trợ lý thiết kế **dời lên nhóm trên** | ✅ XONG | `3b04d3c` | Menu Cài đặt = lối vào **trang cài đặt preset cho người dùng** (`/presets`) + dữ liệu Trợ lý + thư viện; admin thêm mục Cài đặt hệ thống + Quản trị Owner. Đóng menu bằng Escape; mobile có lối vào tương đương |
+
 > 🛑 **BẢNG DƯỚI ĐÂY LÀ ẢNH CHỤP 2026-09-16 — ĐÃ SAI HOÀN TOÀN, CHỈ GIỮ ĐỂ ĐỐI CHIẾU LỊCH SỬ.**
 > Nó nói *"KHÔNG có `.git`"*, *"KHÔNG có `tests/`"*, *"chưa có deploy"* — cả ba đều **SAI** kể từ 2026-09-17.
 > (Đây chính là lỗi mà `STUDIO_REVIEW_DEEPDIVE.md` §1.2 đã chỉ ra: §1/§2 nói ngược §2bis trong cùng file.)
