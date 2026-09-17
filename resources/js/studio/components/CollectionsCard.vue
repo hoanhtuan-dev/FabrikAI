@@ -15,7 +15,7 @@
  * KHÔNG thêm API mới: dùng đúng /api/projects (index/store/transition) đã có, nên mọi bất biến về
  * quyền và luồng trạng thái vẫn do máy chủ quyết định.
  */
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
 
@@ -100,6 +100,38 @@ async function reviewBatch(state) {
   store.loadProjectStats(applied.value.id, true);
   if (!d.failed) reviewNote.value = '';
 }
+
+// ── PHÍM TẮT cho khối duyệt (Đợt 3) ──────────────────────────────────────────────
+// Một buổi duyệt thật là hàng chục ảnh: cứ phải rời tay khỏi bàn phím để bấm chuột từng lượt là chỗ
+// tốn thời gian nhất. Bốn phím, chỉ hoạt động khi khối duyệt ĐANG MỞ và người dùng KHÔNG đang gõ chữ:
+//   S = chọn ảnh chờ duyệt · N = chuyển bước tiếp · A = duyệt · R = loại · Esc = đóng khối.
+// Cố ý KHÔNG giành phím khi có công cụ canvas/modal đang chạy (Esc của modal vẫn phải đóng modal).
+const REVIEW_KEYS = { s: 'select', n: 'next', a: 'approved', r: 'rejected', Escape: 'close' };
+function typingIn(el) {
+  // Không cướp phím khi người dùng đang gõ (ô prompt, ghi chú duyệt, đổi tên layer…).
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+}
+function toolBusy() {
+  // Đang có modal/công cụ cần bàn phím riêng ⇒ nhường toàn bộ phím.
+  return !!(store.viewer || store.promptOpen || store.planOpen || store.sourcePickerOpen
+    || store.confirmDeleteOpen || store.confirmClearCanvasOpen || store.reframeOpen || store.filmOpen
+    || store.cropMode || store.inpaintMaskMode !== 'none' || store.drawMode || store.eraseMode
+    || store.selectTool || store.panMode);
+}
+function onReviewKey(e) {
+  if (!reviewOpen.value || !applied.value) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (typingIn(e.target) || toolBusy()) return;
+  const action = REVIEW_KEYS[e.key];
+  if (!action) return;
+  e.preventDefault();
+  if (action === 'close') { reviewOpen.value = false; return; }
+  if (action === 'select') { selectAwaiting(); return; }
+  if (!shotsSel.value.length) { store.toast('Chọn ảnh trước (S = chọn ảnh chờ duyệt).', 'error'); return; }
+  reviewBatch(action);
+}
+onMounted(() => window.addEventListener('keydown', onReviewKey));
+onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 
 // ── Form tạo bộ sưu tập mới ──
 const createOpen = ref(false);
@@ -324,7 +356,7 @@ async function submit() {
         <p v-if="!shots.length" class="mt-1 text-[10px] text-cream-300">Bộ này chưa có ảnh nào tạo xong — duyệt được ngay khi ảnh render xong.</p>
         <template v-else>
           <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <button class="tool-btn !py-1 text-[10px]" @click="selectAwaiting()"><StudioIcon name="selectAll" size="h-3 w-3" /> Chọn ảnh chờ duyệt</button>
+            <button class="tool-btn !py-1 text-[10px]" title="Chọn tất cả ảnh đang chờ duyệt (phím S)" @click="selectAwaiting()"><StudioIcon name="selectAll" size="h-3 w-3" /> Chọn ảnh chờ duyệt</button>
             <button class="tool-btn !py-1 text-[10px]" @click="shotsSel = []"><StudioIcon name="x" size="h-3 w-3" /> Bỏ chọn</button>
             <span class="text-[10px] text-cream-300">đã chọn {{ selectedCount }}/{{ shots.length }}</span>
           </div>
@@ -345,13 +377,21 @@ async function submit() {
           </div>
           <input v-model="reviewNote" class="input mt-1.5 !py-1 text-[10px]" maxlength="1000" placeholder="Ghi chú duyệt (tuỳ chọn) — vd: chốt 12 ảnh đợt 1, loại ảnh lệch màu">
           <div class="mt-1.5 flex flex-wrap gap-1.5">
-            <button class="tool-btn" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('next')"><StudioIcon name="chevronRight" size="h-3.5 w-3.5" /> Chuyển bước tiếp</button>
-            <button class="tool-btn" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('approved')"><StudioIcon name="check" size="h-3.5 w-3.5" /> Duyệt {{ selectedCount }} ảnh</button>
-            <button class="tool-btn !text-red-300 hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('rejected')"><StudioIcon name="ban" size="h-3.5 w-3.5" /> Loại {{ selectedCount }} ảnh</button>
+            <button class="tool-btn" :disabled="reviewBusy || !selectedCount" title="Chuyển các ảnh đã chọn lên bước kế tiếp (phím N)" @click="reviewBatch('next')"><StudioIcon name="chevronRight" size="h-3.5 w-3.5" /> Chuyển bước tiếp</button>
+            <button class="tool-btn" :disabled="reviewBusy || !selectedCount" title="Chốt các ảnh đã chọn (phím A)" @click="reviewBatch('approved')"><StudioIcon name="check" size="h-3.5 w-3.5" /> Duyệt {{ selectedCount }} ảnh</button>
+            <button class="tool-btn !text-red-300 hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" title="Loại các ảnh đã chọn (phím R)" @click="reviewBatch('rejected')"><StudioIcon name="ban" size="h-3.5 w-3.5" /> Loại {{ selectedCount }} ảnh</button>
           </div>
           <p class="mt-1.5 text-[10px] leading-relaxed text-cream-300">
             Ảnh đi theo từng bước: Bản nháp → Đã chọn → Đã lên phom → <b class="text-cream-100">Chờ duyệt</b> → <b class="text-cream-100">Đã duyệt</b>.
             Ảnh chưa tới bước "Chờ duyệt" thì dùng <b class="text-cream-100">Chuyển bước tiếp</b> (không nhảy cóc) — máy chủ chặn mọi bước nhảy không hợp lệ và nói rõ lý do.
+          </p>
+          <p class="mt-1 text-[10px] text-cream-300">
+            Phím tắt khi khối này đang mở:
+            <b class="text-cream-100">S</b> chọn ảnh chờ duyệt ·
+            <b class="text-cream-100">N</b> chuyển bước tiếp ·
+            <b class="text-cream-100">A</b> duyệt ·
+            <b class="text-cream-100">R</b> loại ·
+            <b class="text-cream-100">Esc</b> đóng.
           </p>
           <ul v-if="reviewErrors.length" class="mt-1.5 space-y-1">
             <li v-for="err in reviewErrors" :key="err.id" class="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] text-red-200">

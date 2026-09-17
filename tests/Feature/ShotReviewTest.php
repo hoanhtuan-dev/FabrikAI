@@ -230,4 +230,31 @@ class ShotReviewTest extends TestCase
         $this->assertStringContainsString('transitionShotState(', $controller, 'Controller phải đi qua model, không tự gán trạng thái.');
         $this->assertStringContainsString('nextShotState(', $controller, "Bước 'next' phải lấy từ đường thuận của model.");
     }
+
+    public function test_review_shortcuts_are_wired_and_safe(): void
+    {
+        // Đợt 3 — phím tắt cho khối duyệt: một buổi duyệt là hàng chục ảnh, rời tay khỏi bàn phím để bấm
+        // chuột từng lượt là chỗ tốn thời gian nhất. Bất biến: phím CHỈ chạy khi khối duyệt đang mở, KHÔNG
+        // cướp phím khi người dùng đang gõ, và NHƯỜNG phím cho modal/công cụ canvas đang chạy (Esc của
+        // modal vẫn phải đóng modal, không được đóng khối duyệt).
+        $card = (string) file_get_contents(resource_path('js/studio/components/CollectionsCard.vue'));
+
+        $this->assertStringContainsString('window.addEventListener(\'keydown\', onReviewKey)', $card, 'Phải có bộ xử lý phím tắt.');
+        $this->assertStringContainsString('window.removeEventListener(\'keydown\', onReviewKey)', $card, 'Phải gỡ bộ xử lý khi card bị tháo (không rò rỉ listener).');
+        $this->assertStringContainsString('if (!reviewOpen.value || !applied.value) return;', $card, 'Phím tắt chỉ có tác dụng khi khối duyệt đang mở.');
+        $this->assertStringContainsString('typingIn(e.target)', $card, 'Không được cướp phím khi người dùng đang gõ.');
+        $this->assertStringContainsString('toolBusy()', $card, 'Phải nhường phím khi modal/công cụ canvas đang chạy.');
+        $this->assertStringContainsString('e.ctrlKey || e.metaKey || e.altKey', $card, 'Không được đụng vào tổ hợp phím của trình duyệt/hệ thống.');
+
+        // Đúng bốn phím, đúng việc, và có nhắc trong giao diện (không có phím tắt "ẩn" không ai biết).
+        foreach (["s: 'select'", "n: 'next'", "a: 'approved'", "r: 'rejected'", "Escape: 'close'"] as $pair) {
+            $this->assertStringContainsString($pair, $card, 'Thiếu phím tắt: '.$pair);
+        }
+        $this->assertStringContainsString("reviewBatch(action)", $card, 'Phím duyệt/loại phải đi qua đúng hàm gửi lượt duyệt.');
+        $this->assertStringContainsString('selectAwaiting()', $card, 'Phím S phải chọn ảnh chờ duyệt.');
+        $this->assertStringContainsString('Phím tắt khi khối này đang mở', $card, 'Phải nhắc phím tắt ngay trong khối duyệt.');
+
+        // Cùng một đường dữ liệu: không có fetch trực tiếp trong card (bất biến chung của panel).
+        $this->assertStringNotContainsString("fetch('/api/", $card, 'Card không được tự gọi API.');
+    }
 }
