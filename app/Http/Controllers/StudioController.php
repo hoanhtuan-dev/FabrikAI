@@ -1817,6 +1817,9 @@ RULES:
                 'price_vnd' => (int) $p->price_vnd,
                 'credits_per_month' => (int) $p->credits_per_month,
                 'credits_label' => $p->creditsLabel(),
+                // [Modules] Gói cấp module nào — popup nói đúng "nâng lên gói X để có tính năng Y".
+                'modules' => $p->modules(),
+                'modules_count' => $p->modulesCount(),
                 // [Q3] Gói theo VỤ: khách mua 1 vụ (3 tháng) chứ không mua 3 tháng rời.
                 'unit_label' => $p->unitLabel(),
                 'unit_months' => $p->unitMonths(),

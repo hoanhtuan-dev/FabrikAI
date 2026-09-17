@@ -315,6 +315,13 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api/admin')->name('api.
     Route::get('/upgrade-requests', [AdminController::class, 'upgradeRequests'])->name('upgrade.index');
     Route::post('/upgrade-requests/{upgradeRequest}', [AdminController::class, 'updateUpgradeRequest'])->name('upgrade.update');
     Route::get('/payment-info', [AdminController::class, 'paymentInfoShow'])->name('payment.show');
+
+    // ── [Modules 2026-09-19] MODULE: công tắc toàn cục + công tắc theo GÓI ──
+    // Danh mục + ma trận gói × module đều SINH TỪ ModuleRegistry nên thêm module mới là màn tự có thêm dòng.
+    Route::get('/modules', [AdminController::class, 'modules'])->name('modules.index');
+    Route::post('/modules', [AdminController::class, 'saveModules'])->name('modules.save');
+    Route::put('/plans/{plan}/modules', [AdminController::class, 'savePlanModules'])->name('plans.modules.save');
+    Route::post('/plans/{plan}/modules/suggested', [AdminController::class, 'applySuggestedPlanModules'])->name('plans.modules.suggested');
     Route::post('/payment-info', [AdminController::class, 'paymentInfoSave'])->name('payment.save');
 
     // ── [Yêu cầu 2026-09-17] GIAO DIỆN do OWNER quản lý (thanh công cụ trái của Studio) ──

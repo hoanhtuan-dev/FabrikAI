@@ -46,6 +46,8 @@ const SECTIONS = [
   // [Q2 — 2026-09-19] Hàng đợi YÊU CẦU NÂNG CẤP: khách gửi yêu cầu (có mã) → xác nhận tiền → kích hoạt.
   { id: 'upgrades',  group: 'Người & credit', label: 'Yêu cầu nâng cấp', icon: 'coins',    superOnly: false },
   { id: 'gui',       group: 'Hệ thống',       label: 'Giao diện Studio', icon: 'palette',  superOnly: false },
+  // [Modules 2026-09-19] Công tắc tính năng: bật/tắt toàn cục + cấp module theo GÓI (gói = công tắc).
+  { id: 'modules',   group: 'Hệ thống',       label: 'Tính năng & gói',  icon: 'puzzle',   superOnly: false },
 ];
 const SECTION_GROUPS = ['Bắt đầu', 'Người & credit', 'Hệ thống'];
 
@@ -95,7 +97,7 @@ const BADGE_TONE = {
 const me = ref(null);
 const section = ref('dashboard');
 const toast = ref(null);
-const loading = reactive({ dashboard: true, plans: false, users: false, ledger: false, gui: false, upgrades: false });
+const loading = reactive({ dashboard: true, plans: false, users: false, ledger: false, gui: false, upgrades: false, modules: false });
 
 const dashboard = ref(null);
 const plansData = ref([]);
@@ -113,6 +115,25 @@ const paymentForm = reactive({
   support_phone: '', support_email: '', support_zalo: '', support_hours: '',
 });
 const pendingUpgrades = computed(() => Number(upgradesData.value.counts.pending || 0) + Number(upgradesData.value.counts.contacted || 0));
+
+// [Modules] Công tắc tính năng: danh mục module (sinh từ ModuleRegistry) + gói nào cấp module nào.
+const modulesData = ref({ modules: [], plans: [], groups: {}, disabled: [], total_modules: 0 });
+const moduleSearch = ref('');
+/** Bản nháp cục bộ: { [planSlug]: [moduleId] } — chỉ ghi khi bấm Lưu. */
+const planModules = ref({});
+const globalDisabled = ref([]);
+const moduleDirty = ref(false);
+const filteredModules = computed(() => {
+  const n = moduleSearch.value.trim().toLowerCase();
+  const list = modulesData.value.modules || [];
+  return n ? list.filter((m) => (m.name + ' ' + m.id + ' ' + m.group).toLowerCase().includes(n)) : list;
+});
+const moduleGroups = computed(() => {
+  const out = {};
+  filteredModules.value.forEach((m) => { (out[m.group] = out[m.group] || []).push(m); });
+  return out;
+});
+const plansWithModule = (id) => (modulesData.value.plans || []).filter((p) => (planModules.value[p.slug] || []).includes(id));
 
 const f = reactive({ userSearch: '', userRole: '', userStatus: '', userPerPage: 20 });
 const l = reactive({ search: '', type: '', userId: null, userName: '', perPage: 20 });
@@ -255,12 +276,66 @@ async function savePayment() {
 }
 const upgradeTone = (s) => (s === 'pending' ? 'warn' : s === 'contacted' ? 'info' : s === 'activated' ? 'ok' : 'neutral');
 
+// ─────────────────────────── Tính năng & gói (Modules) ───────────────────────────
+// Một nguồn: ModuleRegistry. Màn này chỉ đọc bản khai và ghi vào DỮ LIỆU (setting + plans.modules), nên
+// thêm module mới là màn tự có thêm dòng, không phải sửa giao diện.
+async function loadModules() {
+  loading.modules = true;
+  try {
+    const d = await api('/modules');
+    modulesData.value = d;
+    globalDisabled.value = (d.disabled || []).slice();
+    const draft = {};
+    (d.plans || []).forEach((p) => { draft[p.slug] = (p.modules || []).slice(); });
+    planModules.value = draft;
+    moduleDirty.value = false;
+  } catch (e) { flash(e.message, false); }
+  finally { loading.modules = false; }
+}
+function toggleGlobal(id) {
+  const i = globalDisabled.value.indexOf(id);
+  if (i === -1) globalDisabled.value.push(id); else globalDisabled.value.splice(i, 1);
+  moduleDirty.value = true;
+}
+async function saveGlobalModules() {
+  const ok = await run(() => api('/modules', 'POST', { disabled: globalDisabled.value }), 'Đã lưu công tắc tính năng.');
+  if (ok) loadModules();
+}
+function toggleGrant(slug, id) {
+  const list = planModules.value[slug] || [];
+  const i = list.indexOf(id);
+  if (i === -1) list.push(id); else list.splice(i, 1);
+  planModules.value = { ...planModules.value, [slug]: list };
+  moduleDirty.value = true;
+}
+async function savePlanModules(plan) {
+  const ok = await run(
+    () => api('/plans/' + plan.id + '/modules', 'PUT', { modules: planModules.value[plan.slug] || [] }),
+    'Đã lưu module cho gói ' + plan.name,
+  );
+  if (ok) loadModules();
+}
+async function applySuggested(plan) {
+  const ok = await run(
+    () => api('/plans/' + plan.id + '/modules/suggested', 'POST', {}),
+    'Đã áp đề xuất cho gói ' + plan.name,
+  );
+  if (ok) loadModules();
+}
+const moduleKindMeta = (k) => ({
+  panel: { label: 'Nhóm card', cls: 'bg-brand-600/25 text-brand-100' },
+  action: { label: 'Popup', cls: 'bg-amber-500/20 text-amber-200' },
+  menu: { label: 'Menu', cls: 'bg-ink-700 text-cream-300' },
+  feature: { label: 'Tính năng', cls: 'bg-sky-500/15 text-sky-300' },
+}[k] || { label: k, cls: 'bg-ink-700 text-cream-300' });
+
 function ensureLoaded(id) {
   if (id === 'users' && isSuper.value && !usersData.value.users.length) loadUsers();
   if (id === 'ledger' && !ledgerData.value.transactions.length) loadLedger();
   if (id === 'gui' && !guiItems.value.length) loadGui();
   if (id === 'plans' && !plansData.value.length) loadPlans();
   if (id === 'upgrades' && !upgradesData.value.requests.length) loadUpgrades();
+  if (id === 'modules' && !modulesData.value.modules.length) loadModules();
 }
 
 // ─────────────────────────── Việc cần xử lý (tổng quan) ───────────────────────────
@@ -549,6 +624,8 @@ function navBadge(id) {
     dashboard: attention.value[0] && attention.value[0].tone !== 'ok' ? attention.value.length : '',
     // [Q2] Số yêu cầu nâng cấp CHƯA xong — đây là việc chủ dự án cần xử lý, nên phải thấy ngay ở menu.
     upgrades: pendingUpgrades.value ? String(pendingUpgrades.value) : '',
+    // [Modules] Số module đang bị TẮT toàn cục — con số đáng để thấy ngay trên menu.
+    modules: globalDisabled.value.length ? globalDisabled.value.length + ' tắt' : (modulesData.value.total_modules ? String(modulesData.value.total_modules) : ''),
   };
   return map[id] == null ? '' : map[id];
 }
@@ -610,7 +687,7 @@ onMounted(async () => {
             <StudioIcon name="gear" size="h-3.5 w-3.5" />
             <span class="hidden sm:inline">Cài đặt</span>
           </a>
-          <button class="tool-btn" :disabled="loading.dashboard" title="Nạp lại dữ liệu" @click="loadDashboard(); if (section==='users') loadUsers(); if (section==='ledger') loadLedger(); if (section==='gui') loadGui(); if (section==='plans') loadPlans(); if (section==='upgrades') loadUpgrades()">
+          <button class="tool-btn" :disabled="loading.dashboard" title="Nạp lại dữ liệu" @click="loadDashboard(); if (section==='users') loadUsers(); if (section==='ledger') loadLedger(); if (section==='gui') loadGui(); if (section==='plans') loadPlans(); if (section==='upgrades') loadUpgrades(); if (section==='modules') loadModules()">
             <StudioIcon name="refresh" size="h-3.5 w-3.5" :class="{ 'animate-spin': loading.dashboard }" />
             <span class="hidden sm:inline">Tải lại</span>
           </button>
@@ -1202,6 +1279,124 @@ onMounted(async () => {
               đối chiếu sao kê → bấm <b class="text-cream-100">Kích hoạt</b> (hệ thống tự gán gói, đúng số tháng, cấp bonus lần đầu và credit của chu kỳ đầu, có ghi vết ai kích hoạt).
               Khách gửi lại cùng một gói thì hệ thống dùng lại yêu cầu cũ nên không có yêu cầu trùng.
             </p>
+          </section>
+
+          <!-- ═════════ TÍNH NĂNG & GÓI (Modules) ═════════ -->
+          <section v-show="section === 'modules'" class="space-y-5">
+            <div class="card p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
+                    <StudioIcon name="puzzle" size="h-4 w-4" class="text-brand-300" /> Tính năng &amp; gói
+                    <span :class="[BADGE, BADGE_TONE.neutral]">{{ modulesData.total_modules }} module</span>
+                  </h2>
+                  <p class="mt-1 max-w-3xl text-xs text-cream-300/75">
+                    Mọi tính năng của Studio được khai ở <b class="text-cream-100">một nguồn duy nhất</b> (module registry):
+                    tắt/mở ở đây là tắt/mở thật ở máy chủ, và tick vào <b class="text-cream-100">gói</b> nghĩa là gói đó cấp tính năng cho khách.
+                    Thêm tính năng mới thì màn này tự có thêm dòng — không phải cấu hình lại.
+                  </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <div class="relative min-w-[12rem]">
+                    <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                    <input v-model="moduleSearch" type="search" aria-label="Tìm tính năng" class="input !py-2 !pl-9 text-xs" placeholder="Tìm tính năng…">
+                  </div>
+                  <button class="tool-btn" :disabled="loading.modules" title="Nạp lại" @click="loadModules()">
+                    <StudioIcon name="refresh" size="h-3.5 w-3.5" /> Nạp lại
+                  </button>
+                </div>
+              </div>
+              <p v-if="moduleDirty" class="mt-3 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+                Có thay đổi chưa lưu — nhớ bấm <b>Lưu công tắc</b> (toàn cục) hoặc <b>Lưu</b> ở từng gói.
+              </p>
+            </div>
+
+            <!-- Công tắc TOÀN CỤC -->
+            <div class="card p-4">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="flex items-center gap-2 text-sm font-semibold text-cream-50">
+                  <StudioIcon name="sliders" size="h-4 w-4" class="text-brand-300" /> Bật / tắt toàn hệ thống
+                </h3>
+                <span :class="[BADGE, globalDisabled.length ? BADGE_TONE.warn : BADGE_TONE.ok]">
+                  {{ globalDisabled.length ? globalDisabled.length + ' đang tắt' : 'tất cả đang bật' }}
+                </span>
+                <button class="btn-brand btn-sm ml-auto" :disabled="loading.modules" @click="saveGlobalModules()">
+                  <StudioIcon name="save" size="h-3.5 w-3.5" /> Lưu công tắc
+                </button>
+              </div>
+              <p class="mt-1 text-xs text-cream-300/75">
+                Tắt một tính năng ở đây là chặn ở máy chủ (khách gọi thẳng API cũng bị 403), <b class="text-cream-100">không ảnh hưởng tính năng khác</b>.
+                Tài khoản quản trị vẫn vào được để hỗ trợ khách.
+              </p>
+              <div class="mt-3 space-y-3">
+                <div v-for="(items, group) in moduleGroups" :key="group">
+                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/75">{{ group }}</p>
+                  <ul class="mt-1 divide-y divide-ink-700/60">
+                    <li v-for="m in items" :key="m.id" class="flex flex-wrap items-center gap-2 py-2">
+                      <StudioIcon :name="m.icon" size="h-4 w-4" class="text-cream-300/75" />
+                      <span class="min-w-0 flex-1">
+                        <span class="block text-xs font-semibold text-cream-100">{{ m.name }}</span>
+                        <span class="block text-[10px] text-cream-300/70">{{ m.summary }}</span>
+                        <span v-if="m.depends_on.length" class="block text-[10px] text-amber-200/80">cần: {{ m.depends_on.join(' · ') }}</span>
+                      </span>
+                      <span :class="[BADGE, moduleKindMeta(m.kind).cls]">{{ moduleKindMeta(m.kind).label }}</span>
+                      <span class="hidden text-[10px] text-cream-300/70 sm:inline">{{ plansWithModule(m.id).map((p) => p.name).join(' · ') || 'chưa gói nào' }}</span>
+                      <button class="tool-btn" :class="globalDisabled.includes(m.id) ? '!text-red-300' : '!text-emerald-300'"
+                              :title="globalDisabled.includes(m.id) ? 'Đang TẮT toàn hệ thống — bấm để bật' : 'Đang BẬT — bấm để tắt toàn hệ thống'"
+                              @click="toggleGlobal(m.id)">
+                        <StudioIcon :name="globalDisabled.includes(m.id) ? 'eyeOff' : 'eye'" size="h-3.5 w-3.5" />
+                        {{ globalDisabled.includes(m.id) ? 'Đang tắt' : 'Đang bật' }}
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- CÔNG TẮC THEO GÓI -->
+            <div class="card p-4">
+              <h3 class="flex items-center gap-2 text-sm font-semibold text-cream-50">
+                <StudioIcon name="package" size="h-4 w-4" class="text-brand-300" /> Gói cấp tính năng nào
+              </h3>
+              <p class="mt-1 text-xs text-cream-300/75">
+                Gói đăng ký chính là công tắc cấp phát: khách ở gói chỉ dùng được đúng những tính năng được tick.
+                Nút <b class="text-cream-100">Áp đề xuất</b> lấy gợi ý từ bản khai module (gói miễn phí giữ phần cơ bản, gói cao có thêm video · trợ lý · xuất gói · ghế…).
+              </p>
+              <div class="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+                <div v-for="p in modulesData.plans" :key="p.slug" class="rounded-lg border border-ink-700 bg-ink-900/60 p-3">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-xs font-semibold text-cream-100">{{ p.name }}</span>
+                    <span :class="[BADGE, BADGE_TONE.neutral]">{{ p.price_label }}</span>
+                    <span :class="[BADGE, (planModules[p.slug] || []).length ? BADGE_TONE.ok : BADGE_TONE.warn]">
+                      {{ (planModules[p.slug] || []).length }}/{{ modulesData.total_modules }} tính năng
+                    </span>
+                    <span v-if="!p.is_active" :class="[BADGE, BADGE_TONE.warn]">đang ẩn</span>
+                    <div class="ml-auto flex gap-1.5">
+                      <button class="tool-btn !py-1 text-[10px]" title="Áp đề xuất từ bản khai module" @click="applySuggested(p)">
+                        <StudioIcon name="sparkles" size="h-3 w-3" /> Áp đề xuất
+                      </button>
+                      <button class="btn-brand btn-sm" @click="savePlanModules(p)">Lưu</button>
+                    </div>
+                  </div>
+                  <div class="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
+                    <div v-for="(items, group) in moduleGroups" :key="p.slug + group">
+                      <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/70">{{ group }}</p>
+                      <div class="mt-0.5 flex flex-wrap gap-1">
+                        <button v-for="m in items" :key="p.slug + m.id"
+                                class="rounded border px-1.5 py-0.5 text-[10px] transition"
+                                :class="(planModules[p.slug] || []).includes(m.id)
+                                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200'
+                                  : 'border-ink-700 bg-ink-800/60 text-cream-300/70 hover:border-ink-600'"
+                                :title="m.summary"
+                                @click="toggleGrant(p.slug, m.id)">
+                          <StudioIcon :name="(planModules[p.slug] || []).includes(m.id) ? 'check' : 'x'" size="h-3 w-3" class="mr-0.5 inline" />{{ m.name }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section v-show="section === 'gui'" class="space-y-5">

@@ -302,6 +302,61 @@
         </div>
     </section>
 
+    {{-- ── Tính năng theo gói (SINH TỪ MODULE REGISTRY — không viết tay) ── --}}
+    <section id="tinh-nang" class="border-y border-ink-800 bg-ink-900/40 py-12">
+        <div class="container-x">
+            <h2 class="font-display text-2xl font-semibold text-cream-50">Tính năng nào có ở gói nào</h2>
+            <p class="mt-2 max-w-3xl text-sm leading-relaxed text-cream-300">
+                Mỗi gói là một công tắc cấp phát tính năng: bảng dưới đây lấy trực tiếp từ cấu hình hệ thống,
+                nên đúng ngay cả khi FabrikAI vừa thêm tính năng mới. Gói thấp vẫn dùng được phần cơ bản;
+                tính năng chuyên sâu (video · trợ lý thiết kế · xuất gói cho xưởng · nhiều ghế) mở dần ở gói cao.
+            </p>
+            <div class="mt-5 overflow-x-auto">
+                <table class="w-full min-w-[720px] text-left text-xs">
+                    <thead>
+                        <tr class="border-b border-ink-700 text-cream-300">
+                            <th class="py-2.5 pr-4 font-semibold">Tính năng</th>
+                            @foreach($plans as $plan)
+                                <th class="py-2.5 pr-4 font-semibold">{{ $plan->name }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody class="text-cream-200">
+                        @foreach($moduleGroups as $group => $moduleIds)
+                            <tr class="border-b border-ink-800/60">
+                                <td colspan="{{ $plans->count() + 1 }}" class="py-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/70">{{ $group }}</td>
+                            </tr>
+                            @foreach($moduleIds as $moduleId)
+                                @php($module = collect($modules)->firstWhere('id', $moduleId))
+                                <tr class="border-b border-ink-800">
+                                    <td class="py-2.5 pr-4">
+                                        <span class="font-semibold text-cream-50">{{ $module['name'] ?? $moduleId }}</span>
+                                        @if(! empty($module['summary']))
+                                            <span class="block text-[10px] text-cream-300/75">{{ $module['summary'] }}</span>
+                                        @endif
+                                    </td>
+                                    @foreach($plans as $plan)
+                                        @php($has = in_array($moduleId, $planModules[$plan->slug] ?? [], true))
+                                        <td class="py-2.5 pr-4">
+                                            @if($has)
+                                                <span class="text-emerald-400" aria-label="có">✓</span>
+                                            @else
+                                                <span class="text-cream-300/40" aria-label="không">—</span>
+                                            @endif
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <p class="mt-3 text-[11px] text-cream-300/75">
+                Đang dùng gói nào thì Studio chỉ mở đúng các tính năng của gói đó; tính năng chưa có sẽ hiện ổ khoá kèm gợi ý nâng cấp.
+            </p>
+        </div>
+    </section>
+
     {{-- ── Cách hoạt động ── --}}
     <section class="container-x py-12">
         <h2 class="font-display text-2xl font-semibold text-cream-50">Từ ý tưởng tới ảnh bán được: 4 bước</h2>

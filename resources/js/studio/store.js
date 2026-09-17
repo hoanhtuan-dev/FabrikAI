@@ -64,6 +64,11 @@ export const useStudioStore = defineStore('studio', {
     upgradeBusy: false,
     upgradeResult: null,    // yêu cầu vừa gửi: { code, amount_label, method_label, ... }
     upgradeForm: { units: 1, method: 'bank_transfer', phone: '', name: '', note: '' },
+    // [Modules 2026-09-19] QUYỀN THEO GÓI: module nào khách được dùng (từ /api/gui hoặc /api/boot).
+    // Giao diện KHÔNG tự suy luận quyền — chỉ đọc đúng dữ liệu máy chủ trả về.
+    modulesStatus: [],      // [{ id, name, group, kind, allowed, reason, depends_on }]
+    modulesCatalog: [],     // danh mục đầy đủ (kể cả module không có nút)
+    plansWithModuleMap: {}, // module id → [{ slug, name, price_label }] (gói nào đang cấp) — nạp khi cần
     // [Q4] NHÓM LÀM VIỆC THEO SỐ GHẾ: chủ nhóm mời/bỏ thành viên; thành viên dùng chung credit + bộ sưu tập.
     team: null,              // { seats, is_owner, owner, members: [...] }
     teamOpen: false,
@@ -404,6 +409,13 @@ export const useStudioStore = defineStore('studio', {
         // [Q1 — 2026-09-19] Hết credit (402 code=out_of_credits) ⇒ MỞ THẲNG bảng nâng cấp kèm danh mục
         // gói, thay vì để khách đọc một câu lỗi rồi không biết bấm vào đâu. Xử lý ở MỘT chỗ này nên
         // mọi đường tạo ảnh/video (8 endpoint) đều có cùng trải nghiệm.
+        // [Modules] 403 module_locked ⇒ mở bảng nâng cấp (giống hết cách xử lý hết credit).
+        if (res.status === 403 && data && data.code === 'module_locked') {
+          this.planOpen = true;
+          this.planCatalogOpen = true;
+          this.upgradeOpen = false;
+          this.loadPlanStatus(true);
+        }
         if (res.status === 402 && data && data.code === 'out_of_credits') {
           this.planOpen = true;
           this.planCatalogOpen = true;
@@ -578,6 +590,37 @@ export const useStudioStore = defineStore('studio', {
         this.toast('Không đổi được gói: ' + e.message, 'error');
       }
       this.planBusy = false;
+    },
+    // ── [Modules] Quyền theo gói ─────────────────────────────────────────────────────────
+    /** Nhận danh sách quyền module từ máy chủ (/api/gui hoặc /api/boot). */
+    setModuleAccess(status, allowedIds, catalog) {
+      if (Array.isArray(status) && status.length) this.modulesStatus = status;
+      else if (Array.isArray(allowedIds)) {
+        // /api/boot chỉ trả id được phép ⇒ đánh dấu phần còn lại là bị khoá (chi tiết lấy sau từ /api/gui).
+        this.modulesStatus = this.modulesStatus.length
+          ? this.modulesStatus
+          : allowedIds.map((id) => ({ id, name: id, allowed: true, reason: null, depends_on: [] }));
+      }
+      if (Array.isArray(catalog) && catalog.length) this.modulesCatalog = catalog;
+    },
+    /** Module có bị KHOÁ theo gói không? (chưa biết ⇒ coi như mở, để không chặn nhầm người dùng). */
+    moduleLocked(id) {
+      const row = this.modulesStatus.find((m) => m.id === id);
+      return !!row && row.allowed === false;
+    },
+    moduleInfo(id) {
+      return this.modulesStatus.find((m) => m.id === id) || this.modulesCatalog.find((m) => m.id === id) || null;
+    },
+    /** Gói nào đang cấp module này — lấy từ /api/plan/status (danh mục gói) để mời nâng cấp cho đúng. */
+    plansWithModule(id) {
+      const plans = (this.planStatus && this.planStatus.catalog) || [];
+      return plans.filter((p) => Array.isArray(p.modules) && p.modules.includes(id));
+    },
+    /** Số module được cấp / tổng — hiển thị trong popup gói. */
+    moduleCounts() {
+      const total = this.modulesStatus.length || this.modulesCatalog.length || 0;
+      const allowed = this.modulesStatus.filter((m) => m.allowed).length;
+      return { allowed, total };
     },
     toast(msg, type = 'info') {
       // Use the Vue studio's own toast (works standalone); fall back to Alpine if present.

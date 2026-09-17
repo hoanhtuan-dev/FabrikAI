@@ -37,6 +37,9 @@ const upgradeUnits = computed(() => {
   return (Array.isArray(u) && u.length) ? u : [1, 3, 6, 12];
 });
 const upgradeUnitLabel = computed(() => (upgradePlan.value && upgradePlan.value.unit_label) || 'tháng');
+
+// [Modules] Module khách CHƯA được dùng (kèm lý do) — popup gói nói thẳng thiếu gì và gói nào có.
+const lockedModules = computed(() => (store.modulesStatus || []).filter((m) => m.allowed === false));
 // Đăng xuất qua fetch (route Laravel POST /dang-xuat) — dùng XSRF-TOKEN cookie cho CSRF.
 async function logout() {
   const m = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
@@ -98,6 +101,8 @@ const activityBar = computed(() => {
       icon: a.icon || 'square',
       label: a.label || a.id,
       cards: a.kind === 'panel' ? ACTIVITY_CARDS[a.id] : null,
+      // [Modules] Bị khoá theo gói ⇒ nút vẫn hiện (khách biết có tính năng này) nhưng bấm sẽ mời nâng cấp.
+      locked: store.moduleLocked(a.id),
     }));
 });
 
@@ -138,7 +143,27 @@ async function loadGuiConfig() {
     if (!r.ok) return;
     const d = await r.json();
     if (Array.isArray(d.activityBar) && d.activityBar.length) activityCfg.value = d.activityBar;
+    // [Modules 2026-09-19] Quyền theo GÓI: mục nào bị khoá thì hiện ổ khoá + mời nâng cấp thay vì
+    // để khách bấm vào rồi bị chặn ở máy chủ mà không hiểu vì sao.
+    if (Array.isArray(d.modules)) {
+      store.setModuleAccess(d.modules, d.modules_allowed || [], d.modules_catalog || []);
+    }
   } catch (e) { /* giữ bản gốc */ }
+}
+
+/** Mở bảng «Gói & credit» để nâng cấp khi khách bấm vào tính năng không có trong gói. */
+function openUpgradeFor(id) {
+  const info = store.moduleInfo(id);
+  const plans = store.plansWithModule(id);
+  store.toast(
+    'Tính năng «' + ((info && info.name) || id) + '» không có trong gói của bạn'
+    + (plans.length ? ' — có ở gói ' + plans.map((p) => p.name).join(' · ') + '.' : '.')
+    + ' Mở «Gói & credit» để nâng cấp.',
+    'error',
+  );
+  store.planOpen = true;
+  store.planCatalogOpen = true;
+  store.togglePlanPopover && store.loadPlanStatus(true);
 }
 
 // [Đợt 2] Mở workspace Dự án khi card "Bộ sưu tập" yêu cầu (card không nhận được event).
@@ -705,6 +730,24 @@ function onTouchEnd(e) {
                 </p>
               </div>
 
+              <!-- [Modules] Tính năng theo gói: khách thấy ngay mình đang có gì và thiếu gì -->
+              <div v-if="store.modulesStatus.length" class="mt-2 rounded-lg border border-ink-700 bg-ink-900/70 p-2.5">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Tính năng theo gói</p>
+                  <span class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200">
+                    {{ store.moduleCounts().allowed }}/{{ store.moduleCounts().total }} đang dùng được
+                  </span>
+                </div>
+                <ul v-if="lockedModules.length" class="mt-1.5 space-y-1">
+                  <li v-for="m in lockedModules" :key="m.id" class="flex flex-wrap items-center gap-1.5 rounded bg-ink-800/70 px-2 py-1 text-[10px] text-cream-200">
+                    <StudioIcon name="lock" size="h-3 w-3" class="text-amber-300" />
+                    <span class="font-semibold text-cream-100">{{ m.name }}</span>
+                    <span class="text-cream-300/70">{{ m.reason === 'disabled' ? 'tạm tắt' : (store.plansWithModule(m.id).length ? 'có ở gói ' + store.plansWithModule(m.id).map((p) => p.name).join(' · ') : 'chưa gói nào có') }}</span>
+                  </li>
+                </ul>
+                <p v-else class="mt-1 text-[10px] text-emerald-200">Gói của bạn đang có đủ mọi tính năng đang mở.</p>
+              </div>
+
               <button type="button" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition hover:bg-ink-700" @click="store.planCatalogOpen = !store.planCatalogOpen">
                 <StudioIcon name="sparkles" size="h-3 w-3" /> {{ store.planCatalogOpen ? 'Thu gọn danh mục gói' : 'Xem gói khác / nâng cấp' }}
               </button>
@@ -817,11 +860,19 @@ function onTouchEnd(e) {
              danh sách quản trị ⇒ owner không đổi được nhãn/icon/thứ tự của chúng.
              Nút ghim đáy (menu Cài đặt) tách riêng ngay dưới vì cần thêm markup popup. -->
         <template v-for="a in activityBar" :key="a.id">
-          <button v-if="a.kind === 'panel'" @click="selectActivity(a.id)" class="activity-btn" :class="activeActivity === a.id ? 'is-active' : ''" :title="a.label" :aria-label="a.label">
+          <!-- [Modules] Mục bị khoá theo gói: vẫn hiện (khách biết có tính năng) nhưng bấm là mời nâng cấp,
+               kèm ổ khoá nhỏ ở góc — không để khách bấm vào rồi bị máy chủ chặn mà không hiểu vì sao. -->
+          <button v-if="a.kind === 'panel'" @click="a.locked ? openUpgradeFor(a.id) : selectActivity(a.id)"
+                  class="activity-btn relative" :class="[activeActivity === a.id ? 'is-active' : '', a.locked ? 'opacity-55' : '']"
+                  :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label" :aria-label="a.label">
             <StudioIcon :name="a.icon" size="h-5 w-5" />
+            <span v-if="a.locked" class="absolute -right-0.5 -top-0.5 rounded-full bg-amber-500 p-0.5 text-ink-900" aria-hidden="true"><StudioIcon name="lock" size="h-2.5 w-2.5" /></span>
           </button>
-          <button v-else-if="a.kind === 'action'" @click="runToolbarAction(a.id)" class="activity-btn" :class="isToolbarActionActive(a.id) ? 'is-active' : ''" :title="a.label" :aria-label="a.label">
+          <button v-else-if="a.kind === 'action'" @click="a.locked ? openUpgradeFor(a.id) : runToolbarAction(a.id)"
+                  class="activity-btn relative" :class="[isToolbarActionActive(a.id) ? 'is-active' : '', a.locked ? 'opacity-55' : '']"
+                  :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label" :aria-label="a.label">
             <StudioIcon :name="a.icon" size="h-5 w-5" />
+            <span v-if="a.locked" class="absolute -right-0.5 -top-0.5 rounded-full bg-amber-500 p-0.5 text-ink-900" aria-hidden="true"><StudioIcon name="lock" size="h-2.5 w-2.5" /></span>
           </button>
         </template>
 
@@ -1017,11 +1068,17 @@ function onTouchEnd(e) {
           <!-- [Sửa 2026-09-17] Panel + nút popup đều sinh từ CÙNG cấu hình owner quản lý, nên
                mobile không còn bản sao viết cứng lệch khỏi desktop. -->
           <template v-for="a in activityBar" :key="'m-' + a.id">
-            <button v-if="a.kind === 'panel'" @click="selectActivity(a.id)" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'">
-              <StudioIcon :name="a.icon" size="h-4 w-4" /> {{ a.label }}
+            <button v-if="a.kind === 'panel'" @click="a.locked ? openUpgradeFor(a.id) : selectActivity(a.id)"
+                    class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors"
+                    :class="a.locked ? 'bg-ink-800/60 text-cream-300/50' : (activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70')"
+                    :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label">
+                <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-4 w-4" /> {{ a.label }}
             </button>
-            <button v-else-if="a.kind === 'action'" @click="runToolbarAction(a.id); menuOpen = false" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="isToolbarActionActive(a.id) ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" :title="a.label">
-              <StudioIcon :name="a.icon" size="h-4 w-4" /> {{ a.label }}
+            <button v-else-if="a.kind === 'action'" @click="a.locked ? openUpgradeFor(a.id) : runToolbarAction(a.id); menuOpen = a.locked ? menuOpen : false"
+                    class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors"
+                    :class="a.locked ? 'bg-ink-800/60 text-cream-300/50' : (isToolbarActionActive(a.id) ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70')"
+                    :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label">
+                <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-4 w-4" /> {{ a.label }}
             </button>
           </template>
           <!-- [Đợt 0.5] Nguồn ảnh + Thư viện: trước đây chỉ có nút ở rail hidden lg:flex (≥1024px),

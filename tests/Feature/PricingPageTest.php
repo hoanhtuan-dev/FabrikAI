@@ -71,6 +71,33 @@ class PricingPageTest extends TestCase
         $res->assertSee('Chủ xưởng may', false);
     }
 
+    public function test_pricing_page_shows_the_module_matrix_from_the_registry(): void
+    {
+        // [Modules 2026-09-26] Bảng "tính năng nào có ở gói nào" phải SINH TỪ bản khai module + plans.modules:
+        // thêm tính năng mới là bảng tự có dòng, đổi quyền trong Quản trị là trang giá đổi theo.
+        $plan = Plan::where('slug', 'pro')->firstOrFail();
+        $plan->forceFill(['modules' => array_values(array_diff($plan->modules(), ['team_seats']))])->save();
+
+        $html = $this->get('/bang-gia')->assertOk()->getContent();
+
+        $this->assertStringContainsString('Tính năng nào có ở gói nào', $html);
+        foreach (['collections' => 'Bộ sưu tập', 'team_seats' => 'Nhóm làm việc'] as $id => $name) {
+            $this->assertStringContainsString($name, $html, 'Thiếu module '.$id.' trong bảng tính năng.');
+        }
+
+        // Gói 'pro' vừa bị rút 'team_seats' ⇒ trong bảng, dòng đó phải là dấu "—" ở cột Chuyên nghiệp.
+        $row = null;
+        foreach (explode('<tr', $html) as $tr) {
+            if (str_contains($tr, 'Nhóm làm việc (ghế)')) {
+                $row = $tr;
+                break;
+            }
+        }
+        $this->assertNotNull($row, 'Không tìm thấy dòng module «Nhóm làm việc (ghế)».');
+        $this->assertStringContainsString('—', $row, 'Gói đã bị rút module thì phải hiện dấu —, không phải ✓.');
+        $this->assertStringContainsString('✓', $row, 'Gói khác vẫn cấp module này ⇒ phải có ít nhất một dấu ✓ trong dòng.');
+    }
+
     public function test_pricing_page_links_to_signup(): void
     {
         $this->get('/bang-gia')->assertOk()->assertSee(route('register'), false);

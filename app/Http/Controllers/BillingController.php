@@ -86,6 +86,12 @@ class BillingController extends Controller
             // [Q2 — 2026-09-19] Cách thanh toán thật (chuyển khoản + kênh hỗ trợ) để trang giá nói được
             // bước tiếp theo thay vì chỉ "chưa có cổng thanh toán". Cùng nguồn với popup trong Studio.
             'payment' => self::paymentInfo(),
+            // [Modules 2026-09-19] TÍNH NĂNG THEO GÓI — sinh từ ModuleRegistry + plans.modules, KHÔNG viết
+            // tay: thêm tính năng mới là bảng này tự có thêm dòng; đổi quyền trong Quản trị là trang giá
+            // đổi theo nên không bao giờ lệch với thực tế hệ thống.
+            'modules' => \App\Support\ModuleRegistry::catalog(),
+            'moduleGroups' => \App\Support\ModuleRegistry::groups(),
+            'planModules' => $plans->mapWithKeys(fn (Plan $p) => [$p->slug => $p->modules()])->all(),
         ]);
     }
 

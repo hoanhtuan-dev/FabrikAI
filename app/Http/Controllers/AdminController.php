@@ -6,6 +6,7 @@ use App\Models\CreditTransaction;
 use App\Models\Generation;
 use App\Models\Plan;
 use App\Models\UpgradeRequest;
+use App\Support\ModuleRegistry;
 use App\Models\User;
 use App\Services\CreditService;
 use App\Services\PlanService;
@@ -464,6 +465,114 @@ class AdminController extends Controller
         return response()->json(['ok' => true, 'payment' => \App\Http\Controllers\BillingController::paymentInfo()]);
     }
 
+// ── [Modules 2026-09-19] QUẢN LÝ MODULE: công tắc bật/tắt + gói nào cấp module nào ──────────
+    //
+    // Chủ dự án cần một chỗ để (a) tắt/mở một tính năng cho TOÀN hệ thống, (b) tick module cho từng gói
+    // — tức biến gói thành công tắc cấp phát tính năng, và (c) áp đề xuất có sẵn thay vì tick tay 23 ô.
+    // Mọi thứ suy từ ModuleRegistry nên thêm module mới là màn này tự có thêm dòng.
+
+    /** GET /api/admin/modules — danh mục module + ma trận gói × module + đề xuất. */
+    public function modules(): JsonResponse
+    {
+        $plans = Plan::query()->orderBy('sort')->get();
+
+        $rows = [];
+        foreach (ModuleRegistry::catalog() as $m) {
+            $plansWith = [];
+            foreach ($plans as $p) {
+                if ($p->grantsModule($m['id'])) {
+                    $plansWith[] = $p->slug;
+                }
+            }
+            $rows[] = array_merge($m, [
+                'enabled' => ModuleRegistry::enabledGlobally($m['id']),
+                'plans_with' => $plansWith,
+            ]);
+        }
+
+        return response()->json([
+            'modules' => $rows,
+            'plans' => $plans->map(fn (Plan $p) => [
+                'id' => $p->id,
+                'slug' => $p->slug,
+                'name' => $p->name,
+                'price_label' => $p->priceLabel(),
+                'is_active' => (bool) $p->is_active,
+                'modules' => $p->modules(),
+                'modules_count' => $p->modulesCount(),
+                'suggested' => ModuleRegistry::suggestedForPlan((string) $p->slug),
+            ])->values(),
+            'groups' => ModuleRegistry::groups(),
+            'disabled' => ModuleRegistry::disabledGlobally(),
+            'total_modules' => count(ModuleRegistry::all()),
+        ]);
+    }
+
+    /** POST /api/admin/modules — lưu công tắc TOÀN CỤC (danh sách module bị tắt). */
+    public function saveModules(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'disabled' => ['present', 'array'],
+            'disabled.*' => ['string'],
+        ]);
+
+        // Id lạ bị BỎ QUA nhưng phải BÁO LẠI (trang Quản trị mở lâu có thể còn id của module vừa gỡ
+        // khỏi bản khai): bỏ qua để không chặn việc, báo để không im lặng nuốt lỗi gõ sai.
+        $ids = array_values(array_intersect($data['disabled'], ModuleRegistry::ids()));
+        $ignored = array_values(array_diff($data['disabled'], ModuleRegistry::ids()));
+
+        set_setting(ModuleRegistry::SETTING_DISABLED, json_encode($ids));
+
+        return response()->json([
+            'ok' => true,
+            'disabled' => ModuleRegistry::disabledGlobally(),
+            'ignored' => $ignored,
+            'message' => count($ids).' module đang tắt toàn cục.'
+                .($ignored ? ' (bỏ qua '.count($ignored).' id không tồn tại: '.implode(', ', $ignored).')' : ''),
+        ]);
+    }
+
+    /** PUT /api/admin/plans/{plan}/modules — gán danh sách module cho một gói (công tắc cấp phát). */
+    public function savePlanModules(Request $request, Plan $plan): JsonResponse
+    {
+        $data = $request->validate([
+            'modules' => ['present', 'array'],
+            'modules.*' => ['string'],
+        ]);
+
+        // Giữ thứ tự theo bản khai (dữ liệu đọc được, so sánh được) và bỏ qua id lạ — nhưng BÁO LẠI để
+        // không im lặng nuốt lỗi.
+        $ids = array_values(array_filter(ModuleRegistry::ids(), fn ($id) => in_array($id, $data['modules'], true)));
+        $ignored = array_values(array_diff($data['modules'], ModuleRegistry::ids()));
+
+        $plan->forceFill(['modules' => $ids])->save();
+
+        return response()->json([
+            'ok' => true,
+            'plan' => ['id' => $plan->id, 'slug' => $plan->slug, 'name' => $plan->name],
+            'modules' => $plan->fresh()->modules(),
+            'modules_count' => $plan->fresh()->modulesCount(),
+            'ignored' => $ignored,
+            'message' => 'Gói '.$plan->name.' nay cấp '.count($ids).' module.'
+                .($ignored ? ' (bỏ qua '.count($ignored).' id không tồn tại: '.implode(', ', $ignored).')' : ''),
+        ]);
+    }
+
+    /** POST /api/admin/plans/{plan}/modules/suggested — áp ĐỀ XUẤT của bản khai cho một gói. */
+    public function applySuggestedPlanModules(Plan $plan): JsonResponse
+    {
+        $ids = ModuleRegistry::suggestedForPlan((string) $plan->slug);
+        $plan->forceFill(['modules' => $ids])->save();
+
+        return response()->json([
+            'ok' => true,
+            'plan' => ['id' => $plan->id, 'slug' => $plan->slug, 'name' => $plan->name],
+            'modules' => $plan->fresh()->modules(),
+            'modules_count' => $plan->fresh()->modulesCount(),
+            'message' => 'Đã áp đề xuất cho gói '.$plan->name.': '.count($ids).' module.',
+        ]);
+    }
+
     public function plans(): JsonResponse
     {
         $plans = Plan::query()->withCount('users')->orderBy('sort')->get();
@@ -474,6 +583,7 @@ class AdminController extends Controller
     public function storePlan(Request $request): JsonResponse
     {
         $data = $this->validatePlan($request);
+        $data = $this->normalizePlanModules($data, null);
 
         if (! empty($data['is_default'])) {
             Plan::query()->update(['is_default' => false]);
@@ -487,6 +597,7 @@ class AdminController extends Controller
     public function updatePlan(Request $request, Plan $plan): JsonResponse
     {
         $data = $this->validatePlan($request, $plan);
+        $data = $this->normalizePlanModules($data, $plan);
 
         if (! empty($data['is_default'])) {
             Plan::query()->where('id', '!=', $plan->id)->update(['is_default' => false]);
@@ -495,6 +606,28 @@ class AdminController extends Controller
         $plan->update($data);
 
         return response()->json(['plan' => $this->mapPlan($plan->fresh())]);
+    }
+
+    /**
+     * [Modules] Chuẩn hoá danh sách module khi lưu gói: bỏ id lạ · giữ thứ tự bản khai · và nếu form
+     * KHÔNG gửi 'modules' thì giữ nguyên giá trị đang có (không vô tình xoá sạch quyền của gói).
+     */
+    protected function normalizePlanModules(array $data, ?Plan $plan): array
+    {
+        if (! array_key_exists('modules', $data) || $data['modules'] === null) {
+            unset($data['modules']);
+
+            return $data;
+        }
+
+        $wanted = is_array($data['modules']) ? $data['modules'] : [];
+
+        $data['modules'] = array_values(array_filter(
+            ModuleRegistry::ids(),
+            fn ($id) => in_array($id, $wanted, true)
+        ));
+
+        return $data;
     }
 
     public function destroyPlan(Plan $plan): JsonResponse
@@ -562,6 +695,9 @@ class AdminController extends Controller
             'resolution_cap' => ['nullable', 'string', 'in:1K,2K'],
             // [Q4] Số ghế: gói cho bao nhiêu NGƯỜI dùng chung (1–100).
             'seats' => ['nullable', 'integer', 'min:1', 'max:100'],
+            // [Modules] Tick module ngay trong form gói (đường thứ hai ngoài ma trận module × gói).
+            'modules' => ['nullable', 'array'],
+            'modules.*' => ['string'],
             'features' => ['nullable', 'array'],
             'features.*' => ['string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
@@ -605,6 +741,10 @@ class AdminController extends Controller
             // [Q4] Ghế để trang Quản trị hiện và sửa được.
             'seats' => $p->seats(),
             'seats_label' => $p->seatsLabel(),
+            // [Modules] Gói cấp module nào (công tắc cấp phát tính năng) + đề xuất từ bản khai.
+            'modules' => $p->modules(),
+            'modules_count' => $p->modulesCount(),
+            'suggested_modules' => ModuleRegistry::suggestedForPlan((string) $p->slug),
             'features' => $p->features ?? [],
             'is_active' => (bool) $p->is_active,
             'is_default' => (bool) $p->is_default,
