@@ -14,6 +14,8 @@ namespace App\Services;
  * Lưu ở bảng `settings` (khoá studio_gui_activity_bar) nên đi theo mọi bản deploy, không phụ
  * thuộc localStorage của từng máy — đúng tính chất cấu hình TOÀN CỤC.
  */
+use App\Support\IconRegistry;
+
 class StudioGuiConfig
 {
     public const SETTING_KEY = 'studio_gui_activity_bar';
@@ -32,28 +34,6 @@ class StudioGuiConfig
         ['id' => 'director',  'label' => 'Kịch bản quay',    'icon' => 'film',       'visible' => true],
     ];
 
-    /**
-     * Toàn bộ icon của `StudioIcon.vue` — PHẢI khớp file đó.
-     * `StudioGuiConfigTest` đối chiếu hai danh sách nên lệch là đỏ ngay.
-     */
-    public const ICONS = [
-        'alertTriangle', 'alignCenterHorizontal', 'alignCenterVertical', 'alignEndHorizontal', 'alignEndVertical', 'alignStartHorizontal', 'alignStartVertical', 'archive',
-        'arrowRight', 'background', 'ban', 'betweenDots', 'blend', 'body', 'bot', 'boxSelect',
-        'briefcase', 'brush', 'calendar', 'camera', 'check', 'checkSquare', 'chevronDown', 'chevronLeft',
-        'chevronRight', 'chevronsDown', 'chevronsUp', 'chevronUp', 'clock', 'coins', 'columns', 'copy',
-        'crop', 'cursor', 'distributeHorizontal', 'distributeVertical', 'download', 'droplet', 'eraser', 'eye',
-        'eyeOff', 'feather', 'film', 'filter', 'flipHorizontal', 'flipVertical', 'folderOpen', 'gear',
-        'grid', 'gripVertical', 'group', 'hair', 'hand', 'hanger', 'hardness', 'height',
-        'hip', 'history', 'image', 'imagePlus', 'info', 'kanban', 'lasso', 'layers',
-        'library', 'lightbulb', 'link', 'list', 'lock', 'lockOpen', 'maximize', 'menu',
-        'minus', 'move', 'name', 'paintBucket', 'palette', 'panelLeft', 'panelRight', 'pencil',
-        'penTool', 'pin', 'pinOff', 'play', 'plus', 'pose', 'puzzle', 'redo',
-        'refresh', 'rotateCcw', 'save', 'scan', 'scissors', 'search', 'selectAdd', 'selectAll',
-        'selectSubtract', 'shirt', 'shoulder', 'size', 'sliders', 'sparkles', 'spline', 'square',
-        'swapHorizontal', 'tag', 'target', 'template', 'trash', 'trashAll', 'undo', 'unlink',
-        'user', 'users', 'userX', 'variations', 'waist', 'wand', 'waves', 'x',
-        'zap', 'zoomIn', 'zoomOut',
-    ];
 
     /** @return array<int, string> */
     public static function defaultIds(): array
@@ -152,7 +132,7 @@ class StudioGuiConfig
                 $icon = $byId[$id]['icon'];
             }
             // Icon lạ ⇒ nút render ra TRỐNG (không ai biết lỗi nằm ở cấu hình). Chặn ngay ở đây.
-            if (! in_array($icon, self::ICONS, true)) {
+            if (! IconRegistry::has($icon)) {
                 throw new \InvalidArgumentException('Icon "'.$icon.'" không tồn tại trong bộ icon của Studio.');
             }
 

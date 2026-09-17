@@ -588,8 +588,8 @@ onMounted(async () => {
               <button @click="moveGui(i, 1)" :disabled="i === guiItems.length - 1" class="grid h-7 w-7 place-items-center rounded-md bg-ink-700 text-cream-200 transition hover:bg-ink-600 disabled:opacity-30" title="Đưa xuống" aria-label="Đưa xuống">▼</button>
             </div>
             <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-800 text-brand-200" title="Xem trước icon"><StudioIcon :name="it.icon" size="h-5 w-5" /></span>
-            <select v-model="it.icon" class="input !w-36 !py-1.5 text-xs" aria-label="Icon" title="Chọn icon">
-              <option v-for="n in guiIcons" :key="n" :value="n">{{ n }}</option>
+            <select v-model="it.icon" class="input !w-40 !py-1.5 text-xs" aria-label="Icon" title="Chọn icon — danh sách lấy từ registry chung">
+              <option v-for="ic in guiIcons" :key="ic.name" :value="ic.name" :title="ic.note || ic.name">{{ ic.name }}</option>
             </select>
             <input v-model="it.label" type="text" maxlength="40" class="input !min-w-40 !flex-1 !py-1.5 text-xs" placeholder="Nhãn hiển thị" aria-label="Nhãn">
             <span class="shrink-0 rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[10px] text-cream-300/50" title="Id — không đổi được">{{ it.id }}</span>

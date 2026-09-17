@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\StudioGuiConfig;
+use App\Support\IconRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -44,19 +45,103 @@ class StudioGuiConfigTest extends TestCase
 
     // ── (d) CHỐNG LỆCH giữa PHP và Vue ────────────────────────────────────
 
-    public function test_icon_list_matches_studio_icon_component(): void
+    public function test_icons_come_from_exactly_one_shared_source(): void
     {
-        $src = (string) file_get_contents(resource_path('js/studio/components/StudioIcon.vue'));
-        preg_match_all('/^  ([a-zA-Z][a-zA-Z0-9]*):/m', $src, $m);
-        $vueIcons = $m[1] ?? [];
+        IconRegistry::flush();
 
-        $this->assertNotEmpty($vueIcons, 'Không đọc được danh sách icon từ StudioIcon.vue.');
-        sort($vueIcons);
-        $phpIcons = StudioGuiConfig::ICONS;
-        sort($phpIcons);
+        $path = resource_path('js/studio/icons.json');
+        $this->assertFileExists($path, 'Thiếu registry icon dùng chung.');
 
-        $this->assertSame($vueIcons, $phpIcons,
-            'Danh sách icon của StudioGuiConfig LỆCH với StudioIcon.vue — owner chọn icon sẽ ra nút TRỐNG.');
+        $json = json_decode((string) file_get_contents($path), true);
+        $this->assertIsArray($json);
+        $this->assertNotEmpty($json);
+        $this->assertSame(array_keys($json), IconRegistry::names(),
+            'IconRegistry phải đọc ĐÚNG file JSON đó (không có bản sao).');
+
+        // Vue phải IMPORT chính file ấy, không giữ danh sách riêng.
+        $vue = (string) file_get_contents(resource_path('js/studio/components/StudioIcon.vue'));
+        $this->assertStringContainsString("import ICONS from '../icons.json'", $vue,
+            'StudioIcon.vue phải import registry chung thay vì tự khai báo danh sách icon.');
+
+        // PHP KHÔNG được giữ danh sách song song — đây chính là lỗi đã sửa.
+        $cfg = (string) file_get_contents(app_path('Services/StudioGuiConfig.php'));
+        $this->assertStringNotContainsString('const ICONS', $cfg,
+            'StudioGuiConfig không được giữ danh sách icon riêng: thêm icon sẽ phải sửa 2 chỗ và lệch nhau.');
+    }
+
+    /**
+     * Thêm icon mới vào registry là MỌI nơi tự có: không phải sửa PHP, không phải sửa Vue.
+     * Test này mô phỏng đúng việc đó bằng cách ghi thêm một icon vào JSON rồi đọc lại.
+     */
+    public function test_a_newly_registered_icon_is_available_everywhere(): void
+    {
+        $path = resource_path('js/studio/icons.json');
+        $original = (string) file_get_contents($path);
+
+        try {
+            $json = json_decode($original, true);
+            $json['iconThuNghiem'] = ['svg' => '<circle cx="12" cy="12" r="9"/>', 'note' => 'icon thử nghiệm'];
+            file_put_contents($path, json_encode($json, JSON_UNESCAPED_UNICODE));
+            IconRegistry::flush();
+
+            $this->assertTrue(IconRegistry::has('iconThuNghiem'), 'Icon mới phải có mặt ngay.');
+            $this->assertContains('iconThuNghiem', $this->svc()->save([
+                ['id' => 'concept', 'label' => 'X', 'icon' => 'iconThuNghiem', 'visible' => true],
+            ])[0]['icon'] === 'iconThuNghiem' ? ['iconThuNghiem'] : [],
+                'Cấu hình phải nhận icon vừa đăng ký mà KHÔNG cần sửa PHP.');
+
+            $names = array_column(IconRegistry::catalog(), 'name');
+            $this->assertContains('iconThuNghiem', $names, 'Danh sách cho ô chọn phải tự có icon mới.');
+        } finally {
+            file_put_contents($path, $original);
+            IconRegistry::flush();
+        }
+    }
+
+    /**
+     * Mọi icon ĐANG DÙNG trong app phải tồn tại trong registry.
+     *
+     * Guard này đặc biệt quan trọng sau khi gộp về một nguồn: đổi nguồn icon mà quên một chỗ thì
+     * nút render TRỐNG, không có lỗi nào để lần ra.
+     */
+    public function test_every_icon_used_in_the_app_exists_in_the_registry(): void
+    {
+        IconRegistry::flush();
+        $known = IconRegistry::names();
+
+        $files = array_merge(
+            glob(resource_path('js/studio/components/*.vue')) ?: [],
+            glob(resource_path('js/studio/*.vue')) ?: [],
+            glob(resource_path('views/**/*.blade.php')) ?: [],
+            glob(resource_path('views/*.blade.php')) ?: [],
+        );
+        $this->assertNotEmpty($files, 'Không tìm thấy file nào để quét.');
+
+        $missing = [];
+        foreach ($files as $file) {
+            $src = (string) file_get_contents($file);
+            $rel = str_replace(base_path().DIRECTORY_SEPARATOR, '', $file);
+
+            preg_match_all('/<StudioIcon\b[^>]*>/s', $src, $tags);
+            foreach ($tags[0] ?? [] as $tag) {
+                if (preg_match('/\bname="([a-zA-Z][a-zA-Z0-9]*)"/', $tag, $m) === 1) {
+                    if (! in_array($m[1], $known, true)) {
+                        $missing[] = $rel.' → name="'.$m[1].'"';
+                    }
+                }
+                if (preg_match('/:name="([^"]*)"/s', $tag, $m) === 1) {
+                    preg_match_all("/'([a-zA-Z][a-zA-Z0-9]*)'/", $m[1], $lits);
+                    foreach ($lits[1] ?? [] as $lit) {
+                        if (! in_array($lit, $known, true)) {
+                            $missing[] = $rel.' → :name … \''.$lit.'\'';
+                        }
+                    }
+                }
+            }
+        }
+
+        $this->assertSame([], $missing,
+            "Có icon được dùng nhưng KHÔNG có trong registry (nút sẽ render trống):\n".implode("\n", $missing));
     }
 
     public function test_activity_ids_match_the_cards_map_in_the_studio_app(): void
@@ -195,7 +280,8 @@ class StudioGuiConfigTest extends TestCase
 
         $resp = $this->actingAs($this->customer())->getJson('/api/gui')->assertOk();
         $this->assertCount(count(StudioGuiConfig::DEFAULTS), $resp->json('activityBar'));
-        $this->assertContains('hanger', $resp->json('icons'), 'Phải kèm danh sách icon cho trang quản trị.');
+        $iconNames = array_column($resp->json('icons'), 'name');
+        $this->assertContains('hanger', $iconNames, 'Phải kèm danh sách icon cho trang quản trị.');
     }
 
     public function test_invalid_payload_returns_422_with_a_specific_message(): void

@@ -2024,7 +2024,8 @@ RULES:
     {
         return response()->json([
             'activityBar' => app(\App\Services\StudioGuiConfig::class)->all(),
-            'icons' => \App\Services\StudioGuiConfig::ICONS,
+            // Nguồn DUY NHẤT: resources/js/studio/icons.json (cùng file StudioIcon.vue import).
+            'icons' => \App\Support\IconRegistry::catalog(),
         ]);
     }
 

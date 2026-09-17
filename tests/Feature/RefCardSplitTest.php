@@ -137,11 +137,14 @@ class RefCardSplitTest extends TestCase
 
     public function test_industry_standard_icons_are_used(): void
     {
-        $icons = $this->src('components/StudioIcon.vue');
+        // Icon nay nam o REGISTRY CHUNG `resources/js/studio/icons.json` (nguon duy nhat, ca Vue
+        // lan PHP deu doc) — khong con khai bao trong StudioIcon.vue nhu truoc.
+        $icons = json_decode((string) file_get_contents(resource_path('js/studio/icons.json')), true);
         $card = $this->src('components/RefImageCard.vue');
 
         foreach (['variations', 'hanger'] as $name) {
-            $this->assertStringContainsString($name.':', $icons, "Thiếu icon SVG '.$name.' trong StudioIcon.");
+            $this->assertArrayHasKey($name, (array) $icons, "Thiếu icon SVG '{$name}' trong registry chung.");
+            $this->assertNotEmpty($icons[$name]['svg'] ?? '', "Icon '{$name}' rỗng.");
         }
 
         $this->assertStringContainsString(":name=\"isTryon ? 'hanger' : 'variations'\"", $card,

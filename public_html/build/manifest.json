@@ -1,6 +1,6 @@
 {
-  "_StudioIcon-BGLRA9vD.js": {
-    "file": "assets/StudioIcon-BGLRA9vD.js",
+  "_StudioIcon-CkEVg32U.js": {
+    "file": "assets/StudioIcon-CkEVg32U.js",
     "name": "StudioIcon",
     "imports": [
       "_pageBoot-CmsEgZ-F.js"
@@ -102,7 +102,7 @@
     "name": "useLocalCatalog"
   },
   "resources/css/app.css": {
-    "file": "assets/app-BgWzxCrG.css",
+    "file": "assets/app-qj0b-WZ1.css",
     "name": "app",
     "names": [
       "app.css"
@@ -111,29 +111,29 @@
     "isEntry": true
   },
   "resources/js/studio/admin.js": {
-    "file": "assets/admin-BC_3_48o.js",
+    "file": "assets/admin-BK91K1SU.js",
     "name": "admin",
     "src": "resources/js/studio/admin.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-CmsEgZ-F.js",
       "_pinia-DNsqIwCQ.js",
-      "_StudioIcon-BGLRA9vD.js",
+      "_StudioIcon-CkEVg32U.js",
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/admin-A_DUayNP.css"
+      "assets/admin-Di8xRaao.css"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-BgGIusqq.js",
+    "file": "assets/main-Dz70R_Of.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-CmsEgZ-F.js",
       "_pinia-DNsqIwCQ.js",
-      "_StudioIcon-BGLRA9vD.js",
+      "_StudioIcon-CkEVg32U.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
       "_StylistDataManager-Bx_sEmxf.js"
     ],

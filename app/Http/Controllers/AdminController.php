@@ -39,7 +39,7 @@ class AdminController extends Controller
     {
         return response()->json([
             'activityBar' => app(\App\Services\StudioGuiConfig::class)->all(),
-            'icons' => \App\Services\StudioGuiConfig::ICONS,
+            'icons' => \App\Support\IconRegistry::catalog(),
         ]);
     }
 
