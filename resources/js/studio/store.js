@@ -64,6 +64,12 @@ export const useStudioStore = defineStore('studio', {
     upgradeBusy: false,
     upgradeResult: null,    // yêu cầu vừa gửi: { code, amount_label, method_label, ... }
     upgradeForm: { units: 1, method: 'bank_transfer', phone: '', name: '', note: '' },
+    // [Q4] NHÓM LÀM VIỆC THEO SỐ GHẾ: chủ nhóm mời/bỏ thành viên; thành viên dùng chung credit + bộ sưu tập.
+    team: null,              // { seats, is_owner, owner, members: [...] }
+    teamOpen: false,
+    teamBusy: false,
+    teamResult: null,        // { member, temp_password } — mật khẩu tạm hiện ĐÚNG MỘT LẦN
+    teamForm: { name: '', email: '', phone: '' },
     // film / reframe share the source image (editSource || preview)
     editSource: null,
     texture: 5,
@@ -441,7 +447,7 @@ export const useStudioStore = defineStore('studio', {
     },
     togglePlanPopover() {
       this.planOpen = !this.planOpen;
-      if (this.planOpen) { this.loadPlanStatus(); }
+      if (this.planOpen) { this.loadPlanStatus(); this.loadTeam(); }
       else { this.planCatalogOpen = false; }
     },
     /**
@@ -459,6 +465,64 @@ export const useStudioStore = defineStore('studio', {
       this.upgradeForm.method = 'bank_transfer';
     },
     closeUpgrade() { this.upgradeOpen = false; this.upgradePlanId = null; },
+    // ── [Q4] Nhóm làm việc theo số ghế ───────────────────────────────────────────────────
+    /** Nạp tình trạng nhóm: tổng ghế · đã dùng · danh sách thành viên (một lời gọi duy nhất). */
+    async loadTeam(force = false) {
+      if (!this.user) return null;
+      if (!force && this.team) return this.team;
+      try {
+        const r = await fetch('/api/team', { headers: { Accept: 'application/json' } });
+        if (!r.ok) return null;
+        const d = await r.json();
+        this.team = d;
+        return d;
+      } catch (e) { console.error('loadTeam failed', e); return null; }
+    },
+    toggleTeam() {
+      this.teamOpen = !this.teamOpen;
+      if (this.teamOpen) { this.teamResult = null; this.loadTeam(true); }
+    },
+    /**
+     * Mời một thành viên vào nhóm. Mật khẩu tạm do MÁY CHỦ sinh và chỉ trả về đúng lần này — giao diện
+     * hiển thị để chủ nhóm gửi cho nhân viên, không lưu lại ở đâu khác.
+     */
+    async inviteMember() {
+      if (this.teamBusy) return null;
+      const email = String(this.teamForm.email || '').trim();
+      if (!email) { this.toast('Nhập email của thành viên.', 'error'); return null; }
+      this.teamBusy = true;
+      try {
+        const d = await this.api('/api/team/members', {
+          email,
+          name: this.teamForm.name || null,
+          phone: this.teamForm.phone || null,
+        });
+        this.teamResult = { member: d.member, temp_password: d.temp_password };
+        this.teamForm = { name: '', email: '', phone: '' };
+        await this.loadTeam(true);
+        if (d.seats) this.team = { ...(this.team || {}), seats: d.seats };
+        this.toast(d.message || ('Đã thêm ' + (d.member?.name || '') + ' vào nhóm.'), 'success');
+        return d;
+      } catch (e) {
+        this.toast(e.message || 'Không thêm được thành viên.', 'error');
+        return null;
+      } finally { this.teamBusy = false; }
+    },
+    /** Bỏ một thành viên khỏi nhóm (giải phóng ghế). Tài khoản + ảnh đã tạo vẫn giữ nguyên. */
+    async removeMember(id) {
+      if (this.teamBusy || !id) return null;
+      this.teamBusy = true;
+      try {
+        const d = await this.api('/api/team/members/' + id, { _method: 'DELETE' });
+        await this.loadTeam(true);
+        if (d.seats) this.team = { ...(this.team || {}), seats: d.seats };
+        this.toast(d.message || 'Đã bỏ thành viên khỏi nhóm.', 'info');
+        return d;
+      } catch (e) {
+        this.toast(e.message || 'Không bỏ được thành viên.', 'error');
+        return null;
+      } finally { this.teamBusy = false; }
+    },
     /**
      * Gửi yêu cầu nâng cấp. Máy chủ kiểm gói/số tháng/phương thức/SĐT và trả MÃ THEO DÕI; ở đây chỉ
      * hiển thị đúng những gì máy chủ trả về (không tự bịa mã, không tự bịa số tiền).

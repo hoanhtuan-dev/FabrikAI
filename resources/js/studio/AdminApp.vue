@@ -320,7 +320,8 @@ const planModal = reactive({ open: false, mode: 'create', row: null, form: blank
 
 function blankUser() { return { name: '', email: '', phone: '', password: '', role: 'customer', plan_id: '', is_active: true }; }
 function blankPlan() {
-  return { name: '', slug: '', tagline: '', price_vnd: 0, credits_per_month: 0, bonus_credits: 0, image_credit_cost: 1, video_credit_cost: 10, resolution_cap: '2K', features: [], is_active: true, is_default: false, sort: 0 };
+  // seats: [Q4] số NGƯỜI dùng chung một gói (1 = một người).
+  return { name: '', slug: '', tagline: '', price_vnd: 0, credits_per_month: 0, bonus_credits: 0, image_credit_cost: 1, video_credit_cost: 10, resolution_cap: '2K', seats: 1, features: [], is_active: true, is_default: false, sort: 0 };
 }
 function openCreateUser() { Object.assign(userModal, { open: true, mode: 'create', row: null, form: blankUser(), errors: {}, saving: false }); }
 function openEditUser(u) {
@@ -943,6 +944,9 @@ onMounted(async () => {
                   <span :class="[BADGE, BADGE_TONE.neutral]"><StudioIcon name="image" size="h-3 w-3" /> {{ p.image_credit_cost }} credit/ảnh</span>
                   <span :class="[BADGE, BADGE_TONE.neutral]"><StudioIcon name="film" size="h-3 w-3" /> {{ p.video_credit_cost }} credit/video</span>
                   <span :class="[BADGE, BADGE_TONE.neutral]">{{ p.resolution_cap }}</span>
+                  <span :class="[BADGE, p.seats > 1 ? BADGE_TONE.ok : BADGE_TONE.neutral]" title="Số ghế: số người dùng chung gói này">
+                    <StudioIcon name="users" size="h-3 w-3" /> {{ p.seats_label || (p.seats + ' người') }}
+                  </span>
                   <span :class="[BADGE, BADGE_TONE.neutral]" title="Thứ tự sắp xếp">#{{ p.sort }}</span>
                 </div>
                 <div class="mt-3 flex flex-wrap gap-1.5">
@@ -1431,6 +1435,12 @@ onMounted(async () => {
               <option value="1K">1K</option>
               <option value="2K">2K</option>
             </select>
+          </div>
+          <!-- [Q4] Số ghế: gói cho bao nhiêu NGƯỜI dùng chung (ảnh hưởng trực tiếp giá trị gói) -->
+          <div>
+            <label class="label" for="pl-seats">Số ghế (người dùng chung)</label>
+            <input id="pl-seats" v-model.number="planModal.form.seats" type="number" min="1" max="100" class="input !py-2">
+            <p v-if="planModal.errors.seats" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.seats }}</p>
           </div>
           <div>
             <label class="label" for="pl-img">Credit / ảnh</label>

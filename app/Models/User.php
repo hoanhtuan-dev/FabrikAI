@@ -126,11 +126,65 @@ class User extends Authenticatable
      */
     public function activePlan(): ?Plan
     {
+        // [Q4 — 2026-09-19] Thành viên nhóm dùng GÓI CỦA CHỦ NHÓM: không có bể credit/hạn mức riêng để
+        // lệch số với người trả tiền. Mọi nơi đọc activePlan() (hạn mức, cap, chi phí, giao diện) đều
+        // tự đúng mà không phải sửa từng chỗ.
+        $owner = $this->teamOwnerForPlan();
+        if ($owner && (int) $owner->id !== (int) $this->id) {
+            return $owner->activePlanOwn();
+        }
+
+        return $this->activePlanOwn();
+    }
+
+    /** Gói gắn trực tiếp trên CHÍNH tài khoản này (không đi theo nhóm). */
+    public function activePlanOwn(): ?Plan
+    {
         if ($this->plan_expires_at === null) {
             return $this->plan;
         }
 
         return $this->plan_expires_at->isFuture() ? $this->plan : null;
+    }
+
+    /** Chủ nhóm (nếu tài khoản này là thành viên) — quan hệ `teamOwner`. */
+    public function teamOwnerForPlan(): ?self
+    {
+        if (! $this->team_owner_id) {
+            return null;
+        }
+
+        return $this->relationLoaded('teamOwner') ? $this->teamOwner : $this->teamOwner()->first();
+    }
+
+    public function teamOwner(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'team_owner_id');
+    }
+
+    public function teamMembers(): HasMany
+    {
+        return $this->hasMany(self::class, 'team_owner_id');
+    }
+
+    /** Tài khoản này có phải thành viên của một nhóm (không phải chủ nhóm)? */
+    public function isTeamMember(): bool
+    {
+        return $this->team_owner_id !== null;
+    }
+
+    /** Người TRẢ TIỀN cho thao tác của tài khoản này (thành viên ⇒ chủ nhóm). */
+    public function billingUser(): self
+    {
+        return $this->isTeamMember() ? ($this->teamOwnerForPlan() ?? $this) : $this;
+    }
+
+    /** Số dư credit THẬT dùng để tạo ảnh: của chủ nhóm nếu là thành viên. */
+    public function billingBalance(): int
+    {
+        $billing = $this->billingUser();
+
+        return (int) ($billing->is($this) ? $this->credits_balance : $billing->credits_balance);
     }
 
     /** Đang trả phí (gói active khác miễn phí) hay không. */

@@ -635,6 +635,76 @@ function onTouchEnd(e) {
                 <span v-if="store.planStatus.payment.bank.holder"> · {{ store.planStatus.payment.bank.holder }}</span>
                 <span class="block text-cream-300/85">Nội dung: mã yêu cầu (vd UP-2609-0001) + tên tài khoản FabrikAI của bạn.</span>
               </div>
+              <!-- [Q4] NHÓM LÀM VIỆC THEO SỐ GHẾ: mời/bỏ người dùng chung gói, chung credit, chung bộ sưu tập -->
+              <div v-if="store.team" class="mt-2 rounded-lg border border-ink-700 bg-ink-900/70 p-2.5">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Nhóm làm việc</p>
+                  <span class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200">
+                    ghế {{ store.team.seats.used }}/{{ store.team.seats.limit }}
+                  </span>
+                  <span v-if="store.team.seats.remaining" class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">còn {{ store.team.seats.remaining }} ghế</span>
+                  <span v-else class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">hết ghế</span>
+                  <button type="button" class="icon-btn ml-auto !h-5 !w-5" title="Nạp lại danh sách nhóm" aria-label="Nạp lại danh sách nhóm" @click="store.loadTeam(true)">
+                    <StudioIcon name="refresh" size="h-3 w-3" />
+                  </button>
+                </div>
+
+                <template v-if="store.team.is_owner">
+                  <p class="mt-1 text-[10px] leading-relaxed text-cream-300/85">
+                    Gói của bạn cho <b class="text-cream-100">{{ store.team.seats.limit }} người</b> dùng chung: cùng một bể credit và cùng bộ sưu tập.
+                    Ảnh vẫn ghi rõ ai tạo. Mời thêm người bằng email bên dưới.
+                  </p>
+                  <ul v-if="store.team.members.length > 1" class="mt-1.5 space-y-1">
+                    <li v-for="m in store.team.members.filter((x) => !x.is_owner)" :key="m.id" class="flex items-center gap-1.5 rounded bg-ink-800/70 px-2 py-1 text-[10px] text-cream-200">
+                      <StudioIcon name="user" size="h-3 w-3" class="text-cream-300/70" />
+                      <span class="min-w-0 flex-1 truncate">{{ m.name }} · {{ m.email }}</span>
+                      <span class="shrink-0 text-cream-300/60">{{ m.joined_at }}</span>
+                      <button type="button" class="icon-btn !h-5 !w-5 !text-red-300" title="Bỏ thành viên khỏi nhóm (giải phóng ghế)" :aria-label="'Bỏ ' + m.name + ' khỏi nhóm'" :disabled="store.teamBusy" @click="store.removeMember(m.id)">
+                        <StudioIcon name="userX" size="h-3 w-3" />
+                      </button>
+                    </li>
+                  </ul>
+                  <button type="button" class="mt-1.5 w-full rounded border border-ink-700 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700" @click="store.toggleTeam()">
+                    <StudioIcon name="plus" size="h-3 w-3" class="mr-1 inline" />{{ store.teamOpen ? 'Đóng form mời' : 'Mời thành viên' }}
+                  </button>
+                  <div v-if="store.teamOpen" class="mt-1.5 space-y-1.5 rounded border border-brand-500/30 bg-brand-600/10 p-2">
+                    <template v-if="!store.teamResult">
+                      <label class="block text-[10px] text-cream-300/85">Tên thành viên
+                        <input v-model="store.teamForm.name" maxlength="120" class="input mt-0.5 !py-1 text-[11px]" placeholder="Nguyễn Thị B">
+                      </label>
+                      <label class="block text-[10px] text-cream-300/85">Email (dùng để đăng nhập)
+                        <input v-model="store.teamForm.email" type="email" maxlength="190" class="input mt-0.5 !py-1 text-[11px]" placeholder="nhanvien@shop.vn">
+                      </label>
+                      <label class="block text-[10px] text-cream-300/85">Số điện thoại (tuỳ chọn)
+                        <input v-model="store.teamForm.phone" maxlength="32" class="input mt-0.5 !py-1 text-[11px]" placeholder="0901234567">
+                      </label>
+                      <button type="button" class="w-full rounded bg-brand-600 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                              :disabled="store.teamBusy" @click="store.inviteMember()">
+                        {{ store.teamBusy ? 'Đang thêm…' : 'Thêm vào nhóm' }}
+                      </button>
+                      <p class="text-[10px] leading-relaxed text-cream-300/85">
+                        Thành viên đăng nhập bằng email này và dùng chung gói của bạn — không cần mua gói riêng. Mỗi người cần một email riêng.
+                      </p>
+                    </template>
+                    <template v-else>
+                      <p class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[10px] text-emerald-200">
+                        Đã thêm <b>{{ store.teamResult.member.name }}</b> ({{ store.teamResult.member.email }}) vào nhóm.
+                      </p>
+                      <div class="rounded bg-ink-800 px-2 py-1.5 text-[10px] text-cream-200">
+                        <p>Mật khẩu tạm (chỉ hiện MỘT LẦN — hãy gửi ngay cho nhân viên):</p>
+                        <p class="mt-0.5 font-mono text-[12px] font-semibold text-cream-50">{{ store.teamResult.temp_password }}</p>
+                      </div>
+                      <p class="text-[10px] text-cream-300/85">Nhân viên vào <b class="text-cream-100">/dang-nhap</b> bằng email + mật khẩu tạm rồi đổi mật khẩu trong phần tài khoản.</p>
+                      <button type="button" class="w-full rounded border border-ink-700 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700" @click="store.teamResult = null; store.teamOpen = false">Xong</button>
+                    </template>
+                  </div>
+                </template>
+                <p v-else class="mt-1 text-[10px] leading-relaxed text-cream-300/85">
+                  Bạn là <b class="text-cream-100">thành viên</b> trong nhóm của <b class="text-cream-100">{{ store.team.owner.name }}</b>:
+                  dùng chung credit và bộ sưu tập của nhóm. Cần thêm credit hoặc thêm ghế thì nhờ chủ nhóm nâng cấp gói.
+                </p>
+              </div>
+
               <button type="button" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition hover:bg-ink-700" @click="store.planCatalogOpen = !store.planCatalogOpen">
                 <StudioIcon name="sparkles" size="h-3 w-3" /> {{ store.planCatalogOpen ? 'Thu gọn danh mục gói' : 'Xem gói khác / nâng cấp' }}
               </button>

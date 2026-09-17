@@ -17,7 +17,7 @@ class Plan extends Model
     protected $fillable = [
         'name', 'slug', 'tagline', 'price_vnd', 'unit_months', 'cycle_months', 'units',
         'credits_per_month', 'bonus_credits',
-        'image_credit_cost', 'video_credit_cost', 'resolution_cap', 'features',
+        'image_credit_cost', 'video_credit_cost', 'resolution_cap', 'seats', 'features',
         'is_active', 'is_default', 'sort',
     ];
 
@@ -33,6 +33,7 @@ class Plan extends Model
         'bonus_credits' => 'integer',
         'image_credit_cost' => 'integer',
         'video_credit_cost' => 'integer',
+        'seats' => 'integer',
         'sort' => 'integer',
     ];
 
@@ -122,5 +123,26 @@ class Plan extends Model
     public function isSeasonal(): bool
     {
         return $this->unitMonths() > 1;
+    }
+
+    // ── [Q4 — 2026-09-19] SỐ GHẾ ────────────────────────────────────────────────────────
+    // Chủ doanh nghiệp không làm một mình: gói phải nói được "bao nhiêu NGƯỜI dùng chung gói này".
+
+    /** Số ghế (người dùng chung một gói). Tối thiểu 1 — không có gói nào cho 0 người. */
+    public function seats(): int
+    {
+        return max(1, (int) ($this->seats ?: 1));
+    }
+
+    /** Nhãn ghế để hiển thị: "1 người" · "3 người" · "10 người". */
+    public function seatsLabel(): string
+    {
+        return $this->seats().' người';
+    }
+
+    /** Gói dùng chung cho nhóm (nhiều hơn 1 ghế)? */
+    public function hasTeamSeats(): bool
+    {
+        return $this->seats() > 1;
     }
 }

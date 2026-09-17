@@ -61,7 +61,9 @@ class StudioController extends Controller
                 'role' => $user->role,
                 'role_label' => $user->roleLabel(),
                 'avatar' => $user->avatar,
-                'credits_balance' => $user->credits_balance,
+                // [Q4] Thành viên nhóm thấy SỐ DƯ CỦA NHÓM (bể credit của chủ nhóm) — nếu trả số dư
+                // riêng của tài khoản phụ thì thanh công cụ hiện một con số không dùng được.
+                'credits_balance' => studio_credit_balance($user),
                 'is_admin' => $user->isAdmin(),
                 'is_super_admin' => $user->isSuperAdmin(),
                 // Gói hiện hành + hạn mức chu kỳ: để giao diện nói đúng "bạn đang ở gói nào,
@@ -78,7 +80,14 @@ class StudioController extends Controller
                     'expires_at' => $user->plan_expires_at?->format('d/m/Y'),
                     'credits_granted_at' => $user->plan_credits_granted_at?->format('d/m/Y'),
                     'is_subscribed' => $user->isSubscribed(),
+                    'seats' => $plan->seats(),
+                    'seats_label' => $plan->seatsLabel(),
                 ] : null,
+                // [Q4 — 2026-09-19] NHÓM LÀM VIỆC: còn mấy ghế · tài khoản này là thành viên hay chủ
+                // nhóm · ai là người trả tiền. Giao diện dùng đúng số này, không tự đếm ở client.
+                'team' => array_merge(studio_team_seats($user), [
+                    'is_owner' => ! $user->isTeamMember(),
+                ]),
             ] : null,
             'project_statuses' => app(\App\Services\ProjectWorkflowService::class)->states(),
         ]);
@@ -219,7 +228,7 @@ class StudioController extends Controller
 
         return response()->json([
             'items' => $items,
-            'credits_left' => auth()->user()->fresh()->credits_balance,
+            'credits_left' => studio_credit_balance(),
             'notice' => $this->planNotice,
             'credit_warning' => $this->creditWarning(auth()->user(), $cost ?? 0, $variants ?? 1),
         ]);
@@ -546,7 +555,7 @@ class StudioController extends Controller
 
         return response()->json([
             'items' => $items,
-            'credits_left' => auth()->user()->fresh()->credits_balance,
+            'credits_left' => studio_credit_balance(),
             'notice' => $this->planNotice,
             'credit_warning' => $this->creditWarning(auth()->user(), $cost ?? 0, $variants ?? 1),
         ]);
@@ -782,7 +791,7 @@ class StudioController extends Controller
 
         return response()->json([
             'items' => $items,
-            'credits_left' => auth()->user()->fresh()->credits_balance,
+            'credits_left' => studio_credit_balance(),
             'notice' => $this->planNotice,
             'credit_warning' => $this->creditWarning(auth()->user(), $cost ?? 0, $variants ?? 1),
             'tryon' => $isTryon ? true : null,
@@ -847,7 +856,7 @@ class StudioController extends Controller
 
         return response()->json([
             'items' => $items,
-            'credits_left' => auth()->user()->fresh()->credits_balance,
+            'credits_left' => studio_credit_balance(),
             'notice' => $this->planNotice,
             'credit_warning' => $this->creditWarning(auth()->user(), $cost ?? 0, $variants ?? 1),
         ]);
@@ -1751,10 +1760,16 @@ RULES:
                 'is_subscribed' => $user->isSubscribed(),
             ] : null,
             'credits' => [
-                'balance' => (int) $user->credits_balance,
+                // [Q4] Số dư của NGƯỜI TRẢ TIỀN (thành viên nhóm ⇒ chủ nhóm).
+                'balance' => studio_credit_balance($user),
                 'used_total' => (int) $usage['used_total'],
                 'used_today' => (int) $usage['used_today'],
             ],
+            // Ghế: gói này cho bao nhiêu người · đã dùng mấy · còn mấy (Q4).
+            'seats' => array_merge(studio_team_seats($user), [
+                'limit' => $plan ? $plan->seats() : 1,
+                'is_owner' => ! $user->isTeamMember(),
+            ]),
             'limits' => [
                 'image_resolution_cap' => $limits['image_resolution_cap'],
                 'video_resolution_cap' => $limits['video_resolution_cap'],
@@ -1832,15 +1847,18 @@ RULES:
         // khoản owner khi credit = 0 là tự khoá mình khỏi sản phẩm (đo trên production 2026-09-19: tài
         // khoản owner đang có 0 credit). Việc chặn nhằm bảo vệ DOANH THU từ khách, và khách vẫn bị chặn
         // đúng như đã quyết — muốn thử trải nghiệm bị chặn thì dùng một tài khoản khách.
-        $limits = studio_plan_limits($user);
-        if ($cost > 0 && ! $user->isSuperAdmin() && $limits['enforce_credits'] && (int) $user->credits_balance < $cost) {
+        // [Q4 — 2026-09-19] Thành viên nhóm tiêu credit của CHỦ NHÓM ⇒ mọi phép kiểm/trừ ở đây dùng
+        // người trả tiền (billingUser), còn ảnh vẫn ghi `user_id` = người bấm để biết ai làm gì.
+        $billing = $user->billingUser();
+        $limits = studio_plan_limits($billing);
+        if ($cost > 0 && ! $user->isSuperAdmin() && $limits['enforce_credits'] && (int) $billing->credits_balance < $cost) {
             $plan = $limits['plan'];
             abort(response()->json([
                 'code' => 'out_of_credits',
-                'message' => 'Bạn đã dùng hết credit của gói (thao tác này cần '.$cost.' credit, hiện còn '
-                    .max(0, (int) $user->credits_balance).'). Mở «Gói & credit» để nâng cấp gói.',
+                'message' => ($billing->is($user) ? 'Bạn' : 'Nhóm của bạn').' đã dùng hết credit của gói (thao tác này cần '.$cost.' credit, hiện còn '
+                    .max(0, (int) $billing->credits_balance).'). Mở «Gói & credit» để nâng cấp gói.',
                 'needed' => $cost,
-                'balance' => max(0, (int) $user->credits_balance),
+                'balance' => max(0, (int) $billing->credits_balance),
                 'plan' => $plan ? ['id' => $plan->id, 'name' => $plan->name, 'slug' => $plan->slug] : null,
                 'upgrade_url' => '/bang-gia',
             ], 402));
@@ -1873,10 +1891,11 @@ RULES:
         // [M-h — 2026-09-17] Trừ credit + tạo row trong CÙNG một transaction. Trước đây decrement()
         // chạy TRƯỚC create(); nếu create ném lỗi (DB/constraint/model event) thì người dùng mất
         // credit mà không có generation nào để heal hay hoàn.
-        $generation = \Illuminate\Support\Facades\DB::transaction(function () use ($user, $cost, $type, $data, $source, $provider, $model) {
+        $generation = \Illuminate\Support\Facades\DB::transaction(function () use ($user, $billing, $cost, $type, $data, $source, $provider, $model) {
             $credit = app(\App\Services\CreditService::class);
             if ($cost > 0) {
-                $credit->mutate($user, -$cost);
+                // Trừ ở NGƯỜI TRẢ TIỀN (chủ nhóm) — sổ cái ghi đúng người bị trừ tiền.
+                $credit->mutate($billing, -$cost);
             }
 
             $generation = $user->generations()->create([
@@ -1918,11 +1937,13 @@ RULES:
             ]);
 
             // Ghi sổ cái tham chiếu generation vừa tạo (cùng transaction — create lỗi thì rollback hết).
+            // [Q4] Sổ cái ghi ở NGƯỜI BỊ TRỪ TIỀN (chủ nhóm) — nếu ghi ở thành viên thì sổ sai người và
+            // số dư sau giao dịch cũng sai (lấy từ tài khoản phụ). Ai bấm thì ghi rõ trong ghi chú.
             if ($cost > 0) {
-                $credit->record($user, -$cost, 'spend', [
+                $credit->record($billing, -$cost, 'spend', [
                     'reference_type' => 'generation',
                     'reference_id' => $generation->id,
-                    'note' => 'Tạo '.$type,
+                    'note' => 'Tạo '.$type.($billing->is($user) ? '' : ' (bởi '.$user->name.')'),
                 ]);
             }
 
@@ -1942,7 +1963,7 @@ RULES:
             'media_url' => $fresh->media_url,
             'error' => $fresh->error,
             'credits_cost' => $fresh->credits_cost,
-            'credits_left' => $user->fresh()->credits_balance,
+            'credits_left' => studio_credit_balance($user),
             'notice' => $this->planNotice,
             'credit_warning' => $this->creditWarning($user, $cost),
             'prompts_history_id' => $fresh->prompts_history_id,

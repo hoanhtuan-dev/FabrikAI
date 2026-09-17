@@ -1270,7 +1270,8 @@ if (! function_exists('studio_usage')) {
         $q = $user ? $user->generations()->where('status', 'completed') : null;
 
         return [
-            'balance' => $user ? (int) $user->credits_balance : 0,
+            // [Q4] Thành viên nhóm ⇒ số dư là của CHỦ NHÓM (người trả tiền), không phải tài khoản phụ.
+            'balance' => $user ? (int) $user->billingBalance() : 0,
             'used_total' => $q ? (int) $q->sum('credits_cost') : 0,
             'used_today' => $q ? (int) $q->whereDate('created_at', today())->sum('credits_cost') : 0,
             'limit' => (int) studio_config('quota_limit', 0),
@@ -1315,6 +1316,78 @@ if (! function_exists('studio_plan_limits')) {
             // Đổi mặc định ở ĐÚNG MỘT CHỖ này; muốn tạm mở lại thì đặt setting studio_enforce_credits=0
             // trong Quản trị (không cần sửa mã).
             'enforce_credits' => filter_var(studio_config('enforce_credits', true), FILTER_VALIDATE_BOOLEAN),
+        ];
+    }
+}
+
+if (! function_exists('team_can_view_project')) {
+    /**
+     * [Q4 — 2026-09-19] Ai được XEM/LÀM VIỆC trên một bộ sưu tập: chủ bộ sưu tập · thành viên trong
+     * nhóm của họ · Super Admin. Thành viên làm việc chung bộ sưu tập của chủ nhóm — đó là toàn bộ ý
+     * nghĩa của "ghế"; nhưng KHÔNG được xoá bộ sưu tập hay đổi trạng thái (việc của chủ nhóm).
+     */
+    function team_can_view_project($actor, $project): bool
+    {
+        if (! $actor || ! $project) {
+            return false;
+        }
+
+        if ($actor->isSuperAdmin() || (int) $project->user_id === (int) $actor->id) {
+            return true;
+        }
+
+        return $actor->isTeamMember() && (int) $project->user_id === (int) $actor->team_owner_id;
+    }
+}
+
+if (! function_exists('team_can_manage_project')) {
+    /** [Q4] Ai được XOÁ/ĐỔI TRẠNG THÁI bộ sưu tập: chủ bộ sưu tập hoặc Super Admin (thành viên: không). */
+    function team_can_manage_project($actor, $project): bool
+    {
+        return (bool) $actor && (bool) $project
+            && ($actor->isSuperAdmin() || (int) $project->user_id === (int) $actor->id);
+    }
+}
+
+if (! function_exists('studio_credit_balance')) {
+    /**
+     * [Q4 — 2026-09-19] Số dư credit THẬT của phiên làm việc: thành viên nhóm dùng bể credit của chủ
+     * nhóm. Một chỗ duy nhất để giao diện và pipeline nói cùng một con số.
+     */
+    function studio_credit_balance($user = null): int
+    {
+        $user = $user ?? auth()->user();
+
+        return $user ? (int) $user->billingBalance() : 0;
+    }
+}
+
+if (! function_exists('studio_team_seats')) {
+    /**
+     * [Q4] Tình trạng ghế của nhóm: tổng ghế theo gói · đã dùng · còn lại · có phải thành viên không.
+     * Giao diện dùng đúng số này (không tự đếm ở client).
+     */
+    function studio_team_seats($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $team = app(\App\Services\TeamService::class);
+        $owner = $team->ownerOf($user);
+
+        if (! $user || ! $owner) {
+            return ['limit' => 1, 'used' => 1, 'remaining' => 0, 'is_member' => false, 'owner' => null];
+        }
+
+        // Tính MỘT lần rồi suy ra phần còn lại: gọi usedSeats() và remainingSeats() riêng sẽ đếm hai
+        // lần cùng một con số (bắt được bằng ngân sách query của /api/boot).
+        $limit = $team->seatLimit($owner);
+        $used = $team->usedSeats($owner);
+
+        return [
+            'limit' => $limit,
+            'used' => $used,
+            'remaining' => max(0, $limit - $used),
+            'is_member' => $user->isTeamMember(),
+            'owner' => ['id' => $owner->id, 'name' => $owner->name],
         ];
     }
 }

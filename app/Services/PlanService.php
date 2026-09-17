@@ -98,6 +98,11 @@ class PlanService
      */
     public function syncCycleCredits(User $user): ?CreditTransaction
     {
+        // [Q4 — 2026-09-19] Thành viên nhóm dùng gói của chủ nhóm ⇒ credit chu kỳ phải cấp cho CHỦ NHÓM,
+        // không cấp vào tài khoản thành viên. (Lỗi bắt được bằng test: gọi với thành viên thì tài khoản
+        // phụ nhận thêm 350 credit của gói nhóm — tiền bị nhân bản.)
+        $user = $user->billingUser();
+
         $plan = $user->activePlan();
         if (! $plan || (int) $plan->credits_per_month <= 0) {
             return null;

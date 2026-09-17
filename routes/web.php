@@ -8,6 +8,7 @@ use App\Http\Controllers\ProjectShareController;
 use App\Http\Controllers\StudioController;
 use App\Http\Controllers\StudioSettingsController;
 use App\Http\Controllers\StylistDataController;
+use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -217,6 +218,12 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
 Route::post('/billing/upgrade-request', [BillingController::class, 'upgradeRequest'])
     ->middleware('throttle:upgrade-request')->name('billing.upgrade.request');
 Route::get('/billing/upgrade-request', [BillingController::class, 'upgradeStatus'])->name('billing.upgrade.status');
+
+// [Q4 — 2026-09-19] NHÓM LÀM VIỆC THEO SỐ GHẾ: chủ nhóm mời/bỏ thành viên; thành viên dùng chung gói,
+// credit và bộ sưu tập. Thành viên xem được nhóm mình nhưng không mời/xoá (controller trả 403).
+Route::get('/team', [TeamController::class, 'index'])->name('team.index');
+Route::post('/team/members', [TeamController::class, 'store'])->name('team.members.store');
+Route::delete('/team/members/{user}', [TeamController::class, 'destroy'])->name('team.members.destroy');
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

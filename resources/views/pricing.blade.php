@@ -162,6 +162,11 @@
                             <dt class="text-cream-300">Ảnh tối đa</dt>
                             <dd class="font-semibold text-cream-50">{{ $plan->resolution_cap }}</dd>
                         </div>
+                        {{-- [Q4] Số ghế: chủ doanh nghiệp cần biết gói cho bao nhiêu NGƯỜI dùng chung. --}}
+                        <div class="flex items-baseline justify-between gap-2">
+                            <dt class="text-cream-300">Số ghế</dt>
+                            <dd class="font-semibold {{ $plan->hasTeamSeats() ? 'text-emerald-300' : 'text-cream-50' }}">{{ $plan->seatsLabel() }}</dd>
+                        </div>
                         <div class="flex items-baseline justify-between gap-2">
                             <dt class="text-cream-300">Mỗi ảnh</dt>
                             <dd class="font-semibold text-cream-50">{{ $vn((int) $plan->image_credit_cost) }} credit</dd>
@@ -262,6 +267,12 @@
                             @endforeach
                         </tr>
                         <tr class="border-b border-ink-800">
+                            <td class="py-2.5 pr-4 text-cream-300">Số ghế (người dùng chung một gói)</td>
+                            @foreach($plans as $plan)
+                                <td class="py-2.5 pr-4">{{ $plan->seatsLabel() }}</td>
+                            @endforeach
+                        </tr>
+                        <tr class="border-b border-ink-800">
                             <td class="py-2.5 pr-4 text-cream-300">Độ phân giải ảnh tối đa</td>
                             @foreach($plans as $plan)
                                 <td class="py-2.5 pr-4">{{ $plan->resolution_cap }}</td>
@@ -318,7 +329,8 @@
                 @foreach([
                     ['Credit là gì?', 'Credit là đơn vị tính công việc. Mỗi ảnh tốn số credit ghi trên gói của bạn (thường 1 credit), mỗi video tốn nhiều hơn. Số credit còn lại luôn hiện ở góc phải Studio.'],
                     ['Tôi không biết gì về AI, có dùng được không?', 'Được. Bạn mô tả bằng tiếng Việt như đang trao đổi với thợ may hoặc nhiếp ảnh gia; hệ thống tự dịch thành câu lệnh cho model và gợi ý sẵn bố cục, dáng, bối cảnh.'],
-                    ['Thanh toán thế nào?', 'Chưa có cổng thanh toán trực tuyến: bạn gửi «Yêu cầu nâng cấp» trong Studio, nhận mã yêu cầu, chuyển khoản theo mã đó rồi FabrikAI kích hoạt gói. VNPay sẽ mở sau.'],
+                    ['Nhiều người trong công ty dùng chung một gói được không?', 'Được — gói có SỐ GHẾ: Chuyên nghiệp 3 người, Studio 10 người, Xưởng theo vụ 5 người. Chủ gói mời nhân viên bằng email trong Studio (mục «Gói & credit» → Nhóm làm việc); cả nhóm dùng chung credit và chung bộ sưu tập, ảnh vẫn ghi rõ ai tạo.'],
+        ['Thanh toán thế nào?', 'Chưa có cổng thanh toán trực tuyến: bạn gửi «Yêu cầu nâng cấp» trong Studio, nhận mã yêu cầu, chuyển khoản theo mã đó rồi FabrikAI kích hoạt gói. VNPay sẽ mở sau.'],
                     ['Hết credit giữa việc thì sao?', 'Hệ thống cảnh báo sớm khi credit sắp hết và cho bạn nạp/nâng gói ngay trong Studio. Bạn cũng xem được toàn bộ lịch sử trừ credit trong mục Sổ credit.'],
                     ['Ảnh dùng cho sàn thương mại điện tử và in ấn được không?', 'Được. Gói từ mức trả phí cho ảnh tới 2K; bạn chọn tỉ lệ khung (1:1, 4:5, 3:4, 16:9…) phù hợp từng kênh bán.'],
                     ['Dữ liệu và ảnh của tôi có riêng tư không?', 'Mỗi tài khoản có thư viện, dự án, khuôn mặt và dáng người mẫu riêng; người khác không thấy. Khoá API của hệ thống được mã hoá và không bao giờ hiển thị lại.'],

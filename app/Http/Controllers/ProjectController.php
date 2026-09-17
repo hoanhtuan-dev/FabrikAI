@@ -56,9 +56,18 @@ class ProjectController extends Controller
 
         // Eager-load latestGeneration (thumbnail) + withCount (generations_count)
         // để serialize() không bắn thêm query nào cho từng project (N+1).
-        $projects = $user->projects()
+        // [Q4 — 2026-09-19] Thành viên trong nhóm thấy BỘ SƯU TẬP CỦA CHỦ NHÓM: cả nhóm làm chung một
+        // danh sách việc, không phải mỗi người một danh sách rồi ngồi chép qua lại.
+        $ownerIds = $user->isTeamMember() ? [(int) $user->team_owner_id] : [];
+        $projects = Project::query()
+            ->where(function ($q) use ($user, $ownerIds) {
+                $q->where('user_id', $user->id);
+                if ($ownerIds) {
+                    $q->orWhereIn('user_id', $ownerIds);
+                }
+            })
             ->where('archived', $archived)
-            ->with('latestGeneration')
+            ->with(['latestGeneration', 'user:id,name'])
             ->withCount('generations')
             ->orderBy('sort')
             ->orderByDesc('id')
@@ -81,7 +90,7 @@ class ProjectController extends Controller
     {
         // Owner hoặc Super Admin (reviewer cần xem dự án của Designer trước khi duyệt).
         $actor = $request->user();
-        abort_unless($project->user_id === $actor->id || $actor->isSuperAdmin(), 403);
+        abort_unless(team_can_view_project($actor, $project), 403);
         $project->load(['generations' => fn ($q) => $q->latest()->limit(60), 'assets', 'user:id,name']);
 
         return response()->json($this->serialize($project, $actor, true));
@@ -99,7 +108,7 @@ class ProjectController extends Controller
     public function stats(Request $request, Project $project): \Illuminate\Http\JsonResponse
     {
         $actor = $request->user();
-        abort_unless($project->user_id === $actor->id || $actor->isSuperAdmin(), 403);
+        abort_unless(team_can_view_project($actor, $project), 403);
 
         $byStatus = [];
         $rows = $project->generations()
@@ -176,7 +185,7 @@ class ProjectController extends Controller
     public function reviewShots(Request $request, Project $project): \Illuminate\Http\JsonResponse
     {
         $actor = $request->user();
-        abort_unless($project->user_id === $actor->id || $actor->isSuperAdmin(), 403);
+        abort_unless(team_can_view_project($actor, $project), 403);
 
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1', 'max:60'],
@@ -262,7 +271,7 @@ class ProjectController extends Controller
     public function exportBundle(Request $request, Project $project)
     {
         $actor = $request->user();
-        abort_unless($project->user_id === $actor->id || $actor->isSuperAdmin(), 403);
+        abort_unless(team_can_view_project($actor, $project), 403);
 
         $data = $request->validate([
             'sizes' => ['nullable', 'string', 'max:2000'],
@@ -318,7 +327,9 @@ class ProjectController extends Controller
      */
     public function update(Request $request, Project $project)
     {
-        abort_unless($project->user_id === $request->user()->id, 403);
+        // [Q4] Sửa thông tin bộ sưu tập (tên · hạn · brief · tags) là việc của CHỦ bộ sưu tập; thành
+        // viên trong nhóm được làm việc trên bộ sưu tập nhưng không đổi "vỏ" của nó.
+        abort_unless(team_can_manage_project($request->user(), $project), 403);
 
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
@@ -345,7 +356,9 @@ class ProjectController extends Controller
      */
     public function destroy(Request $request, Project $project)
     {
-        abort_unless($project->user_id === $request->user()->id, 403);
+        // [Q4] Xoá bộ sưu tập: CHỈ chủ bộ sưu tập hoặc Super Admin. Thành viên dù là "ghế" trong nhóm
+        // cũng không được xoá công việc chung.
+        abort_unless(team_can_manage_project($request->user(), $project), 403);
 
         // Detach generations (set project_id null) để không mất output đã tạo.
         // Bọc transaction: nếu delete fail giữa chừng thì detach cũng rollback,
@@ -368,7 +381,8 @@ class ProjectController extends Controller
         // Owner tự chuyển trạng thái của mình; Super Admin (reviewer) được duyệt
         // dự án BẤT KỲ — gate tách nhiệm vụ nằm trong ProjectWorkflowService.
         $actor = $request->user();
-        abort_unless($project->user_id === $actor->id || $actor->isSuperAdmin(), 403);
+        // [Q4] Thành viên trong nhóm KHÔNG đổi trạng thái bộ sưu tập (vẫn tạo ảnh + duyệt mẫu bình thường).
+        abort_unless(team_can_manage_project($actor, $project), 403);
 
         $data = $request->validate([
             // in: chặn chuỗi lạ ngay ở tầng validation, không để lọt xuống engine.
@@ -399,7 +413,7 @@ class ProjectController extends Controller
      */
     public function attachGeneration(Request $request, Project $project)
     {
-        abort_unless($project->user_id === $request->user()->id, 403);
+        abort_unless(team_can_view_project($request->user(), $project), 403);
 
         $data = $request->validate([
             'generation_id' => ['required', 'integer', 'exists:generations,id'],

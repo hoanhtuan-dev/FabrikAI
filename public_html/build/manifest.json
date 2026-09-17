@@ -107,7 +107,7 @@
     "isEntry": true
   },
   "resources/js/studio/admin.js": {
-    "file": "assets/admin-6xjDXGT3.js",
+    "file": "assets/admin-_hIFCHRz.js",
     "name": "admin",
     "src": "resources/js/studio/admin.js",
     "isEntry": true,
@@ -117,11 +117,11 @@
       "_BaseModal-UUm9MVVI.js"
     ],
     "css": [
-      "assets/admin-BSKhUbhL.css"
+      "assets/admin-CiV1lPJj.css"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-Btd5cpox.js",
+    "file": "assets/main-BcCZEYgT.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,

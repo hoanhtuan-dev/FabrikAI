@@ -169,6 +169,8 @@ class ProjectShareController extends Controller
     private function authorizeOwner(Request $request, Project $project): void
     {
         $actor = $request->user();
-        abort_unless($actor && ($project->user_id === $actor->id || $actor->isSuperAdmin()), 403);
+        // [Q4] Ai xem/làm việc được trên bộ sưu tập thì chia sẻ được (chủ bộ sưu tập · thành viên nhóm ·
+        // Super Admin) — dùng CHUNG một hàm quyền với ProjectController để không lệch luật.
+        abort_unless(team_can_view_project($actor, $project), 403);
     }
 }

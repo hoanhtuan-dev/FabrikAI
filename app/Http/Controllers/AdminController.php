@@ -560,6 +560,8 @@ class AdminController extends Controller
             'image_credit_cost' => ['nullable', 'integer', 'min:1', 'max:100'],
             'video_credit_cost' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'resolution_cap' => ['nullable', 'string', 'in:1K,2K'],
+            // [Q4] Số ghế: gói cho bao nhiêu NGƯỜI dùng chung (1–100).
+            'seats' => ['nullable', 'integer', 'min:1', 'max:100'],
             'features' => ['nullable', 'array'],
             'features.*' => ['string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
@@ -600,6 +602,9 @@ class AdminController extends Controller
             'image_credit_cost' => (int) $p->image_credit_cost,
             'video_credit_cost' => (int) $p->video_credit_cost,
             'resolution_cap' => $p->resolution_cap,
+            // [Q4] Ghế để trang Quản trị hiện và sửa được.
+            'seats' => $p->seats(),
+            'seats_label' => $p->seatsLabel(),
             'features' => $p->features ?? [],
             'is_active' => (bool) $p->is_active,
             'is_default' => (bool) $p->is_default,

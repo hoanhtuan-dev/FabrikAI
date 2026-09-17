@@ -9,6 +9,11 @@ use Illuminate\Database\Seeder;
  * Seed 4 gói cước VNĐ (chiến lược giá cho thị trường Việt Nam — xem PRICING.md).
  *
  * Đây là dữ liệu CẤU HÌNH (không phải demo): chạy ở mọi môi trường, idempotent theo slug.
+ *
+ * [Q4 — 2026-09-19] Số ghế ({{B}}seats{{B}}) phải khai Ở ĐÂY cho cài đặt MỚI, và migration
+ * 2026_09_19_000006 lo phần cài đặt ĐANG CHẠY (nơi bảng plans đã có dữ liệu trước khi thêm cột).
+ * Bài học từ chính lần làm này: migration UPDATE ... WHERE seats = 1 chạy trên bảng RỖNG khi migrate
+ * fresh ⇒ test đỏ vì gói vẫn 1 ghế; phải khai ở cả hai chỗ.
  * Giá/credit được tính để biên gộp ≥ 60% ở mô hình Qwen base (~500 ₫/ảnh 1K); Qwen Max
  * (~1.800 ₫/ảnh) chỉ dành cho gói Pro/Studio với mức tiêu hao credit cao hơn (xem PRICING.md).
  */
@@ -27,6 +32,8 @@ class PlanSeeder extends Seeder
                 'image_credit_cost' => 1,
                 'video_credit_cost' => 10,
                 'resolution_cap' => '1K',
+                // [Q4] Số ghế: gói miễn phí 1 người.
+                'seats' => 1,
                 'is_default' => true,
                 'sort' => 0,
                 'features' => [
@@ -47,6 +54,8 @@ class PlanSeeder extends Seeder
                 'image_credit_cost' => 1,
                 'video_credit_cost' => 10,
                 'resolution_cap' => '2K',
+                // [Q4] Khởi nghiệp: 1 người (chủ shop tự làm).
+                'seats' => 1,
                 'is_default' => false,
                 'sort' => 1,
                 'features' => [
@@ -67,6 +76,8 @@ class PlanSeeder extends Seeder
                 'image_credit_cost' => 1,
                 'video_credit_cost' => 10,
                 'resolution_cap' => '2K',
+                // [Q4] Chuyên nghiệp: 3 ghế (chủ shop + 2 nhân viên).
+                'seats' => 3,
                 'is_default' => false,
                 'sort' => 2,
                 'features' => [
@@ -87,6 +98,8 @@ class PlanSeeder extends Seeder
                 'image_credit_cost' => 1,
                 'video_credit_cost' => 10,
                 'resolution_cap' => '2K',
+                // [Q4] Studio: 10 ghế (đội nhóm).
+                'seats' => 10,
                 'is_default' => false,
                 'sort' => 3,
                 'features' => [

@@ -109,6 +109,9 @@ class BillingController extends Controller
                 'price_per_unit_label' => $p->pricePerUnitLabel(),
                 'credits_label' => $p->creditsLabel(),
                 'is_seasonal' => $p->isSeasonal(),
+                // [Q4] Số ghế: gói này cho bao nhiêu NGƯỜI dùng chung.
+                'seats' => $p->seats(),
+                'seats_label' => $p->seatsLabel(),
                 'credits_per_month' => (int) $p->credits_per_month,
                 'bonus_credits' => (int) $p->bonus_credits,
                 'resolution_cap' => $p->resolution_cap,
@@ -202,6 +205,18 @@ class BillingController extends Controller
 
         $plan = Plan::query()->where('is_active', true)->findOrFail((int) $data['plan_id']);
         $user = $request->user();
+
+        // [Q4] Thành viên nhóm KHÔNG mua gói: các em đang dùng gói của chủ nhóm, mua thêm là trả tiền
+        // hai lần cho cùng một chỗ ngồi. Việc nâng cấp thuộc về chủ nhóm.
+        if ($user->isTeamMember()) {
+            $owner = $user->teamOwnerForPlan();
+
+            return response()->json([
+                'message' => 'Bạn đang dùng gói của nhóm'.($owner ? ' (chủ nhóm: '.$owner->name.')' : '')
+                    .'. Cần thêm credit hoặc thêm ghế thì nhờ chủ nhóm nâng cấp gói.',
+                'code' => 'team_member_cannot_upgrade',
+            ], 422);
+        }
 
         $units = (int) $data['units'];
         if (! in_array($units, $plan->allowedUnits(), true)) {
