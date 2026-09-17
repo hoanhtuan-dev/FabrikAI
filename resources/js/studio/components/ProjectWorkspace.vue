@@ -2,11 +2,16 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
+import { useFocusTrap } from '../composables/useFocusTrap.js';
 import StudioIcon from './StudioIcon.vue';
 
 const store = useStudioStore();
 
 const open = defineModel({ type: Boolean, default: false });
+
+// [Đợt 0.7] Focus trap cho hộp thoại "Dự án thiết kế" (role=dialog): trước đây Tab đi xuyên ra ngoài.
+const dialogEl = ref(null);
+useFocusTrap(dialogEl, { active: open });
 
 const creating = ref(false);
 const editing = ref(false);
@@ -229,7 +234,7 @@ watch(() => open.value, (v) => {
 
 <template>
   <Teleport to="body">
-    <div v-if="open" role="dialog" aria-modal="true" aria-label="Dự án thiết kế" class="fixed inset-0 z-[95] flex items-stretch justify-center bg-black/70 p-3 sm:p-6">
+    <div v-if="open" ref="dialogEl" role="dialog" aria-modal="true" aria-label="Dự án thiết kế" class="fixed inset-0 z-[95] flex items-stretch justify-center bg-black/70 p-3 sm:p-6">
       <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-ink-700 bg-ink-950 text-cream-100 shadow-2xl">
         <!-- ══ Header ══ -->
         <div class="flex shrink-0 items-center justify-between gap-3 border-b border-ink-700 bg-ink-900 px-4 py-3">

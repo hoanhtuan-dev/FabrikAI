@@ -359,6 +359,33 @@ class StaticIntegrityTest extends TestCase
         return $out;
     }
 
+    public function test_dialogs_trap_focus_instead_of_letting_tab_escape(): void
+    {
+        // [Đợt 0.7 — focus trap]
+        //   role="dialog" + aria-modal đã có từ vá §5.2/§5.3, nhưng KHÔNG lớp phủ nào giữ bàn phím:
+        //   bấm Tab vài lần là focus đi xuyên ra sau lớp phủ, Enter kích hoạt nhầm hành động ẩn.
+        //   Bất biến: composable useFocusTrap tồn tại, thực sự giữ Tab (vòng lại đầu/cuối) + trả
+        //   focus khi đóng + gỡ listener khi unmount; và các hộp thoại NỀN (BaseModal dùng chung,
+        //   ProjectWorkspace) phải DÙNG nó.
+        $trapFile = resource_path('js/studio/composables/useFocusTrap.js');
+        $this->assertFileExists($trapFile, 'Composable useFocusTrap phải tồn tại (Đợt 0.7).');
+        $trap = (string) file_get_contents($trapFile);
+
+        foreach (["e.key !== 'Tab'", 'shiftKey', 'last.focus', 'first.focus', 'removeEventListener', 'document.activeElement'] as $needle) {
+            $this->assertStringContainsString($needle, $trap,
+                "useFocusTrap thiếu logic giữ Tab: '$needle' — bất biến focus trap bị phá.");
+        }
+        $this->assertStringContainsString('lastFocused.focus', $trap, 'useFocusTrap phải TRẢ focus khi đóng.');
+
+        $baseModal = (string) file_get_contents(resource_path('js/studio/components/BaseModal.vue'));
+        $this->assertStringContainsString('useFocusTrap', $baseModal, 'BaseModal (đế chung của các hộp thoại) phải giữ focus.');
+        $this->assertStringContainsString('trap.activate', $baseModal, 'BaseModal phải BẬT trap khi mở.');
+        $this->assertStringContainsString('trap.deactivate', $baseModal, 'BaseModal phải TẮT trap (trả focus) khi đóng/unmount.');
+
+        $workspace = (string) file_get_contents(resource_path('js/studio/components/ProjectWorkspace.vue'));
+        $this->assertStringContainsString('useFocusTrap(dialogEl', $workspace, 'ProjectWorkspace (hộp thoại Dự án) phải giữ focus.');
+    }
+
     public function test_no_pwa_install_ui_remains(): void
     {
         // [Đợt 0.6 — Chốt Q4: bỏ PWA HOÀN TOÀN]

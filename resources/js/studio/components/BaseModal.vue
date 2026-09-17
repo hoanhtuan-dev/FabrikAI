@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, nextTick, onBeforeUnmount } from 'vue';
+import { useFocusTrap } from '../composables/useFocusTrap.js';
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -9,23 +10,26 @@ const props = defineProps({
 });
 const emit = defineEmits(['update:modelValue']);
 
-// §5.2 (a11y): trước đây modal không có role/aria-modal, không đóng bằng Esc và không nhận focus
-// -> trình đọc màn hình không biết đây là hộp thoại, và bàn phím vẫn đi xuyên ra sau lớp phủ.
+// §5.2/§5.3 (a11y): role/aria-modal + Esc + nhận focus đã có từ trước. [Đợt 0.7] thêm FOCUS TRAP:
+// trước đây Tab đi XUYÊN RA khỏi hộp thoại vào những nút mờ đằng sau — bàn phím vẫn "lạc" sau lớp
+// phủ, Enter kích hoạt nhầm hành động ẩn. useFocusTrap giữ Tab trong hộp thoại + trả focus khi đóng.
 const rootEl = ref(null);
 function close() { emit('update:modelValue', false); }
 function onKey(e) {
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
 }
+const trap = useFocusTrap(rootEl);
 watch(() => props.modelValue, async (open) => {
   if (open) {
     window.addEventListener('keydown', onKey, true);
     await nextTick();
-    rootEl.value?.focus?.();
+    trap.activate();
   } else {
     window.removeEventListener('keydown', onKey, true);
+    trap.deactivate();
   }
 });
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKey, true); trap.deactivate(); });
 </script>
 <template>
   <div v-if="modelValue" ref="rootEl" tabindex="-1" role="dialog" aria-modal="true" :aria-label="title || undefined"
