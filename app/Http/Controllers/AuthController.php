@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Plan;
 use App\Models\User;
+use App\Services\CreditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -67,12 +69,39 @@ class AuthController extends Controller
             // KHÔNG truyền 'role' ở đây: `role` không nằm trong User::$fillable (cố ý — chống tự
             // nâng quyền), nên truyền vào cũng bị bỏ qua im lặng. Mặc định 'customer' nay khai báo
             // tường minh ở User::$attributes.
-        ]); 
+        ]);
+
+        $this->assignDefaultPlan($user);
 
         Auth::login($user);
         $request->session()->regenerate();
 
         return redirect('/');
+    }
+
+    /**
+     * Gán gói mặc định (miễn phí) cho tài khoản tự đăng ký + ghi sổ cái credit khởi tạo.
+     *
+     * credits_balance có sẵn từ schema (100 credit dùng thử) — không gán qua mass-assignment.
+     * Sổ cái ghi ĐÚNG số dư thực tế sau khi tạo để sổ khớp với số dư ngay từ dòng đầu tiên.
+     */
+    protected function assignDefaultPlan(User $user): void
+    {
+        $default = Plan::query()
+            ->where('is_default', true)
+            ->where('is_active', true)
+            ->orderBy('sort')
+            ->first();
+
+        if ($default) {
+            $user->forceFill(['plan_id' => $default->id, 'plan_expires_at' => null])->save();
+        }
+
+        app(CreditService::class)->record($user->fresh(), (int) $user->fresh()->credits_balance, 'signup', [
+            'reference_type' => 'plan',
+            'reference_id' => $default?->id,
+            'note' => 'Credit dùng thử khi đăng ký',
+        ]);
     }
 
     public function logout(Request $request)

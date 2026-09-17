@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -59,6 +60,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'plan_expires_at' => 'datetime',
         ];
     }
 
@@ -103,5 +105,36 @@ class User extends Authenticatable
     public function generations(): HasMany
     {
         return $this->hasMany(Generation::class);
+    }
+
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class);
+    }
+
+    public function creditTransactions(): HasMany
+    {
+        return $this->hasMany(CreditTransaction::class);
+    }
+
+    /**
+     * Gói hiện hành (chưa hết hạn). Gói không có plan_expires_at được coi là gói vĩnh viễn
+     * (gán tay bởi admin, hoặc gói miễn phí). Null = chưa gán gói hoặc gói đã hết hạn.
+     */
+    public function activePlan(): ?Plan
+    {
+        if ($this->plan_expires_at === null) {
+            return $this->plan;
+        }
+
+        return $this->plan_expires_at->isFuture() ? $this->plan : null;
+    }
+
+    /** Đang trả phí (gói active khác miễn phí) hay không. */
+    public function isSubscribed(): bool
+    {
+        $plan = $this->activePlan();
+
+        return $plan !== null && ! $plan->isFree();
     }
 }

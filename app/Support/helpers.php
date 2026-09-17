@@ -351,7 +351,14 @@ if (! function_exists('studio_finalize_generation')) {
         }
 
         if (in_array($to, ['failed', 'cancelled'], true) && (int) $generation->credits_cost > 0) {
-            $generation->user?->increment('credits_balance', (int) $generation->credits_cost);
+            $user = $generation->user;
+            if ($user) {
+                app(\App\Services\CreditService::class)->apply($user, (int) $generation->credits_cost, 'refund', [
+                    'reference_type' => 'generation',
+                    'reference_id' => $generation->id,
+                    'note' => 'Hoàn credit khi generation '.$to,
+                ]);
+            }
         }
 
         // Giữ model trong bộ nhớ khớp DB để caller không đọc lại trạng thái cũ.

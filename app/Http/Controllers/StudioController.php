@@ -1614,11 +1614,12 @@ RULES:
         // chạy TRƯỚC create(); nếu create ném lỗi (DB/constraint/model event) thì người dùng mất
         // credit mà không có generation nào để heal hay hoàn.
         $generation = \Illuminate\Support\Facades\DB::transaction(function () use ($user, $cost, $type, $data, $source, $provider, $model) {
+            $credit = app(\App\Services\CreditService::class);
             if ($cost > 0) {
-                $user->decrement('credits_balance', $cost);
+                $credit->mutate($user, -$cost);
             }
 
-            return $user->generations()->create([
+            $generation = $user->generations()->create([
             'project_id' => $data['project_id'] ?? null,
             'prompts_history_id' => $data['history_id'] ?? null,
             'type' => $type,
@@ -1654,7 +1655,18 @@ RULES:
                 'style' => $data['style'] ?? null,
                 'ornament_level' => $data['ornament_level'] ?? null,
             ], fn ($v) => $v !== null && $v !== ''),
-            ]); // đóng create() trong closure
+            ]);
+
+            // Ghi sổ cái tham chiếu generation vừa tạo (cùng transaction — create lỗi thì rollback hết).
+            if ($cost > 0) {
+                $credit->record($user, -$cost, 'spend', [
+                    'reference_type' => 'generation',
+                    'reference_id' => $generation->id,
+                    'note' => 'Tạo '.$type,
+                ]);
+            }
+
+            return $generation;
         }); // đóng DB::transaction — create lỗi ⇒ decrement bị rollback theo
 
         // The job is processed lazily when the client polls this generation (show()), or via the

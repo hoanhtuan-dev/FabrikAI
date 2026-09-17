@@ -359,6 +359,26 @@ class StaticIntegrityTest extends TestCase
         return $out;
     }
 
+    public function test_no_pwa_install_ui_remains(): void
+    {
+        // [Đợt 0.6 — Chốt Q4: bỏ PWA HOÀN TOÀN]
+        //   Sau khi gỡ service worker + manifest, hai nút "Cài đặt FabrikAI" (banner dưới + thanh
+        //   công cụ) vẫn còn trong StudioApp.vue nhưng KHÔNG BAO GIỜ hiện: không còn gì bắn
+        //   `beforeinstallprompt`. Đó là UI chết — người đọc code sau này sẽ tưởng PWA vẫn hoạt động.
+        //   Bất biến: không tệp nguồn .vue/.js nào còn tham chiếu tới cơ chế cài đặt PWA.
+        $bad = [];
+        foreach ($this->vueFiles() as $f) {
+            $src = (string) file_get_contents($f);
+            foreach (['beforeinstallprompt', 'appinstalled', 'doInstall', 'showInstall', 'installPrompt'] as $needle) {
+                if (str_contains($src, $needle)) {
+                    $bad[] = str_replace(base_path().'/', '', $f).' → '.$needle;
+                }
+            }
+        }
+        $this->assertSame([], $bad,
+            "Dư lượng PWA còn sót (chốt Q4 là BỎ PWA hoàn toàn, không để lại nút chết):\n".implode("\n", $bad));
+    }
+
     public function test_generation_progress_is_real_not_simulated(): void
     {
         // [Đợt 0.2 — chống tái phát "thanh tiến trình mô phỏng"]

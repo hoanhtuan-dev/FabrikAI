@@ -229,10 +229,11 @@ class CreditRefundSafetyTest extends TestCase
             }
         }
 
-        // HOÀN tiền chỉ được nằm trong helper CAS dùng chung — thêm đường thứ hai là mở lại M-c.
-        $this->assertSame(['app/Support/helpers.php'], $increment, 'Hoàn credit phải đi qua ĐÚNG MỘT helper có CAS');
-        // TRỪ tiền chỉ được nằm ở một chỗ tạo generation (trong transaction — M-h).
-        $this->assertSame(['app/Http/Controllers/StudioController.php'], $decrement, 'Trừ credit phải đi qua một điểm duy nhất');
+        // [2026-09-18] Cộng VÀ trừ credit nay đều đi qua ĐÚNG MỘT dịch vụ sổ cái (CreditService) —
+        // nơi duy nhất giữ literal increment/decrement. Hoàn (helpers) và trừ (StudioController) đều uỷ
+        // quyền về đây nên không thể mở lại lỗi M-c/M-h bằng một đường mutate thứ hai.
+        $this->assertSame(['app/Services/CreditService.php'], $increment, 'Mọi đường cộng credit phải đi qua CreditService');
+        $this->assertSame(['app/Services/CreditService.php'], $decrement, 'Mọi đường trừ credit phải đi qua CreditService');
     }
 }
 

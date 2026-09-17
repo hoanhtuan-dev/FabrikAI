@@ -52,18 +52,7 @@ const outputOpen = ref(false);
 const projectsOpen = ref(false);
 const promptPopupOpen = ref(false);  // popup độc lập cho Prompt Tạo Ảnh (ConceptCard)
 const stylistPopupOpen = ref(false); // popup độc lập cho Trợ lý Thiết kế (StylistCard)
-// PWA install prompt (beforeinstallprompt) — hiện nút cài đặt khi trình duyệt cho phép.
-const installPrompt = ref(null);
-const showInstall = ref(false);
-function onBeforeInstallPrompt(e) { e.preventDefault(); installPrompt.value = e; showInstall.value = true; }
-function onAppInstalled() { showInstall.value = false; installPrompt.value = null; }
-async function doInstall() {
-  if (!installPrompt.value) return;
-  installPrompt.value.prompt();
-  const choice = await installPrompt.value.userChoice;
-  if (choice && choice.outcome === 'accepted') showInstall.value = false;
-  installPrompt.value = null;
-}
+// [Đợt 0.6] Đã gỡ khối cài đặt PWA (hai nút "Cài đặt FabrikAI" + 4 hàm/ref liên quan) — Chốt Q4 bỏ PWA hoàn toàn.
 // Popup "Prompt Tạo Ảnh" (ConceptCard) mount GLOBAL ở cuối template (mọi viewport):
 // chỉ cần đồng bộ activity hiện tại + đóng drawer Outputs mobile cho gọn.
 watch(() => store.promptOpen, (v) => { if (v) { activeActivity.value = 'concept'; outputOpen.value = false; } });
@@ -81,8 +70,8 @@ function openApplyPopover() {
 }
 function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++; }); }
 function onBeforeUnload() { try { store.saveLayerLayout(); } catch (e) { /* bỏ qua */ } }
-onMounted(async () => { await store.load(); if (new URLSearchParams(window.location.search).get('view') === 'library') store.studioView = 'library'; activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'ref' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('keydown', onGlobalKey); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt); window.addEventListener('appinstalled', onAppInstalled); });
-onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); window.removeEventListener('resize', onCanvasResize); window.removeEventListener('beforeunload', onBeforeUnload); window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt); window.removeEventListener('appinstalled', onAppInstalled); });
+onMounted(async () => { await store.load(); if (new URLSearchParams(window.location.search).get('view') === 'library') store.studioView = 'library'; activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'ref' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('keydown', onGlobalKey); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); });
+onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); window.removeEventListener('resize', onCanvasResize); window.removeEventListener('beforeunload', onBeforeUnload); });
 // Palette bám ẢNH HIỆN TẠI (mọi nguồn: result/preview, ảnh tải lên, product, layer đang sửa…).
 watch(() => store.upscaleSrc, (url) => { store.loadPaletteFromImage(url); });
 // Template refs -> store: StudioApp owns the canvas DOM; the store needs the elements for crop geometry.
@@ -496,7 +485,7 @@ function onTouchEnd(e) {
           <button type="button" @click="store.unapplyProject()" class="shrink-0 text-brand-200/70 hover:text-white" aria-label="Ngắt dự án hiện tại"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
         </span>
         <span v-if="store.user" class="tool-btn hidden cursor-default md:inline-flex" title="Số credit còn lại"><StudioIcon name="coins" size="h-3.5 w-3.5" /> {{ store.creditsLeft }}</span>
-        <button v-if="showInstall" @click="doInstall" class="tool-btn is-active" title="Cài đặt FabrikAI — thêm vào màn hình chính"><StudioIcon name="download" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Cài đặt</span></button>
+        <!-- [Đợt 0.6] đã gỡ nút "Cài đặt FabrikAI" (PWA) — bỏ PWA hoàn toàn (Q4) -->
         <a v-if="store.user && store.user.is_admin" href="/settings" class="tool-btn" title="Cài đặt AI Models & API Keys"><StudioIcon name="gear" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Cài đặt</span></a>
         <button v-if="store.user" type="button" @click="logout" class="tool-btn" title="Đăng xuất khỏi tài khoản">Đăng xuất</button>
         <a v-else href="/dang-nhap?redirect=/" class="rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-amber-400">Đăng nhập</a>
@@ -506,16 +495,8 @@ function onTouchEnd(e) {
     <div v-if="store.flashMsg" class="pointer-events-none fixed left-1/2 bottom-5 z-[90] -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold shadow-2xl" :class="store.flashType === 'error' ? 'bg-red-600 text-white' : 'bg-ink-800 text-cream-100 border border-brand-500/40'">{{ store.flashMsg }}</div>
     <!-- ══ Thư viện (SPA view nhúng trong /studio — thay thế trang riêng /api/library) ══ -->
     <LibraryApp v-if="store.studioView === 'library'" embedded @back="store.studioView = 'studio'" />
-    <!-- Prompt cài đặt PWA (hiện khi trình duyệt báo beforeinstallprompt) -->
-    <div v-if="showInstall" class="fixed bottom-5 left-1/2 z-[95] flex -translate-x-1/2 items-center gap-3 rounded-lg border border-brand-500/40 bg-ink-900/95 px-4 py-3 shadow-2xl backdrop-blur">
-      <span class="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-5 w-5" /></span>
-      <div class="min-w-0 text-xs">
-        <p class="font-semibold text-cream-100">Cài đặt FabrikAI</p>
-        <p class="text-cream-300/60">Thêm vào màn hình chính để mở nhanh hơn</p>
-      </div>
-      <button @click="doInstall" class="shrink-0 rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-500">Cài đặt</button>
-      <button @click="showInstall = false" class="icon-btn !h-7 !w-7 shrink-0" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
-    </div>
+    <!-- [Đợt 0.6] Đã gỡ banner "Cài đặt FabrikAI" (PWA) — Chốt Q4 bỏ PWA hoàn toàn, nên không còn gì
+         để trình duyệt bật lời mời cài đặt (đã bỏ service worker lẫn manifest). -->
     <!-- Mobile top bar (chỉ ở view studio) -->
     <div v-if="store.studioView !== 'library'" class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
       <button @click="menuOpen = true" class="icon-btn !h-9 !w-9 border border-ink-700 md:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>

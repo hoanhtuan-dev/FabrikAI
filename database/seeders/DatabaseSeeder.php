@@ -19,6 +19,9 @@ class DatabaseSeeder extends Seeder
         //  được ghi khi người dùng lưu ở trang Cài đặt — seed sẵn chỉ tạo dữ liệu thừa.)
         $this->users();
 
+        // ── Gói cước (plans) — dữ liệu CẤU HÌNH, không phải demo ──
+        $this->call(PlanSeeder::class);
+
         // ── Nội dung CẤU HÌNH của app (không phải dữ liệu demo) ──
         // Preset thợ may / khuôn mặt / tư thế + thư viện Trợ lý thiết kế. Đây là thứ app cần để chạy,
         // không phải hàng mẫu, nên seed cả ở production.
