@@ -95,7 +95,7 @@
     "name": "useLocalCatalog"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DJs8XHVL.css",
+    "file": "assets/app-BnBCwjNr.css",
     "name": "app",
     "names": [
       "app.css"
@@ -118,7 +118,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-d8wBXO-y.js",
+    "file": "assets/main-BWKzTHJ6.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -130,6 +130,16 @@
     ],
     "css": [
       "assets/main-BAm4LXrd.css"
+    ]
+  },
+  "resources/js/studio/model-settings.js": {
+    "file": "assets/model-settings-CahdsQnq.js",
+    "name": "model-settings",
+    "src": "resources/js/studio/model-settings.js",
+    "isEntry": true,
+    "imports": [
+      "_pageBoot-CmsEgZ-F.js",
+      "_useLocalCatalog-BgZp4638.js"
     ]
   },
   "resources/js/studio/presets.js": {

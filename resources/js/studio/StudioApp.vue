@@ -542,6 +542,8 @@ function onTouchEnd(e) {
             <p class="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">Cài đặt của tôi</p>
             <a href="/presets" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="template" size="h-4 w-4" class="text-brand-400" /> Cài đặt Preset (Prompt Templates)</a>
             <a href="/stylist-data" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="shirt" size="h-4 w-4" class="text-brand-400" /> Dữ liệu Trợ lý thiết kế</a>
+            <a href="/model-settings?tab=model" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="user" size="h-4 w-4" class="text-brand-400" /> Khuôn mặt (model)</a>
+            <a href="/model-settings?tab=pose" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="pose" size="h-4 w-4" class="text-brand-400" /> Dáng pose (người mẫu)</a>
             <button type="button" @click="settingsOpen = false; goLibrary()" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="grid" size="h-4 w-4" class="text-brand-400" /> Thư viện &amp; ảnh của tôi</button>
             <template v-if="store.user && store.user.is_admin">
               <div class="my-1 border-t border-ink-700"></div>
@@ -739,6 +741,9 @@ function onTouchEnd(e) {
           <!-- [Yêu cầu 2026-09-17] Trên desktop là nút Cài đặt ở góc trái dưới; mobile phải có lối vào tương đương. -->
           <a href="/presets" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-[10px] font-semibold text-cream-300/70 transition-colors" title="Cài đặt — preset prompt của bạn">
             <StudioIcon name="gear" size="h-4 w-4" /> Cài đặt
+          </a>
+          <a href="/model-settings" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-[10px] font-semibold text-cream-300/70 transition-colors" title="Cài đặt — khuôn mặt & dáng pose của bạn">
+            <StudioIcon name="user" size="h-4 w-4" /> Mặt &amp; dáng
           </a>
         </div>
         <div class="space-y-3"><component :is="c" v-for="(c,i) in panel" :key="i" /></div>

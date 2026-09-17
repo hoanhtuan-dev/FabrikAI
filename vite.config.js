@@ -16,6 +16,8 @@ export default defineConfig({
                 'resources/js/studio/settings.js',
                 'resources/js/studio/presets.js',
                 'resources/js/studio/stylist-data.js',
+                // [Yêu cầu 2026-09-17] Trang cài đặt Khuôn mặt (model) + Dáng pose (người mẫu), cấp USER.
+                'resources/js/studio/model-settings.js',
                 'resources/js/studio/admin.js',
             ],
             refresh: true,
