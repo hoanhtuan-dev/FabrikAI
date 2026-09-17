@@ -16,12 +16,13 @@
 >   Đọc để tra cứu; **KHÔNG trích số trực tiếp** (cả 3 đã lệch neo ít nhất một lần, có file tự mâu thuẫn).
 > - Mở **mỗi vòng** bằng `bash scripts/measure.sh` rồi dán output vào đây.
 
-**Neo đo 2026-09-17 (commit `93dfd86` — chạy `scripts/measure.sh`):**
-`HEAD 93dfd86` · **50 commit** · **127 route** · **309 test / 1.629 assertion XANH · 35 file test** ·
-PHP `app/` **47 file / 13.839 dòng** · `app/Services` 11 · `app/Models` 17 · migrations 27 ·
-JS/Vue studio **42 file (33 .vue) / 12.828 dòng** · `public_html` **21 MB** ·
-**production `fabrikai.shop` ĐANG CHẠY** (MySQL, 25 bảng).
-Điểm nóng monolith: `StudioController.php` **4.643** · `store.js` **3.987** · `helpers.php` **1.610**.
+**Neo đo 2026-09-17 15:53 (commit `436675d` — chạy `scripts/measure.sh`):**
+`HEAD 436675d` · **99 commit** · **148 route** · **471 test / 2.518 assertion XANH · 53 file test** ·
+PHP `app/` **58 file / 15.658 dòng** · `app/Services` 14 · `app/Models` 20 · migrations 35 ·
+JS/Vue studio **51 file (38 .vue) / 14.239 dòng** · `public_html` **21 MB** ·
+**production `fabrikai.shop` ĐANG CHẠY** (MySQL, 29 bảng · đang chạy commit `436675d`).
+Điểm nóng monolith: `StudioController.php` **4.805** · `store.js` **4.044** · `helpers.php` **1.718**.
+*(Neo trước `93dfd86`: 127 route · 309 test — giữ lại để đối chiếu lịch sử.)*
 
 ### Tiến độ THỰC THI kế hoạch nâng cấp (STUDIO_REVIEW_PLAN.md)
 
@@ -55,7 +56,7 @@ JS/Vue studio **42 file (33 .vue) / 12.828 dòng** · `public_html` **21 MB** ·
 | Phát hiện | Trạng thái | Commit | Ghi chú |
 |---|---|---|---|
 | `/admin` là console Owner nhưng KHÔNG middleware — khách 200 · customer 200 | ✅ ĐÃ VÁ | `3acf968` | nay `['auth','admin','nostore']`; `AdminConsoleAccessTest` (3 test) khoá bất biến |
-| Việc song song (gói cước · sổ cái credit · quản trị user) | ✅ ĐÃ ĐỐI CHIẾU | (commit riêng) | 21 test (4+6+11) chạy xanh; **mutation-test lại**: bỏ guard tự-hạ-quyền ⇒ RED ⇒ test thật sự bắt lỗi. Hạ tầng (`Plan`·`CreditTransaction`·`PlanService`·`CreditService`·`AdminController`·`AdminApp.vue`·`admin.js`) đã có sẵn và nhất quán (vite input · manifest · blade · route) |
+| Việc song song (gói cước · sổ cái credit · quản trị user) | ✅ ĐÃ ĐỐI CHIẾU | `0afec4e` + `10d142b` + `adc2700` | 21 test (4+6+11) chạy xanh; **mutation-test lại**: bỏ guard tự-hạ-quyền ⇒ RED ⇒ test thật sự bắt lỗi. Hạ tầng (`Plan`·`CreditTransaction`·`PlanService`·`CreditService`·`AdminController`·`AdminApp.vue`·`admin.js`) đã có sẵn và nhất quán (vite input · manifest · blade · route). ➜ **Chi tiết đầy đủ (gồm tự-đăng-ký-gói `436675d` + deploy production) ở mục "GÓI CƯỚC · SỔ CÁI CREDIT · QUẢN TRỊ OWNER" bên dưới** |
 | Build CSS **KHÔNG TẤT ĐỊNH** — chạy test xong build ra hash khác bản đã commit | ✅ ĐÃ VÁ | `32ba8ac` | `app.css` quét `storage/framework/views/*.php` (view ĐÃ BIÊN DỊCH); test Đợt 1.5 render `mail::message` ⇒ Tailwind nhặt thêm class mail (`.break-all`) ⇒ hash đổi. Đã gỡ dòng đó; `view:clear` + build ⇒ ra **đúng hash đã commit**, và build lại SAU khi chạy test vẫn không đổi. `BuildDeterminismTest` khoá bất biến |
 | **Deploy production** `eee1bba` → `c4afbf8` | ✅ ĐÃ LÊN | — | Sao lưu DB trước (`~/fabrikai-db-backup-20260917-064320.sql`, 26 bảng) → pull → `dump-autoload` (BẮT BUỘC vì có class mới) → `package:discover` tay (`proc_open` bị chặn) → **7 migration** → cache → `queue:restart`. Verify: `/` `/dang-nhap` `/settings` `/presets` `/stylist-data` `/up` = 200 · khách `/admin` = **302 → /dang-nhap** · admin `/admin` = **200** · `jobs=0 failed=0` · log sạch · DB 29 bảng |
 | **Quyết định người dùng 2026-09-17**: `/settings` → cấp OWNER · `/presets` + `/stylist-data` → cấp USER + lưu CỤC BỘ trên máy khách | ✅ XONG | `76c6139` | `/settings` = `auth+admin`; 2 trang kia = `auth+can-studio`. Bản tùy chỉnh lưu `localStorage` **theo từng userId** (`useLocalCatalog.js`: custom/edits/hidden); bảng toàn cục chỉ còn là giá trị mặc định; admin giữ thêm chế độ “Bản dùng chung” nên không mất khả năng sửa catalog toàn cục. `UserCatalogTest` (10 test) + `scripts/check-local-catalog.mjs` (23 phép kiểm Node, nối vào suite vì repo không có JS test runner) |
@@ -77,6 +78,23 @@ JS/Vue studio **42 file (33 .vue) / 12.828 dòng** · `public_html` **21 MB** ·
 | — | **Cài đặt KHUÔN MẶT (model) + DÁNG POSE (người mẫu)** — cấp USER | ✅ XONG | `dc58604` + `a666f18` | `studio_assets` thêm `user_id` (NULL = catalog dùng chung có từ trước). Người dùng thêm mặt/dáng **của mình** (chỉ họ thấy), **owner thấy & xoá tất cả**; 2 route `/api/assets` chuyển sang nhóm STUDIO. Trang `/model-settings` (2 tab) + 2 mục trong menu Cài đặt. `UserModelSettingsTest` (10 test) + mutation-test RED |
 
 > ⚠️ **Vì sao mặt/dáng lưu ở SERVER, không như `/presets` · `/stylist-data` (localStorage):** khi tạo ảnh, studio gửi **id** của mặt/dáng lên và backend phải tra ra ảnh tham chiếu (`VirtualTryOnService::pickModel/pickPose`). Id chỉ nằm trong localStorage thì backend **không tra được** ⇒ tính năng vô hiệu. Test `own_asset_resolves_at_generation_time` khoá đúng điều này.
+
+### GÓI CƯỚC · SỔ CÁI CREDIT · QUẢN TRỊ OWNER · TỰ ĐĂNG KÝ GÓI (2026-09-18) — mở khoá PLAN Đợt 3 mục (2)
+
+> Việc này chạy **SONG SONG** với các đợt 0–1 ở trên (dòng "Việc song song" ở bảng XÁC MINH CHÉO bên dưới).
+> Nguồn số: `scripts/measure.sh` @ `436675d` — **471 test / 2.518 assertion XANH · 148 route**.
+
+| # | Việc | Trạng thái | Commit | Ghi chú |
+|---|---|---|---|---|
+| — | **Sổ cái credit** (`credit_transactions`) — mọi biến động `credits_balance` ghi đúng MỘT dòng (amount có dấu · `balance_after` · reference · `admin_id`) | ✅ XONG | `10d142b` | `CreditService::mutate/record/apply` là **điểm DUY NHẤT** còn giữ literal `increment/decrement(credits_balance)`. Đường TRỪ (`StudioController::queueGeneration`) và đường HOÀN (`helpers.php::studio_finalize_generation`) nay **uỷ quyền về đây** ⇒ bất biến "một đường credit" siết chặt hơn; `CreditRefundSafetyTest::test_only_one_credit_mutation_path_exists_in_app` đã cập nhật theo (đỏ nếu có file thứ hai mutate). 4 test `CreditLedgerTest` |
+| — | **Gói cước** (`plans`) + `users.plan_id` / `plan_expires_at` | ✅ XONG | `10d142b` | Bảng `plans` (giá VNĐ · credit/tháng · bonus · trần phân giải · `features` JSON · `is_default` · thứ tự). `PlanService::assign()` là đường **DUY NHẤT** đổi gói: đặt hạn N tháng · tặng bonus **MỘT LẦN** khi lần đầu chuyển gói · ghi sổ cái. Đăng ký mới tự gán gói mặc định + ghi dòng `signup` (`AuthController::assignDefaultPlan`) |
+| — | **4 gói VNĐ** seed sẵn | ✅ XONG | `10d142b` (seeder) · đã chạy trên **cả dev và production** | Miễn phí (0₫ · mặc định · 100 credit dùng thử khi đăng ký) · Khởi nghiệp 199.000₫/120cr (+30) · Chuyên nghiệp 499.000₫/350cr (+100) · Studio 1.490.000₫/1.200cr (+400). Biên gộp ≥60% ở mô hình Qwen base — luận cứ + bảng chi phí gốc ở `PRICING.md` |
+| — | **Trang quản trị Owner** `/admin` (SPA Vue) | ✅ XONG | `0afec4e` | `AdminController` (391 dòng) + `AdminApp.vue` (604) + `admin.js` + `admin.blade.php`: 4 tab **Tổng quan · Người dùng · Gói cước · Sổ credit**. Phân quyền 2 tầng: dashboard/plans/ledger = `admin`; CRUD tài khoản = `superadmin` (+ `UserPolicy`). Chặn **tự hạ quyền / tự khoá chính mình**; modal `role=dialog` + Esc; xoá có bước xác nhận. 11 test `AdminUsersTest` + 6 test `PlanManagementTest` + mutation-test (bỏ guard tự-hạ-quyền ⇒ RED). Sau đó thêm tab **🎨 Giao diện** (`305392e`, việc song song) |
+| — | **Người dùng TỰ đăng ký gói** (self-service) | ✅ XONG | `436675d` | `BillingController`: `GET /api/billing/plans` (công khai — cho trang giá) + `POST /api/billing/subscribe` (`auth`+`can-studio`) → `PlanService::assign`. 6 test `BillingSubscribeTest`. ⚠️ **CHƯA có cổng thanh toán VNĐ** — đăng ký gói trả phí hiện = kích hoạt gói; thu tiền (VNPay/MoMo/chuyển khoản) là bước sau, đã ghi ở `PRICING.md` §4 |
+| — | **Chiến lược giá VNĐ** | ✅ XONG | `adc2700` | `PRICING.md`: chi phí gốc Qwen (base/2512 ≈500₫/ảnh 1K · edit ≈750₫ · Max ≈1.800₫) vs giá bán · đối thủ (Shopee AI miễn phí ⇒ moat phải là workflow/tiếng Việt/giá VNĐ) · đơn vị kinh tế · gói nạp thêm · lộ trình 4 giai đoạn. Nguồn: qwencloud.com/models + bảng giá Model Studio (Alibaba) |
+| — | **Deploy production** (đưa tới `436675d`) | ✅ ĐÃ LÊN | — | `git pull --ff-only` → `dump-autoload` (**BỊ CHẶN `proc_open` trên Hostinger** — PSR-4 vẫn nạp được `BillingController`, đã verify `class_exists` = true) → `package:discover` tay → `db:seed --class=PlanSeeder --force` → `config:cache` + `route:cache` + `view:cache` → `queue:restart`. **Không có migration mới** (tính năng billing dùng bảng `plans` sẵn có ⇒ rủi ro schema = 0). Verify: `/` `/dang-nhap` `/up` = **200** · khách `/admin` = **302** · `/api/billing/plans` = **200 (đủ 4 gói)** · `plans` = 4 · log **không có ERROR/CRITICAL mới** |
+
+> ⚠️ **Nợ còn lại của mảng này:** (a) chưa có cổng thanh toán VNĐ (đăng ký gói = kích hoạt, không thu tiền); (b) gia hạn tự động theo chu kỳ chưa có (hạn đặt tay lúc gán gói); (c) gói chưa phân hoá trọng số credit theo model (cột `image_credit_cost`/`video_credit_cost` đã có sẵn trong `plans` nhưng pipeline còn đọc `config/studio.php`).
 
 > 🛑 **BẢNG DƯỚI ĐÂY LÀ ẢNH CHỤP 2026-09-16 — ĐÃ SAI HOÀN TOÀN, CHỈ GIỮ ĐỂ ĐỐI CHIẾU LỊCH SỬ.**
 > Nó nói *"KHÔNG có `.git`"*, *"KHÔNG có `tests/`"*, *"chưa có deploy"* — cả ba đều **SAI** kể từ 2026-09-17.
