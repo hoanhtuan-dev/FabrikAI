@@ -19,6 +19,18 @@ class RefCardSplitTest extends TestCase
         return (string) file_get_contents(resource_path('js/studio/'.$rel));
     }
 
+    /** Chỉ phần KHAI BÁO mục thanh công cụ (bỏ comment giải thích xung quanh). */
+    private function nav(): string
+    {
+        $app = $this->src('StudioApp.vue');
+        $start = strpos($app, 'const activityNav');
+        $end = strpos($app, '];', (int) $start);
+        $block = substr($app, (int) $start, (int) $end - (int) $start);
+
+        // Bỏ comment `//` (kể cả comment nằm TRONG mảng): ghi chú được phép nhắc tên nhóm đã xoá.
+        return (string) preg_replace('#//[^\n]*#', '', $block);
+    }
+
     public function test_two_separate_card_components_exist(): void
     {
         $this->assertFileExists(resource_path('js/studio/components/VariationCard.vue'));
@@ -28,14 +40,60 @@ class RefCardSplitTest extends TestCase
         $this->assertStringContainsString('variant="tryon"', $this->src('components/TryOnCard.vue'));
     }
 
-    public function test_both_cards_are_registered_in_the_fitting_room_panel(): void
+    public function test_each_card_is_its_own_activity_item(): void
     {
         $app = $this->src('StudioApp.vue');
 
-        $this->assertStringContainsString('cards: [VariationCard, TryOnCard]', $app,
-            'Panel phải đăng ký CẢ HAI card riêng, không gộp lại thành 1 card 2 chip.');
+        // CHỈ soi mảng activityNav — comment giải thích được phép NHẮC tới tên nhóm đã xoá
+        // (chính file này ghi lại lý do), soi cả file sẽ bắt oan ghi chú.
+        $nav = $this->nav();
+
+        // [Yêu cầu 2026-09-17] Nhóm "Fitting Room" bị XOÁ: mỗi card nay là MỘT MỤC RIÊNG trên
+        // thanh công cụ, có panel và icon của chính nó.
+        $this->assertStringNotContainsString('Fitting Room', $nav,
+            'Nhóm "Fitting Room" phải bị xoá khỏi activityNav.');
+        $this->assertStringNotContainsString("id: 'ref'", $nav, 'Activity id \'ref\' phải bị xoá.');
+
+        $this->assertStringContainsString(
+            "{ id: 'variation', icon: 'variations', label: 'Tạo biến thể ảnh', cards: [VariationCard] }",
+            $nav,
+            'Phải có MỤC RIÊNG "Tạo biến thể ảnh" với icon chuẩn ngành variations.'
+        );
+        $this->assertStringContainsString(
+            "{ id: 'tryon', icon: 'hanger', label: 'Mặc thử đồ', cards: [TryOnCard] }",
+            $nav,
+            'Phải có MỤC RIÊNG "Mặc thử đồ" với icon móc treo.'
+        );
+
         $this->assertStringContainsString("import VariationCard from './components/VariationCard.vue'", $app);
         $this->assertStringContainsString("import TryOnCard from './components/TryOnCard.vue'", $app);
+    }
+
+    public function test_no_activity_points_at_a_removed_id(): void
+    {
+        // Bẫy thật đã gặp: xoá activity 'ref' nhưng còn chỗ gán activeActivity = 'ref' ⇒ panel
+        // rơi về mục đầu và người dùng mất ngữ cảnh. Bất biến: mọi id gán phải CÒN tồn tại.
+        $app = $this->src('StudioApp.vue');
+
+        preg_match_all("/id: '([A-Za-z0-9_\\-]+)'/u", $app, $m);
+        $ids = $m[1] ?? [];
+        $this->assertContains('variation', $ids, 'Thiếu activity id \'variation\'.');
+        $this->assertContains('tryon', $ids, 'Thiếu activity id \'tryon\'.');
+
+        // Quét MỌI câu gán vào activeActivity rồi lấy các literal trong đó. Bản trước chỉ khớp
+        // đúng một biểu thức ternary với [a-z]+ nên id chứa '_' (vd 'ref_da_xoa') LỌT — mutation-test
+        // phát hiện. Nay quét theo CÂU LỆNH nên không phụ thuộc hình dạng biểu thức.
+        preg_match_all('/activeActivity\.value\s*=\s*([^;]+);/', $app, $stmts);
+        $used = [];
+        foreach ($stmts[1] ?? [] as $stmt) {
+            preg_match_all("/'([A-Za-z0-9_\\-]+)'/", (string) $stmt, $mm);
+            $used = array_merge($used, $mm[1] ?? []);
+        }
+
+        $this->assertNotEmpty($used, 'Không tìm thấy câu gán activeActivity nào — guard sẽ vô hiệu.');
+        foreach (array_unique($used) as $id) {
+            $this->assertContains($id, $ids, "activeActivity gán id '{$id}' nhưng id đó không tồn tại trong activityNav.");
+        }
     }
 
     public function test_mode_chips_are_gone(): void

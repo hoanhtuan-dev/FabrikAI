@@ -39,8 +39,10 @@ async function logout() {
 // Activity bar (VSCode-style): mỗi icon mở 1 nhóm card trong sidebar.
 const activityNav = [
   { id: 'concept', icon: 'sparkles', label: 'Tạo ảnh', cards: [SuggestCard] },
-  // 2 card riêng: "Tạo biến thể ảnh" + "Mặc thử đồ" (trước gộp trong 1 card 2 chip).
-  { id: 'ref', icon: 'hanger', label: 'Fitting Room', cards: [VariationCard, TryOnCard] },
+  // [Yêu cầu 2026-09-17] XOÁ nhóm "Fitting Room": 2 card nay là 2 MỤC RIÊNG trên thanh công cụ,
+  // mỗi mục có panel + tiêu đề + icon chuẩn ngành của chính nó (trước đây chung 1 nhóm).
+  { id: 'variation', icon: 'variations', label: 'Tạo biến thể ảnh', cards: [VariationCard] },
+  { id: 'tryon', icon: 'hanger', label: 'Mặc thử đồ', cards: [TryOnCard] },
   { id: 'inpaint', icon: 'pencil', label: 'Sửa ảnh', cards: [InpaintCard] },
   { id: 'compose', icon: 'layers', label: 'Ghép ảnh', cards: [ComposeCard] },
   { id: 'upscale', icon: 'maximize', label: 'Upscale', cards: [UpscaleCard] },
@@ -82,7 +84,7 @@ function openApplyPopover() {
 }
 function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++; }); }
 function onBeforeUnload() { try { store.saveLayerLayout(); } catch (e) { /* bỏ qua */ } }
-onMounted(async () => { await store.load(); if (new URLSearchParams(window.location.search).get('view') === 'library') store.studioView = 'library'; activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'ref' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('keydown', onGlobalKey); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); });
+onMounted(async () => { await store.load(); if (new URLSearchParams(window.location.search).get('view') === 'library') store.studioView = 'library'; activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'variation' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('keydown', onGlobalKey); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); });
 onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); window.removeEventListener('resize', onCanvasResize); window.removeEventListener('beforeunload', onBeforeUnload); });
 // Palette bám ẢNH HIỆN TẠI (mọi nguồn: result/preview, ảnh tải lên, product, layer đang sửa…).
 watch(() => store.upscaleSrc, (url) => { store.loadPaletteFromImage(url); });
