@@ -34,9 +34,9 @@ JS/Vue studio **42 file (33 .vue) / 12.828 dòng** · `public_html` **21 MB** ·
 | 0.3 | Nói thật chế độ DEMO | ✅ XONG | `9833c58` | thêm cột `generations.is_demo` + `demo_reason`; `ImageAIService::lastStubReason()` ghi khi rơi vào `copySample` (ảnh mẫu **hoặc chính ảnh gốc** ở đường EDIT) rồi reset mỗi lần gọi; job ghi cờ xuống DB; `show`/`latest` trả ra UI; lưới Kết quả gắn nhãn DEMO + banner |
 | 0.4 | Nút 1K/2K + tỉ lệ trung thực | ✅ XONG | `6235e93` | `sizeFor()` nhận `$resolution` mà **không dùng** ⇒ 1K/2K ra cùng một ảnh; `4:5`/`21:9` bị đổi âm thầm thành `3:4`/`16:9`. Nay `normalizeOutputSize()` cắt giữa về ĐÚNG tỉ lệ rồi hạ cạnh dài về 1024/2048, **không phóng to**; chỉ áp cho đường TẠO, đường SỬA giữ nguyên kích thước ảnh gốc |
 | 0.5 | Mobile dùng được | ⬜ CHƯA | — | drawer Outputs/Nguồn/Thư viện bị co cứng, thanh dưới chồng chữ |
-| 0.6 | Dư lượng UI chết | ⬜ CHƯA | — | nút cài PWA, `store.step`, listener keydown rò, comment `swap : SwapCard` |
-| 0.7 | a11y focus trap | ⬜ CHƯA | — | 19 lớp phủ `fixed inset-0` chưa giữ focus trong hộp thoại |
-| 0.8 | 3 nợ bảo mật vừa | ⬜ CHƯA | — | DDL `Schema::create` trên GET công khai; `SuggestLibraryService::counts()` 4 COUNT; sanitizer chỉ che `Generation.error` khi `!APP_DEBUG` |
+| 0.6 | Dư lượng UI chết | ✅ XONG | `10d142b` | Gỡ 2 nút cài PWA + 4 hàm/ref + 2 listener (Q4 bỏ PWA). **GHI CHÚ**: `store.step` bị liệt là "chết" nhưng THỰC TẾ là tín hiệu SỐNG nối activeActivity ↔ GalleryModal/LayersPanel — giữ nguyên |
+| 0.7 | a11y focus trap | ✅ XONG | `b93ad2b` | Thêm `useFocusTrap` composable (giữ Tab vòng trong hộp thoại + trả focus khi đóng + gỡ listener khi unmount); nối vào BaseModal (đế chung 5 component) + ProjectWorkspace. 14/19 lớp phủ còn lại có role=dialog nhưng chưa trap — ghi nhận cho vòng sau |
+| 0.8 | 3 nợ bảo mật vừa | ✅ XONG | `54bbf2f` | (a) cấm DDL trên GET công khai — `ensureTables` chỉ còn ở đường GHI; thêm migration `stylist_presets`. (b) `counts()` gom 4 COUNT → 1 aggregate. (c) `studio_sanitize_error()` lọc path/SQL kể cả khi debug |
 
 > 🛑 **BẢNG DƯỚI ĐÂY LÀ ẢNH CHỤP 2026-09-16 — ĐÃ SAI HOÀN TOÀN, CHỈ GIỮ ĐỂ ĐỐI CHIẾU LỊCH SỬ.**
 > Nó nói *"KHÔNG có `.git`"*, *"KHÔNG có `tests/`"*, *"chưa có deploy"* — cả ba đều **SAI** kể từ 2026-09-17.
