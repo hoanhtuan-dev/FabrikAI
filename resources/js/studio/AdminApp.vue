@@ -309,18 +309,63 @@ function toggleGrant(slug, id) {
   moduleDirty.value = true;
 }
 async function savePlanModules(plan) {
-  const ok = await run(
-    () => api('/plans/' + plan.id + '/modules', 'PUT', { modules: planModules.value[plan.slug] || [] }),
-    'Đã lưu module cho gói ' + plan.name,
+  const next = (planModules.value[plan.slug] || []).slice();
+  confirmRevokeIfNeeded(plan, next, 'Kiểm tra lại danh sách rồi bấm Lưu nếu vẫn đúng.', async () => {
+    const ok = await run(
+      () => api('/plans/' + plan.id + '/modules', 'PUT', { modules: next }),
+      'Đã lưu module cho gói ' + plan.name,
+    );
+    if (ok) loadModules();
+  });
+}
+/**
+ * [Modules] Thay đổi quyền của gói là thay đổi TRẢI NGHIỆM của mọi người dùng gói đó ⇒ nếu gói đang có
+ * người dùng mà lại RÚT tính năng thì phải xác nhận kèm ẢNH HƯỞNG cụ thể (bao nhiêu người · rút gì).
+ * Đây là bài học từ chính lần chủ dự án bấm «Áp đề xuất»: thao tác đúng chức năng nhưng không nói trước
+ * hậu quả.
+ */
+function moduleNamesOf(ids) {
+  return ids.map((id) => (modulesData.value.modules.find((m) => m.id === id) || {}).name || id);
+}
+function confirmRevokeIfNeeded(plan, nextIds, message, after) {
+  const removed = (planModules.value[plan.slug] || []).filter((id) => !nextIds.includes(id));
+  const users = Number(plan.users_count || 0);
+  if (!removed.length || !users) { after(); return; }
+  askConfirm(
+    'Rút tính năng khỏi gói ' + plan.name + '?',
+    'Gói này đang có ' + users + ' người dùng. Thao tác sẽ RÚT ' + removed.length + ' tính năng: '
+      + moduleNamesOf(removed).join(' · ') + '. '
+      + 'Người dùng gói này sẽ thấy ổ khoá và được mời nâng cấp ngay khi tính năng bị rút. '
+      + message,
+    'Rút và lưu',
+    after,
   );
-  if (ok) loadModules();
 }
 async function applySuggested(plan) {
-  const ok = await run(
-    () => api('/plans/' + plan.id + '/modules/suggested', 'POST', {}),
-    'Đã áp đề xuất cho gói ' + plan.name,
+  const suggested = (plan.suggested || []).slice();
+  confirmRevokeIfNeeded(plan, suggested, 'Bạn có thể bấm «Cấp tất cả» nếu muốn giữ nguyên quyền cũ.', async () => {
+    const ok = await run(
+      () => api('/plans/' + plan.id + '/modules/suggested', 'POST', {}),
+      'Đã áp đề xuất cho gói ' + plan.name,
+    );
+    if (ok) loadModules();
+  });
+}
+/** [Modules] Cấp LẠI toàn bộ tính năng cho gói — đường khôi phục 1 cú bấm nếu lỡ rút nhầm. */
+async function grantAllModules(plan) {
+  askConfirm(
+    'Cấp tất cả tính năng cho gói ' + plan.name + '?',
+    'Gói này sẽ cấp đủ ' + modulesData.value.total_modules + ' tính năng đang mở. '
+      + (Number(plan.users_count || 0) ? Number(plan.users_count) + ' người dùng của gói sẽ dùng được ngay.' : 'Gói hiện chưa có người dùng nào.'),
+    'Cấp tất cả',
+    async () => {
+      const ok = await run(
+        () => api('/plans/' + plan.id + '/modules', 'PUT', { modules: (modulesData.value.modules || []).map((m) => m.id) }),
+        'Đã cấp toàn bộ tính năng cho gói ' + plan.name,
+      );
+      if (ok) loadModules();
+    },
   );
-  if (ok) loadModules();
 }
 const moduleKindMeta = (k) => ({
   panel: { label: 'Nhóm card', cls: 'bg-brand-600/25 text-brand-100' },
@@ -1412,9 +1457,17 @@ onMounted(async () => {
                           :title="'Đề xuất chưa cấp: ' + (p.missing_suggested || []).join(', ')">
                       thiếu {{ p.missing_suggested.length }} so với đề xuất
                     </span>
+                    <!-- Số người dùng: rút tính năng là đổi trải nghiệm của từng ấy người ⇒ hiện ngay tại đây. -->
+                    <span :class="[BADGE, p.users_count ? BADGE_TONE.info : BADGE_TONE.neutral]"
+                          :title="p.users_count ? 'Số người dùng đang ở gói này (sẽ thấy ổ khoá nếu bị rút tính năng)' : 'Chưa có người dùng nào ở gói này'">
+                      <StudioIcon name="users" size="h-3 w-3" /> {{ p.users_count || 0 }} người dùng
+                    </span>
                     <div class="ml-auto flex gap-1.5">
-                      <button class="tool-btn !py-1 text-[10px]" title="Áp đề xuất từ bản khai module" @click="applySuggested(p)">
+                      <button class="tool-btn !py-1 text-[10px]" title="Áp đề xuất từ bản khai module (hỏi xác nhận kèm ảnh hưởng nếu gói đang có người dùng)" @click="applySuggested(p)">
                         <StudioIcon name="sparkles" size="h-3 w-3" /> Áp đề xuất
+                      </button>
+                      <button class="tool-btn !py-1 text-[10px]" title="Cấp lại TOÀN BỘ tính năng đang mở cho gói này (khôi phục nếu lỡ rút nhầm)" @click="grantAllModules(p)">
+                        <StudioIcon name="selectAll" size="h-3 w-3" /> Cấp tất cả
                       </button>
                       <button class="btn-brand btn-sm" @click="savePlanModules(p)">Lưu</button>
                     </div>

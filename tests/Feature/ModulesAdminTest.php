@@ -241,6 +241,29 @@ class ModulesAdminTest extends TestCase
         $plan->forceFill(['modules' => $before, 'features' => []])->save();
     }
 
+    public function test_changing_entitlements_reports_impact_for_confirmation(): void
+    {
+        // Bài học từ chính lần chủ dự án bấm «Áp đề xuất»: thao tác đúng chức năng nhưng giao diện không nói
+        // trước hậu quả. Nay màn Quản trị phải biết SỐ NGƯỜI DÙNG của từng gói để hỏi xác nhận kèm ảnh hưởng.
+        $u = $this->customer();
+        app(PlanService::class)->assign($u, $this->plan('pro'));
+
+        $res = $this->actingAs($this->superAdmin())->getJson('/api/admin/modules')->assertOk();
+        $pro = collect($res->json('plans'))->firstWhere('slug', 'pro');
+        $this->assertSame(1, $pro['users_count'], 'Phải trả số người dùng của gói để tính ảnh hưởng.');
+        $free = collect($res->json('plans'))->firstWhere('slug', 'free');
+        $this->assertSame(0, $free['users_count']);
+
+        // Giao diện: có hàm xác nhận ảnh hưởng + nút khôi phục 1 cú bấm, và đều gọi đúng API.
+        $admin = (string) file_get_contents(resource_path('js/studio/AdminApp.vue'));
+        $this->assertStringContainsString('function confirmRevokeIfNeeded(', $admin, 'Thiếu bước xác nhận ảnh hưởng.');
+        $this->assertStringContainsString('sẽ RÚT', $admin, 'Câu xác nhận phải nói rõ SẼ RÚT tính năng.');
+        $this->assertStringContainsString('người dùng. Thao tác sẽ', $admin, 'Câu xác nhận phải nêu số người dùng bị ảnh hưởng.');
+        $this->assertStringContainsString('async function grantAllModules(', $admin, 'Thiếu đường khôi phục 1 cú bấm.');
+        $this->assertStringContainsString('Cấp tất cả', $admin);
+        $this->assertStringContainsString('askConfirm(', $admin, 'Phải dùng hộp xác nhận chuẩn của trang Quản trị.');
+    }
+
     public function test_admin_and_studio_surfaces_are_wired_to_the_registry(): void
     {
         // Chống "tính năng chết": API có mà giao diện không gọi thì chủ dự án không dùng được công tắc.

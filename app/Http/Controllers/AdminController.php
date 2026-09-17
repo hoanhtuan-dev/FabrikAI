@@ -513,6 +513,9 @@ class AdminController extends Controller
                     'is_active' => (bool) $p->is_active,
                     'modules' => $own,
                     'modules_count' => $p->modulesCount(),
+                    // Số NGƯỜI DÙNG của gói: đổi quyền là đổi trải nghiệm của từng ấy người ⇒ cần cho
+                    // bước xác nhận ảnh hưởng trước khi rút tính năng.
+                    'users_count' => (int) $p->users()->count(),
                     'suggested' => $suggested,
                     // Đề xuất mà gói CHƯA cấp (gồm module mới thêm) — Quản trị hiện "thiếu N" + 1 nút áp.
                     'missing_suggested' => array_values(array_diff($suggested, $own)),
