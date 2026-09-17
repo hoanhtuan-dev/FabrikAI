@@ -59,7 +59,7 @@ class ImageAIService
 
     protected function provider(): string
     {
-        return (string) studio_config('image_provider', 'flux');
+        return (string) studio_config('image_provider', 'qwen');
     }
 
     protected function providerKey(): ?string
@@ -215,30 +215,68 @@ class ImageAIService
             return $this->tryDashscope($prompt, $model, $key, $resolution, $ratio, $faceRef, $negativePrompt, $seed);
         }
 
-        // User-declared custom provider routes (Settings → Custom Providers) — the profile
-        // carries its own protocol + base URL + auth style. Built-ins never reach this branch,
-        // so existing routing is untouched.
-        $custom = function_exists('studio_custom_provider') ? studio_custom_provider($provider) : null;
-        if ($custom) {
-            return $this->tryCustomProvider($prompt, $model, $custom);
+        // Fal.ai — Flux: the FALLBACK tier of the provider priority flow (qwen → custom →
+        // flux → gemini). Wired through the public queue.fal.run API (submit + poll + result).
+        if ($provider === 'fal') {
+            return $this->tryFal($prompt, $model, $key, $resolution, $ratio);
         }
 
-        // 'fal' / 'replicate' are not wired into this service (no Fal client), so skip them.
+        // User-declared custom provider routes (Settings → Custom Providers) — the profile
+        // carries its own protocol + base URL + auth style. Built-ins never reach this branch,
+        // so existing routing is untouched. openai-protocol routes generate images through
+        // the OpenAI Images API (/images/generations) — e.g. CKEY (api.xah.io/v1) qwen-image.
+        $custom = function_exists('studio_custom_provider') ? studio_custom_provider($provider) : null;
+        if ($custom) {
+            return $this->tryCustomProvider($prompt, $model, $custom, $resolution, $ratio);
+        }
+
+        // 'replicate' has a bespoke transport — declare it as a custom provider route instead.
         return null;
     }
 
     /**
-     * Generate through one user-declared custom provider profile. Supports the two
-     * image-capable wire protocols: dashscope (multimodal generation) and gemini
-     * (generateContent). openai-protocol routes are chat-only and cannot return
-     * images, so they are skipped for generation (still valid for text/inference).
+     * Generate through one user-declared custom provider profile. All three wire
+     * protocols can return images now:
+     *   - openai:    POST {base}/images/generations (OpenAI Images API) — how CKEY
+     *                (https://ckey.vn/docs · api.xah.io/v1) serves qwen-image models;
+     *   - dashscope: multimodal generation (unchanged);
+     *   - gemini:    generateContent (unchanged).
      */
-    protected function tryCustomProvider(string $prompt, string $model, array $provider): ?string
+    protected function tryCustomProvider(string $prompt, string $model, array $provider, ?string $resolution = null, ?string $ratio = null): ?string
     {
-        if (! in_array($provider['protocol'] ?? '', ['dashscope', 'gemini'], true)) {
+        $protocol = (string) ($provider['protocol'] ?? 'openai');
+
+        if (! in_array($protocol, ['openai', 'dashscope', 'gemini'], true)) {
             return null;
         }
 
+        // ── openai: OpenAI Images API route (CKEY / mọi gateway [OI]-compatible) ──
+        if ($protocol === 'openai') {
+            $size = $resolution ? $this->falSizeFor($resolution, $ratio) : null;
+            $body = studio_custom_provider_image_call($provider, $model, $prompt, array_filter([
+                'size' => $size,
+            ]));
+            if (! is_array($body)) {
+                return null;
+            }
+
+            $url = (string) (data_get($body, 'data.0.url') ?: data_get($body, 'data.0.b64_json') ?: '');
+            if ($url === '') {
+                return null;
+            }
+
+            // b64_json (không phải URL) → lưu xuống storage rồi trả /storage/…
+            if (! str_starts_with($url, 'http') && ! str_starts_with($url, '/')) {
+                $name = 'studio/gen-'.Str::uuid().'.png';
+                \Illuminate\Support\Facades\Storage::disk('public')->put($name, base64_decode($url, true) ?: '');
+
+                return '/storage/'.$name;
+            }
+
+            return $this->storeRemoteImage($url);
+        }
+
+        // ── dashscope / gemini (như cũ) ──
         $extra = [];
         $parameters = [];
         if ($resolution) {
@@ -274,6 +312,115 @@ class ImageAIService
         }
 
         return $url ? (string) $url : null;
+    }
+
+    /**
+     * Generate through Fal.ai's QUEUE API — the real Flux fallback of the provider
+     * priority flow (qwen → custom → flux → gemini). Previously 'fal' candidates
+     * were declared in the registry but skipped at dispatch (no transport), so the
+     * documented fallback never actually ran.
+     *
+     * Wire format (https://queue.fal.run):
+     *   POST {base}/{model}                      → {"request_id", "status_url", "response_url"}
+     *   GET  {base}/{model}/requests/{id}/status → {"status": IN_QUEUE|IN_PROGRESS|COMPLETED}
+     *   GET  {base}/{model}/requests/{id}        → {"images": [{"url", "width", "height"}]}
+     * Auth: "Authorization: Key <FAL_KEY>" (literal "Key " prefix — NOT "Bearer").
+     * Registry model ids normalize to "fal-ai/<id>" when the prefix is missing.
+     */
+    protected function tryFal(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null): ?string
+    {
+        $modelId = str_starts_with($model, 'fal-ai/') ? $model : 'fal-ai/'.ltrim($model, '/');
+        $base = 'https://queue.fal.run/'.$modelId;
+        $auth = ['Authorization' => 'Key '.$key];
+
+        // fal nhận image_size là enum HOẶC object {width,height} (không phải chuỗi "WxH"
+        // như OpenAI) — dựng object từ resolution + tỉ lệ.
+        $imageSize = null;
+        if ($size = $this->falSizeFor($resolution, $ratio)) {
+            [$w, $h] = array_map('intval', explode('x', $size));
+            $imageSize = ['width' => $w, 'height' => $h];
+        }
+
+        try {
+            $body = array_filter([
+                'prompt' => $prompt,
+                'num_images' => 1,
+            ], fn ($v) => $v !== null && $v !== '');
+            if ($imageSize) {
+                $body['image_size'] = $imageSize;
+            }
+
+            $submit = Http::withHeaders($auth)->timeout(60)->post($base, $body);
+
+            if (! $submit->successful()) {
+                logger()->warning('Fal submit failed ('.$submit->status().'): '.Str::limit((string) $submit->body(), 240));
+
+                return null;
+            }
+
+            $requestId = data_get($submit->json(), 'request_id');
+            if (! $requestId) {
+                logger()->warning('Fal submit returned no request_id.');
+
+                return null;
+            }
+
+            $deadline = microtime(true) + 150;
+            $wait = [1, 3];   // poll nhanh lần đầu (Flux schnell thường xong ~2s) rồi 3s/lượt.
+
+            while (microtime(true) < $deadline) {
+                sleep(array_shift($wait) ?? 3);
+
+                $q = Http::withHeaders($auth)->timeout(30)->get($base.'/requests/'.$requestId.'/status');
+                if (! $q->successful()) {
+                    logger()->warning('Fal status failed ('.$q->status().').');
+
+                    return null;
+                }
+
+                $status = (string) data_get($q->json(), 'status', '');
+
+                if ($status === 'COMPLETED') {
+                    $res = Http::withHeaders($auth)->timeout(60)->get($base.'/requests/'.$requestId);
+                    $url = data_get($res->json(), 'images.0.url');
+
+                    return $url ? $this->storeRemoteImage((string) $url) : null;
+                }
+
+                if (in_array($status, ['FAILED', 'ERROR'], true)) {
+                    logger()->warning('Fal task failed: '.Str::limit((string) $q->body(), 240));
+
+                    return null;
+                }
+            }
+
+            logger()->warning('Fal task timed out: '.$requestId);
+
+            return null;   // hết giờ → nhường cho candidate kế tiếp trong chuỗi
+        } catch (\Throwable $e) {
+            logger()->warning('Fal generation failed: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
+     * Size "WxH" (OpenAI Images / Fal style) từ resolution 1K/2K + tỉ lệ.
+     * Dùng chung cho tryFal (image_size string) và custom provider openai (size).
+     */
+    protected function falSizeFor(?string $resolution, ?string $ratio): ?string
+    {
+        if (! $resolution) {
+            return null;
+        }
+
+        $long = $resolution === '2K' ? 2048 : 1024;
+        $ratioMap = ['1:1' => [1, 1], '4:3' => [4, 3], '3:4' => [3, 4], '16:9' => [16, 9], '9:16' => [9, 16], '4:5' => [4, 5], '21:9' => [21, 9], '19:6' => [19, 6]];
+        [$rw, $rh] = $ratioMap[$ratio] ?? [1, 1];
+        $w = $rw >= $rh ? $long : (int) round($long * $rw / $rh);
+        $h = $rw >= $rh ? (int) round($long * $rh / $rw) : $long;
+
+        return $w.'x'.$h;
     }
 
     protected function providerErrorMessage(): string

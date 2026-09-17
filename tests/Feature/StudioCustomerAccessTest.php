@@ -85,6 +85,9 @@ class StudioCustomerAccessTest extends TestCase
             'settings.data' => ['GET', '/api/settings/data'],
             'settings.update' => ['POST', '/api/settings'],
             'settings-vue.config' => ['POST', '/api/settings-vue/config'],
+            // [2026-09-17] Luồng ưu tiên provider + đồng bộ catalog Qwen — cấu hình toàn cục ⇒ ADMIN.
+            'settings-vue.provider-priority' => ['POST', '/api/settings-vue/provider-priority'],
+            'settings-vue.sync-catalog' => ['POST', '/api/settings-vue/sync-catalog'],
             'models.store' => ['POST', '/api/models'],
             'keys.store' => ['POST', '/api/keys'],
             'presets.store' => ['POST', '/api/presets'],

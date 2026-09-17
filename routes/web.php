@@ -219,6 +219,10 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->gr
     Route::delete('/settings-vue/models/{model}', [StudioSettingsController::class, 'deleteModel'])->name('settings-vue.models.delete');
     Route::post('/settings-vue/config', [StudioSettingsController::class, 'updateConfig'])->name('settings-vue.config');
     Route::post('/settings-vue/task-defaults', [StudioSettingsController::class, 'updateTaskDefault'])->name('settings-vue.task-defaults');
+    // [2026-09-17] Luồng ưu tiên provider: qwen → custom → flux → gemini (đổi được thứ tự)
+    // + đồng bộ catalog model QwenCloud mới nhất vào registry (cập nhật được về sau).
+    Route::post('/settings-vue/provider-priority', [StudioSettingsController::class, 'providerPriority'])->name('settings-vue.provider-priority');
+    Route::post('/settings-vue/sync-catalog', [StudioSettingsController::class, 'syncCatalog'])->name('settings-vue.sync-catalog');
 
     // ── Legacy settings JSON endpoints (giữ để không vỡ tham chiếu cũ) ──
     Route::get('/settings/data', [StudioController::class, 'settingsData'])->name('settings.data');

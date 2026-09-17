@@ -55,6 +55,16 @@ const keysByProvider = computed(() => {
 });
 const providerName = (slug) => providers.value.find(p => p.slug === slug)?.name || slug;
 
+// ── Badge luồng ưu tiên (qwen=1 → custom=2 → flux=3 → gemini=4) ───────────
+const FLOW_SHORT = { qwen: 'Qwen', custom: 'Custom', flux: 'Flux', gemini: 'Gemini', other: 'Khác' };
+const providerFamily = (slug) => providers.value.find(p => p.slug === slug)?.family || 'other';
+const flowRank = (slug) => { const i = flowTokens.value.indexOf(providerFamily(slug)); return i === -1 ? 99 : i + 1; };
+const familyBadgeLabel = (slug) => { const f = providerFamily(slug); return '#' + flowRank(slug) + ' ' + (FLOW_SHORT[f] || f); };
+const familyBadgeClass = (slug) => {
+  const f = providerFamily(slug);
+  return { qwen: 'bg-emerald-100 text-emerald-700', custom: 'bg-indigo-100 text-indigo-700', flux: 'bg-sky-100 text-sky-700', gemini: 'bg-amber-100 text-amber-700' }[f] || 'bg-gray-200 text-gray-600';
+};
+
 // DSH-style key hygiene: trim + printable ASCII only (what a header can carry).
 function validKey(v) {
   const t = (v || '').trim();
@@ -188,6 +198,49 @@ async function removeModel(m) {
   await run(async () => { await api('/models/' + m.id, 'DELETE'); }, 'Đã xóa model.');
 }
 
+// ── Tab: Luồng ưu tiên provider (qwen → custom → flux → gemini) ──────────
+const FLOW_META = {
+  qwen: { label: 'Qwen — QwenCloud / DashScope', icon: '☁️', desc: 'Provider chính: model QwenCloud mới nhất (qwen-image-3.0-pro · qwen-image-edit-2511 · wan3.0-video · qwen3.8-flash/max). Ảnh/video qua dashscope-intl, chat qua compatible-mode/v1.', providers: ['qwen', 'qwen_edit', 'dashscope', 'wan'] },
+  custom: { label: 'Custom provider', icon: '🌐', desc: 'Route tự khai báo protocol + base URL — vd CKEY Việt Nam (https://api.xah.io/v1 · OpenAI-compatible · giá VND · ảnh qua /images/generations).', providers: [] },
+  flux: { label: 'Flux — Fal.ai (fallback)', icon: '⚡', desc: 'Fallback tạo ảnh khi Qwen lỗi hoặc hết hạn mức — queue.fal.run, auth "Key …".', providers: ['fal', 'replicate'] },
+  gemini: { label: 'Gemini (tùy chọn)', icon: '✨', desc: 'Nhóm cuối — chỉ dùng khi đã cấu hình GEMINI_API_KEY.', providers: ['gemini', 'veo'] },
+  other: { label: 'Khác (DeepSeek…)', icon: '···', desc: 'Provider ngoài luồng — chỉ dùng khi được gán default riêng.', providers: ['deepseek'] },
+};
+const flowTokens = computed(() => (data.value?.provider_priority || 'qwen,custom,flux,gemini').split(',').map(s => s.trim()).filter(Boolean));
+const flowCounts = computed(() => data.value?.flow_counts || {});
+const flowSaving = ref(false);
+const syncSaving = ref(false);
+const familyProviders = (token) => providers.value.filter(p => (p.family || 'other') === token);
+const familyConfigured = (token) => familyProviders(token).some(p => p.configured && (p.custom || p.enabled));
+function flowMetaFor(token) { return FLOW_META[token] || { label: token, icon: '···', desc: '', providers: [] }; }
+async function moveFlow(i, dir) {
+  const t = [...flowTokens.value];
+  const j = i + dir;
+  if (j < 0 || j >= t.length) return;
+  [t[i], t[j]] = [t[j], t[i]];
+  await saveFlow(t);
+}
+async function saveFlow(tokens) {
+  flowSaving.value = true;
+  await run(async () => {
+    await api('/provider-priority', 'POST', { value: (tokens || flowTokens.value).join(',') });
+  }, 'Đã lưu luồng ưu tiên provider.');
+  flowSaving.value = false;
+}
+async function syncModels() {
+  syncSaving.value = true;
+  await run(async () => {
+    await api('/sync-catalog', 'POST', {});
+  }, 'Đã đồng bộ model QwenCloud mới nhất vào Model Registry.');
+  syncSaving.value = false;
+}
+// Preset CKEY (ckey.vn/docs): OpenAI-compatible gateway api.xah.io/v1 — base của bước 2.
+function applyCkeyPreset() {
+  provForm.value = { slug: 'ckey', name: 'CKEY — gateway VN (api.xah.io)', protocol: 'openai', base_url: 'https://api.xah.io/v1', auth_style: 'bearer', api_key_ref: 'ckey', note: 'https://ckey.vn/docs · ảnh: /v1/images/generations · chat: /v1/chat/completions · giá VND' };
+  tab.value = 'providers';
+  flash('Đã điền sẵn preset CKEY — nhập API key (lấy tại ckey.vn/llm-api) rồi bấm "➕ Thêm provider".');
+}
+
 // ── Tab: General config ──────────────────────────────────────────────────
 const cfgForm = ref(null);
 const cfgSaving = ref(false);
@@ -248,10 +301,11 @@ async function clearTaskDefault(g) {
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="font-display text-xl font-semibold text-cream-50">⚙️ Cài đặt Studio</h1>
-        <p class="mt-0.5 text-xs text-ink-500">API keys · Custom providers · Model registry — một trang, một nguồn dữ liệu.</p>
+        <p class="mt-0.5 text-xs text-ink-500">Luồng ưu tiên · API keys · Custom providers · Model registry — một trang, một nguồn dữ liệu.</p>
         <a href="/admin" class="mt-1 inline-block text-xs font-semibold text-brand-300 hover:text-brand-200">👑 Quản trị (Owner console) →</a>
       </div>
       <div class="flex flex-wrap gap-1.5">
+        <button @click="tab='flow'" :class="tab==='flow' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors">🔥 Luồng ưu tiên</button>
         <button @click="tab='keys'" :class="tab==='keys' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors">🔑 API Keys</button>
         <button @click="tab='providers'" :class="tab==='providers' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors">🌐 Custom Providers</button>
         <button @click="tab='models'" :class="tab==='models' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors">🤖 Models</button>
@@ -264,6 +318,81 @@ async function clearTaskDefault(g) {
     <div v-else-if="error" class="card border-red-300 p-6 text-sm text-red-600">{{ error }} — <button class="underline" @click="load">thử lại</button></div>
 
     <template v-else>
+      <!-- ══════════ TAB: LUỒNG ƯU TIÊN (PROVIDER PRIORITY FLOW) ══════════ -->
+      <div v-show="tab==='flow'" class="space-y-5">
+        <div class="card p-5">
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 class="font-display text-base font-semibold text-ink-900">🔥 Luồng ưu tiên provider</h2>
+            <p class="text-xs text-ink-500">Thứ tự fallback khi chọn model cho MỌI nhóm công việc — giống cách DeepSeek Harness xếp route.</p>
+          </div>
+          <p class="mt-1 text-xs text-ink-500">
+            Khi tạo ảnh/video/suy luận, hệ thống thử provider theo thứ tự dưới đây (đủ mọi key của mỗi model) cho tới khi có kết quả.
+            Model mặc định gán riêng cho từng nhóm (tab 🎯) vẫn thắng chuỗi này; cùng một nhóm provider thì theo Ưu tiên model giảm dần.
+          </p>
+
+          <!-- Chuỗi trực quan -->
+          <div class="mt-4 flex flex-wrap items-center gap-1.5">
+            <template v-for="(token, i) in flowTokens" :key="token">
+              <span class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold"
+                    :class="familyConfigured(token) ? 'bg-emerald-100 text-emerald-800' : 'bg-cream-200 text-ink-700'">
+                <span>{{ flowMetaFor(token).icon }}</span>
+                <span>{{ flowMetaFor(token).label }}</span>
+                <span class="rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-semibold">{{ flowCounts[token] || 0 }} model</span>
+                <span class="h-2 w-2 rounded-full" :class="familyConfigured(token) ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+                <span v-if="!familyConfigured(token)" class="text-[10px] font-normal text-amber-700">chưa có key</span>
+              </span>
+              <span v-if="i < flowTokens.length - 1" class="text-ink-400">→</span>
+            </template>
+          </div>
+
+          <!-- Bảng chi tiết từng nhóm + đổi thứ tự -->
+          <div class="mt-5 space-y-2">
+            <div v-for="(token, i) in flowTokens" :key="token" class="rounded-xl border border-cream-200 p-3.5">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-600/15 text-sm font-bold text-ink-900">#{{ i + 1 }}</span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-semibold text-ink-900">{{ flowMetaFor(token).icon }} {{ flowMetaFor(token).label }}</p>
+                  <p class="mt-0.5 text-[11px] text-ink-500">{{ flowMetaFor(token).desc }}</p>
+                </div>
+                <span class="flex items-center gap-1">
+                  <button @click="moveFlow(i, -1)" :disabled="i === 0 || flowSaving" class="btn-outline btn-sm">↑</button>
+                  <button @click="moveFlow(i, 1)" :disabled="i === flowTokens.length - 1 || flowSaving" class="btn-outline btn-sm">↓</button>
+                </span>
+              </div>
+              <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                <span v-for="p in familyProviders(token)" :key="p.slug"
+                      class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
+                      :class="p.configured ? 'bg-emerald-50 text-emerald-700' : 'bg-cream-100 text-ink-600'">
+                  <span class="h-1.5 w-1.5 rounded-full" :class="p.configured ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+                  {{ p.name }}
+                  <span v-if="p.key_count" class="text-ink-400">×{{ p.key_count }}</span>
+                </span>
+                <span v-if="token === 'custom'" class="flex items-center gap-1.5">
+                  <button @click="applyCkeyPreset" class="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-200">⚡ Thêm preset CKEY (api.xah.io)</button>
+                  <button @click="tab='providers'" class="rounded-full bg-cream-200 px-2.5 py-0.5 text-[10px] font-semibold text-ink-600 hover:bg-cream-300">→ khai báo route khác</button>
+                </span>
+                <span v-if="token === 'custom' && !familyProviders('custom').length" class="text-[11px] text-ink-500">Chưa có custom provider — thêm CKEY hoặc route [OI]-compatible bất kỳ.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <button @click="syncModels" :disabled="syncSaving" class="btn-brand btn-sm">{{ syncSaving ? 'Đang đồng bộ…' : '🔄 Đồng bộ model QwenCloud mới nhất' }}</button>
+            <span class="text-[11px] text-ink-500">Nhập catalog tích hợp (Qwen Image 3.0 Pro · Edit 2511 · Wan3.0 · Qwen 3.8) vào Model Registry — idempotent, không đụng model bạn đã tùy biến. Khi QwenCloud ra model mới: cập nhật catalog trong helpers.php rồi bấm lại.</span>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <h3 class="text-sm font-semibold text-ink-900">📖 Tương thích CKEY (ckey.vn/docs)</h3>
+          <div class="mt-2 space-y-1.5 text-[11px] text-ink-600">
+            <p>· Gateway LLM của CKEY chạy ở <b>https://api.xah.io/v1</b> (khác tên miền ckey.vn) — xác thực <b>Bearer &lt;API key&gt;</b> lấy tại trang Profile của ckey.vn.</p>
+            <p>· Ảnh: <code class="rounded bg-ink-700 px-1 text-cream-100">POST /v1/images/generations</code> (OpenAI Images API) — dùng được model Qwen image trên CKEY (id dạng <code>user/qwen-image-…</code>, giá ~120–1.100 ₫/ảnh).</p>
+            <p>· Chat/vision/prompt: <code class="rounded bg-ink-700 px-1 text-cream-100">POST /v1/chat/completions</code> — bấm nút preset bên trên để tạo route trong 10 giây, rồi thêm key ở tab 🔑 với provider = <code>ckey</code>.</p>
+            <p>· Bảng giá &amp; danh sách model sống: <code class="rounded bg-ink-700 px-1 text-cream-100">GET https://api.xah.io/v1/models</code> (công khai, VND).</p>
+          </div>
+        </div>
+      </div>
+
       <!-- ══════════ TAB: API KEYS ══════════ -->
       <div v-show="tab==='keys'" class="space-y-5">
         <div class="card p-5">
@@ -426,6 +555,7 @@ async function clearTaskDefault(g) {
                   <div v-if="editingModel !== m.id" class="flex flex-wrap items-center gap-2">
                     <span class="font-semibold text-ink-900">{{ m.name }}</span>
                     <span class="text-ink-500">{{ m.provider }} · {{ m.model_id }}</span>
+                    <span :class="familyBadgeClass(m.provider)" class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :title="'Vị trí trong luồng ưu tiên (qwen → custom → flux → gemini)'">{{ familyBadgeLabel(m.provider) }}</span>
                     <span v-if="providers.find(p => p.slug === m.provider)?.custom" class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">Custom</span>
                     <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px] text-ink-700">Ưu tiên {{ m.priority }}</span>
                     <span :class="m.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'" class="rounded-full px-2 py-0.5 text-[10px]">{{ m.enabled ? 'Bật' : 'Tắt' }}</span>
@@ -515,8 +645,9 @@ async function clearTaskDefault(g) {
               <div v-if="taskGroups[g].models.length" class="mt-2 flex flex-wrap gap-1">
                 <span v-for="(m, i) in taskGroups[g].models.slice(0, 6)" :key="m.provider + m.model"
                       class="rounded-full px-2 py-0.5 text-[10px]"
+                      :title="'Fallback #' + flowRank(m.provider) + ' — ' + familyBadgeLabel(m.provider)"
                       :class="m.provider + ':' + m.model === taskGroups[g].default ? 'bg-emerald-100 text-emerald-700 font-semibold' : 'bg-cream-100 text-ink-600'">
-                  {{ m.label }}{{ i === 5 && taskGroups[g].models.length > 6 ? '…' : '' }}
+                  <span :class="familyBadgeClass(m.provider)" class="mr-1 rounded-full px-1 py-px text-[9px] font-semibold">#{{ flowRank(m.provider) }}</span>{{ m.label }}{{ i === 5 && taskGroups[g].models.length > 6 ? '…' : '' }}
                 </span>
                 <button @click="tab='models'" class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-200">→ quản lý ở tab Models</button>
               </div>
@@ -554,9 +685,9 @@ async function clearTaskDefault(g) {
       <div v-show="tab==='general'">
         <div class="card p-5" v-if="cfgForm">
           <h2 class="font-display text-base font-semibold text-ink-900">📋 Cấu hình chung</h2>
-          <p class="mt-1 text-xs text-ink-500">Cấu hình mặc định cho pipeline gọi model. Thứ tự fallback thực tế: model mặc định dưới đây → Model Registry theo ưu tiên.</p>
+          <p class="mt-1 text-xs text-ink-500">Cấu hình mặc định cho pipeline gọi model. Thứ tự fallback thực tế: model mặc định của nhóm (tab 🎯) → Luồng ưu tiên provider (tab 🔥: qwen → custom → flux → gemini) → Ưu tiên model giảm dần.</p>
           <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div><label class="label">Provider sinh ảnh</label><input v-model="cfgForm.image_provider" class="input !py-2" placeholder="flux / wan / qwen / gemini / slug custom"></div>
+            <div><label class="label">Provider sinh ảnh</label><input v-model="cfgForm.image_provider" class="input !py-2" placeholder="qwen (mặc định) / flux / wan / gemini / slug custom"></div>
             <div><label class="label">Model ảnh (flux)</label><input v-model="cfgForm.image_model" class="input !py-2"></div>
             <div><label class="label">Model ảnh (qwen)</label><input v-model="cfgForm.qwen_model" class="input !py-2"></div>
             <div><label class="label">Model video</label><input v-model="cfgForm.video_model" class="input !py-2"></div>

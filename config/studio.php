@@ -32,7 +32,25 @@ return [
     'remote_image_hosts' => env('STUDIO_REMOTE_IMAGE_HOSTS', ''),
     'video_credits' => (int) env('STUDIO_VIDEO_CREDITS', 10),
     'processing' => env('STUDIO_PROCESSING', 'sync'), // sync | queue (async + worker)
-    'image_provider' => env('STUDIO_IMAGE_PROVIDER', 'flux'), // flux | wan | qwen
+    // [2026-09-17] Luồng ưu tiên provider mặc định: qwen → custom → flux → gemini.
+    // 'qwen' = QwenCloud/DashScope (nhà cung cấp chính), 'custom' = provider tự khai báo trong
+    // Settings (vd CKEY — api.xah.io), 'flux' = Fal.ai fallback, 'gemini' = tùy chọn cuối.
+    'image_provider' => env('STUDIO_IMAGE_PROVIDER', 'qwen'), // flux | wan | qwen | gemini | slug custom
+
+    /*
+    |--------------------------------------------------------------------------
+    | Luồng ưu tiên provider (fallback chain) — DeepSeek Harness style
+    |--------------------------------------------------------------------------
+    | CSV thứ tự NHÓM provider khi xếp danh sách model cho mỗi nhóm công việc:
+    |   qwen   → Qwen/DashScope/Wan (nhà cung cấp chính, model QwenCloud mới nhất)
+    |   custom → provider tự khai báo trong Settings (vd CKEY — https://api.xah.io/v1)
+    |   flux   → Fal.ai / Replicate (fallback Flux khi Qwen lỗi/hết hạn mức)
+    |   gemini → Google Gemini (tùy chọn — chỉ dùng khi có GEMINI_API_KEY)
+    | Model mặc định gán cho từng nhóm (studio_task_<group>_model) vẫn luôn đứng trước
+    | chuỗi này; bên dưới sắp theo rank nhóm, rồi priority model. Đổi thứ tự bằng
+    | setting này (hoặc tab Luồng ưu tiên trong Cài đặt) — không cần sửa code.
+    */
+    'provider_priority' => env('STUDIO_PROVIDER_PRIORITY', 'qwen,custom,flux,gemini'),
 
     /*
     |--------------------------------------------------------------------------
@@ -63,7 +81,10 @@ return [
     'qwen_edit_model' => env('STUDIO_QWEN_EDIT_MODEL', 'qwen-image-edit'),
     'brand_name' => env('STUDIO_BRAND_NAME', ''),
     'gemini_image_model' => env('STUDIO_GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image'),
-    'video_model' => env('STUDIO_VIDEO_MODEL', 'wan2.5-t2v'),
+    // [2026-09-17] wan3.0-video = model mới nhất trên QwenCloud (all-in-one: t2v/i2v/r2v/edit,
+    // tới 30s); wan2.5-t2v giữ làm fallback trong Model Registry. Xem docs.qwencloud.com
+    // → developer-guides/video-generation ("Wan3.0 Video Generation").
+    'video_model' => env('STUDIO_VIDEO_MODEL', 'wan3.0-video'),
     'vision_provider' => env('STUDIO_VISION_PROVIDER', 'qwen'), // qwen | gemini — Qwen đa phương thức ưu tiên
     'vision_model' => env('STUDIO_VISION_MODEL', 'gemini-2.5-flash'),
     'qwen_vision_model' => env('STUDIO_QWEN_VISION_MODEL', 'qwen3.8-flash'), // multimodal: flash (nhanh) / qwen3.8-max (mạnh), vẫn giữ fallback qwen-vl-*

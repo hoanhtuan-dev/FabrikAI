@@ -842,6 +842,118 @@ if (! function_exists('dashscope_base_url')) {
     }
 }
 
+if (! function_exists('studio_provider_priority_flow')) {
+    /**
+     * Luồng ưu tiên NHÓM provider (fallback chain) — DeepSeek Harness style.
+     *
+     * Mặc định: qwen → custom → flux → gemini. Đọc từ setting DB (tab "Luồng ưu
+     * tiên" của trang Cài đặt) → env STUDIO_PROVIDER_PRIORITY → config. Token hợp
+     * lệ: qwen | custom | flux | gemini | other (mọi token khác bị bỏ).
+     */
+    function studio_provider_priority_flow(): array
+    {
+        $raw = (string) studio_config('provider_priority', (string) config('studio.provider_priority', 'qwen,custom,flux,gemini'));
+        $valid = ['qwen', 'custom', 'flux', 'gemini', 'other'];
+        $tokens = array_values(array_filter(
+            array_map('trim', explode(',', $raw)),
+            fn ($t) => $t !== '' && in_array($t, $valid, true)
+        ));
+
+        return $tokens ?: ['qwen', 'custom', 'flux', 'gemini'];
+    }
+}
+
+if (! function_exists('studio_provider_family')) {
+    /**
+     * Nhóm luồng ưu tiên của một provider: built-in tra catalog (khoá 'family'),
+     * slug khai báo trong studio_providers → 'custom', còn lại → 'other'.
+     * Custom map được memo tĩnh theo request (tránh query lặp khi xếp rank).
+     */
+    function studio_provider_family(string $provider): string
+    {
+        $catalog = studio_provider_catalog();
+        if (isset($catalog[$provider])) {
+            return $catalog[$provider]['family'] ?? 'other';
+        }
+
+        return in_array($provider, studio_custom_provider_slugs(), true) ? 'custom' : 'other';
+    }
+}
+
+if (! function_exists('studio_custom_provider_slugs')) {
+    /**
+     * Slug của mọi custom provider (bảng studio_providers) — memo theo request để
+     * studio_provider_rank() không query lặp trong lúc sắp xếp (N log N lần gọi).
+     *
+     * ⚠️ Memo PHẢI xoá được: worker queue sống qua nhiều job, còn admin thêm provider
+     * mới ở request khác — cache tĩnh không có đường invalidate sẽ giữ danh sách cũ.
+     * StudioProvider model event gọi studio_custom_provider_slugs(true) ở mọi đường
+     * ghi (giống cách StudioModel/Setting xoá cache của chúng).
+     */
+    function studio_custom_provider_slugs(bool $forget = false): array
+    {
+        static $slugs = null;
+
+        if ($forget) {
+            $slugs = null;
+        }
+
+        if ($slugs === null) {
+            try {
+                $slugs = \App\Models\StudioProvider::pluck('slug')->all();
+            } catch (\Throwable $e) {
+                $slugs = [];
+            }
+        }
+
+        return $slugs;
+    }
+}
+
+if (! function_exists('studio_provider_rank')) {
+    /**
+     * Số nguyên xếp hạng provider trong luồng ưu tiên (nhỏ hơn = dùng trước):
+     * vị trí nhóm trong flow × 10. Nhóm không có trong flow (hoặc 'other') = 990,
+     * đứng sau mọi nhóm đã cấu hình. Rank chỉ áp SAU default đã gán của nhóm công
+     * việc — admin override vẫn luôn thắng.
+     */
+    function studio_provider_rank(string $provider): int
+    {
+        $family = studio_provider_family($provider);
+        $flow = studio_provider_priority_flow();
+        $idx = array_search($family, $flow, true);
+
+        return $idx === false ? 990 : (int) ($idx * 10);
+    }
+}
+
+if (! function_exists('studio_sort_by_provider_rank')) {
+    /**
+     * Xếp danh sách model theo luồng ưu tiên: rank provider tăng dần (qwen trước,
+     * custom sau, rồi flux, gemini), cùng rank thì priority giảm dần, rồi id tăng
+     * (ổn định). Input/output: mảng các dòng registry (array) hoặc candidate.
+     */
+    function studio_sort_by_provider_rank(array $rows): array
+    {
+        usort($rows, function ($a, $b) {
+            $ra = studio_provider_rank((string) ($a['provider'] ?? ''));
+            $rb = studio_provider_rank((string) ($b['provider'] ?? ''));
+            if ($ra !== $rb) {
+                return $ra <=> $rb;
+            }
+            $pa = (int) ($a['priority'] ?? 0);
+            $pb = (int) ($b['priority'] ?? 0);
+            if ($pa !== $pb) {
+                return $pb <=> $pa;
+            }
+
+            return (int) ($a['id'] ?? 0) <=> (int) ($b['id'] ?? 0);
+        });
+
+        return $rows;
+    }
+}
+
 if (! function_exists('studio_provider_catalog')) {
     /**
      * BUILT-IN provider directory (the part every deployment ships — the DeepSeek
@@ -853,16 +965,20 @@ if (! function_exists('studio_provider_catalog')) {
      */
     function studio_provider_catalog(): array
     {
+        // 'family' = NHÓM trong luồng ưu tiên (config studio.provider_priority, mặc định
+        // qwen,custom,flux,gemini) — dùng để xếp rank provider khi chọn model (xem
+        // studio_provider_rank). Custom providers (bảng studio_providers) luôn thuộc
+        // nhóm 'custom'.
         return [
-            'qwen' => ['name' => 'Qwen — ảnh (QwenCloud)', 'protocol' => 'dashscope', 'hint' => 'QWEN_API_KEY (home.qwencloud.com/api-keys)'],
-            'qwen_edit' => ['name' => 'Qwen Edit — chỉnh sửa ảnh / Inpaint', 'protocol' => 'dashscope', 'hint' => 'QWEN_EDIT_KEY · model edit (qwen-image-edit, wanx2.1-imageedit…)'],
-            'dashscope' => ['name' => 'DashScope — Wan/Qwen image & video (Alibaba)', 'protocol' => 'dashscope', 'hint' => 'DASHSCOPE_API_KEY'],
-            'wan' => ['name' => 'Wan AI — video', 'protocol' => 'dashscope', 'hint' => 'WAN_API_KEY / DASHSCOPE_API_KEY'],
-            'gemini' => ['name' => 'Gemini — Giám đốc sáng tạo', 'protocol' => 'gemini', 'hint' => 'GEMINI_API_KEY (aistudio.google.com)'],
-            'veo' => ['name' => 'Google Veo — video', 'protocol' => 'gemini', 'hint' => 'GOOGLE_VEO_KEY'],
-            'fal' => ['name' => 'Fal.ai — Flux (ảnh)', 'protocol' => 'openai', 'hint' => 'FAL_KEY'],
-            'replicate' => ['name' => 'Replicate — Flux (ảnh)', 'protocol' => 'openai', 'hint' => 'REPLICATE_API_TOKEN (replicate.com/account/api-tokens)'],
-            'deepseek' => ['name' => 'DeepSeek — ngôn ngữ / suy luận', 'protocol' => 'openai', 'hint' => 'DEEPSEEK_API_KEY · model deepseek-chat'],
+            'qwen' => ['name' => 'Qwen — QwenCloud (ảnh · video · suy luận)', 'protocol' => 'dashscope', 'family' => 'qwen', 'hint' => 'QWEN_API_KEY · home.qwencloud.com/api-keys · ảnh qua dashscope-intl, chat qua compatible-mode/v1'],
+            'qwen_edit' => ['name' => 'Qwen Edit — sửa ảnh / Inpaint / thử đồ', 'protocol' => 'dashscope', 'family' => 'qwen', 'hint' => 'QWEN_EDIT_KEY · qwen-image-edit-2511 / qwen-image-edit'],
+            'dashscope' => ['name' => 'DashScope — Wan/Qwen image & video (Alibaba)', 'protocol' => 'dashscope', 'family' => 'qwen', 'hint' => 'DASHSCOPE_API_KEY (pay-go sk-… / plan sk-sp-…)'],
+            'wan' => ['name' => 'Wan — video catwalk (Wan3.0)', 'protocol' => 'dashscope', 'family' => 'qwen', 'hint' => 'WAN_API_KEY / DASHSCOPE_API_KEY'],
+            'gemini' => ['name' => 'Gemini — suy luận / ảnh (tùy chọn)', 'protocol' => 'gemini', 'family' => 'gemini', 'hint' => 'GEMINI_API_KEY (aistudio.google.com) — nhóm CUỐI trong luồng ưu tiên'],
+            'veo' => ['name' => 'Google Veo — video', 'protocol' => 'gemini', 'family' => 'gemini', 'hint' => 'GOOGLE_VEO_KEY'],
+            'fal' => ['name' => 'Fal.ai — Flux (fallback ảnh)', 'protocol' => 'openai', 'family' => 'flux', 'hint' => 'FAL_KEY (fal.ai/dashboard/keys) — queue.fal.run, auth "Key …"'],
+            'replicate' => ['name' => 'Replicate — Flux (ảnh)', 'protocol' => 'openai', 'family' => 'flux', 'hint' => 'REPLICATE_API_TOKEN (dùng qua custom provider để gọi trực tiếp)'],
+            'deepseek' => ['name' => 'DeepSeek — ngôn ngữ / suy luận', 'protocol' => 'openai', 'family' => 'other', 'hint' => 'DEEPSEEK_API_KEY · model deepseek-chat'],
         ];
     }
 }
@@ -884,6 +1000,8 @@ if (! function_exists('studio_provider_registry')) {
                 'base_url' => null,
                 'auth_style' => $meta['protocol'] === 'gemini' ? 'x-goog-api-key' : 'bearer',
                 'hint' => $meta['hint'] ?? null,
+                'family' => $meta['family'] ?? 'other',
+                'rank' => studio_provider_rank($slug),
                 'custom' => false,
                 'enabled' => true,
             ];
@@ -898,6 +1016,8 @@ if (! function_exists('studio_provider_registry')) {
                     'base_url' => $p->base_url,
                     'auth_style' => $p->auth_style,
                     'hint' => $p->note,
+                    'family' => 'custom',
+                    'rank' => studio_provider_rank($p->slug),
                     'custom' => true,
                     'enabled' => (bool) $p->enabled,
                 ];
@@ -1010,6 +1130,56 @@ if (! function_exists('studio_custom_provider_call')) {
     }
 }
 
+if (! function_exists('studio_custom_provider_image_call')) {
+    /**
+     * SINH ẢNH qua custom provider — hỗ trợ đủ 3 giao thức:
+     *   - openai:    POST {base}/images/generations (OpenAI Images API: model, prompt, n,
+     *                size). Đây chính là wire format của các gateway [OI]-compatible bán
+     *                model ảnh — điển hình CKEY Việt Nam (https://ckey.vn/docs, base
+     *                https://api.xah.io/v1, Bearer key, model dạng adminsgehdt/qwen-image-max).
+     *   - dashscope: POST {base}/api/v1/services/aigc/multimodal-generation/generation.
+     *   - gemini:    POST {base}/v1beta/models/{model}:generateContent.
+     * Trả về JSON đã decode khi thành công, null khi lỗi/key thiếu. Bên gọi tự trích
+     * URL/base64 (data.0.url | data.0.b64_json | output.choices… | inlineData.data).
+     */
+    function studio_custom_provider_image_call(array $provider, string $model, string $prompt, array $extra = [])
+    {
+        $key = studio_custom_provider_key($provider);
+        if (! $key) {
+            return null;
+        }
+
+        $base = rtrim((string) ($provider['base_url'] ?? ''), '/');
+        if ($base === '') {
+            return null;
+        }
+
+        $protocol = (string) ($provider['protocol'] ?? 'openai');
+
+        try {
+            if ($protocol === 'openai') {
+                $url = $base.'/images/generations';
+                $body = array_merge([
+                    'model' => $model,
+                    'prompt' => $prompt,
+                    'n' => 1,
+                ], $extra);
+
+                $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(180)->post($url, $body);
+
+                return $resp->successful() ? $resp->json() : null;
+            }
+
+            // dashscope / gemini: dùng chung transport chat-style có sẵn.
+            return studio_custom_provider_call($provider, $model, $prompt, $extra);
+        } catch (\Throwable $e) {
+            logger()->warning('Custom provider image call failed ('.($provider['slug'] ?? '?').'): '.$e->getMessage());
+
+            return null;
+        }
+    }
+}
+
 if (! function_exists('is_qwen_quota_error')) {
     /**
      * Whether a DashScope/QwenCloud message/body indicates quota exhaustion (Throttling.AllocationQuota).
@@ -1115,20 +1285,120 @@ if (! function_exists('studio_usage')) {
  * Falls back to a built-in catalog when nothing is registered yet (so it works out-of-the-box).
  */
 if (! function_exists('studio_model_catalog')) {
+    /**
+     * Catalog model TÍCH HỢP — "model QwenCloud mới nhất" theo qwencloud.com/models
+     * (kiểm tra 2026-09-17), tập trung Qwen làm nhà cung cấp chính, flux làm fallback,
+     * gemini tùy chọn (cuối luồng). Đây là nguồn cho:
+     *   · fallback khi registry (studio_models) còn trống — chạy được ngay out-of-the-box;
+     *   · lệnh đồng bộ "php artisan studio:sync-models" (và nút Đồng bộ ở tab Luồng ưu
+     *     tiên) — idempotent theo (group, provider, model_id), nên khi QwenCloud ra
+     *     model mới, cập nhật MẢNG NÀY rồi chạy lại lệnh là registry được làm mới.
+     *
+     * Thứ tự thực tế khi chọn model: default gán cho nhóm công việc → rank provider
+     * theo luồng (qwen → custom → flux → gemini) → priority trong cùng provider.
+     */
     function studio_model_catalog(): array
     {
         return [
-            ['group' => 'image', 'name' => 'Flux Schnell (Fal)', 'provider' => 'fal', 'model_id' => 'flux-1.1-schnell', 'api_key_ref' => 'fal', 'priority' => 5, 'note' => 'Nhanh, rẻ — dùng cho stub/CRUD'],
-            ['group' => 'image', 'name' => 'Qwen Image 3.0 Pro', 'provider' => 'qwen', 'model_id' => 'qwen-image-3.0-pro', 'api_key_ref' => 'qwen', 'priority' => 8, 'note' => 'Giàu chi tiết, ưu tiên cao'],
-            ['group' => 'image', 'name' => 'Wan 2.7 Image Pro', 'provider' => 'wan', 'model_id' => 'wan2.7-image-pro', 'api_key_ref' => 'dashscope', 'priority' => 7, 'note' => 'DashScope'],
-            ['group' => 'image', 'name' => 'Gemini Flash Image', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash-image', 'api_key_ref' => 'gemini', 'priority' => 6, 'note' => 'Google'],
-            ['group' => 'video', 'name' => 'Wan 2.2 i2v', 'provider' => 'wan', 'model_id' => 'wan2.2-i2v', 'api_key_ref' => 'wan', 'priority' => 9, 'note' => 'Chất lượng cao'],
-            ['group' => 'video', 'name' => 'Wan 2.5 i2v', 'provider' => 'wan', 'model_id' => 'wan2.5-i2v', 'api_key_ref' => 'wan', 'priority' => 7, 'note' => 'Cân bằng'],
-            ['group' => 'video', 'name' => 'Wan 2.1 i2v Turbo', 'provider' => 'wan', 'model_id' => 'wan2.1-i2v-turbo', 'api_key_ref' => 'wan', 'priority' => 5, 'note' => 'Nhanh'],
-            ['group' => 'video', 'name' => 'Kling i2v', 'provider' => 'kling', 'model_id' => 'kling-v1-6-i2v', 'api_key_ref' => 'kling', 'priority' => 8, 'note' => 'Nếu có key Kling'],
-            ['group' => 'inference', 'name' => 'Gemini (Giám đốc sáng tạo)', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash', 'api_key_ref' => 'gemini', 'priority' => 9, 'note' => 'Suy luận prompt'],
-            ['group' => 'inference', 'name' => 'Qwen 3.8 Flash (multimodal)', 'provider' => 'qwen', 'model_id' => 'qwen3.8-flash', 'api_key_ref' => 'qwen', 'priority' => 8, 'note' => 'Suy luận prompt — đọc được ảnh/video/text'],
-            ['group' => 'inference', 'name' => 'Qwen 3.8 Max (multimodal)', 'provider' => 'qwen', 'model_id' => 'qwen3.8-max', 'api_key_ref' => 'qwen', 'priority' => 7, 'note' => 'Chất lượng cao hơn flash'],
+            // ── IMAGE — Tạo Ảnh 2D / ảnh từ ảnh mẫu (ConceptCard, RefImageCard) ──
+            ['group' => 'image', 'name' => 'Qwen Image 3.0 Pro', 'provider' => 'qwen', 'model_id' => 'qwen-image-3.0-pro', 'api_key_ref' => 'qwen', 'priority' => 10, 'note' => 'QwenCloud mới nhất — chữ dày đặc 10px, 12 ngôn ngữ, ảnh-trong-ảnh'],
+            ['group' => 'image', 'name' => 'Qwen Image 2512 (base)', 'provider' => 'qwen', 'model_id' => 'qwen-image-2512', 'api_key_ref' => 'qwen', 'priority' => 8, 'note' => 'Rẻ hơn — ảnh chuẩn sàn TMĐT (~$0.02/MP)'],
+            ['group' => 'image', 'name' => 'Qwen Image (base)', 'provider' => 'qwen', 'model_id' => 'qwen-image', 'api_key_ref' => 'qwen', 'priority' => 7, 'note' => 'Base ổn định, rẻ'],
+            ['group' => 'image', 'name' => 'Qwen Image Max', 'provider' => 'qwen', 'model_id' => 'qwen-image-max', 'api_key_ref' => 'qwen', 'priority' => 6, 'note' => 'Chất lượng cao nhất (~$0.075/ảnh) — gói Pro/Studio, xem PRICING.md §3.2'],
+            ['group' => 'image', 'name' => 'Flux 1.1 Schnell (Fal)', 'provider' => 'fal', 'model_id' => 'flux-1.1-schnell', 'api_key_ref' => 'fal', 'priority' => 3, 'note' => 'FALLBACK khi Qwen lỗi/hết hạn mức — nhanh, rẻ'],
+            ['group' => 'image', 'name' => 'Gemini Flash Image', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash-image', 'api_key_ref' => 'gemini', 'priority' => 1, 'note' => 'Tùy chọn cuối — chỉ khi có GEMINI_API_KEY'],
+
+            // ── EDIT — Sửa ảnh / Inpaint / reimagine / xoá nền ──
+            ['group' => 'edit', 'name' => 'Qwen Image Edit 2511', 'provider' => 'qwen_edit', 'model_id' => 'qwen-image-edit-2511', 'api_key_ref' => 'qwen_edit', 'priority' => 10, 'note' => 'Bản edit mới nhất (~$0.03/MP) — "xưởng" của FabrikAI'],
+            ['group' => 'edit', 'name' => 'Qwen Image Edit', 'provider' => 'qwen_edit', 'model_id' => 'qwen-image-edit', 'api_key_ref' => 'qwen_edit', 'priority' => 9, 'note' => 'Ổn định, có ở mọi gói key'],
+            ['group' => 'edit', 'name' => 'Qwen Image Edit (max)', 'provider' => 'qwen_edit', 'model_id' => 'qwen-image-edit-max', 'api_key_ref' => 'qwen_edit', 'priority' => 8, 'note' => 'Chất lượng cao hơn (~$0.075/ảnh) — xem PRICING.md'],
+            ['group' => 'edit', 'name' => 'Gemini Flash Image (edit)', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash-image', 'api_key_ref' => 'gemini', 'priority' => 1, 'note' => 'Tùy chọn cuối — geminiImageEdit path'],
+
+            // ── VIDEO — catwalk (Wan3.0 mới nhất của QwenCloud; wan2.7 là thế hệ trước) ──
+            ['group' => 'video', 'name' => 'Wan 3.0 Video', 'provider' => 'wan', 'model_id' => 'wan3.0-video', 'api_key_ref' => 'wan', 'priority' => 10, 'note' => 'QwenCloud 2026 — all-in-one t2v/i2v/r2v/edit, tới 30s, có tiếng'],
+            ['group' => 'video', 'name' => 'Wan 2.7 T2V', 'provider' => 'wan', 'model_id' => 'wan2.7-t2v', 'api_key_ref' => 'wan', 'priority' => 8, 'note' => 'Text-to-video thế hệ 2.7'],
+            ['group' => 'video', 'name' => 'Wan 2.7 i2v', 'provider' => 'wan', 'model_id' => 'wan2.7-i2v', 'api_key_ref' => 'wan', 'priority' => 7, 'note' => 'Image-to-video (ảnh đầu thành video catwalk)'],
+            ['group' => 'video', 'name' => 'Wan 2.5 T2V', 'provider' => 'wan', 'model_id' => 'wan2.5-t2v', 'api_key_ref' => 'wan', 'priority' => 5, 'note' => 'Fallback cũ — một số host/key chưa có 2.7+'],
+
+            // ── SWAP — Thử đồ / ghép người mẫu (Fitting Room) — dùng chung model edit ──
+            ['group' => 'swap', 'name' => 'Qwen Image Edit 2511 (thử đồ)', 'provider' => 'qwen_edit', 'model_id' => 'qwen-image-edit-2511', 'api_key_ref' => 'qwen_edit', 'priority' => 10, 'note' => 'Giữ đồ, thay người/nền — cùng model edit của Inpaint'],
+            ['group' => 'swap', 'name' => 'Qwen Image Edit (thử đồ)', 'provider' => 'qwen_edit', 'model_id' => 'qwen-image-edit', 'api_key_ref' => 'qwen_edit', 'priority' => 9, 'note' => 'Fallback thử đồ ổn định'],
+
+            // ── VISION — đọc ảnh (mô tả khuôn mặt/dáng, phân tích ảnh tham chiếu) ──
+            ['group' => 'vision', 'name' => 'Qwen 3.8 Flash (multimodal)', 'provider' => 'qwen', 'model_id' => 'qwen3.8-flash', 'api_key_ref' => 'qwen', 'priority' => 10, 'note' => 'Rẻ, đọc ảnh/video/text — endpoint chat OpenAI-compatible'],
+            ['group' => 'vision', 'name' => 'Qwen 3.8 Max (multimodal)', 'provider' => 'qwen', 'model_id' => 'qwen3.8-max', 'api_key_ref' => 'qwen', 'priority' => 8, 'note' => 'Nhận diện sắc hơn, đắt hơn'],
+            ['group' => 'vision', 'name' => 'Gemini 2.5 Flash (vision)', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash', 'api_key_ref' => 'gemini', 'priority' => 1, 'note' => 'Tùy chọn cuối'],
+
+            // ── PROMPT — Giám đốc sáng tạo / Thuật sỹ ảo ──
+            ['group' => 'prompt', 'name' => 'Qwen 3.8 Flash', 'provider' => 'qwen', 'model_id' => 'qwen3.8-flash', 'api_key_ref' => 'qwen', 'priority' => 10, 'note' => '1M context, agentic, tiếng Việt tốt'],
+            ['group' => 'prompt', 'name' => 'Qwen 3.8 Max', 'provider' => 'qwen', 'model_id' => 'qwen3.8-max', 'api_key_ref' => 'qwen', 'priority' => 8, 'note' => 'Suy luận sâu hơn (snapshot 0902)'],
+            ['group' => 'prompt', 'name' => 'Gemini 2.5 Flash', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash', 'api_key_ref' => 'gemini', 'priority' => 1, 'note' => 'Tùy chọn cuối'],
+
+            // ── TRANSLATE — dịch prompt VI ↔ EN ──
+            ['group' => 'translate', 'name' => 'Qwen 3.8 Flash (dịch)', 'provider' => 'qwen', 'model_id' => 'qwen3.8-flash', 'api_key_ref' => 'qwen', 'priority' => 10, 'note' => 'Dịch VI↔EN tự nhiên, rẻ'],
+            ['group' => 'translate', 'name' => 'Gemini 2.5 Flash (dịch)', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash', 'api_key_ref' => 'gemini', 'priority' => 1, 'note' => 'Tùy chọn cuối'],
+
+            // ── INFERENCE (legacy key — giữ cho đường resolve_studio_model cũ) ──
+            ['group' => 'inference', 'name' => 'Qwen 3.8 Flash (multimodal)', 'provider' => 'qwen', 'model_id' => 'qwen3.8-flash', 'api_key_ref' => 'qwen', 'priority' => 10, 'note' => 'Suy luận prompt — đọc được ảnh/video/text'],
+            ['group' => 'inference', 'name' => 'Qwen 3.8 Max (multimodal)', 'provider' => 'qwen', 'model_id' => 'qwen3.8-max', 'api_key_ref' => 'qwen', 'priority' => 8, 'note' => 'Chất lượng cao hơn flash'],
+            ['group' => 'inference', 'name' => 'Gemini (Giám đốc sáng tạo)', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash', 'api_key_ref' => 'gemini', 'priority' => 1, 'note' => 'Suy luận prompt — tùy chọn cuối'],
+        ];
+    }
+}
+
+if (! function_exists('studio_sync_model_catalog')) {
+    /**
+     * Đồng bộ catalog tích hợp (model QwenCloud mới nhất) vào Model Registry DB
+     * (studio_models) — idempotent theo (group, provider, model_id): cập nhật
+     * name/priority/note của dòng đã có, tạo dòng mới, KHÔNG xoá dòng admin tự
+     * thêm. Trả về ['created' => n, 'updated' => n, 'total' => n].
+     *
+     * Cách gọi: "php artisan studio:sync-models" hoặc nút "Đồng bộ model Qwen"
+     * trong trang Cài đặt (tab Luồng ưu tiên). Khi QwenCloud thêm model mới: cập
+     * nhật studio_model_catalog() rồi chạy lại — cache tự xoá qua model events.
+     */
+    function studio_sync_model_catalog(): array
+    {
+        $created = 0;
+        $updated = 0;
+
+        foreach (studio_model_catalog() as $row) {
+            $existing = \App\Models\StudioModel::query()
+                ->where('group', $row['group'])
+                ->where('provider', $row['provider'])
+                ->where('model_id', $row['model_id'])
+                ->first();
+
+            if ($existing) {
+                // Chỉ đè các trường "mô tả/catalog"; giữ enabled + api_key_ref của admin.
+                $existing->fill([
+                    'name' => $row['name'],
+                    'priority' => $row['priority'],
+                    'note' => $row['note'],
+                ]);
+                if ($existing->isDirty()) {
+                    $existing->save();
+                    $updated++;
+                }
+            } else {
+                \App\Models\StudioModel::create([
+                    'group' => $row['group'],
+                    'name' => $row['name'],
+                    'provider' => $row['provider'],
+                    'model_id' => $row['model_id'],
+                    'api_key_ref' => $row['api_key_ref'],
+                    'priority' => $row['priority'],
+                    'enabled' => true,
+                    'note' => $row['note'],
+                ]);
+                $created++;
+            }
+        }
+
+        return [
+            'created' => $created,
+            'updated' => $updated,
+            'total' => \App\Models\StudioModel::count(),
         ];
     }
 }
@@ -1283,22 +1553,37 @@ if (! function_exists('studio_model_candidates')) {
 
         // 1. Default settings model for the group (top priority).
         if ($group === 'video') {
-            $add('wan', (string) studio_config('video_model', 'wan2.5-t2v'));
+            $add('wan', (string) studio_config('video_model', 'wan3.0-video'));
         } elseif (in_array($group, ['image', 'inference', 'text'], true)) {
-            $p = (string) studio_config('image_provider', 'flux');
+            $p = (string) studio_config('image_provider', 'qwen');
+            // Chỉ provider có ÁNH XẠ MODEL tường minh mới đóng góp candidate mặc định.
+            // Custom slug (vd 'ckey') không có model mặc định ⇒ bỏ qua: model của nó đến
+            // từ Model Registry (bước 2) hoặc từ default gán riêng cho nhóm công việc.
+            // Trước đây nhánh default gán model flux-1.1-schnell cho MỌI slug lạ — sai model
+            // (vd ckey + flux-1.1-schnell ⇒ gọi gateway CKEY bằng model fal không tồn tại).
             $m = match ($p) {
                 'gemini' => (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image'),
                 'wan' => (string) studio_config('wan_model', 'wan2.7-image-pro'),
                 'qwen' => (string) studio_config('qwen_model', 'qwen-image-3.0-pro'),
-                default => (string) studio_config('image_model', 'flux-1.1-schnell'),
+                'flux' => (string) studio_config('image_model', 'flux-1.1-schnell'),
+                default => null,
             };
-            $add($p, $m);
+            if ($m !== null && $m !== '') {
+                $add($p, $m);
+            }
         }
 
-        // 2. Registered models of the group, by priority (desc).
-        foreach (studio_models($group)->filter(function ($m) {
-            return ($m['enabled'] ?? true) == true;
-        })->sortByDesc('priority')->values() as $m) {
+        // 2. Registered models of the group, ranked by the PROVIDER PRIORITY FLOW
+        // (qwen → custom → flux → gemini; xem studio_provider_rank) first, then by
+        // their saved priority (desc) within the same provider. This is what makes
+        // Qwen the primary route and Flux/Gemini true fallbacks without touching the
+        // per-model priorities the admin set.
+        $rows = studio_sort_by_provider_rank(
+            studio_models($group)->filter(function ($m) {
+                return ($m['enabled'] ?? true) == true;
+            })->values()->all()
+        );
+        foreach ($rows as $m) {
             $add($m['provider'] ?? null, $m['model_id'] ?? null);
         }
 
@@ -1389,7 +1674,7 @@ if (! function_exists('studio_task_groups')) {
     {
         return [
             'image' => ['label' => 'Tạo ảnh 2D (Concept / Ảnh mới từ ảnh mẫu)', 'legacy_default' => function () {
-                $p = (string) studio_config('image_provider', 'flux');
+                $p = (string) studio_config('image_provider', 'qwen');
                 $m = match ($p) {
                     'gemini' => (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image'),
                     'wan' => (string) studio_config('wan_model', 'wan2.7-image-pro'),
@@ -1399,7 +1684,7 @@ if (! function_exists('studio_task_groups')) {
                 return $p.':'.$m;
             }],
             'edit' => ['label' => 'Sửa ảnh / Inpaint (chỉnh sửa theo vùng, reimagine)', 'legacy_default' => fn () => 'qwen:'.(string) studio_config('qwen_edit_model', 'qwen-image-edit')],
-            'video' => ['label' => 'Video catwalk (Kịch bản quay)', 'legacy_default' => fn () => 'wan:'.(string) studio_config('video_model', 'wan2.5-t2v')],
+            'video' => ['label' => 'Video catwalk (Kịch bản quay)', 'legacy_default' => fn () => 'wan:'.(string) studio_config('video_model', 'wan3.0-video')],
             // Nhóm 'swap' giữ nguyên KEY (nhiều nơi đọc) nhưng ĐỔI NHÃN: từ 2026-09-17 card "Thay
             // người mẫu" đã bị gỡ, nhóm này chỉ còn phục vụ đường thử đồ của Fitting Room
             // (VirtualTryOnService) và swapEdit (remove-bg / xoá người khỏi ảnh).
@@ -1488,7 +1773,10 @@ if (! function_exists('studio_task_group_models')) {
         // 2. Model Registry của nhóm — hình thức chính: gán model vào đúng vai trò.
         // Nạp MỘT lần rồi lọc theo nhóm (trước đây query lại cho MỖI nhóm — 21 query/request).
         // $row là MẢNG (cache trả mảng thuần) — dùng truy cập mảng, không dùng -> như bản cũ.
-        foreach (studio_models_enabled_by_group()[$group] ?? [] as $row) {
+        // Xếp lại theo LUỒNG ƯU TIÊN provider (qwen → custom → flux → gemini) trước,
+        // rồi mới tới priority — DB chỉ sort priority nên phải xếp lại ở đây.
+        $rows = studio_sort_by_provider_rank(studio_models_enabled_by_group()[$group] ?? []);
+        foreach ($rows as $row) {
             $add($row['provider'] ?? null, $row['model_id'] ?? null, $row['id'] ?? null, false, $row['name'] ?? null);
         }
 
@@ -1517,9 +1805,11 @@ if (! function_exists('studio_task_group_models')) {
                 $legacy = array_map(fn ($m) => ['provider' => 'qwen', 'model' => $m], array_slice(studio_qwen_text_models(), 0, 5));
                 $legacy[] = ['provider' => 'gemini', 'model' => (string) studio_config('prompt_model', 'gemini-2.5-flash')];
             } elseif ($group === 'translate') {
+                // Qwen trước theo luồng ưu tiên; Gemini là tùy chọn cuối (đổi từ bản cũ
+                // đặt gemini đầu — giữ làm fallback khi chưa cấu hình key Qwen).
                 $legacy = [
-                    ['provider' => 'gemini', 'model' => (string) studio_config('translate_model', 'gemini-2.5-flash')],
                     ['provider' => 'qwen', 'model' => (string) studio_config('qwen_prompt_model', 'qwen3.8-flash')],
+                    ['provider' => 'gemini', 'model' => (string) studio_config('translate_model', 'gemini-2.5-flash')],
                 ];
             }
             foreach ($legacy as $i => $c) {

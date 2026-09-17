@@ -1468,6 +1468,7 @@ RULES:
             return [$list[0]['provider'], $list[0]['model']];
         }
 
+        // Ultimate fallback (no settings, no registry, no catalog) — Flux schnell on Fal.
         return ['flux', (string) studio_config('image_model', 'flux-1.1-schnell')];
     }
 
@@ -1545,7 +1546,7 @@ RULES:
      */
     public function testModel(\App\Models\StudioModel $model)
     {
-        $knownVideo = ['wan2.5-t2v', 'wan2.2-i2v', 'wan2.5-i2v', 'wan2.1-i2v-turbo', 'happyhorse-1.1-i2v', 'wanx2.1-t2v-turbo', 'wanx2.1-i2v-turbo'];
+        $knownVideo = ['wan3.0-video', 'wan2.7-t2v', 'wan2.7-i2v', 'wan2.5-t2v', 'wan2.2-i2v', 'wan2.5-i2v', 'wan2.1-i2v-turbo', 'happyhorse-1.1-i2v', 'wanx2.1-t2v-turbo', 'wanx2.1-i2v-turbo'];
         $group = $model->group;
 
         // The checked model itself is the subject — report ITS key (generation uses the same

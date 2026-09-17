@@ -102,7 +102,7 @@
     "name": "useLocalCatalog"
   },
   "resources/css/app.css": {
-    "file": "assets/app-qj0b-WZ1.css",
+    "file": "assets/app-Bdpk5AQ4.css",
     "name": "app",
     "names": [
       "app.css"
@@ -162,7 +162,7 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-BU7E_uJ0.js",
+    "file": "assets/settings-D5IWs-Oc.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
@@ -172,7 +172,7 @@
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/settings-DtwNsAIq.css"
+      "assets/settings-OYyT3wGQ.css"
     ]
   },
   "resources/js/studio/stylist-data.js": {

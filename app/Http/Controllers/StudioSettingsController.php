@@ -42,6 +42,8 @@ class StudioSettingsController extends Controller
                 'base_url' => $meta['base_url'],
                 'auth_style' => $meta['auth_style'],
                 'hint' => $meta['hint'],
+                'family' => $meta['family'] ?? 'other',
+                'rank' => $meta['rank'] ?? 990,
                 'custom' => $meta['custom'],
                 'enabled' => $meta['enabled'],
                 'key_count' => $n,
@@ -57,8 +59,12 @@ class StudioSettingsController extends Controller
             // Đây là cầu nối giữa các tab: tab Models đăng ký model vào nhóm, tab Cấu hình
             // nhóm chọn default, cards /studio đọc đúng danh sách của nhóm mình.
             'task_groups' => $this->taskGroupRows(),
+            // Luồng ưu tiên provider (qwen → custom → flux → gemini) + số model mỗi nhóm
+            // provider theo registry — cho tab "Luồng ưu tiên" vẽ chuỗi fallback.
+            'provider_priority' => implode(',', studio_provider_priority_flow()),
+            'flow_counts' => $this->flowCounts(),
             'config' => [
-                'image_provider' => setting('studio_image_provider', 'flux'),
+                'image_provider' => setting('studio_image_provider', 'qwen'),
                 'image_model' => setting('studio_image_model', config('studio.image_model')),
                 'qwen_model' => setting('studio_qwen_model', ''),
                 'video_model' => setting('studio_video_model', config('studio.video_model')),
@@ -92,6 +98,59 @@ class StudioSettingsController extends Controller
         set_setting('studio_task_'.$data['group'].'_model', $value);
 
         return response()->json(['ok' => true, 'group' => $data['group'], 'value' => $value]);
+    }
+
+    /**
+     * POST /studio/settings-vue/provider-priority — đổi thứ tự luồng ưu tiên provider.
+     * value = CSV các token: qwen,custom,flux,gemini,other (mọi token khác bị bỏ).
+     */
+    public function providerPriority(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'value' => ['required', 'string', 'max:120'],
+        ]);
+
+        $valid = ['qwen', 'custom', 'flux', 'gemini', 'other'];
+        $tokens = array_values(array_filter(array_map('trim', explode(',', (string) $data['value']))));
+        $tokens = array_values(array_intersect($tokens, $valid));
+        if (! $tokens) {
+            return response()->json(['message' => 'Luồng ưu tiên cần ít nhất một nhóm: qwen, custom, flux, gemini.'], 422);
+        }
+
+        set_setting('studio_provider_priority', implode(',', $tokens));
+
+        return response()->json(['ok' => true, 'value' => implode(',', $tokens)]);
+    }
+
+    /**
+     * POST /studio/settings-vue/sync-catalog — nhập model QwenCloud mới nhất từ catalog
+     * tích hợp vào Model Registry (idempotent). Khi QwenCloud thêm model: cập nhật
+     * studio_model_catalog() trong helpers.php rồi bấm nút này (hoặc chạy
+     * "php artisan studio:sync-models").
+     */
+    public function syncCatalog(): JsonResponse
+    {
+        $result = studio_sync_model_catalog();
+
+        return response()->json(['ok' => true] + $result);
+    }
+
+    /**
+     * Số model ĐANG BẬT của mỗi nhóm luồng ưu tiên — cho badge ở tab Luồng ưu tiên.
+     */
+    protected function flowCounts(): array
+    {
+        $counts = ['qwen' => 0, 'custom' => 0, 'flux' => 0, 'gemini' => 0, 'other' => 0];
+        try {
+            foreach (StudioModel::query()->where('enabled', true)->get() as $m) {
+                $family = studio_provider_family((string) $m->provider);
+                $counts[$family] = ($counts[$family] ?? 0) + 1;
+            }
+        } catch (\Throwable $e) {
+            // bảng chưa migrate — để trống
+        }
+
+        return $counts;
     }
 
     /**

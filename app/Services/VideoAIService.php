@@ -50,7 +50,7 @@ class VideoAIService
     protected function callDashscopeVideo(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution, ?string $duration, string $key, ?int $generationId = null, ?string $modelOverride = null, ?string $provider = null): string
     {
         $base = dashscope_base_url($key).'/api/v1';
-        $model = $modelOverride ?: (string) studio_config('video_model', 'wan2.5-t2v');
+        $model = $modelOverride ?: (string) studio_config('video_model', 'wan3.0-video');
         $size = $this->videoSize($resolution);
 
         $prompt = trim($prompt);
@@ -83,7 +83,7 @@ class VideoAIService
             $lower = strtolower($body);
             if (str_contains($lower, 'model not exist') || str_contains($lower, 'invalidparameter') || str_contains($lower, 'model_not_supported')) {
                 throw new \RuntimeException('Model video không tồn tại trên nhà cung cấp. Model_id không hợp lệ cho provider đã chọn — '
-                    .'VD model video HỢP LỆ cho DashScope/Wan: wan2.5-t2v, wan2.2-i2v, wan2.5-i2v, wan2.1-i2v-turbo, happyhorse-1.1-i2v. '
+                    .'VD model video HỢP LỆ cho DashScope/Wan/QwenCloud: wan3.0-video (mới nhất), wan2.7-t2v, wan2.7-i2v, wan2.5-t2v, wan2.2-i2v, happyhorse-1.1-i2v. '
                     .'Kiểm tra lại model_id trong Model Registry (không dùng tên model của provider khác như Kling nếu chỉ có key DashScope). '.Str::limit($body, 160));
             }
             throw new \RuntimeException('DashScope video ('.$submit->status().'): '.Str::limit($body, 240));
