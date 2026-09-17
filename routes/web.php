@@ -37,6 +37,12 @@ Route::get('/dang-nhap', [AuthController::class, 'showLogin'])->name('login');
 // throttle:login — chống brute-force (5 lần/phút theo email+IP; xem AppServiceProvider).
 Route::post('/dang-nhap', [AuthController::class, 'login'])->middleware('throttle:login')->name('login.store');
 Route::get('/dang-ky', [AuthController::class, 'showRegister'])->name('register');
+
+// ── Trang GIÁ công khai (không cần đăng nhập) ──
+// [Đợt 1 — 2026-09-19] Trước đây khách chưa đăng nhập KHÔNG có cách nào xem gói cước (không có view
+// pricing, trang đăng ký không nhắc gói nào) ⇒ phải tạo tài khoản mới biết. Trang render phía máy
+// chủ; giá/credit đọc từ bảng plans đang mở bán nên không bao giờ lệch với hệ thống.
+Route::get('/bang-gia', [BillingController::class, 'pricingPage'])->name('pricing.page');
 // throttle:register — chống spam tạo tài khoản (5 lần/phút theo IP).
 Route::post('/dang-ky', [AuthController::class, 'register'])->middleware('throttle:register')->name('register.store');
 Route::post('/dang-xuat', [AuthController::class, 'logout'])->name('logout');

@@ -7,6 +7,7 @@
     <meta name="theme-color" content="#193d2b">
     <meta name="color-scheme" content="dark light">
     <title>@yield('title', 'FabrikAI') — FabrikAI</title>
+    @yield('meta')
     @vite(['resources/css/app.css'])
 </head>
 <body class="min-h-screen bg-ink-950 text-cream-100 antialiased">

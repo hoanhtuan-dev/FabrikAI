@@ -139,8 +139,12 @@
   dùng · credit còn lại · chi phí **theo gói** của ảnh/video · độ phân giải tối đa của gói · hạn gói ·
   cảnh báo sắp cạn · và **danh mục gói để đổi/nâng cấp ngay trong Studio** (nói rõ hệ thống chưa có cổng
   thanh toán). Dữ liệu từ `GET /api/plan/status`.
-- **Còn nợ của đợt 1**: **trang giá công khai** (khách chưa đăng nhập vẫn chưa xem được gói) và việc
-  **bật** cờ enforce sau khi có thanh toán (Q1/Q2).
+- ✅ **Trang giá công khai `/bang-gia`** (render phía máy chủ, không cần JS): định vị theo **3 persona**
+  (nỗi đau + việc cần làm + gói khởi đầu/gói lớn lên), bảng gói lấy **trực tiếp từ DB** (không có con số
+  nào ghi cứng), bảng so sánh, 4 bước từ ý tưởng tới ảnh bán được, 6 câu hỏi thường gặp, CTA theo trạng thái
+  đăng nhập (khách → /dang-ky · đã đăng nhập → Vào Studio / Kích hoạt trong Studio) và **nói thật** về việc
+  chưa có cổng thanh toán. Link tới trang giá được thêm ở trang Đăng nhập và Đăng ký.
+- **Đợt 1 đã ĐÓNG** (trừ 2 việc phụ thuộc quyết định của chủ dự án: **bật** cờ enforce và **cổng thanh toán** — Q1/Q2).
 
 ### Đợt 2 — Không gian làm việc theo nghề
 - Sidebar "Không gian làm việc": **Bộ sưu tập** (gom ảnh/biến thể theo mùa vụ, tái dùng ngữ cảnh), **Việc đang chạy**, **Thư viện**, **Duyệt**.

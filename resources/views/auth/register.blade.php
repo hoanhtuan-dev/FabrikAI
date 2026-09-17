@@ -32,6 +32,7 @@
         </form>
 
         <p class="mt-4 text-sm text-cream-300/60">Đã có tài khoản? <a href="{{ route('login') }}" class="link">Đăng nhập</a></p>
+        <p class="mt-2 text-xs text-cream-300/60">Xem trước <a href="{{ route('pricing.page') }}" class="link">các gói và giá</a> — không cần đăng ký.</p>
     </div>
 </div>
 @endsection
