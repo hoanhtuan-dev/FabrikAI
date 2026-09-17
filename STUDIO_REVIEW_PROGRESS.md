@@ -30,7 +30,13 @@ JS/Vue studio **42 file (33 .vue) / 12.828 dòng** · `public_html` **21 MB** ·
 | 0.9 | scripts/measure.sh | ✅ XONG | `93dfd86` | nguồn số liệu chuẩn cho mọi vòng |
 | 0.1 | Mở studio cho customer (quyền hẹp) + banner 3 trạng thái | ✅ XONG | `4703b58` + `ce55a7d` | tách route 2 nhóm; 338 test |
 | 0.1b | Scope ảnh ref/uploads theo user | ⬜ CHƯA | — | 4 endpoint (/uploads*, /ref-images*) TẠM để ADMIN vì thư mục ref là kho chung — phải có cột user_id rồi mới chuyển về STUDIO. **Ưu tiên** vì khách cần xem/liệt kê ảnh tham chiếu của mình |
-| 0.2 | Tiến trình thật | 🔄 đang làm | — | — |
+| 0.2 | Tiến trình thật (bỏ mô phỏng) | ✅ XONG | `46a9ae2` | bỏ bộ đếm lặp cộng % ngẫu nhiên ở generateImage; % nay suy từ trạng thái THẬT qua `syncBatchProgress()`; generateImage còn thiếu `pollGeneration` nên thumbnail kẹt "Đang chờ" tới khi F5 — đã thêm |
+| 0.3 | Nói thật chế độ DEMO | ✅ XONG | `9833c58` | thêm cột `generations.is_demo` + `demo_reason`; `ImageAIService::lastStubReason()` ghi khi rơi vào `copySample` (ảnh mẫu **hoặc chính ảnh gốc** ở đường EDIT) rồi reset mỗi lần gọi; job ghi cờ xuống DB; `show`/`latest` trả ra UI; lưới Kết quả gắn nhãn DEMO + banner |
+| 0.4 | Nút 1K/2K + tỉ lệ trung thực | ✅ XONG | `6235e93` | `sizeFor()` nhận `$resolution` mà **không dùng** ⇒ 1K/2K ra cùng một ảnh; `4:5`/`21:9` bị đổi âm thầm thành `3:4`/`16:9`. Nay `normalizeOutputSize()` cắt giữa về ĐÚNG tỉ lệ rồi hạ cạnh dài về 1024/2048, **không phóng to**; chỉ áp cho đường TẠO, đường SỬA giữ nguyên kích thước ảnh gốc |
+| 0.5 | Mobile dùng được | ⬜ CHƯA | — | drawer Outputs/Nguồn/Thư viện bị co cứng, thanh dưới chồng chữ |
+| 0.6 | Dư lượng UI chết | ⬜ CHƯA | — | nút cài PWA, `store.step`, listener keydown rò, comment `swap : SwapCard` |
+| 0.7 | a11y focus trap | ⬜ CHƯA | — | 19 lớp phủ `fixed inset-0` chưa giữ focus trong hộp thoại |
+| 0.8 | 3 nợ bảo mật vừa | ⬜ CHƯA | — | DDL `Schema::create` trên GET công khai; `SuggestLibraryService::counts()` 4 COUNT; sanitizer chỉ che `Generation.error` khi `!APP_DEBUG` |
 
 > 🛑 **BẢNG DƯỚI ĐÂY LÀ ẢNH CHỤP 2026-09-16 — ĐÃ SAI HOÀN TOÀN, CHỈ GIỮ ĐỂ ĐỐI CHIẾU LỊCH SỬ.**
 > Nó nói *"KHÔNG có `.git`"*, *"KHÔNG có `tests/`"*, *"chưa có deploy"* — cả ba đều **SAI** kể từ 2026-09-17.
