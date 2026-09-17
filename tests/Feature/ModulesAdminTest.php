@@ -188,6 +188,59 @@ class ModulesAdminTest extends TestCase
         $pro->forceFill(['modules' => $before])->save();
     }
 
+    public function test_no_blade_comment_syntax_leaks_into_vue_files(): void
+    {
+        // Bài học thật: chú thích kiểu Blade đặt trong file .vue bị Vue hiểu là interpolation ⇒ build đỏ
+        // ("Invalid left-hand side in prefix operation"). Test này bắt lỗi đó TRƯỚC khi build.
+        $bladeComment = '{'.'{--';
+
+        foreach (['AdminApp.vue', 'StudioApp.vue', 'store.js'] as $file) {
+            $code = (string) file_get_contents(resource_path('js/studio/'.$file));
+            $this->assertStringNotContainsString($bladeComment, $code, 'File '.$file.' dùng chú thích Blade — Vue/JS phải dùng HTML comment hoặc //.');
+        }
+    }
+
+    public function test_manual_feature_notes_never_grant_anything_and_plan_display_follows_the_switch(): void
+    {
+        // Yêu cầu chủ dự án: gói cước ĐỒNG BỘ với "gói cấp tính năng nào", nhưng owner vẫn nhập tay được chữ
+        // hiển thị cho khách. Phần nhập tay KHÔNG phải công tắc: thêm/xoá ghi chú không đổi quyền.
+        $owner = $this->superAdmin();
+        $plan = $this->plan('pro');
+        $customer = $this->customer();
+        app(PlanService::class)->assign($customer, $plan);
+
+        $before = $plan->modules();
+
+        // (a) Ghi chú nhập tay: KHÔNG cấp thêm tính năng nào.
+        $this->actingAs($owner)->putJson('/api/admin/plans/'.$plan->id, [
+            'name' => $plan->name, 'slug' => $plan->slug, 'price_vnd' => $plan->price_vnd,
+            'credits_per_month' => $plan->credits_per_month,
+            'features' => ['Hỗ trợ ưu tiên 1:1', 'Hoá đơn theo vụ'],
+            'modules' => $before,
+        ])->assertOk();
+
+        $wasLocked = ! module_allowed($customer->fresh(), 'team_seats');
+        $plan->forceFill(['features' => ['Ghi chú mới toanh']])->save();
+        $this->assertSame($wasLocked, ! module_allowed($customer->fresh(), 'team_seats'), 'Ghi chú nhập tay không được đổi quyền.');
+        $this->assertSame($before, $plan->fresh()->modules(), 'Ghi chú nhập tay không được đụng vào công tắc.');
+
+        // (b) Tên tính năng hiển thị SUY TỪ công tắc: rút một module ⇒ tên đó biến mất khỏi danh sách hiển thị.
+        $plan->forceFill(['modules' => array_values(array_diff($before, ['upscale']))])->save();
+        $this->assertNotContains('Upscale', $plan->fresh()->moduleNames());
+        $this->assertSame($plan->fresh()->modulesCount(), count($plan->fresh()->moduleNames()));
+        $this->assertArrayHasKey('Chỉnh ảnh', $plan->fresh()->modulesByGroup());
+
+        // (c) mapPlan trả đủ dữ liệu cho màn Quản trị (số tính năng + tên + ghi chú).
+        $row = collect($this->actingAs($owner)->getJson('/api/admin/plans')->assertOk()->json('plans'))
+            ->firstWhere('slug', 'pro');
+        $this->assertSame($plan->fresh()->modules(), $row['modules']);
+        $this->assertSame($plan->fresh()->moduleNames(), $row['module_names']);
+        $this->assertSame(['Ghi chú mới toanh'], $row['manual_features']);
+        $this->assertArrayHasKey('modules_by_group', $row);
+
+        $plan->forceFill(['modules' => $before, 'features' => []])->save();
+    }
+
     public function test_admin_and_studio_surfaces_are_wired_to_the_registry(): void
     {
         // Chống "tính năng chết": API có mà giao diện không gọi thì chủ dự án không dùng được công tắc.

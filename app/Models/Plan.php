@@ -112,6 +112,52 @@ class Plan extends Model
         return count($this->modules());
     }
 
+    /**
+     * TÊN các tính năng gói cấp — dùng để HIỂN THỊ cho khách (trang giá, popup gói, Quản trị).
+     *
+     * Đây là phần "gói cước đồng bộ với gói cấp tính năng nào": tên lấy từ ModuleRegistry ⇒ chủ dự án đổi
+     * tên/ thêm/ bớt tính năng là phần hiển thị tự đúng, không phải viết lại danh sách ở trang giá.
+     *
+     * @return array<int, string>
+     */
+    public function moduleNames(): array
+    {
+        return array_values(array_map(
+            fn (string $id) => \App\Support\ModuleRegistry::name($id),
+            $this->modules()
+        ));
+    }
+
+    /** Tên tính năng theo NHÓM (nhóm do bản khai quyết định) — để trang giá hiển thị gọn. */
+    public function modulesByGroup(): array
+    {
+        $out = [];
+        foreach ($this->modules() as $id) {
+            $m = \App\Support\ModuleRegistry::get($id);
+
+            $out[$m['group']][] = $m['name'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * GHI CHÚ HIỂN THỊ do chủ dự án NHẬP TAY (cột `features`).
+     *
+     * Cố ý KHÔNG phải công tắc: đây là câu chữ bán hàng/giải thích thêm cho khách đọc (vd "hỗ trợ ưu tiên
+     * 1:1", "hoá đơn theo vụ"). Việc cấp quyền thật nằm ở `modules()` — nhập tay ở đây KHÔNG mở
+     * thêm tính năng nào, và xoá hết ghi chú cũng KHÔNG lấy mất quyền của khách.
+     *
+     * @return array<int, string>
+     */
+    public function manualFeatures(): array
+    {
+        return array_values(array_filter(array_map(
+            fn ($f) => trim((string) $f),
+            is_array($this->features) ? $this->features : []
+        ), fn (string $f) => $f !== ''));
+    }
+
     // ── [Q3 — 2026-09-19] GÓI THEO MÙA VỤ ────────────────────────────────────────────────
     // Chủ xưởng may mua theo VỤ (một bộ sưu tập / một đơn lớn), không mua theo tháng. Ba khái niệm:
     //   unit_months  = một đơn vị mua bằng mấy tháng (1 = gói tháng, 3 = gói vụ)

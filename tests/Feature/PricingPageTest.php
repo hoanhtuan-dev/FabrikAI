@@ -86,8 +86,11 @@ class PricingPageTest extends TestCase
         }
 
         // Gói 'pro' vừa bị rút 'team_seats' ⇒ trong bảng, dòng đó phải là dấu "—" ở cột Chuyên nghiệp.
+        // Khoanh vùng BẢNG trước rồi mới tìm dòng: tên module còn xuất hiện ở thẻ gói phía trên (danh sách
+        // tính năng suy từ quyền), nên quét cả trang sẽ bắt nhầm.
+        $matrix = substr($html, (int) strpos($html, 'Tính năng nào có ở gói nào'));
         $row = null;
-        foreach (explode('<tr', $html) as $tr) {
+        foreach (explode('<tr', $matrix) as $tr) {
             if (str_contains($tr, 'Nhóm làm việc (ghế)')) {
                 $row = $tr;
                 break;
@@ -96,6 +99,39 @@ class PricingPageTest extends TestCase
         $this->assertNotNull($row, 'Không tìm thấy dòng module «Nhóm làm việc (ghế)».');
         $this->assertStringContainsString('—', $row, 'Gói đã bị rút module thì phải hiện dấu —, không phải ✓.');
         $this->assertStringContainsString('✓', $row, 'Gói khác vẫn cấp module này ⇒ phải có ít nhất một dấu ✓ trong dòng.');
+    }
+
+    public function test_plan_card_shows_capabilities_from_the_switch_and_manual_notes_separately(): void
+    {
+        // Yêu cầu chủ dự án: GÓI CƯỚC phải đồng bộ với "gói cấp tính năng nào", ĐỒNG THỜI owner vẫn nhập
+        // tay được phần chữ hiển thị cho khách — phần nhập tay KHÔNG phải công tắc.
+        $plan = Plan::where('slug', 'pro')->firstOrFail();
+        $plan->forceFill([
+            'modules' => ['collections', 'upscale'],
+            'features' => ['Hỗ trợ ưu tiên 1:1', 'Hoá đơn theo vụ'],
+        ])->save();
+
+        $html = $this->get('/bang-gia')->assertOk()->getContent();
+
+        // (a) Danh sách tính năng trong thẻ gói suy TỪ quyền: có 2 tính năng đã tick…
+        $this->assertStringContainsString('Có trong gói', $html);
+        $this->assertStringContainsString('2/'.count(\App\Support\ModuleRegistry::all()).' tính năng', $html);
+        $card = substr($html, (int) strpos($html, 'id="goi-pro"'));
+        $card = substr($card, 0, (int) strpos($card, 'id="goi-', 5) ?: 6000);
+        $this->assertStringContainsString('Bộ sưu tập', $card, 'Tên tính năng phải lấy từ bản khai module.');
+        $this->assertStringContainsString('Upscale', $card);
+        // …và KHÔNG chứa tính năng chưa được tick (vd Kịch bản quay / video).
+        $this->assertStringNotContainsString('Kịch bản quay', $card, 'Tính năng chưa cấp không được quảng cáo trong thẻ gói.');
+
+        // (b) Ghi chú nhập tay vẫn hiển thị, ở khối riêng, và không cấp quyền gì.
+        $this->assertStringContainsString('Thông tin thêm', $html);
+        $this->assertStringContainsString('Hỗ trợ ưu tiên 1:1', $html);
+        $this->assertStringContainsString('Hoá đơn theo vụ', $html);
+
+        $user = \App\Models\User::where('email', 'user@fabrikai.shop')->firstOrFail();
+        app(\App\Services\PlanService::class)->assign($user, $plan);
+        $this->assertFalse(module_allowed($user->fresh(), 'director'), 'Ghi chú nhập tay KHÔNG được cấp quyền.');
+        $this->assertSame(['collections', 'upscale'], $plan->fresh()->modules(), 'Ghi chú không được đụng vào công tắc.');
     }
 
     public function test_pricing_page_links_to_signup(): void

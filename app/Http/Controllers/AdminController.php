@@ -760,7 +760,11 @@ class AdminController extends Controller
             // [Modules] Gói cấp module nào (công tắc cấp phát tính năng) + đề xuất từ bản khai.
             'modules' => $p->modules(),
             'modules_count' => $p->modulesCount(),
+            'module_names' => $p->moduleNames(),
+            'modules_by_group' => $p->modulesByGroup(),
             'suggested_modules' => ModuleRegistry::suggestedForPlan((string) $p->slug),
+            // Ghi chú hiển thị NHẬP TAY — chỉ để khách đọc, KHÔNG cấp quyền (xem Plan::manualFeatures()).
+            'manual_features' => $p->manualFeatures(),
             'features' => $p->features ?? [],
             'is_active' => (bool) $p->is_active,
             'is_default' => (bool) $p->is_default,

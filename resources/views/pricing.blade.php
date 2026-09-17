@@ -129,7 +129,9 @@
         <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             @foreach($plans as $plan)
                 @php $badges = $recommended[$plan->slug] ?? []; @endphp
-                <article class="card flex flex-col p-5 {{ $plan->isFree() ? '' : 'ring-1 ring-inset ring-brand-500/20' }}">
+                {{-- id ổn định theo slug: vừa để chia sẻ link tới đúng gói, vừa để test khoanh vùng được
+                     đúng thẻ gói (không bắt nhầm tên gói xuất hiện ở khối persona/bảng so sánh). --}}
+                <article id="goi-{{ $plan->slug }}" class="card flex flex-col p-5 {{ $plan->isFree() ? '' : 'ring-1 ring-inset ring-brand-500/20' }}">
                     <div class="flex flex-wrap items-center gap-2">
                         <h3 class="font-display text-lg font-semibold text-cream-50">{{ $plan->name }}</h3>
                         @if($plan->isFree())
@@ -177,17 +179,42 @@
                         </div>
                     </dl>
 
-                    @if(! empty($plan->features))
-                        <ul class="mt-4 flex-1 space-y-1.5 border-t border-ink-700 pt-3">
-                            @foreach($plan->features as $feature)
-                                <li class="flex items-start gap-2 text-[11px] text-cream-200">
-                                    <svg class="mt-0.5 h-3 w-3 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-9 11-5-5"/></svg>
-                                    {{ $feature }}
-                                </li>
-                            @endforeach
-                        </ul>
-                    @else
-                        <div class="flex-1"></div>
+                    {{-- [Modules] PHẦN 1 — TÍNH NĂNG CÓ TRONG GÓI: suy TỪ quyền thật (plans.modules),
+                         nên gói cước luôn khớp với gói cấp tính năng nào. --}}
+                    <div class="mt-4 flex-1 border-t border-ink-700 pt-3">
+                        <p class="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300">
+                            <span>Có trong gói</span>
+                            <span class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200">{{ $plan->modulesCount() }}/{{ count($modules) }} tính năng</span>
+                        </p>
+                        <details class="group mt-1.5">
+                            <summary class="cursor-pointer list-none text-[11px] font-semibold text-brand-200 hover:text-brand-100">
+                                <span class="group-open:hidden">Xem {{ $plan->modulesCount() }} tính năng ▾</span>
+                                <span class="hidden group-open:inline">Thu gọn ▴</span>
+                            </summary>
+                            <div class="mt-2 space-y-1.5">
+                                @foreach($plan->modulesByGroup() as $group => $names)
+                                    <p class="text-[10px] text-cream-300/75">
+                                        <span class="font-semibold text-cream-200">{{ $group }}:</span> {{ implode(' · ', $names) }}
+                                    </p>
+                                @endforeach
+                            </div>
+                        </details>
+                    </div>
+
+                    {{-- [Modules] PHẦN 2 — GHI CHÚ HIỂN THỊ do chủ dự án NHẬP TAY: chỉ để khách đọc thêm,
+                         KHÔNG phải công tắc (không cấp quyền gì). --}}
+                    @if(! empty($plan->manualFeatures()))
+                        <div class="mt-3 border-t border-ink-800 pt-3">
+                            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/75">Thông tin thêm</p>
+                            <ul class="mt-1.5 space-y-1.5">
+                                @foreach($plan->manualFeatures() as $feature)
+                                    <li class="flex items-start gap-2 text-[11px] text-cream-200">
+                                        <svg class="mt-0.5 h-3 w-3 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-9 11-5-5"/></svg>
+                                        {{ $feature }}
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
                     @endif
 
                     @if(! empty($badges))

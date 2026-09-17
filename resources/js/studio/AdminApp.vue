@@ -396,7 +396,9 @@ const planModal = reactive({ open: false, mode: 'create', row: null, form: blank
 function blankUser() { return { name: '', email: '', phone: '', password: '', role: 'customer', plan_id: '', is_active: true }; }
 function blankPlan() {
   // seats: [Q4] số NGƯỜI dùng chung một gói (1 = một người).
-  return { name: '', slug: '', tagline: '', price_vnd: 0, credits_per_month: 0, bonus_credits: 0, image_credit_cost: 1, video_credit_cost: 10, resolution_cap: '2K', seats: 1, features: [], is_active: true, is_default: false, sort: 0 };
+  // modules: [Modules] công tắc cấp phát tính năng của gói (danh sách id module).
+  // features: ghi chú HIỂN THỊ nhập tay — chỉ để khách đọc, KHÔNG cấp quyền gì.
+  return { name: '', slug: '', tagline: '', price_vnd: 0, credits_per_month: 0, bonus_credits: 0, image_credit_cost: 1, video_credit_cost: 10, resolution_cap: '2K', seats: 1, modules: [], features: [], is_active: true, is_default: false, sort: 0 };
 }
 function openCreateUser() { Object.assign(userModal, { open: true, mode: 'create', row: null, form: blankUser(), errors: {}, saving: false }); }
 function openEditUser(u) {
@@ -470,8 +472,12 @@ function openUserLedger(u) {
 }
 
 // ─────────────────────────── Hộp thoại: gói cước ───────────────────────────
-function openCreatePlan() { Object.assign(planModal, { open: true, mode: 'create', row: null, form: blankPlan(), errors: {}, saving: false, featureText: '' }); }
+function openCreatePlan() {
+  ensureModulesLoaded();
+  Object.assign(planModal, { open: true, mode: 'create', row: null, form: blankPlan(), errors: {}, saving: false, featureText: '' });
+}
 function openEditPlan(p) {
+    ensureModulesLoaded();
   const form = blankPlan();
   Object.keys(form).forEach((k) => { if (k in p) form[k] = k === 'features' ? (p.features || []).slice() : p[k]; });
   Object.assign(planModal, { open: true, mode: 'edit', row: p, form, errors: {}, saving: false, featureText: '' });
@@ -482,6 +488,23 @@ function addFeature() {
   planModal.featureText = '';
 }
 function removeFeature(i) { planModal.form.features.splice(i, 1); }
+// [Modules] Tick/bỏ tick module cho gói NGAY TRONG form gói (cùng dữ liệu với màn «Tính năng & gói»).
+function togglePlanFormModule(id) {
+  const list = planModal.form.modules || [];
+  const i = list.indexOf(id);
+  if (i === -1) list.push(id); else list.splice(i, 1);
+  planModal.form.modules = list.slice();
+}
+const planFormModuleCount = () => (planModal.form.modules || []).length;
+/** Tên tính năng khách sẽ thấy (suy từ module đã tick) — để owner xem trước khi lưu. */
+const planFormModuleNames = () => (planModal.form.modules || [])
+  .map((id) => (modulesData.value.modules || []).find((m) => m.id === id))
+  .filter(Boolean)
+  .map((m) => m.name);
+/** Đảm bảo màn «Tính năng & gói» có dữ liệu để form gói hiện được danh sách module. */
+function ensureModulesLoaded() {
+  if (!modulesData.value.modules.length) loadModules();
+}
 
 function validatePlan() {
   const v = planModal.form;
@@ -1001,6 +1024,16 @@ onMounted(async () => {
                   <span v-if="p.is_default" :class="[BADGE, BADGE_TONE.warn]"><StudioIcon name="target" size="h-3 w-3" /> Mặc định</span>
                   <span :class="[BADGE, p.is_active ? BADGE_TONE.ok : BADGE_TONE.neutral]">{{ p.is_active ? 'Đang mở bán' : 'Đang ẩn' }}</span>
                   <span :class="[BADGE, BADGE_TONE.info]" :title="'Số người dùng đang gán gói này'">{{ fmtNum(p.users_count) }} người</span>
+                  <!-- [Modules] Gói cước gắn liền với quyền cấp tính năng: hiện NGAY số tính năng (công tắc)
+                       và số ghi chú hiển thị (nhập tay) để không phải mở form mới biết. -->
+                  <span :class="[BADGE, (p.modules_count || 0) ? BADGE_TONE.brand : BADGE_TONE.warn]"
+                        :title="'Tính năng gói này CẤP cho khách: ' + ((p.module_names || []).slice(0, 12).join(' · ') || 'chưa cấp tính năng nào')">
+                    <StudioIcon name="puzzle" size="h-3 w-3" /> {{ p.modules_count || 0 }} tính năng
+                  </span>
+                  <span v-if="(p.manual_features || []).length" :class="[BADGE, BADGE_TONE.neutral]"
+                        :title="'Ghi chú hiển thị (chỉ để khách đọc, không cấp quyền): ' + (p.manual_features || []).join(' · ')">
+                    <StudioIcon name="info" size="h-3 w-3" /> {{ p.manual_features.length }} ghi chú
+                  </span>
                 </div>
                 <p class="mt-1 min-h-[2rem] text-xs text-cream-300/85">{{ p.tagline || '—' }}</p>
                 <div class="mt-2 flex items-baseline gap-1.5">
@@ -1661,18 +1694,77 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div>
-          <label class="label" for="pl-feature">Đặc quyền (Enter để thêm từng mục)</label>
+        <!-- [Modules] KHỐI 1 — CÔNG TẮC THẬT: tick module là gói CẤP quyền dùng tính năng đó cho khách.-->
+        <div class="rounded-lg border border-brand-500/30 bg-brand-600/10 p-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <p class="flex items-center gap-2 text-xs font-semibold text-cream-50">
+              <StudioIcon name="puzzle" size="h-4 w-4" class="text-brand-300" /> Tính năng gói này CẤP cho khách
+            </p>
+            <span :class="[BADGE, BADGE_TONE.brand]">{{ planFormModuleCount() }}/{{ modulesData.total_modules }} tính năng</span>
+            <span class="text-[10px] text-cream-300/75">Đây là công tắc thật: khách ở gói chỉ dùng được đúng những mục được tick.</span>
+          </div>
+          <p v-if="!modulesData.modules.length" class="mt-2 text-[11px] text-cream-300/75">Đang nạp danh mục tính năng…</p>
+          <template v-else>
+            <div class="mt-2 max-h-64 space-y-2 overflow-y-auto pr-1">
+              <div v-for="(items, group) in moduleGroups" :key="'pf-' + group">
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/70">{{ group }}</p>
+                <div class="mt-0.5 flex flex-wrap gap-1">
+                  <button v-for="m in items" :key="'pf-' + m.id" type="button"
+                          class="rounded border px-1.5 py-0.5 text-[10px] transition"
+                          :class="(planModal.form.modules || []).includes(m.id)
+                            ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200'
+                            : 'border-ink-700 bg-ink-800/60 text-cream-300/70 hover:border-ink-600'"
+                          :title="m.summary + (m.depends_on.length ? ' · cần: ' + m.depends_on.join(', ') : '')"
+                          @click="togglePlanFormModule(m.id)">
+                    <StudioIcon :name="(planModal.form.modules || []).includes(m.id) ? 'check' : 'x'" size="h-3 w-3" class="mr-0.5 inline" />{{ m.name }}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              <button type="button" class="tool-btn !py-1 text-[10px]" title="Chọn tất cả tính năng đang mở" @click="planModal.form.modules = (modulesData.modules || []).map((m) => m.id)">
+                <StudioIcon name="selectAll" size="h-3 w-3" /> Chọn tất cả
+              </button>
+              <button type="button" class="tool-btn !py-1 text-[10px]" title="Bỏ chọn hết" @click="planModal.form.modules = []">
+                <StudioIcon name="x" size="h-3 w-3" /> Bỏ chọn hết
+              </button>
+              <button type="button" class="tool-btn !py-1 text-[10px]" title="Lấy đề xuất từ bản khai tính năng" @click="planModal.form.modules = (modulesData.plans.find((x) => x.slug === planModal.form.slug)?.suggested || []).slice()">
+                <StudioIcon name="sparkles" size="h-3 w-3" /> Áp đề xuất
+              </button>
+            </div>
+          </template>
+        </div>
+
+        <!-- [Modules] KHỐI 2 — GHI CHÚ HIỂN THỊ nhập tay: chỉ để khách đọc, KHÔNG phải công tắc.-->
+        <div class="rounded-lg border border-ink-700 bg-ink-900/60 p-3">
+          <label class="label" for="pl-feature">Ghi chú hiển thị cho khách (Enter để thêm từng mục)</label>
+          <p class="mb-2 text-[11px] leading-relaxed text-amber-200/90">
+            <StudioIcon name="info" size="h-3 w-3" class="mr-1 inline" />
+            Phần này <b>CHỈ để khách đọc</b> trên trang giá — <b>không cấp quyền</b> và không chặn gì cả.
+            Muốn mở/ khoá tính năng thì tick ở khối phía trên.
+          </p>
           <div class="flex gap-2">
-            <input id="pl-feature" v-model="planModal.featureText" class="input flex-1 !py-2" placeholder="VD: Tạo ảnh 2K không giới hạn" @keyup.enter.prevent="addFeature">
+            <input id="pl-feature" v-model="planModal.featureText" class="input flex-1 !py-2" placeholder="VD: Hỗ trợ ưu tiên 1:1 · Hoá đơn theo vụ" @keyup.enter.prevent="addFeature">
             <button type="button" class="tool-btn" @click="addFeature"><StudioIcon name="plus" size="h-3.5 w-3.5" /> Thêm</button>
           </div>
           <div class="mt-2 flex flex-wrap gap-1.5">
             <span v-for="(ft, i) in planModal.form.features" :key="i" class="inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-1 text-[11px] text-cream-100">
               {{ ft }}
-              <button type="button" class="text-cream-300/85 hover:text-red-300" :aria-label="'Xoá đặc quyền ' + ft" @click="removeFeature(i)"><StudioIcon name="x" size="h-3 w-3" /></button>
+              <button type="button" class="text-cream-300/85 hover:text-red-300" :aria-label="'Xoá ghi chú ' + ft" @click="removeFeature(i)"><StudioIcon name="x" size="h-3 w-3" /></button>
             </span>
-            <span v-if="!planModal.form.features.length" class="text-[11px] text-cream-300/75">Chưa có đặc quyền nào.</span>
+            <span v-if="!planModal.form.features.length" class="text-[11px] text-cream-300/75">Chưa có ghi chú nào.</span>
+          </div>
+
+          <!-- Xem trước: khách sẽ thấy gì trên trang giá (tính năng suy từ công tắc + ghi chú ở trên)-->
+          <div class="mt-3 rounded border border-ink-700 bg-ink-950/40 p-2">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/70">Khách sẽ thấy trên trang giá</p>
+            <p class="mt-1 text-[11px] text-cream-200">
+              <b class="text-cream-50">{{ planFormModuleCount() }} tính năng</b><span v-if="planFormModuleNames().length">:</span>
+              <span class="text-cream-300/85">{{ planFormModuleNames().slice(0, 12).join(' · ') }}<span v-if="planFormModuleNames().length > 12"> …</span></span>
+            </p>
+            <p v-if="planModal.form.features.length" class="mt-1 text-[11px] text-cream-300/85">
+              Thông tin thêm: {{ planModal.form.features.join(' · ') }}
+            </p>
           </div>
         </div>
 

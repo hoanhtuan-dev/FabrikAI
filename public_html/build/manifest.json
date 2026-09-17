@@ -98,7 +98,7 @@
     "name": "useLocalCatalog"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DXDSi7mU.css",
+    "file": "assets/app-AzTGjwIc.css",
     "name": "app",
     "names": [
       "app.css"
@@ -107,7 +107,7 @@
     "isEntry": true
   },
   "resources/js/studio/admin.js": {
-    "file": "assets/admin-DxowSYC7.js",
+    "file": "assets/admin-C_Mbdei4.js",
     "name": "admin",
     "src": "resources/js/studio/admin.js",
     "isEntry": true,
@@ -117,7 +117,7 @@
       "_BaseModal-UUm9MVVI.js"
     ],
     "css": [
-      "assets/admin-YNh2bhkS.css"
+      "assets/admin-D4dLh7yT.css"
     ]
   },
   "resources/js/studio/main.js": {
