@@ -774,7 +774,7 @@ const bodyHipsLabel = computed(() => {
               <button type="button" @click="store.promptUsePrefix = !store.promptUsePrefix" class="grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors" :class="store.promptUsePrefix ? 'border-brand-400 bg-brand-500/40 text-white' : 'border-ink-600 text-transparent'" :title="store.promptUsePrefix ? 'Đang dùng Prompt Prefix — bấm để tắt' : 'Không dùng Prompt Prefix — bấm để bật'" :aria-label="store.promptUsePrefix ? 'Tắt dùng Prompt Prefix' : 'Bật dùng Prompt Prefix'"><StudioIcon name="check" size="h-3 w-3" :class="store.promptUsePrefix ? '' : 'opacity-0'" /></button>
               <StudioIcon name="arrowRight" size="h-3.5 w-3.5" /> Prompt Prefix (tự động thêm vào đầu)
             </label>
-            <p class="mb-2 text-[10px] text-cream-300/50">Đồng bộ 2 chiều với <a href="/settings" target="_blank" class="text-brand-400 underline">Cài đặt Studio</a>. Để trống = dùng mặc định.</p>
+            <p class="mb-2 text-[10px] text-cream-300/50">Đồng bộ 2 chiều với <a v-if="store.user && store.user.is_admin" href="/settings" target="_blank" class="text-brand-400 underline">Cài đặt Studio</a><span v-else class="text-cream-300/40">Cài đặt Studio</span>. Để trống = dùng mặc định.</p>
             <textarea v-model="store.promptPrefix" rows="8" :disabled="!store.promptUsePrefix" class="input !text-sm !py-2 !rounded-md disabled:opacity-50" placeholder="High-fashion editorial photograph, professional fashion photography" title="Tự động ghép vào ĐẦU prompt khi tạo ảnh"></textarea>
           </div>
           <!-- Prompt Suffix (đồng bộ từ Settings) -->
@@ -783,7 +783,7 @@ const bodyHipsLabel = computed(() => {
               <button type="button" @click="store.promptUseSuffix = !store.promptUseSuffix" class="grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors" :class="store.promptUseSuffix ? 'border-brand-400 bg-brand-500/40 text-white' : 'border-ink-600 text-transparent'" :title="store.promptUseSuffix ? 'Đang dùng Prompt Suffix — bấm để tắt' : 'Không dùng Prompt Suffix — bấm để bật'" :aria-label="store.promptUseSuffix ? 'Tắt dùng Prompt Suffix' : 'Bật dùng Prompt Suffix'"><StudioIcon name="check" size="h-3 w-3" :class="store.promptUseSuffix ? '' : 'opacity-0'" /></button>
               <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Prompt Suffix (tự động thêm vào cuối)
             </label>
-            <p class="mb-2 text-[10px] text-cream-300/50">Đồng bộ 2 chiều với <a href="/settings" target="_blank" class="text-brand-400 underline">Cài đặt Studio</a>. Để trống = dùng mặc định.</p>
+            <p class="mb-2 text-[10px] text-cream-300/50">Đồng bộ 2 chiều với <a v-if="store.user && store.user.is_admin" href="/settings" target="_blank" class="text-brand-400 underline">Cài đặt Studio</a><span v-else class="text-cream-300/40">Cài đặt Studio</span>. Để trống = dùng mặc định.</p>
             <textarea v-model="store.promptSuffix" rows="4" :disabled="!store.promptUseSuffix" class="input !text-sm !py-2 !rounded-md disabled:opacity-50" placeholder="soft diffused studio lighting, clean minimal background, ultra detailed, 4k, sharp focus" title="Tự động ghép vào CUỐI prompt khi tạo ảnh"></textarea>
           </div>
           <!-- Negative prompt -->
