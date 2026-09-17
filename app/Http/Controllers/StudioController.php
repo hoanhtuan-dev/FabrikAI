@@ -220,6 +220,8 @@ class StudioController extends Controller
         return response()->json([
             'items' => $items,
             'credits_left' => auth()->user()->fresh()->credits_balance,
+            'notice' => $this->planNotice,
+            'credit_warning' => $this->creditWarning(auth()->user(), $cost ?? 0, $variants ?? 1),
         ]);
     }
 
@@ -545,6 +547,8 @@ class StudioController extends Controller
         return response()->json([
             'items' => $items,
             'credits_left' => auth()->user()->fresh()->credits_balance,
+            'notice' => $this->planNotice,
+            'credit_warning' => $this->creditWarning(auth()->user(), $cost ?? 0, $variants ?? 1),
         ]);
     }
 
@@ -779,6 +783,8 @@ class StudioController extends Controller
         return response()->json([
             'items' => $items,
             'credits_left' => auth()->user()->fresh()->credits_balance,
+            'notice' => $this->planNotice,
+            'credit_warning' => $this->creditWarning(auth()->user(), $cost ?? 0, $variants ?? 1),
             'tryon' => $isTryon ? true : null,
             'face_model_id' => $isTryon && ! empty($data['face_model_id']) ? $data['face_model_id'] : null,
         ]);
@@ -842,6 +848,8 @@ class StudioController extends Controller
         return response()->json([
             'items' => $items,
             'credits_left' => auth()->user()->fresh()->credits_balance,
+            'notice' => $this->planNotice,
+            'credit_warning' => $this->creditWarning(auth()->user(), $cost ?? 0, $variants ?? 1),
         ]);
     }
 
@@ -1619,6 +1627,135 @@ RULES:
         ]);
     }
 
+    /** Thông báo khi thao tác bị hạ xuống theo giới hạn của gói (để UI nói thật với khách). */
+    protected ?string $planNotice = null;
+
+    /**
+     * Hạ độ phân giải yêu cầu xuống ĐÚNG giới hạn của gói (thay vì chặn công việc của khách).
+     *
+     * Vì sao hạ thay vì chặn: khách đang làm dở mà bị 422 vì "gói của bạn chỉ 1K" là trải nghiệm
+     * tệ; hạ xuống cap và NÓI RÕ (planNotice) vừa giữ được việc cho khách, vừa làm đặc quyền của
+     * gói có tác dụng thật. Cap lấy từ plans.resolution_cap qua studio_plan_limits().
+     */
+    protected function clampResolutionToPlan(array $data): array
+    {
+        $limits = studio_plan_limits();
+        $requested = isset($data['resolution']) ? (string) $data['resolution'] : '';
+
+        if ($requested === '') {
+            return $data;
+        }
+
+        // Ảnh: 1K | 2K
+        if (in_array($requested, ['1K', '2K'], true)) {
+            if ($requested === '2K' && $limits['image_resolution_cap'] === '1K') {
+                $data['resolution'] = '1K';
+                $this->planNotice = 'Gói của bạn giới hạn ảnh ở 1K — ảnh được tạo ở 1K. Nâng cấp gói để dùng 2K.';
+            }
+
+            return $data;
+        }
+
+        // Video: 480 | 720 | 1080
+        if (in_array($requested, ['480', '720', '1080'], true)) {
+            $cap = (int) $limits['video_resolution_cap'];
+            if ((int) $requested > $cap) {
+                $data['resolution'] = (string) $cap;
+                $this->planNotice = 'Gói của bạn giới hạn video ở '.$cap.'p — video được tạo ở '.$cap.'p. Nâng cấp gói để dùng độ phân giải cao hơn.';
+            }
+        }
+
+        return $data;
+    }
+
+    /** Cảnh báo SỚM khi credit sắp hết — không chặn, chỉ để khách không bị gián đoạn giữa việc. */
+    protected function creditWarning(?\App\Models\User $user, int $cost = 0, int $count = 1): ?string
+    {
+        if (! $user || $cost <= 0) {
+            return null;
+        }
+
+        $balance = (int) $user->fresh()->credits_balance;
+        $need = $cost * max(1, $count);
+
+        if ($balance >= $need * 3) {
+            return null;
+        }
+
+        if ($balance < $need) {
+            return 'Bạn còn '.$balance.' credit, chưa đủ cho thao tác này ('.$need.' credit). Nạp thêm hoặc nâng cấp gói để tiếp tục.';
+        }
+
+        return 'Bạn còn '.$balance.' credit (~'.max(1, intdiv($balance, $cost)).' thao tác nữa). Cân nhắc nạp thêm để không gián đoạn.';
+    }
+
+    /**
+     * GET /api/plan/status — gói hiện tại · hạn mức · chi phí · danh mục gói đang mở bán.
+     *
+     * Một chỗ để giao diện nói đúng: "bạn ở gói nào, còn bao nhiêu credit, mỗi ảnh/video tốn bao
+     * nhiêu, được tối đa độ phân giải nào, gói khác có gì". Trước đây SPA không có cách nào biết.
+     */
+    public function planStatus(): \Illuminate\Http\JsonResponse
+    {
+        $user = auth()->user();
+
+        // Cấp credit theo chu kỳ nếu tới kỳ (idempotent) — số liệu trả về luôn là số THẬT.
+        app(\App\Services\PlanService::class)->syncCycleCredits($user);
+        $user = $user->fresh();
+
+        $limits = studio_plan_limits($user);
+        $plan = $limits['plan'];
+        $usage = studio_usage($user);
+
+        return response()->json([
+            'plan' => $plan ? [
+                'id' => $plan->id,
+                'name' => $plan->name,
+                'slug' => $plan->slug,
+                'price_label' => $plan->priceLabel(),
+                'price_vnd' => (int) $plan->price_vnd,
+                'credits_per_month' => (int) $plan->credits_per_month,
+                'bonus_credits' => (int) $plan->bonus_credits,
+                'resolution_cap' => $plan->resolution_cap,
+                'features' => $plan->features ?? [],
+                'is_free' => $plan->isFree(),
+                'expires_at' => $user->plan_expires_at?->format('d/m/Y'),
+                'credits_granted_at' => $user->plan_credits_granted_at?->format('d/m/Y'),
+                'is_subscribed' => $user->isSubscribed(),
+            ] : null,
+            'credits' => [
+                'balance' => (int) $user->credits_balance,
+                'used_total' => (int) $usage['used_total'],
+                'used_today' => (int) $usage['used_today'],
+            ],
+            'limits' => [
+                'image_resolution_cap' => $limits['image_resolution_cap'],
+                'video_resolution_cap' => $limits['video_resolution_cap'],
+                'enforce_credits' => $limits['enforce_credits'],
+            ],
+            'costs' => [
+                'image' => studio_credit_cost('image', $user),
+                'video' => studio_credit_cost('video', $user),
+            ],
+            'warning' => $this->creditWarning($user, studio_credit_cost('image', $user)),
+            // Danh mục để mở bảng "Nâng cấp gói" ngay trong Studio (không phải sang trang khác).
+            'catalog' => \App\Models\Plan::query()->where('is_active', true)->orderBy('sort')->get()->map(fn (\App\Models\Plan $p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'slug' => $p->slug,
+                'tagline' => $p->tagline,
+                'price_label' => $p->priceLabel(),
+                'price_vnd' => (int) $p->price_vnd,
+                'credits_per_month' => (int) $p->credits_per_month,
+                'bonus_credits' => (int) $p->bonus_credits,
+                'resolution_cap' => $p->resolution_cap,
+                'features' => $p->features ?? [],
+                'is_free' => $p->isFree(),
+                'is_current' => $plan && $plan->id === $p->id,
+            ])->values(),
+        ]);
+    }
+
     protected function queueGeneration(string $type, array $data, int $cost, ?Generation $source = null)
     {
         $user = auth()->user();
@@ -1630,6 +1767,19 @@ RULES:
 
         // Internal admin tool: never hard-block on credits. Track usage (balance may go negative).
         $this->reconcileStuckCredits($user);
+
+        // [Đợt 1 — 2026-09-19] THỰC THI đặc quyền của GÓI: hạ độ phân giải vượt cap của gói và ghi
+        // lại lý do (planNotice) để giao diện nói thật với khách. Trước đây plans.resolution_cap
+        // không được kiểm ở đâu ⇒ gói Miễn phí (1K) và gói Studio (2K) cho ra ảnh giống hệt nhau.
+        $data = $this->clampResolutionToPlan($data);
+
+        // Chặn khi hết credit — CHỈ khi bật cờ studio_enforce_credits (MẶC ĐỊNH TẮT: giữ nguyên
+        // hành vi "never hard-block" cho tới khi có cổng thanh toán — docs/UX_PERSONA_STRATEGY.md Q1).
+        if ($cost > 0 && studio_plan_limits($user)['enforce_credits'] && (int) $user->credits_balance < $cost) {
+            abort(402, 'Bạn đã dùng hết credit của gói (thao tác này cần '.$cost.' credit, hiện còn '
+                .max(0, (int) $user->credits_balance).'). Mở «Gói & credit» để nạp thêm hoặc nâng cấp gói.');
+        }
+
         // (M-h — 2026-09-17) Việc TRỪ CREDIT đã chuyển xuống khối `DB::transaction` ngay dưới,
         // nằm CÙNG transaction với `generations.create()`: create lỗi ⇒ rollback ⇒ không mất credit.
 
@@ -1727,6 +1877,8 @@ RULES:
             'error' => $fresh->error,
             'credits_cost' => $fresh->credits_cost,
             'credits_left' => $user->fresh()->credits_balance,
+            'notice' => $this->planNotice,
+            'credit_warning' => $this->creditWarning($user, $cost),
             'prompts_history_id' => $fresh->prompts_history_id,
         ]);
     }

@@ -101,6 +101,12 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::post('/generations/{generation}/region', [StudioController::class, 'regionEdit'])->name('region');
     Route::post('/process', [StudioController::class, 'processQueue'])->name('process');
 
+    // ── Trạng thái GÓI của chính người dùng (gói · hạn mức · chi phí · danh mục gói) ──
+    // [Đợt 1 — 2026-09-19] Một chỗ để SPA nói đúng "bạn ở gói nào, còn bao nhiêu credit, được
+    // tối đa độ phân giải nào" và mở bảng nâng cấp ngay trong Studio. Trước đây /api/boot không
+    // trả gói và không có UI gói cước nào (grep 'billing' trong resources/js = 0).
+    Route::get('/plan/status', [StudioController::class, 'planStatus'])->name('plan.status');
+
     // ── Cài đặt Ghép Trang Phục — theo TỪNG user (`studio_outfit_settings.user_id`) ──
     Route::get('/outfit-settings', [StudioController::class, 'outfitSettings'])->name('outfit-settings');
     Route::post('/outfit-settings', [StudioController::class, 'saveOutfitSettings'])->name('outfit-settings.save');

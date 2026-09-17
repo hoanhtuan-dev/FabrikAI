@@ -130,9 +130,17 @@
 - **Đo được**: 8 test mới (`PlanCreditCycleTest`) · **499 test / 2.682 assert xanh** · chạy thật trên dữ liệu
   thật: gán gói Khởi nghiệp cho một tài khoản ⇒ 200 → **350 credit** (+30 bonus +120 kỳ đầu) và **đúng một**
   dòng sổ cái `plan_grant`; `--dry-run` không ghi gì.
-- **Còn nợ của đợt 1** (sang vòng sau): UI gói cước trong Studio (xem gói/credit, nâng cấp tại chỗ), cờ
-  `studio_enforce_credits` (chặn mềm khi hết credit — hiện vẫn KHÔNG chặn), trang giá công khai, và
-  **thực thi `resolution_cap`** theo gói.
+- ✅ **Thực thi đặc quyền của gói** (`resolution_cap`): yêu cầu vượt cap bị **hạ xuống cap** (không chặn
+  việc đang làm) và trả `notice` nói rõ; cap video suy từ cap ảnh (1K ⇒ 720p, 2K ⇒ 1080p).
+- ✅ **Cờ `studio_enforce_credits`** (mặc định **TẮT** để không phá trải nghiệm khách đang dùng): bật thì
+  thao tác thiếu credit trả **402** kèm hướng dẫn nâng cấp; tắt thì giữ nguyên hành vi cũ. Kèm
+  `credit_warning` trả sớm khi credit sắp cạn (< 3 thao tác) — cảnh báo TRƯỚC, không chặn giữa chừng.
+- ✅ **UI "Gói & credit" trong Studio**: badge credit trên thanh công cụ nay là **nút** mở popup — gói đang
+  dùng · credit còn lại · chi phí **theo gói** của ảnh/video · độ phân giải tối đa của gói · hạn gói ·
+  cảnh báo sắp cạn · và **danh mục gói để đổi/nâng cấp ngay trong Studio** (nói rõ hệ thống chưa có cổng
+  thanh toán). Dữ liệu từ `GET /api/plan/status`.
+- **Còn nợ của đợt 1**: **trang giá công khai** (khách chưa đăng nhập vẫn chưa xem được gói) và việc
+  **bật** cờ enforce sau khi có thanh toán (Q1/Q2).
 
 ### Đợt 2 — Không gian làm việc theo nghề
 - Sidebar "Không gian làm việc": **Bộ sưu tập** (gom ảnh/biến thể theo mùa vụ, tái dùng ngữ cảnh), **Việc đang chạy**, **Thư viện**, **Duyệt**.

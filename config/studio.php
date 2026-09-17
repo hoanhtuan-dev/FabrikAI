@@ -13,6 +13,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Chặn khi hết credit (mặc định TẮT)
+    |--------------------------------------------------------------------------
+    | Từ trước tới nay pipeline KHÔNG chặn khi hết credit (ghi rõ trong queueGeneration:
+    | "never hard-block on credits, track usage") — hợp lý khi công cụ còn nội bộ, nhưng là
+    | lỗ hổng khi bán gói: khách vượt hạn mức vẫn tạo ảnh được.
+    |
+    | Bật cờ này (setting DB studio_enforce_credits = 1, hoặc env STUDIO_ENFORCE_CREDITS=true)
+    | thì mỗi thao tác phải có đủ credit, nếu không trả 402 kèm thông báo nâng cấp.
+    | MẶC ĐỊNH TẮT để không phá trải nghiệm khách đang dùng — xem
+    | docs/UX_PERSONA_STRATEGY.md §7 Q1 trước khi bật trên production.
+    */
+    'enforce_credits' => filter_var(env('STUDIO_ENFORCE_CREDITS', false), FILTER_VALIDATE_BOOLEAN),
+
+    /*
+    |--------------------------------------------------------------------------
     | Giới hạn an toàn khi decode ảnh (T14)
     |--------------------------------------------------------------------------
     | Cap số pixel chống "decompression bomb": ảnh nén vài chục KB có thể giải nén

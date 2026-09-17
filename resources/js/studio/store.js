@@ -40,6 +40,14 @@ export const useStudioStore = defineStore('studio', {
     generations: [],
     creditsLeft: (bootUser() && Number(bootUser().credits_balance)) || 0,
     imageCreditCost: 1,  // chi phí credit cho 1 ảnh (load từ defaults)
+    // ── Gói & credit (Đợt 1 — 2026-09-19) ──────────────────────────────────────────────
+    // Trước đây SPA chỉ biết mỗi con số credit: không biết mình ở gói nào, mỗi thao tác tốn bao
+    // nhiêu, được tối đa độ phân giải nào, và không có đường nâng cấp (grep 'billing' = 0).
+    // planStatus nạp từ GET /api/plan/status — MỘT chỗ để UI nói đúng mọi thứ về gói.
+    planStatus: null,
+    planOpen: false,        // popup "Gói & credit" ở thanh công cụ
+    planCatalogOpen: false, // mở danh mục gói bên trong popup
+    planBusy: false,
     // film / reframe share the source image (editSource || preview)
     editSource: null,
     texture: 5,
@@ -290,6 +298,13 @@ export const useStudioStore = defineStore('studio', {
     projectCanReview: false,      // true khi user là Super Admin (được duyệt/lưu trữ dự án của người khác)
   }),
   getters: {
+    /** Tên gói đang dùng (hiển thị cạnh số credit). */
+    planName() { return (this.planStatus && this.planStatus.plan) ? this.planStatus.plan.name : ''; },
+    /** Chi phí credit theo GÓI (server trả) — fallback về giá trị mặc định đã nạp. */
+    planCostImage() { return (this.planStatus && this.planStatus.costs && this.planStatus.costs.image) || this.imageCreditCost || 1; },
+    planCostVideo() { return (this.planStatus && this.planStatus.costs && this.planStatus.costs.video) || 10; },
+    /** Sắp cạn credit: còn ít hơn 3 thao tác ảnh ⇒ tô đậm nút để khách biết trước. */
+    creditsLow() { return this.creditsLeft < this.planCostImage * 3; },
     upscaleSrc() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId && x.visible !== false); if (l && l.image) return l.image; } return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
     upscaleName() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId); if (l) return l.name; } return (this.editSource && this.editSource.name) || (this.preview ? 'Ảnh kết quả #' + this.preview.id : 'Ảnh đang chọn'); },
 
@@ -369,6 +384,45 @@ export const useStudioStore = defineStore('studio', {
       if (g.media_url) { this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id); this.setActiveLayer(String(g.id)); }
     },
     setPreview(g) { if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } },
+    /**
+     * Nạp trạng thái GÓI của chính người dùng: gói · hạn mức · chi phí · danh mục gói.
+     * Server cũng cấp credit theo chu kỳ ở đây (idempotent) nên số dư trả về luôn là số thật.
+     */
+    async loadPlanStatus() {
+      if (!this.user) return;
+      try {
+        const res = await fetch('/api/plan/status', { headers: { Accept: 'application/json' } });
+        if (!res.ok) return;
+        const d = await res.json();
+        this.planStatus = d;
+        if (d.credits && d.credits.balance != null) this.creditsLeft = Number(d.credits.balance);
+        if (d.costs && d.costs.image) this.imageCreditCost = Number(d.costs.image);
+      } catch (e) { console.error('loadPlanStatus failed', e); }
+    },
+    togglePlanPopover() {
+      this.planOpen = !this.planOpen;
+      if (this.planOpen) { this.loadPlanStatus(); }
+      else { this.planCatalogOpen = false; }
+    },
+    /** Tự đăng ký/đổi gói (dùng POST /api/billing/subscribe có sẵn của hệ thống). */
+    async subscribePlan(planId) {
+      if (this.planBusy) return;
+      this.planBusy = true;
+      try {
+        const res = await fetch('/api/billing/subscribe', {
+          method: 'POST',
+          headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ plan_id: planId }),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.message || ('HTTP ' + res.status));
+        await this.loadPlanStatus();
+        this.toast('Đã chuyển sang gói ' + ((d.plan && d.plan.name) || ''), 'info');
+      } catch (e) {
+        this.toast('Không đổi được gói: ' + e.message, 'error');
+      }
+      this.planBusy = false;
+    },
     toast(msg, type = 'info') {
       // Use the Vue studio's own toast (works standalone); fall back to Alpine if present.
       this.flashMsg = msg; this.flashType = type;
@@ -441,6 +495,8 @@ export const useStudioStore = defineStore('studio', {
         if (res.status === 403) { this.setAuthStatus(403); return; }
         if (res.status === 401 || res.redirected || (res.url && res.url.includes('/dang-nhap'))) { this.setAuthStatus(401); return; }
         this.setAuthStatus(200);
+        // [Đợt 1 — 2026-09-19] Nạp gói & hạn mức credit (1 request, không chặn luồng chính).
+        this.loadPlanStatus();
         const d = await res.json();
         const items = d.items || d.generations || [];
         if (Array.isArray(items)) this.generations = items;

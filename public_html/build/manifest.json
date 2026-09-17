@@ -98,7 +98,7 @@
     "name": "useLocalCatalog"
   },
   "resources/css/app.css": {
-    "file": "assets/app-D0O6gaFI.css",
+    "file": "assets/app-BLPZrG1f.css",
     "name": "app",
     "names": [
       "app.css"
@@ -121,7 +121,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-CBH9oKth.js",
+    "file": "assets/main-DCLN5TOp.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,

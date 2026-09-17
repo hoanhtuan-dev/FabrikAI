@@ -1279,6 +1279,43 @@ if (! function_exists('studio_usage')) {
     }
 }
 
+if (! function_exists('studio_plan_limits')) {
+    /**
+     * Giới hạn của GÓI đang có hiệu lực — dùng để THỰC THI đặc quyền của gói.
+     *
+     * Vì sao: plans.resolution_cap trước đây chỉ được trả về ở API catalog, KHÔNG chỗ nào trong
+     * pipeline kiểm tra ⇒ gói Miễn phí (1K) và gói Studio (2K) cho ra ảnh giống hệt nhau, tức
+     * đặc quyền của gói chỉ là chữ trang trí.
+     *
+     * Quy ước: cap ảnh theo plans.resolution_cap ('1K'|'2K'); cap video suy ra từ cap ảnh
+     * (1K ⇒ 720p, 2K ⇒ 1080p). Không có gói / gói hết hạn ⇒ dùng mặc định toàn cục — GIỮ NGUYÊN
+     * hành vi cũ cho tài khoản chưa gán gói.
+     */
+    function studio_plan_limits($user = null): array
+    {
+        $user = $user ?? auth()->user();
+
+        $plan = null;
+        try {
+            $plan = $user?->activePlan();
+        } catch (\Throwable $e) {
+            $plan = null;
+        }
+
+        $imageCap = (string) ($plan->resolution_cap ?? studio_config('image_resolution', '2K'));
+        if (! in_array($imageCap, ['1K', '2K'], true)) {
+            $imageCap = '2K';
+        }
+
+        return [
+            'plan' => $plan,
+            'image_resolution_cap' => $imageCap,
+            'video_resolution_cap' => $imageCap === '1K' ? '720' : '1080',
+            'enforce_credits' => filter_var(studio_config('enforce_credits', false), FILTER_VALIDATE_BOOLEAN),
+        ];
+    }
+}
+
 if (! function_exists('studio_credit_cost')) {
     /**
      * Chi phí credit của MỘT thao tác — ƯU TIÊN THEO GÓI, fallback về setting toàn cục.

@@ -575,7 +575,63 @@ function onTouchEnd(e) {
           <button type="button" @click="projectsOpen = true" class="flex min-w-0 items-center gap-1.5 truncate hover:text-white"><StudioIcon name="pin" size="h-3.5 w-3.5" /><span class="truncate">{{ store.appliedProject.name }}</span></button>
           <button type="button" @click="store.unapplyProject()" class="shrink-0 text-brand-200/70 hover:text-white" aria-label="Ngắt dự án hiện tại"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
         </span>
-        <span v-if="store.user" class="tool-btn hidden cursor-default md:inline-flex" title="Số credit còn lại"><StudioIcon name="coins" size="h-3.5 w-3.5" /> {{ store.creditsLeft }}</span>
+        <!-- [Đợt 1 — 2026-09-19] Badge credit cũ chỉ hiển thị con số (không biết gói, không có đường
+             nâng cấp). Nay là nút mở popup "Gói & credit": gói hiện tại · credit còn lại · chi phí
+             mỗi ảnh/video THEO GÓI · độ phân giải tối đa của gói · danh mục gói để đổi/nâng cấp. -->
+        <div v-if="store.user" class="relative">
+          <button type="button" class="tool-btn" :class="store.creditsLow ? 'is-active' : ''"
+                  :title="'Gói & credit — còn ' + store.creditsLeft + ' credit' + (store.planName ? ' · gói ' + store.planName : '')"
+                  @click="store.togglePlanPopover()">
+            <StudioIcon name="coins" size="h-3.5 w-3.5" />
+            {{ store.creditsLeft }}
+            <span v-if="store.planName" class="hidden text-[10px] text-cream-300/85 lg:inline">{{ store.planName }}</span>
+            <StudioIcon name="chevronDown" size="h-3 w-3" />
+          </button>
+
+          <div v-if="store.planOpen" role="dialog" aria-label="Gói và credit"
+               class="fixed inset-x-3 top-16 z-50 rounded-md border border-ink-700 bg-ink-900 p-3 shadow-xl md:absolute md:inset-x-auto md:right-0 md:top-full md:mt-1 md:w-80">
+            <template v-if="store.planStatus">
+              <p class="flex items-center gap-2 text-xs font-semibold text-cream-50">
+                <StudioIcon name="package" size="h-3.5 w-3.5" class="text-brand-300" />
+                {{ store.planStatus.plan ? store.planStatus.plan.name : 'Chưa gán gói' }}
+                <span v-if="store.planStatus.plan" class="ml-auto rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-300">{{ store.planStatus.plan.price_label }}</span>
+              </p>
+              <p class="mt-1 text-[11px] text-cream-300/85">
+                Còn <b class="text-cream-50">{{ store.planStatus.credits.balance }}</b> credit
+                · hôm nay dùng {{ store.planStatus.credits.used_today }}
+                <span v-if="store.planStatus.plan && store.planStatus.plan.expires_at"> · hạn {{ store.planStatus.plan.expires_at }}</span>
+              </p>
+              <div class="mt-2 grid grid-cols-2 gap-1.5 text-[10px]">
+                <span class="rounded bg-ink-800 px-2 py-1 text-cream-200"><StudioIcon name="image" size="h-3 w-3" class="mr-1 inline" />{{ store.planCostImage }} credit/ảnh</span>
+                <span class="rounded bg-ink-800 px-2 py-1 text-cream-200"><StudioIcon name="film" size="h-3 w-3" class="mr-1 inline" />{{ store.planCostVideo }} credit/video</span>
+                <span class="rounded bg-ink-800 px-2 py-1 text-cream-200">Ảnh tối đa {{ store.planStatus.limits.image_resolution_cap }}</span>
+                <span class="rounded bg-ink-800 px-2 py-1 text-cream-200">Video tối đa {{ store.planStatus.limits.video_resolution_cap }}p</span>
+              </div>
+              <p v-if="store.planStatus.warning" class="mt-2 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-200">{{ store.planStatus.warning }}</p>
+              <button type="button" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition hover:bg-ink-700" @click="store.planCatalogOpen = !store.planCatalogOpen">
+                <StudioIcon name="sparkles" size="h-3 w-3" /> {{ store.planCatalogOpen ? 'Thu gọn danh mục gói' : 'Xem gói khác / nâng cấp' }}
+              </button>
+              <div v-if="store.planCatalogOpen" class="mt-2 max-h-64 space-y-1.5 overflow-y-auto">
+                <p class="rounded bg-ink-800 px-2 py-1 text-[10px] text-cream-300/85">Hệ thống chưa có cổng thanh toán trực tuyến — gói trả phí được kích hoạt ngay, vui lòng thanh toán theo hướng dẫn của FabrikAI.</p>
+                <div v-for="p in store.planStatus.catalog" :key="p.id" class="rounded-lg border border-ink-700 bg-ink-900/60 p-2">
+                  <p class="flex items-center gap-2 text-[11px] font-semibold text-cream-100">
+                    {{ p.name }}
+                    <span class="ml-auto text-cream-300/85">{{ p.price_label }}</span>
+                  </p>
+                  <p class="mt-0.5 text-[10px] text-cream-300/85">{{ p.credits_per_month }} credit/tháng · tối đa {{ p.resolution_cap }}<span v-if="p.bonus_credits"> · +{{ p.bonus_credits }} tặng lần đầu</span></p>
+                  <p v-if="p.tagline" class="mt-0.5 text-[10px] text-cream-300/75">{{ p.tagline }}</p>
+                  <button type="button" class="mt-1.5 w-full rounded bg-brand-600 px-2 py-1 text-[10px] font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                          :disabled="p.is_current || store.planBusy"
+                          @click="store.subscribePlan(p.id)">
+                    {{ p.is_current ? 'Đang dùng' : (p.is_free ? 'Chuyển sang gói này' : 'Kích hoạt gói này') }}
+                  </button>
+                </div>
+              </div>
+            </template>
+            <p v-else class="text-[11px] text-cream-300/85">Đang tải thông tin gói…</p>
+          </div>
+          <div v-if="store.planOpen" class="fixed inset-0 z-40" @click="store.planOpen = false"></div>
+        </div>
         <!-- [Đợt 0.6] đã gỡ nút "Cài đặt FabrikAI" (PWA) — bỏ PWA hoàn toàn (Q4) -->
         <a v-if="store.user && store.user.is_admin" href="/settings" class="tool-btn" title="Cài đặt AI Models & API Keys"><StudioIcon name="gear" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Cài đặt</span></a>
         <button v-if="store.user" type="button" @click="logout" class="tool-btn" title="Đăng xuất khỏi tài khoản">Đăng xuất</button>
