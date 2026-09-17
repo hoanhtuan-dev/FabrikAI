@@ -33,6 +33,22 @@ const form = ref({ name: '', season: '', deadline: '', brief: '' });
 
 const applied = computed(() => store.appliedProject || null);
 
+// ── Xuất gói cho xưởng (Đợt 4) ─────────────────────────────────────────────────────
+// Người nhận là XƯỞNG MAY (không dùng FabrikAI) nên gói phải tự đủ nghĩa: ảnh + phiếu kỹ thuật +
+// bảng size. Bảng size và ghi chú do người dùng nhập ở đây rồi gửi kèm qua query (giới hạn 2000 ký tự
+// mỗi trường ở phía máy chủ).
+const exportOpen = ref(false);
+const exportForm = ref({ sizes: '', note: '' });
+function startExport() {
+  if (!applied.value) { store.toast('Chọn bộ sưu tập trước khi xuất gói.', 'error'); return; }
+  const q = new URLSearchParams();
+  if (exportForm.value.sizes.trim()) q.set('sizes', exportForm.value.sizes.trim());
+  if (exportForm.value.note.trim()) q.set('note', exportForm.value.note.trim());
+  const url = '/api/projects/' + applied.value.id + '/export' + (q.toString() ? '?' + q.toString() : '');
+  window.open(url, '_blank', 'noopener');
+  store.toast('Đang đóng gói ZIP cho xưởng — trình duyệt sẽ tải về.');
+}
+
 /** Bộ sưu tập gần đây (mới cập nhật lên trước) — bỏ cái đang áp dụng để không trùng. */
 const recent = computed(() => {
   const list = (store.projects || []).slice();
@@ -126,7 +142,36 @@ async function submit() {
       <p v-if="applied.brief" class="mt-1.5 line-clamp-2 text-[11px] text-cream-300">{{ applied.brief }}</p>
       <div class="mt-2 flex flex-wrap gap-1.5">
         <button class="tool-btn" @click="openWorkspace(applied)"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> Mở workspace</button>
+        <button class="tool-btn" :class="exportOpen ? 'is-active' : ''" title="Đóng gói ảnh + phiếu kỹ thuật + bảng size thành 1 file ZIP để gửi xưởng may" @click="exportOpen = !exportOpen">
+          <StudioIcon name="download" size="h-3.5 w-3.5" /> Xuất gói cho xưởng
+        </button>
         <button class="tool-btn" title="Không gắn ảnh mới vào bộ này nữa" @click="store.unapplyProject()"><StudioIcon name="pinOff" size="h-3.5 w-3.5" /> Bỏ áp dụng</button>
+      </div>
+
+      <!-- Xuất gói cho xưởng: gói ZIP gồm ảnh tham chiếu + phiếu kỹ thuật + bảng size + manifest -->
+      <div v-if="exportOpen" class="mt-2 space-y-2 rounded-lg border border-ink-700 bg-ink-900/70 p-2.5">
+        <p class="text-[10px] leading-relaxed text-cream-300">
+          Gói ZIP gồm: <b class="text-cream-100">ảnh tham chiếu</b> (đánh số) · <b class="text-cream-100">phiếu kỹ thuật</b>
+          từng mẫu (chất liệu · màu · đường may) · <b class="text-cream-100">bảng size</b> · thông tin bộ sưu tập ·
+          <b class="text-cream-100">manifest.json</b> cho hệ thống của xưởng. Ảnh nào không tải được sẽ được ghi rõ trong gói.
+        </p>
+        <div>
+          <label class="label" for="ex-sizes">Bảng size — mỗi dòng một size (size, ngực, eo, hông, dài áo, dài tay)</label>
+          <textarea id="ex-sizes" v-model="exportForm.sizes" rows="3" class="input !py-1.5 text-xs" placeholder="S, 84, 68, 92, 58, 56&#10;M, 88, 72, 96, 59, 57"></textarea>
+        </div>
+        <div>
+          <label class="label" for="ex-note">Ghi chú kỹ thuật chung (chất liệu, màu, yêu cầu riêng)</label>
+          <textarea id="ex-note" v-model="exportForm.note" rows="2" class="input !py-1.5 text-xs" placeholder="VD: Vải linen 100%, màu trắng ngà, đường may 1cm, không dùng khoá kéo kim loại"></textarea>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          <button class="btn-brand btn-sm flex-1" @click="startExport()">
+            <StudioIcon name="download" size="h-3.5 w-3.5" /> Tải gói ZIP
+          </button>
+          <button class="tool-btn" @click="exportOpen = false">Đóng</button>
+        </div>
+        <p class="text-[10px] text-cream-300">
+          Ảnh AI là ảnh <b class="text-cream-100">tham chiếu</b> — README trong gói nhắc xưởng đối chiếu mẫu thật trước khi sản xuất hàng loạt.
+        </p>
       </div>
     </div>
     <div v-else class="mt-3 rounded-lg border border-dashed border-ink-600 p-3 text-[11px] text-cream-300">

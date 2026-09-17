@@ -182,9 +182,22 @@
 - Hiển thị chi phí trước khi chạy + cảnh báo credit thấp + nâng cấp tại chỗ.
 - Đo: giảm ≥ 40% số cú bấm cho cùng kết quả; Time-to-first-image < 5 phút.
 
-### Đợt 4 — Xuất hàng & cộng tác
-- **Xuất gói cho xưởng** (ảnh + mô tả chất liệu + bảng size + ghi chú kỹ thuật), chia sẻ link khách duyệt, phân quyền nhân viên theo gói.
-- Đo: tỉ lệ khách dùng export ≥ 25%; free → paid > 5%; số ảnh/người/tuần tăng.
+### Đợt 4 — Xuất hàng & cộng tác — ✅ PHẦN ĐẦU ĐÃ TRIỂN KHAI (2026-09-19)
+- ✅ **Xuất gói cho xưởng** (`GET /api/projects/{id}/export` → 1 file ZIP) gồm: **ảnh tham chiếu** đánh số
+  (`anh/01-<mô tả>.jpg`) · **phiếu kỹ thuật** từng mẫu (ô trống cho xưởng điền: chất liệu · màu · đường may ·
+  chi tiết cần lưu ý) · **bảng size CSV** (dùng số đo người dùng nhập, không nhập thì phát mẫu S/M/L/XL) ·
+  **thông tin bộ sưu tập + brief của khách** · **manifest.json** cho hệ thống của xưởng · **README** hướng dẫn.
+- ✅ **Trung thực là bất biến**: ảnh nào không tải được thì ghi rõ vào `anh/_KHONG_TAI_DUOC.txt` **và**
+  `manifest.skipped` + cảnh báo trong README (không im lặng bỏ qua — xưởng nhận thiếu ảnh mà không biết là tai họa);
+  README nói rõ **ảnh AI là ảnh THAM CHIẾU**, không in/cắt thẳng để sản xuất hàng loạt.
+- ✅ **UI**: trong panel "Bộ sưu tập" (bộ đang áp dụng) có nút **Xuất gói cho xưởng** → nhập bảng size +
+  ghi chú kỹ thuật → tải ZIP; nêu rõ gói gồm những gì trước khi tải.
+- **Đo được**: 5 test mới (`ProjectExportTest`: quyền · đủ 5 thành phần · bảng size đi nguyên vào gói ·
+  ảnh lỗi được báo trong gói · bộ chưa có ảnh vẫn xuất được) · **524 test xanh** · UI kiểm bằng Chrome CDP
+  **12/12 bước** (URL tải gói đúng endpoint + mang đúng bảng size/ghi chú đã mã hoá) · chạy thật trên
+  production (tinker: tạo bộ tạm → dựng ZIP → đọc lại nội dung → xoá bộ tạm).
+- **Còn lại của đợt 4**: **chia sẻ link cho khách duyệt** (token công khai + nút Duyệt/Yêu cầu sửa) ·
+  phân quyền nhân viên theo gói (số ghế) · preset kênh bán (sàn TMĐT/catalogue) cho tên file ảnh.
 
 ---
 

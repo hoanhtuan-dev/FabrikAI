@@ -88,6 +88,40 @@ class ProjectController extends Controller
     }
 
     /**
+     * GET /api/projects/{project}/export — TẢI GÓI SẢN XUẤT CHO XƯỞNG (ZIP).
+     *
+     * Người nhận là XƯỞNG MAY (không dùng FabrikAI), nên gói phải tự đủ nghĩa: ảnh tham chiếu + phiếu
+     * kỹ thuật + bảng size + manifest đọc được bằng máy, kèm cảnh báo ảnh AI là ảnh tham chiếu.
+     *
+     * Quyền: chủ bộ sưu tập hoặc Super Admin (reviewer) — giống show().
+     * Tham số: sizes (bảng size, mỗi dòng một size) · note (ghi chú kỹ thuật chung).
+     */
+    public function exportBundle(Request $request, Project $project)
+    {
+        $actor = $request->user();
+        abort_unless($project->user_id === $actor->id || $actor->isSuperAdmin(), 403);
+
+        $data = $request->validate([
+            'sizes' => ['nullable', 'string', 'max:2000'],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $bundle = app(\App\Services\ProjectExportService::class)->build($project, [
+                'sizes' => $data['sizes'] ?? null,
+                'note' => $data['note'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Không đóng gói được: '.$e->getMessage()], 500);
+        }
+
+        // deleteFileAfterSend: ZIP chỉ tồn tại trong lúc tải, không để lại rác trong /tmp.
+        return response()->download($bundle['path'], $bundle['name'], [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
+    }
+
+    /**
      * POST /studio/projects — tạo dự án mới (mặc định status=draft).
      */
     public function store(Request $request)

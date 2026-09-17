@@ -83,6 +83,10 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::post('/projects/{project}/transition', [ProjectController::class, 'transition'])->name('projects.transition');
     Route::post('/projects/{project}/generations', [ProjectController::class, 'attachGeneration'])->name('projects.attach');
 
+    // [Đợt 4 — 2026-09-19] XUẤT GÓI CHO XƯỞNG: ảnh tham chiếu + phiếu kỹ thuật + bảng size + manifest,
+    // đóng thành 1 file ZIP. Chủ xưởng may cần "gói đủ để cắt may", không chỉ một tấm ảnh.
+    Route::get('/projects/{project}/export', [ProjectController::class, 'exportBundle'])->name('projects.export');
+
     // ── Generation pipelines (mọi thứ tạo ra ảnh/video của chính user) ──
     Route::post('/generate', [StudioController::class, 'generate'])->name('generate');
     Route::post('/video', [StudioController::class, 'renderVideo'])->name('video');
