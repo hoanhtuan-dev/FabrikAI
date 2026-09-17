@@ -108,14 +108,23 @@ class RenderImageJob implements ShouldQueue
             // [M-d — 2026-09-17] CAS: nếu người dùng đã Huỷ trong lúc job chạy (hoặc đường khác đã
             // kết thúc row) thì KHÔNG ghi đè 'completed'. Trước đây update() vô điều kiện làm "hồi
             // sinh" row đã cancelled trong khi credit đã được hoàn ⇒ trạng thái và tiền lệch nhau.
+            // [Đợt 0.3] NÓI THẬT về ảnh DEMO: khi chưa có API key, service trả ảnh mẫu (hoặc với đường
+            // EDIT thì trả lại CHÍNH ẢNH GỐC) mà vẫn đi tới đây với trạng thái 'completed'. Không có
+            // cờ này thì người dùng bấm "Sửa ảnh", nhận lại ảnh cũ, và app báo thành công.
+            $stubReason = $images->lastStubReason();
+
             $claimed = studio_claim_generation($generation, ['processing'], [
                 'status' => 'completed',
                 'media_url' => $url,
+                'is_demo' => $stubReason !== null,
+                'demo_reason' => $stubReason,
                 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
                 'provider' => $usedProvider,
                 'model' => $usedModel,
                 'meta' => array_merge($genMeta, [
                     'type' => 'image',
+                    'is_demo' => $stubReason !== null,
+                    'demo_reason' => $stubReason,
                     'provider' => $usedProvider,
                     'model' => $usedModel,
                     'requested_provider' => $generation->provider,

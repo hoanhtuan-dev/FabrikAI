@@ -13,12 +13,15 @@ class Generation extends Model
     protected $fillable = [
         'user_id', 'project_id', 'prompts_history_id', 'type', 'status',
         'prompt', 'model', 'provider', 'resolution', 'ratio', 'duration', 'media_url', 'base_image', 'mask_image', 'job_id', 'error', 'credits_cost', 'elapsed_ms', 'meta',
+        // [Đợt 0.3] cờ DEMO — xem migration 2026_09_17_000000_add_demo_flags_to_generations
+        'is_demo', 'demo_reason',
     ];
 
     protected function casts(): array
     {
         return [
             'meta' => 'array',
+            'is_demo' => 'boolean',
         ];
     }
 

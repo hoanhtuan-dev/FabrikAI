@@ -1426,6 +1426,9 @@ RULES:
             'ratio' => $g->ratio,
             'duration' => $g->duration,
             'elapsed_ms' => $g->elapsed_ms,
+            // [Đợt 0.3] cờ DEMO ra tới client để UI nói thật thay vì báo "thành công" im lặng.
+            'is_demo' => (bool) $g->is_demo,
+            'demo_reason' => $g->demo_reason,
             'meta' => $g->meta,
         ]);
     }
@@ -4433,6 +4436,8 @@ RULES:
                 'created_at' => $g->created_at?->format('d/m H:i'),
                 'resolution' => $g->resolution, 'ratio' => $g->ratio, 'duration' => $g->duration,
                 'elapsed_ms' => $g->elapsed_ms, 'meta' => $g->meta, 'prompt' => $g->prompt,
+                // [Đợt 0.3] để lưới Kết quả gắn nhãn "DEMO" lên đúng những ảnh không do AI tạo.
+                'is_demo' => (bool) $g->is_demo, 'demo_reason' => $g->demo_reason,
             ])->values();
 
         return response()->json(['items' => $items]);

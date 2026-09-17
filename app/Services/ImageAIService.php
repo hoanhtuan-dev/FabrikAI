@@ -24,6 +24,23 @@ class ImageAIService
     protected ?string $lastProvider = null;
     protected ?string $lastModel = null;
 
+    /**
+     * [Đợt 0.3 — 2026-09-17] Lý do lần generate() vừa rồi trả về ảnh DEMO (null = ảnh thật).
+     *
+     * Vì sao cần: khi chưa cấu hình API key, generate() KHÔNG ném lỗi mà trả về ảnh mẫu — hoặc với
+     * đường EDIT thì trả lại CHÍNH ẢNH GỐC (copySample) — rồi generation được đánh dấu 'completed'.
+     * Người dùng bấm "Sửa ảnh", nhận lại đúng ảnh cũ, và app báo thành công. Đó là lỗi NIỀM TIN
+     * (xem STUDIO_REVIEW_DEEPDIVE §3.2 S3), không phải lỗi logic — nên không test nào bắt được.
+     *
+     * Nay job hoàn tất đọc cờ này và ghi vào generations.is_demo + demo_reason, để API/UI nói thật.
+     */
+    protected ?string $lastStubReason = null;
+
+    /** Lý do ảnh vừa trả về là DEMO/fallback (null ⇒ ảnh do provider thật tạo). */
+    public function lastStubReason(): ?string
+    {
+        return $this->lastStubReason;
+    }
 
     public function lastProvider(): ?string
     {
@@ -57,6 +74,11 @@ class ImageAIService
 
     public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $providerOverride = null, ?string $modelOverride = null, ?string $negativePrompt = null, array $refImages = [], ?string $mode = null, ?int $seed = null): string
     {
+        // [Đợt 0.3] Mỗi lần generate() là một lần đánh giá mới — xoá cờ DEMO của lần trước.
+        // Service là singleton trong container, nên quên reset sẽ làm kết quả ảnh THẬT kế tiếp
+        // bị gắn cờ demo (hoặc ngược lại) — đúng lớp bug "trạng thái rò giữa các lần gọi".
+        $this->lastStubReason = null;
+
         $dashscopeKey = studio_api_key('dashscope');
 
         // Tạo ẢNH MỚI từ ảnh tham chiếu (i2i — mode='refgen', card "Tạo ảnh mới từ ảnh mẫu"):
@@ -169,6 +191,12 @@ class ImageAIService
         }
 
         // No real key configured -> stub (reuse the source image for edits, sample otherwise).
+        // [Đợt 0.3] Ghi rõ LÝ DO để job hoàn tất đánh dấu is_demo + nói thật với người dùng, thay vì
+        // trả ảnh mẫu/ảnh gốc rồi báo 'completed' im lặng.
+        $this->lastStubReason = $baseImage
+            ? 'Chưa cấu hình API key — kết quả là ẢNH GỐC được trả lại, KHÔNG phải ảnh do AI sửa.'
+            : 'Chưa cấu hình API key — kết quả là ẢNH MẪU có sẵn, KHÔNG phải ảnh do AI tạo.';
+
         return $this->copySample($prompt, $baseImage);
     }
 

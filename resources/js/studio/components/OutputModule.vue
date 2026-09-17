@@ -30,10 +30,17 @@ function projectName(pid, fallback) {
         <StudioIcon name="filter" size="h-3.5 w-3.5" />
       </button>
     </div>
+    <!-- [Đợt 0.3] Banner nói thật khi lô hiện tại có ảnh DEMO -->
+    <p v-if="store.generations.some(g => g.is_demo)" class="mx-2 mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug text-amber-200">
+      <span class="font-semibold">Ảnh DEMO:</span> chưa cấu hình API key cho model này nên kết quả là ảnh mẫu (hoặc chính ảnh gốc), <span class="font-semibold">không phải do AI tạo</span>. Vào Cài đặt để thêm API key.
+    </p>
     <div class="scrollbar-hide mt-2 grid flex-1 auto-rows-min grid-cols-1 gap-1.5 overflow-y-auto p-2">
       <div v-for="g in store.visibleGenerations" :key="g.id" class="group relative aspect-square overflow-hidden rounded-lg border-2" :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700'">
         <!-- Badge dự án -->
         <span v-if="g.project_id" class="absolute top-1 left-1 z-10 h-2.5 w-2.5 rounded-full ring-1 ring-black/40" :style="{ background: projectColor(g.project_id) }" :title="'Dự án: ' + projectName(g.project_id, g.project)"></span>
+        <!-- [Đợt 0.3] Nhãn DEMO: ảnh này KHÔNG do AI tạo (chưa có API key) — ảnh mẫu hoặc chính ảnh gốc.
+             Trước đây những ảnh này được báo 'Hoàn tất' im lặng, người dùng tưởng AI đã xử lý. -->
+        <span v-if="g.is_demo" class="absolute right-1 top-1 z-10 rounded-full bg-amber-500 px-1.5 py-0.5 text-[8px] font-bold uppercase leading-none text-black" :title="g.demo_reason || 'Ảnh mẫu — chưa cấu hình API key'">DEMO</span>
         <!-- Ảnh hoàn tất -->
         <template v-if="g.status === 'completed' && g.media_url">
           <button @click="store.openViewer(g)" draggable="true" @dragstart="onThumbDrag($event, g)" class="absolute inset-0 cursor-grab active:cursor-grabbing" :title="'Kéo thả vào canvas để thêm · nhấn để xem lớn'"><img :src="thumbUrl(g.media_url)" class="pointer-events-none h-full w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)"></button>

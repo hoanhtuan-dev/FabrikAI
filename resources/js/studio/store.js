@@ -2941,7 +2941,7 @@ export const useStudioStore = defineStore('studio', {
           if (!res.ok) { delete this._pollTimers[id]; return; }
           const g = await res.json();
           const item = this.generations.find(x => x.id === Number(g.id));
-          if (item) { item.status = g.status; item.media_url = g.media_url; item.error = g.error; item.model = g.model; item.provider = g.provider; item.elapsed_ms = g.elapsed_ms; if (g.meta && typeof g.meta === 'object') item.meta = g.meta; }
+          if (item) { item.status = g.status; item.media_url = g.media_url; item.error = g.error; item.model = g.model; item.provider = g.provider; item.elapsed_ms = g.elapsed_ms; if (g.meta && typeof g.meta === 'object') item.meta = g.meta; item.is_demo = !!g.is_demo; item.demo_reason = g.demo_reason || null; }
           // [Đợt 0.2] trạng thái THẬT vừa đổi ⇒ cập nhật thanh tiến trình của lô (không mô phỏng).
           this.syncBatchProgress();
           if (['completed', 'failed', 'cancelled'].includes(g.status)) {
