@@ -145,6 +145,40 @@ class UserCatalogTest extends TestCase
         );
     }
 
+    /**
+     * [Yêu cầu 2026-09-17] Sắp xếp lại activity bar: Prompt Tạo Ảnh + Trợ lý thiết kế LÊN NHÓM
+     * TRÊN (bỏ `mt-auto`) và nhường ĐÁY cho nút Cài đặt. Guard này chặn việc lùi về bố cục cũ.
+     */
+    public function test_settings_sits_at_the_bottom_and_prompt_stylist_moved_up(): void
+    {
+        $src = (string) file_get_contents(resource_path('js/studio/StudioApp.vue'));
+
+        // CHỈ soi activity bar BÊN TRÁI. Thanh bên PHẢI có nút Outputs neo đáy (`mt-auto`) là
+        // thiết kế đúng — nếu soi cả file thì test bắt oan nút đó.
+        $start = strpos($src, '<nav class="activity-bar');
+        $this->assertNotFalse($start, 'Không tìm thấy activity bar bên trái.');
+        $end = strpos($src, '</nav>', $start);
+        $nav = substr($src, (int) $start, (int) $end - (int) $start);
+
+        $this->assertStringNotContainsString('activity-btn mt-auto', $nav,
+            'Trong activity bar TRÁI, không nút công cụ nào được neo đáy nữa — Prompt/Trợ lý phải ở nhóm TRÊN.');
+
+        $settingsPos = strpos($nav, 'class="relative mt-auto"');
+        $this->assertNotFalse($settingsPos, 'Nút Cài đặt phải nằm ở ĐÁY activity bar (mt-auto).');
+
+        $promptPos = strpos($nav, 'title="Prompt Tạo Ảnh');
+        $stylistPos = strpos($nav, 'title="Trợ lý thiết kế');
+        $this->assertNotFalse($promptPos);
+        $this->assertNotFalse($stylistPos);
+        $this->assertLessThan($settingsPos, $promptPos, 'Prompt Tạo Ảnh phải ở TRÊN nút Cài đặt.');
+        $this->assertLessThan($settingsPos, $stylistPos, 'Trợ lý thiết kế phải ở TRÊN nút Cài đặt.');
+
+        // Menu cài đặt phải có lối vào trang preset của người dùng.
+        $this->assertStringContainsString('Cài đặt Preset (Prompt Templates)', $src,
+            'Menu Cài đặt phải dẫn tới trang cài đặt preset cho người dùng.');
+        $this->assertStringContainsString('href="/presets"', $src);
+    }
+
     public function test_both_pages_use_the_local_catalog(): void
     {
         $targets = [

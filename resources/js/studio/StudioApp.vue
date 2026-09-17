@@ -52,6 +52,15 @@ const outputOpen = ref(false);
 const projectsOpen = ref(false);
 const promptPopupOpen = ref(false);  // popup độc lập cho Prompt Tạo Ảnh (ConceptCard)
 const stylistPopupOpen = ref(false); // popup độc lập cho Trợ lý Thiết kế (StylistCard)
+// [Yêu cầu 2026-09-17] Menu Cài đặt ở GÓC TRÁI DƯỚI CÙNG của activity bar.
+const settingsOpen = ref(false);
+// Backdrop chỉ là <div> bắt click (không nhận bàn phím) nên phải tự lo đóng bằng Escape.
+function closeSettingsOnEsc(e) { if (e.key === 'Escape') settingsOpen.value = false; }
+watch(settingsOpen, (open) => {
+  if (open) window.addEventListener('keydown', closeSettingsOnEsc);
+  else window.removeEventListener('keydown', closeSettingsOnEsc);
+});
+onBeforeUnmount(() => window.removeEventListener('keydown', closeSettingsOnEsc));
 // [Đợt 0.6] Đã gỡ khối cài đặt PWA (hai nút "Cài đặt FabrikAI" + 4 hàm/ref liên quan) — Chốt Q4 bỏ PWA hoàn toàn.
 // Popup "Prompt Tạo Ảnh" (ConceptCard) mount GLOBAL ở cuối template (mọi viewport):
 // chỉ cần đồng bộ activity hiện tại + đóng drawer Outputs mobile cho gọn.
@@ -513,14 +522,35 @@ function onTouchEnd(e) {
         <button v-for="a in activityNav" :key="a.id" @click="selectActivity(a.id)" :class="activeActivity === a.id ? 'is-active' : ''" class="activity-btn" :title="a.label" :aria-label="a.label">
           <StudioIcon :name="a.icon" size="h-5 w-5" />
         </button>
-        <!-- Prompt Tạo Ảnh — popup độc lập (ConceptCard mount ở cuối template) -->
-        <button @click="store.promptOpen = true; stylistPopupOpen = false; outputOpen = false" class="activity-btn mt-auto" :class="store.promptOpen ? 'is-active' : ''" title="Prompt Tạo Ảnh — nhập prompt & tạo ảnh" aria-label="Prompt Tạo Ảnh">
+        <!-- [Yêu cầu 2026-09-17] Prompt Tạo Ảnh + Trợ lý thiết kế nay nằm CÙNG NHÓM PHÍA TRÊN
+             với các nút khác (trước đây bị `mt-auto` đẩy xuống ĐÁY). Đáy nay dành cho Cài đặt. -->
+        <button @click="store.promptOpen = true; stylistPopupOpen = false; outputOpen = false; settingsOpen = false" class="activity-btn" :class="store.promptOpen ? 'is-active' : ''" title="Prompt Tạo Ảnh — nhập prompt & tạo ảnh" aria-label="Prompt Tạo Ảnh">
           <StudioIcon name="sparkles" size="h-5 w-5" />
         </button>
         <!-- Trợ lý thiết kế — popup độc lập (StylistCard mount ở cuối template) -->
-        <button @click="stylistPopupOpen = true; store.promptOpen = false; outputOpen = false" class="activity-btn" :class="stylistPopupOpen ? 'is-active' : ''" title="Trợ lý thiết kế — khảo sát & tạo prompt thiết kế" aria-label="Trợ lý thiết kế">
+        <button @click="stylistPopupOpen = true; store.promptOpen = false; outputOpen = false; settingsOpen = false" class="activity-btn" :class="stylistPopupOpen ? 'is-active' : ''" title="Trợ lý thiết kế — khảo sát & tạo prompt thiết kế" aria-label="Trợ lý thiết kế">
           <StudioIcon name="shirt" size="h-5 w-5" />
         </button>
+
+        <!-- ⚙️ CÀI ĐẶT — GÓC TRÁI DƯỚI CÙNG ------------------------------------------------->
+        <div class="relative mt-auto">
+          <div v-if="settingsOpen" class="fixed inset-0 z-40" @click="settingsOpen = false"></div>
+          <button @click="settingsOpen = !settingsOpen" class="activity-btn" :class="settingsOpen ? 'is-active' : ''" title="Cài đặt — preset, dữ liệu Trợ lý, thư viện" aria-label="Cài đặt" aria-haspopup="menu" :aria-expanded="settingsOpen ? 'true' : 'false'">
+            <StudioIcon name="gear" size="h-5 w-5" />
+          </button>
+          <div v-if="settingsOpen" role="menu" class="absolute bottom-0 left-full z-50 ml-2 w-64 overflow-hidden rounded-xl border border-ink-700 bg-ink-900 p-1.5 shadow-2xl">
+            <p class="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">Cài đặt của tôi</p>
+            <a href="/presets" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="template" size="h-4 w-4" class="text-brand-400" /> Cài đặt Preset (Prompt Templates)</a>
+            <a href="/stylist-data" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="shirt" size="h-4 w-4" class="text-brand-400" /> Dữ liệu Trợ lý thiết kế</a>
+            <button type="button" @click="settingsOpen = false; goLibrary()" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="grid" size="h-4 w-4" class="text-brand-400" /> Thư viện &amp; ảnh của tôi</button>
+            <template v-if="store.user && store.user.is_admin">
+              <div class="my-1 border-t border-ink-700"></div>
+              <p class="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">Quản trị</p>
+              <a href="/settings" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="gear" size="h-4 w-4" class="text-amber-400" /> Cài đặt hệ thống (API key · model)</a>
+              <a href="/admin" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="coins" size="h-4 w-4" class="text-amber-400" /> Quản trị Owner (người dùng · gói cước)</a>
+            </template>
+          </div>
+        </div>
       </nav>
       <aside v-if="store.leftPanelOpen" class="scrollbar-hide hidden w-72 shrink-0 flex-col overflow-y-auto border-r border-ink-700 bg-ink-900/70 lg:flex">
         <div class="panel-head border-b border-ink-700">
@@ -706,6 +736,10 @@ function onTouchEnd(e) {
           <button @click="menuOpen = false; goLibrary()" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors bg-ink-800 text-cream-300/70" title="Thư viện — xem ảnh đã tạo & file tải lên">
             <StudioIcon name="library" size="h-4 w-4" /> Thư viện
           </button>
+          <!-- [Yêu cầu 2026-09-17] Trên desktop là nút Cài đặt ở góc trái dưới; mobile phải có lối vào tương đương. -->
+          <a href="/presets" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-[10px] font-semibold text-cream-300/70 transition-colors" title="Cài đặt — preset prompt của bạn">
+            <StudioIcon name="gear" size="h-4 w-4" /> Cài đặt
+          </a>
         </div>
         <div class="space-y-3"><component :is="c" v-for="(c,i) in panel" :key="i" /></div>
       </div>
