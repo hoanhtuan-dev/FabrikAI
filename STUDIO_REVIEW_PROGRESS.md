@@ -48,7 +48,7 @@ JS/Vue studio **42 file (33 .vue) / 12.828 dòng** · `public_html` **21 MB** ·
 | 1.4 | Channel Validator | ⬜ CHƯA | — | pre-flight: cạnh ≥ ngưỡng · dung lượng · nền #FFFFFF · watermark · sản phẩm ≥70% khung |
 | 1.5 | Thông báo khi render xong | ⬜ CHƯA | — | Notification::fake ⇒ đúng 1 lần/lô, không spam từng ảnh |
 | 1.6 | Mô tả + caption + hashtag | ⬜ CHƯA | — | XÂY MỚI (ProductAIService đã bị gỡ ở 729ceb0) |
-| 1.7 | `prompt_templates` | ⬜ CHƯA | — | bắt đầu bằng `garment.lock` |
+| 1.7 | `prompt_templates` | ✅ XONG | `f44f6c0` | bảng `prompt_templates` + `studio_prompt_template()` (chọn version cao nhất active, placeholder, fallback); `garment.lock` ở StudioController nay resolve từ DB, chuỗi cũ giữ làm fallback |
 
 > 🛑 **BẢNG DƯỚI ĐÂY LÀ ẢNH CHỤP 2026-09-16 — ĐÃ SAI HOÀN TOÀN, CHỈ GIỮ ĐỂ ĐỐI CHIẾU LỊCH SỬ.**
 > Nó nói *"KHÔNG có `.git`"*, *"KHÔNG có `tests/`"*, *"chưa có deploy"* — cả ba đều **SAI** kể từ 2026-09-17.
