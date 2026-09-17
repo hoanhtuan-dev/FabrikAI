@@ -240,8 +240,8 @@
 
 | # | Việc | Vì sao cần hỏi |
 |---|---|---|
-| Q1 | **Bật chặn khi hết credit?** (hiện không chặn) | Ảnh hưởng trực tiếp trải nghiệm khách đang dùng; nên có cờ `studio_enforce_credits` mặc định TẮT, bật khi đã có thanh toán |
-| Q2 | **Cổng thanh toán** (VNPay/MoMo/chuyển khoản) | Chưa có ⇒ nút "Nâng cấp" chỉ được nói thật là "kích hoạt ngay, thanh toán sau" |
+| Q1 | ~~Bật chặn khi hết credit?~~ **✅ ĐÃ QUYẾT: BẬT (2026-09-19)** | Mặc định nay là BẬT (`config/studio.php` + `studio_plan_limits()`); tắt lại bằng setting `studio_enforce_credits=0`. 402 có cấu trúc + tự mở bảng nâng cấp; Super Admin được miễn chặn để không tự khoá mình |
+| Q2 | ~~Cổng thanh toán~~ **✅ ĐÃ QUYẾT: chuyển khoản + hỗ trợ trước, VNPay sau (2026-09-19)** | Nút "Nâng cấp" nay là **yêu cầu có mã theo dõi** ({{B}}upgrade_requests{{B}}); khách chuyển khoản theo mã, Super Admin kích hoạt. Lỗ hổng "khách tự kích hoạt gói trả phí miễn phí" đã đóng |
 | Q3 | **Gói theo mùa vụ/xưởng** (bán theo đơn hàng thay vì theo tháng) | Chủ xưởng may mua theo vụ, không mua theo tháng |
 | Q4 | **Số ghế theo gói** | Cần cho chủ doanh nghiệp; hiện mỗi tài khoản là một người dùng riêng |
 
