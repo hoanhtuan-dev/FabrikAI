@@ -166,12 +166,20 @@ class UserCatalogTest extends TestCase
         $settingsPos = strpos($nav, 'class="relative mt-auto"');
         $this->assertNotFalse($settingsPos, 'Nút Cài đặt phải nằm ở ĐÁY activity bar (mt-auto).');
 
-        $promptPos = strpos($nav, 'title="Prompt Tạo Ảnh');
-        $stylistPos = strpos($nav, 'title="Trợ lý thiết kế');
-        $this->assertNotFalse($promptPos);
-        $this->assertNotFalse($stylistPos);
-        $this->assertLessThan($settingsPos, $promptPos, 'Prompt Tạo Ảnh phải ở TRÊN nút Cài đặt.');
-        $this->assertLessThan($settingsPos, $stylistPos, 'Trợ lý thiết kế phải ở TRÊN nút Cài đặt.');
+        // [Sửa 2026-09-17] Nút nay SINH TỪ CẤU HÌNH nên không còn nhãn viết cứng trong template.
+        // Bất biến "ở trên nút Cài đặt" nay nằm ở THỨ TỰ CẤU HÌNH: vòng lặp render mọi nút đứng
+        // TRƯỚC khối Cài đặt ghim đáy.
+        $loopPos = strpos($nav, 'v-for="a in activityBar"');
+        $this->assertNotFalse($loopPos, 'Thanh công cụ phải render nút từ cấu hình.');
+        $this->assertLessThan($settingsPos, $loopPos,
+            'Mọi nút (gồm Prompt Tạo Ảnh · Trợ lý thiết kế) phải nằm TRÊN khối Cài đặt ghim đáy.');
+
+        // Và trong cấu hình, 2 nút popup đứng TRƯỚC mục ghim.
+        $ids = \App\Services\StudioGuiConfig::defaultIds();
+        $this->assertLessThan(array_search('settings', $ids, true), array_search('prompt', $ids, true),
+            'Prompt Tạo Ảnh phải đứng trước mục ghim ở đáy.');
+        $this->assertLessThan(array_search('settings', $ids, true), array_search('stylist', $ids, true),
+            'Trợ lý thiết kế phải đứng trước mục ghim ở đáy.');
 
         // Menu cài đặt phải có lối vào trang preset của người dùng.
         $this->assertStringContainsString('Cài đặt Preset (Prompt Templates)', $src,

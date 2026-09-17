@@ -155,11 +155,91 @@ class StudioGuiConfigTest extends TestCase
 
         $this->assertNotEmpty($vueIds, 'Không đọc được ACTIVITY_CARDS từ StudioApp.vue.');
         sort($vueIds);
-        $phpIds = StudioGuiConfig::defaultIds();
+        // CHỈ mục kind='panel' mới có card; 'action' (popup) và 'menu' (Cài đặt) thì không.
+        $phpIds = StudioGuiConfig::panelIds();
         sort($phpIds);
 
         $this->assertSame($vueIds, $phpIds,
-            'Bộ id trong StudioGuiConfig LỆCH với ACTIVITY_CARDS — mục bị ẩn oan hoặc không có card.');
+            'Bộ id PANEL trong StudioGuiConfig LỆCH với ACTIVITY_CARDS — mục bị ẩn oan hoặc không có card.');
+    }
+
+    /**
+     * [Sửa 2026-09-17] LỖI NGƯỜI DÙNG PHÁT HIỆN: danh sách quản trị THIẾU nút 'Prompt Tạo Ảnh' và
+     * 'Trợ lý thiết kế' (chúng bị viết cứng trong template nên không ai quản lý được), và thiếu cả
+     * nút menu 'Cài đặt'. Guard này khoá bất biến: MỌI nút trên thanh công cụ trái đều có trong
+     * cấu hình.
+     */
+    public function test_every_left_toolbar_button_is_managed_by_the_config(): void
+    {
+        $ids = StudioGuiConfig::defaultIds();
+
+        foreach (['prompt' => 'action', 'stylist' => 'action', 'settings' => 'menu'] as $id => $kind) {
+            $this->assertContains($id, $ids, "Nút '{$id}' KHÔNG có trong cấu hình ⇒ owner không quản lý được.");
+            $row = collect(StudioGuiConfig::DEFAULTS)->firstWhere('id', $id);
+            $this->assertSame($kind, $row['kind'], "Mục '{$id}' phải có kind='{$kind}'.");
+        }
+
+        // Nền tảng cũ (panel) vẫn nguyên vẹn.
+        $this->assertCount(7, StudioGuiConfig::panelIds(), 'Phải còn đủ 7 nhóm card.');
+        $this->assertSame(['settings'], StudioGuiConfig::PINNED_IDS);
+    }
+
+    public function test_toolbar_renders_from_the_config_not_hardcoded_buttons(): void
+    {
+        $src = (string) file_get_contents(resource_path('js/studio/StudioApp.vue'));
+
+        // Thanh công cụ trái phải sinh nút từ cấu hình...
+        $this->assertStringContainsString('v-for="a in activityBar"', $src,
+            'Thanh công cụ trái phải render từ cấu hình (activityBar).');
+        // ...và KHÔNG còn markup viết cứng cho 2 nút popup (đúng thứ đã bị bỏ sót).
+        $this->assertStringNotContainsString('@click="store.promptOpen = true; stylistPopupOpen = false', $src,
+            'Nút Prompt Tạo Ảnh còn bị viết cứng ⇒ lại thoát khỏi danh sách quản trị.');
+        $this->assertStringNotContainsString('@click="stylistPopupOpen = true; store.promptOpen = false', $src,
+            'Nút Trợ lý thiết kế còn bị viết cứng ⇒ lại thoát khỏi danh sách quản trị.');
+
+        // Fallback trong JS phải khớp cấu hình PHP (không thì lúc API lỗi sẽ thiếu nút).
+        preg_match_all("/\\{ id: '([a-z_]+)', kind: '([a-z]+)'/", $src, $m, PREG_SET_ORDER);
+        $fallback = [];
+        foreach ($m as $row) {
+            $fallback[$row[1]] = $row[2];
+        }
+        foreach (StudioGuiConfig::DEFAULTS as $d) {
+            $this->assertSame($d['kind'], $fallback[$d['id']] ?? null,
+                "Fallback JS thiếu hoặc sai kind cho '{$d['id']}'.");
+        }
+    }
+
+    public function test_admin_ui_pinned_list_matches_the_backend(): void
+    {
+        $src = (string) file_get_contents(resource_path('js/studio/AdminApp.vue'));
+        $this->assertStringContainsString("const GUI_PINNED = ['" . implode("', '", StudioGuiConfig::PINNED_IDS) . "']", $src,
+            'Danh sách ghim ở trang quản trị phải khớp StudioGuiConfig::PINNED_IDS.');
+    }
+
+    /** Mục ghim luôn nằm CUỐI dù client gửi thứ tự nào — nếu không, UI và thực tế lệch nhau. */
+    public function test_pinned_entry_stays_last_whatever_order_is_saved(): void
+    {
+        $items = $this->svc()->all();
+        // Đưa 'settings' lên ĐẦU rồi lưu.
+        $settings = null;
+        $rest = [];
+        foreach ($items as $it) {
+            if ($it['id'] === 'settings') { $settings = $it; } else { $rest[] = $it; }
+        }
+        $saved = $this->svc()->save(array_merge([$settings], $rest));
+
+        $this->assertSame('settings', end($saved)['id'], 'Mục ghim phải luôn ở cuối.');
+    }
+
+    /** `kind` do CODE quyết định — client không được đổi hành vi của nút. */
+    public function test_client_cannot_change_the_kind(): void
+    {
+        $saved = $this->svc()->save([
+            ['id' => 'settings', 'kind' => 'panel', 'label' => 'X', 'icon' => 'gear', 'visible' => true],
+        ]);
+
+        $row = collect($saved)->firstWhere('id', 'settings');
+        $this->assertSame('menu', $row['kind'], 'kind phải lấy từ code, không nhận từ client.');
     }
 
     // ── Mặc định ───────────────────────────────────────────────────────────

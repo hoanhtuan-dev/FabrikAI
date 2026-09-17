@@ -95,6 +95,18 @@ const guiIcons = ref([]);
 const guiSaving = ref(false);
 const guiPreview = computed(() => guiItems.value.filter((i) => i.visible !== false));
 
+// Id LUÔN ghim ở đáy thanh công cụ — đổi được nhãn/icon/ẩn-hiện nhưng KHÔNG đổi được vị trí.
+// Phải khớp StudioGuiConfig::PINNED_IDS (có test đối chiếu).
+const GUI_PINNED = ['settings'];
+
+const GUI_KIND = {
+  panel: { label: 'Nhóm card', hint: 'Mở nhóm card ở sidebar trái' },
+  action: { label: 'Popup', hint: 'Mở popup riêng (không đổi sidebar)' },
+  menu: { label: 'Menu (ghim đáy)', hint: 'Menu Cài đặt — luôn nằm ở đáy thanh công cụ' },
+};
+
+function isGuiPinned(it) { return GUI_PINNED.includes(it.id); }
+
 async function loadGui() {
   try {
     const d = await api('/gui');
@@ -566,7 +578,10 @@ onMounted(async () => {
         </div>
         <p class="mb-4 text-xs leading-relaxed text-cream-300/60">
           Đổi <b class="text-cream-200">thứ tự</b> · <b class="text-cream-200">nhãn</b> · <b class="text-cream-200">icon</b> · <b class="text-cream-200">ẩn/hiện</b> từng mục — áp dụng cho MỌI người dùng Studio.
-          Không thêm/xoá được mục vì mỗi mục gắn cứng một bộ công cụ có sẵn trong code.
+          Danh sách này gồm <b class="text-cream-200">toàn bộ nút trên thanh công cụ trái</b>: nhóm card
+          (<span class="text-brand-200">Nhóm card</span>), nút mở popup như Prompt Tạo Ảnh · Trợ lý thiết kế
+          (<span class="text-amber-200">Popup</span>) và menu Cài đặt (<span class="text-cream-300">ghim đáy</span>).
+          Không thêm/xoá được mục vì mỗi mục gắn cứng một chức năng có sẵn trong code.
         </p>
 
         <!-- Xem trước đúng thứ tự & icon sẽ hiện trên thanh công cụ -->
@@ -584,8 +599,8 @@ onMounted(async () => {
           <div v-for="(it, i) in guiItems" :key="it.id" class="flex flex-wrap items-center gap-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5">
             <span class="w-6 shrink-0 text-center text-[10px] font-semibold text-cream-300/40">{{ i + 1 }}</span>
             <div class="flex shrink-0 gap-1">
-              <button @click="moveGui(i, -1)" :disabled="i === 0" class="grid h-7 w-7 place-items-center rounded-md bg-ink-700 text-cream-200 transition hover:bg-ink-600 disabled:opacity-30" title="Đưa lên" aria-label="Đưa lên">▲</button>
-              <button @click="moveGui(i, 1)" :disabled="i === guiItems.length - 1" class="grid h-7 w-7 place-items-center rounded-md bg-ink-700 text-cream-200 transition hover:bg-ink-600 disabled:opacity-30" title="Đưa xuống" aria-label="Đưa xuống">▼</button>
+              <button @click="moveGui(i, -1)" :disabled="i === 0 || isGuiPinned(it)" class="grid h-7 w-7 place-items-center rounded-md bg-ink-700 text-cream-200 transition hover:bg-ink-600 disabled:opacity-30" title="Đưa lên" aria-label="Đưa lên">▲</button>
+              <button @click="moveGui(i, 1)" :disabled="i === guiItems.length - 1 || isGuiPinned(it)" class="grid h-7 w-7 place-items-center rounded-md bg-ink-700 text-cream-200 transition hover:bg-ink-600 disabled:opacity-30" :title="isGuiPinned(it) ? 'Mục này luôn ở đáy' : 'Đưa xuống'" aria-label="Đưa xuống">▼</button>
             </div>
             <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-800 text-brand-200" title="Xem trước icon"><StudioIcon :name="it.icon" size="h-5 w-5" /></span>
             <select v-model="it.icon" class="input !w-40 !py-1.5 text-xs" aria-label="Icon" title="Chọn icon — danh sách lấy từ registry chung">
@@ -593,6 +608,7 @@ onMounted(async () => {
             </select>
             <input v-model="it.label" type="text" maxlength="40" class="input !min-w-40 !flex-1 !py-1.5 text-xs" placeholder="Nhãn hiển thị" aria-label="Nhãn">
             <span class="shrink-0 rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[10px] text-cream-300/50" title="Id — không đổi được">{{ it.id }}</span>
+            <span class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" :class="it.kind === 'panel' ? 'bg-brand-600/25 text-brand-200' : it.kind === 'action' ? 'bg-amber-500/20 text-amber-200' : 'bg-ink-700 text-cream-300/70'" :title="GUI_KIND[it.kind]?.hint || ''">{{ GUI_KIND[it.kind]?.label || it.kind }}</span>
             <label class="flex shrink-0 cursor-pointer items-center gap-1.5 text-[11px] text-cream-200">
               <input type="checkbox" v-model="it.visible" class="h-3.5 w-3.5 accent-brand-500"> Hiện
             </label>

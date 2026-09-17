@@ -53,27 +53,58 @@ const ACTIVITY_CARDS = {
 };
 
 // Bản GỐC — dùng khi chưa tải xong cấu hình hoặc API lỗi, để thanh công cụ không bao giờ trống.
+// Phải khớp `StudioGuiConfig::DEFAULTS` (có test đối chiếu), gồm cả nút popup + menu Cài đặt.
 const ACTIVITY_FALLBACK = [
-  { id: 'concept', icon: 'sparkles', label: 'Tạo ảnh' },
-  { id: 'variation', icon: 'variations', label: 'Tạo biến thể ảnh' },
-  { id: 'tryon', icon: 'hanger', label: 'Mặc thử đồ' },
-  { id: 'inpaint', icon: 'pencil', label: 'Sửa ảnh' },
-  { id: 'compose', icon: 'layers', label: 'Ghép ảnh' },
-  { id: 'upscale', icon: 'maximize', label: 'Upscale' },
-  { id: 'director', icon: 'film', label: 'Kịch bản quay' },
+  { id: 'concept', kind: 'panel', icon: 'sparkles', label: 'Tạo ảnh' },
+  { id: 'variation', kind: 'panel', icon: 'variations', label: 'Tạo biến thể ảnh' },
+  { id: 'tryon', kind: 'panel', icon: 'hanger', label: 'Mặc thử đồ' },
+  { id: 'inpaint', kind: 'panel', icon: 'pencil', label: 'Sửa ảnh' },
+  { id: 'compose', kind: 'panel', icon: 'layers', label: 'Ghép ảnh' },
+  { id: 'upscale', kind: 'panel', icon: 'maximize', label: 'Upscale' },
+  { id: 'director', kind: 'panel', icon: 'film', label: 'Kịch bản quay' },
+  { id: 'prompt', kind: 'action', icon: 'sparkles', label: 'Prompt Tạo Ảnh' },
+  { id: 'stylist', kind: 'action', icon: 'shirt', label: 'Trợ lý thiết kế' },
+  { id: 'settings', kind: 'menu', icon: 'gear', label: 'Cài đặt' },
 ];
 
-const activityCfg = ref(null); // [{ id, label, icon, visible }] từ /api/gui
+const activityCfg = ref(null); // [{ id, kind, label, icon, visible }] từ /api/gui
 
-const activityNav = computed(() => {
+/** Toàn bộ nút thanh công cụ TRÁI (trừ nút ghim đáy) — sinh từ cấu hình owner quản lý. */
+const activityBar = computed(() => {
   const src = Array.isArray(activityCfg.value) && activityCfg.value.length
     ? activityCfg.value
     : ACTIVITY_FALLBACK;
 
   return src
-    .filter((a) => a && a.visible !== false && ACTIVITY_CARDS[a.id]) // ẩn/hiện + chặn id lạ
-    .map((a) => ({ id: a.id, icon: a.icon || 'square', label: a.label || a.id, cards: ACTIVITY_CARDS[a.id] }));
+    .filter((a) => a && a.visible !== false)
+    // Mục 'panel' phải có card, nếu không thì bấm vào sẽ ra panel rỗng ⇒ chặn id lạ.
+    .filter((a) => (a.kind === 'panel' ? !!ACTIVITY_CARDS[a.id] : ['action', 'menu'].includes(a.kind)))
+    .map((a) => ({
+      id: a.id,
+      kind: a.kind || 'panel',
+      icon: a.icon || 'square',
+      label: a.label || a.id,
+      cards: a.kind === 'panel' ? ACTIVITY_CARDS[a.id] : null,
+    }));
 });
+
+/** Nhóm panel (đổi sidebar) — dùng cho vòng lặp card + panel đang mở. */
+const activityNav = computed(() => activityBar.value.filter((a) => a.kind === 'panel'));
+
+/** Mục menu Cài đặt — luôn ghim ở ĐÁY; nhãn/icon/ẩn-hiện theo cấu hình. */
+const settingsEntry = computed(() => activityBar.value.find((a) => a.kind === 'menu' && a.id === 'settings') || null);
+
+/** Nút KHÔNG đổi panel mà mở POPUP độc lập (Prompt Tạo Ảnh · Trợ lý thiết kế). */
+function runToolbarAction(id) {
+  if (id === 'prompt') { store.promptOpen = true; stylistPopupOpen.value = false; outputOpen.value = false; settingsOpen.value = false; }
+  else if (id === 'stylist') { stylistPopupOpen.value = true; store.promptOpen = false; outputOpen.value = false; settingsOpen.value = false; }
+}
+
+function isToolbarActionActive(id) {
+  if (id === 'prompt') return store.promptOpen;
+  if (id === 'stylist') return stylistPopupOpen.value;
+  return false;
+}
 
 // Owner ẩn đúng mục đang mở ⇒ nhảy về mục hiển thị đầu tiên, tránh panel rỗng không lối thoát.
 watch(activityNav, (list) => {
@@ -570,24 +601,25 @@ function onTouchEnd(e) {
       <!-- Activity bar (VSCode-style) + Sidebar card của activity đang chọn (desktop) -->
       <nav class="activity-bar hidden md:flex" aria-label="Công cụ">
         <div class="mb-2 grid h-11 w-11 shrink-0 place-items-center text-brand-400" title="Studio"><StudioIcon name="bot" size="h-5 w-5" /></div>
-        <button v-for="a in activityNav" :key="a.id" @click="selectActivity(a.id)" :class="activeActivity === a.id ? 'is-active' : ''" class="activity-btn" :title="a.label" :aria-label="a.label">
-          <StudioIcon :name="a.icon" size="h-5 w-5" />
-        </button>
-        <!-- [Yêu cầu 2026-09-17] Prompt Tạo Ảnh + Trợ lý thiết kế nay nằm CÙNG NHÓM PHÍA TRÊN
-             với các nút khác (trước đây bị `mt-auto` đẩy xuống ĐÁY). Đáy nay dành cho Cài đặt. -->
-        <button @click="store.promptOpen = true; stylistPopupOpen = false; outputOpen = false; settingsOpen = false" class="activity-btn" :class="store.promptOpen ? 'is-active' : ''" title="Prompt Tạo Ảnh — nhập prompt & tạo ảnh" aria-label="Prompt Tạo Ảnh">
-          <StudioIcon name="sparkles" size="h-5 w-5" />
-        </button>
-        <!-- Trợ lý thiết kế — popup độc lập (StylistCard mount ở cuối template) -->
-        <button @click="stylistPopupOpen = true; store.promptOpen = false; outputOpen = false; settingsOpen = false" class="activity-btn" :class="stylistPopupOpen ? 'is-active' : ''" title="Trợ lý thiết kế — khảo sát & tạo prompt thiết kế" aria-label="Trợ lý thiết kế">
-          <StudioIcon name="shirt" size="h-5 w-5" />
-        </button>
+        <!-- [Sửa 2026-09-17] MỌI nút ở đây sinh từ CẤU HÌNH owner quản lý (/admin → tab Giao diện).
+             Trước đây Prompt Tạo Ảnh + Trợ lý thiết kế bị VIẾT CỨNG nên không xuất hiện trong
+             danh sách quản trị ⇒ owner không đổi được nhãn/icon/thứ tự của chúng.
+             Nút ghim đáy (menu Cài đặt) tách riêng ngay dưới vì cần thêm markup popup. -->
+        <template v-for="a in activityBar" :key="a.id">
+          <button v-if="a.kind === 'panel'" @click="selectActivity(a.id)" class="activity-btn" :class="activeActivity === a.id ? 'is-active' : ''" :title="a.label" :aria-label="a.label">
+            <StudioIcon :name="a.icon" size="h-5 w-5" />
+          </button>
+          <button v-else-if="a.kind === 'action'" @click="runToolbarAction(a.id)" class="activity-btn" :class="isToolbarActionActive(a.id) ? 'is-active' : ''" :title="a.label" :aria-label="a.label">
+            <StudioIcon :name="a.icon" size="h-5 w-5" />
+          </button>
+        </template>
 
         <!-- ⚙️ CÀI ĐẶT — GÓC TRÁI DƯỚI CÙNG ------------------------------------------------->
-        <div class="relative mt-auto">
+        <!-- Ghim đáy; nhãn/icon/ẩn-hiện lấy từ CẤU HÌNH (không đổi được vị trí). -->
+        <div v-if="settingsEntry" class="relative mt-auto">
           <div v-if="settingsOpen" class="fixed inset-0 z-40" @click="settingsOpen = false"></div>
-          <button @click="settingsOpen = !settingsOpen" class="activity-btn" :class="settingsOpen ? 'is-active' : ''" title="Cài đặt — preset, dữ liệu Trợ lý, thư viện" aria-label="Cài đặt" aria-haspopup="menu" :aria-expanded="settingsOpen ? 'true' : 'false'">
-            <StudioIcon name="gear" size="h-5 w-5" />
+          <button @click="settingsOpen = !settingsOpen" class="activity-btn" :class="settingsOpen ? 'is-active' : ''" :title="settingsEntry.label + ' — preset, dữ liệu Trợ lý, thư viện'" :aria-label="settingsEntry.label" aria-haspopup="menu" :aria-expanded="settingsOpen ? 'true' : 'false'">
+            <StudioIcon :name="settingsEntry.icon" size="h-5 w-5" />
           </button>
           <div v-if="settingsOpen" role="menu" class="absolute bottom-0 left-full z-50 ml-2 w-64 overflow-hidden rounded-xl border border-ink-700 bg-ink-900 p-1.5 shadow-2xl">
             <p class="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">Cài đặt của tôi</p>
@@ -771,16 +803,16 @@ function onTouchEnd(e) {
       <div class="absolute left-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span><button @click="menuOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng menu" aria-label="Đóng menu"><StudioIcon name="x" size="h-4 w-4" /></button></div>
         <div class="mb-3 flex gap-1.5 overflow-x-auto">
-          <button v-for="a in activityNav" :key="a.id" @click="selectActivity(a.id)" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'">
-            <StudioIcon :name="a.icon" size="h-4 w-4" /> {{ a.label }}
-          </button>
-          <!-- Truy cập popup Prompt + Trợ lý thiết kế trên mobile/tablet (đi qua drawer) -->
-          <button @click="store.promptOpen = true; menuOpen = false" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="store.promptOpen ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" title="Prompt Tạo Ảnh">
-            <StudioIcon name="sparkles" size="h-4 w-4" /> Prompt
-          </button>
-          <button @click="stylistPopupOpen = true; menuOpen = false" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="stylistPopupOpen ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" title="Trợ lý thiết kế">
-            <StudioIcon name="shirt" size="h-4 w-4" /> Trợ lý
-          </button>
+          <!-- [Sửa 2026-09-17] Panel + nút popup đều sinh từ CÙNG cấu hình owner quản lý, nên
+               mobile không còn bản sao viết cứng lệch khỏi desktop. -->
+          <template v-for="a in activityBar" :key="'m-' + a.id">
+            <button v-if="a.kind === 'panel'" @click="selectActivity(a.id)" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'">
+              <StudioIcon :name="a.icon" size="h-4 w-4" /> {{ a.label }}
+            </button>
+            <button v-else-if="a.kind === 'action'" @click="runToolbarAction(a.id); menuOpen = false" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="isToolbarActionActive(a.id) ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" :title="a.label">
+              <StudioIcon :name="a.icon" size="h-4 w-4" /> {{ a.label }}
+            </button>
+          </template>
           <!-- [Đợt 0.5] Nguồn ảnh + Thư viện: trước đây chỉ có nút ở rail hidden lg:flex (≥1024px),
                nên người dùng điện thoại KHÔNG có cách mở. Nay cho vào drawer mobile. -->
           <button @click="menuOpen = false; store.sourcePickerOpen = true" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="store.sourcePickerOpen ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm">
@@ -790,8 +822,8 @@ function onTouchEnd(e) {
             <StudioIcon name="library" size="h-4 w-4" /> Thư viện
           </button>
           <!-- [Yêu cầu 2026-09-17] Trên desktop là nút Cài đặt ở góc trái dưới; mobile phải có lối vào tương đương. -->
-          <a href="/presets" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-[10px] font-semibold text-cream-300/70 transition-colors" title="Cài đặt — preset prompt của bạn">
-            <StudioIcon name="gear" size="h-4 w-4" /> Cài đặt
+          <a v-if="settingsEntry" href="/presets" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-[10px] font-semibold text-cream-300/70 transition-colors" :title="settingsEntry.label + ' — preset prompt của bạn'">
+            <StudioIcon :name="settingsEntry.icon" size="h-4 w-4" /> {{ settingsEntry.label }}
           </a>
           <a href="/model-settings" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-[10px] font-semibold text-cream-300/70 transition-colors" title="Cài đặt — khuôn mặt & dáng pose của bạn">
             <StudioIcon name="user" size="h-4 w-4" /> Mặt &amp; dáng

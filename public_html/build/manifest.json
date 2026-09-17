@@ -111,7 +111,7 @@
     "isEntry": true
   },
   "resources/js/studio/admin.js": {
-    "file": "assets/admin-BK91K1SU.js",
+    "file": "assets/admin-CwkKSD0D.js",
     "name": "admin",
     "src": "resources/js/studio/admin.js",
     "isEntry": true,
@@ -122,11 +122,11 @@
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/admin-Di8xRaao.css"
+      "assets/admin-DTBlMAPO.css"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-Dz70R_Of.js",
+    "file": "assets/main-YmSyFMbB.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,

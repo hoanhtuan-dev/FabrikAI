@@ -60,9 +60,10 @@ class RefCardSplitTest extends TestCase
             'Mục "Tạo biến thể ảnh" phải gắn với VariationCard.');
         $this->assertStringContainsString('tryon: [TryOnCard]', $app,
             'Mục "Mặc thử đồ" phải gắn với TryOnCard.');
-        $this->assertStringContainsString("{ id: 'variation', icon: 'variations', label: 'Tạo biến thể ảnh' }", $app,
+        // Mục nay có thêm `kind` (panel/action/menu) — xem StudioGuiConfig::DEFAULTS.
+        $this->assertStringContainsString("{ id: 'variation', kind: 'panel', icon: 'variations', label: 'Tạo biến thể ảnh' }", $app,
             'Phải có mục "Tạo biến thể ảnh" với icon chuẩn ngành variations.');
-        $this->assertStringContainsString("{ id: 'tryon', icon: 'hanger', label: 'Mặc thử đồ' }", $app,
+        $this->assertStringContainsString("{ id: 'tryon', kind: 'panel', icon: 'hanger', label: 'Mặc thử đồ' }", $app,
             'Phải có mục "Mặc thử đồ" với icon móc treo.');
 
         $this->assertStringContainsString("import VariationCard from './components/VariationCard.vue'", $app);
