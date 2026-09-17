@@ -273,13 +273,36 @@ if (! function_exists('studio_is_unique_violation')) {
     }
 }
 
+if (! function_exists('studio_sanitize_error')) {
+    /**
+     * [Đợt 0.8 — 2026-09-17] Lọc chi tiết NHẠY CẢM khỏi thông điệp lỗi trả về client.
+     *
+     * Giữ phần diễn giải (dev vẫn thấy "InvalidApiKey", "timeout"...) nhưng xoá những thứ KHÔNG
+     * bao giờ được lộ: đường dẫn tuyệt đối trên máy chủ và chi tiết SQLSTATE/SQL thô.
+     */
+    function studio_sanitize_error(string $message): string
+    {
+        $m = $message;
+
+        // 1) Đường dẫn tuyệt đối (Unix) + dòng ":123" → chỉ giữ tên file.php.
+        //    (Hosting là Linux; đường dẫn Windows không xuất hiện ở môi trường chạy thật.)
+        $m = (string) preg_replace('#(/[A-Za-z0-9_.\-]+)+/([A-Za-z0-9_.\-]+\.php)(:\d+)?#', '$2', $m);
+
+        // 2) Chuỗi SQLSTATE[...] (MySQL) → gom gọn, không lộ câu SQL thô.
+        $m = (string) preg_replace('#SQLSTATE\[[A-Za-z0-9]+\][^;]*#', 'SQLSTATE[...]', $m);
+
+        return $m;
+    }
+}
+
 if (! function_exists('studio_generation_error')) {
     /**
      * Thông điệp lỗi ghi vào cột Generation.error (N8/N10). Cột này TRẢ CHO CLIENT qua
      * StudioController::show(), nên KHÔNG được chứa message thô của provider/DB.
      *
      * - Luôn log đầy đủ (class + message + file:line) ở server để còn chẩn đoán.
-     * - APP_DEBUG=true  → giữ nguyên văn (dev cần thấy lỗi thật).
+     * - APP_DEBUG=true  → vẫn trả chi tiết DIỄN GIẢI để dev dò, nhưng đã LỌC đường dẫn/SQL.
+     *   (APP_DEBUG có thể bị bật quên trên hosting — không vì thế mà lộ cấu trúc máy chủ.)
      * - Production      → chỉ trả câu chung, không lộ chi tiết nội bộ.
      *
      * @param  string  $prefix  tiền tố giữ nguyên cho user (vd 'Render bị ngắt: ')
@@ -293,7 +316,7 @@ if (! function_exists('studio_generation_error')) {
         ]);
 
         if (config('app.debug')) {
-            return $prefix.$e->getMessage();
+            return $prefix.studio_sanitize_error($e->getMessage()).' ['.class_basename($e).']';
         }
 
         return $prefix !== ''

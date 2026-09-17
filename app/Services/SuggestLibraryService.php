@@ -84,13 +84,21 @@ class SuggestLibraryService
      */
     public function counts(User $user): array
     {
-        $base = $user->suggestResults();
+        // [Đợt 0.8 — 2026-09-17] Trước đây 4 lệnh count() riêng = 4 vòng SQL cho cùng một bảng.
+        // Gộp thành MỘT aggregate query. Giữ ĐÚNG ngữ nghĩa cũ:
+        //   applied = apply_count > 0 · unused = apply_count = 0 (NULL không tính) · with_image = có reference_url.
+        $agg = $user->suggestResults()
+            ->selectRaw('COUNT(*) AS total')
+            ->selectRaw('SUM(CASE WHEN apply_count > 0 THEN 1 ELSE 0 END) AS applied')
+            ->selectRaw('SUM(CASE WHEN apply_count = 0 THEN 1 ELSE 0 END) AS unused')
+            ->selectRaw('SUM(CASE WHEN reference_url IS NOT NULL THEN 1 ELSE 0 END) AS with_image')
+            ->first();
 
         return [
-            'total' => (clone $base)->count(),
-            'applied' => (clone $base)->where('apply_count', '>', 0)->count(),
-            'unused' => (clone $base)->where('apply_count', 0)->count(),
-            'with_image' => (clone $base)->whereNotNull('reference_url')->count(),
+            'total' => (int) ($agg->total ?? 0),
+            'applied' => (int) ($agg->applied ?? 0),
+            'unused' => (int) ($agg->unused ?? 0),
+            'with_image' => (int) ($agg->with_image ?? 0),
         ];
     }
 

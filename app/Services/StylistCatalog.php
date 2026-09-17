@@ -103,7 +103,8 @@ class StylistCatalog
 
     public function garmentTypes(): array
     {
-        $this->ensureTables();
+        // [Đợt 0.8] Đường ĐỌC công khai KHÔNG được chạy DDL — bảng có sẵn từ migration; nếu chưa
+        // có thì try/catch bên dưới tự trả dữ liệu mặc định. ensureTables chỉ ở đường GHI (admin).
         try {
             $rows = StylistGarmentType::orderBy('sort_order')->orderBy('id')->get();
         } catch (\Throwable $e) {
@@ -147,7 +148,7 @@ class StylistCatalog
      */
     public function questions(string $type): array
     {
-        $this->ensureTables();
+        // [Đợt 0.8] Đường ĐỌC công khai — không chạy DDL (xem garmentTypes).
         $g = $this->nameOf($type);
         try {
             $rows = StylistQuestion::orderBy('sort_order')->orderBy('id')->get();
@@ -265,7 +266,7 @@ class StylistCatalog
 
     public function presets(): array
     {
-        $this->ensureTables();
+        // [Đợt 0.8] Đường ĐỌC công khai — không chạy DDL (xem garmentTypes).
         try {
             return StylistPreset::orderBy('sort_order')->orderBy('id')->get()
                 ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'prompt' => $p->prompt, 'type' => $p->type])

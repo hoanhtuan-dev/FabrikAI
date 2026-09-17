@@ -13,7 +13,12 @@ use Illuminate\Http\Request;
  */
 class StylistDataController extends Controller
 {
-    /** Trả catalog và tự tạo bảng + seed nếu chưa có (hosting chưa chạy migrate). */
+    /**
+     * [Đợt 0.8 — 2026-09-17] Catalog cho đường GHI (admin, đã đăng nhập).
+     *
+     * ensureTables() chạy DDL (Schema::create) để tự tạo bảng khi hosting chưa chạy migrate.
+     * DDL CHỈ được phép ở đường GHI (saveType/saveQuestion/delete*) — admin đã xác thực.
+     */
     protected function catalog(): StylistCatalog
     {
         $catalog = app(StylistCatalog::class);
@@ -21,9 +26,23 @@ class StylistDataController extends Controller
         return $catalog;
     }
 
+    /**
+     * [Đợt 0.8] Catalog cho đường ĐỌC công khai (GET /api/stylist-data/data, /api/stylist/presets).
+     *
+     * Lỗi gốc: data()/presets() nằm trong nhóm route PUBLIC (throttle:60,1, KHÔNG cần đăng nhập)
+     * nhưng gọi catalog() → ensureTables() → Schema::create. Một khách vô danh chỉ cần GET là đủ để
+     * chạy lệnh CREATE TABLE lên DB — ghi DDL không xác thực, và còn chạy trên MỌI lần truy cập.
+     * Đường đọc chỉ được ĐỌC: bảng đã có sẵn từ migration (2026_09_03_...) — nếu chưa có thì trả
+     * dữ liệu mặc định, KHÔNG tạo bảng.
+     */
+    protected function catalogRead(): StylistCatalog
+    {
+        return app(StylistCatalog::class);
+    }
+
     public function data(): \Illuminate\Http\JsonResponse
     {
-        $catalog = $this->catalog();
+        $catalog = $this->catalogRead();
         $defaultTypes = collect($catalog->defaultGarmentTypes())
             ->map(fn ($t, $i) => ['id' => null, 'slug' => $t['id'], 'name' => $t['name'], 'emoji' => $t['emoji'], 'color' => $t['color'], 'sort_order' => $i])
             ->values();
@@ -58,7 +77,7 @@ class StylistDataController extends Controller
 
     public function presets(): \Illuminate\Http\JsonResponse
     {
-        return response()->json(['presets' => $this->catalog()->presets()]);
+        return response()->json(['presets' => $this->catalogRead()->presets()]);
     }
 
     public function deletePreset(int $id): \Illuminate\Http\JsonResponse
