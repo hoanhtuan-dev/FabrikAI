@@ -1903,28 +1903,55 @@ RULES:
     /**
      * List images under public_html/studio/images/assets (for the source-image upload popup).
      */
+    // [Đợt 0.1b] Kiểu trả về trước đây ghi `\Illuminate\JsonResponse` — class KHÔNG tồn tại,
+    // nên mọi lời gọi thật đều ném TypeError (HTTP 500). Lỗi ẩn vì endpoint này chỉ ở nhóm ADMIN
+    // và chưa từng có test gọi tới đích. Nay là cấp user nên test chạm tới và lộ ra.
     public function refImages(): \Illuminate\Http\JsonResponse
     {
-        $dir = storage_path('app/public/studio/ref');
-        $files = is_dir($dir) ? glob($dir.'/*.{png,jpg,jpeg,webp,gif}', GLOB_BRACE) : [];
+        // [Đợt 0.1b] Ảnh nguồn nay RIÊNG theo user (`studio/ref/u<id>/`); owner thấy TẤT CẢ.
+        // Thư mục gốc `studio/ref/` vẫn được quét: đó là KHO CHUNG của dữ liệu có TRƯỚC khi tách
+        // — bỏ nó đi sẽ làm ảnh người dùng đang chèn trong dự án biến mất khỏi danh sách.
+        $base = storage_path('app/public/studio/ref');
+        $uid = (int) auth()->id();
+        $isAdmin = (bool) auth()->user()?->isAdmin();
+
+        $dirs = $isAdmin
+            ? array_merge(glob($base.'/u*', GLOB_ONLYDIR) ?: [], [$base])
+            : [$base.'/u'.$uid, $base];
+
         $items = [];
-        $current = request()->get('current', '');
-        foreach ($files as $f) {
-            $name = basename($f);
-            $used = \App\Models\Generation::where('media_url', 'like', '%'.$name.'%')->exists();
-            $mtime = is_file($f) ? (int) filemtime($f) : 0;
-            $size = is_file($f) ? (int) filesize($f) : 0;
-            $dims = @getimagesize($f);
-            $items[] = [
-                'name' => $name,
-                'url' => '/storage/studio/ref/'.$name,
-                'used' => $used,
-                'size' => $size,
-                'mtime' => $mtime ?: 0,
-                'width' => $dims[0] ?? 0,
-                'height' => $dims[1] ?? 0,
-            ];
+        $seen = [];
+        foreach ($dirs as $dir) {
+            if (! is_dir($dir)) {
+                continue;
+            }
+            foreach (glob($dir.'/*.{png,jpg,jpeg,webp,gif}', GLOB_BRACE) ?: [] as $f) {
+                if (! is_file($f)) {
+                    continue;
+                }
+                $name = basename($f);
+                $rel = 'studio/ref/'.ltrim(str_replace($base, '', str_replace('\\', '/', $f)), '/');
+                if (isset($seen[$rel])) {
+                    continue;
+                }
+                $seen[$rel] = true;
+
+                $used = \App\Models\Generation::where('media_url', 'like', '%'.$name.'%')->exists();
+                $dims = @getimagesize($f);
+                $items[] = [
+                    'name' => $name,
+                    'rel' => $rel,
+                    'url' => '/storage/'.$rel,
+                    'used' => $used,
+                    'size' => (int) filesize($f),
+                    'mtime' => (int) filemtime($f) ?: 0,
+                    'width' => $dims[0] ?? 0,
+                    'height' => $dims[1] ?? 0,
+                ];
+            }
         }
+        usort($items, fn ($a, $b) => ($b['mtime'] ?? 0) <=> ($a['mtime'] ?? 0));
+
         return response()->json(['items' => $items]);
     }
 
@@ -1933,11 +1960,39 @@ RULES:
      */
     public function refImageDelete(Request $request, string $name): \Illuminate\Http\JsonResponse
     {
-        $name = basename($name);
+        $name = basename($name); // chặn traversal: chỉ nhận tên file, không nhận đường dẫn
+        $base = storage_path('app/public/studio/ref');
+        $uid = (int) auth()->id();
+        $isAdmin = (bool) auth()->user()?->isAdmin();
+
+        // [Đợt 0.1b] Tìm theo thứ tự: thư mục CỦA MÌNH trước, rồi tới kho phẳng cũ.
+        // Owner (admin) được xoá trong thư mục của MỌI user — "owner quản lý tất cả".
+        $candidates = [];
+        if ($isAdmin) {
+            foreach (glob($base.'/u*', GLOB_ONLYDIR) ?: [] as $d) {
+                $candidates[] = $d.'/'.$name;
+            }
+        } else {
+            $candidates[] = $base.'/u'.$uid.'/'.$name;
+        }
+        $candidates[] = $base.'/'.$name;
+
+        $file = null;
+        foreach ($candidates as $c) {
+            if (is_file($c)) {
+                $file = $c;
+                break;
+            }
+        }
+        if ($file === null) {
+            return response()->json(['message' => 'Không tìm thấy ảnh.'], 404);
+        }
+
         $used = \App\Models\Generation::where('media_url', 'like', '%'.$name.'%')->exists();
         if ($used) { return response()->json(['message' => 'Ảnh đang được dùng, không thể xóa.'], 422); }
-        $file = storage_path('app/public/studio/ref/'.$name);
-        if (is_file($file)) { @unlink($file); }
+
+        @unlink($file);
+
         return response()->json(['ok' => true]);
     }
 
@@ -1945,8 +2000,11 @@ RULES:
     {
         $data = $request->validate(['image' => ['required', 'image', 'max:8192']]);
         $name = 'ref-'.Str::uuid()->toString().'.'.$request->file('image')->extension();
-        $request->file('image')->storeAs('studio/ref', $name, 'public');
-        $url = '/storage/studio/ref/'.$name;
+        // [Đợt 0.1b] Lưu vào thư mục RIÊNG của user ⇒ mỗi người quản lý ảnh của mình,
+        // owner vẫn thấy và xoá được tất cả.
+        $dir = studio_ref_user_dir(auth()->id());
+        $request->file('image')->storeAs($dir, $name, 'public');
+        $url = '/storage/'.$dir.'/'.$name;
         return response()->json(['url' => $url, 'name' => $name]);
     }
 
@@ -3685,7 +3743,8 @@ RULES:
      */
     public function uploadedFiles(): \Illuminate\Http\JsonResponse
     {
-        return response()->json(app(\App\Services\StudioLibraryService::class)->uploadedFiles());
+        // [Đợt 0.1b] Người dùng quản lý thư viện CỦA MÌNH; owner quản lý tất cả.
+        return response()->json(app(\App\Services\StudioLibraryService::class)->uploadedFiles(auth()->user()));
     }
 
     /**
@@ -3694,7 +3753,7 @@ RULES:
     public function uploadedFilesDelete(Request $request): \Illuminate\Http\JsonResponse
     {
         $rels = (array) $request->input('rels', []);
-        $result = app(\App\Services\StudioLibraryService::class)->deleteUploadedFiles($rels);
+        $result = app(\App\Services\StudioLibraryService::class)->deleteUploadedFiles($rels, auth()->user());
 
         return response()->json(['ok' => true, ...$result]);
     }

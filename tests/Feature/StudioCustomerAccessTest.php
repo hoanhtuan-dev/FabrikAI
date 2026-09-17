@@ -60,6 +60,9 @@ class StudioCustomerAccessTest extends TestCase
             'suggest-library' => ['/api/suggest-library/data'],
             'prompt-history' => ['/api/prompt-history'],
             'models-catalog' => ['/api/swap-models'],
+            // [Đợt 0.1b] Nay là CẤP USER: mỗi người quản lý ảnh/thư viện của mình.
+            'uploads' => ['/api/uploads'],
+            'ref-images' => ['/api/ref-images'],
         ];
     }
 
@@ -86,8 +89,9 @@ class StudioCustomerAccessTest extends TestCase
             'face-presets.store' => ['POST', '/api/face-presets'],
             // dùng POST (không có route-model binding) để chắc chắn chạm middleware admin
             'assets.store' => ['POST', '/api/assets'],
-            'uploads' => ['GET', '/api/uploads'],
-            'ref-images' => ['GET', '/api/ref-images'],
+            // [Đợt 0.1b] /uploads + /ref-images đã RỜI khỏi danh sách này — nay là cấp user
+            // (xem studioReadEndpoints + UserLibraryScopeTest). Dọn mồ côi vẫn là việc toàn cục.
+            'uploads.cleanup' => ['POST', '/api/uploads/cleanup'],
             'stylist-data.types.save' => ['POST', '/api/stylist-data/types'],
             'stylist-data.questions.save' => ['POST', '/api/stylist-data/questions'],
         ];

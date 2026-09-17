@@ -224,18 +224,34 @@ class StudioLibraryService
      * Danh sách file ĐÃ TẢI LÊN (ảnh nguồn studio/ref + tài nguyên tự thêm studio/assets),
      * kèm trạng thái "đang dùng" và thống kê file mồ côi (không dùng).
      */
-    public function uploadedFiles(): array
+    public function uploadedFiles(?\App\Models\User $user = null): array
     {
         $referenced = $this->referencedPaths();
-        $dirs = ['studio/ref', 'studio/assets'];
+
+        // [Đợt 0.1b] `studio/ref` nay tách theo user: người dùng chỉ thấy thư mục của MÌNH
+        // (+ kho phẳng cũ để không mất ảnh cũ); owner (hoặc $user = null) thấy TẤT CẢ.
+        $isAdmin = $user === null || (bool) $user->isAdmin();
+        $refBase = Storage::disk('public')->path('studio/ref');
+        $refDirs = $isAdmin
+            ? array_merge(glob($refBase.'/u*', GLOB_ONLYDIR) ?: [], [$refBase])
+            : [$refBase.'/u'.$user->id, $refBase];
+
+        $files = [];
+        foreach ($refDirs as $dir) {
+            if (is_dir($dir)) {
+                $files = array_merge($files, glob($dir.'/*.{png,jpg,jpeg,webp,gif}', GLOB_BRACE) ?: []);
+            }
+        }
+
+        // `studio/assets` là tài nguyên DÙNG CHUNG (không có user_id) nên ai cũng thấy.
+        $assetBase = Storage::disk('public')->path('studio/assets');
+        if (is_dir($assetBase)) {
+            $files = array_merge($files, glob($assetBase.'/*.{png,jpg,jpeg,webp,gif}', GLOB_BRACE) ?: []);
+        }
+
         $items = [];
 
-        foreach ($dirs as $dir) {
-            $abs = Storage::disk('public')->path($dir);
-            if (! is_dir($abs)) {
-                continue;
-            }
-            $files = glob($abs.'/*.{png,jpg,jpeg,webp,gif}', GLOB_BRACE) ?: [];
+        {
             foreach ($files as $file) {
                 if (! is_file($file)) {
                     continue;
@@ -277,16 +293,21 @@ class StudioLibraryService
     /**
      * Xóa hàng loạt file đã tải lên (chỉ cho phép xóa file KHÔNG còn được dùng).
      */
-    public function deleteUploadedFiles(array $rels): array
+    public function deleteUploadedFiles(array $rels, ?\App\Models\User $user = null): array
     {
         $referenced = $this->referencedPaths();
         $deleted = 0;
         $freed = 0;
+        $isAdmin = $user === null || (bool) $user->isAdmin();
 
         foreach ($rels as $rel) {
             $rel = $this->normalizeUploadRel((string) $rel);
             if ($rel === '' || isset($referenced[$rel])) {
                 continue; // bỏ qua file đang được dùng / đường dẫn không hợp lệ
+            }
+            // [Đợt 0.1b] Không được xoá ảnh của user khác; owner thì được.
+            if (! studio_upload_visible_to($rel, $user?->id, $isAdmin)) {
+                continue;
             }
             $abs = Storage::disk('public')->path($rel);
             if (! is_file($abs)) {
@@ -307,7 +328,7 @@ class StudioLibraryService
      */
     public function cleanupUploadedOrphans(): array
     {
-        $data = $this->uploadedFiles();
+        $data = $this->uploadedFiles(); // dọn mồ côi là việc TOÀN CỤC (route ADMIN) ⇒ quét tất cả
         $unused = array_values(array_filter($data['items'], fn ($i) => ! $i['used']));
 
         return $this->deleteUploadedFiles(array_column($unused, 'rel'));

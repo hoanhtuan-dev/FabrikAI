@@ -325,6 +325,55 @@ if (! function_exists('studio_generation_error')) {
     }
 }
 
+if (! function_exists('studio_ref_user_dir')) {
+    /**
+     * [0.1b — 2026-09-17] Thư mục ảnh nguồn RIÊNG của một user (đường dẫn tương đối trong disk 'public').
+     *
+     * Trước đây mọi ảnh tải lên đổ chung vào `studio/ref/` nên không thể phân quyền: endpoint liệt kê
+     * và xoá buộc phải giữ ở nhóm ADMIN, người dùng thường không quản lý được thư viện của mình.
+     */
+    function studio_ref_user_dir(?int $userId): string
+    {
+        return 'studio/ref/u'.(int) $userId;
+    }
+}
+
+if (! function_exists('studio_ref_owner_of')) {
+    /**
+     * Đọc chủ sở hữu từ đường dẫn tương đối.
+     *
+     * @return int|null userId, hoặc null nếu là KHO CHUNG — file phẳng ở `studio/ref/` (dữ liệu có
+     *                  TRƯỚC khi tách theo user) hoặc tài nguyên dùng chung `studio/assets/`.
+     */
+    function studio_ref_owner_of(?string $rel): ?int
+    {
+        $rel = str_replace('\\', '/', (string) $rel);
+
+        return preg_match('#^studio/ref/u(\d+)/#', $rel, $m) === 1 ? (int) $m[1] : null;
+    }
+}
+
+if (! function_exists('studio_upload_visible_to')) {
+    /**
+     * [0.1b] User có được ĐỌC / XOÁ đường dẫn này không?
+     *
+     *   · Owner (admin) thì được với MỌI thứ (yêu cầu: "owner có thể quản lý tất cả").
+     *   · Nằm trong thư mục riêng `studio/ref/u<id>/` thì chỉ chủ sở hữu.
+     *   · Kho CHUNG (file phẳng cũ + `studio/assets/`) thì mọi người — giữ tương thích ngược:
+     *     ảnh người dùng đã chèn vào dự án trước đây không được biến mất.
+     */
+    function studio_upload_visible_to(?string $rel, ?int $userId, bool $isAdmin): bool
+    {
+        if ($isAdmin) {
+            return true;
+        }
+
+        $owner = studio_ref_owner_of($rel);
+
+        return $owner === null || $owner === (int) $userId;
+    }
+}
+
 if (! function_exists('studio_prompt_template')) {
     /**
      * [Đợt 1.7 — 2026-09-17] Resolve prompt theo KEY từ bảng prompt_templates.

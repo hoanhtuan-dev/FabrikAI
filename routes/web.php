@@ -107,6 +107,15 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::post('/library/scan', [StudioController::class, 'libraryScan'])->name('library.scan');
     Route::post('/library/bulk-delete', [StudioController::class, 'libraryBulkDelete'])->name('library.bulk-delete');
     Route::post('/library/cleanup', [StudioController::class, 'libraryCleanup'])->name('library.cleanup');
+
+    // ── [Đợt 0.1b] Ảnh nguồn + file tải lên: MỖI NGƯỜI QUẢN LÝ PHẦN CỦA MÌNH ──
+    // Ảnh mới lưu vào `studio/ref/u<id>/`; người dùng chỉ thấy/xoá phần của mình, owner
+    // (admin) thấy và xoá được TẤT CẢ. Kho phẳng `studio/ref/` cũ vẫn đọc được để không
+    // làm mất ảnh người dùng đã chèn vào dự án trước khi tách theo user.
+    Route::get('/uploads', [StudioController::class, 'uploadedFiles'])->name('uploads');
+    Route::post('/uploads/delete', [StudioController::class, 'uploadedFilesDelete'])->name('uploads.delete');
+    Route::get('/ref-images', [StudioController::class, 'refImages'])->name('ref-images');
+    Route::delete('/ref-images/{name}', [StudioController::class, 'refImageDelete'])->name('ref-images.delete');
     Route::post('/upload-ref', [StudioController::class, 'uploadRef'])->name('uploadRef');
 
     // ── Thư viện Prompt phân tích ("Gợi ý từ ảnh") — bảng `suggest_results` có user_id ──
@@ -172,13 +181,9 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->gr
     Route::post('/assets', [StudioController::class, 'assetStore'])->name('assets.store');
     Route::delete('/assets/{asset}', [StudioController::class, 'assetDestroy'])->name('assets.destroy');
 
-    // ── Kho ảnh tham chiếu dùng chung `storage/app/public/studio/ref` (chưa scope theo user) ──
-    // ⬅ mục 0.1b của kế hoạch: scope theo user rồi chuyển 4 route này sang nhóm STUDIO.
-    Route::get('/uploads', [StudioController::class, 'uploadedFiles'])->name('uploads');
-    Route::post('/uploads/delete', [StudioController::class, 'uploadedFilesDelete'])->name('uploads.delete');
+    // ── DỌN file mồ côi: việc TOÀN CỤC ⇒ vẫn thuộc ADMIN ──
+    // (endpoint liệt kê/xoá đã chuyển sang nhóm STUDIO ở mục 0.1b bên dưới.)
     Route::post('/uploads/cleanup', [StudioController::class, 'uploadedFilesCleanup'])->name('uploads.cleanup');
-    Route::get('/ref-images', [StudioController::class, 'refImages'])->name('ref-images');
-    Route::delete('/ref-images/{name}', [StudioController::class, 'refImageDelete'])->name('ref-images.delete');
 
     // ── Preset dùng chung (`presets` TOÀN CỤC — ghi/xoá ảnh hưởng MỌI người dùng) ──
     Route::post('/presets', [StudioController::class, 'storePreset'])->name('presets.store');
