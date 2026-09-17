@@ -1,13 +1,30 @@
-@import 'tailwindcss';
+/*
+ * [Xác minh 2026-09-17] `source(none)` = TẮT cơ chế TỰ DÒ NGUỒN của Tailwind.
+ *
+ * Mặc định Tailwind tự quét cả cây dự án (chỉ bỏ qua file trong .gitignore) — kể cả file
+ * MARKDOWN và file ghi chú. Sự cố thật: chữ "break-all" xuất hiện trong
+ * STUDIO_REVIEW_PROGRESS.md (ghi chú) làm sinh ra utility `.break-all` trong CSS bán cho khách;
+ * xoá chữ đó khỏi ghi chú thì utility biến mất ⇒ CSS phụ thuộc VĂN BẢN TÀI LIỆU, không phải mã.
+ *
+ * Nay chỉ quét đúng các nguồn khai báo bên dưới (view Blade + JS/Vue + pagination của vendor).
+ */
+@import 'tailwindcss' source(none);
 
-// Pagination của Laravel render từ vendor nên phải trỏ thẳng vào blade nguồn.
+/* Pagination của Laravel render từ vendor nên phải trỏ thẳng vào blade nguồn. */
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-// [Xác minh 2026-09-17] ĐÃ GỠ: @source '../../storage/framework/views/*.php';
-//  Thư mục đó chứa view ĐÃ BIÊN DỊCH (sinh ra lúc chạy), không phải nguồn. Quét nó làm
-//  CSS build KHÔNG TẤT ĐỊNH: chỉ cần chạy test (render mail ⇒ biên dịch `mail::message`)
-//  là Tailwind nhặt thêm class của mail ⇒ hash CSS đổi dù không sửa dòng CSS/JS nào.
-//  Phần hợp lệ duy nhất (pagination) đã trỏ thẳng blade nguồn ở dòng trên; blade app đã có
-//  `@source '../views'`. Đã kiểm chứng: xoá view cache rồi build ⇒ ra ĐÚNG hash đã commit.
+
+/*
+ * [Xác minh 2026-09-17] ĐÃ GỠ dòng quét thư mục view đã biên dịch.
+ *
+ * Thư mục đó chứa view ĐÃ BIÊN DỊCH (sinh ra lúc chạy), không phải nguồn. Quét nó làm
+ * CSS build KHÔNG TẤT ĐỊNH: chỉ cần chạy test (render mail ⇒ biên dịch mail::message)
+ * là Tailwind nhặt thêm class của mail ⇒ hash CSS đổi dù không sửa dòng CSS/JS nào.
+ * Phần hợp lệ duy nhất (pagination) đã trỏ thẳng blade nguồn ở trên; blade app đã có
+ * @source '../views'. Đã kiểm chứng: xoá view cache rồi build ⇒ ra ĐÚNG hash đã commit.
+ *
+ * ⚠️ Dùng comment CSS /.../ ở đây, KHÔNG dùng // — Tailwind coi // là khai báo hỏng và
+ * nuốt luôn dòng @source phía sau ⇒ build đỏ.
+ */
 @source '../views';
 @source '../js/studio';
 
