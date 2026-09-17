@@ -7,7 +7,9 @@ import StylistCard from './components/StylistCard.vue';
 import UpscaleCard from './components/UpscaleCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
 import ComposeCard from './components/ComposeCard.vue';
-import RefImageCard from './components/RefImageCard.vue';
+// [Yêu cầu 2026-09-17] Card cũ "Ảnh mới từ ảnh mẫu" tách thành 2 card riêng.
+import VariationCard from './components/VariationCard.vue';
+import TryOnCard from './components/TryOnCard.vue';
 import RegionTools from './components/RegionTools.vue';
 import CanvasMaskTools from './components/CanvasMaskTools.vue';
 import ContextToolbar from './components/ContextToolbar.vue';
@@ -37,7 +39,8 @@ async function logout() {
 // Activity bar (VSCode-style): mỗi icon mở 1 nhóm card trong sidebar.
 const activityNav = [
   { id: 'concept', icon: 'sparkles', label: 'Tạo ảnh', cards: [SuggestCard] },
-  { id: 'ref', icon: 'shirt', label: 'Fitting Room', cards: [RefImageCard] },
+  // 2 card riêng: "Tạo biến thể ảnh" + "Mặc thử đồ" (trước gộp trong 1 card 2 chip).
+  { id: 'ref', icon: 'hanger', label: 'Fitting Room', cards: [VariationCard, TryOnCard] },
   { id: 'inpaint', icon: 'pencil', label: 'Sửa ảnh', cards: [InpaintCard] },
   { id: 'compose', icon: 'layers', label: 'Ghép ảnh', cards: [ComposeCard] },
   { id: 'upscale', icon: 'maximize', label: 'Upscale', cards: [UpscaleCard] },

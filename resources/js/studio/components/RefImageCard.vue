@@ -16,12 +16,21 @@ const store = useStudioStore();
 const img = computed(() => store.upscaleSrc || store.preview?.media_url || '');
 const imgName = computed(() => store.upscaleName || (store.preview ? 'Ảnh kết quả #' + store.preview.id : 'Ảnh đang chọn'));
 
-const mode = ref('refgen'); // 'refgen' | 'tryon'
-const prompt = ref('');
-// Prompt riêng cho từng chế độ — chuyển chip sẽ tự khôi phục/giữ prompt của chế độ đó.
-const refgenPrompt = ref('');
-const tryonPrompt = ref('mặc trang phục trong ảnh lên người mẫu thời trang, giữ nguyên màu sắc, chất liệu, họa tiết và phụ kiện, pose đứng tự nhiên, ánh sáng studio');
-const similarity = ref(70);
+// [Yêu cầu 2026-09-17] TÁCH 2 CHIP THÀNH 2 CARD RIÊNG — mỗi card cố định MỘT chế độ:
+//   variant='variation' → card "Tạo biến thể ảnh"  (trước là chip "Tạo ảnh mới")
+//   variant='tryon'     → card "Mặc thử đồ"        (trước là chip "Thử đồ")
+// Nhờ tách card, mỗi luồng có state RIÊNG (mô tả · độ giống · số ảnh) thay vì dùng chung
+// rồi phải lưu/khôi phục qua lại như hồi còn 2 chip.
+const props = defineProps({
+  variant: { type: String, default: 'variation' },
+});
+const isTryon = computed(() => props.variant === 'tryon');
+const mode = computed(() => (isTryon.value ? 'tryon' : 'refgen')); // giữ tên cũ cho phần còn lại
+
+const prompt = ref(isTryon.value
+  ? 'mặc trang phục trong ảnh lên người mẫu thời trang, giữ nguyên màu sắc, chất liệu, họa tiết và phụ kiện, pose đứng tự nhiên, ánh sáng studio'
+  : '');
+const similarity = ref(isTryon.value ? 85 : 70); // thử đồ cần bám mẫu cao hơn
 const variants = ref(1);
 const busy = ref(false);
 
@@ -53,21 +62,6 @@ onMounted(async () => {
 });
 const selectedFace = computed(() => faces.value.find(f => String(f.id) === String(faceModelId.value)) || null);
 const selectedPose = computed(() => poses.value.find(p => String(p.id) === String(poseId.value)) || null);
-
-function setMode(m) {
-  if (m === mode.value) return;
-  // Lưu prompt hiện tại về chế độ cũ trước khi chuyển.
-  if (mode.value === 'refgen') refgenPrompt.value = prompt.value;
-  else if (mode.value === 'tryon') tryonPrompt.value = prompt.value;
-
-  mode.value = m;
-  if (m === 'tryon') {
-    prompt.value = tryonPrompt.value;
-    similarity.value = 85; // tryon cần độ giống cao (bám mẫu trang phục)
-  } else {
-    prompt.value = refgenPrompt.value;
-  }
-}
 
 // Không còn dropdown chọn model trên card này: backend refgen đã mặc định dùng model
 // sinh ảnh (qwen-image-3.0-pro / qwen_model trong Cài đặt) và tự fallback đúng model
@@ -147,16 +141,16 @@ async function runRefgen() {
   // Model: selector trên card (imageModelSel — dùng chung nhóm image với Tạo Ảnh 2D);
   // '' = default nhóm image từ Cài đặt → 🎯 Nhóm công việc.
   // Thử đồ: gửi tryon=true + body directive từ store + khuôn mặt mẫu (ảnh, mô tả do vision đọc).
-  const isTryon = mode.value === 'tryon';
-  const body = isTryon ? { height: store.bodyHeight, build: store.bodyBuild, waist: store.bodyWaist, shoulders: store.bodyShoulders, hips: store.bodyHips } : null;
+  const tryon = isTryon.value;
+  const body = tryon ? { height: store.bodyHeight, build: store.bodyBuild, waist: store.bodyWaist, shoulders: store.bodyShoulders, hips: store.bodyHips } : null;
   const selModel = store.imageModelSel && store.imageModelSel.includes(':')
     ? (([p, m]) => ({ provider: p, model: m }))(store.imageModelSel.split(':'))
     : null;
   // Nền Studio áp dụng cho cả 2 chế độ; Góc chụp chỉ cho "Tạo ảnh mới".
   const items = await store.refgen(
-    img.value, prompt.value.trim(), similarity.value, variants.value, selModel, isTryon, body,
-    isTryon ? faceModelId.value : '', isTryon ? poseId.value : '',
-    activeBgPrompt.value, isTryon ? '' : activeAnglePrompt.value,
+    img.value, prompt.value.trim(), similarity.value, variants.value, selModel, tryon, body,
+    tryon ? faceModelId.value : '', tryon ? poseId.value : '',
+    activeBgPrompt.value, tryon ? '' : activeAnglePrompt.value,
   );
   busy.value = false;
   if (items && items.length) {
@@ -167,24 +161,17 @@ async function runRefgen() {
 
 <template>
   <div class="card p-5" style="background: linear-gradient(160deg, rgba(124,200,90,.13), rgba(74,122,144,.06));">
+    <!-- [Yêu cầu 2026-09-17] Hai chip cũ nay là HAI CARD RIÊNG — mỗi card một tiêu đề/icon chuẩn ngành. -->
     <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300">
-      <StudioIcon name="image" /> Ảnh mới từ ảnh mẫu
-      <span class="rounded-full bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">i2i</span>
+      <StudioIcon :name="isTryon ? 'hanger' : 'variations'" />
+      {{ isTryon ? 'Mặc thử đồ' : 'Tạo biến thể ảnh' }}
+      <span class="rounded-full bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">{{ isTryon ? 'try-on' : 'i2i' }}</span>
     </h2>
-
-    <!-- Chọn chế độ: segmented tabs (giống Card Ghép ảnh) -->
-    <div class="mt-3 seg">
-      <button @click="setMode('refgen')" title="Tạo ảnh mới giống ảnh mẫu"
-              :class="mode === 'refgen' ? 'is-active' : ''"
-              class="seg-btn">
-        <StudioIcon name="image" size="h-4 w-4" /> Tạo ảnh mới
-      </button>
-      <button @click="setMode('tryon')" title="Dùng ảnh làm trang phục → sinh người mẫu mặc đúng đồ (rẻ hơn edit)"
-              :class="mode === 'tryon' ? 'is-active' : ''"
-              class="seg-btn">
-        <StudioIcon name="shirt" size="h-4 w-4" /> Thử đồ
-      </button>
-    </div>
+    <p class="mt-1 text-[11px] leading-relaxed text-cream-300/50">
+      {{ isTryon
+        ? 'Dùng ảnh đang chọn làm TRANG PHỤC → sinh người mẫu mặc đúng đồ đó (rẻ hơn sửa ảnh).'
+        : 'Sinh ảnh MỚI giống ảnh mẫu theo độ tương đồng — không phải sửa ảnh.' }}
+    </p>
 
     <!-- Ảnh tham chiếu -->
     <div v-if="img" class="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-2.5">
@@ -374,11 +361,13 @@ async function runRefgen() {
               :class="variants === n ? 'is-active' : ''">{{ n }}</button>
     </div>
 
-    <button @click="runRefgen" :disabled="!canSubmit" class="btn-brand mt-4 w-full whitespace-nowrap">
+    <!-- [Yêu cầu 2026-09-17] Nút hành động riêng cho từng card, kèm ICON CHUẨN NGÀNH. -->
+    <button @click="runRefgen" :disabled="!canSubmit" class="btn-brand mt-4 flex w-full items-center justify-center gap-2 whitespace-nowrap">
+      <StudioIcon v-if="!busy" :name="isTryon ? 'hanger' : 'variations'" size="h-4 w-4" />
       <span v-if="busy">Đang tạo {{ variants }} ảnh…</span>
-      <span v-else>{{ mode === 'tryon' ? 'Thử đồ ' + variants + ' bản' : 'Tạo ' + variants + ' ảnh mới' }} <span class="opacity-70">· {{ store.imageCreditCost * variants }} credit</span></span>
+      <span v-else>{{ isTryon ? 'Mặc thử đồ ' + variants + ' bản' : 'Tạo ' + variants + ' biến thể' }} <span class="opacity-70">· {{ store.imageCreditCost * variants }} credit</span></span>
     </button>
-    <LoadingSpinner v-if="busy" :text="mode === 'tryon' ? 'AI đang tạo người mẫu mặc đồ…' : 'AI đang tạo ảnh từ ảnh mẫu…'" subtext="Quá trình này có thể mất vài giây" size="sm" />
+    <LoadingSpinner v-if="busy" :text="isTryon ? 'AI đang tạo người mẫu mặc đồ…' : 'AI đang tạo biến thể từ ảnh mẫu…'" subtext="Quá trình này có thể mất vài giây" size="sm" />
     <p class="mt-2 text-[10px] leading-relaxed text-cream-300/40">Kết quả xuất hiện trong <b>Outputs</b> — chọn ảnh nào cũng được để xem lớn / làm ảnh gốc tiếp theo.</p>
   </div>
 </template>
