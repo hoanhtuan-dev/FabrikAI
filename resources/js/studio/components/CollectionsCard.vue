@@ -24,7 +24,20 @@ const store = useStudioStore();
 // Panel này là ĐIỂM VÀO công việc hằng ngày nên phải tự nạp danh sách bộ sưu tập — không chờ người
 // dùng mở popover "Dự án" mới có dữ liệu (trước khi sửa: vào panel thấy trống dù đã có bộ sưu tập).
 // Cùng mẫu với LibraryApp/PromptLibraryTab: chưa có dữ liệu VÀ chưa từng nạp thì mới gọi.
-onMounted(() => { if (!store.projects.length && !store.projectLoaded) store.loadProjects(); });
+onMounted(() => {
+  if (!store.projects.length && !store.projectLoaded) store.loadProjects();
+  if (store.appliedProject) store.loadProjectStats(store.appliedProject.id);
+});
+
+// Thống kê của bộ đang làm: ảnh xong/đang chạy/lỗi · credit đã dùng · hạn còn lại · phản hồi của khách.
+const stats = computed(() => (applied.value ? store.projectStats[applied.value.id] || null : null));
+function loadStats() { if (applied.value) store.loadProjectStats(applied.value.id, true); }
+function deadlineTone(days) {
+  if (days === null || days === undefined) return 'bg-ink-700 text-cream-300';
+  if (days < 0) return 'bg-red-500/15 text-red-300';
+  if (days <= 3) return 'bg-amber-500/15 text-amber-300';
+  return 'bg-emerald-500/15 text-emerald-300';
+}
 
 // ── Form tạo bộ sưu tập mới ──
 const createOpen = ref(false);
@@ -143,6 +156,7 @@ function statusStyle(p) {
 }
 async function pick(p) {
   store.applyProject(p);
+  store.loadProjectStats(p.id);   // nạp chi phí/tiến độ của bộ vừa chọn
   store.toast('Đang làm bộ sưu tập «' + p.name + '» — ảnh mới sẽ tự gắn vào đây.');
 }
 function openWorkspace(p) {
@@ -189,6 +203,33 @@ async function submit() {
         <span v-if="applied.deadline" class="rounded-full px-2 py-0.5 font-semibold" :class="deadlineClass(applied.deadline)">{{ deadlineLabel(applied.deadline) }}</span>
       </div>
       <p v-if="applied.brief" class="mt-1.5 line-clamp-2 text-[11px] text-cream-300">{{ applied.brief }}</p>
+
+      <!-- Chi phí & tiến độ THẬT của bộ này (số liệu từ bảng generations, không đếm lại ở client) -->
+      <div class="mt-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2">
+        <div class="flex items-center gap-1.5">
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Chi phí &amp; tiến độ</p>
+          <button class="icon-btn ml-auto !h-5 !w-5" title="Nạp lại số liệu" aria-label="Nạp lại số liệu bộ sưu tập" @click="loadStats()">
+            <StudioIcon name="refresh" size="h-3 w-3" />
+          </button>
+        </div>
+        <template v-if="stats">
+          <div class="mt-1 flex flex-wrap gap-1 text-[10px]">
+            <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-300">{{ stats.images.completed }} ảnh xong</span>
+            <span v-if="stats.images.running" class="rounded-full bg-sky-500/15 px-2 py-0.5 font-semibold text-sky-300">{{ stats.images.running }} đang chạy</span>
+            <span v-if="stats.images.failed" class="rounded-full bg-red-500/15 px-2 py-0.5 font-semibold text-red-300">{{ stats.images.failed }} ảnh lỗi</span>
+            <span class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200">{{ stats.credits.used }} credit đã dùng</span>
+            <span v-if="stats.deadline" class="rounded-full px-2 py-0.5 font-semibold" :class="deadlineTone(stats.deadline.days_left)">
+              {{ stats.deadline.days_left < 0 ? 'Quá hạn ' + Math.abs(stats.deadline.days_left) + ' ngày' : (stats.deadline.days_left === 0 ? 'Hạn hôm nay' : 'Còn ' + stats.deadline.days_left + ' ngày') }}
+            </span>
+            <span v-if="stats.feedback.count" class="rounded-full bg-brand-600/25 px-2 py-0.5 font-semibold text-brand-100">khách đã phản hồi {{ stats.feedback.count }} lần</span>
+          </div>
+          <p v-if="stats.feedback.latest && stats.feedback.latest.message" class="mt-1 text-[10px] text-cream-300">
+            «{{ stats.feedback.latest.decision_label }}» — {{ stats.feedback.latest.message }}
+          </p>
+          <p v-else-if="!stats.images.total" class="mt-1 text-[10px] text-cream-300">Bộ này chưa có ảnh nào — tạo ảnh trong Studio rồi số liệu sẽ hiện ở đây.</p>
+        </template>
+        <p v-else class="mt-1 text-[10px] text-cream-300">Đang tải số liệu…</p>
+      </div>
       <div class="mt-2 flex flex-wrap gap-1.5">
         <button class="tool-btn" @click="openWorkspace(applied)"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> Mở workspace</button>
         <button class="tool-btn" :class="exportOpen ? 'is-active' : ''" title="Đóng gói ảnh + phiếu kỹ thuật + bảng size thành 1 file ZIP để gửi xưởng may" @click="toggleExport()">

@@ -179,8 +179,12 @@
   **Catalogue nhiều SKU**. Bấm một mẫu là có ngay: danh sách prompt cho tạo hàng loạt + tỉ lệ + độ phân giải;
   mẫu của xưởng còn **điền sẵn khối "Xuất gói cho xưởng"** (không bắt gõ lại bảng size).
   Nguồn dữ liệu ở **một chỗ duy nhất** (PHP) — JS đọc qua API, có test cấm chép prompt vào JS.
-- **Còn lại của đợt 2**: màn **Duyệt theo lô** cho chủ doanh nghiệp (nền `?scope=pending` + transition đã có,
-  chưa có màn hình gọn) và **báo cáo chi phí/tiến độ theo bộ sưu tập** (số ảnh · credit đã dùng · ảnh lỗi).
+- ✅ **Chi phí & tiến độ theo bộ sưu tập** (`GET /api/projects/{id}/stats` + khối trong panel "Bộ sưu tập"):
+  số ảnh **xong / đang chạy / lỗi** · **credit đã dùng** · **hạn còn lại** (âm = quá hạn) · **phản hồi mới nhất
+  của khách**. Số liệu lấy trực tiếp từ bảng `generations` (không đếm lại ở client) nên không lệch.
+- ✅ **Chạy lại CHỈ mục lỗi** trong lượt tạo hàng loạt (kèm tiến trình từng mục): một lượt 12 mục mà 2 mục lỗi
+  thì không phải làm lại cả lượt — danh sách prompt lỗi được giữ lại và chạy lại bằng một cú bấm.
+- **Còn lại của đợt 2**: màn **Duyệt theo lô** cho owner (nền `?scope=pending` + transition đã có, chưa có màn hình gọn).
 
 ### Đợt 3 — Tối ưu thao tác
 - Tạo hàng loạt 1 cú bấm (N SKU × M bối cảnh), hàng đợi có tiến trình thật, so sánh trước/sau, phím tắt.

@@ -88,6 +88,70 @@ class ProjectController extends Controller
     }
 
     /**
+     * GET /api/projects/{project}/stats — CHI PHÍ & TIẾN ĐỘ của MỘT bộ sưu tập (Đợt 2).
+     *
+     * Vì sao: chủ doanh nghiệp cần biết "bộ này đã ngốn bao nhiêu credit, còn bao nhiêu ảnh chưa xong,
+     * có ảnh nào lỗi không, còn mấy ngày tới hạn" — trước đây chỉ thấy tổng số ảnh trong danh sách dự án.
+     * Số liệu lấy TRỰC TIẾP từ bảng generations (không đếm lại ở client) nên không bao giờ lệch.
+     *
+     * Quyền: chủ bộ sưu tập hoặc Super Admin — giống show()/export().
+     */
+    public function stats(Request $request, Project $project): \Illuminate\Http\JsonResponse
+    {
+        $actor = $request->user();
+        abort_unless($project->user_id === $actor->id || $actor->isSuperAdmin(), 403);
+
+        $byStatus = [];
+        $rows = $project->generations()
+            ->selectRaw('status, count(*) as n, coalesce(sum(credits_cost), 0) as credits')
+            ->groupBy('status')
+            ->get();
+
+        foreach ($rows as $row) {
+            $byStatus[(string) $row->status] = ['n' => (int) $row->n, 'credits' => (int) $row->credits];
+        }
+
+        $count = fn (string $s): int => $byStatus[$s]['n'] ?? 0;
+        $total = array_sum(array_map(fn ($r) => $r['n'], $byStatus));
+        $creditsUsed = array_sum(array_map(fn ($r) => $r['credits'], $byStatus));
+
+        $deadline = $project->deadline;
+        $feedback = $project->feedback()->orderByDesc('id')->first();
+
+        return response()->json([
+            'project' => [
+                'id' => $project->id,
+                'name' => $project->name,
+                'status' => $project->status,
+                'status_label' => app(\App\Services\ProjectWorkflowService::class)->describe($project, $actor)['status_label'] ?? $project->status,
+            ],
+            'images' => [
+                'total' => $total,
+                'completed' => $count('completed'),
+                'running' => $count('pending') + $count('processing'),
+                'failed' => $count('failed'),
+                'by_status' => $byStatus,
+            ],
+            'credits' => ['used' => $creditsUsed],
+            'deadline' => $deadline ? [
+                'date' => $deadline->format('d/m/Y'),
+                // Âm = đã quá hạn. Tính theo NGÀY (không theo giờ) để "còn 0 ngày" = hạn hôm nay.
+                'days_left' => (int) now()->startOfDay()->diffInDays($deadline->copy()->startOfDay(), false),
+            ] : null,
+            'feedback' => [
+                'count' => $project->feedback()->count(),
+                'latest' => $feedback ? [
+                    'author_name' => $feedback->author_name,
+                    'decision' => $feedback->decision,
+                    'decision_label' => $feedback->decisionLabel(),
+                    'message' => $feedback->message,
+                    'created_at' => $feedback->created_at?->format('d/m/Y H:i'),
+                ] : null,
+            ],
+        ]);
+    }
+
+    /**
      * GET /api/projects/{project}/export — TẢI GÓI SẢN XUẤT CHO XƯỞNG (ZIP).
      *
      * Người nhận là XƯỞNG MAY (không dùng FabrikAI), nên gói phải tự đủ nghĩa: ảnh tham chiếu + phiếu

@@ -45,6 +45,18 @@ function runBatch() {
   clearDraft();
   store.generateBatch(items, per);
 }
+/**
+ * CHẠY LẠI CHỈ NHỮNG MỤC LỖI của lượt hàng loạt vừa rồi.
+ *
+ * Vì sao: một lượt 12 mục mà 2 mục lỗi (provider rate-limit, ảnh nguồn hỏng…) thì trước đây người dùng
+ * phải tự nhớ mục nào lỗi rồi gõ lại. Nay danh sách mục lỗi được giữ trong store và chạy lại bằng 1 cú bấm.
+ */
+function retryFailed() {
+  const fails = (store.batchFailed || []).slice();
+  if (!fails.length || store.generating) return;
+  clearDraft();
+  store.generateBatch(fails, batchVariants.value);
+}
 
 // ── Sub-panels ──
 const showAdvanced = ref(false);
@@ -957,7 +969,21 @@ const bodyHipsLabel = computed(() => {
 
           <div v-if="store.batchSend" class="rounded-lg border border-ink-700 bg-ink-900/60 p-2.5">
             <p class="text-[11px] font-semibold text-cream-100">Đang gửi {{ store.batchSend.done }}/{{ store.batchSend.total }} mục · {{ store.batchSend.images }} ảnh đã xếp hàng<span v-if="store.batchSend.failed"> · {{ store.batchSend.failed }} mục lỗi</span></p>
-            <p class="mt-0.5 truncate text-[10px] text-cream-300/85">{{ store.batchSend.current }}</p>
+            <!-- Tiến trình TỪNG MỤC (thật, từ vòng gửi) — biết mục nào xong, mục nào lỗi, vì sao -->
+            <ul class="mt-1 space-y-0.5">
+              <li v-for="(it, i) in store.batchSend.items.slice(-6)" :key="i" class="flex items-start gap-1.5 text-[10px]">
+                <StudioIcon :name="it.ok ? 'check' : (it.error ? 'alertTriangle' : 'clock')" size="h-3 w-3" class="mt-px shrink-0" :class="it.ok ? 'text-emerald-400' : (it.error ? 'text-red-400' : 'text-cream-300')" />
+                <span class="min-w-0 flex-1 truncate" :class="it.error ? 'text-red-300' : 'text-cream-300'" :title="it.prompt + (it.error ? ' — ' + it.error : '')">{{ it.prompt }}</span>
+              </li>
+            </ul>
+            <p v-if="store.batchSend.items.length > 6" class="mt-0.5 text-[10px] text-cream-300/70">… và {{ store.batchSend.items.length - 6 }} mục trước đó</p>
+          </div>
+
+          <!-- Chạy lại CHỈ mục lỗi (không phải làm lại cả lượt) -->
+          <div v-if="!store.generating && store.batchFailed && store.batchFailed.length" class="flex flex-wrap items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-2.5">
+            <StudioIcon name="alertTriangle" size="h-3.5 w-3.5 text-red-300" />
+            <p class="min-w-0 flex-1 text-[11px] text-red-200">{{ store.batchFailed.length }} mục lỗi ở lượt vừa rồi — có thể do hạn mức provider hoặc ảnh nguồn. Chạy lại chỉ những mục đó.</p>
+            <button class="tool-btn shrink-0" @click="retryFailed()"><StudioIcon name="refresh" size="h-3.5 w-3.5" /> Chạy lại {{ store.batchFailed.length }} mục lỗi</button>
           </div>
 
           <p class="text-[11px] leading-relaxed text-cream-300/85">

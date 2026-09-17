@@ -96,6 +96,10 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     // đóng thành 1 file ZIP. Chủ xưởng may cần "gói đủ để cắt may", không chỉ một tấm ảnh.
     Route::get('/projects/{project}/export', [ProjectController::class, 'exportBundle'])->name('projects.export');
 
+    // [Đợt 2 — 2026-09-19] Chi phí & tiến độ của MỘT bộ sưu tập (số ảnh xong/đang chạy/lỗi · credit đã
+    // dùng · hạn còn lại · phản hồi mới nhất) — cho chủ doanh nghiệp kiểm soát chi phí theo bộ.
+    Route::get('/projects/{project}/stats', [ProjectController::class, 'stats'])->name('projects.stats');
+
     // [Đợt 4 — 2026-09-19] CHIA SẺ CHO KHÁCH DUYỆT: tạo link công khai (có hạn) + thu hồi.
     Route::get('/projects/{project}/share', [ProjectShareController::class, 'status'])->name('projects.share.status');
     Route::post('/projects/{project}/share', [ProjectShareController::class, 'create'])->name('projects.share.create');

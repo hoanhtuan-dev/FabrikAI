@@ -47,6 +47,10 @@ export const useStudioStore = defineStore('studio', {
     planStatus: null,
     // Tiến trình GỬI của lượt tạo hàng loạt (khác generateProgress = % RENDER thật của từng ảnh).
     batchSend: null,
+    // Prompt của các mục LỖI trong lượt hàng loạt gần nhất — dùng cho nút "Chạy lại mục lỗi".
+    batchFailed: [],
+    // [Đợt 2] Thống kê chi phí/tiến độ theo từng bộ sưu tập (nạp khi cần, không nạp cả danh sách).
+    projectStats: {},
     planOpen: false,        // popup "Gói & credit" ở thanh công cụ
     planCatalogOpen: false, // mở danh mục gói bên trong popup
     planBusy: false,
@@ -569,16 +573,22 @@ export const useStudioStore = defineStore('studio', {
       this.generating = true;
       this.generateStage = 'preparing';
       this.lastBatch = [];
-      this.batchSend = { total: list.length, done: 0, failed: 0, current: list[0], images: 0 };
+      this.batchFailed = [];
+      // Theo dõi TỪNG MỤC (prompt · xong/lỗi · id ảnh) để giao diện hiện tiến trình thật và cho phép
+      // CHẠY LẠI CHỈ NHỮNG MỤC LỖI — trước đây mục lỗi chỉ hiện toast rồi mất, người dùng phải tự nhớ.
+      this.batchSend = { total: list.length, done: 0, failed: 0, current: list[0], images: 0, items: [] };
 
       try {
         for (let i = 0; i < list.length; i++) {
           this.batchSend.current = list[i];
+          const entry = { prompt: list[i], ok: false, error: null, ids: [] };
+          this.batchSend.items.push(entry);
           try {
             const d = await this.api('/api/generate', this.imagePayload(list[i], per));
             const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
             items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Hàng loạt' }));
-            items.forEach((it) => { if (it.generation_id) allIds.push(it.generation_id); });
+            items.forEach((it) => { if (it.generation_id) { allIds.push(it.generation_id); entry.ids.push(it.generation_id); } });
+            entry.ok = true;
             sent++;
             // Nói thật khi gói giới hạn độ phân giải (backend hạ cap) — chỉ báo MỘT lần cho cả lượt.
             if (!noticeShown && d.notice) { noticeShown = true; this.toast(d.notice, 'info'); }
@@ -586,7 +596,9 @@ export const useStudioStore = defineStore('studio', {
             if (d.credits_left != null) this.creditsLeft = d.credits_left;
           } catch (e) {
             failed++;
-            this.toast('Mục ' + (i + 1) + ' lỗi: ' + (e.message || 'không rõ nguyên nhân'), 'error');
+            entry.error = e.message || 'không rõ nguyên nhân';
+            this.batchFailed.push(list[i]);
+            this.toast('Mục ' + (i + 1) + ' lỗi: ' + entry.error, 'error');
           }
           this.batchSend.done = i + 1;
           this.batchSend.failed = failed;
@@ -602,8 +614,10 @@ export const useStudioStore = defineStore('studio', {
         }
       } finally {
         this.generating = false;
-        this.toast('Đã gửi ' + sent + '/' + list.length + ' mục · ' + allIds.length + ' ảnh đang tạo' + (failed ? ' · ' + failed + ' mục lỗi' : ''), failed && !sent ? 'error' : 'info');
-        setTimeout(() => { this.batchSend = null; }, 5000);
+        const failNote = failed ? ' · ' + failed + ' mục lỗi (bấm «Chạy lại mục lỗi»)' : '';
+        this.toast('Đã gửi ' + sent + '/' + list.length + ' mục · ' + allIds.length + ' ảnh đang tạo' + failNote, failed && !sent ? 'error' : 'info');
+        // Giữ danh sách mục lỗi lại (không xoá cùng batchSend) để còn chạy lại được.
+        setTimeout(() => { if (this.batchSend) this.batchSend = null; }, 8000);
       }
 
       return allIds;
@@ -1680,6 +1694,24 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) {
         this.toast('Không thu hồi được: ' + e.message, 'error');
         return false;
+      }
+    },
+    /**
+     * [Đợt 2] Thống kê một bộ sưu tập: số ảnh xong/đang chạy/lỗi · credit đã dùng · hạn còn lại · phản hồi.
+     * Nạp theo yêu cầu và nhớ theo id (bấm qua lại giữa các bộ không gọi lại liên tục).
+     */
+    async loadProjectStats(projectId, force = false) {
+      if (!projectId) return null;
+      if (!force && this.projectStats[projectId]) return this.projectStats[projectId];
+      try {
+        const r = await fetch('/api/projects/' + projectId + '/stats', { headers: { Accept: 'application/json' } });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        this.projectStats = { ...this.projectStats, [projectId]: d };
+        return d;
+      } catch (e) {
+        console.error('loadProjectStats failed', e);
+        return null;
       }
     },
     // ── Mẫu việc theo ngành (Đợt 2) ───────────────────────────────────────────────────────
