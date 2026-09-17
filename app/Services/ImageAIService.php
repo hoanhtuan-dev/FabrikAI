@@ -87,7 +87,8 @@ class ImageAIService
         if ($mode === 'refgen' && $baseImage) {
             $refUrl = $this->generateFromReference($prompt, $baseImage, $providerOverride, $modelOverride, $faceRef);
             if ($refUrl) {
-                return $refUrl;
+                // [Đợt 0.4] Đây là đường TẠO ảnh mới ⇒ áp đúng tỉ lệ + mức phân giải đã chọn.
+                return $this->normalizeOutputSize($refUrl, $resolution, $ratio) ?: $refUrl;
             }
             throw new \RuntimeException($this->dashscopeError ?: 'Không tạo được ảnh mới từ ảnh tham chiếu.');
         }
@@ -180,7 +181,8 @@ class ImageAIService
                     if (! $this->lastModel) {
                         $this->lastModel = $model;
                     }
-                    return $url;
+                    // [Đợt 0.4] đường TẠO ảnh: trả về đúng tỉ lệ + mức phân giải đã chọn (1K/2K).
+                    return $this->normalizeOutputSize($url, $resolution, $ratio) ?: $url;
                 }
             }
         }
@@ -1588,6 +1590,11 @@ class ImageAIService
     {
         // Qwen-Image only accepts a fixed set of sizes; map the ratio (and the extra
         // ratios) onto the nearest supported one so the provider call succeeds.
+        //
+        // ⚠️ Đây là kích thước GỬI CHO PROVIDER, không phải kích thước GIAO CHO NGƯỜI DÙNG:
+        // '4:5' ở đây thành 1104*1472 (tỉ lệ 3:4) và '21:9' thành 1664*928 (tỉ lệ 16:9) — đúng
+        // tỉ lệ người dùng chọn được khôi phục ở normalizeOutputSize() (Đợt 0.4). Vì vậy TUYỆT ĐỐI
+        // không đọc hàm này để suy ra kích thước kết quả.
         return match ($ratio) {
             '16:9', '21:9', '19:6' => '1664*928',
             '4:3' => '1472*1104',
@@ -1596,6 +1603,119 @@ class ImageAIService
             '9:16' => '928*1664',
             default => '1328*1328',
         };
+    }
+
+    /**
+     * [Đợt 0.4 — 2026-09-17] Kích thước ĐÍCH thật sự giao cho người dùng.
+     *
+     * Hai lỗi bị khoá ở đây (xem STUDIO_REVIEW_PLAN.md Đợt 0.4):
+     *   · Nút 1K/2K KHÔNG có tác dụng: sizeFor() nhận $resolution nhưng không dùng ⇒ chọn 1K hay
+     *     2K đều ra cùng một ảnh.
+     *   · Tỉ lệ 4:5 và 21:9 bị ÂM THẦM đổi thành 3:4 và 16:9 ở sizeFor() ⇒ người dùng chọn 4:5
+     *     (đăng Instagram) nhưng nhận 3:4 mà không được báo.
+     *
+     * Trả về [rộng, cao] theo ĐÚNG tỉ lệ yêu cầu với cạnh dài = 1K (1024) hoặc 2K (2048).
+     * null ⇒ không có tỉ lệ hợp lệ để xử lý (giữ nguyên ảnh provider trả về).
+     *
+     * @return array{0:int,1:int}|null
+     */
+    protected function outputTargetSize(?string $resolution, ?string $ratio): ?array
+    {
+        if (! preg_match('/^(\d{1,3}):(\d{1,3})$/', (string) $ratio, $m)) {
+            return null;
+        }
+        $rw = (int) $m[1];
+        $rh = (int) $m[2];
+        if ($rw < 1 || $rh < 1) {
+            return null;
+        }
+
+        // 1K = 1024, 2K = 2048 (cạnh DÀI). Không gửi resolution ⇒ 1K, đúng nhãn mặc định trên UI.
+        $long = ($resolution === '2K') ? 2048 : 1024;
+
+        return $rw >= $rh
+            ? [$long, max(1, (int) round($long * $rh / $rw))]
+            : [max(1, (int) round($long * $rw / $rh)), $long];
+    }
+
+    /**
+     * [Đợt 0.4] Đưa ảnh provider trả về về ĐÚNG tỉ lệ và ĐÚNG mức phân giải người dùng đã chọn.
+     *
+     * 1) CẮT GIỮA về đúng tỉ lệ yêu cầu (4:5 ra 4:5, 21:9 ra 21:9 — không còn bị đổi thành 3:4/16:9).
+     * 2) Hạ cạnh dài về mốc 1K/2K. KHÔNG phóng to: thà giao đúng độ phân giải provider tạo ra còn
+     *    hơn nội suy lên rồi dán nhãn "2K" — đó lại đúng kiểu nói dối mà Đợt 0.3 vừa dẹp.
+     *
+     * CHỈ áp dụng cho đường TẠO ẢNH. Đường SỬA ảnh (inpaint/region) phải giữ nguyên kích thước
+     * ẢNH GỐC — cắt về tỉ lệ khác là phá đúng thứ người dùng đang sửa (fitToSourceSize đã lo việc đó).
+     *
+     * Trả về URL mới, hoặc null khi ảnh đã đúng sẵn / không đọc được (caller giữ URL cũ).
+     */
+    public function normalizeOutputSize(string $url, ?string $resolution, ?string $ratio): ?string
+    {
+        $target = $this->outputTargetSize($resolution, $ratio);
+        if (! $target) {
+            return null;
+        }
+        [$tw, $th] = $target;
+
+        try {
+            $src = studio_image_decode((string) $this->resolveImageBinary($url));
+            if (! $src) {
+                return null;
+            }
+            $sw = imagesx($src);
+            $sh = imagesy($src);
+            if ($sw < 1 || $sh < 1) {
+                imagedestroy($src);
+
+                return null;
+            }
+
+            // 1) Cắt giữa về ĐÚNG tỉ lệ yêu cầu.
+            $want = $tw / $th;
+            $have = $sw / $sh;
+            if ($have > $want) {
+                $cw = (int) max(1, round($sh * $want));
+                $ch = $sh;
+            } else {
+                $cw = $sw;
+                $ch = (int) max(1, round($sw / $want));
+            }
+            $cx = (int) max(0, floor(($sw - $cw) / 2));
+            $cy = (int) max(0, floor(($sh - $ch) / 2));
+
+            // 2) Hạ về mốc phân giải (không bao giờ > 1.0 ⇒ không phóng to).
+            $scale = min($tw / $cw, $th / $ch, 1.0);
+            $ow = (int) max(1, round($cw * $scale));
+            $oh = (int) max(1, round($ch * $scale));
+
+            if ($ow === $sw && $oh === $sh) {
+                imagedestroy($src);
+
+                return null; // đã đúng sẵn — không ghi thêm file rác
+            }
+
+            $out = imagecreatetruecolor($ow, $oh);
+            imagealphablending($out, false);
+            imagesavealpha($out, true);
+            imagecopyresampled($out, $src, 0, 0, $cx, $cy, $ow, $oh, $cw, $ch);
+            imagedestroy($src);
+
+            ob_start();
+            imagepng($out);
+            $bytes = (string) ob_get_clean();
+            imagedestroy($out);
+
+            $name = 'studio/size-'.Str::uuid().'.png';
+            Storage::disk('public')->put($name, $bytes);
+
+            return '/storage/'.$name;
+        } catch (\Throwable $e) {
+            // Không chuẩn hoá được thì KHÔNG được làm hỏng cả lần tạo ảnh — trả ảnh gốc của provider.
+            logger()->warning('normalizeOutputSize failed: '.$e->getMessage());
+
+            return null;
+        }
     }
 
     protected function placeholder(): string
