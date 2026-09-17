@@ -292,6 +292,31 @@ JS/Vue studio **51 file (38 .vue) / 14.239 dòng** · `public_html` **21 MB** ·
 - **Lỗi bắt được khi kiểm thử**: hàm `run()` cũ trả về giá trị của callback; với closure `async () => { await api(...) }` (không return) thì kết quả là `undefined` ⇒ tạo người dùng thành công nhưng **hộp thoại không đóng và danh sách không nạp lại**. Nay `run()` trả `true/false`, chỗ cần dữ liệu trả về (khôi phục thanh công cụ) gọi API trực tiếp.
 - Đã kiểm: `php artisan test` **491 pass / 2657 assert** ✓ · đo bằng Chrome headless ở 390/500/820/1024/1500px: 0 tràn ngang · 0 icon rỗng · 0 lỗi JS · header/sidebar sticky đúng · **0/563 đoạn chữ dưới WCAG AA** · **47/47 bước của 11 kịch bản thao tác** (tạo người dùng, chặn submit khi thiếu dữ liệu, cộng/trừ credit, khoá tài khoản, xoá người dùng, tạo gói + đặc quyền, lọc sổ cái theo người & theo loại, sửa+lưu thanh công cụ, tìm kiếm, phân trang, vai trò không phải Owner) đều đạt · smoke test app thật: owner → `/admin` 200 + 5 endpoint 200; vai trò Quản trị → `/admin` 200 nhưng `/api/admin/users` 403.
 
+### 3.5ter Gói cước THẬT — cấp credit theo chu kỳ + chi phí theo gói (2026-09-19)
+
+**Lỗ hổng phát hiện khi phân tích gói cước** (mọi kết luận đều có bằng chứng đọc mã):
+1. `plans.credits_per_month` **chưa từng được cấp**: `routes/console.php` chỉ có `inspire`; grep `Schedule::|->monthly|->daily` trong `app/` `routes/` `bootstrap/` = **0**; `PlanService::assign()` chỉ tặng `bonus_credits` một lần ⇒ khách trả 499.000 ₫ cho "350 credit/tháng" mà không nhận được gì sau tháng đầu.
+2. `plans.image_credit_cost` / `video_credit_cost` là **cột trang trí**: pipeline đọc `studio_config('image_credits')` ở **9 chỗ** (`StudioController.php` 186 · 219 · 321 · 502 · 552 · 721 · 788 · 1156) ⇒ mọi gói tiêu credit như nhau.
+3. `resolution_cap` không được thực thi (chỉ xuất hiện ở `BillingController.php:38`).
+4. **Không có giao diện gói cước**: `grep -rn 'billing' resources/js` = 0 ⇒ 2 endpoint `/api/billing/*` không có ai gọi; `/api/boot` không trả thông tin gói (`StudioController.php:46-56`).
+5. **Không chặn khi hết credit**: `StudioController.php:1600` — *"never hard-block on credits"*; grep `credits_balance <` toàn repo = 0.
+6. Không có trang giá công khai (`resources/views/` không có view pricing).
+
+**Đã sửa (đợt 1)**:
+- `PlanService::syncCycleCredits()` — cấp credit chu kỳ **idempotent** bằng CAS (`UPDATE … WHERE plan_credits_granted_at IS NULL OR < mốc chu kỳ`) trong transaction; chu kỳ = 1 tháng tính ngược từ `plan_expires_at` (gói trả phí) hoặc tháng dương lịch (gói miễn phí); gói **hết hạn ⇒ không cấp**.
+- Migration `2026_09_19_000002_add_plan_credits_granted_at_to_users_table.php` (nullable — người dùng cũ được cấp bù đúng một lần) + cast `datetime` trong `User::casts()`.
+- Lệnh cron `php artisan studio:grant-plan-credits [--dry-run] [--limit=] ` (đăng ký ở `bootstrap/app.php`) **+ đường lazy** trong `/api/boot` và `queueGeneration()` ⇒ không phụ thuộc cron trên host.
+- `studio_credit_cost('image'|'video')` (helper mới) — **8 chỗ** trong pipeline nay lấy chi phí THEO GÓI, fallback setting toàn cục (tương thích ngược: gói mặc định 1/10 cho kết quả y hệt).
+- `CreditTransaction::TYPE_PLAN_GRANT = 'plan_grant'` ("Cấp theo gói") + bổ sung vào bộ lọc Sổ credit ở trang Quản trị.
+- `/api/boot` trả `user.plan` (slug · giá · credit/tháng · chi phí ảnh/video · cap · hạn · mốc cấp · is_subscribed).
+- 2 test cũ khoá **hành vi sai** đã cập nhật theo hợp đồng đúng: `BillingSubscribeTest` (đăng ký gói cấp bonus **+ credit kỳ đầu**) và `PlanManagementTest`.
+
+**Kiểm chứng**: `PlanCreditCycleTest` 8 test mới (cấp một lần/chu kỳ · gia hạn cấp tiếp · gói hết hạn không cấp · gói miễn phí 0 credit · dry-run không ghi · chi phí theo gói khi tạo ảnh · boot trả gói) · **499 test / 2.682 assert xanh** (trước: 491/2.657) · chạy thật trên DB local: gán gói Khởi nghiệp cho `user@fabrikai.shop` ⇒ credit 200 → **350** và **đúng một** dòng `plan_grant` *"Cấp 120 credit theo gói Khởi nghiệp (kỳ từ 17/09/2026)"*.
+
+**Tài liệu chiến lược kèm theo**: `docs/UX_PERSONA_STRATEGY.md` (3 persona · 6 lỗ hổng gói cước có bằng chứng · 7 nguyên tắc thiết kế · roadmap 4 đợt có tiêu chí đo · 4 câu hỏi cần chủ dự án quyết).
+
+**Còn nợ (các vòng sau)**: UI gói cước trong Studio · cờ `studio_enforce_credits` (hiện vẫn không chặn khi hết credit) · thực thi `resolution_cap` · trang giá công khai · không gian làm việc theo persona (bộ sưu tập/đơn/xuất gói cho xưởng).
+
 ### 3.6 Sửa lỗi / đồng bộ khác
 - `900f547` `studio_config()` bỏ qua empty string từ DB → fallback config default · `565c1a8` preview-enrich nhận body/hair từ tab Phom dáng · `6e16472` fix 500 image-thumb + popup GalleryModal/SourcePickerPopup không hiển thị trong StudioApp · `d6572a1` render ProjectWorkspace popup + gọn prompt `StylistService` · `d674560` fix **cross-world SW resource mismatch** cho modulepreload.
 - `e9ed8e5` khôi phục `settings.blade.php` bị cắt mất **184 dòng** · `c64ea21` fix CSS syntax + Vue missing closing tags · `1b804ed` + `e5175c6` bo góc **VSCode-style** toàn diện (card/input/btn/badge/chip + admin blade).

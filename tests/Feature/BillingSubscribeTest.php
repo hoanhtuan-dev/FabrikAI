@@ -49,7 +49,12 @@ class BillingSubscribeTest extends TestCase
         $this->assertSame($starter->id, (int) $fresh->plan_id);
         $this->assertNotNull($fresh->plan_expires_at);
         $this->assertTrue($fresh->plan_expires_at->isFuture());
-        $this->assertSame($before + (int) $starter->bonus_credits, (int) $fresh->credits_balance);
+        // [2026-09-19] Đăng ký gói trả phí cấp NGAY cả bonus (một lần) LẪN credit của chu kỳ đầu
+        // (plans.credits_per_month). Trước đây chỉ có bonus vì chưa có đường cấp credit định kỳ.
+        $this->assertSame(
+            $before + (int) $starter->bonus_credits + (int) $starter->credits_per_month,
+            (int) $fresh->credits_balance,
+        );
         $this->assertTrue($fresh->isSubscribed());
     }
 

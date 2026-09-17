@@ -76,7 +76,12 @@ class PlanManagementTest extends TestCase
         $this->assertSame($starter->id, (int) $fresh->plan_id);
         $this->assertNotNull($fresh->plan_expires_at);
         $this->assertTrue($fresh->plan_expires_at->isFuture());
-        $this->assertSame(100 + (int) $starter->bonus_credits, (int) $fresh->credits_balance, 'Tặng bonus credit đúng một lần khi lần đầu chuyển gói.');
+        // [2026-09-19] Gán gói cấp: bonus (một lần khi đổi gói) + credit chu kỳ đầu (credits_per_month).
+        $this->assertSame(
+            100 + (int) $starter->bonus_credits + (int) $starter->credits_per_month,
+            (int) $fresh->credits_balance,
+            'Tặng bonus một lần khi đổi gói + cấp credit chu kỳ đầu.'
+        );
     }
 
     public function test_free_plan_has_no_expiry(): void

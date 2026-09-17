@@ -42,6 +42,17 @@ class StudioController extends Controller
     public function boot(): \Illuminate\Http\JsonResponse
     {
         $user = auth()->user();
+
+        // [2026-09-19] Cấp credit theo CHU KỲ GÓI ngay khi người dùng vào app (idempotent —
+        // cron chỉ là đường dự phòng). Nhờ vậy khách vừa gia hạn có credit dùng được NGAY,
+        // không phải chờ tới lượt cron chạy.
+        if ($user) {
+            app(\App\Services\PlanService::class)->syncCycleCredits($user);
+            $user = $user->fresh();
+        }
+
+        $plan = $user?->activePlan();
+
         return response()->json([
             'user' => $user ? [
                 'id' => $user->id,
@@ -53,6 +64,21 @@ class StudioController extends Controller
                 'credits_balance' => $user->credits_balance,
                 'is_admin' => $user->isAdmin(),
                 'is_super_admin' => $user->isSuperAdmin(),
+                // Gói hiện hành + hạn mức chu kỳ: để giao diện nói đúng "bạn đang ở gói nào,
+                // còn bao nhiêu credit kỳ này, mỗi ảnh tốn bao nhiêu".
+                'plan' => $plan ? [
+                    'id' => $plan->id,
+                    'name' => $plan->name,
+                    'slug' => $plan->slug,
+                    'price_label' => $plan->priceLabel(),
+                    'credits_per_month' => (int) $plan->credits_per_month,
+                    'image_credit_cost' => studio_credit_cost('image', $user),
+                    'video_credit_cost' => studio_credit_cost('video', $user),
+                    'resolution_cap' => $plan->resolution_cap,
+                    'expires_at' => $user->plan_expires_at?->format('d/m/Y'),
+                    'credits_granted_at' => $user->plan_credits_granted_at?->format('d/m/Y'),
+                    'is_subscribed' => $user->isSubscribed(),
+                ] : null,
             ] : null,
             'project_statuses' => app(\App\Services\ProjectWorkflowService::class)->states(),
         ]);
@@ -183,7 +209,7 @@ class StudioController extends Controller
         $data['prompt'] = $finalPrompt;
         $data['negative_prompt'] = $negativePrompt;
 
-        $cost = (int) studio_config('image_credits', 1);
+        $cost = studio_credit_cost('image');
         $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
 
         $items = [];
@@ -216,7 +242,7 @@ class StudioController extends Controller
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
         ]);
 
-        $cost = (int) studio_config('video_credits', 10);
+        $cost = studio_credit_cost('video');
 
         // Multi-model selector: resolve the chosen registered model (unique id) so the render uses
         // exactly that provider + model_id (not the highest-priority default). Avoids model_id collisions.
@@ -318,7 +344,7 @@ class StudioController extends Controller
         }
         $data['edit'] = true;
 
-        $cost = (int) studio_config('image_credits', 1);
+        $cost = studio_credit_cost('image');
 
         return $this->queueGeneration('image', $data, $cost, $generation);
     }
@@ -499,7 +525,7 @@ class StudioController extends Controller
             .'% similarity to the original (same subject, identity and key layout), but apply: '.$userPrompt
             .'. Keep high quality, realistic, studio lighting, sharp details.';
 
-        $cost = (int) studio_config('image_credits', 1);
+        $cost = studio_credit_cost('image');
         $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
         $model = trim((string) ($data['model'] ?? ''));
         $provider = trim((string) ($data['provider'] ?? ''));
@@ -549,7 +575,7 @@ class StudioController extends Controller
             $prompt .= ' A mask is provided: its WHITE region is the subject to KEEP unchanged; its BLACK region is the background to REMOVE (make pure white).';
         }
 
-        $cost = (int) studio_config('image_credits', 1);
+        $cost = studio_credit_cost('image');
 
         return $this->queueGeneration('image', [
             'prompt' => $prompt,
@@ -718,7 +744,7 @@ class StudioController extends Controller
                 .'High quality, photorealistic, sharp details, professional studio lighting, no text, no watermark.';
         }
 
-        $cost = (int) studio_config('image_credits', 1);
+        $cost = studio_credit_cost('image');
         $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
         $provider = trim((string) ($data['provider'] ?? ''));
         $model = trim((string) ($data['model'] ?? ''));
@@ -785,7 +811,7 @@ class StudioController extends Controller
 
         $mode = (string) ($data['mode'] ?? '');
         $base = $this->downscaleSource((string) ($data['images'][0] ?? ''), 1600);
-        $cost = (int) studio_config('image_credits', 1);
+        $cost = studio_credit_cost('image');
         $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
         $isOutfit = $mode === 'outfit';
 
@@ -1153,7 +1179,7 @@ class StudioController extends Controller
             'reg_x' => $cord_x, 'reg_y' => $cord_y, 'reg_w' => $cord_x2 - $cord_x + 1, 'reg_h' => $cord_y2 - $cord_y + 1,
         ];
 
-        $cost = (int) studio_config('image_credits', 1);
+        $cost = studio_credit_cost('image');
 
         // Giới hạn crop tối đa ~2048px để không vượt quá giới hạn model AI.
         $maxDim = 2048;
@@ -1596,6 +1622,11 @@ RULES:
     protected function queueGeneration(string $type, array $data, int $cost, ?Generation $source = null)
     {
         $user = auth()->user();
+
+        // [2026-09-19] Cấp credit chu kỳ gói TRƯỚC khi trừ — người vừa gia hạn không bị chặn oan
+        // vì cron chưa chạy. Idempotent nên gọi ở đây là an toàn.
+        app(\App\Services\PlanService::class)->syncCycleCredits($user);
+        $user = $user->fresh();
 
         // Internal admin tool: never hard-block on credits. Track usage (balance may go negative).
         $this->reconcileStuckCredits($user);

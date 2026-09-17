@@ -62,6 +62,9 @@ const TYPE_META = {
   renew: { label: 'Gia hạn', cls: 'bg-brand-600/25 text-brand-100' },
   signup: { label: 'Đăng ký', cls: 'bg-sky-500/15 text-sky-300' },
   adjust: { label: 'Điều chỉnh', cls: 'bg-amber-500/15 text-amber-300' },
+  // [2026-09-19] Cấp credit theo CHU KỲ GÓI (plans.credits_per_month) — trước đây gói chỉ hiển thị
+  // số credit/tháng mà không có đường cấp nào.
+  plan_grant: { label: 'Cấp theo gói', cls: 'bg-brand-600/25 text-brand-100' },
 };
 const typeMeta = (t) => TYPE_META[t] || { label: t, cls: 'bg-ink-700 text-cream-300' };
 

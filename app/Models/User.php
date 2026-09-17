@@ -61,6 +61,9 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'plan_expires_at' => 'datetime',
+            // Mốc cấp credit theo chu kỳ gói — PHẢI cast thành datetime, nếu không
+            // PlanService so sánh chu kỳ sẽ nhận string và ném lỗi.
+            'plan_credits_granted_at' => 'datetime',
         ];
     }
 

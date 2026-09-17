@@ -1279,6 +1279,42 @@ if (! function_exists('studio_usage')) {
     }
 }
 
+if (! function_exists('studio_credit_cost')) {
+    /**
+     * Chi phí credit của MỘT thao tác — ƯU TIÊN THEO GÓI, fallback về setting toàn cục.
+     *
+     * Vì sao: plans.image_credit_cost / video_credit_cost đã có trong lược đồ và trong trang Quản
+     * trị, nhưng pipeline lại luôn đọc setting toàn cục studio_config('image_credits') ⇒ cột của
+     * gói là trang trí, mọi gói tiêu credit như nhau. Hàm này là ĐƯỜNG DUY NHẤT để lấy chi phí.
+     *
+     * Tương thích ngược: gói để mặc định (1 credit/ảnh · 10 credit/video) cho kết quả y hệt
+     * setting cũ; gói hết hạn hoặc chưa gán gói cũng rơi về mặc định toàn cục.
+     *
+     * @param  string  $kind  'image' | 'video'
+     */
+    function studio_credit_cost(string $kind = 'image', $user = null): int
+    {
+        $user = $user ?? auth()->user();
+
+        $plan = null;
+        try {
+            $plan = $user?->activePlan();
+        } catch (\Throwable $e) {
+            // Không có bảng plans / lỗi truy vấn: dùng mặc định toàn cục, KHÔNG làm hỏng pipeline.
+            $plan = null;
+        }
+
+        $fromPlan = $kind === 'video' ? (int) ($plan->video_credit_cost ?? 0) : (int) ($plan->image_credit_cost ?? 0);
+        if ($fromPlan > 0) {
+            return $fromPlan;
+        }
+
+        return $kind === 'video'
+            ? (int) studio_config('video_credits', 10)
+            : (int) studio_config('image_credits', 1);
+    }
+}
+
 
 /**
  * Studio model registry — dynamic per group (image | video | inference).

@@ -17,6 +17,8 @@ class CreditTransaction extends Model
     public const TYPE_ADJUST = 'adjust';
     public const TYPE_SIGNUP = 'signup';
     public const TYPE_RENEW = 'renew';
+    /** Cấp credit theo CHU KỲ GÓI (khi gia hạn/đầu kỳ) — tách khỏi 'grant' (tặng tay) và 'renew' (mốc gia hạn). */
+    public const TYPE_PLAN_GRANT = 'plan_grant';
 
     public const TYPES = [
         self::TYPE_PURCHASE,
@@ -26,6 +28,7 @@ class CreditTransaction extends Model
         self::TYPE_ADJUST,
         self::TYPE_SIGNUP,
         self::TYPE_RENEW,
+        self::TYPE_PLAN_GRANT,
     ];
 
     public const TYPE_LABELS = [
@@ -36,6 +39,7 @@ class CreditTransaction extends Model
         self::TYPE_ADJUST => 'Điều chỉnh',
         self::TYPE_SIGNUP => 'Đăng ký',
         self::TYPE_RENEW => 'Gia hạn',
+        self::TYPE_PLAN_GRANT => 'Cấp theo gói',
     ];
 
     protected $fillable = [
