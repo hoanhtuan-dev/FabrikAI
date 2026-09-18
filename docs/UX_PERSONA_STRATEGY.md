@@ -693,4 +693,78 @@ hành vẫn nhận đủ hiệu ứng.
   đúng biến CSS `--motion-dur-dock`; test đối chiếu bảng dự phòng trong JS với token trong CSS để hai bên không trôi
   khỏi nhau.
 
+---
+
+## 14. Đợt 10 — Áp dụng chuyển động SÂU RỘNG + tay cầm icon cho vách ngăn kéo (2026-09-20)
+
+### 14.1 Vấn đề — đo được, không suy đoán
+
+| Sự thật | Bằng chứng (đo trên mã nguồn trước đợt này) |
+|---|---|
+| Token mới chỉ phủ phần NHỎ của giao diện | **199 chỗ** dùng tiện ích `transition*` trong class (124 `transition` · 59 `transition-colors` · 13 `transition-all` · 2 `transition-opacity` · 1 `transition-transform`) đi theo mặc định của Tailwind: **150ms + cubic-bezier(.4,0,.2,1) cứng**, không theo token và **không tắt** khi người dùng bật "giảm chuyển động" |
+| Còn số ms viết tay | 11 chỗ trong `<style>` của .vue (`.fade-enter-active 0.2s` · `.cf-* .18s` · `genflow 0.35s/0.4s`) + 6 chỗ trong app.css/js (`duration-150/200/300/500` · `transition: background .2s` · `reveal 0.6s`) |
+| Có hover mà KHÔNG có chuyển động | 6 chỗ: 3 `<tr>` bảng admin, 1 `<tr>` danh sách dự án, 2 nút xoá (slot ảnh · preset) |
+| Vách ngăn kéo không có chỉ báo | chỉ 1 đường kẻ 1px — người chưa biết không có cách nào đoán chỗ đó kéo được |
+| Hiệu ứng vòng lặp không tắt theo token | `animate-pulse` · `shimmer` · `dotBlink`… chạy mãi kể cả khi bật giảm chuyển động |
+
+### 14.2 Đã làm — bốn tầng, vẫn MỘT nguồn số
+
+1. **Một dòng cho toàn app**: `@theme { --default-transition-duration: var(--motion-dur-fast);
+   --default-transition-timing-function: var(--motion-ease-standard) }`. Tailwind v4 phát ra
+   `.transition{transition-duration:var(--tw-duration,var(--default-transition-duration))}`, nên ghi đè
+   hai biến này là **199 chỗ** tự chạy theo token — và tự về 0ms khi bật giảm chuyển động.
+2. **Thời lượng thành tiện ích theo TÊN NGHĨA**: nhờ namespace `--transition-duration-*` của Tailwind v4,
+   nay viết được `duration-fast · duration-base · duration-slow · duration-dock` (và `ease-standard ·
+   ease-emphasized · ease-exit`) — đọc là biết nhịp, không ai phải nhớ con số, tất cả trỏ về token.
+3. **`.motion-ui` khớp ĐÚNG bộ thuộc tính Tailwind v4** — thêm `translate · scale · rotate` (v4 dùng
+   thuộc tính riêng, không gộp vào `transform`) cùng `outline-color · text-decoration-color ·
+   backdrop-filter`; thêm `.motion-ui--size` cho chỗ CẦN chuyển động kích thước (thanh tiến trình) và
+   `.motion-row` cho hàng bảng. 6 chỗ hở đã bịt.
+4. **Tay cầm cho vách ngăn**: tay cầm 14×30px có icon grip nằm giữa vách ngăn 7px, **hiện sẵn ở mức mờ
+   0.45** ngay khi tải trang (chỉ hiện khi hover thì người mới không bao giờ thấy nó), sáng rõ + nở ra
+   khi trỏ vào · focus bàn phím · đang kéo; đường kẻ dày 1px → 3px màu thương hiệu.
+5. **Công tắc giảm chuyển động chặn cả vòng lặp**: `animation-duration: 1ms` + `animation-iteration-count: 1`
+   cho mọi phần tử (giữ 1 vòng để trạng thái cuối của keyframes vẫn được áp — nếu không, vài chỉ báo có
+   thể trở nên vô hình).
+
+### 14.3 Ràng buộc đã giữ
+
+- **Nhịp cũ không đổi**: mặc định của Tailwind vốn đã là 150ms = `--motion-dur-fast`, nên 199 chỗ kia giữ
+  nguyên thời lượng, chỉ đổi đường cong sang token.
+- Không đổi cấu trúc DOM nào ngoài **một span trang trí** (`aria-hidden`) trong vách ngăn; tên/giá trị
+  vẫn nằm trên `role="separator"`.
+- Kéo từ chính tay cầm **không thêm đường kéo thứ hai**: pointerdown vẫn bắt ở vách ngăn
+  (`e.currentTarget`) nên không sinh hai nguồn sự thật cho cùng một thao tác.
+- Hiệu ứng cuộn `v-reveal` (0.6s) giữ nguyên nhịp — chỉ chuyển thành token `--motion-dur-reveal`.
+- Không thêm endpoint, không đụng luồng tạo ảnh.
+
+### 14.4 Đo được (Chrome thật 1600×1000 + phpunit)
+
+| Đo | Trước | Sau |
+|---|---|---|
+| Tiện ích `transition*` theo token | `0.15s` + `cubic-bezier(0.4, 0, 0.2, 1)` (cứng) | `0.15s` + `cubic-bezier(0.2, 0.8, 0.2, 1)` (token) |
+| Số ms viết tay trong transition | 17 chỗ (11 trong `<style>` · 6 trong css/js) | **0** |
+| Bề mặt hover không có chuyển động | 6 | **0** |
+| Tay cầm trên vách ngăn | không có (chỉ kẻ 1px) | **14×30px**, icon grip; `opacity 0.45` → **1.0** khi hover, `scale` 1.12, viền `rgb(85,155,120)` + quầng sáng 4px |
+| Kéo TỪ CHÍNH tay cầm | — | 288 → **408px** khi kéo +120px (`data-resizing=true`, tay cầm đổi nền brand-600) |
+| Bàn phím trên vách ngăn | — | `ArrowLeft` ⇒ 408 → **392px**, `aria-valuenow`=392, tay cầm vẫn sáng rõ khi focus |
+| Ảnh chụp tay cầm (phân tích điểm ảnh) | — | nghỉ: icon mờ hai cột điểm; hover: **1.954** điểm sáng + **10.801** điểm xanh; đang kéo: **31.500** điểm xanh (nền brand-600) |
+| Giảm chuyển động | tiện ích `transition*` vẫn chạy 150ms | `--default-transition-duration` = **0ms**; mọi transition = 1ms; vòng lặp = 1 vòng; thu gọn dock tức thì |
+| `vendor/bin/phpunit` | 676 test / 4343 khẳng định | **683 test / 4462 khẳng định — XANH** (thêm 7 test bất biến) |
+| `npm run build` | — | thoát 0; bundle có `.duration-base`, `--default-transition-duration:var(--motion-dur-fast)`, `.dock-resizer__knob`, `gripVertical` |
+
+### 14.5 Bài học tự bắt được trong đợt này
+
+- **"Đã có token" KHÁC "cả app theo token".** Đợt trước tôi tưởng xong vì đã có token + vài class, nhưng
+  199 chỗ vẫn đi đường riêng của Tailwind. Chỗ nối hoá ra chỉ là **hai biến theme** — đáng ra phải tìm
+  chỗ nối đó TRƯỚC khi viết class dùng chung.
+- **Tailwind v4 dùng `translate/scale/rotate` làm thuộc tính RIÊNG.** `transition-property` thiếu chúng
+  thì hiệu ứng "nhấc thẻ khi hover" đứng im mà **không có lỗi nào** — chỉ nhìn mới biết. Đây là loại lỗi
+  im lặng, nên test bất biến phải khoá danh sách thuộc tính lại.
+- **Ảnh chụp màn hình đen thui chưa chắc là app hỏng.** Ba ảnh của tôi giống hệt nhau vì script đăng nhập
+  **không await** promise nên trang vẫn ở trạng thái "chưa đăng nhập" và bị lớp phủ `z-[98]` che. Bài học:
+  kiểm tra TRẠNG THÁI trang trước khi chụp, và khi không xem được ảnh thì phân tích điểm ảnh (lưới độ
+  sáng) là cách đọc ảnh bằng số.
+
+
 
