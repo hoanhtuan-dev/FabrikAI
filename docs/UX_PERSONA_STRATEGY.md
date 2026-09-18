@@ -1111,6 +1111,60 @@ Và khi đo toạ độ ở khung 390px thì lộ ra lỗi thứ hai, nặng hơ
   tải lại. Đây là lý do rất có thể khiến người dùng vẫn thấy hành vi cũ sau nhiều lần deploy — cần nói rõ
   "tải lại trang" mỗi lần giao bản sửa, và nên có chỉ báo "có bản mới" trong ứng dụng.
 
+---
+
+## 20. Đợt 16 — GỐC RỄ CUỐI CÙNG: chế độ "CHỈNH 1 LAYER" làm mất tay cầm VÀ làm con mắt như không có tác dụng (2026-09-20)
+
+### 20.1 Cách tìm ra
+
+Sau khi người dùng xác nhận **đã tải lại trang (Ctrl+Shift+R) mà vẫn không thấy tay cầm**, tôi mới đặt câu hỏi
+đúng: *có trạng thái nào của ứng dụng mà CẢ HAI khiếu nại cùng đúng không?* Câu trả lời là **chế độ chỉnh 1
+layer** — bật bởi một công cụ canvas đang hoạt động. Đo được:
+
+| Trong chế độ "chỉnh 1 layer" (bật công cụ Vẽ tự do / Xóa vùng / vùng chọn inpaint) | Trước |
+|---|---|
+| Tay cầm chỉnh kích cỡ · xoay | **0 tay cầm** — điều kiện `isolateActive` loại bỏ tay cầm từ đầu |
+| Bấm con mắt để ẩn layer đang chọn | Canvas **KHÔNG đổi gì**: khung xem 1 layer dùng `store.upscaleSrc`, mà hàm này có ĐƯỜNG LÙI sang ảnh khác ⇒ thay ảnh ẩn bằng ảnh khác, nhìn như "bật/tắt layer không có tác dụng" |
+| Người dùng có biết mình đang ở chế độ đó? | Không — không có nhãn nào nói canvas đang chỉ hiện 1 layer |
+
+Đây là lời giải thích khớp với **cả hai** câu khiếu nại cùng lúc, và khớp với việc chúng lặp lại y nguyên sau
+nhiều lần deploy: chỉ cần một công cụ canvas đang bật là mọi bản sửa về tay cầm đều không hiện ra.
+
+### 20.2 Đã làm
+
+1. **Tay cầm hiện ở CẢ HAI chế độ xem.** Chỉ ẩn khi đang Crop/Reframe (khung crop có tay cầm riêng của nó)
+   hoặc khi layer đang ẩn (không thấy thì không chỉnh được).
+2. **Chế độ 1 layer hiện ĐÚNG ảnh của layer đang chọn** (`:src="store.activeLayer.image"`) thay vì
+   `upscaleSrc` có đường lùi ⇒ bấm con mắt là canvas **đổi ngay**, và khi layer đang ẩn thì hiện dòng chữ
+   "Layer đang chọn đang bị ẨN — bấm con mắt trong bảng Lớp để hiện lại".
+3. **Nhãn CHẾ ĐỘ trên canvas**: "Đang chỉnh 1 layer (Vẽ tự do · Xóa vùng · lasso …) — canvas chỉ hiện layer
+   đang chọn" kèm nút **Thoát** một chạm (`store.exitCanvasTools()`). Người dùng không còn phải đoán vì sao
+   chỉ thấy một layer, và thoát được ngay tại chỗ.
+
+### 20.3 Đo được (Chrome thật)
+
+| Kiểm | Trước | Sau |
+|---|---|---|
+| Tay cầm khi đang bật "Vẽ tự do" | 0 | **2**, cả hai `elementFromPoint` trả về chính tay cầm |
+| Kéo tay cầm trong chế độ đó | (không có) | scale **1 → 1.25** |
+| Bấm con mắt để ẩn layer đang chọn | canvas không đổi (ảnh dự phòng) | **ảnh lớn trên canvas: 1 → 0** + hiện dòng "đang bị ẨN" |
+| Nút "Thoát" trên nhãn chế độ | (không có nhãn) | thoát công cụ, nhãn biến mất, **cả 2 layer hiện lại** |
+| `vendor/bin/phpunit` | 698 test / 4639 khẳng định | **699 test / 4646 khẳng định — XANH** (16 test bất biến cho khung canvas) |
+
+### 20.4 Bài học tự bắt được trong đợt này
+
+- **Khi một khiếu nại lặp lại y nguyên, phải đi tìm TRẠNG THÁI làm cả hai điều cùng sai** — chứ không phải
+  sửa sâu hơn cái đã sửa. Ở đây chỉ một câu hỏi đúng ("trạng thái nào khiến cả hai cùng đúng?") là ra gốc rễ,
+  sau khi đã tốn ba vòng sửa.
+- **Đường LÙI (fallback) của hàm hiển thị có thể che mất hành vi người dùng đang kiểm.** `upscaleSrc` lùi
+  sang ảnh khác để "luôn có gì đó để xem" — nhưng chính nó làm thao tác ẩn/hiện layer trở nên VÔ HÌNH. Chỗ
+  hiển thị thì phải hiển thị ĐÚNG thứ người dùng vừa thao tác, và nói rõ khi không có gì để hiện.
+- **Chế độ ẩn của ứng dụng phải TỰ KHAI.** "Chỉ hiện 1 layer" là chế độ hợp lệ, nhưng không có nhãn thì người
+  dùng đọc nó thành "ứng dụng hỏng". Một nhãn + một nút thoát rẻ hơn rất nhiều so với một vòng sửa lỗi.
+- **Một lần nữa: deploy không cập nhật tab đang mở.** Ghi lại ở đây để lần sau câu hỏi đầu tiên luôn là
+  "đã tải lại trang chưa", trước khi đi sửa mã.
+
+
 
 
 
