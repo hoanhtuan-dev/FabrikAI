@@ -834,6 +834,76 @@ hành vẫn nhận đủ hiệu ứng.
   đọc ngay sau `.click()` khi Vue chưa patch xong. Bài học: kết quả đo bất thường thì nghi cách ĐO trước khi
   nghi sản phẩm (đúng vệt với vụ ảnh chụp đen thui ở mục 14).
 
+---
+
+## 16. Đợt 12 — hiệu ứng bật/tắt layer cho ĐÚNG · gỡ "Xóa nền AI" · nút hành động luôn hiện · "Lưu Output" biết ảnh mới (2026-09-20)
+
+### 16.1 Vấn đề — đo được, không suy đoán
+
+| Sự thật | Bằng chứng (đo trên mã nguồn trước đợt này) |
+|---|---|
+| Hiệu ứng bật/tắt layer **chỉ mờ mỗi ảnh** | Lớp hiệu ứng đặt lên thẻ layer, nhưng opacity của thẻ do từng layer quy định (inline style) ⇒ CSS thua inline, nên chỉ `<img>` mờ được: **viền chọn, tay cầm kéo, nhãn nhóm đứng nguyên tới lúc phần tử bị gỡ** — đúng cảm giác "hiệu ứng chưa đúng" |
+| Nút **"Xóa nền AI · 1 credit"** vẫn nằm đó | còn nguyên cả dây chuyền: UI + popup + `store.removeBackground()` + route `POST /api/remove-bg` + `StudioController::removeBackground()` + `buildBackgroundMask()` + khai endpoint trong `ModuleRegistry` |
+| 3 nút hành động **chỉ hiện khi hover** | hai nhóm nút (hàng nhóm + hàng layer) đều `opacity-0` + `group-hover:opacity-100` ⇒ người mới không biết là có, và **trên thiết bị cảm ứng gần như không bấm được** (không có hover) |
+| Nút "Lưu Output" **không phân biệt ảnh mới với ảnh đã lưu** | bấm nhiều lần cho cùng một ảnh ⇒ **Outputs đầy bản trùng**; không có chỗ nào so ảnh đang chọn với danh sách Output |
+
+### 16.2 Đã làm
+
+1. **Bật/tắt layer cho ĐÚNG**: layer ẩn **không bị gỡ khỏi DOM** nữa mà mờ tại chỗ —
+   `opacity: calc(var(--layer-opacity, 1) * var(--layer-vis))`. Độ mờ riêng của layer nay đi qua **biến CSS**
+   (JS đặt `--layer-opacity`) nên CSS **nhân** được với hệ số ẩn/hiện, và hiệu ứng phủ **cả thẻ layer**:
+   ảnh + viền chọn + tay cầm kéo + nhãn nhóm mờ cùng nhau. Layer ẩn thêm `pointer-events: none` (bấm xuyên
+   qua như khi không có layer) và `scale: .94`. Giữ trong DOM còn giữ ảnh đã nạp ⇒ bật lại không nháy.
+2. **Gỡ trọn tính năng "Xóa nền AI"**: nút · state cục bộ · popup xác nhận · action trong store · route ·
+   `StudioController::removeBackground()` + `buildBackgroundMask()` (chỉ nó dùng) · khai endpoint trong
+   `ModuleRegistry`. **Giữ** nhánh hậu kỳ theo METADATA trong `RenderImageJob` (generation đã xếp hàng trước
+   lúc gỡ vẫn cần nó) — và ghi rõ lý do ngay tại chỗ để người sau không tưởng là mã chết.
+3. **Ba nút (khóa · nhân đôi · gỡ khỏi canvas) LUÔN hiện** ở cả hàng nhóm lẫn hàng layer: bỏ `opacity-0` và
+   `group-hover:opacity-100`.
+4. **"Lưu Output" biết ảnh mới**: getter `activeLayerInOutputs` nhận biết trùng theo **đúng thứ tự danh tính**
+   (đã lưu trong phiên → `genId` là ảnh kết quả → đường dẫn `/storage/…` so với `media_url`), và
+   `canSaveActiveLayerToOutput`. Nút **sáng màu thương hiệu khi có ảnh mới**, im khi ảnh đã có; hàm lưu
+   **chặn ngay từ đầu** (không gọi máy chủ) và **đánh dấu `savedOutputId`** sau khi lưu — vì layer ghép bằng
+   data URL không đổi danh tính sau khi lưu, không đánh dấu thì nút vẫn sáng và bấm lại là tạo bản trùng.
+
+### 16.3 Ràng buộc đã giữ
+
+- Composite/xuất ảnh vẫn dựa trên `visibleLayers` ⇒ **layer ẩn vẫn không lọt vào ảnh xuất** (chỉ đổi cách HIỂN THỊ).
+- Không đụng dữ liệu: vị trí/scale/xoay/opacity của layer giữ nguyên; không thêm endpoint nào.
+- Hiệu ứng dùng token chuyển động ⇒ tự tắt khi người dùng bật "giảm chuyển động".
+- Các đường tải ảnh khác (`Xuất PNG` · nút tải layer đang chọn ở thanh công cụ) vẫn nguyên.
+
+### 16.4 Đo được (Chrome thật 1600×1000 + phpunit)
+
+| Đo | Trước | Sau |
+|---|---|---|
+| Chuỗi opacity khi TẮT layer (mỗi 45ms) | chỉ `<img>` mờ; viền chọn/tay cầm đứng nguyên | `1 → 0.268 → 0.109 → 0.0275 → 0.0035 → 0` và `scale 1 → 0.94` — mượt, dừng đúng ở 0/0.94 |
+| Layer ẩn còn trong DOM? | bị gỡ ngay | **còn** (`div.layer-el` = 1), `pointer-events: none` |
+| Bấm vào chỗ layer ẩn | (layer đã bị gỡ) | `elementFromPoint` trả về phần tử của canvas ⇒ **không chặn chuột** |
+| Chuỗi opacity khi BẬT lại | hiện ra đột ngột | `0 → 0.305 → 0.830 → 0.955 → 0.99 → 1`; kết thúc `scale: none`, `pointer-events: auto` |
+| Nút xóa nền AI | có (kèm cả dây chuyền phía sau) | **không còn** ở UI; bảng route không còn tên `remove-bg`; controller không còn 2 phương thức |
+| 3 nút hành động lúc KHÔNG hover | `opacity: 0` | **`opacity: 1`**, hiện, 24×24 px (đo cho cả ba: khóa · nhân đôi · gỡ) |
+| "Lưu Output" với ảnh mới | `ink-800` (im) | **`rgb(45,111,77)` = brand-600** + chữ trắng + title "Lưu layer đang chọn vào Output" |
+| Sau khi lưu | vẫn sáng, bấm lại tạo bản trùng | về `rgb(47,44,35)` (im) + title "Ảnh này đã có trong Output — không lưu trùng"; bấm lần 2 ⇒ toast chặn, **không tạo bản ghi** |
+| `vendor/bin/phpunit` | 689 test / 4539 khẳng định | **692 test / 4570 khẳng định — XANH** (9 test bất biến cho khung canvas) |
+| `npm run build` | — | thoát 0; build lặp lại cho **đúng hash cũ** (tất định) |
+
+### 16.5 Bài học tự bắt được trong đợt này
+
+- **"Có class hiệu ứng" chưa chắc "hiệu ứng đúng chỗ".** Đợt trước tôi đặt lớp hiệu ứng lên thẻ layer nhưng
+  opacity của thẻ bị inline style chi phối, nên thực tế chỉ mỗi ảnh mờ — mắt thấy "chưa đúng" mà test của tôi
+  vẫn xanh vì nó chỉ kiểm *có class* và *có transition-duration*. Bài học: test phải kiểm **phần tử nào đổi
+  thuộc tính nào**, và khi một thuộc tính vừa do inline style vừa do CSS quản thì phải đưa về **một biến**.
+- **Gỡ một tính năng là gỡ cả DÂY CHUYỀN, nhưng phải biết chỗ nào CỐ Ý giữ.** Ở đây route/controller/action/
+  module/UI đều gỡ; riêng nhánh hậu kỳ trong job đọc theo metadata thì giữ vì generation đã xếp hàng trước
+  đó vẫn cần — và ghi lý do ngay tại chỗ, nếu không người sau sẽ "dọn mã chết" và làm hỏng hàng đợi cũ.
+- **Ẩn theo hover là bẫy trên thiết bị cảm ứng.** Ba nút hành động chỉ hiện khi hover: trên máy tính bảng/
+  điện thoại không có hover ⇒ không có cách nào bấm. "Gọn mắt" không đáng đánh đổi khả năng dùng được.
+- **Chống trùng phải dựa trên DANH TÍNH, và danh tính có thể KHÔNG đổi sau khi lưu.** Với layer ghép (data URL),
+  lưu xong ảnh vẫn là chính nó nên so sánh kiểu "có trong danh sách chưa" luôn trả "chưa" ⇒ phải đánh dấu
+  ngay trên layer vừa lưu.
+
+
 
 
 
