@@ -443,3 +443,83 @@ khu Cài đặt lẫn thẻ Trợ lý thiết kế trong Studio.
   ở một chỗ là người dùng **không thấy tùy chỉnh của chính mình** (baseline hiện ra như chưa từng sửa). Đã biến
   điều này thành một khẳng định trong test, và chính nó phát hiện `StylistDataManager` cũ (dùng trong Studio)
   không gọi `load()` — nếu để nguyên thì thẻ Trợ lý thiết kế sẽ hiện thiếu dữ liệu của người dùng.
+
+## 11. Đợt 7 — Ảnh ở Outputs KHÔNG lưu / KHÔNG nạp được vào Thư viện & Bộ sưu tập (2026-09-20)
+
+### 11.1 Vấn đề — đo được, không suy đoán
+
+Khiếu nại: *ảnh outputs không lưu | load từ library | bộ sưu tập*. Đo tách riêng hai chiều thì thấy
+**chỉ MỘT chiều hỏng**, và hỏng đúng ở chỗ ít ai ngờ:
+
+- **Chiều NP: ĐÚNG.** Đã kiểm chứng đầu-cuối bằng một generation thật (id 7) gắn vào dự án 1:
+  `/api/latest`, `/api/library/data` và `/api/projects/1` đều trả về nó kèm `project_id = 1`.
+  `StudioLibraryService::list()` duyệt **toàn bộ** `$user->generations()` (có phân trang) nên không hề lọc mất;
+  `LibraryApp.vue` được mount bằng `v-if` và gọi `loadLibrary(true)` trong `onMounted` — mở lại là nạp lại.
+  → Không có lỗi nào để sửa ở chiều này. *(Nếu chỉ sửa theo cảm giác thì đã sửa nhầm chỗ.)*
+- **Chiều LƯU: HỎNG.** Chỉ `/api/generate` và `/api/render-video` nhận và ghi `project_id`.
+  Bằng chứng trực tiếp: `POST /api/reframe` kèm `project_id: 1` trả **200** và tạo ảnh — nhưng dòng
+  trong CSDL có `project_id = NULL`. Endpoint **âm thầm bỏ qua** tham số, không báo lỗi.
+- Dữ liệu dev khớp với kết luận: **5 generation, 3 dự án của chủ tài khoản, 0 ảnh nào được gắn** (một trong
+  số đó chính là một ảnh `reframe`).
+
+**9 phép phái sinh không gửi/không lưu `project_id`:** inpaint, reimagine, removeBackground, refgen, compose,
+upscale, look, regionEdit, reframe (processAndStore) — cộng thêm ảnh TẢI LÊN.
+
+Hệ quả với người dùng: `store.applyProject()` hiện toast *“ảnh/video tạo mới sẽ tự gắn vào”* — một lời hứa
+bị vi phạm ở **mọi thao tác trừ tạo ảnh mới**. Người dùng sửa/nâng cấp ảnh trong một bộ sưu tập và ảnh rơi ra ngoài.
+
+### 11.2 Đã làm
+
+**a) Máy chủ — nhận và lưu `project_id` ở cả 9 phép phái sinh.**
+Thêm `resolveProjectId(Request, ?Generation $source)`: đọc `project_id` từ request; nếu id đó **không tồn tại
+hoặc không thuộc tài khoản** thì **bỏ qua** và lùi về dự án của ảnh nguồn. Cố ý **không** dùng `Rule::exists`:
+một id dự án cũ còn sót ở client sẽ làm hỏng cả thao tác sửa ảnh — hỏng nặng hơn nhiều so với việc ảnh không được gắn.
+4 chỗ tạo generation trực tiếp (regionEdit, upscale, look, processAndStore) và 5 chỗ đi qua `queueGeneration`
+(inpaint, reimagine, removeBackground, refgen, compose) đều đã nhận.
+
+**b) Máy chủ — trả `project_id` về trong phản hồi** (`queueGeneration`, `show()`, regionEdit, và cả 3 phản hồi
+`media_url/generation_id`), để client lưu được **ngay** mà không phải chờ `/api/latest`.
+
+**c) Client — gửi `project_id` ở cả 8 phép** qua `store.projectField()`, và `addGen()` tự điền `project_id`/`project`
+cho ảnh vừa tạo; `pollGeneration` đồng bộ lại khi job xong.
+
+**d) Ảnh TẢI LÊN — bảng liên kết riêng `upload_project_links`.**
+Ảnh tải lên là **FILE trên đĩa**, không có dòng nào trong CSDL (được liệt kê bằng `glob()`), nên **không thể**
+thêm cột `project_id` cho chúng. Bảng riêng với `unique(user_id, rel)`. **Cố ý KHÔNG dùng `studio_assets`**:
+đó là kho tài nguyên dùng chung cho picker “Nguồn ảnh” (model/pose/trang phục) — nhét ảnh tải lên vào đó sẽ làm
+chúng hiện nhầm trong picker. Mọi thao tác ghi đi qua đúng hai lớp của đường xoá: `normalizeUploadRel()`
+(chặn leo thư mục) và `studio_upload_visible_to()` (chặn gắn ảnh của người khác).
+Xoá file ⇒ xoá liên kết; xoá dự án ⇒ ảnh rời khỏi bộ sưu tập nhưng **không** bị xoá khỏi đĩa.
+
+**e) Giao diện** — mỗi ảnh tải lên trong Thư viện có một ô chọn bộ sưu tập (cả dạng lưới và dạng danh sách).
+
+### 11.3 Ràng buộc đã giữ
+
+- **Giữ nguyên hành vi hiện tại**: không đổi route cũ, không đổi hình dạng phản hồi cũ (chỉ **thêm** trường).
+- Client cũ gửi lên mà không có `project_id` ⇒ hành vi **y hệt trước** (không gắn gì), trừ khi ảnh nguồn đã
+  thuộc một bộ sưu tập — khi đó kết quả **ở lại** đúng bộ sưu tập đó, đúng như người dùng mong đợi.
+- Không nới lỏng `$fillable` của `Project`/`User` chỉ để tiện cho test; test đi đúng đường `unguarded` như seeder.
+
+### 11.4 Đo được
+
+- `vendor/bin/phpunit`: **658 test / 4089 khẳng định — XANH** (thêm 19 test mới: 10 cho 9 phép phái sinh, 9 cho ảnh tải lên).
+- `npm run build`: thoát 0. `node scripts/check-local-catalog.mjs`: **23/23 ĐẠT**.
+- **Chrome thật** (đăng nhập `owner@fabrikai.shop`, DOM thật): 50 ảnh tải lên đều có ô chọn bộ sưu tập với 4 lựa chọn
+  (1 “chưa gắn” + 3 dự án của tài khoản); phát sự kiện `change` như người dùng ⇒ **đúng 1** ảnh đổi, `/api/uploads`
+  trả `project_id = 1`; **tải lại trang** ⇒ vẫn `project_id = 1` và ô chọn hiện đúng dự án.
+- **Kịch bản gốc trên server dev**: `POST /api/reframe` kèm `project_id = 1` ⇒ 200, `project_id = 1` ở **cả phản hồi
+  lẫn `/api/latest`**. Trước khi sửa, đúng request đó tạo ảnh với `project_id = NULL`.
+- Ảnh vừa tạo **hiện ngay** dưới bộ lọc “chỉ outputs của dự án đang áp dụng” (trước đây vô hình cho tới lần nạp sau).
+- Dọn dẹp: dự án dev trở lại **5 generation / 0 liên kết / 5 dự án**, file test đã xoá.
+
+### 11.5 Bài học tự bắt được trong đợt này
+
+- **“Không lưu” và “không nạp” là hai lỗi khác nhau — phải đo tách ra.** Chiều nạp hoàn toàn đúng; nếu gộp chung
+  rồi sửa cả hai thì vừa mất công vừa có nguy cơ làm hỏng phần đang chạy tốt.
+- **Tham số bị bỏ qua âm thầm nguy hiểm hơn tham số bị từ chối.** Endpoint trả 200 nên không ai nghi ngờ;
+  chỉ khi đọc thẳng dòng trong CSDL mới thấy `NULL`. Bài test mới khoá đúng chỗ đó.
+- **Nhất quán giữa hai loại dữ liệu cùng nằm một chỗ.** Ảnh AI tạo và ảnh người dùng tải lên nằm chung một Thư viện;
+  chỉ một loại vào được bộ sưu tập là điều vô lý với người dùng, dù về kỹ thuật chúng khác nhau hoàn toàn
+  (một loại là dòng CSDL, một loại là file trên đĩa).
+- **Không nới bảo mật để tiện.** `studio_assets` là đường tắt hấp dẫn nhưng sẽ làm rò ảnh cá nhân vào picker chung;
+  và mọi thao tác ghi lên ảnh tải lên đều phải đi qua đúng hai lớp kiểm tra mà đường xoá đang dùng.
