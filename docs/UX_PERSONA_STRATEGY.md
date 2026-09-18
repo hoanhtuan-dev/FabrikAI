@@ -1149,6 +1149,7 @@ nhiều lần deploy: chỉ cần một công cụ canvas đang bật là mọi 
 | Kéo tay cầm trong chế độ đó | (không có) | scale **1 → 1.25** |
 | Bấm con mắt để ẩn layer đang chọn | canvas không đổi (ảnh dự phòng) | **ảnh lớn trên canvas: 1 → 0** + hiện dòng "đang bị ẨN" |
 | Nút "Thoát" trên nhãn chế độ | (không có nhãn) | thoát công cụ, nhãn biến mất, **cả 2 layer hiện lại** |
+| Bỏ chọn hết (canvas có layer) | tay cầm 0, **không nói gì** | tay cầm 0 **kèm nhãn** "Chưa chọn layer nào — bấm vào một layer (hoặc một hàng trong bảng Lớp) để chỉnh kích cỡ · xoay"; chọn lại ⇒ tay cầm trở về |
 | `vendor/bin/phpunit` | 698 test / 4639 khẳng định | **699 test / 4646 khẳng định — XANH** (16 test bất biến cho khung canvas) |
 
 ### 20.4 Bài học tự bắt được trong đợt này

@@ -1264,6 +1264,14 @@ function onTouchEnd(e) {
               <button @click="store.exitCanvasTools()" class="rounded-full bg-amber-400/20 px-1.5 py-0.5 hover:bg-amber-400/35" title="Thoát công cụ để thấy toàn bộ canvas">Thoát</button>
             </div>
           </div>
+          <!-- Nhãn "chưa chọn layer": bấm ra vùng trống là BỎ CHỌN, mà không có layer đang chọn thì không
+               có tay cầm chỉnh kích cỡ — không nói rõ thì người dùng tưởng tay cầm biến mất. -->
+          <div v-if="!store.activeLayer && store.visibleLayers.length && !isolateActive" class="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2">
+            <div class="flex items-center gap-1.5 rounded-full border border-ink-600 bg-ink-900/95 px-2.5 py-1 text-[10px] font-semibold text-cream-200 shadow-lg">
+              <StudioIcon name="cursor" size="h-3 w-3" class="shrink-0 text-brand-300" />
+              <span>Chưa chọn layer nào — bấm vào một layer (hoặc một hàng trong bảng Lớp) để chỉnh kích cỡ · xoay</span>
+            </div>
+          </div>
           <div ref="canvasZoom" class="absolute inset-0" :class="store.selectTool ? 'cursor-crosshair active:cursor-crosshair' : 'cursor-grab active:cursor-grabbing'" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="onCanvasBgMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="onCanvasBgUp($event)" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
             <!-- Chế độ isolate (crop/inpaint/erase): chỉ khi có layer active — không có layer thì hiện composite (không ẩn hết) -->
             <div v-if="isolateActive && store.activeLayer" class="absolute inset-0">

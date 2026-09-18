@@ -460,4 +460,19 @@ class CanvasControlsTest extends TestCase
         $this->assertStringContainsString('isolateToolLabel', $app, 'Nhãn chế độ phải nói rõ công cụ nào đang bật.');
         $this->assertStringContainsString('store.exitCanvasTools()', $app, 'Thiếu nút thoát công cụ để thấy lại toàn bộ canvas.');
     }
+
+    public function test_canvas_says_when_no_layer_is_selected(): void
+    {
+        $app = $this->src('js/studio/StudioApp.vue');
+
+        // Bấm ra vùng trống là BỎ CHỌN (hành vi sẵn có); không có layer đang chọn thì không có tay cầm
+        // chỉnh kích cỡ. Không nói rõ thì người dùng đọc thành "tay cầm biến mất".
+        $this->assertMatchesRegularExpression(
+            '/v-if="!store.activeLayer && store.visibleLayers.length && !isolateActive"/',
+            $app,
+            'Thiếu nhãn "chưa chọn layer nào" khi canvas có layer nhưng không layer nào đang chọn.'
+        );
+        $this->assertStringContainsString('Chưa chọn layer nào', $app,
+            'Nhãn phải nói rõ cách lấy lại tay cầm (bấm vào một layer hoặc một hàng trong bảng Lớp).');
+    }
 }
