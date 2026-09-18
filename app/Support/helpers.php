@@ -1941,7 +1941,7 @@ if (! function_exists('studio_task_groups')) {
             'video' => ['label' => 'Video catwalk (Kịch bản quay)', 'legacy_default' => fn () => 'wan:'.(string) studio_config('video_model', 'wan3.0-video')],
             // Nhóm 'swap' giữ nguyên KEY (nhiều nơi đọc) nhưng ĐỔI NHÃN: từ 2026-09-17 card "Thay
             // người mẫu" đã bị gỡ, nhóm này chỉ còn phục vụ đường thử đồ của Fitting Room
-            // (VirtualTryOnService) và swapEdit (remove-bg / xoá người khỏi ảnh).
+            // (VirtualTryOnService) và swapEdit (đổi/xoá người trong ảnh).
             'swap' => ['label' => 'Thử đồ / ghép người mẫu (Fitting Room)', 'legacy_default' => fn () => 'qwen:'.studio_swap_model()],
             'vision' => ['label' => 'Đọc ảnh (mô tả khuôn mặt / dáng / phân tích)', 'legacy_default' => fn () => 'qwen:'.(string) studio_config('qwen_vision_model', 'qwen3.8-flash')],
             'prompt' => ['label' => 'Suy luận prompt (Giám đốc sáng tạo / Thuật sỹ ảo)', 'legacy_default' => function () {

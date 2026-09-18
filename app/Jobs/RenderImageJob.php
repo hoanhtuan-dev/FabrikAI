@@ -80,9 +80,12 @@ class RenderImageJob implements ShouldQueue
                 if ($pasted) { $url = $pasted; }
             }
 
-            // Xóa nền AI: hậu kỳ cắt nền thành trong suốt (PNG alpha).
+            // Cắt nền trong suốt (PNG alpha) — hậu kỳ theo METADATA của generation.
             // Có mask lasso → cắt theo mask; KHÔNG có mask → tự nhận diện nền trắng (auto).
             // Lỗi → fallback ảnh không trong suốt.
+            // [2026-09-20] Nút "Xóa nền AI" đã bị gỡ nên KHÔNG còn đường nào tạo mode 'remove-bg' MỚI;
+            // nhánh này được GIỮ vì nó đọc metadata của generation đã xếp hàng TRƯỚC lúc gỡ — xoá đi thì
+            // một generation đang chờ sẽ mất hậu kỳ trong suốt (kết quả vẫn ra, nhưng sai định dạng).
             if (($genMeta['mode'] ?? '') === 'remove-bg') {
                 try {
                     $transparent = $generation->mask_image

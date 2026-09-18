@@ -85,8 +85,9 @@ class ModuleRegistry
             'id' => 'inpaint', 'name' => 'Sửa ảnh', 'group' => 'Chỉnh ảnh',
             'kind' => self::KIND_PANEL, 'gui' => true, 'icon' => 'pencil',
             'summary' => 'Xoá/thay chi tiết trong ảnh bằng vùng chọn hoặc mô tả.',
-            // Đường thật của Sửa ảnh: inpaint toàn ảnh · vùng chọn · xoá nền.
-            'endpoints' => ['inpaint', 'generations/{generation}/inpaint', 'generations/{generation}/region', 'remove-bg'],
+            // Đường thật của Sửa ảnh: inpaint toàn ảnh · vùng chọn.
+            // (Đường xóa nền đã gỡ cùng nút của nó trong bảng Lớp — xem ghi chú ở LayersPanel.vue.)
+            'endpoints' => ['inpaint', 'generations/{generation}/inpaint', 'generations/{generation}/region'],
             'depends_on' => [],
             'plans' => ['*'],
         ],

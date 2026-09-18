@@ -387,19 +387,24 @@
     .canvas-bg-cream { background: var(--color-cream-100); }
 
     /* ── 3. BẬT/TẮT LAYER (nút con mắt ở bảng Lớp) ───────────────────────────────────────
-       Layer bị ẩn là bị GỠ khỏi danh sách hiển thị; để mặc định thì nó biến mất tức thì — bấm mắt
-       xong không thấy vừa tắt cái gì, và bật lại cũng "hiện ra đột ngột".
-       Lưu ý kỹ thuật: hiệu ứng opacity đặt lên <img> BÊN TRONG thẻ layer, vì chính thẻ đó đã mang
-       opacity riêng của từng layer (inline style) nên nó không thể tự chuyển động opacity được —
-       còn scale thì đặt lên thẻ (Tailwind v4 dùng thuộc tính riêng, không đụng transform inline). */
-    .layer-vis-enter-active, .layer-vis-leave-active {
-        transition: scale var(--motion-dur-base) var(--motion-ease-emphasized);
+       Layer ẩn KHÔNG bị gỡ khỏi DOM — nó mờ đi tại chỗ. Vì sao không gỡ: (a) hiệu ứng phải phủ CẢ thẻ
+       layer (ảnh + viền chọn + tay cầm kéo + nhãn nhóm), mà opacity của thẻ do từng layer quy định
+       nên cách "chỉ mờ mỗi <img>" để lại viền chọn và tay cầm đứng nguyên tới lúc phần tử bị gỡ —
+       đúng cảm giác hiệu ứng chưa đúng; (b) gỡ rồi dựng lại là ảnh bị nạp lại/nháy khi bật lại;
+       (c) mỗi lần bấm mắt lại sinh phần tử mới trong khi dữ liệu (vị trí, scale, xoay) không đổi.
+       Độ mờ = độ mờ riêng của layer (--layer-opacity do JS đặt) × hệ số ẩn/hiện --layer-vis. */
+    .layer-el {
+        --layer-vis: 1;
+        opacity: calc(var(--layer-opacity, 1) * var(--layer-vis));
+        transition: opacity var(--motion-dur-base) var(--motion-ease-standard),
+                    scale var(--motion-dur-base) var(--motion-ease-emphasized);
     }
-    .layer-vis-enter-active img, .layer-vis-leave-active img {
-        transition: opacity var(--motion-dur-base) var(--motion-ease-standard);
+    /* Layer đã tắt: mờ hẳn, thu nhẹ, và KHÔNG nhận chuột nữa (bấm xuyên qua như khi không có layer). */
+    .layer-el--hidden {
+        --layer-vis: 0;
+        scale: 0.94;
+        pointer-events: none;
     }
-    .layer-vis-enter-from, .layer-vis-leave-to { scale: 0.94; }
-    .layer-vis-enter-from img, .layer-vis-leave-to img { opacity: 0; }
 
     /* ── 4. Hiệu ứng XUẤT HIỆN cho lớp phủ · ngăn kéo · popup ───────────────
        Đặt lên phần tử được mount bằng v-if: nó chạy một lần lúc xuất hiện. */

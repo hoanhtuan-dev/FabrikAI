@@ -143,22 +143,36 @@ class CanvasControlsTest extends TestCase
         $css = $this->src('css/app.css');
         $layers = $this->vue('LayersPanel.vue');
 
-        // Layer ẩn bị gỡ khỏi danh sách hiển thị ⇒ cần TransitionGroup mới có hiệu ứng vào/ra.
-        $this->assertStringContainsString('<TransitionGroup', $app,
-            'Danh sách layer trên canvas phải dùng TransitionGroup để bật/tắt có hiệu ứng.');
-        foreach (['layer-vis-enter-active', 'layer-vis-enter-from', 'layer-vis-leave-active', 'layer-vis-leave-to'] as $cls) {
-            $this->assertStringContainsString($cls, $app, "Thiếu lớp hiệu ứng $cls khi bật/tắt layer.");
-            $this->assertStringContainsString('.'.$cls, $css, "app.css thiếu định nghĩa .$cls.");
-        }
+        // Layer ẩn KHÔNG bị gỡ khỏi DOM: vòng lặp phải đi qua TOÀN BỘ canvasLayers và đánh dấu layer ẩn.
+        $this->assertStringContainsString('v-for="(l, i) in store.canvasLayers"', $app,
+            'Layer ẩn phải được giữ trong DOM (mờ đi tại chỗ). Nếu duyệt visibleLayers thì layer ẩn bị gỡ '
+            .'ngay lập tức và không thể có hiệu ứng phủ cả thẻ layer.');
+        $this->assertStringContainsString('class="layer-el absolute left-0 top-0"', $app,
+            'Thẻ layer phải mang class .layer-el để CSS lo phần mờ/thu.');
+        $this->assertStringContainsString(":class=\"l.visible === false ? 'layer-el--hidden' : ''\"", $app,
+            'Thiếu dấu hiệu layer đang tắt (.layer-el--hidden).');
 
-        // Hiệu ứng phải theo TOKEN chung (và do đó tắt được bằng công tắc giảm chuyển động).
-        preg_match('/\.layer-vis-enter-active[^{]*\{([^}]*)\}/', $css, $m);
-        $this->assertNotEmpty($m[1] ?? '', 'Không đọc được định nghĩa .layer-vis-enter-active.');
-        $this->assertStringContainsString('var(--motion-dur-', $m[1], 'Hiệu ứng bật/tắt layer phải dùng token, không viết số ms.');
+        // CSS: độ mờ = độ mờ riêng của layer × hệ số ẩn/hiện, và theo TOKEN chung.
+        preg_match('/\.layer-el\s*\{([^}]*)\}/', $css, $m);
+        $this->assertNotEmpty($m[1] ?? '', 'app.css thiếu định nghĩa .layer-el.');
+        $this->assertStringContainsString('calc(var(--layer-opacity, 1) * var(--layer-vis))', $m[1],
+            'Độ mờ phải nhân độ mờ riêng của layer với hệ số ẩn/hiện (nếu không, layer có opacity riêng sẽ mờ sai).');
+        $this->assertStringContainsString('var(--motion-dur-', $m[1],
+            'Hiệu ứng bật/tắt layer phải dùng token chuyển động, không viết số ms.');
 
-        // Opacity của layer do inline style giữ ⇒ hiệu ứng mờ phải đặt lên <img> bên trong.
-        $this->assertMatchesRegularExpression('/\.layer-vis-(?:enter-from|leave-to)\s+img\s*\{[^}]*opacity:\s*0/s', $css,
-            'Hiệu ứng mờ phải đặt lên <img> bên trong thẻ layer (thẻ layer đã có opacity riêng theo từng layer).');
+        preg_match('/\.layer-el--hidden\s*\{([^}]*)\}/', $css, $hidden);
+        $this->assertNotEmpty($hidden[1] ?? '', 'app.css thiếu .layer-el--hidden.');
+        $this->assertStringContainsString('--layer-vis: 0', $hidden[1], 'Layer đã tắt phải có hệ số mờ bằng 0.');
+        $this->assertStringContainsString('pointer-events: none', $hidden[1],
+            'Layer đã tắt không được nhận chuột — nếu không, nó chặn cả canvas dù vô hình.');
+
+        // Opacity riêng của layer phải đi qua BIẾN, không ghi thẳng 'opacity' (ghi thẳng là CSS thua inline style).
+        preg_match('/function layerStyle\(l, i\)\s*\{(.*?)\n\}/s', $app, $ls);
+        $this->assertNotEmpty($ls[1] ?? '', 'Không đọc được layerStyle().');
+        $this->assertStringContainsString("'--layer-opacity'", $ls[1],
+            'layerStyle phải đưa độ mờ vào biến --layer-opacity để CSS nhân được với hệ số ẩn/hiện.');
+        $this->assertStringNotContainsString('opacity:', $ls[1],
+            'layerStyle KHÔNG được ghi thẳng opacity — inline style sẽ đè mất hiệu ứng mờ của CSS.');
 
         // Hàng trong bảng Lớp cũng phải mờ dần khi ẩn layer, không đổi tức thì.
         $this->assertMatchesRegularExpression('/class="motion-ui[^"]*group flex items-center/', $layers,
@@ -171,12 +185,88 @@ class CanvasControlsTest extends TestCase
         $css = (string) file_get_contents(base_path('public_html/build/'.$manifest['resources/css/app.css']['file']));
         $js = (string) file_get_contents(base_path('public_html/build/'.$manifest['resources/js/studio/main.js']['file']));
 
-        foreach (['.canvas-bg-grid', '.canvas-bg-cream', '.layer-vis-enter-active', '.motion-pop-in'] as $needle) {
+        foreach (['.canvas-bg-grid', '.canvas-bg-cream', '.layer-el--hidden', '.motion-pop-in'] as $needle) {
             $this->assertStringContainsString($needle, $css, "CSS đã build thiếu $needle — chạy lại npm run build.");
         }
-        foreach (['canvas-bg-', 'layer-vis-enter-active', 'selectionUnitLabels', 'lockedSelectionCount'] as $needle) {
+        foreach (['canvas-bg-', 'layer-el--hidden', 'selectionUnitLabels', 'lockedSelectionCount'] as $needle) {
             $this->assertStringContainsString($needle, $js, "JS đã build thiếu $needle — chạy lại npm run build.");
         }
         $this->assertStringNotContainsString('Tải ảnh đang chọn', $js, 'Bundle vẫn còn nút "Tải ảnh đang chọn".');
+    }
+
+    public function test_remove_background_feature_is_gone_everywhere(): void
+    {
+        // Gỡ nút thì phải gỡ CẢ DÂY CHUYỀN — để lại route/controller/action là mã chết vẫn gọi được.
+        $layers = $this->vue('LayersPanel.vue');
+        $store = $this->src('js/studio/store.js');
+
+        $this->assertStringNotContainsString('Xóa nền AI', $layers, 'Bảng Lớp vẫn còn nút "Xóa nền AI".');
+        $this->assertStringNotContainsString('removeBgConfirmOpen', $layers, 'Còn state popup xác nhận xóa nền.');
+        $this->assertStringNotContainsString('removeBackground', $store, 'store.js vẫn còn action removeBackground().');
+
+        $controller = (string) file_get_contents(app_path('Http/Controllers/StudioController.php'));
+        $this->assertStringNotContainsString('function removeBackground(', $controller, 'Controller vẫn còn removeBackground().');
+        $this->assertStringNotContainsString('function buildBackgroundMask(', $controller, 'buildBackgroundMask() chỉ phục vụ xóa nền ⇒ phải gỡ.');
+
+        $routes = (string) file_get_contents(base_path('routes/web.php'));
+        $this->assertStringNotContainsString("'/remove-bg'", $routes, 'routes/web.php vẫn còn route /remove-bg.');
+
+        $registry = (string) file_get_contents(app_path('Support/ModuleRegistry.php'));
+        $this->assertStringNotContainsString("'remove-bg'", $registry, 'ModuleRegistry vẫn khai endpoint remove-bg.');
+
+        // Và kiểm bằng chính bảng route đang chạy: không còn đường nào tên remove-bg.
+        $names = array_map(static fn ($r) => $r->getName(), app('router')->getRoutes()->getRoutes());
+        $this->assertNotContains('remove-bg', $names, 'Bảng route vẫn còn route tên remove-bg.');
+
+        // Hậu kỳ theo METADATA trong job thì GIỮ (generation xếp hàng trước lúc gỡ vẫn cần nó) — nhưng phải
+        // nói rõ vì sao còn, nếu không người sau sẽ tưởng là mã chết rồi xoá.
+        $job = (string) file_get_contents(app_path('Jobs/RenderImageJob.php'));
+        $this->assertStringContainsString("=== 'remove-bg'", $job, 'Thiếu hậu kỳ remove-bg cho generation đã xếp hàng trước đó.');
+        $this->assertStringContainsString('KHÔNG còn đường nào tạo mode', $job,
+            'Phải ghi rõ vì sao nhánh remove-bg trong job vẫn được giữ.');
+    }
+
+    public function test_layer_row_buttons_are_always_visible(): void
+    {
+        $layers = $this->vue('LayersPanel.vue');
+
+        // Ba nút (khóa · nhân đôi · gỡ) phải LUÔN hiện: trước đây chúng opacity-0 + chỉ hiện khi hover
+        // ⇒ không ai biết là có, và trên thiết bị cảm ứng thì gần như không bấm được.
+        $this->assertStringNotContainsString('group-hover:opacity-100', $layers,
+            'Nút trong bảng Lớp không được ẩn chờ hover nữa.');
+        $this->assertStringNotContainsString('opacity-0 transition-opacity', $layers,
+            'Bỏ lớp opacity-0 của nhóm nút hành động trong bảng Lớp.');
+
+        // Vẫn phải đủ 3 hành động, và nhóm layer cũng vậy.
+        foreach (['toggleLayerLock', 'duplicateLayer', 'deleteLayer', 'toggleGroupLock', 'duplicateGroup', 'deleteGroup'] as $action) {
+            $this->assertStringContainsString($action, $layers, "Thiếu hành động $action trong bảng Lớp.");
+        }
+    }
+
+    public function test_save_output_is_lit_only_for_new_images(): void
+    {
+        $store = $this->src('js/studio/store.js');
+        $layers = $this->vue('LayersPanel.vue');
+
+        // Nhận biết "đã có trong Output" theo ĐÚNG thứ tự danh tính của ảnh.
+        $this->assertStringContainsString('activeLayerInOutputs()', $store, 'Thiếu getter biết ảnh đã có trong Output.');
+        foreach (['savedOutputId', 'l.genId', 'media_url'] as $needle) {
+            $this->assertStringContainsString($needle, $store, "Thiếu cách nhận biết trùng qua $needle.");
+        }
+        $this->assertStringContainsString('canSaveActiveLayerToOutput()', $store, 'Thiếu getter "có ảnh mới để lưu".');
+
+        // Chặn lưu trùng NGAY ĐẦU hàm (không gọi máy chủ) + đánh dấu sau khi lưu thành công.
+        preg_match('/async saveActiveLayerToOutput\(\)\s*\{(.*?)\n    \},/s', $store, $m);
+        $this->assertNotEmpty($m[1] ?? '', 'Không đọc được saveActiveLayerToOutput().');
+        $this->assertStringContainsString('if (this.activeLayerInOutputs)', $m[1],
+            'Hàm lưu phải tự chặn khi ảnh đã có trong Output — nút im không đủ, người dùng còn bấm được bằng phím/khác đường.');
+        $this->assertStringContainsString('savedOutputId =', $m[1],
+            'Sau khi lưu phải ĐÁNH DẤU layer đã có bản trong Output (layer ghép data URL không đổi danh tính).');
+
+        // Nút phải phản ánh đúng trạng thái đó.
+        $this->assertStringContainsString('store.canSaveActiveLayerToOutput', $layers,
+            'Nút "Lưu Output" phải sáng theo trạng thái có ảnh mới hay không.');
+        $this->assertStringContainsString('bg-brand-600 text-white', $layers,
+            'Trạng thái có ảnh mới phải là nút SÁNG (màu thương hiệu).');
     }
 }

@@ -142,7 +142,6 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::post('/refgen', [StudioController::class, 'refgen'])->name('refgen');
     Route::post('/compose', [StudioController::class, 'compose'])->name('compose');
     Route::post('/compose/preview', [StudioController::class, 'composePreview'])->name('compose.preview');
-    Route::post('/remove-bg', [StudioController::class, 'removeBackground'])->name('remove-bg');
     Route::post('/generations/{generation}/region', [StudioController::class, 'regionEdit'])->name('region');
     Route::post('/process', [StudioController::class, 'processQueue'])->name('process');
 

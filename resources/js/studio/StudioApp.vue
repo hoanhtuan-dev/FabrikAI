@@ -484,7 +484,10 @@ function layerStyle(l, i) {
   return {
     transform: store.layerTransformStyle(l),
     transformOrigin: 'center',
-    opacity: l.opacity != null ? l.opacity : 1,
+    // Độ mờ riêng của layer đưa vào BIẾN CSS (không ghi thẳng 'opacity') để CSS nhân nó với hệ số
+    // ẩn/hiện --layer-vis: nhờ vậy bật/tắt layer mờ được CẢ thẻ (viền chọn, tay cầm, nhãn nhóm)
+    // chứ không chỉ mỗi ảnh — xem .layer-el trong app.css.
+    '--layer-opacity': String(l.opacity != null ? l.opacity : 1),
     mixBlendMode: (l.blend && l.blend !== 'normal') ? l.blend : 'normal',
     zIndex: i + 1,
   };
@@ -1111,21 +1114,18 @@ function onTouchEnd(e) {
               </div>
               <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
             </div>
-            <!-- Chế độ stack: composite tất cả layer đang hiển thị.
-                 TransitionGroup: bật/tắt layer (nút con mắt) phải có hiệu ứng — layer ẩn bị gỡ khỏi
-                 danh sách hiển thị nên mặc định nó biến mất tức thì, bấm mắt xong không thấy vừa tắt
-                 cái gì. Lớp hiệu ứng (.layer-vis-*) nằm ở app.css, dùng chung token chuyển động. -->
+            <!-- Chế độ stack: composite tất cả layer.
+                 BẬT/TẮT LAYER ẩn/hiện bằng CHÍNH thẻ layer (class .layer-el / .layer-el--hidden):
+                 layer ẩn KHÔNG bị gỡ khỏi DOM mà mờ đi. Vì sao không dùng TransitionGroup cho gọn:
+                 hiệu ứng phải phủ CẢ thẻ (ảnh + viền chọn + tay cầm kéo + nhãn nhóm) — TransitionGroup
+                 chỉ đặt lớp hiệu ứng lên thẻ, mà opacity của thẻ lại do từng layer quy định (inline
+                 style), nên chỉ <img> mờ được còn viền chọn/tay cầm vẫn đứng nguyên tới lúc bị gỡ →
+                 đúng cảm giác "hiệu ứng chưa đúng". Giữ trong DOM còn giữ luôn ảnh đã nạp (không nháy
+                 lại khi bật) và không dựng lại phần tử mỗi lần bấm mắt.
+                 Layer ẩn bị chặn pointer (pointer-events:none) nên vẫn bấm xuyên qua được như cũ. -->
             <div v-else class="absolute inset-0">
-              <TransitionGroup
-                tag="div"
-                class="absolute left-1/2 top-1/2"
-                :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }"
-                enter-active-class="layer-vis-enter-active"
-                enter-from-class="layer-vis-enter-from"
-                leave-active-class="layer-vis-leave-active"
-                leave-to-class="layer-vis-leave-to"
-              >
-                <div v-for="(l, i) in store.visibleLayers" :key="l.id" class="absolute left-0 top-0" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
+              <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
+                <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="layer-el absolute left-0 top-0" :class="l.visible === false ? 'layer-el--hidden' : ''" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
                   <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :title="l.groupId ? 'Thuộc nhóm — Alt+click để chỉnh sửa riêng layer này' : l.name" :class="[l.id === store.activeLayerId ? 'outline outline-2 -outline-offset-2 outline-sky-400' : (store.isSelected(l.id) ? 'outline outline-2 -outline-offset-2 outline-sky-400/70' : ''), l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']" draggable="false" />
                   <template v-if="l.id === store.activeLayerId && !l.locked">
                     <div class="absolute -bottom-3 -right-3 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onScalePointerDown(l, $event)" title="Kéo để phóng to/thu nhỏ"></div>
@@ -1142,7 +1142,7 @@ function onTouchEnd(e) {
                     </span>
                   </template>
                 </div>
-              </TransitionGroup>
+              </div>
               <CanvasEmptyState v-if="!store.visibleLayers.length && !store.generating" />
             </div>
             <!-- Overlay canvas xóa: bám đúng vùng ảnh hiển thị (chịu zoom/pan) -->

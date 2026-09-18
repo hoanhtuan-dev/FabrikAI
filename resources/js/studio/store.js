@@ -389,6 +389,30 @@ export const useStudioStore = defineStore('studio', {
     },
     // Số đối tượng đang chọn bị KHÓA — hiện trước khi bấm xóa để không "xóa mà im lặng bỏ qua".
     lockedSelectionCount() { return this._selectionUnits().filter((u) => u.layers.some((l) => l.locked)).length; },
+    /**
+     * Ảnh của layer ĐANG CHỌN đã có trong Output chưa?
+     *
+     * Vì sao cần: nút "Lưu Output" phải SÁNG khi có ảnh MỚI và phải im khi ảnh đã có — nếu không,
+     * người dùng bấm Lưu nhiều lần cho cùng một ảnh và Outputs đầy bản trùng. Ba cách nhận biết, theo
+     * đúng thứ tự danh tính của ảnh:
+     *   1. Đã lưu trong phiên này (l.savedOutputId) → chắc chắn trùng, không cần đoán;
+     *   2. Layer vốn là một ảnh KẾT QUẢ (l.genId) → trùng khi generation đó còn trong danh sách;
+     *   3. Ảnh đã nằm trên máy chủ (/storage/…) → so ĐƯỜNG DẪN với media_url của các kết quả.
+     * Layer ghép cục bộ (data URL) chưa từng lưu thì không thể trùng ⇒ trả false.
+     */
+    activeLayerInOutputs() {
+      const l = this.activeLayer;
+      if (!l || !l.image) return false;
+      if (l.savedOutputId && this.generations.some((g) => Number(g.id) === Number(l.savedOutputId))) return true;
+      if (l.genId && this.generations.some((g) => Number(g.id) === Number(l.genId))) return true;
+      const img = String(l.image);
+      const isServerUrl = img.startsWith('/storage/') || (typeof location !== 'undefined' && img.startsWith(location.origin + '/storage/'));
+      if (!isServerUrl) return false;
+      const rel = typeof location !== 'undefined' ? img.replace(location.origin, '') : img;
+      return this.generations.some((g) => g.media_url && String(g.media_url).replace(typeof location !== 'undefined' ? location.origin : '', '') === rel);
+    },
+    // Có ảnh MỚI để lưu vào Output không (nút "Lưu Output" chỉ sáng khi true).
+    canSaveActiveLayerToOutput() { return !!(this.activeLayer && this.activeLayer.image) && !this.activeLayerInOutputs; },
     visibleLayers() { return this.canvasLayers.filter(l => l.visible !== false); },
     // Danh sách layer hiển thị front-first (layer TRƯỚC NHẤT ở trên cùng) — chuẩn trình chỉnh
     // ảnh. canvasLayers giữ thứ tự vẽ (zIndex), getter này chỉ đảo để hiển thị panel.
@@ -996,25 +1020,7 @@ export const useStudioStore = defineStore('studio', {
         return items;
       } catch (e) { this.toast(e.message || 'Lỗi tạo ảnh từ ảnh mẫu.', 'error'); return null; }
     },
-    // Xóa nền AI: giữ chủ thể (vùng chọn hiện tại nếu có), xóa nền bằng model edit.
-    async removeBackground() {
-      const l = this.activeLayer;
-      if (!l || !l.image) { this.toast('Chọn 1 layer ảnh để xóa nền.', 'error'); return null; }
-      try {
-        const d = await this.api('/api/remove-bg', {
-          image: l.image,
-          mask_data: this.inpaintBrushData || undefined, // lasso tuỳ chọn — không có thì AI tự nhận diện chủ thể
-          prompt: '',
-          ...this.projectField(),
-        });
-        if (d.generation_id) {
-          this.addGen({ id: d.generation_id, type: 'image', status: d.status || 'pending', model: d.model || 'qwen-image-edit', provider: d.provider || 'qwen', media_url: d.media_url, error: d.error, credits_cost: d.credits_cost ?? 1, created_at: 'Vừa xóa nền' });
-          if (d.credits_left != null) this.creditsLeft = d.credits_left;
-          this.pollGeneration(d.generation_id);
-        }
-        return d;
-      } catch (e) { this.toast(e.message || 'Lỗi xóa nền.', 'error'); return null; }
-    },
+    // (Đã gỡ action xóa nền AI cùng nút của nó — xem ghi chú ở bảng Lớp.)
     // i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend).
     async compose(images, prompt, variants = 1, mode = 'compose', creativeLevel = 6, style = '', ornamentLevel = 3, overridePrompt = '') {
       if (!Array.isArray(images) || images.length < 2 || !(prompt || '').trim()) { this.toast('Chọn ít nhất 2 ảnh + nhập mô tả.', 'error'); return null; }
@@ -2319,6 +2325,8 @@ export const useStudioStore = defineStore('studio', {
     async saveActiveLayerToOutput() {
       const l = this.activeLayer;
       if (!l || !l.image) { this.toast('Chưa có layer để lưu.', 'error'); return; }
+      // KHÔNG lưu trùng: ảnh đã có trong Output thì dừng ngay, không gọi máy chủ (tránh rác Outputs).
+      if (this.activeLayerInOutputs) { this.toast('Ảnh này đã có trong Output — không lưu trùng.', 'error'); return; }
       try {
         // Ảnh ĐÃ nằm trên máy chủ (layer lấy từ Output / ảnh nguồn) ⇒ gửi ĐƯỜNG DẪN, KHÔNG tải lại byte nào.
         // Trước đây luôn tải lên lại: đo thật layer 2K ≈ 0,9 MB và layer ghép 2400×2400 ≈ 4,4 MB cho MỘT
@@ -2354,6 +2362,10 @@ export const useStudioStore = defineStore('studio', {
           created_at: 'Vừa lưu', project_id: d.project_id ?? null,
           project: (d.project_id && this.appliedProject && Number(this.appliedProject.id) === Number(d.project_id)) ? this.appliedProject.name : null,
         });
+        // Đánh dấu NGAY layer này đã có bản trong Output ⇒ nút "Lưu Output" hết sáng, và lần bấm sau
+        // bị chặn bởi activeLayerInOutputs (layer ghép bằng data URL không đổi danh tính sau khi lưu,
+        // nên nếu không đánh dấu thì người dùng vẫn thấy nút sáng và bấm lại sẽ tạo bản trùng).
+        l.savedOutputId = d.generation_id;
         this.toast('Đã lưu layer vào Output và Thư viện.');
       } catch (e) { this.toast(e.message || 'Không lưu được.', 'error'); }
     },

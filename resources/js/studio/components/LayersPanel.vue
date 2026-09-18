@@ -83,9 +83,8 @@ async function copyColor(c) {
   try { await navigator.clipboard.writeText(c); store.toast('Đã chọn màu ' + c); } catch (e) { store.toast('Lỗi copy.', 'error'); }
 }
 
-// Modal xác nhận Xóa nền AI (nội bộ panel) — markup y hệt StudioApp :542-551.
-const removeBgConfirmOpen = ref(false);
-function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackground(); }
+// (Đã gỡ modal xác nhận của tính năng xóa nền cùng nút gọi nó — xem ghi chú ở cuối khối 3 trong template.)
+// (Hàm doRemoveBg() cũng đã gỡ cùng tính năng xóa nền.)
 </script>
 
 <template>
@@ -156,7 +155,10 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
             <span v-else class="min-w-0 flex-1 truncate text-[11px] font-semibold text-cream-100" :title="'Nhóm: ' + groupName(l.groupId) + ' — nhấn đúp để đổi tên'" @dblclick.stop="startGroupRename(l.groupId)">{{ groupName(l.groupId) }}</span>
             <span class="shrink-0 rounded bg-ink-700 px-1 text-[9px] text-cream-300/70">{{ groupCount(l.groupId) }}</span>
             <button @click.stop="store.ungroupGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300 hover:bg-red-600/25 hover:text-red-200" :title="'Tách nhóm ' + groupName(l.groupId)"><StudioIcon name="unlink" size="h-3.5 w-3.5" /></button>
-            <div class="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+            <!-- [2026-09-20] Ba nút (khóa · nhân đôi · gỡ) LUÔN hiện. Trước đây chúng opacity-0 và chỉ
+                 hiện khi hover ⇒ người dùng không biết là có, và trên thiết bị cảm ứng thì gần như không
+                 bấm được (không có hover). -->
+            <div class="flex items-center gap-0.5">
               <button @click.stop="store.toggleGroupLock(l.groupId)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" :title="groupLocked(l.groupId) ? 'Mở khóa nhóm' : 'Khóa nhóm'" :aria-label="groupLocked(l.groupId) ? 'Mở khóa nhóm' : 'Khóa nhóm'"><StudioIcon :name="groupLocked(l.groupId) ? 'lock' : 'lockOpen'" size="h-3.5 w-3.5" /></button>
               <button @click.stop="store.duplicateGroup(l.groupId)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Nhân đôi nhóm" aria-label="Nhân đôi nhóm"><StudioIcon name="copy" size="h-3.5 w-3.5" /></button>
               <button @click.stop="store.deleteGroup(l.groupId)" class="grid h-6 w-6 place-items-center rounded bg-red-600/25 text-red-200 hover:bg-red-600" title="Xóa nhóm" aria-label="Xóa nhóm"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
@@ -192,7 +194,8 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
           <button @click.stop="l.groupId ? store.toggleGroupLock(l.groupId) : store.toggleLayerLock(l.id)" class="grid h-6 w-6 place-items-center rounded" :class="l.locked ? 'bg-amber-500/20 text-amber-300' : 'text-cream-300 hover:bg-ink-700'" :title="l.groupId ? 'Khóa/Mở khóa nhóm' : (l.locked ? 'Mở khóa' : 'Khóa layer')" :aria-label="l.groupId ? 'Khóa/Mở khóa nhóm' : (l.locked ? 'Mở khóa' : 'Khóa layer')">
             <StudioIcon :name="l.locked ? 'lock' : 'lockOpen'" size="h-3.5 w-3.5" />
           </button>
-          <div class="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+          <!-- Ba nút (khóa · nhân đôi · gỡ khỏi canvas) LUÔN hiện — cùng lý do như khối nhóm ở trên. -->
+          <div class="flex items-center gap-0.5">
             <button @click.stop="l.groupId ? store.duplicateGroup(l.groupId) : store.duplicateLayer(l.id)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" :title="l.groupId ? 'Nhân đôi nhóm' : 'Nhân đôi layer'" :aria-label="l.groupId ? 'Nhân đôi nhóm' : 'Nhân đôi layer'">
               <StudioIcon name="copy" size="h-3.5 w-3.5" />
             </button>
@@ -260,10 +263,10 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
         <button @click="store.toggleFlipX(store.activeLayer.id)" class="flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[10px] font-semibold" :class="store.activeLayer.flipX ? 'bg-brand-600/30 text-cream-100' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" title="Lật ngang layer"><StudioIcon name="flipHorizontal" size="h-3.5 w-3.5" /><span>Lật ngang</span></button>
         <button @click="store.toggleFlipY(store.activeLayer.id)" class="flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[10px] font-semibold" :class="store.activeLayer.flipY ? 'bg-brand-600/30 text-cream-100' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" title="Lật dọc layer"><StudioIcon name="flipVertical" size="h-3.5 w-3.5" /><span>Lật dọc</span></button>
       </div>
-      <button @click="removeBgConfirmOpen = true" :disabled="!store.activeLayer" class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-600/15 px-2 py-1.5 text-[10px] font-semibold text-violet-200 transition-colors hover:bg-violet-600/30 disabled:opacity-40" title="Xóa nền AI (nền sẽ trong suốt; giữ vùng chọn hiện tại làm chủ thể nếu có)">
-        <StudioIcon name="userX" size="h-3.5 w-3.5" />
-        <span>Xóa nền AI · 1 credit</span>
-      </button>
+      <!-- [2026-09-20] Đã GỠ nút xóa nền AI (1 credit) theo yêu cầu — gỡ luôn CẢ DÂY CHUYỀN phía sau:
+           state cục bộ · popup xác nhận · action trong store · route POST tương ứng · phương thức
+           controller + hàm tạo mask chỉ nó dùng · khai báo endpoint trong ModuleRegistry. Để lại một
+           mắt xích là còn một đường gọi được vào tính năng đã bỏ. -->
     </section>
 
     <!-- 4. Palette ảnh -->
@@ -281,19 +284,19 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
     <footer class="flex shrink-0 gap-1.5 border-t border-ink-700 p-2">
       <button @click="store.exportComposite()" :disabled="!store.visibleLayers.length" class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-40" title="Gộp tất cả layer đang hiển thị và tải xuống PNG"><StudioIcon name="download" size="h-3.5 w-3.5" /><span>Xuất PNG</span></button>
       <button @click="store.flattenToLayer()" :disabled="!store.visibleLayers.length" class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-40" title="Gộp tất cả layer đang hiển thị thành 1 layer mới"><StudioIcon name="layers" size="h-3.5 w-3.5" /><span>Gộp</span></button>
-      <button @click="store.saveActiveLayerToOutput()" :disabled="!store.activeLayer" class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-40" title="Lưu layer đang chọn vào Output"><StudioIcon name="save" size="h-3.5 w-3.5" /><span>Lưu Output</span></button>
+      <!-- "Lưu Output" SÁNG khi layer đang chọn là ảnh MỚI (chưa có bản nào trong Output), và IM khi ảnh
+           đã có — bấm vào lúc đó sẽ bị chặn kèm lời nhắc, không tạo bản trùng trong Outputs. -->
+      <button
+        @click="store.saveActiveLayerToOutput()"
+        :disabled="!store.activeLayer || !store.activeLayer.image"
+        class="motion-ui flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold disabled:opacity-40"
+        :class="store.canSaveActiveLayerToOutput
+          ? 'bg-brand-600 text-white ring-1 ring-brand-400/70 hover:bg-brand-500'
+          : 'bg-ink-800 text-cream-300/70 hover:bg-ink-700'"
+        :title="store.canSaveActiveLayerToOutput ? 'Lưu layer đang chọn vào Output' : 'Ảnh này đã có trong Output — không lưu trùng'"
+        :aria-label="store.canSaveActiveLayerToOutput ? 'Lưu layer đang chọn vào Output' : 'Ảnh này đã có trong Output'"
+      ><StudioIcon name="save" size="h-3.5 w-3.5" /><span>Lưu Output</span></button>
     </footer>
-
-    <!-- Popup xác nhận xóa nền AI -->
-    <ConfirmDialog
-      :open="removeBgConfirmOpen"
-      title="Xóa nền AI?"
-      confirm-label="Xóa nền"
-      @confirm="doRemoveBg()"
-      @cancel="removeBgConfirmOpen = false"
-    >
-      Nền sẽ được xóa thành <b>trong suốt</b> (PNG alpha). AI tự nhận diện chủ thể — <b>vẽ lasso quanh chủ thể</b> nếu muốn chính xác hơn. Tốn <b>1 credit</b>.
-    </ConfirmDialog>
 
     <!-- Popup xác nhận dọn canvas — chính là popup mà hành động XÓA ĐỐI TƯỢNG ĐANG CHỌN kế thừa -->
     <ConfirmDialog
