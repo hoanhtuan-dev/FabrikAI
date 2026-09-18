@@ -27,16 +27,19 @@ const toolHint = computed(() => {
 // Nút icon chuẩn (spec §4.2): h-7 hit-target, hover nền ink-700, disabled mờ 30%.
 const BTN = 'grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700 disabled:opacity-30';
 
-// Nền swatch — inline style y hệt pill cũ StudioApp (grid checker / dark / white / cream).
-const bgSwatchStyle = (b) => ({
-  background: b === 'grid'
-    ? 'repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 10px 10px'
-    : b === 'dark'
-      ? '#0a0a0f'
-      : b === 'white'
-        ? '#fff'
-        : '#f5ead9',
-});
+// Nền canvas — MỘT NGUỒN với chính vùng canvas.
+//
+// Trước đây chỗ này tự vẽ màu bằng inline style, lệch hẳn với màu thật của canvas: ô "tối" một sắc,
+// canvas ink-950 một sắc khác; ô "kem" một sắc, canvas cream-100 một sắc khác —
+// và "lưới" thì canvas trỏ tới một class KHÔNG hề được định nghĩa nên nền trong suốt,
+// trông như bấm nút không có tác dụng. Nay ô màu dùng ĐÚNG class .canvas-bg-* mà canvas đang dùng
+// (app.css) ⇒ nhìn nút là biết canvas sẽ ra sao, không thể lệch.
+const BG_OPTIONS = [
+  { id: 'grid', label: 'Lưới trong suốt' },
+  { id: 'dark', label: 'Tối' },
+  { id: 'white', label: 'Trắng' },
+  { id: 'cream', label: 'Kem' },
+];
 </script>
 
 <template>
@@ -57,16 +60,16 @@ const bgSwatchStyle = (b) => ({
     <!-- 4. Divider -->
     <div class="h-4 w-px bg-ink-700" aria-hidden="true"></div>
 
-    <!-- 5. Nền canvas -->
+    <!-- 5. Nền canvas — ô màu dùng CHÍNH class nền của canvas -->
     <button
-      v-for="b in ['grid', 'dark', 'white', 'cream']"
-      :key="b"
-      @click="store.canvasBg = b"
-      class="h-5 w-5 rounded-full border border-ink-600"
-      :class="store.canvasBg === b ? 'ring-2 ring-brand-400' : ''"
-      :style="bgSwatchStyle(b)"
-      :title="'Nền: ' + b"
-      :aria-label="'Nền: ' + b"
+      v-for="b in BG_OPTIONS"
+      :key="b.id"
+      @click="store.canvasBg = b.id"
+      class="motion-ui h-5 w-5 rounded-full border border-ink-600"
+      :class="['canvas-bg-' + b.id, store.canvasBg === b.id ? 'ring-2 ring-brand-400' : '']"
+      :title="'Nền canvas: ' + b.label"
+      :aria-label="'Nền canvas: ' + b.label"
+      :aria-pressed="store.canvasBg === b.id"
     ></button>
 
     <!-- 6. Snap (bắt điểm) — mặc định BẬT 8px -->
@@ -101,16 +104,8 @@ const bgSwatchStyle = (b) => ({
       aria-label="Lưu trang"
     ><StudioIcon name="save" /></button>
 
-    <!-- 9. Download -->
-    <button
-      @click="store.downloadActive()"
-      :disabled="!store.upscaleSrc"
-      class="grid h-7 w-7 place-items-center rounded-lg bg-brand-600 text-white transition-colors hover:bg-brand-500 disabled:opacity-30"
-      title="Tải ảnh đang chọn"
-      aria-label="Tải ảnh đang chọn"
-    ><StudioIcon name="download" /></button>
-
-    <!-- 9. Toggle inspector (lg+) -->
+    <!-- 9. Toggle inspector (lg+) — nút tải ảnh đang chọn ở thanh này đã bỏ theo yêu cầu: việc tải ảnh
+         đã có đường riêng ở bảng Lớp (Xuất PNG) và ở Kết quả/Thư viện, để đây chỉ gây trùng và bấm nhầm. -->
     <button
       @click="store.toggleInspector()"
       class="grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700 disabled:opacity-30"

@@ -32,6 +32,10 @@ import CanvasStatusBar from './components/CanvasStatusBar.vue';
 import AuthNotice from './components/AuthNotice.vue';
 import CanvasEmptyState from './components/CanvasEmptyState.vue';
 import NotificationCenter from './components/NotificationCenter.vue';
+// [2026-09-20] Popup xác nhận DÙNG CHUNG — hành động xóa đối tượng đang chọn KẾ THỪA đúng popup
+// của "⚠️ Dọn toàn bộ canvas?" (trước đây cờ confirmDeleteOpen không có popup nào render ⇒ bấm
+// Delete/nút thùng rác không thấy gì xảy ra, cờ treo lại còn chặn cả phím tắt layer).
+import ConfirmDialog from './components/ConfirmDialog.vue';
 const store = useStudioStore();
 
 // [Q3 — 2026-09-19] GÓI THEO MÙA VỤ: mốc mua của gói xưởng là số VỤ (1 vụ = 3 tháng), không phải số
@@ -331,7 +335,11 @@ function onHistoryKeys(e) {
   if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); if (e.shiftKey) store.redo(); else store.undo(); }
   else if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); store.redo(); }
 }
-const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
+// Nền canvas — dùng CHUNG class .canvas-bg-* trong app.css với ô màu ở CanvasStatusBar. Trước đây chỗ
+// này trỏ tới một class bàn cờ không hề được định nghĩa (nền "lưới" thành trong suốt) và ô màu ở status
+// bar tự vẽ màu riêng nên lệch với màu thật. Một nguồn ⇒ không thể lệch nữa.
+const CANVAS_BGS = ['grid', 'dark', 'white', 'cream'];
+const bgClass = computed(() => 'canvas-bg-' + (CANVAS_BGS.includes(store.canvasBg) ? store.canvasBg : 'grid'));
 const activeActivityDef = computed(() => activityNav.value.find(a => a.id === activeActivity.value) || activityNav.value[0]);
 const panel = computed(() => activeActivityDef.value.cards);
 // Quản lý title cho /studio: cập nhật document.title theo activity + dự án đang áp dụng.
@@ -956,6 +964,24 @@ function onTouchEnd(e) {
     <!-- [Trục 2 — 2026-09-20] Trung tâm thông báo kiểu VSCode (thay ô flashMsg đơn lẻ):
          xếp chồng · tự tắt theo loại · đóng tay được · kèm thẻ tiến trình việc đang chạy. -->
     <NotificationCenter />
+    <!-- Xác nhận XÓA ĐỐI TƯỢNG ĐANG CHỌN (1 đối tượng cũng vào đây — không xóa ngay tay).
+         Đặt ở shell chứ không trong bảng Lớp: bảng Lớp có thể đang bị thu gọn mà phím Delete
+         vẫn phải hoạt động. -->
+    <ConfirmDialog
+      :open="store.confirmDeleteOpen"
+      :title="'⚠️ Xóa ' + store.selectionUnitLabels.length + ' đối tượng?'"
+      confirm-label="Xóa"
+      @confirm="store.confirmDeleteSelection()"
+      @cancel="store.confirmDeleteOpen = false"
+    >
+      <template v-if="store.selectionUnitLabels.length">
+        <b>{{ store.selectionUnitLabels.slice(0, 4).join(' · ') }}</b><span v-if="store.selectionUnitLabels.length > 4"> · …</span><br>
+      </template>
+      <template v-if="store.lockedSelectionCount">
+        <span class="text-amber-300/90">{{ store.lockedSelectionCount }} đối tượng đang KHÓA sẽ được giữ lại (mở khóa rồi xóa sau).</span><br>
+      </template>
+      Chỉ gỡ khỏi canvas — ảnh kết quả vẫn còn trong <b>Output/Thư viện</b>. Có thể hoàn tác (Ctrl+Z).
+    </ConfirmDialog>
     <!-- ══ Thư viện (SPA view nhúng trong /studio — thay thế trang riêng /api/library) ══ -->
     <LibraryApp v-if="store.studioView === 'library'" embedded @back="store.studioView = 'studio'" />
     <!-- [Đợt 0.6] Đã gỡ banner "Cài đặt FabrikAI" (PWA) — Chốt Q4 bỏ PWA hoàn toàn, nên không còn gì
@@ -1085,9 +1111,20 @@ function onTouchEnd(e) {
               </div>
               <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
             </div>
-            <!-- Chế độ stack: composite tất cả layer đang hiển thị -->
+            <!-- Chế độ stack: composite tất cả layer đang hiển thị.
+                 TransitionGroup: bật/tắt layer (nút con mắt) phải có hiệu ứng — layer ẩn bị gỡ khỏi
+                 danh sách hiển thị nên mặc định nó biến mất tức thì, bấm mắt xong không thấy vừa tắt
+                 cái gì. Lớp hiệu ứng (.layer-vis-*) nằm ở app.css, dùng chung token chuyển động. -->
             <div v-else class="absolute inset-0">
-              <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
+              <TransitionGroup
+                tag="div"
+                class="absolute left-1/2 top-1/2"
+                :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }"
+                enter-active-class="layer-vis-enter-active"
+                enter-from-class="layer-vis-enter-from"
+                leave-active-class="layer-vis-leave-active"
+                leave-to-class="layer-vis-leave-to"
+              >
                 <div v-for="(l, i) in store.visibleLayers" :key="l.id" class="absolute left-0 top-0" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
                   <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :title="l.groupId ? 'Thuộc nhóm — Alt+click để chỉnh sửa riêng layer này' : l.name" :class="[l.id === store.activeLayerId ? 'outline outline-2 -outline-offset-2 outline-sky-400' : (store.isSelected(l.id) ? 'outline outline-2 -outline-offset-2 outline-sky-400/70' : ''), l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']" draggable="false" />
                   <template v-if="l.id === store.activeLayerId && !l.locked">
@@ -1105,7 +1142,7 @@ function onTouchEnd(e) {
                     </span>
                   </template>
                 </div>
-              </div>
+              </TransitionGroup>
               <CanvasEmptyState v-if="!store.visibleLayers.length && !store.generating" />
             </div>
             <!-- Overlay canvas xóa: bám đúng vùng ảnh hiển thị (chịu zoom/pan) -->

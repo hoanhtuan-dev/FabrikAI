@@ -378,6 +378,17 @@ export const useStudioStore = defineStore('studio', {
     selection() { return this.canvasLayers.filter(l => this.selectedIds.includes(l.id) && l.visible !== false); },
     selectionCount() { return this.selection.length; },
     selectionUnitCount() { return this._selectionUnits().length; },
+    // Nhãn các ĐỐI TƯỢNG đang chọn (group = 1 đối tượng) — popup xác nhận xóa đọc từ đây để nói
+    // RÕ sắp xóa cái gì, thay vì chỉ hỏi "xóa 3 đối tượng?" mà người dùng không biết là cái nào.
+    selectionUnitLabels() {
+      return this._selectionUnits().map((u) => {
+        if (u.type === 'group') return 'Nhóm ' + (this.groupLabel(u.layers[0]) || 'không tên');
+        const l = u.layers[0] || {};
+        return l.name || 'Layer';
+      });
+    },
+    // Số đối tượng đang chọn bị KHÓA — hiện trước khi bấm xóa để không "xóa mà im lặng bỏ qua".
+    lockedSelectionCount() { return this._selectionUnits().filter((u) => u.layers.some((l) => l.locked)).length; },
     visibleLayers() { return this.canvasLayers.filter(l => l.visible !== false); },
     // Danh sách layer hiển thị front-first (layer TRƯỚC NHẤT ở trên cùng) — chuẩn trình chỉnh
     // ảnh. canvasLayers giữ thứ tự vẽ (zIndex), getter này chỉ đảo để hiển thị panel.
@@ -3157,8 +3168,17 @@ export const useStudioStore = defineStore('studio', {
     confirmDeleteSelection() {
       // GROUP = 1 đối tượng: xóa theo ĐƠN VỊ (nguyên nhóm + layer đơn), không phải từng layer.
       const units = this._selectionUnits(); if (!units.length) { this.confirmDeleteOpen = false; return; }
+      // Layer KHÓA không bị xóa — đúng luật đã áp ở nút xóa trong bảng Lớp (disabled) và deleteLayer().
+      // Trước đây đường xóa theo lựa chọn bỏ qua hoàn toàn khóa ⇒ phím Delete xóa được cả layer đã khóa.
+      const locked = units.filter(u => u.layers.some(l => l.locked));
+      const units2 = units.filter(u => !u.layers.some(l => l.locked));
+      if (!units2.length) {
+        this.confirmDeleteOpen = false;
+        this.toast('Đối tượng đang KHÓA — mở khóa rồi mới xóa được.', 'error');
+        return;
+      }
       const ids = new Set(); const delGids = new Set();
-      units.forEach(u => { u.layers.forEach(l => ids.add(l.id)); if (u.type === 'group') delGids.add(u.gid); });
+      units2.forEach(u => { u.layers.forEach(l => ids.add(l.id)); if (u.type === 'group') delGids.add(u.gid); });
       const wasActive = this.activeLayerId;
       this.pushHistory();
       this.canvasLayers = this.canvasLayers.filter(l => !ids.has(l.id));
@@ -3170,7 +3190,9 @@ export const useStudioStore = defineStore('studio', {
       this.selectedLayerIds = [];
       this.confirmDeleteOpen = false;
       this.saveLayerLayout();
-      this.toast('Đã xóa ' + units.length + ' đối tượng.');
+      this.toast('Đã xóa ' + units2.length + ' đối tượng.'
+        + (locked.length ? ' Giữ lại ' + locked.length + ' đối tượng đang khóa.' : ''),
+        locked.length ? 'error' : 'success');
     },
     // clearCanvas + confirmClearCanvas đã gộp vào cleanCanvas() (có pushHistory + confirm popup qua LayersPanel).
     // Bỏ chọn layer active (nhấp khoảng trống trên canvas).
@@ -3273,29 +3295,8 @@ export const useStudioStore = defineStore('studio', {
     },
     // Tên hiển thị của một generation (dùng tên tuỳ chỉnh nếu có, ngược lại "Ảnh #id").
     genName(g) { return (g && g.meta && g.meta.name) ? g.meta.name : (g ? 'Ảnh #' + g.id : 'Ảnh'); },
-    // Tải ảnh đang active trên canvas (kết quả dùng endpoint download; ảnh nguồn tải trực tiếp).
-    async downloadActive() {
-      const l = this.canvasLayers.find((x) => x.id === this.activeLayerId && x.visible !== false);
-      if (!l || !l.image) { this.toast('Chưa có ảnh trên canvas.', 'error'); return; }
-      if (l.kind === 'gen' && l.genId) {
-        window.location.href = '/api/generations/' + l.genId + '/download';
-        return;
-      }
-      try {
-        const res = await fetch(l.image);
-        if (!res.ok) throw new Error();
-        const blob = await res.blob();
-        const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : blob.type === 'image/gif' ? 'gif' : 'jpg';
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = ((l.name || 'anh').replace(/\.[^.]+$/, '') || 'anh') + '.' + ext;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      } catch (e) { this.toast('Không tải được ảnh nguồn.', 'error'); }
-    },
+    // (Đã gỡ downloadActive() cùng nút "Tải ảnh đang chọn" ở thanh trạng thái: việc tải ảnh đã có
+    //  đường riêng — Xuất PNG ở bảng Lớp và nút tải ở Kết quả/Thư viện — giữ lại chỉ gây trùng.)
     // Ẩn/hiện layer (eye toggle). Ẩn layer đang active thì chuyển sang layer hiển thị kế tiếp.
     toggleLayerVisible(id) {
       const l = this.canvasLayers.find((x) => x.id === id);

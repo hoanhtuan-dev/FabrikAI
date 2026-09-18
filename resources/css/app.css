@@ -373,7 +373,35 @@
                     color var(--motion-dur-fast) var(--motion-ease-standard);
     }
 
-    /* ── 2. Hiệu ứng XUẤT HIỆN cho lớp phủ · ngăn kéo · popup ───────────────
+    /* ── 2. NỀN CANVAS — MỘT NGUỒN cho cả vùng canvas và ô màu ở thanh trạng thái ────────
+       Vì sao phải gom: (a) vùng canvas trỏ tới một class bàn cờ KHÔNG hề được định nghĩa ở đâu ⇒ chọn
+       "lưới" thì nền trong suốt, trông như nút không hoạt động; (b) ô màu ở status bar tự vẽ màu bằng
+       inline style nên LỆCH với màu thật của canvas (ô tối và ô kem mỗi thứ một sắc khác). Nay cả hai
+       dùng CHUNG bốn class dưới đây ⇒ không thể lệch nhau nữa. */
+    .canvas-bg-grid {
+        /* Ô bàn cờ = quy ước "vùng trong suốt" của mọi trình chỉnh ảnh. */
+        background: repeating-conic-gradient(var(--color-ink-800) 0 25%, var(--color-ink-950) 0 50%) 0 / 12px 12px;
+    }
+    .canvas-bg-dark { background: var(--color-ink-950); }
+    .canvas-bg-white { background: #fff; }
+    .canvas-bg-cream { background: var(--color-cream-100); }
+
+    /* ── 3. BẬT/TẮT LAYER (nút con mắt ở bảng Lớp) ───────────────────────────────────────
+       Layer bị ẩn là bị GỠ khỏi danh sách hiển thị; để mặc định thì nó biến mất tức thì — bấm mắt
+       xong không thấy vừa tắt cái gì, và bật lại cũng "hiện ra đột ngột".
+       Lưu ý kỹ thuật: hiệu ứng opacity đặt lên <img> BÊN TRONG thẻ layer, vì chính thẻ đó đã mang
+       opacity riêng của từng layer (inline style) nên nó không thể tự chuyển động opacity được —
+       còn scale thì đặt lên thẻ (Tailwind v4 dùng thuộc tính riêng, không đụng transform inline). */
+    .layer-vis-enter-active, .layer-vis-leave-active {
+        transition: scale var(--motion-dur-base) var(--motion-ease-emphasized);
+    }
+    .layer-vis-enter-active img, .layer-vis-leave-active img {
+        transition: opacity var(--motion-dur-base) var(--motion-ease-standard);
+    }
+    .layer-vis-enter-from, .layer-vis-leave-to { scale: 0.94; }
+    .layer-vis-enter-from img, .layer-vis-leave-to img { opacity: 0; }
+
+    /* ── 4. Hiệu ứng XUẤT HIỆN cho lớp phủ · ngăn kéo · popup ───────────────
        Đặt lên phần tử được mount bằng v-if: nó chạy một lần lúc xuất hiện. */
     .motion-fade-in { animation: motion-fade-in var(--motion-dur-fast) var(--motion-ease-standard) both; }
     .motion-pop-in { animation: motion-pop-in var(--motion-dur-base) var(--motion-ease-emphasized) both; }
@@ -381,7 +409,7 @@
     .motion-slide-in-left { animation: motion-slide-in-left var(--motion-dur-slow) var(--motion-ease-emphasized) both; }
     .motion-slide-in-right { animation: motion-slide-in-right var(--motion-dur-slow) var(--motion-ease-emphasized) both; }
 
-    /* ── 3. DOCK CO/GIÃN ĐƯỢC (bảng trái · dock Outputs · …) ─────────────────
+    /* ── 5. DOCK CO/GIÃN ĐƯỢC (bảng trái · dock Outputs · …) ─────────────────
        Một class dùng chung cho MỌI dock, để mọi dock có cùng nhịp và cùng cách ẩn.
        Bề rộng thật do JS đặt qua inline style (store là nguồn sự thật) — CSS ở đây
        lo phần chuyển động + phần "ẩn mà không gỡ khỏi DOM". */

@@ -4,6 +4,8 @@
 import { ref, computed } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
+// Popup xác nhận DÙNG CHUNG (kế thừa hình dáng popup "⚠️ Dọn toàn bộ canvas?") — xem ConfirmDialog.vue.
+import ConfirmDialog from './ConfirmDialog.vue';
 
 const store = useStudioStore();
 
@@ -163,7 +165,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
         </template>
         <!-- Row layer; ẩn các thành viên khi thu gọn nhóm (chỉ giữ đại diện) -->
         <div v-if="!l.groupId || !collapsedGroups.has(l.groupId)"
-        class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1"
+        class="motion-ui group flex items-center gap-1.5 rounded-lg border px-1.5 py-1"
         :class="[
           store.activeLayerId === l.id ? 'border-sky-400 bg-sky-400/15' : (store.isSelected(l.id) ? 'border-sky-400/60 bg-sky-400/10' : 'border-transparent hover:bg-ink-800/70'),
           l.visible === false ? 'opacity-45' : '',
@@ -282,29 +284,27 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
       <button @click="store.saveActiveLayerToOutput()" :disabled="!store.activeLayer" class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-40" title="Lưu layer đang chọn vào Output"><StudioIcon name="save" size="h-3.5 w-3.5" /><span>Lưu Output</span></button>
     </footer>
 
-    <!-- Popup xác nhận xóa nền AI (markup y hệt StudioApp :542-551) -->
-    <div v-if="removeBgConfirmOpen" role="dialog" aria-modal="true" aria-label="Xác nhận xóa nền AI" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="removeBgConfirmOpen = false">
-      <div class="w-full max-w-xs rounded-lg border border-ink-700 bg-ink-900 p-4 shadow-2xl">
-        <p class="text-sm font-semibold text-cream-100">Xóa nền AI?</p>
-        <p class="mt-1 text-xs leading-relaxed text-cream-300/70">Nền sẽ được xóa thành <b>trong suốt</b> (PNG alpha). AI tự nhận diện chủ thể — <b>vẽ lasso quanh chủ thể</b> nếu muốn chính xác hơn. Tốn <b>1 credit</b>.</p>
-        <div class="mt-3 flex gap-2">
-          <button @click="doRemoveBg()" class="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500">Xóa nền</button>
-          <button @click="removeBgConfirmOpen = false" class="flex-1 rounded-lg bg-ink-800 px-3 py-2 text-sm font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Popup xác nhận dọn canvas -->
-    <div v-if="store.confirmClearCanvasOpen" role="dialog" aria-modal="true" aria-label="Xác nhận dọn canvas" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="store.confirmClearCanvasOpen = false">
-      <div class="w-full max-w-xs rounded-lg border border-red-500/40 bg-ink-900 p-4 shadow-2xl">
-        <p class="text-sm font-semibold text-cream-100">⚠️ Dọn toàn bộ canvas?</p>
-        <p class="mt-1 text-xs leading-relaxed text-cream-300/70">Tất cả <b>{{ store.canvasLayers.length }} layer</b> và <b>{{ store.layerGroups.length }} nhóm</b> sẽ bị xóa khỏi canvas. Ảnh kết quả vẫn còn trong <b>Output/Thư viện</b>. Có thể hoàn tác (Ctrl+Z).</p>
-        <div class="mt-3 flex gap-2">
-          <button @click="store.cleanCanvas()" class="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500">Dọn canvas</button>
-          <button @click="store.confirmClearCanvasOpen = false" class="flex-1 rounded-lg bg-ink-800 px-3 py-2 text-sm font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
-        </div>
-      </div>
-    </div>
+    <!-- Popup xác nhận xóa nền AI -->
+    <ConfirmDialog
+      :open="removeBgConfirmOpen"
+      title="Xóa nền AI?"
+      confirm-label="Xóa nền"
+      @confirm="doRemoveBg()"
+      @cancel="removeBgConfirmOpen = false"
+    >
+      Nền sẽ được xóa thành <b>trong suốt</b> (PNG alpha). AI tự nhận diện chủ thể — <b>vẽ lasso quanh chủ thể</b> nếu muốn chính xác hơn. Tốn <b>1 credit</b>.
+    </ConfirmDialog>
+
+    <!-- Popup xác nhận dọn canvas — chính là popup mà hành động XÓA ĐỐI TƯỢNG ĐANG CHỌN kế thừa -->
+    <ConfirmDialog
+      :open="store.confirmClearCanvasOpen"
+      title="⚠️ Dọn toàn bộ canvas?"
+      confirm-label="Dọn canvas"
+      @confirm="store.cleanCanvas()"
+      @cancel="store.confirmClearCanvasOpen = false"
+    >
+      Tất cả <b>{{ store.canvasLayers.length }} layer</b> và <b>{{ store.layerGroups.length }} nhóm</b> sẽ bị xóa khỏi canvas. Ảnh kết quả vẫn còn trong <b>Output/Thư viện</b>. Có thể hoàn tác (Ctrl+Z).
+    </ConfirmDialog>
   </aside>
 </template>
 
