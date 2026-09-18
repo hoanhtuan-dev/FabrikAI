@@ -618,3 +618,79 @@ vì tải file; dùng `generation_id` THẬT thay cho chuỗi `layer-…`. Vẫn
 - **Rào chắn của dự án đã bắt lỗi thay tôi.** Thêm route mới mà quên khai module ⇒ test đỏ ngay lập tức. Giữ những
   bài test kiểu này đáng giá hơn nhiều bài test chỉ kiểm tra đúng thứ vừa viết.
 
+---
+
+## 13. Đợt 9 — Dock trái & dock Outputs CO/GIÃN ĐƯỢC + cơ sở chuyển động dùng chung (2026-09-20)
+
+### 13.1 Vấn đề — đo được, không suy đoán
+
+| Sự thật | Bằng chứng |
+|---|---|
+| Bề rộng dock là HẰNG SỐ trong class Tailwind | `StudioApp.vue` cũ: `w-72` (bảng trái) và `w-[156px]` (Outputs) — người dùng không tự chỉnh được |
+| Ẩn/hiện bằng `v-if` ⇒ GỠ khỏi DOM | cùng hai thẻ `<aside v-if="store.leftPanelOpen">` / `v-if="store.outputDockOpen"` |
+| Mỗi dock một kiểu | dock Outputs không có nút ẩn trong panel, bảng trái có chevron — hai hành vi khác nhau cho cùng một việc |
+| Không dock nào có đường BÀN PHÍM | không có `role="separator"` hay `tabindex` nào trong `resources/js/studio` |
+| Chuyển động rải rác, mỗi chỗ một số | `0.15s ease` viết cứng trong `app.css`, `transition-all duration-300` trong component, không nơi nào dùng chung một nhịp |
+
+Hệ quả thật: ảnh thumbnail trong Outputs bị ép vào một con số do lập trình viên chọn hộ; ẩn rồi mở lại bảng trái là
+mất trạng thái card (ô đang gõ, vị trí cuộn) vì card bị dựng lại; và người dùng bật "giảm chuyển động" của hệ điều
+hành vẫn nhận đủ hiệu ứng.
+
+### 13.2 Đã làm — ba tầng, một nguồn
+
+1. **Cơ sở chuyển động trong `app.css`**: token `--motion-dur-{instant,fast,base,slow,dock}` +
+   `--motion-ease-{standard,emphasized,exit}`; lớp dùng lại `.motion-ui` (chỉ khai báo đúng bộ thuộc tính hay đổi —
+   KHÔNG dùng `transition-all` vì nó kéo theo cả `width/height` gây giật bố cục) và `.motion-{fade,pop,rise,slide-in-*}-in`.
+   Bật `prefers-reduced-motion` ⇒ MỌI token về `0ms`: cả app tắt chuyển động bằng một công tắc, không phải đi tìm
+   từng chỗ.
+2. **`composables/useDockResize.js` + `components/DockResizer.vue`**: một bộ điều khiển + một vách ngăn dùng CHUNG
+   cho mọi dock — kéo bằng pointer (có bắt pointer nên kéo lệch khỏi vách 7px vẫn dính), bàn phím (←/→, Shift = bước
+   lớn, Home/End, Enter ẩn/hiện, Esc về mặc định), nhấp đúp = mặc định, kẹp `[min, max]` với trần mềm theo bề rộng
+   cửa sổ. Bề rộng là **writable ref trỏ vào store** ⇒ store vẫn là nguồn sự thật duy nhất, và chỉ ghi khi thả tay.
+3. **Ẩn mà không gỡ khỏi DOM**: dock thu bề rộng về 0 kèm `data-collapsed` (CSS lo hiệu ứng), nên card bên trong giữ
+   nguyên trạng thái và canvas nở ra theo từng frame. `visibility` trễ đúng bằng thời lượng để nội dung không biến
+   mất trước khi khung co xong; `:inert` để Tab không chui vào vùng vô hình.
+
+### 13.3 Ràng buộc đã giữ
+
+- **Mặc định không đổi**: 288px và 156px — vào trang lần đầu bố cục y hệt trước.
+- Cờ ẩn/hiện VẪN là `leftPanelOpen` / `outputDockOpen` cũ: activity bar, bảng lệnh (Ctrl+K) và nút chevron vẫn điều
+  khiển đúng dock đó, không sinh trạng thái thứ hai.
+- Không thêm endpoint, không đụng luồng tạo ảnh; bề rộng đi cùng khoá `fabrikai.bar` đã có (không thêm khoá
+  localStorage mới).
+- Vách ngăn chỉ có ở desktop; dưới `lg` dock vẫn là ngăn kéo trượt như trước (nay có thêm hiệu ứng vào).
+
+### 13.4 Đo được (Chrome thật, viewport 1600×1000, đăng nhập owner)
+
+| Đo | Trước | Sau |
+|---|---|---|
+| Bề rộng bảng trái | cố định **288px** | kéo được **200–560px**; đo thật: kéo +140px ⇒ **428px** đúng từng pixel |
+| Bề rộng dock Outputs | cố định **156px** | kéo được **140–420px**; đo thật: kéo +100px ⇒ **256px** |
+| Trần mềm theo cửa sổ | — | cửa sổ 1600px ⇒ `max=560`; kéo +2000px vẫn **dừng ở 560** |
+| Bàn phím trên vách ngăn | không có | 2× → = **+32px** (`aria-valuenow` 528), Home/End, Enter, Esc |
+| Ẩn/hiện | `v-if`: 0 hiệu ứng, mất trạng thái card | thu bề rộng về 0 trong **260ms**; canvas **1006 → 1301px** |
+| Nhớ bề rộng sau khi tải lại | không có | `fabrikai.bar` = `leftDockWidth:288 · outputDockWidth:256` ⇒ tải lại **giữ đúng** |
+| Focus sau khi ẩn bằng bàn phím | rơi về `<body>` (không còn điểm dừng) | về **nút mở lại** (`[data-activity]` / `[data-dock-toggle=outputs]`); Enter lần nữa là mở lại |
+| `prefers-reduced-motion: reduce` | hiệu ứng vẫn chạy | token = **0ms**, thu gọn **tức thì** (< 80ms) |
+| Trong lúc kéo | — | `data-resizing=true` + tắt transition ⇒ dock theo tay **tức thì** |
+| CSS thật của dock | — | `transition-duration: 0.26s` · `min-width: 0` · vách ngăn `cursor: col-resize` |
+
+- `vendor/bin/phpunit`: **676 test / 4343 khẳng định — XANH** (thêm 10 test cho dock: cơ sở dùng chung · ARIA · không
+  còn bề rộng CỨNG · vẫn nằm trong DOM khi ẩn · luật CSS bắt buộc (`min-width:0`) · token không lệch với JS · công tắc
+  giảm chuyển động · lưu bền · **bundle đã build có chứa cơ sở này** · không bỏ rơi focus).
+- `npm run build`: thoát 0; CSS/JS trong `public_html/build` đã cập nhật theo nguồn.
+
+### 13.5 Bài học tự bắt được trong đợt này
+
+- **"Ẩn" bằng `v-if` là mất hai thứ cùng lúc: hiệu ứng và trạng thái.** Thu bề rộng về 0 vừa cho hiệu ứng mượt vừa
+  giữ nguyên card bên trong — nhưng kéo theo một cái bẫy CSS: flex item mặc định `min-width: auto` nên KHÔNG co được
+  xuống 0. Thiếu `min-width: 0` thì "co dock" trông như bị đứng, và test bất biến đã khoá đúng dòng đó lại.
+- **Kiểm bằng trình duyệt thật mới lộ lỗi focus.** Bấm Enter để ẩn dock làm vách ngăn bị gỡ khỏi DOM và nút chevron
+  nằm trong panel vừa `inert` ⇒ trình duyệt đẩy focus về `<body>`; người dùng bàn phím không còn điểm dừng nào để mở
+  lại. Không bài test tĩnh nào nhìn ra việc này — và bản vá đầu tiên của tôi còn SAI: đọc `document.activeElement`
+  lúc đã quá muộn (DOM patch xong rồi). Phải chụp focus trong watcher (chạy TRƯỚC khi patch) rồi mới chuyển ở `nextTick`.
+- **Một nguồn số cho chuyển động, kể cả khi JS cần biết thời lượng.** Thay vì chép `260` vào JS, `motion.js` đọc lại
+  đúng biến CSS `--motion-dur-dock`; test đối chiếu bảng dự phòng trong JS với token trong CSS để hai bên không trôi
+  khỏi nhau.
+
+
