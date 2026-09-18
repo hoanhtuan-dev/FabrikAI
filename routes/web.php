@@ -9,6 +9,7 @@ use App\Http\Controllers\StudioController;
 use App\Http\Controllers\StudioSettingsController;
 use App\Http\Controllers\StylistDataController;
 use App\Http\Controllers\TeamController;
+use App\Http\Controllers\UserCatalogController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -71,6 +72,14 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->group(function () {
     Route::get('/stylist-data', [StudioController::class, 'stylistDataPage'])->name('stylist-data.page');
     // [Yêu cầu 2026-09-17] Cài đặt KHUÔN MẶT (model) + DÁNG POSE (người mẫu) — cấp USER, lưu cục bộ.
     Route::get('/model-settings', [StudioController::class, 'modelSettingsPage'])->name('model-settings.page');
+
+    // [Yêu cầu 2026-09-20] ĐA CHỈ CHÍNH THỨC của khu "Cài đặt của tôi" (4 mục: preset · khuôn mặt ·
+    // dáng pose · trợ lý thiết kế). Ba route phía trên là ĐỊA CHỈ CŨ, giữ nguyên để bookmark không
+    // chết — cả 4 cùng render MỘT app, khác nhau ở mục được mở (data-section của blade).
+    Route::get('/cai-dat', [StudioController::class, 'mySettingsPage'])->name('my-settings.page');
+    Route::get('/cai-dat/{section}', [StudioController::class, 'mySettingsPage'])
+        ->whereIn('section', ['presets', 'model', 'pose', 'stylist'])
+        ->name('my-settings.section');
 });
 // [Xác minh 2026-09-17] /admin là CONSOLE OWNER — KHÔNG được để chung nhóm shell công khai.
 // Trước đây ai cũng tải được vỏ quản trị (khách 200, customer 200), trái mô hình ở đầu file
@@ -201,6 +210,15 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::get('/gui', [StudioController::class, 'gui'])->name('gui');
 
     Route::get('/presets', [StudioController::class, 'presets'])->name('presets');
+
+    // ── [Yêu cầu 2026-09-20] CATALOG TÙY CHỈNH CẤP TÀI KHOẢN ──
+    // Bản tùy chỉnh của /presets và /stylist-data trước đây nằm trong localStorage của trình
+    // duyệt (useLocalCatalog.js); nay lưu ở SERVER theo tài khoản. Hai route dưới đây là ĐƯỜNG
+    // GHI/ĐỌC DUY NHẤT cho bản RIÊNG của từng người và nằm trong nhóm STUDIO (auth + can-studio)
+    // chứ không phải nhóm ADMIN: đây là dữ liệu của chính người dùng, không phải cấu hình dùng chung.
+    // GET /api/presets ở trên vẫn là catalog DÙNG CHUNG (baseline) — không đụng tới.
+    Route::get('/user-catalogs/{name}', [UserCatalogController::class, 'show'])->name('user-catalogs.show');
+    Route::put('/user-catalogs/{name}', [UserCatalogController::class, 'update'])->name('user-catalogs.update');
 
     // ── Prompt helpers ──
     Route::post('/suggest', [StudioController::class, 'suggest'])->name('suggest');

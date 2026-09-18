@@ -1,17 +1,16 @@
 {
-  "_BaseModal-Dmq9d8Jc.js": {
-    "file": "assets/BaseModal-Dmq9d8Jc.js",
-    "name": "BaseModal",
+  "_StylistSection-DyF9ohAW.js": {
+    "file": "assets/StylistSection-DyF9ohAW.js",
+    "name": "StylistSection",
     "imports": [
-      "_pageBoot-Dk6Yo1jS.js"
+      "_pageBoot-DbXiwtk7.js"
     ]
   },
-  "_StylistDataManager-BDvgXLZd.js": {
-    "file": "assets/StylistDataManager-BDvgXLZd.js",
-    "name": "StylistDataManager",
+  "__plugin-vue_export-helper-SKlaRojG.js": {
+    "file": "assets/_plugin-vue_export-helper-SKlaRojG.js",
+    "name": "_plugin-vue_export-helper",
     "imports": [
-      "_pageBoot-Dk6Yo1jS.js",
-      "_useLocalCatalog-BgZp4638.js"
+      "_pageBoot-DbXiwtk7.js"
     ]
   },
   "_fonts-BRD9E1vz.css": {
@@ -82,23 +81,12 @@
     "file": "assets/inter-700-normal-Yt3aPRUw.woff2",
     "src": "_inter-700-normal-Yt3aPRUw.woff2"
   },
-  "_pageBoot-Dk6Yo1jS.js": {
-    "file": "assets/pageBoot-Dk6Yo1jS.js",
+  "_pageBoot-DbXiwtk7.js": {
+    "file": "assets/pageBoot-DbXiwtk7.js",
     "name": "pageBoot"
   },
-  "_pinia-f7sGdZ4k.js": {
-    "file": "assets/pinia-f7sGdZ4k.js",
-    "name": "pinia",
-    "imports": [
-      "_pageBoot-Dk6Yo1jS.js"
-    ]
-  },
-  "_useLocalCatalog-BgZp4638.js": {
-    "file": "assets/useLocalCatalog-BgZp4638.js",
-    "name": "useLocalCatalog"
-  },
   "resources/css/app.css": {
-    "file": "assets/app-C9H-C1pl.css",
+    "file": "assets/app-CjhM9d9J.css",
     "name": "app",
     "names": [
       "app.css"
@@ -107,77 +95,53 @@
     "isEntry": true
   },
   "resources/js/studio/admin.js": {
-    "file": "assets/admin-CEu-ZiJG.js",
+    "file": "assets/admin-r3GMcwi5.js",
     "name": "admin",
     "src": "resources/js/studio/admin.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-Dk6Yo1jS.js",
-      "_pinia-f7sGdZ4k.js",
-      "_BaseModal-Dmq9d8Jc.js"
+      "_pageBoot-DbXiwtk7.js",
+      "__plugin-vue_export-helper-SKlaRojG.js"
     ],
     "css": [
       "assets/admin-jUYc91rI.css"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-B9v0199i.js",
+    "file": "assets/main-CAP7FddA.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-Dk6Yo1jS.js",
-      "_pinia-f7sGdZ4k.js",
-      "_BaseModal-Dmq9d8Jc.js",
-      "_StylistDataManager-BDvgXLZd.js"
+      "_pageBoot-DbXiwtk7.js",
+      "__plugin-vue_export-helper-SKlaRojG.js",
+      "_StylistSection-DyF9ohAW.js"
     ],
     "css": [
       "assets/main-BqAcHxGJ.css"
     ]
   },
-  "resources/js/studio/model-settings.js": {
-    "file": "assets/model-settings-BGQ53FUP.js",
-    "name": "model-settings",
-    "src": "resources/js/studio/model-settings.js",
+  "resources/js/studio/my-settings.js": {
+    "file": "assets/my-settings--a92cm1a.js",
+    "name": "my-settings",
+    "src": "resources/js/studio/my-settings.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-Dk6Yo1jS.js",
-      "_useLocalCatalog-BgZp4638.js"
-    ]
-  },
-  "resources/js/studio/presets.js": {
-    "file": "assets/presets-CfV7udU-.js",
-    "name": "presets",
-    "src": "resources/js/studio/presets.js",
-    "isEntry": true,
-    "imports": [
-      "_pageBoot-Dk6Yo1jS.js",
-      "_useLocalCatalog-BgZp4638.js"
+      "_pageBoot-DbXiwtk7.js",
+      "_StylistSection-DyF9ohAW.js"
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-hfVNYMpN.js",
+    "file": "assets/settings-CdXJzE5i.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-Dk6Yo1jS.js",
-      "_pinia-f7sGdZ4k.js",
-      "_BaseModal-Dmq9d8Jc.js"
+      "_pageBoot-DbXiwtk7.js",
+      "__plugin-vue_export-helper-SKlaRojG.js"
     ],
     "css": [
       "assets/settings-CD0a66op.css"
-    ]
-  },
-  "resources/js/studio/stylist-data.js": {
-    "file": "assets/stylist-data-D8R4KMgF.js",
-    "name": "stylist-data",
-    "src": "resources/js/studio/stylist-data.js",
-    "isEntry": true,
-    "imports": [
-      "_pageBoot-Dk6Yo1jS.js",
-      "_pinia-f7sGdZ4k.js",
-      "_StylistDataManager-BDvgXLZd.js"
     ]
   }
 }

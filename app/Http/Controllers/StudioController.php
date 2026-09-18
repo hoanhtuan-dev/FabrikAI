@@ -109,12 +109,38 @@ class StudioController extends Controller
 
     public function settingsPage() { return view('studio.settings'); }
 
-    public function presetsPage() { return view('studio.presets'); }
+    /**
+     * [Yêu cầu 2026-09-20] KHU "CÀI ĐẶT CỦA TÔI" HỢP NHẤT.
+     *
+     * Trước đây là 4 trang SPA rời rạc (/presets · /stylist-data · /model-settings?tab=model ·
+     * /model-settings?tab=pose), mỗi trang một app và một kiểu giao diện. Nay MỘT app duy nhất
+     * (resources/js/studio/my-settings.js) phục vụ cả 4 lối vào; server quyết định mở MỤC NÀO
+     * bằng cách truyền $section xuống blade, app đọc từ thuộc tính data-section.
+     *
+     * Vì sao vẫn giữ các URL cũ thay vì chuyển hướng hết về /cai-dat:
+     *   · bookmark và liên kết đang dùng tiếp tục chạy;
+     *   · hợp đồng "trang cũ trả 200" đã được khoá bằng tests/Feature/UserCatalogTest.php;
+     *   · đổi mục trong app thì URL được cập nhật bằng history.pushState sang /cai-dat/<mục>.
+     */
+    private const SETTINGS_SECTIONS = ['presets', 'model', 'pose', 'stylist'];
 
-    public function stylistDataPage() { return view('studio.stylist-data'); }
+    public function mySettingsPage(string $section = 'presets')
+    {
+        // Chốt lại danh sách hợp lệ: giá trị lạ (gõ tay trên URL) rơi về mục đầu thay vì để app
+        // rơi vào trạng thái không có mục nào được chọn.
+        if (! in_array($section, self::SETTINGS_SECTIONS, true)) {
+            $section = 'presets';
+        }
 
-    /** [Yêu cầu 2026-09-17] Trang cài đặt Khuôn mặt (model) + Dáng pose (người mẫu) — cấp user. */
-    public function modelSettingsPage() { return view('studio.model-settings'); }
+        return view('studio.my-settings', ['section' => $section]);
+    }
+
+    public function presetsPage() { return $this->mySettingsPage('presets'); }
+
+    public function stylistDataPage() { return $this->mySettingsPage('stylist'); }
+
+    /** [Yêu cầu 2026-09-17] Cài đặt Khuôn mặt (model) + Dáng pose (người mẫu) — cấp user. */
+    public function modelSettingsPage() { return $this->mySettingsPage(request()->query('tab') === 'pose' ? 'pose' : 'model'); }
 
 
     // storeProject() đã bị loại bỏ (finding: duplicate endpoint với validation yếu hơn

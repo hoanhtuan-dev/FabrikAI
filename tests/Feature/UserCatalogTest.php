@@ -44,7 +44,7 @@ class UserCatalogTest extends TestCase
 
     public function test_guest_is_redirected_to_login_on_all_three_pages(): void
     {
-        foreach (['/settings', '/presets', '/stylist-data'] as $uri) {
+        foreach (['/settings', '/presets', '/stylist-data', '/cai-dat', '/cai-dat/model'] as $uri) {
             $this->get($uri)->assertRedirect('/dang-nhap');
         }
     }
@@ -83,26 +83,38 @@ class UserCatalogTest extends TestCase
     {
         $c = $this->customer();
 
-        foreach (['/presets', '/stylist-data'] as $uri) {
+        foreach (['/presets', '/stylist-data', '/cai-dat', '/model-settings?tab=pose'] as $uri) {
             $html = $this->actingAs($c)->get($uri)->assertOk()->getContent();
             $this->assertStringContainsString('data-user-id="'.$c->id.'"', $html,
                 $uri.' phải nhúng data-user-id — khoá localStorage của bản tùy chỉnh theo từng user.');
         }
     }
 
-    public function test_blade_templates_expose_the_user_identity(): void
+    public function test_blade_template_exposes_the_user_identity(): void
     {
-        foreach (['presets', 'stylist-data'] as $view) {
-            $src = (string) file_get_contents(resource_path('views/studio/'.$view.'.blade.php'));
-            $this->assertStringContainsString('data-user-id', $src, $view.'.blade.php thiếu data-user-id.');
-        }
+        // [2026-09-20] Ba blade cũ (presets · stylist-data · model-settings) đã gộp thành MỘT:
+        // cả 4 lối vào cùng render studio/my-settings.blade.php.
+        $src = (string) file_get_contents(resource_path('views/studio/my-settings.blade.php'));
+        $this->assertStringContainsString('data-user-id', $src, 'my-settings.blade.php thiếu data-user-id.');
+        $this->assertStringContainsString('data-user-admin', $src, 'my-settings.blade.php thiếu data-user-admin.');
+        $this->assertStringContainsString('data-section', $src,
+            'my-settings.blade.php thiếu data-section — server phải nói cho app biết mở MỤC nào.');
     }
 
     // ── (e) app dùng lớp lưu trữ cục bộ, không ghi thẳng bảng toàn cục ───
 
-    public function test_client_stores_custom_catalog_locally_per_user(): void
+    /**
+     * [Quyết định 2026-09-20] Người dùng chốt: bản tùy chỉnh phải theo TÀI KHOẢN, không theo máy.
+     * Bản cũ nằm trong localStorage nên đổi máy/đổi trình duyệt là mất sạch — mất dữ liệu thật.
+     * Nay lưu trên server qua /api/user-catalogs/{name}; localStorage CHỈ còn là nguồn DI TRÚ một
+     * lần, nên nó vẫn phải có trong file — bỏ đi là bỏ rơi tùy chỉnh của người dùng cũ.
+     */
+    public function test_client_stores_custom_catalog_on_the_server_per_account(): void
     {
         $js = (string) file_get_contents(resource_path('js/studio/composables/useLocalCatalog.js'));
+
+        $this->assertStringContainsString('/api/user-catalogs/', $js,
+            'Bản tùy chỉnh phải lưu lên server theo tài khoản.');
 
         $this->assertStringContainsString('localStorage', $js, 'Bản tùy chỉnh phải lưu ở localStorage.');
         $this->assertStringContainsString('currentUserId', $js,
@@ -181,17 +193,22 @@ class UserCatalogTest extends TestCase
         $this->assertLessThan(array_search('settings', $ids, true), array_search('stylist', $ids, true),
             'Trợ lý thiết kế phải đứng trước mục ghim ở đáy.');
 
-        // Menu cài đặt phải có lối vào trang preset của người dùng.
-        $this->assertStringContainsString('Cài đặt Preset (Prompt Templates)', $src,
-            'Menu Cài đặt phải dẫn tới trang cài đặt preset cho người dùng.');
-        $this->assertStringContainsString('href="/presets"', $src);
+        // [2026-09-20] Menu Cài đặt nay trỏ về KHU HỢP NHẤT /cai-dat/<mục> thay vì 3 trang rời rạc.
+        $this->assertStringContainsString('href="/cai-dat/presets"', $src,
+            'Menu Cài đặt phải dẫn tới khu cài đặt đã hợp nhất (mục Preset).');
+        $this->assertStringContainsString('href="/cai-dat/model"', $src,
+            'Menu Cài đặt phải có lối vào mục Khuôn mặt.');
+        $this->assertStringContainsString('href="/cai-dat/pose"', $src,
+            'Menu Cài đặt phải có lối vào mục Dáng pose.');
+        $this->assertStringContainsString('href="/cai-dat/stylist"', $src,
+            'Menu Cài đặt phải có lối vào mục Trợ lý thiết kế.');
     }
 
-    public function test_both_pages_use_the_local_catalog(): void
+    public function test_both_sections_use_the_shared_catalog_layer(): void
     {
         $targets = [
-            'PresetsApp.vue' => resource_path('js/studio/PresetsApp.vue'),
-            'StylistDataManager.vue' => resource_path('js/studio/components/StylistDataManager.vue'),
+            'PresetSection.vue' => resource_path('js/studio/components/settings/PresetSection.vue'),
+            'StylistSection.vue' => resource_path('js/studio/components/settings/StylistSection.vue'),
         ];
 
         foreach ($targets as $label => $path) {
@@ -199,5 +216,41 @@ class UserCatalogTest extends TestCase
             $this->assertStringContainsString('useLocalCatalog', $src, $label.' phải dùng lớp lưu trữ cục bộ.');
             $this->assertStringContainsString('recompute', $src, $label.' phải ghép lại baseline sau khi sửa.');
         }
+    }
+
+    /**
+     * Bất biến của khu hợp nhất: mỗi lối vào mở ĐÚNG mục của nó.
+     *
+     * Guard này chặn lỗi nối dây rất khó thấy bằng mắt — cả 4 URL đều trả về CÙNG một app, nên nếu
+     * /model-settings?tab=pose lại mở mục Khuôn mặt thì nhìn bề ngoài trang vẫn chạy bình thường.
+     */
+    public function test_each_entry_point_opens_the_matching_settings_section(): void
+    {
+        $c = $this->customer();
+
+        $expect = [
+            '/cai-dat' => 'presets',
+            '/cai-dat/presets' => 'presets',
+            '/cai-dat/model' => 'model',
+            '/cai-dat/pose' => 'pose',
+            '/cai-dat/stylist' => 'stylist',
+            '/presets' => 'presets',
+            '/stylist-data' => 'stylist',
+            '/model-settings' => 'model',
+            '/model-settings?tab=model' => 'model',
+            '/model-settings?tab=pose' => 'pose',
+        ];
+
+        foreach ($expect as $uri => $section) {
+            $html = $this->actingAs($c)->get($uri)->assertOk()->getContent();
+            $this->assertStringContainsString('data-section="'.$section.'"', $html,
+                $uri.' phải mở mục '.$section.'.');
+        }
+    }
+
+    /** Mục không tồn tại trên URL phải là 404, không được render một mục tuỳ tiện. */
+    public function test_unknown_settings_section_is_not_found(): void
+    {
+        $this->actingAs($this->customer())->get('/cai-dat/khong-ton-tai')->assertNotFound();
     }
 }

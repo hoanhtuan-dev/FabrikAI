@@ -14,10 +14,10 @@ export default defineConfig({
                 // view nào nạp (grep "@vite" chỉ ra app.css; grep "x-data" trong resources/views = 0).
                 'resources/js/studio/main.js',
                 'resources/js/studio/settings.js',
-                'resources/js/studio/presets.js',
-                'resources/js/studio/stylist-data.js',
-                // [Yêu cầu 2026-09-17] Trang cài đặt Khuôn mặt (model) + Dáng pose (người mẫu), cấp USER.
-                'resources/js/studio/model-settings.js',
+                // [Yêu cầu 2026-09-20] KHU "CÀI ĐẶT CỦA TÔI" HỢP NHẤT — thay 3 entry rời rạc
+                // (presets.js · stylist-data.js · model-settings.js). Một app duy nhất phục vụ cả
+                // 4 lối vào: /cai-dat/<mục> cùng các URL cũ /presets · /stylist-data · /model-settings.
+                'resources/js/studio/my-settings.js',
                 'resources/js/studio/admin.js',
             ],
             refresh: true,

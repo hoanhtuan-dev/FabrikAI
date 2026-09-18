@@ -964,15 +964,19 @@ function onTouchEnd(e) {
         <!-- Ghim đáy; nhãn/icon/ẩn-hiện lấy từ CẤU HÌNH (không đổi được vị trí). -->
         <div v-if="settingsEntry" class="relative mt-auto">
           <div v-if="settingsOpen" class="fixed inset-0 z-40" @click="settingsOpen = false"></div>
-          <button @click="settingsOpen = !settingsOpen" class="activity-btn" :class="settingsOpen ? 'is-active' : ''" :title="settingsEntry.label + ' — preset, dữ liệu Trợ lý, thư viện'" :aria-label="settingsEntry.label" aria-haspopup="menu" :aria-expanded="settingsOpen ? 'true' : 'false'">
+          <button @click="settingsOpen = !settingsOpen" class="activity-btn" :class="settingsOpen ? 'is-active' : ''" :title="settingsEntry.label + ' — preset, khuôn mặt, dáng pose, trợ lý thiết kế'" :aria-label="settingsEntry.label" aria-haspopup="menu" :aria-expanded="settingsOpen ? 'true' : 'false'">
             <StudioIcon :name="settingsEntry.icon" size="h-5 w-5" />
           </button>
           <div v-if="settingsOpen" role="menu" class="absolute bottom-0 left-full z-50 ml-2 w-64 overflow-hidden rounded-xl border border-ink-700 bg-ink-900 p-1.5 shadow-2xl">
             <p class="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">Cài đặt của tôi</p>
-            <a href="/presets" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="template" size="h-4 w-4" class="text-brand-400" /> Cài đặt Preset (Prompt Templates)</a>
-            <a href="/stylist-data" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="shirt" size="h-4 w-4" class="text-brand-400" /> Dữ liệu Trợ lý thiết kế</a>
-            <a href="/model-settings?tab=model" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="user" size="h-4 w-4" class="text-brand-400" /> Khuôn mặt (model)</a>
-            <a href="/model-settings?tab=pose" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="pose" size="h-4 w-4" class="text-brand-400" /> Dáng pose (người mẫu)</a>
+            <!-- [2026-09-20] 4 lối vào nay trỏ về KHU HỢP NHẤT /cai-dat/<mục>. Giữ đủ 4 dòng thay vì
+                 gộp còn một: người dùng đã quen bấm thẳng vào mục mình cần, và đích đến vẫn là khu hợp
+                 nhất (có sidebar để đổi mục) nên không mất gì. Các URL cũ /presets, /stylist-data,
+                 /model-settings vẫn chạy và mở đúng mục tương ứng. -->
+            <a href="/cai-dat/presets" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="template" size="h-4 w-4" class="text-brand-400" /> Preset (mẫu prompt)</a>
+            <a href="/cai-dat/model" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="user" size="h-4 w-4" class="text-brand-400" /> Khuôn mặt (model)</a>
+            <a href="/cai-dat/pose" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="pose" size="h-4 w-4" class="text-brand-400" /> Dáng pose (người mẫu)</a>
+            <a href="/cai-dat/stylist" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="shirt" size="h-4 w-4" class="text-brand-400" /> Dữ liệu Trợ lý thiết kế</a>
             <button type="button" @click="settingsOpen = false; goLibrary()" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="grid" size="h-4 w-4" class="text-brand-400" /> Thư viện &amp; ảnh của tôi</button>
             <template v-if="store.user && store.user.is_admin">
               <div class="my-1 border-t border-ink-700"></div>

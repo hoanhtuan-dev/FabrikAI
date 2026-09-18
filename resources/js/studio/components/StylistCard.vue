@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
-import StylistDataManager from './StylistDataManager.vue';
+import StylistSection from './settings/StylistSection.vue';
 import StudioIcon from './StudioIcon.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 const store = useStudioStore();
@@ -145,6 +145,6 @@ function openSettings() { settingsOpen.value = true; }
     </BaseModal>
 
     <BaseModal v-model="settingsOpen" title="Quản lý data Trợ lý thiết kế" wide>
-      <div class="p-5"><StylistDataManager /></div>
+      <div class="p-5"><StylistSection /></div>
     </BaseModal>
 </template>

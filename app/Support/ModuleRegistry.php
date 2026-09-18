@@ -116,7 +116,7 @@ class ModuleRegistry
             'id' => 'prompt', 'name' => 'Prompt Tạo Ảnh', 'group' => 'Nội dung',
             'kind' => self::KIND_ACTION, 'gui' => true, 'icon' => 'sparkles',
             'summary' => 'Thư viện prompt, tạo ảnh theo prompt, hàng loạt và mẫu việc theo ngành.',
-            'endpoints' => ['generate', 'prompt-history', 'presets', 'translate', 'preview-enrich'],
+            'endpoints' => ['generate', 'prompt-history', 'presets', 'user-catalogs', 'translate', 'preview-enrich'],
             'depends_on' => [],
             'plans' => ['*'],
         ],
@@ -124,7 +124,10 @@ class ModuleRegistry
             'id' => 'stylist', 'name' => 'Trợ lý thiết kế', 'group' => 'Nội dung',
             'kind' => self::KIND_ACTION, 'gui' => true, 'icon' => 'shirt',
             'summary' => 'Tư vấn phối đồ, chất liệu và bối cảnh theo bộ sưu tập.',
-            'endpoints' => ['stylist', 'stylist-data'],
+            // 'user-catalogs' phục vụ CẢ /presets lẫn /stylist-data (bản tùy chỉnh của từng tài
+            // khoản) ⇒ cả hai module đều là chủ sở hữu, đúng như 'refgen' dùng chung cho
+            // 'variation' + 'tryon': gói có MỘT trong hai là dùng được.
+            'endpoints' => ['stylist', 'stylist-data', 'user-catalogs'],
             'depends_on' => [],
             'plans' => ['pro', 'studio', 'factory_season'],
         ],
