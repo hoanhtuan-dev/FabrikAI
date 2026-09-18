@@ -973,6 +973,77 @@ hành vẫn nhận đủ hiệu ứng.
 - **Giữ nguyên "đang chọn" khi ẩn/hiện là quyết định UX, không phải chi tiết kỹ thuật.** Chuyển active đi
   chỗ khác khiến tay cầm "biến mất" theo mắt người dùng — và đó là toàn bộ nội dung khiếu nại.
 
+---
+
+## 18. Đợt 14 — VÌ SAO "VẪN KHÔNG CÓ TAY CẦM": trạng thái kiểm thử của tôi KHÁC trạng thái thật của người dùng (2026-09-20)
+
+### 18.1 Vấn đề — và vì sao vòng trước tôi kết luận SAI
+
+Sau khi deploy đợt 13, khiếu nại y nguyên. Nguyên nhân không nằm ở thứ tôi đã sửa, mà ở chỗ **tôi kiểm thử
+trên trạng thái sạch còn người dùng làm việc trên trạng thái CŨ**:
+
+| | Trạng thái tôi kiểm (mỗi lần đều tạo layer MỚI) | Trạng thái thật của người dùng |
+|---|---|---|
+| `baseW/baseH` | luôn có (do `pushCanvasLayer` đặt) | **null** — layer lưu từ phiên bản TRƯỚC khi có hai trường này |
+| Tay cầm chỉnh kích cỡ | hiện đầy đủ ⇒ tôi tưởng đã xong | **KHÔNG hiện tay cầm nào** vì vị trí tay cầm tính theo `baseW/baseH` |
+
+**Tái hiện được 100%**: gieo `localStorage['fabrikai.layers']` hai layer KHÔNG có `baseW/baseH` rồi tải
+trang ⇒ canvas hiện đủ 2 layer (ảnh 400×300) nhưng `document.querySelectorAll('.layer-handle').length` = **0**.
+Đây đúng là ảnh chụp màn hình người dùng đang thấy: layer có, tay cầm không.
+
+Lưu ý phương pháp: lần đầu tôi gieo dữ liệu NGAY TRÊN trang studio nên bị chính app ghi đè lúc
+`beforeunload` (canvas rỗng) ⇒ test ra "0 layer" và suýt dẫn tôi tới kết luận sai nữa. Phải gieo **trước khi
+Studio mount** (ở trang đăng nhập) rồi mới điều hướng vào.
+
+### 18.2 Đã làm
+
+1. **Vá kích thước cho layer cũ** — `ensureLayerSizes()`: layer nào thiếu `baseW/baseH` thì đo lại từ chính
+   ảnh của nó (cạnh dài tối đa 512 — đúng quy ước hiện có) rồi ghi vào, **không đụng tới vị trí/scale đã lưu**.
+   Gọi ngay trong `restoreLayerLayout()` ⇒ layer cũ **TỰ LÀNH** sau một lần tải, người dùng không phải xóa
+   rồi thêm lại. Việc này sửa luôn một lỗi im lặng thứ hai: khung logic của layer cũ là **1×1px** nên căn lề ·
+   chia đều · "Fit chọn" đều sai.
+2. **Đường đo dự phòng từ DOM** cho tay cầm: `layerBaseSize()` lấy `baseW/baseH` → nếu thiếu thì đo
+   `img.offsetWidth/offsetHeight` (`offset*` KHÔNG tính transform nên vẫn đúng khi layer đang xoay/phóng to)
+   → cuối cùng mới tới `frameLayout`. Thẻ layer có `data-layer-id` để đo đúng ảnh của nó.
+3. **Bỏ phụ thuộc `@property`**: hiệu ứng bật/tắt layer nay dùng **hai tầng** — thẻ ngoài `.layer-el` giữ hệ số
+   ẩn/hiện và chuyển động **opacity** (thuộc tính chuyển động được ở MỌI trình duyệt), thẻ trong `.layer-body`
+   giữ **độ mờ riêng của layer** bằng inline style **không transition**. Nhờ vậy: hiệu ứng chạy cả trên trình
+   duyệt không hỗ trợ `@property` (nếu không hỗ trợ thì cách cũ **không chạy hiệu ứng nào**), mà thanh trượt
+   Độ mờ vẫn tức thì.
+
+### 18.3 Ràng buộc đã giữ
+
+- Không đổi toạ độ/scale/xoay/độ mờ đã lưu của layer — chỉ ĐO và ghi kích thước còn thiếu.
+- Composite/xuất ảnh vẫn theo `visibleLayers`; kéo layer, kéo tay cầm, xoay, khóa đều chạy như đợt 13.
+
+### 18.4 Đo được (Chrome thật 1600×1000 + phpunit)
+
+| Đo | Trước (với layer CŨ) | Sau |
+|---|---|---|
+| Số tay cầm khi layer thiếu `baseW/baseH` | **0** | **2** (18×18, `elementFromPoint` trả về chính tay cầm) |
+| `baseW/baseH` trong localStorage sau khi tải | `null` | **`400x300`** (đo từ chính ảnh của layer) |
+| Kéo tay cầm trên layer CŨ | không có gì để kéo | scale **1 → 1.55** |
+| Chuỗi mờ khi ẩn (45ms/lần) | — | `0.694 → 0.169 → 0.070 → 0.016 → 0.001 → 0`; khi hiện: `0.306 → 0.831 → 0.955 → 0.984 → 0.999 → 1` |
+| Thanh trượt Độ mờ | — | `0.5` ngay sau **30ms** (thẻ `.layer-body`) |
+| Canvas MỚI (kiểm hồi quy) | — | 2 layer · 2 `.layer-body` · tay cầm bấm được · kéo tay cầm 1 → **1.3** · kéo layer di chuyển bình thường, tay cầm vẫn bấm được |
+| `vendor/bin/phpunit` | 695 test / 4619 khẳng định | **696 test / 4627 khẳng định — XANH** |
+| `npm run build` | — | thoát 0; build lặp lại cho **đúng hash cũ** |
+
+### 18.5 Bài học tự bắt được trong đợt này
+
+- **Kiểm thử trên trạng thái SẠCH có thể che đúng cái lỗi người dùng đang gặp.** Mọi lần kiểm trước đây tôi
+  đều TẠO layer mới ⇒ dữ liệu luôn đầy đủ ⇒ tay cầm luôn hiện. Chỉ khi gieo **dữ liệu cũ** mới tái hiện được.
+  Từ nay với lỗi liên quan dữ liệu người dùng, phải kiểm bằng **dữ liệu cũ / thiếu trường**, không chỉ dữ liệu mới.
+- **Trường phái sinh trong bộ nhớ phải có đường TỰ VÁ.** `baseW/baseH` là dữ liệu dẫn xuất được lưu kèm; phiên
+  bản trước không có nó ⇒ mọi thứ tính theo nó im lặng sai (tay cầm biến mất, khung logic 1×1px). Dữ liệu dẫn
+  xuất nên được tính lại khi thiếu, chứ không phải giả định là luôn có.
+- **Dựa vào tính năng nền tảng mới thì phải có đường lùi.** `@property` + transition trên biến đã đăng ký là
+  cách hay, nhưng trình duyệt không hỗ trợ thì **không có hiệu ứng nào** và cũng không có lỗi nào. Hai tầng
+  (opacity ở thẻ ngoài + độ mờ riêng ở thẻ trong) chạy ở mọi nơi và vẫn giữ được yêu cầu "thanh trượt tức thì".
+- **Gieo dữ liệu kiểm thử phải làm TRƯỚC khi app mount.** App có handler `beforeunload` ghi đè localStorage;
+  gieo sai thời điểm thì bài test đo chính cái rỗng do mình vừa tạo.
+
+
 
 
 
