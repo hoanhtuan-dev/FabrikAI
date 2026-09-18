@@ -3409,6 +3409,31 @@ export const useStudioStore = defineStore('studio', {
       this.imageSeed = ''; this.hairStyle = ''; this.hairColor = ''; this.imagePoseId = '';
       this.promptUsePrefix = true; this.promptUseSuffix = true; this.promptUseNegative = true;
     },
+    /**
+     * VÁ KÍCH THƯỚC cho layer thiếu baseW/baseH — dữ liệu lưu từ phiên bản TRƯỚC khi có hai trường này
+     * sẽ khôi phục về với baseW/baseH = null. Hệ quả đo được (không có lỗi nào hiện ra):
+     *   · tay cầm chỉnh kích cỡ KHÔNG hiện, vì vị trí tay cầm tính theo kích thước layer;
+     *   · khung logic của layer thành 1×1px nên căn lề · chia đều · fit chọn đều sai.
+     * Nay đo lại từ chính ảnh của layer (cạnh dài tối đa 512 — đúng quy ước của pushCanvasLayer) rồi
+     * ghi vào: layer cũ TỰ LÀNH sau một lần tải, người dùng không phải xóa rồi thêm lại.
+     * KHÔNG đụng tới vị trí/scale đã lưu (khác _positionByImageSize — hàm đó còn xếp lại chỗ đứng).
+     */
+    ensureLayerSizes() {
+      const MAX = 512;
+      this.canvasLayers.forEach((l) => {
+        if (!l.image || (Number(l.baseW) > 0 && Number(l.baseH) > 0)) return;
+        const img = new Image();
+        img.onload = () => {
+          const nw = img.naturalWidth || 0, nh = img.naturalHeight || 0;
+          if (nw < 1 || nh < 1) return;
+          const cap = Math.min(1, MAX / nw, MAX / nh);
+          l.baseW = Math.max(1, Math.round(nw * cap));
+          l.baseH = Math.max(1, Math.round(nh * cap));
+          this.saveLayerLayout();
+        };
+        img.src = l.image;
+      });
+    },
     // Khôi phục bố cục layer; bỏ layer 'gen' đã bị xóa khỏi output, giữ layer 'source' (URL vẫn hợp lệ).
     restoreLayerLayout() {
       try {
@@ -3430,6 +3455,9 @@ export const useStudioStore = defineStore('studio', {
         const active = this.canvasLayers.find((l) => l.id === d.activeLayerId && l.visible !== false);
         if (active) this._setActive(active.id); else this._setActive('');
         this.selectedLayerIds = (Array.isArray(d.selectedLayerIds) ? d.selectedLayerIds : []).filter((id) => this.canvasLayers.some((l) => l.id === id) && id !== this.activeLayerId);
+        // Vá kích thước cho layer CŨ rồi mới lưu (xem ensureLayerSizes — thiếu bước này thì layer khôi
+        // phục từ phiên bản trước về với baseW/baseH = null và KHÔNG có tay cầm chỉnh kích cỡ).
+        this.ensureLayerSizes();
         this.saveLayerLayout();
       } catch (e) { this.canvasLayers = []; this.activeLayerId = ''; this.saveLayerLayout(); }
     },

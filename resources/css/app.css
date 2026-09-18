@@ -299,17 +299,6 @@
     }
 }
 
-/* Đăng ký --layer-vis là SỐ có thể NỘI SUY. Nhờ vậy CSS chuyển động được chính biến này
-   (thay vì chuyển động thuộc tính opacity gộp), nên:
-     · bật/tắt layer ⇒ --layer-vis chạy 1 → 0 và độ mờ đi theo từng frame (hiệu ứng mượt);
-     · kéo thanh trượt ĐỘ MỜ của layer ⇒ --layer-opacity đổi NGAY, không bị trễ 220ms.
-   Gộp cả hai vào một thuộc tính opacity rồi transition sẽ làm thanh trượt opacity "dính tay". */
-@property --layer-vis {
-    syntax: '<number>';
-    inherits: false;
-    initial-value: 1;
-}
-
 /* ═══════════════════════════════════════════════════════════════════════════
    CƠ SỞ CHUNG CHO CHUYỂN ĐỘNG — "motion foundation" (2026-09-20)
    ═══════════════════════════════════════════════════════════════════════════
@@ -406,12 +395,18 @@
        Độ mờ = độ mờ riêng của layer (--layer-opacity do JS đặt) × hệ số ẩn/hiện --layer-vis. */
     .layer-el {
         --layer-vis: 1;
-        opacity: calc(var(--layer-opacity, 1) * var(--layer-vis));
-        /* Chuyển động CHÍNH BIẾN --layer-vis (đã đăng ký ở đầu file), KHÔNG chuyển động opacity:
-           làm vậy độ mờ riêng của layer (thanh trượt Opacity) vẫn đổi tức thì. */
-        transition: --layer-vis var(--motion-dur-base) var(--motion-ease-standard),
+        /* HAI TẦNG, có lý do:
+           · thẻ ngoài (.layer-el) giữ HỆ SỐ ẨN/HIỆN và chuyển động opacity — opacity là thuộc tính
+             chuyển động được ở MỌI trình duyệt (không phụ thuộc @property như cách dùng biến đã đăng ký);
+           · thẻ trong (.layer-body) giữ ĐỘ MỜ RIÊNG của layer bằng inline style và KHÔNG có transition
+             ⇒ kéo thanh trượt Độ mờ vẫn tức thì, không bị "dính tay" 220ms.
+           Gộp cả hai vào một thuộc tính opacity rồi transition là hỏng một trong hai yêu cầu. */
+        opacity: var(--layer-vis);
+        transition: opacity var(--motion-dur-base) var(--motion-ease-standard),
                     scale var(--motion-dur-base) var(--motion-ease-emphasized);
     }
+    /* Thẻ trong: bọc ảnh + viền chọn + nhãn nhóm, chỉ mang độ mờ riêng (không chuyển động). */
+    .layer-body { position: relative; }
     /* Layer đã tắt: mờ hẳn, thu nhẹ, và KHÔNG nhận chuột nữa (bấm xuyên qua như khi không có layer). */
     .layer-el--hidden {
         --layer-vis: 0;

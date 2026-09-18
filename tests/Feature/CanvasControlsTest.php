@@ -152,11 +152,12 @@ class CanvasControlsTest extends TestCase
         $this->assertStringContainsString(":class=\"l.visible === false ? 'layer-el--hidden' : ''\"", $app,
             'Thiếu dấu hiệu layer đang tắt (.layer-el--hidden).');
 
-        // CSS: độ mờ = độ mờ riêng của layer × hệ số ẩn/hiện, và theo TOKEN chung.
+        // CSS: hệ số ẩn/hiện nằm ở thẻ ngoài, độ mờ riêng của layer nằm ở thẻ trong (.layer-body —
+        // kiểm kỹ ở test_motion_of_layer_visibility_does_not_delay_the_opacity_slider).
         preg_match('/\.layer-el\s*\{([^}]*)\}/', $css, $m);
         $this->assertNotEmpty($m[1] ?? '', 'app.css thiếu định nghĩa .layer-el.');
-        $this->assertStringContainsString('calc(var(--layer-opacity, 1) * var(--layer-vis))', $m[1],
-            'Độ mờ phải nhân độ mờ riêng của layer với hệ số ẩn/hiện (nếu không, layer có opacity riêng sẽ mờ sai).');
+        $this->assertStringContainsString('opacity: var(--layer-vis)', $m[1],
+            'Thẻ layer phải mờ theo hệ số ẩn/hiện --layer-vis.');
         $this->assertStringContainsString('var(--motion-dur-', $m[1],
             'Hiệu ứng bật/tắt layer phải dùng token chuyển động, không viết số ms.');
 
@@ -166,13 +167,11 @@ class CanvasControlsTest extends TestCase
         $this->assertStringContainsString('pointer-events: none', $hidden[1],
             'Layer đã tắt không được nhận chuột — nếu không, nó chặn cả canvas dù vô hình.');
 
-        // Opacity riêng của layer phải đi qua BIẾN, không ghi thẳng 'opacity' (ghi thẳng là CSS thua inline style).
+        // Độ mờ riêng của layer KHÔNG nằm ở thẻ ngoài (nếu nằm ở đó là đè mất hiệu ứng mờ của CSS).
         preg_match('/function layerStyle\(l, i\)\s*\{(.*?)\n\}/s', $app, $ls);
         $this->assertNotEmpty($ls[1] ?? '', 'Không đọc được layerStyle().');
-        $this->assertStringContainsString("'--layer-opacity'", $ls[1],
-            'layerStyle phải đưa độ mờ vào biến --layer-opacity để CSS nhân được với hệ số ẩn/hiện.');
         $this->assertStringNotContainsString('opacity:', $ls[1],
-            'layerStyle KHÔNG được ghi thẳng opacity — inline style sẽ đè mất hiệu ứng mờ của CSS.');
+            'layerStyle KHÔNG được ghi opacity cho thẻ .layer-el — inline style sẽ đè mất hiệu ứng mờ của CSS.');
 
         // Hàng trong bảng Lớp cũng phải mờ dần khi ẩn layer, không đổi tức thì.
         $this->assertMatchesRegularExpression('/class="motion-ui[^"]*group flex items-center/', $layers,
@@ -325,21 +324,67 @@ class CanvasControlsTest extends TestCase
     public function test_motion_of_layer_visibility_does_not_delay_the_opacity_slider(): void
     {
         $css = $this->src('css/app.css');
+        $app = $this->src('js/studio/StudioApp.vue');
 
-        // --layer-vis phải được ĐĂNG KÝ thì mới nội suy được; chuyển động đặt lên CHÍNH BIẾN đó để
-        // thanh trượt Độ mờ (đổi --layer-opacity) vẫn tức thì.
-        $this->assertMatchesRegularExpression('/@property\s+--layer-vis\s*\{[^}]*syntax:\s*[\'"]<number>[\'"]/s', $css,
-            'Thiếu @property --layer-vis — không đăng ký thì không chuyển động mượt được biến này.');
-        $this->assertMatchesRegularExpression('/--layer-vis:\s*1;?/', $css, 'Thiếu giá trị khởi tạo cho --layer-vis.');
-
+        // HAI TẦNG: thẻ ngoài giữ hệ số ẩn/hiện + chuyển động opacity (thuộc tính chuyển động được ở
+        // MỌI trình duyệt), thẻ trong giữ độ mờ riêng của layer bằng inline style KHÔNG transition.
+        // Gộp cả hai vào một opacity rồi transition ⇒ thanh trượt Độ mờ bị trễ 220ms (đã dính thật).
         preg_match('/\.layer-el\s*\{([^}]*)\}/', $css, $m);
         $this->assertNotEmpty($m[1] ?? '', 'Không đọc được .layer-el.');
-        $this->assertStringContainsString('transition: --layer-vis', $m[1],
-            'Phải chuyển động BIẾN --layer-vis, KHÔNG chuyển động thẳng opacity (làm thanh trượt Độ mờ bị trễ).');
+        $this->assertStringContainsString('opacity: var(--layer-vis)', $m[1],
+            'Thẻ ngoài phải mang hệ số ẩn/hiện qua --layer-vis.');
+        $this->assertMatchesRegularExpression('/transition:\s*opacity\s+var\(--motion-dur-/s', $m[1],
+            'Bật/tắt layer phải chuyển động thuộc tính opacity (chạy trên mọi trình duyệt — không phụ thuộc @property).');
+        $this->assertStringNotContainsString('@property --layer-vis', $css,
+            'Không dựa vào @property nữa: trình duyệt không hỗ trợ thì hiệu ứng bật/tắt layer sẽ KHÔNG chạy.');
+
+        $this->assertMatchesRegularExpression('/\.layer-body\s*\{[^}]*position:\s*relative/s', $css,
+            'Thiếu .layer-body (thẻ trong giữ độ mờ riêng của layer).');
+        preg_match('/\.layer-body\s*\{([^}]*)\}/', $css, $body);
+        $this->assertStringNotContainsString('transition', $body[1] ?? '',
+            '.layer-body KHÔNG được có transition — kéo thanh trượt Độ mờ phải tức thì.');
+
+        // Trong template: độ mờ riêng của layer đặt ở .layer-body, và layerStyle KHÔNG ghi opacity.
+        $this->assertMatchesRegularExpression('/<div class="layer-body"\s+:style="\{ opacity:/s', $app,
+            'Độ mờ riêng của layer phải nằm ở .layer-body (inline) — không phải ở thẻ .layer-el.');
+        preg_match('/function layerStyle\(l, i\)\s*\{(.*?)\n\}/s', $app, $ls);
+        $this->assertStringNotContainsString('opacity:', $ls[1] ?? '',
+            'layerStyle không được đặt opacity cho thẻ .layer-el — inline style sẽ đè hiệu ứng mờ của CSS.');
 
         // Màn hình trống phải nằm DƯỚI các layer, nếu không nó che mất hiệu ứng mờ của layer cuối.
         $empty = $this->vue('CanvasEmptyState.vue');
         $this->assertStringContainsString('absolute inset-0 z-0', $empty,
             'Màn hình trống phải ở z-0 (dưới layer) — để z-20 thì nó che hiệu ứng mờ của layer đang tắt.');
+    }
+
+    public function test_legacy_layers_get_their_size_backfilled(): void
+    {
+        $store = $this->src('js/studio/store.js');
+        $app = $this->src('js/studio/StudioApp.vue');
+
+        // GỐC RỄ ĐÃ ĐO ĐƯỢC: layer lưu từ phiên bản trước khôi phục về với baseW/baseH = null ⇒
+        // (a) tay cầm chỉnh kích cỡ KHÔNG hiện (vị trí tay cầm tính theo kích thước layer),
+        // (b) khung logic của layer thành 1×1px nên căn lề/chia đều/fit chọn sai.
+        $this->assertStringContainsString('ensureLayerSizes()', $store, 'Thiếu hàm vá kích thước cho layer cũ.');
+        preg_match('/ensureLayerSizes\(\)\s*\{(.*?)\n    \},/s', $store, $m);
+        $this->assertNotEmpty($m[1] ?? '', 'Không đọc được ensureLayerSizes().');
+        $this->assertStringContainsString('naturalWidth', $m[1], 'Phải đo kích thước thật từ chính ảnh của layer.');
+        $this->assertStringContainsString('baseW =', $m[1], 'Phải ghi baseW/baseH sau khi đo.');
+        $this->assertStringNotContainsString('_positionByImageSize', $m[1],
+            'Vá kích thước KHÔNG được xếp lại vị trí layer — layer cũ đã có toạ độ người dùng đặt.');
+
+        // Phải được gọi trong đường KHÔI PHỤC thì layer cũ mới tự lành khi tải trang.
+        preg_match('/restoreLayerLayout\(\)\s*\{(.*?)\n    \},/s', $store, $restore);
+        $this->assertStringContainsString('this.ensureLayerSizes()', $restore[1] ?? '',
+            'restoreLayerLayout phải vá kích thước cho layer cũ ngay khi khôi phục.');
+
+        // Và khi kích thước vẫn còn thiếu (ảnh chưa nạp xong), tay cầm phải đo từ DOM thay vì biến mất.
+        $this->assertStringContainsString('function layerBaseSize(l)', $app, 'Thiếu đường lấy kích thước layer.');
+        preg_match('/function layerBaseSize\(l\)\s*\{(.*?)\n\}/s', $app, $size);
+        $this->assertStringContainsString('offsetWidth', $size[1] ?? '',
+            'Phải có đường đo từ DOM (offsetWidth — không tính transform) cho layer chưa có baseW/baseH.');
+        $this->assertStringContainsString('data-layer-id', $app,
+            'Thẻ layer phải có data-layer-id để đo được đúng ảnh của nó.');
+        $this->assertStringContainsString(':data-layer-id="l.id"', $app, 'Thiếu ràng buộc data-layer-id trên thẻ layer.');
     }
 }

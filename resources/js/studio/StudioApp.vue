@@ -347,11 +347,26 @@ function onHistoryKeys(e) {
  * Vị trí tính bằng số liệu store (x · y · scale · rotation · baseW/baseH · zoom · pan) nên vẫn bám
  * đúng góc ĐÃ XOAY của layer mà không cần đo DOM.
  */
+/**
+ * Kích thước LAYOUT của ảnh layer, theo thứ tự tin cậy:
+ *   1. baseW/baseH trong store (nguồn chính, do pushCanvasLayer/_positionByImageSize đặt);
+ *   2. ĐO TỪ DOM: img.offsetWidth/offsetHeight — offset* KHÔNG tính transform nên vẫn đúng khi layer
+ *      đang xoay/phóng to; đây là đường cứu cho layer CŨ chưa có baseW/baseH (dữ liệu lưu từ phiên bản
+ *      trước) — chính là trường hợp làm tay cầm biến mất hoàn toàn;
+ *   3. frameLayout của store (ảnh isolate đang mở) nếu hai cách trên đều không có.
+ */
+function layerBaseSize(l) {
+  const w = Number(l && l.baseW), h = Number(l && l.baseH);
+  if (w > 0 && h > 0) return { w, h };
+  const img = document.querySelector('[data-layer-id="' + l.id + '"] img');
+  if (img && img.offsetWidth > 0 && img.offsetHeight > 0) return { w: img.offsetWidth, h: img.offsetHeight };
+  return store.frameLayout;
+}
 const activeHandles = computed(() => {
   const l = store.activeLayer;
   const el = store.canvasZoom;
   if (!l || !el || l.visible === false || isolateActive.value) return null;
-  const fl = store.frameLayout;                       // kích thước layout của ảnh layer
+  const fl = layerBaseSize(l);                        // kích thước layout của ảnh layer
   if (!fl) return null;
   const r = el.getBoundingClientRect();
   if (!r.width || !r.height) return null;
@@ -532,10 +547,9 @@ function layerStyle(l, i) {
   return {
     transform: store.layerTransformStyle(l),
     transformOrigin: 'center',
-    // Độ mờ riêng của layer đưa vào BIẾN CSS (không ghi thẳng 'opacity') để CSS nhân nó với hệ số
-    // ẩn/hiện --layer-vis: nhờ vậy bật/tắt layer mờ được CẢ thẻ (viền chọn, tay cầm, nhãn nhóm)
-    // chứ không chỉ mỗi ảnh — xem .layer-el trong app.css.
-    '--layer-opacity': String(l.opacity != null ? l.opacity : 1),
+    // Độ mờ RIÊNG của layer nằm ở thẻ .layer-body bên trong (inline, KHÔNG transition) — thẻ ngoài
+    // .layer-el giữ hệ số ẩn/hiện và chuyển động opacity. Tách hai tầng như vậy để: (a) bật/tắt layer
+    // mờ được CẢ thẻ (ảnh + viền chọn + nhãn nhóm), (b) kéo thanh trượt Độ mờ vẫn TỨC THÌ.
     mixBlendMode: (l.blend && l.blend !== 'normal') ? l.blend : 'normal',
     zIndex: i + 1,
   };
@@ -1195,7 +1209,10 @@ function onTouchEnd(e) {
                  Layer ẩn bị chặn pointer (pointer-events:none) nên vẫn bấm xuyên qua được như cũ. -->
             <div v-else class="absolute inset-0">
               <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
-                <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="layer-el absolute left-0 top-0" :class="l.visible === false ? 'layer-el--hidden' : ''" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
+                <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="layer-el absolute left-0 top-0" :class="l.visible === false ? 'layer-el--hidden' : ''" :data-layer-id="l.id" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
+                  <!-- .layer-body: ĐỘ MỜ RIÊNG của layer (inline, không chuyển động) — nhờ tách hai
+                       tầng mà thanh trượt Độ mờ vẫn tức thì trong khi bật/tắt layer vẫn mờ mượt. -->
+                  <div class="layer-body" :style="{ opacity: l.opacity != null ? l.opacity : 1 }">
                   <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :title="l.groupId ? 'Thuộc nhóm — Alt+click để chỉnh sửa riêng layer này' : l.name" :class="[l.id === store.activeLayerId ? 'outline outline-2 -outline-offset-2 outline-sky-400' : (store.isSelected(l.id) ? 'outline outline-2 -outline-offset-2 outline-sky-400/70' : ''), l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']" draggable="false" />
                   <!-- (Tay cầm chỉnh kích cỡ / xoay KHÔNG còn nằm trong thẻ layer — xem lớp phủ
                        "layer-handle" ở dưới: để trong thẻ thì bị overflow:hidden của vùng canvas cắt mất
@@ -1210,6 +1227,7 @@ function onTouchEnd(e) {
                       <span v-else class="truncate">{{ store.groupLabel(l) }}</span>
                     </span>
                   </template>
+                  </div>
                 </div>
               </div>
               <CanvasEmptyState v-if="!store.visibleLayers.length && !store.generating" />
