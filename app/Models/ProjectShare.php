@@ -23,6 +23,19 @@ class ProjectShare extends Model
         'views' => 'integer',
     ];
 
+    /**
+     * [P0.7 — 2026-09-20] Khoá định tuyến là TOKEN, không phải id.
+     *
+     * Vì sao: giao diện gọi `DELETE /api/projects/{id}/share/{token}` (store.js: revokeShare) —
+     * đúng con token mà nó vừa nhận từ API. Nhưng model không khai getRouteKeyName() nên Laravel
+     * bind theo `id`, chuỗi token 48 ký tự không phải id ⇒ **404 trước khi vào controller** ⇒ nút
+     * "Thu hồi" chưa bao giờ chạy được: khách vẫn mở được link đã bị thu hồi.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'token';
+    }
+
     /** Token ngẫu nhiên 48 ký tự — đủ dài để không đoán được. */
     public static function newToken(): string
     {

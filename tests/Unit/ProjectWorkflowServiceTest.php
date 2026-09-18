@@ -85,7 +85,15 @@ class ProjectWorkflowServiceTest extends TestCase
         $this->assertStringContainsString('Không thể chuyển', $error);
     }
 
-    public function test_reviewer_gate_blocks_admin_from_approving(): void
+    /**
+     * [P0.2 — 2026-09-20] CHỦ bộ sưu tập luôn tự chốt được bài của mình, bất kể vai trò.
+     *
+     * Bản trước chặn MỌI lần approve/archive nếu không phải Super Admin — kể cả khi người thao tác
+     * là chủ bộ sưu tập. Đo được: khách tự phục vụ ở trạng thái "Chờ duyệt" chỉ còn đúng một đường
+     * lùi về "Đang làm", không bao giờ đóng được việc. Tách nhiệm vụ là chốt ở TẦNG SUPER ADMIN
+     * (xem test bên dưới), không phải chốt chặn khách hàng.
+     */
+    public function test_owner_may_approve_own_collection_even_as_plain_admin(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $project = Project::factory()->create([
@@ -94,8 +102,54 @@ class ProjectWorkflowServiceTest extends TestCase
         ]);
 
         [$ok, $error] = $this->workflow->canTransition($project, Project::STATUS_APPROVED, $admin);
+        $this->assertTrue($ok, 'Chủ bộ sưu tập phải duyệt được bài của chính mình: '.$error);
+    }
+
+    public function test_owner_may_archive_own_collection(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $project = Project::factory()->create([
+            'user_id' => $customer->id,
+            'status' => Project::STATUS_APPROVED,
+        ]);
+
+        [$ok, $error] = $this->workflow->canTransition($project, Project::STATUS_ARCHIVED, $customer);
+        $this->assertTrue($ok, 'Chủ bộ sưu tập phải lưu trữ được bài của chính mình: '.$error);
+    }
+
+    /** Khách tự phục vụ đi hết vòng đời: nháp → đang làm → chờ duyệt → đã duyệt → lưu trữ. */
+    public function test_customer_can_walk_the_whole_lifecycle_on_own_collection(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $project = Project::factory()->create([
+            'user_id' => $customer->id,
+            'status' => Project::STATUS_DRAFT,
+        ]);
+
+        foreach ([
+            Project::STATUS_IN_PROGRESS,
+            Project::STATUS_REVIEW,
+            Project::STATUS_APPROVED,
+            Project::STATUS_ARCHIVED,
+        ] as $to) {
+            $project = $this->workflow->transition($project, $to, $customer);
+            $this->assertSame($to, $project->status, "Không đi được tới {$to}");
+        }
+    }
+
+    /** Không phải chủ: Admin thường vẫn KHÔNG duyệt được bài của người khác (hàng đợi là của Super Admin). */
+    public function test_reviewer_gate_blocks_non_owner_admin_from_approving(): void
+    {
+        $owner = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $project = Project::factory()->create([
+            'user_id' => $owner->id,
+            'status' => Project::STATUS_REVIEW,
+        ]);
+
+        [$ok, $error] = $this->workflow->canTransition($project, Project::STATUS_APPROVED, $admin);
         $this->assertFalse($ok);
-        $this->assertStringContainsString('Super Admin', $error);
+        $this->assertStringContainsString('chủ bộ sưu tập hoặc Super Admin', $error);
     }
 
     public function test_reviewer_gate_allows_super_admin_to_approve(): void
@@ -265,7 +319,11 @@ class ProjectWorkflowServiceTest extends TestCase
         $this->assertCount(2, $project->settings['status_history']);
     }
 
-    public function test_available_transitions_respects_reviewer_gate(): void
+    /**
+     * [P0.2 — 2026-09-20] Ở "Chờ duyệt", CHỦ bộ sưu tập phải thấy đủ ba đường: chốt (Đã duyệt),
+     * lưu trữ, và lùi về Đang làm. Bản trước chỉ còn "Đang làm" ⇒ bộ sưu tập không bao giờ đóng được.
+     */
+    public function test_available_transitions_gives_owner_the_full_way_out(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $project = Project::factory()->create([
@@ -273,11 +331,25 @@ class ProjectWorkflowServiceTest extends TestCase
             'status' => Project::STATUS_REVIEW,
         ]);
 
-        $out = $this->workflow->availableTransitions($project, $admin);
-        $targets = array_column($out, 'to');
+        $targets = array_column($this->workflow->availableTransitions($project, $admin), 'to');
 
-        // review -> in_progress (rework) + archived đều bị chặn vì archived là REVIEWER_GATES.
-        // Chỉ còn approved... cũng bị chặn -> Admin chỉ được về in_progress.
+        $this->assertContains(Project::STATUS_IN_PROGRESS, $targets);
+        $this->assertContains(Project::STATUS_APPROVED, $targets, 'Chủ bộ sưu tập phải chốt được.');
+        $this->assertContains(Project::STATUS_ARCHIVED, $targets, 'Chủ bộ sưu tập phải lưu trữ được.');
+    }
+
+    /** Người KHÔNG phải chủ (và không phải Super Admin) chỉ còn đường lùi — không chốt hộ được. */
+    public function test_available_transitions_hides_reviewer_gates_from_non_owner(): void
+    {
+        $owner = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $project = Project::factory()->create([
+            'user_id' => $owner->id,
+            'status' => Project::STATUS_REVIEW,
+        ]);
+
+        $targets = array_column($this->workflow->availableTransitions($project, $admin), 'to');
+
         $this->assertContains(Project::STATUS_IN_PROGRESS, $targets);
         $this->assertNotContains(Project::STATUS_APPROVED, $targets);
         $this->assertNotContains(Project::STATUS_ARCHIVED, $targets);

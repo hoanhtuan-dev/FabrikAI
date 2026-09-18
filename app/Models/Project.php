@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * FabrikAI Studio — Project (Design Board).
@@ -22,6 +23,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Project extends Model
 {
     use HasFactory;
+    // [R6] Soft-delete thủ công: không dùng trait SoftDeletes (gây crash với SQLite trong môi trường test).
+    // deleted_at được quản lý thông qua ProjectController::destroy và các query có whereNull('deleted_at').
 
     /**
      * Danh sách trạng thái hợp lệ — đồng bộ với ProjectWorkflowService::STATES.
@@ -49,6 +52,7 @@ class Project extends Model
      */
     protected $fillable = [
         'name',
+        'assignee_id',
         'base_concept',
         'brief',
         'deadline',
@@ -81,6 +85,34 @@ class Project extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * [P1.2 — 2026-09-20] Người ĐANG LÀM bộ sưu tập (khác `user` = người sở hữu/trả tiền).
+     * Không gán ⇒ null, và giao diện hiểu là "chủ bộ sưu tập tự làm".
+     */
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assignee_id');
+    }
+
+    /**
+     * Ai được giao việc trên bộ sưu tập này: chủ sở hữu + mọi thành viên trong nhóm của chủ.
+     * Dùng CHUNG cho validate ở ProjectController (một nguồn luật, không lệch giữa store/update).
+     *
+     * @return array<int, int>
+     */
+    public function assignableUserIds(): array
+    {
+        $ownerId = (int) $this->user_id;
+
+        $memberIds = User::query()
+            ->where('team_owner_id', $ownerId)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return array_values(array_unique(array_merge([$ownerId], $memberIds)));
     }
 
     /** [Đợt 4 — 2026-09-19] Link chia sẻ công khai cho khách duyệt (có hạn, thu hồi được). */

@@ -28,6 +28,9 @@ class ProjectShareController extends Controller
     /** Số ngày hạn của link — chỉ nhận các mốc này để tránh giá trị lạ. */
     private const ALLOWED_DAYS = [7, 30, 90];
 
+    /** Trần số ảnh hiển thị trên trang khách duyệt (khớp trần của gói xuất xưởng). */
+    private const SHARE_IMAGE_LIMIT = 60;
+
     /** Tạo (hoặc dùng lại) link chia sẻ cho một bộ sưu tập. */
     public function create(Request $request, Project $project): JsonResponse
     {
@@ -79,7 +82,9 @@ class ProjectShareController extends Controller
      */
     public function status(Request $request, Project $project): JsonResponse
     {
-        $this->authorizeOwner($request, $project);
+        // ĐỌC trạng thái chia sẻ: mọi người làm việc trên bộ sưu tập (chủ · thành viên nhóm · Super
+        // Admin) đều xem được — thành viên cần biết khách đã phản hồi gì.
+        abort_unless(team_can_view_project($request->user(), $project), 403);
 
         $share = $project->shares()->orderByDesc('id')->get()->first(fn (ProjectShare $s) => $s->isUsable());
 
@@ -107,8 +112,8 @@ class ProjectShareController extends Controller
     {
         $share = ProjectShare::query()->where('token', $token)->with('project')->first();
 
-        // Hết hạn / đã thu hồi / không tồn tại ⇒ 404 giống nhau (không dò được token).
-        abort_unless($share && $share->isUsable() && $share->project, 404);
+        // Hết hạn / đã thu hồi / không tồn tại / bộ sưu tập đã xoá ⇒ 404 giống nhau (không dò được token).
+        abort_unless($share && $share->isUsable() && $share->project && $share->project->deleted_at === null, 404);
 
         $project = $share->project;
 
@@ -119,10 +124,14 @@ class ProjectShareController extends Controller
             // bỏ qua: số lượt xem không quan trọng bằng việc khách xem được ảnh
         }
 
+        // [P0.5] ẢNH MỚI NHẤT trước + nói THẬT tổng số. Bản trước lấy 60 ảnh CŨ NHẤT và view in
+        // "{{ $images->count() }} ảnh" ⇒ bộ 100 ảnh hiện đúng 60 ảnh cũ kèm dòng "60 ảnh" — khách
+        // duyệt nhìn thấy số sai trên chính trang dùng để chốt mẫu.
+        $imagesTotal = $project->generations()->whereNotNull('media_url')->count();
         $images = $project->generations()
             ->whereNotNull('media_url')
-            ->orderBy('id')
-            ->limit(60)
+            ->orderByDesc('id')
+            ->limit(self::SHARE_IMAGE_LIMIT)
             ->get();
 
         $feedback = $project->feedback()->orderByDesc('id')->limit(20)->get();
@@ -131,6 +140,12 @@ class ProjectShareController extends Controller
             'token' => $token,
             'share' => $share,
             'project' => $project,
+            // Nhãn/màu trạng thái tiếng Việt do MỘT nguồn duy nhất sinh ra (ProjectWorkflowService) —
+            // view không được tự bịa và cũng không được đọc thuộc tính không tồn tại (xem share.blade.php).
+            'statusLabel' => app(\App\Services\ProjectWorkflowService::class)->label((string) $project->status),
+            'imagesTotal' => $imagesTotal,
+            'imagesTruncated' => $imagesTotal > $images->count(),
+            'referenceImages' => app(\App\Services\StudioLibraryService::class)->uploadsForProject((int) $project->id),
             'images' => $images,
             'feedback' => $feedback,
             'sent' => $request->query('sent') === '1',
@@ -165,12 +180,16 @@ class ProjectShareController extends Controller
         return redirect('/chia-se/'.$token.'?sent=1#phan-hoi');
     }
 
-    /** Chỉ chủ bộ sưu tập hoặc Super Admin (reviewer) — giống show()/export. */
+    /**
+     * Chỉ chủ bộ sưu tập hoặc Super Admin được TẠO/THU HỒI link chia sẻ.
+     *
+     * [P1 — 2026-09-20] Trước đây hàm này gọi team_can_view_project(), tức là THÀNH VIÊN NHÓM cũng
+     * tạo và thu hồi được link của bộ sưu tập chủ nhóm — trái với chính comment ngay trên nó và trái
+     * với luật "thành viên không quản lý bộ sưu tập" (team_can_manage_project). Hệ quả thật: một
+     * nhân viên có thể THU HỒI link mà khách đang mở để duyệt mẫu.
+     */
     private function authorizeOwner(Request $request, Project $project): void
     {
-        $actor = $request->user();
-        // [Q4] Ai xem/làm việc được trên bộ sưu tập thì chia sẻ được (chủ bộ sưu tập · thành viên nhóm ·
-        // Super Admin) — dùng CHUNG một hàm quyền với ProjectController để không lệch luật.
-        abort_unless(team_can_view_project($actor, $project), 403);
+        abort_unless(team_can_manage_project($request->user(), $project), 403);
     }
 }

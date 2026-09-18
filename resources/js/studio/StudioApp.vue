@@ -76,6 +76,21 @@ const ACTIVITY_CARDS = {
   director: [DirectorCard],
 };
 
+// [P0.4] Đồng bộ URL với trạng thái hiện tại: ?view=library + ?bo=<id> bộ sưu tập đang áp dụng.
+// Cho phép người dùng đánh dấu trang, gửi link "đang ở Thư viện với bộ X" cho đồng nghiệp.
+function syncUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const next = new URLSearchParams();
+  if (store.studioView === 'library') next.set('view', 'library');
+  const pid = store.appliedProjectId();
+  if (pid) next.set('bo', pid);
+  const qs = next.toString();
+  const target = qs ? window.location.pathname + '?' + qs : window.location.pathname;
+  if (window.location.pathname + window.location.search !== target) {
+    window.history.replaceState(null, '', target);
+  }
+}
+
 // Bản GỐC — dùng khi chưa tải xong cấu hình hoặc API lỗi, để thanh công cụ không bao giờ trống.
 // Phải khớp `StudioGuiConfig::DEFAULTS` (có test đối chiếu), gồm cả nút popup + menu Cài đặt.
 const ACTIVITY_FALLBACK = [
@@ -175,7 +190,7 @@ function openUpgradeFor(id) {
   store.togglePlanPopover && store.loadPlanStatus(true);
 }
 
-// [Đợt 2] Mở workspace Dự án khi card "Bộ sưu tập" yêu cầu (card không nhận được event).
+// [Đợt 2] Mở bảng thiết kế khi card "Bộ sưu tập" yêu cầu (card không nhận được event).
 watch(() => store.workspaceOpenRequest, (n) => { if (n > 0) projectsOpen.value = true; });
 // [Trục 3 — 2026-09-20] Dock Outputs xin chuyển nhóm công cụ (vd "Sửa ảnh" từ ảnh kết quả):
 // ảnh đã được đưa lên canvas trước đó bằng store.select(g) nên card sẽ thấy đúng ảnh nguồn.
@@ -190,6 +205,8 @@ const menuOpen = ref(false);
 const outputOpen = ref(false);
 const projectsOpen = ref(false);
 const promptPopupOpen = ref(false);  // popup độc lập cho Prompt Tạo Ảnh (ConceptCard)
+// [P0] Chờ boot async xong mới render UI thật — tránh flash cấu hình sai (panel lộn, activity lỗi).
+const booting = ref(true);
 const stylistPopupOpen = ref(false); // popup độc lập cho Trợ lý Thiết kế (StylistCard)
 // [Yêu cầu 2026-09-17] Menu Cài đặt ở GÓC TRÁI DƯỚI CÙNG của activity bar.
 const settingsOpen = ref(false);
@@ -205,9 +222,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeSettingsOnEsc))
 // chỉ cần đồng bộ activity hiện tại + đóng drawer Outputs mobile cho gọn.
 watch(() => store.promptOpen, (v) => { if (v) { activeActivity.value = 'concept'; outputOpen.value = false; } });
 // Lưu cài đặt status bar khi thay đổi (snap · nền canvas · inspector).
-watch([() => store.snapGrid, () => store.canvasBg, () => store.inspectorOpen], () => store.saveBarSettings());
+watch([() => store.snapGrid, () => store.canvasBg, () => store.inspectorOpen, () => store.leftPanelOpen, () => store.outputDockOpen, () => store.leftDockWidth, () => store.outputDockWidth], () => store.saveBarSettings());
 // ── Thoát công cụ thông minh khi chuyển tác vụ / thoát ảnh tiêu điểm ──
-watch(activeActivity, () => { store.exitCanvasTools(); store.step = activeActivity.value === 'director' ? 3 : activeActivity.value === 'concept' ? 1 : 2; });
+watch(activeActivity, () => { store.exitCanvasTools(); store.step = activeActivity.value === 'director' ? 3 : activeActivity.value === 'concept' ? 1 : 2; try { localStorage.setItem('fabrikai.lastActivity', activeActivity.value); } catch (e) {} });
 watch(() => store.activeLayerId, (id) => { if (!id) store.exitCanvasTools(); });
 watch(() => !!store.viewer, (v) => { if (v) store.exitCanvasTools(); });
 watch(() => !!store.promptOpen, (v) => { if (v) store.exitCanvasTools(); });
@@ -269,11 +286,51 @@ const inspectorDock = useDockResize({
   onCommit: () => store.saveBarSettings(),
   onSettle: () => onCanvasResize(),
 });
-function onBeforeUnload() { try { store.saveLayerLayout(); } catch (e) { /* bỏ qua */ } }
-onMounted(async () => { loadGuiConfig(); await store.load(); if (new URLSearchParams(window.location.search).get('view') === 'library') store.studioView = 'library'; activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'variation' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('keydown', onGlobalKey); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); });
+function onBeforeUnload() { try { store.saveLayerLayout(); } catch (e) { /* bỏ qua */ } try { store.saveBarSettings(); } catch (e) { /* bỏ qua */ } }
+onMounted(async () => {
+      try {
+        await loadGuiConfig();
+        await store.load();
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('view') === 'library') store.studioView = 'library';
+      // [P0.4] Mở đúng bộ sưu tập đang làm từ URL (?bo=5) hoặc localStorage — không bắt đầu từ trống.
+      const bo = params.get('bo');
+      if (bo) {
+        const pid = Number(bo);
+        const p = store.projects.find(x => Number(x.id) === pid);
+        if (p) { store.applyProject(p); }
+        else { await store.restoreAppliedProject(); }
+      } else {
+        await store.restoreAppliedProject();
+      }
+      // Khôi phục activity cuối cùng mà người dùng để (ưu tiên hơn mặc định theo step).
+      try {
+        const last = localStorage.getItem('fabrikai.lastActivity');
+        if (last && ACTIVITY_CARDS[last]) activeActivity.value = last;
+        else activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'variation' : 'concept';
+      } catch (e) { activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'variation' : 'concept'; }
+      // Mở panel tương ứng nếu URL yêu cầu (vd: về từ /bo-suu-tap với ?panel=collections).
+      const panel = params.get('panel');
+      if (panel && ACTIVITY_CARDS[panel]) {
+        activeActivity.value = panel;
+        store.leftPanelOpen = true;
+      }
+      store.loadPaletteFromImage(store.upscaleSrc);
+      window.addEventListener('keydown', onCanvasKey);
+      window.addEventListener('keydown', onLayerKeys);
+      window.addEventListener('keydown', onHistoryKeys);
+      window.addEventListener('keydown', onGlobalKey);
+      window.addEventListener('resize', onCanvasResize);
+      window.addEventListener('beforeunload', onBeforeUnload);
+      syncUrl();
+      } finally {
+        booting.value = false;
+      }
+    });
 onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); window.removeEventListener('resize', onCanvasResize); window.removeEventListener('beforeunload', onBeforeUnload); });
 // Palette bám ẢNH HIỆN TẠI (mọi nguồn: result/preview, ảnh tải lên, product, layer đang sửa…).
 watch(() => store.upscaleSrc, (url) => { store.loadPaletteFromImage(url); });
+watch(() => [store.studioView, store.appliedProjectId()], () => { syncUrl(); });
 // Template refs -> store: StudioApp owns the canvas DOM; the store needs the elements for crop geometry.
 const cvImg = ref(null);
 const canvasZoom = ref(null);
@@ -551,7 +608,7 @@ const baseCommands = computed(() => ([
   { id: 'toggle-layers', label: 'Bật/tắt panel Layers', hint: 'inspector', icon: 'layers', run: () => store.toggleInspector() },
   { id: 'toggle-outputs', label: 'Bật/tắt dock Outputs', hint: 'outputs', icon: 'grid', run: () => store.toggleOutputDock() },
   { id: 'library', label: 'Mở Thư viện', hint: 'library', icon: 'library', run: () => goLibrary() },
-  { id: 'projects', label: 'Mở workspace Dự án', hint: 'projects', icon: 'kanban', run: () => { projectsOpen.value = true; } },
+  { id: 'projects', label: 'Mở bảng thiết kế', hint: 'projects', icon: 'kanban', run: () => { projectsOpen.value = true; } },
   { id: 'prompt', label: 'Mở Prompt Tạo Ảnh', hint: 'prompt', icon: 'sparkles', run: () => { store.promptOpen = true; } },
   { id: 'stylist', label: 'Mở Trợ lý thiết kế', hint: 'stylist', icon: 'shirt', run: () => { stylistPopupOpen.value = true; } },
   { id: 'source', label: 'Mở Nguồn ảnh', hint: 'source', icon: 'imagePlus', run: () => { store.sourcePickerOpen = true; } },
@@ -880,7 +937,7 @@ function onTouchEnd(e) {
 }
 </script>
 <template>
-  <div class="studio-dark flex h-full w-full flex-col bg-ink-950 text-cream-100">
+  <div v-if="!booting" class="studio-dark flex h-full w-full flex-col bg-ink-950 text-cream-100">
     <!-- [Đợt 0.1] Banner 3 trạng thái xác thực — thay thế 403 im lặng bằng thông báo rõ ràng -->
     <AuthNotice />
     <!-- ══ Top account bar: thông tin người dùng + đăng nhập/đăng xuất + điều hướng quản trị ══ -->
@@ -902,13 +959,13 @@ function onTouchEnd(e) {
         </template>
       </div>
       <div class="flex shrink-0 items-center gap-2">
-        <!-- Dự án + quick-apply gộp 1 tool-btn -->
+        <!-- Bộ sưu tập + quick-apply gộp 1 tool-btn -->
         <div class="relative">
-          <button @click="openApplyPopover" class="tool-btn" title="Dự án — áp dụng nhanh hoặc mở workspace quản lý"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Dự án</span> <StudioIcon name="chevronDown" size="h-3 w-3" /></button>
+          <button @click="openApplyPopover" class="tool-btn" title="Bộ sưu tập — áp dụng nhanh hoặc mở bảng thiết kế quản lý"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Bộ sưu tập</span> <StudioIcon name="chevronDown" size="h-3 w-3" /></button>
           <div v-if="applyOpen" class="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border border-ink-700 bg-ink-900 shadow-xl">
             <div class="p-2.5">
-              <p class="mb-2 text-[11px] font-semibold text-cream-200">Áp dụng dự án cho phiên tạo ảnh</p>
-              <div v-if="store.projectScope !== 'own'" class="mb-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-200">Đang xem dự án chờ duyệt. Mở workspace để xem dự án của bạn.</div>
+              <p class="mb-2 text-[11px] font-semibold text-cream-200">Áp dụng bộ sưu tập cho phiên tạo ảnh</p>
+              <div v-if="store.projectScope !== 'own'" class="mb-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-200">Đang xem bộ sưu tập chờ duyệt. Mở bảng thiết kế để xem bộ sưu tập của bạn.</div>
               <div v-else class="max-h-64 overflow-y-auto">
                 <!-- Tối đa 20 dự án gần nhất, cuộn được (trước giới hạn cứng 8) -->
                 <div v-for="p in store.projects.slice(0, 20)" :key="p.id" @click="store.applyProject(p); applyOpen = false" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-ink-800" :class="store.appliedProjectId() === p.id ? 'bg-brand-600/20 text-brand-100' : 'text-cream-200'">
@@ -917,19 +974,19 @@ function onTouchEnd(e) {
                   <span class="shrink-0 text-[9px] text-cream-300/50">{{ p.status }}</span>
                   <StudioIcon v-if="store.appliedProjectId() === p.id" name="pin" size="h-3 w-3" class="text-brand-400" />
                 </div>
-                <p v-if="!store.projects.length" class="px-2 py-1 text-[10px] text-cream-300/40">Chưa có dự án nào.</p>
+                <p v-if="!store.projects.length" class="px-2 py-1 text-[10px] text-cream-300/40">Chưa có bộ sưu tập nào.</p>
               </div>
               <button v-if="store.appliedProject" @click="store.unapplyProject(); applyOpen = false" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-red-500/30 bg-red-600/10 px-2 py-1.5 text-[10px] font-semibold text-red-200 transition hover:bg-red-600/20">
                 <StudioIcon name="pinOff" size="h-3 w-3" /> Ngắt dự án hiện tại
               </button>
               <button @click="applyOpen = false; projectsOpen = true" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition hover:bg-ink-700">
-                <StudioIcon name="kanban" size="h-3 w-3" /> Mở workspace quản lý dự án
+                <StudioIcon name="kanban" size="h-3 w-3" /> Mở bảng thiết kế quản lý bộ sưu tập
               </button>
             </div>
           </div>
           <div v-if="applyOpen" class="fixed inset-0 z-40" @click="applyOpen = false"></div>
         </div>
-        <span v-if="store.appliedProject" class="tool-btn is-active hidden max-w-[13rem] md:inline-flex" :title="'Dự án hiện tại: ' + store.appliedProject.name + ' — ảnh/video tạo mới sẽ tự gắn vào dự án này'">
+        <span v-if="store.appliedProject" class="tool-btn is-active hidden max-w-[13rem] md:inline-flex" :title="'Bộ sưu tập hiện tại: ' + store.appliedProject.name + ' — ảnh/video tạo mới sẽ tự gắn vào bộ này'">
           <button type="button" @click="projectsOpen = true" class="flex min-w-0 items-center gap-1.5 truncate hover:text-white"><StudioIcon name="pin" size="h-3.5 w-3.5" /><span class="truncate">{{ store.appliedProject.name }}</span></button>
           <button type="button" @click="store.unapplyProject()" class="shrink-0 text-brand-200/70 hover:text-white" aria-label="Ngắt dự án hiện tại"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
         </span>
@@ -1183,7 +1240,7 @@ function onTouchEnd(e) {
       <button @click="menuOpen = true" class="icon-btn !h-9 !w-9 border border-ink-700 md:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>
       <span class="flex items-center gap-1.5 font-display text-sm font-semibold"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span>
       <div class="flex items-center gap-1.5">
-        <button @click="projectsOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-700" :title="store.appliedProject ? 'Dự án hiện tại: ' + store.appliedProject.name : 'Dự án'" aria-label="Dự án"><StudioIcon name="kanban" size="h-4 w-4" /><span v-if="store.appliedProject" class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand-400"></span></button>
+        <button @click="projectsOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-700" :title="store.appliedProject ? 'Bộ sưu tập hiện tại: ' + store.appliedProject.name : 'Bộ sưu tập'" aria-label="Bộ sưu tập"><StudioIcon name="kanban" size="h-4 w-4" /><span v-if="store.appliedProject" class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand-400"></span></button>
         <button @click="outputOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-700" title="Kết quả" aria-label="Kết quả"><StudioIcon name="grid" size="h-4 w-4" /><span v-if="store.generations.length" class="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[9px] font-bold leading-none text-white">{{ store.generations.length }}</span></button>
       </div>
     </div>
@@ -1490,7 +1547,7 @@ function onTouchEnd(e) {
              Thứ tự từ trên xuống: Nguồn ảnh · Thư viện · …khoảng trống… · Bảng lệnh · Outputs. -->
         <!-- Bảng lệnh (Ctrl+K / Ctrl+Shift+P / F1): nút hiện diện để người dùng KHÔNG cần biết phím tắt.
              aria-keyshortcuts để trình đọc màn hình đọc được phím tắt kèm nút. -->
-        <button @click="openPalette()" class="activity-btn mt-auto" aria-keyshortcuts="Control+K" title="Bảng lệnh (Ctrl+K) — tìm lệnh, dự án, mẫu việc, ảnh" aria-label="Bảng lệnh">
+        <button @click="openPalette()" class="activity-btn mt-auto" aria-keyshortcuts="Control+K" title="Bảng lệnh (Ctrl+K) — tìm lệnh, bộ sưu tập, mẫu việc, ảnh" aria-label="Bảng lệnh">
           <StudioIcon name="search" size="h-5 w-5" />
         </button>
         <button @click="store.toggleOutputDock()" data-dock-toggle="outputs" class="activity-btn" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">
@@ -1559,7 +1616,7 @@ function onTouchEnd(e) {
     <GalleryModal v-if="store.viewer" />
     <!-- SourcePickerPopup: popup chọn nguồn ảnh (nút "Nguồn ảnh" ở activity bar) -->
     <SourcePickerPopup v-if="store.sourcePickerOpen" v-model="store.sourcePickerOpen" />
-    <!-- ProjectWorkspace: popup quản lý dự án (nút "Dự án" ở mobile bar / chip dự án / popover apply) -->
+    <!-- ProjectWorkspace: popup quản lý bộ sưu tập (nút "Bộ sưu tập" ở mobile bar / chip bộ sưu tập / popover apply) -->
     <ProjectWorkspace v-if="projectsOpen" v-model="projectsOpen" />
     <!-- Prompt Tạo Ảnh (ConceptCard): popup độc lập — nút sparkles ở right toolbar (dưới cùng) -->
     <!-- ══ Command Palette (VSCode-style) ══ -->
@@ -1567,11 +1624,11 @@ function onTouchEnd(e) {
       <div class="motion-pop-in w-full max-w-lg overflow-hidden rounded-xl border border-ink-600 bg-ink-900 shadow-2xl">
         <div class="flex items-center gap-2 border-b border-ink-700 px-3 py-2.5">
           <StudioIcon name="search" size="h-4 w-4" class="text-cream-300/60" />
-          <input ref="paletteInput" v-model="paletteQuery" class="min-w-0 flex-1 bg-transparent text-sm text-cream-100 placeholder:text-cream-300/40 focus:outline-none" placeholder="Tìm lệnh, dự án, mẫu việc, ảnh…  ( > lệnh · # dự án · @ ảnh )" @keydown.esc="paletteOpen = false" />
+          <input ref="paletteInput" v-model="paletteQuery" class="min-w-0 flex-1 bg-transparent text-sm text-cream-100 placeholder:text-cream-300/40 focus:outline-none" placeholder="Tìm lệnh, bộ sưu tập, mẫu việc, ảnh…  ( > lệnh · # bộ sưu tập · @ ảnh )" @keydown.esc="paletteOpen = false" />
           <span class="rounded border border-ink-700 px-1.5 py-0.5 text-[10px] text-cream-300/40">esc</span>
         </div>
         <div class="max-h-[50vh] overflow-y-auto p-1.5">
-          <!-- [Trục 4] Kết quả theo NHÓM (Lệnh · Bộ sưu tập & dự án · Mẫu việc · Ảnh đã tạo) -->
+          <!-- [Trục 4] Kết quả theo NHÓM (Lệnh · Bộ sưu tập · Mẫu việc · Ảnh đã tạo) -->
           <template v-for="grp in paletteGroups" :key="grp.name">
             <p class="px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">{{ grp.name }}</p>
             <button v-for="cmd in grp.items" :key="cmd.id" @click="runCommand(cmd)" class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm text-cream-100 transition hover:bg-brand-600/25">
@@ -1584,7 +1641,7 @@ function onTouchEnd(e) {
         </div>
         <div class="flex items-center gap-3 border-t border-ink-700 px-3 py-1.5 text-[10px] text-cream-300/40">
           <span><b class="text-cream-300/70">&gt;</b> lệnh</span>
-          <span><b class="text-cream-300/70">#</b> dự án</span>
+          <span><b class="text-cream-300/70">#</b> bộ sưu tập</span>
           <span><b class="text-cream-300/70">@</b> ảnh đã tạo</span>
         </div>
       </div>

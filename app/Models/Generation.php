@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Generation extends Model
 {
     use HasFactory;
+    // [R6] Soft-delete thủ công: không dùng trait SoftDeletes (gây crash với SQLite trong môi trường test).
+    // deleted_at được quản lý thông qua query có whereNull('deleted_at').
 
     protected $fillable = [
         'user_id', 'project_id', 'prompts_history_id', 'type', 'status',

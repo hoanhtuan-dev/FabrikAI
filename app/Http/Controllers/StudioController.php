@@ -142,6 +142,12 @@ class StudioController extends Controller
     /** [Yêu cầu 2026-09-17] Cài đặt Khuôn mặt (model) + Dáng pose (người mẫu) — cấp user. */
     public function modelSettingsPage() { return $this->mySettingsPage(request()->query('tab') === 'pose' ? 'pose' : 'model'); }
 
+    // [Yeu cau 2026-09-20] Trang BO SUU TAP day du cho nguoi dung moi - UX UI chuan, hien thi tung buoc duyet mau.
+    public function collectionsPage()
+    {
+        return view('studio.collections');
+    }
+
 
     // storeProject() đã bị loại bỏ (finding: duplicate endpoint với validation yếu hơn
     // ProjectController::store). Route POST /studio/projects nay trỏ về ProjectController::store.
@@ -159,7 +165,10 @@ class StudioController extends Controller
             'prompt' => ['required', 'string', 'max:4000'],
             'resolution' => ['nullable', 'string', 'in:1K,2K'],
             'ratio' => ['nullable', 'string', 'in:1:1,4:3,3:4,16:9,9:16,4:5,21:9,19:6'],
-            'project_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('projects', 'id')->where('user_id', $request->user()->id)],
+            // [P0.3] Chỉ cần bộ sưu tập TỒN TẠI ở tầng validation; quyền ghi được kiểm ngay sau đó
+            // bằng studio_project_writable_by() để thành viên nhóm dùng được bộ sưu tập chung, và
+            // để câu báo lỗi là tiếng Việt thay vì message mặc định tiếng Anh của Laravel.
+            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
             'base_image' => ['nullable', 'string', 'max:2048'],
@@ -183,6 +192,8 @@ class StudioController extends Controller
             'pose_id' => ['nullable', 'string', 'max:255'],
             'seed' => ['nullable', 'integer', 'min:1', 'max:2147483647'],
         ]);
+
+        $this->assertProjectWritable($data['project_id'] ?? null);
 
         $userPrompt = (string) $data['prompt'];
         $creativeLevel = (int) ($data['creative_level'] ?? studio_config('creative_level', 6));
@@ -277,9 +288,12 @@ class StudioController extends Controller
             'provenance' => ['nullable', 'string', 'max:20'],
             'resolution' => ['nullable', 'string', 'in:480,720,1080'],
             'duration' => ['nullable', 'string', 'in:5,8,10,15,20'],
-            'project_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('projects', 'id')->where('user_id', $request->user()->id)],
+            // [P0.3] Quyền ghi bộ sưu tập kiểm ngay sau validate (xem generate()).
+            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
         ]);
+
+        $this->assertProjectWritable($data['project_id'] ?? null);
 
         $cost = studio_credit_cost('video');
 
@@ -1803,15 +1817,48 @@ RULES:
      * không được để một id dự án cũ làm hỏng cả thao tác. Id không thuộc về người dùng ⇒ bỏ qua
      * (không gắn) chứ không báo lỗi; đây không phải lỗ hổng vì ta chỉ ĐỌC để kiểm quyền sở hữu.
      */
+    /** Cảnh báo (nếu có) của lần phân giải bộ sưu tập — gắn vào response để giao diện nói thật. */
+    protected ?string $projectWarning = null;
+
+    /**
+     * [P0.3] Chặn NGAY TẠI CỬA nếu người dùng không được ghi vào bộ sưu tập đã gửi lên — kèm câu
+     * giải thích tiếng Việt.
+     *
+     * Ném ValidationException (khoá `project_id`) thay vì abort(): giao diện vốn đã biết hiển thị
+     * lỗi theo từng trường, và trả về đúng khoá thì câu lỗi nằm ngay cạnh ô chọn bộ sưu tập thay vì
+     * một toast chung chung.
+     */
+    private function assertProjectWritable($projectId): void
+    {
+        if ($projectId === null || $projectId === '') {
+            return;
+        }
+
+        if (! studio_project_writable_by(auth()->user(), $projectId)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'project_id' => 'Bạn không có quyền thêm ảnh vào bộ sưu tập này. Chọn bộ sưu tập của bạn (hoặc bộ sưu tập chung của nhóm) rồi thử lại.',
+            ]);
+        }
+    }
+
     private function resolveProjectId(Request $request, ?Generation $source = null): ?int
     {
         $raw = $request->input('project_id');
 
         if ($raw !== null && $raw !== '') {
             $id = (int) $raw;
-            if ($id > 0 && \App\Models\Project::where('id', $id)->where('user_id', auth()->id())->exists()) {
+
+            // [P0.3] Dùng CÙNG một luật với generate()/video(): chủ bộ sưu tập hoặc thành viên nhóm
+            // (trước đây chỉ nhận chủ sở hữu ⇒ thành viên gửi lên bị bỏ qua im lặng).
+            if ($id > 0 && studio_project_writable_by(auth()->user(), $id)) {
                 return $id;
             }
+
+            // Có gửi id nhưng KHÔNG có quyền ghi: các endpoint phái sinh (nâng cấp · sửa vùng · ghép ·
+            // lưu layer…) KHÔNG được hỏng vì một id cũ/không hợp lệ — người dùng sẽ mất luôn thao tác
+            // đang làm. Ta rơi về đúng bộ sưu tập của ẢNH NGUỒN, nhưng GHI LẠI cảnh báo để giao diện
+            // nói được vì sao kết quả không nằm ở bộ vừa chọn (thay vì im lặng như trước).
+            $this->projectWarning = 'Không thêm được vào bộ sưu tập bạn chọn (bạn không có quyền ghi vào bộ đó) — kết quả nằm cùng bộ sưu tập với ảnh nguồn.';
         }
 
         // Không gửi id (hoặc id không hợp lệ) ⇒ THỪA HƯỞNG dự án của ảnh nguồn: sửa một ảnh thuộc
@@ -2266,7 +2313,20 @@ RULES:
         $used = \App\Models\Generation::where('media_url', 'like', '%'.$name.'%')->exists();
         if ($used) { return response()->json(['message' => 'Ảnh đang được dùng, không thể xóa.'], 422); }
 
+        // [P0.1b — 2026-09-20] ẢNH ĐANG THUỘC MỘT BỘ SƯU TẬP cũng là "đang được dùng".
+        // Đường xoá này trước đây chỉ hỏi bảng generations, nên xoá được ảnh gốc của một bộ sưu tập;
+        // tệ hơn, nó @unlink mà KHÔNG xoá dòng liên kết ⇒ bộ sưu tập còn dòng trỏ tới file không tồn tại.
+        // Dùng ĐÚNG một luật với StudioLibraryService::deleteUploadedFiles() để hai đường không lệch.
+        $rel = ltrim(str_replace(storage_path('app/public'), '', str_replace('\\', '/', $file)), '/');
+        $linked = \App\Models\UploadProjectLink::where('rel', $rel)->exists();
+        if ($linked) {
+            return response()->json([
+                'message' => 'Ảnh này đang thuộc một bộ sưu tập — gỡ khỏi bộ sưu tập trước khi xoá.',
+            ], 422);
+        }
+
         @unlink($file);
+        \App\Models\UploadProjectLink::where('rel', $rel)->delete();
 
         return response()->json(['ok' => true]);
     }
@@ -2339,6 +2399,8 @@ RULES:
             'generation_id' => $gen->id,
             'media_url' => $mediaUrl,
             'project_id' => $gen->project_id,
+            // Có khi người dùng gửi một bộ sưu tập họ không có quyền ghi (xem resolveProjectId).
+            'project_warning' => $this->projectWarning,
         ]);
     }
 
@@ -2439,6 +2501,10 @@ RULES:
             if ($abs !== false && is_file($abs) && str_starts_with($abs, $root.DIRECTORY_SEPARATOR)) {
                 @unlink($abs);
             }
+            // [P0.1b] File trong studio/assets/ GẮN ĐƯỢC vào bộ sưu tập (normalizeUploadRel chấp nhận
+            // cả studio/assets/). Xoá file mà bỏ quên bảng liên kết sẽ để lại dòng trỏ tới file đã mất
+            // ⇒ bộ sưu tập hiển thị ảnh gốc hỏng vĩnh viễn.
+            \App\Models\UploadProjectLink::where('rel', $rel)->delete();
         }
         $asset->delete();
         return response()->json(['ok' => true]);

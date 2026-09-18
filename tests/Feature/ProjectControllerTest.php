@@ -188,7 +188,8 @@ class ProjectControllerTest extends TestCase
 
         $this->deleteJson('/api/projects/'.$project->id)->assertOk();
 
-        $this->assertDatabaseMissing('projects', ['id' => $project->id]);
+        $this->assertDatabaseHas('projects', ['id' => $project->id]);
+        $this->assertNotNull(Project::find($project->id)->deleted_at);
         // Generation ph\u1ea3i \u0111\u01b0\u1ee3c gi\u1eef l\u1ea1i (project_id = null).
         $this->assertDatabaseHas('generations', ['id' => $gen->id, 'project_id' => null]);
     }
@@ -229,11 +230,16 @@ class ProjectControllerTest extends TestCase
         $res->assertJsonPath('message', fn (string $msg) => $msg !== '' && str_contains($msg, 'approve') === false);
     }
 
-    public function test_transition_reviewer_gate_blocks_admin_from_approving(): void
+    /**
+     * [P0.2 — 2026-09-20] Người KHÔNG PHẢI chủ vẫn bị chặn duyệt — nhưng nay câu chữ nói đúng luật
+     * ("chủ bộ sưu tập hoặc Super Admin"), thay vì đòi Super Admin cho cả chủ sở hữu.
+     */
+    public function test_transition_reviewer_gate_blocks_non_owner_admin_from_approving(): void
     {
         $admin = User::where('email', 'admin@fabrikai.shop')->first();
+        $owner = User::where('email', 'user@fabrikai.shop')->first();
         $project = Project::factory()->create([
-            'user_id' => $admin->id,
+            'user_id' => $owner->id,
             'status' => Project::STATUS_REVIEW,
         ]);
         $this->actingAs($admin);
@@ -241,8 +247,37 @@ class ProjectControllerTest extends TestCase
         $res = $this->postJson('/api/projects/'.$project->id.'/transition', [
             'to' => Project::STATUS_APPROVED,
         ]);
-        $res->assertStatus(422);
-        $res->assertJsonPath('message', fn (string $msg) => str_contains($msg, 'Super Admin'));
+        // Chặn sớm hơn ở tầng quản lý bộ sưu tập: Admin không phải chủ thì không thao tác được
+        // trên bộ sưu tập của người khác (hàng đợi duyệt là của Super Admin).
+        $res->assertStatus(403);
+    }
+
+    /**
+     * [P0.2] KHÁCH TỰ PHỤC VỤ phải chốt và đóng được bộ sưu tập của chính mình — đây là ngõ cụt
+     * đo được của bản trước: ở "Chờ duyệt", availableTransitions() chỉ còn ["in_progress"].
+     */
+    public function test_customer_owner_can_approve_and_archive_own_collection(): void
+    {
+        $customer = User::where('email', 'user@fabrikai.shop')->first();
+        $project = Project::factory()->create([
+            'user_id' => $customer->id,
+            'status' => Project::STATUS_REVIEW,
+        ]);
+        $this->actingAs($customer);
+
+        $this->postJson('/api/projects/'.$project->id.'/transition', ['to' => Project::STATUS_APPROVED, 'note' => 'Chốt BST'])
+            ->assertOk()
+            ->assertJsonPath('status', Project::STATUS_APPROVED);
+
+        $this->postJson('/api/projects/'.$project->id.'/transition', ['to' => Project::STATUS_ARCHIVED])
+            ->assertOk()
+            ->assertJsonPath('status', Project::STATUS_ARCHIVED);
+
+        // Vết tự duyệt vẫn được ghi để kiểm toán (không biến mất cùng rào chắn cũ).
+        $history = $project->fresh()->settings['status_history'] ?? [];
+        $approved = collect($history)->firstWhere('to', Project::STATUS_APPROVED);
+        $this->assertNotNull($approved, 'Thiếu vết chuyển trạng thái đã duyệt.');
+        $this->assertTrue((bool) ($approved['self_approved'] ?? false), 'Lần tự duyệt phải được đánh dấu self_approved.');
     }
 
     public function test_transition_reviewer_gate_allows_super_admin_to_approve(): void
@@ -317,10 +352,15 @@ class ProjectControllerTest extends TestCase
         ]);
         $this->actingAs($admin);
 
-        $this->postJson('/api/projects/'.$project->id.'/generations', [
+        $res = $this->postJson('/api/projects/'.$project->id.'/generations', [
             'generation_id' => $gen->id,
             'action' => 'attach',
-        ])->assertStatus(403);
+        ])->assertOk();
+
+        // [P1.3] Không im lặng báo 403 nữa: API báo THẬT cái nào được, cái nào không — đo được.
+        $this->assertSame(0, $res->json('done'));
+        $this->assertSame(1, $res->json('failed'));
+        $this->assertFalse($res->json('results.0.ok'));
     }
 
     // ── Duyệt chéo (reviewer flow thật, Phần I) ──────────────────────────────

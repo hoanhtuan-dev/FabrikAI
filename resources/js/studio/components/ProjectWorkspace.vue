@@ -9,7 +9,7 @@ const store = useStudioStore();
 
 const open = defineModel({ type: Boolean, default: false });
 
-// [Đợt 0.7] Focus trap cho hộp thoại "Dự án thiết kế" (role=dialog): trước đây Tab đi xuyên ra ngoài.
+// [Đợt 0.7] Focus trap cho hộp thoại "Bảng thiết kế" (role=dialog): trước đây Tab đi xuyên ra ngoài.
 const dialogEl = ref(null);
 useFocusTrap(dialogEl, { active: open });
 
@@ -18,15 +18,15 @@ const editing = ref(false);
 const busy = ref(false);
 const confirmDelete = ref('');
 let confirmTimer = null;
-const movingId = ref(null);   // id dự án đang chuyển trạng thái — chống double-click
-const openingId = ref(null);  // id dự án đang tải chi tiết — spinner trên card/row
+const movingId = ref(null);   // id bộ sưu tập đang chuyển trạng thái — chống double-click
+const openingId = ref(null);  // id bộ sưu tập đang tải chi tiết — spinner trên card/row
 const transNote = ref('');    // ghi chú (tùy chọn) kèm lần chuyển trạng thái
-const detachId = ref(null);   // id generation đang gỡ khỏi dự án (chống double-click)
+const detachId = ref(null);   // id generation đang gỡ khỏi bộ sưu tập (chống double-click)
 
 // Form state
 const form = ref(blankForm());
 function blankForm() {
-  return { name: '', base_concept: '', brief: '', deadline: '', tags: [], color: '', thumbnail_url: '' };
+  return { name: '', base_concept: '', brief: '', deadline: '', tags: [], color: '', thumbnail_url: '', assignee_id: null };
 }
 const tagsText = ref('');
 
@@ -49,14 +49,14 @@ const grouped = computed(() => {
 // Empty state riêng theo scope (hàng đợi duyệt / lưu trữ) — scope own giữ khung kanban.
 const boardEmptyMessage = computed(() => {
   if (store.projects.length) return '';
-  if (store.projectScope === 'pending') return 'Không có dự án chờ duyệt 🎉';
-  if (store.projectsArchived) return 'Không có dự án lưu trữ.';
+  if (store.projectScope === 'pending') return 'Không có bộ sưu tập chờ duyệt 🎉';
+  if (store.projectsArchived) return 'Không có bộ sưu tập lưu trữ.';
   return '';
 });
 const listEmptyMessage = computed(() => {
-  if (store.projectScope === 'pending') return 'Không có dự án chờ duyệt 🎉';
-  if (store.projectsArchived) return 'Không có dự án lưu trữ.';
-  return 'Chưa có dự án. Bấm "＋ Dự án mới" để bắt đầu.';
+  if (store.projectScope === 'pending') return 'Không có bộ sưu tập chờ duyệt 🎉';
+  if (store.projectsArchived) return 'Không có bộ sưu tập lưu trữ.';
+  return 'Chưa có bộ sưu tập. Bấm "＋ Bộ sưu tập mới" để bắt đầu.';
 });
 
 function statusLabel(s) { return statuses.value[s]?.label || s; }
@@ -128,7 +128,7 @@ function parseTags() {
 }
 
 async function submitCreate() {
-  if (!form.value.name.trim()) { store.toast('Nhập tên dự án.', 'error'); return; }
+  if (!form.value.name.trim()) { store.toast('Nhập tên bộ sưu tập.', 'error'); return; }
   busy.value = true;
   try {
     const payload = { ...form.value, tags: parseTags() };
@@ -137,10 +137,10 @@ async function submitCreate() {
   } finally { busy.value = false; }
 }
 async function submitEdit() {
-  if (!form.value.name.trim()) { store.toast('Nhập tên dự án.', 'error'); return; }
-  // Lưu vào ĐÚNG dự án đã mở form (editingId), không phải dự án đang được chọn lúc bấm Lưu.
+  if (!form.value.name.trim()) { store.toast('Nhập tên bộ sưu tập.', 'error'); return; }
+  // Lưu vào ĐÚNG bộ sưu tập đã mở form (editingId), không phải bộ đang được chọn lúc bấm Lưu.
   const targetId = editingId.value ?? projectId.value;
-  if (targetId == null) { store.toast('Không xác định được dự án cần lưu — mở lại form.', 'error'); return; }
+  if (targetId == null) { store.toast('Không xác định được bộ sưu tập cần lưu — mở lại form.', 'error'); return; }
   busy.value = true;
   try {
     const payload = { ...form.value, tags: parseTags() };
@@ -152,7 +152,7 @@ async function submitEdit() {
 async function openProject(p) {
   if (openingId.value) return;
   openingId.value = p.id;
-  // Mở dự án người khác (scope pending) → chế độ duyệt, KHÔNG áp dụng cho phiên tạo ảnh.
+  // Mở bộ sưu tập người khác (scope pending) → chế độ duyệt, KHÔNG áp dụng cho phiên tạo ảnh.
   try { await store.loadProject(p.id, { reviewOnly: store.projectScope === 'pending' }); }
   finally { openingId.value = null; }
 }
@@ -234,12 +234,12 @@ watch(() => open.value, (v) => {
 
 <template>
   <Teleport to="body">
-    <div v-if="open" ref="dialogEl" role="dialog" aria-modal="true" aria-label="Dự án thiết kế" class="fixed inset-0 z-[95] flex items-stretch justify-center bg-black/70 p-3 sm:p-6">
+    <div v-if="open" ref="dialogEl" role="dialog" aria-modal="true" aria-label="Bảng thiết kế" class="fixed inset-0 z-[95] flex items-stretch justify-center bg-black/70 p-3 sm:p-6">
       <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-ink-700 bg-ink-950 text-cream-100 shadow-2xl">
         <!-- ══ Header ══ -->
         <div class="flex shrink-0 items-center justify-between gap-3 border-b border-ink-700 bg-ink-900 px-4 py-3">
           <div class="flex items-center gap-3">
-            <span class="font-display text-base font-semibold"><StudioIcon name="kanban" size="h-4 w-4" class="mr-1.5 inline align-[-2px]" />Dự án thiết kế</span>
+            <span class="font-display text-base font-semibold"><StudioIcon name="kanban" size="h-4 w-4" class="mr-1.5 inline align-[-2px]" />Bảng thiết kế</span>
             <div class="flex items-center gap-1 rounded-md bg-ink-800 p-1">
               <button @click="store.projectView = 'board'" class="rounded-lg px-2.5 py-1 text-xs font-semibold" :class="store.projectView === 'board' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">Bảng</button>
               <button @click="store.projectView = 'list'" class="rounded-lg px-2.5 py-1 text-xs font-semibold" :class="store.projectView === 'list' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">Danh sách</button>
@@ -248,8 +248,8 @@ watch(() => open.value, (v) => {
           <div class="flex items-center gap-2">
             <button v-if="store.projectCanReview" @click="togglePending" class="rounded-full border px-3 py-1.5 text-xs font-semibold" :class="store.projectScope === 'pending' ? 'border-brand-500 bg-brand-600/30 text-brand-100' : 'border-ink-700 text-cream-200 hover:bg-ink-800'"><StudioIcon name="clock" size="h-3.5 w-3.5" class="mr-1 inline align-[-2px]" />Chờ duyệt</button>
             <button @click="toggleArchived" class="rounded-full border px-3 py-1.5 text-xs font-semibold" :class="store.projectsArchived ? 'border-brand-500 bg-brand-600/30 text-brand-100' : 'border-ink-700 text-cream-200 hover:bg-ink-800'"><StudioIcon name="archive" size="h-3.5 w-3.5" class="mr-1 inline align-[-2px]" />Đã lưu trữ</button>
-            <button @click="openCreate" class="rounded-full bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-500">+ Dự án mới</button>
-            <button @click="open = false" aria-label="Đóng không gian dự án" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600"><StudioIcon name="x" size="h-4 w-4" /></button>
+            <button @click="openCreate" class="rounded-full bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-500">+ Bộ sưu tập mới</button>
+            <button @click="open = false" aria-label="Đóng bảng thiết kế" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600"><StudioIcon name="x" size="h-4 w-4" /></button>
           </div>
         </div>
 
@@ -258,7 +258,7 @@ watch(() => open.value, (v) => {
           <!-- Loading (board + list) — spinner gọn, không để khoảng trống im lặng -->
           <div v-if="!store.activeProject && store.projectLoading" class="flex flex-1 flex-col items-center justify-center gap-3 p-10">
             <span class="h-7 w-7 animate-spin rounded-full border-2 border-ink-700 border-t-brand-500"></span>
-            <p class="text-xs text-cream-300/50">Đang tải dự án…</p>
+            <p class="text-xs text-cream-300/50">Đang tải bộ sưu tập…</p>
           </div>
 
           <!-- Board view -->
@@ -307,7 +307,7 @@ watch(() => open.value, (v) => {
               <table class="w-full min-w-[560px] text-left text-xs">
                 <thead class="bg-ink-900 text-cream-300/70">
                   <tr>
-                    <th class="px-3 py-2 font-semibold">Dự án</th>
+                    <th class="px-3 py-2 font-semibold">Bộ sưu tập</th>
                     <th class="px-3 py-2 font-semibold">Trạng thái</th>
                     <th class="px-3 py-2 font-semibold">Deadline</th>
                     <th class="px-3 py-2 font-semibold">Ảnh</th>
@@ -353,6 +353,7 @@ watch(() => open.value, (v) => {
                   <p class="text-[11px] text-cream-300/60">{{ statusLabel(store.activeProject.status) }} · {{ store.activeProject.generations_count || 0 }} ảnh</p>
                   <p v-if="store.activeProjectReviewOnly" class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-[10px] font-semibold text-amber-200" :title="'Bạn đang duyệt dự án của người khác — ảnh/video bạn tạo KHÔNG tự gắn vào đây'"><StudioIcon name="eye" size="h-3.5 w-3.5" class="shrink-0" />Chế độ duyệt — output bạn tạo không gắn vào dự án này</p>
                   <p v-else-if="store.appliedProject?.id === store.activeProject?.id" class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-600/20 px-2.5 py-1 text-[10px] font-semibold text-brand-200" :title="'Ảnh/video tạo mới sẽ tự gắn vào dự án này'"><StudioIcon name="pin" size="h-3.5 w-3.5" class="shrink-0" />Đang áp dụng — ảnh/video tạo mới sẽ tự gắn vào đây <button type="button" @click="store.unapplyProject()" class="ml-1 underline decoration-dotted hover:text-white">ngắt</button></p>
+                  <p v-if="store.activeProject?.generations_truncated" class="mt-1 inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold text-amber-200">Hiển thị {{ store.activeProjectGenerations.length }}/{{ store.activeProject.generations_count || 0 }} ảnh mới nhất — sang Thư viện để xem toàn bộ</p>
                   <button v-else @click="store.applyProject(store.activeProject)" class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-brand-500"><StudioIcon name="pin" size="h-3.5 w-3.5" class="shrink-0" />Áp dụng dự án này</button>
                 </div>
               </div>
@@ -412,7 +413,7 @@ watch(() => open.value, (v) => {
                       </div>
                     </div>
                   </div>
-                  <p v-else class="py-6 text-center text-[11px] text-cream-300/40">Chưa có ảnh nào gắn vào dự án.</p>
+                  <p v-else class="py-6 text-center text-[11px] text-cream-300/40">Chưa có ảnh nào gắn vào bộ sưu tập.</p>
                 </div>
               </div>
               <div class="space-y-3">
@@ -440,15 +441,15 @@ watch(() => open.value, (v) => {
 
   <!-- ══ Modal tạo/sửa ══ -->
   <Teleport to="body">
-    <div v-if="creating || editing" role="dialog" aria-modal="true" :aria-label="creating ? 'Tạo dự án mới' : 'Sửa dự án'" class="fixed inset-0 z-[96] flex items-center justify-center bg-black/70 p-4" @click.self="closeForm">
+    <div v-if="creating || editing" role="dialog" aria-modal="true" :aria-label="creating ? 'Tạo bộ sưu tập mới' : 'Sửa bộ sưu tập'" class="fixed inset-0 z-[96] flex items-center justify-center bg-black/70 p-4" @click.self="closeForm">
       <div class="w-full max-w-lg rounded-lg border border-ink-700 bg-ink-950 p-5 text-cream-100 shadow-2xl">
         <div class="mb-4 flex items-center justify-between">
-          <p class="font-display text-sm font-semibold">{{ creating ? 'Dự án mới' : 'Sửa dự án' }}</p>
+          <p class="font-display text-sm font-semibold">{{ creating ? 'Bộ sưu tập mới' : 'Sửa bộ sưu tập' }}</p>
           <button @click="closeForm" aria-label="Đóng biểu mẫu" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600"><StudioIcon name="x" size="h-4 w-4" /></button>
         </div>
         <div class="space-y-3">
           <div>
-            <label class="mb-1 block text-[11px] font-semibold text-cream-300/70">Tên dự án <span class="text-red-400">*</span></label>
+            <label class="mb-1 block text-[11px] font-semibold text-cream-300/70">Tên bộ sưu tập <span class="text-red-400">*</span></label>
             <input v-model="form.name" type="text" class="w-full rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-cream-50 placeholder:text-cream-300/30 focus:border-brand-500 focus:outline-none" placeholder="Ví dụ: BST Xuân Hè 2026 — Đầm Linen">
           </div>
           <div>
@@ -469,6 +470,13 @@ watch(() => open.value, (v) => {
               <!-- input[type=color] không chấp nhận '' (warning "must be a valid CSS color") — fallback hiển thị, giữ nguyên '' trong model (dự án không màu) -->
               <input :value="form.color || '#4a7a90'" @input="form.color = $event.target.value" type="color" class="h-10 w-full rounded-lg border border-ink-700 bg-ink-900 px-1 py-1 focus:border-brand-500 focus:outline-none">
             </div>
+            <div>
+              <label class="mb-1 block text-[11px] font-semibold text-cream-300/70">Người phụ trách</label>
+              <select v-model="form.assignee_id" class="w-full rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-xs text-cream-100 focus:border-brand-400 focus:outline-none">
+                <option :value="null">Chủ bộ sưu tập tự làm</option>
+                <option v-for="u in store.assignableUsers" :key="u.id" :value="u.id">{{ u.name }}</option>
+              </select>
+            </div>
           </div>
           <div>
             <label class="mb-1 block text-[11px] font-semibold text-cream-300/70">Thẻ (phân cách bằng dấu phẩy)</label>
@@ -477,7 +485,7 @@ watch(() => open.value, (v) => {
         </div>
         <div class="mt-5 flex justify-end gap-2">
           <button @click="closeForm" class="rounded-full border border-ink-700 px-4 py-2 text-xs font-semibold text-cream-200 hover:bg-ink-800">Hủy</button>
-          <button @click="creating ? submitCreate() : submitEdit()" :disabled="busy" class="rounded-full bg-brand-600 px-5 py-2 text-xs font-semibold text-white hover:bg-brand-500 disabled:opacity-50">{{ busy ? 'Đang lưu…' : (creating ? 'Tạo dự án' : 'Lưu thay đổi') }}</button>
+          <button @click="creating ? submitCreate() : submitEdit()" :disabled="busy" class="rounded-full bg-brand-600 px-5 py-2 text-xs font-semibold text-white hover:bg-brand-500 disabled:opacity-50">{{ busy ? 'Đang lưu…' : (creating ? 'Tạo bộ sưu tập' : 'Lưu thay đổi') }}</button>
         </div>
       </div>
     </div>

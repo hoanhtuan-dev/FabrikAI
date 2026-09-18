@@ -80,6 +80,9 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->group(function () {
     Route::get('/cai-dat/{section}', [StudioController::class, 'mySettingsPage'])
         ->whereIn('section', ['presets', 'model', 'pose', 'stylist'])
         ->name('my-settings.section');
+
+    // [Yeu cau 2026-09-20] Trang BO SUU TAP day du - moi nguoi dung moi vao de lam viec.
+    Route::get('/bo-suu-tap', [StudioController::class, 'collectionsPage'])->name('collections.page');
 });
 // [Xác minh 2026-09-17] /admin là CONSOLE OWNER — KHÔNG được để chung nhóm shell công khai.
 // Trước đây ai cũng tải được vỏ quản trị (khách 200, customer 200), trái mô hình ở đầu file

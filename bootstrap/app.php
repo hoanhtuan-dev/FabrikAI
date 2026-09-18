@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\CleanStudioStorage;
 use App\Console\Commands\GrantPlanCredits;
 use App\Console\Commands\ProcessStudioGenerations;
 use App\Http\Middleware\EnsureUserCanUseStudio;
@@ -10,7 +11,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 
 $app = Application::configure(basePath: dirname(__DIR__))
-    ->withCommands([ProcessStudioGenerations::class, GrantPlanCredits::class])
+    ->withCommands([CleanStudioStorage::class, ProcessStudioGenerations::class, GrantPlanCredits::class])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',

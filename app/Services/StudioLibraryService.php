@@ -272,7 +272,9 @@ class StudioLibraryService
                     'kind' => str_contains($rel, 'studio/assets/') ? 'asset' : 'ref',
                     'size' => (int) filesize($file),
                     'mtime' => (int) filemtime($file),
-                    'used' => isset($referenced[$rel]),
+                    // [P0.1] Ảnh thuộc bộ sưu tập cũng là "đang dùng" — nhãn này điều khiển cả ô
+                    // "Dọn file mồ côi" lẫn nút xoá, nên nếu nói sai thì người dùng xoá mất ảnh gốc.
+                    'used' => isset($referenced[$rel]) || isset($links[$rel]),
                     'project_id' => $links[$rel] ?? null,
                     'width' => $dims[0] ?? 0,
                     'height' => $dims[1] ?? 0,
@@ -360,6 +362,42 @@ class StudioLibraryService
     }
 
     /**
+     * [P1.3 — 2026-09-20] ẢNH TẢI LÊN đang thuộc MỘT bộ sưu tập — đường ĐỌC còn thiếu.
+     *
+     * Vì sao cần: `POST /api/projects/{id}/uploads` đã ghi liên kết từ lâu, nhưng không có đường
+     * đọc nào phía bộ sưu tập (serialize/export/trang chia sẻ đều chỉ lấy generations) ⇒ người dùng
+     * gắn ảnh gốc của cả bộ vào bộ sưu tập rồi... không thấy nó ở đâu nữa. Đây là dead-end đúng
+     * nghĩa: thao tác thành công nhưng không có cách nào kiểm chứng ngoài việc quay lại Thư viện.
+     *
+     * KHÔNG quét đĩa (khác uploadedFiles()): chỉ đọc bảng liên kết nên rẻ, gọi được trong serialize().
+     *
+     * @return array<int, array{rel:string,name:string,url:string,kind:string}>
+     */
+    public function uploadsForProject(int $projectId): array
+    {
+        if ($projectId <= 0) {
+            return [];
+        }
+
+        return \App\Models\UploadProjectLink::query()
+            ->where('project_id', $projectId)
+            ->orderBy('id')
+            ->get()
+            ->map(function (\App\Models\UploadProjectLink $link): array {
+                $rel = (string) $link->rel;
+
+                return [
+                    'rel' => $rel,
+                    'name' => basename($rel),
+                    'url' => '/storage/'.$rel,
+                    'kind' => str_contains($rel, 'studio/assets/') ? 'asset' : 'ref',
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
      * Chuẩn hoá + giới hạn đường dẫn tải lên về studio/ref hoặc studio/assets (chống traversal).
      */
     private function normalizeUploadRel(string $rel): string
@@ -426,44 +464,51 @@ class StudioLibraryService
      * Quét file mồ côi trong các thư mục output. Được gọi ở chế độ admin — tham chiếu
      * được gom từ TẤT CẢ người dùng để không xóa nhầm file của người khác.
      */
+    // [R5 — 2026-09-20] B16: quét toàn bộ thư mục output là đắt (glob + filemtime trên hàng nghìn file).
+    // Lưu kết quả 5 phút trong cache — đủ cho stats sidebar, người dùng vẫn thấy "Dọn file mồ côi"
+    // hoạt động; chỉ là con số được làm mới 5 phút/lần.
     private function scanOrphanFiles(): array
     {
-        $referenced = $this->referencedPaths();
-        $files = [];
-        $grace = now()->subMinutes(self::ORPHAN_GRACE_MINUTES)->getTimestamp();
+        $key = 'studio:orphan_scan:all:v1';
 
-        foreach (self::OUTPUT_DIRS as $dir) {
-            $abs = Storage::disk('public')->path($dir);
-            if (! is_dir($abs)) {
-                continue;
-            }
-            $found = glob($abs.'/*.{png,jpg,jpeg,webp,gif,mp4,webm,mov}', GLOB_BRACE) ?: [];
-            foreach ($found as $file) {
-                if (! is_file($file)) {
+        return cache()->remember($key, 300, function () {
+            $referenced = $this->referencedPaths();
+            $files = [];
+            $grace = now()->subMinutes(self::ORPHAN_GRACE_MINUTES)->getTimestamp();
+
+            foreach (self::OUTPUT_DIRS as $dir) {
+                $abs = Storage::disk('public')->path($dir);
+                if (! is_dir($abs)) {
                     continue;
                 }
-                $mtime = (int) filemtime($file);
-                if ($mtime >= $grace) {
-                    continue; // file mới — có thể đang được render
+                $found = glob($abs.'/*.{png,jpg,jpeg,webp,gif,mp4,webm,mov}', GLOB_BRACE) ?: [];
+                foreach ($found as $file) {
+                    if (! is_file($file)) {
+                        continue;
+                    }
+                    $mtime = (int) filemtime($file);
+                    if ($mtime >= $grace) {
+                        continue; // file mới — có thể đang được render
+                    }
+                    $rel = $this->pathToRelative($file);
+                    if ($rel === '' || isset($referenced[$rel])) {
+                        continue;
+                    }
+                    $files[] = [
+                        'path' => $file,
+                        'rel' => $rel,
+                        'name' => basename($file),
+                        'size' => (int) filesize($file),
+                        'mtime' => $mtime,
+                    ];
                 }
-                $rel = $this->pathToRelative($file);
-                if ($rel === '' || isset($referenced[$rel])) {
-                    continue;
-                }
-                $files[] = [
-                    'path' => $file,
-                    'rel' => $rel,
-                    'name' => basename($file),
-                    'size' => (int) filesize($file),
-                    'mtime' => $mtime,
-                ];
             }
-        }
 
-        // Sắp xếp theo thời gian cũ → mới để dễ nhận diện.
-        usort($files, fn ($a, $b) => ($a['mtime'] ?? 0) <=> ($b['mtime'] ?? 0));
+            // Sắp xếp theo thời gian cũ → mới để dễ nhận diện.
+            usort($files, fn ($a, $b) => ($a['mtime'] ?? 0) <=> ($b['mtime'] ?? 0));
 
-        return $files;
+            return $files;
+        });
     }
 
     /**
@@ -489,6 +534,16 @@ class StudioLibraryService
                 $collect($ref);
             }
             $collect($meta['face_ref'] ?? null);
+        }
+
+        // [P0.1 — 2026-09-20] ẢNH TẢI LÊN ĐANG THUỘC MỘT BỘ SƯU TẬP LÀ ẢNH ĐANG ĐƯỢC DÙNG.
+        // Trước khi thêm dòng này, tập tham chiếu chỉ gom từ bảng generations/studio_assets/
+        // face_presets/pose_presets — bảng upload_project_links (liên kết file ↔ bộ sưu tập) bị bỏ
+        // sót. Hệ quả ĐO ĐƯỢC: ảnh vừa gắn vào bộ sưu tập vẫn bị liệt kê là "chưa dùng", hiện trong
+        // ô "Dọn file mồ côi", và nút dọn XOÁ THẬT file trên đĩa + xoá luôn liên kết bộ sưu tập
+        // (bộ sưu tập mất ảnh tham chiếu mà không có cách nào lấy lại).
+        foreach (\App\Models\UploadProjectLink::query()->cursor() as $link) {
+            $collect($link->rel);
         }
 
         foreach (\App\Models\StudioAsset::query()->cursor() as $a) {

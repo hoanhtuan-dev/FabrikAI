@@ -38,11 +38,18 @@ class ProjectExportService
      */
     public function build(Project $project, array $options = []): array
     {
-        $generations = $project->generations()
-            ->whereNotNull('media_url')
-            ->orderBy('id')
+        // [P0.5 — 2026-09-20] Lấy ẢNH MỚI NHẤT trước (orderByDesc), không phải ảnh cũ nhất.
+        // Bản trước dùng orderBy('id') tăng dần + limit 60 ⇒ bộ sưu tập 100 ảnh đóng gói 60 ảnh
+        // CŨ NHẤT, tức là bỏ đúng những ảnh vừa duyệt xong và gửi cho xưởng bộ cũ. Tệ hơn: không có
+        // chỗ nào nói ảnh đã bị cắt, nên xưởng nhận thiếu mà không ai biết.
+        $baseQuery = $project->generations()->whereNotNull('media_url');
+        $totalWithMedia = (clone $baseQuery)->count();
+
+        $generations = $baseQuery
+            ->orderByDesc('id')
             ->limit(self::MAX_IMAGES)
             ->get();
+        $truncated = $totalWithMedia > $generations->count();
 
         $tmp = tempnam(sys_get_temp_dir(), 'fabrikai-export-');
         if ($tmp === false) {
@@ -100,12 +107,20 @@ class ProjectExportService
                 'tags' => $this->tags($project),
             ],
             'note' => $note !== '' ? $note : null,
+            // Số ảnh THẬT của bộ sưu tập so với số ảnh có trong gói — để hệ thống của xưởng (và
+            // người đọc manifest) biết gói này có bị cắt hay không, thay vì đoán.
+            'images_total_in_collection' => $totalWithMedia,
+            'images_in_bundle' => count($images),
+            'truncated' => $truncated,
+            'truncated_note' => $truncated
+                ? 'Bộ sưu tập có '.$totalWithMedia.' ảnh; gói chỉ chứa '.self::MAX_IMAGES.' ảnh MỚI NHẤT. Ảnh còn lại tải riêng trong Thư viện FabrikAI.'
+                : null,
             'images' => $images,
             'skipped' => $skipped,
             'disclaimer' => 'Ảnh do AI tạo — dùng làm ảnh THAM CHIẾU/ý tưởng. Vui lòng đối chiếu mẫu thật trước khi sản xuất hàng loạt.',
         ];
 
-        $zip->addFromString('README.txt', $this->readme($project, count($images), count($skipped)));
+        $zip->addFromString('README.txt', $this->readme($project, count($images), count($skipped), $truncated ? $totalWithMedia : null));
         $zip->addFromString('thong-tin-bo-suu-tap.txt', $this->projectInfo($project, $note));
         $zip->addFromString('bang-size.csv', $this->sizeSheet((string) ($options['sizes'] ?? '')));
         $zip->addFromString('phieu-ky-thuat.txt', $this->techSheet($project, $images, $note));
@@ -220,7 +235,10 @@ class ProjectExportService
         };
     }
 
-    private function readme(Project $project, int $imageCount, int $skipped): string
+    /**
+     * @param  int|null  $collectionTotal  Tổng số ảnh THẬT của bộ sưu tập khi gói bị cắt (null = không cắt).
+     */
+    private function readme(Project $project, int $imageCount, int $skipped, ?int $collectionTotal = null): string
     {
         $lines = [
             'GÓI SẢN XUẤT — '.$project->name,
@@ -239,6 +257,12 @@ class ProjectExportService
             '    chi tiết đường may) trước khi sản xuất hàng loạt.',
             '  · Mọi ô còn trống trong phiếu kỹ thuật là phần xưởng cần xác nhận với khách.',
         ];
+        if ($collectionTotal !== null) {
+            $lines[] = '';
+            $lines[] = 'LƯU Ý VỀ SỐ LƯỢNG: bộ sưu tập có '.$collectionTotal.' ảnh, gói này chứa '.$imageCount
+                .' ảnh MỚI NHẤT (giới hạn '.self::MAX_IMAGES.' ảnh/gói). Nếu xưởng cần đủ bộ,';
+            $lines[] = '  hãy yêu cầu designer xuất thêm một gói nữa hoặc tải ảnh còn lại trong Thư viện FabrikAI.';
+        }
         if ($skipped > 0) {
             $lines[] = '';
             $lines[] = 'CẢNH BÁO: có '.$skipped.' ảnh KHÔNG tải được vào gói — xem anh/_KHONG_TAI_DUOC.txt.';

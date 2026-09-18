@@ -91,25 +91,26 @@ class StudioDockResizeTest extends TestCase
     }
 
 
-    public function test_both_docks_use_the_shared_base_instead_of_a_fixed_width(): void
+    public function test_every_dock_uses_the_shared_base_instead_of_a_fixed_width(): void
     {
         $app = $this->src('js/studio/StudioApp.vue');
 
-        // Hai dock (trái · Outputs) cùng dùng một cơ sở.
-        $this->assertSame(2, substr_count($app, '<DockResizer'), 'Cả hai dock phải dùng chung <DockResizer>.');
-        $this->assertSame(2, substr_count($app, 'useDockResize({'), 'Mỗi dock phải có một bộ điều khiển useDockResize().');
-        foreach (['DOCK_PRESETS.left', 'DOCK_PRESETS.outputs', 'controls="dock-left"', 'controls="dock-outputs"'] as $needle) {
+        // BA dock (trái · Outputs · Layers) cùng dùng MỘT cơ sở — thêm dock mới chỉ là khai preset +
+        // gắn vách ngăn, không chép lại logic kéo/kẹp/lưu/trả focus.
+        $this->assertSame(3, substr_count($app, '<DockResizer'), 'Cả ba dock phải dùng chung <DockResizer>.');
+        $this->assertSame(3, substr_count($app, 'useDockResize({'), 'Mỗi dock phải có một bộ điều khiển useDockResize().');
+        foreach (['DOCK_PRESETS.left', 'DOCK_PRESETS.outputs', 'DOCK_PRESETS.inspector', 'controls="dock-left"', 'controls="dock-outputs"', 'controls="dock-inspector"'] as $needle) {
             $this->assertStringContainsString($needle, $app, "StudioApp thiếu $needle.");
         }
 
         // Bề rộng KHÔNG còn là class cứng: mỗi dock lấy bề rộng từ bộ điều khiển (store là nguồn sự thật).
-        foreach (['dock-left', 'dock-outputs'] as $id) {
+        foreach (['dock-left', 'dock-outputs', 'dock-inspector'] as $id) {
             $this->assertMatchesRegularExpression('/<aside\\s+id="'.$id.'"(.*?)>/s', $app, "Không tìm thấy thẻ mở của dock #$id.");
             preg_match('/<aside\\s+id="'.$id.'"(.*?)>/s', $app, $m);
             $tag = $m[1] ?? '';
 
             $this->assertStringContainsString('dock-panel', $tag, "Dock #$id phải dùng class chung .dock-panel.");
-            $this->assertMatchesRegularExpression('/:style="(leftDock|outputDock)\\.panelStyle"/', $tag,
+            $this->assertMatchesRegularExpression('/:style="(leftDock|outputDock|inspectorDock)\\.panelStyle"/', $tag,
                 "Dock #$id phải lấy bề rộng động từ bộ điều khiển (kéo được), không phải hằng số.");
             $this->assertDoesNotMatchRegularExpression('/\\bw-(?:\\[|\\d)/', $tag,
                 "Dock #$id còn bề rộng CỨNG trong class Tailwind — kéo bao nhiêu cũng bị class ghi đè.");
@@ -125,13 +126,15 @@ class StudioDockResizeTest extends TestCase
             'Dock trái bị gỡ khỏi DOM khi ẩn — mất hiệu ứng co/giãn và mất trạng thái card bên trong.');
         $this->assertStringNotContainsString('<aside v-if="store.outputDockOpen"', $app,
             'Dock Outputs bị gỡ khỏi DOM khi ẩn — mất hiệu ứng co/giãn và mất trạng thái bên trong.');
+        $this->assertStringNotContainsString('v-if="store.inspectorOpen" data-covers-canvas', $app,
+            'Dock Layers bị gỡ khỏi DOM khi ẩn — mất hiệu ứng bật/tắt và mất trạng thái bên trong.');
 
         // Trạng thái ẩn đi qua data-collapsed (CSS lo phần hiệu ứng) cho CẢ HAI dock.
-        $this->assertSame(2, substr_count($app, ':data-collapsed='), 'Cả hai dock phải báo trạng thái ẩn qua data-collapsed.');
+        $this->assertSame(3, substr_count($app, ':data-collapsed='), 'Cả ba dock phải báo trạng thái ẩn qua data-collapsed.');
         // Và trạng thái đang kéo (để tắt transition cho con trỏ đi trước).
-        $this->assertSame(2, substr_count($app, ':data-resizing='), 'Cả hai dock phải báo trạng thái đang kéo qua data-resizing.');
+        $this->assertSame(3, substr_count($app, ':data-resizing='), 'Cả ba dock phải báo trạng thái đang kéo qua data-resizing.');
         // Ẩn khỏi bàn phím: dock thu về 0 vẫn còn cây DOM nên phải chặn Tab vào trong.
-        $this->assertSame(2, substr_count($app, ':inert='), 'Dock đã ẩn phải inert — nếu không, Tab vẫn nhảy vào nội dung vô hình.');
+        $this->assertSame(3, substr_count($app, ':inert='), 'Dock đã ẩn phải inert — nếu không, Tab vẫn nhảy vào nội dung vô hình.');
     }
 
 
@@ -152,8 +155,8 @@ class StudioDockResizeTest extends TestCase
 
         // Mỗi dock phải chỉ đích danh nút MỞ LẠI của mình, và nút đó phải tồn tại thật trong template.
         $app = $this->src('js/studio/StudioApp.vue');
-        $this->assertSame(2, substr_count($app, 'focusAfterCollapse:'),
-            'Cả hai dock phải khai nút mở lại — nếu không, ẩn bằng bàn phím là mất dấu.');
+        $this->assertSame(3, substr_count($app, 'focusAfterCollapse:'),
+            'Cả ba dock phải khai nút mở lại — nếu không, ẩn bằng bàn phím là mất dấu.');
         $this->assertStringContainsString('[data-activity="', $app,
             'Nút activity phải có data-activity để trả focus về đúng mục đang xem.');
         $this->assertStringContainsString(':data-activity="a.id"', $app, 'Nút activity phải mang data-activity.');

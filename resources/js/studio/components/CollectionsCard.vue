@@ -1,19 +1,12 @@
 <script setup>
 /**
- * CollectionsCard — "BỘ SƯU TẬP" (Đợt 2 — 2026-09-19).
+ * CollectionsCard — "Bộ sưu tập" (2026-09-20, bản tối ưu sidebar).
  *
- * Vì sao có card này: người làm nghề không nghĩ theo "ảnh lẻ", họ nghĩ theo BỘ SƯU TẬP / ĐƠN HÀNG.
- * Trước đây khái niệm dự án nằm sau nút "Dự án" ở thanh tiêu đề (popover chỉ để áp dụng), còn tiến độ,
- * hạn chót và việc đang chạy thì không thấy ở đâu ⇒ mỗi lần vào làm phải tự nhớ đang ở bộ nào, còn
- * bao nhiêu ảnh, hạn khi nào, còn việc gì chạy dở.
- *
- * Card này gom đúng 3 câu hỏi đó vào MỘT panel trong sidebar:
- *   1) Đang làm bộ nào (áp dụng cho phiên tạo ảnh) — đổi/bỏ trong 1 cú bấm;
- *   2) Các bộ sưu tập gần đây kèm trạng thái · số ảnh · hạn chót;
- *   3) Việc đang chạy (ảnh đang xếp hàng/xử lý) + nút xử lý ngay.
- *
- * KHÔNG thêm API mới: dùng đúng /api/projects (index/store/transition) đã có, nên mọi bất biến về
- * quyền và luồng trạng thái vẫn do máy chủ quyết định.
+ * THIẾT KẾ:
+ *  - Sidebar = không gian hẹp → card phải GỌN, không đè nút.
+ *  - Hiển thị rõ Bộ đang áp dụng + tiến trình duyệt 6 bước dạng MINI.
+ *  - Link rõ ràng sang trang đầy đủ /bo-suu-tap để thao tác chuyên sâu.
+ *  - Giữ lại các hành động nhanh: Duyệt · Chia sẻ · Xuất gói · Vào Studio.
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useStudioStore } from '../store.js';
@@ -21,58 +14,143 @@ import StudioIcon from './StudioIcon.vue';
 
 const store = useStudioStore();
 
-// Panel này là ĐIỂM VÀO công việc hằng ngày nên phải tự nạp danh sách bộ sưu tập — không chờ người
-// dùng mở popover "Dự án" mới có dữ liệu (trước khi sửa: vào panel thấy trống dù đã có bộ sưu tập).
-// Cùng mẫu với LibraryApp/PromptLibraryTab: chưa có dữ liệu VÀ chưa từng nạp thì mới gọi.
 onMounted(() => {
   if (!store.projects.length && !store.projectLoaded) store.loadProjects();
   if (store.appliedProject) {
     store.loadProjectStats(store.appliedProject.id);
-    store.loadProjectShots(store.appliedProject.id);   // để badge "chờ duyệt" đúng ngay khi mở panel
+    store.loadProjectShots(store.appliedProject.id);
   }
+  const timer = setInterval(() => {
+    if (applied.value?.id) {
+      store.loadProjectStats(applied.value.id, true);
+      store.loadProjectShots(applied.value.id, true);
+    }
+  }, 30000);
+  onBeforeUnmount(() => clearInterval(timer));
 });
 
-// Thống kê của bộ đang làm: ảnh xong/đang chạy/lỗi · credit đã dùng · hạn còn lại · phản hồi của khách.
+const applied = computed(() => store.appliedProject || null);
 const stats = computed(() => (applied.value ? store.projectStats[applied.value.id] || null : null));
-function loadStats() { if (applied.value) store.loadProjectStats(applied.value.id, true); }
-function deadlineTone(days) {
-  if (days === null || days === undefined) return 'bg-ink-700 text-cream-300';
-  if (days < 0) return 'bg-red-500/15 text-red-300';
-  if (days <= 3) return 'bg-amber-500/15 text-amber-300';
-  return 'bg-emerald-500/15 text-emerald-300';
-}
-
-// ── Duyệt mẫu theo lô (Đợt 2) ─────────────────────────────────────────────────────
-// Vòng đời duyệt ảnh (idea → drafted → selected → fitted → campaign_ready → approved/rejected) đã có ở
-// máy chủ từ Đợt 1.1 nhưng KHÔNG giao diện nào gọi tới ⇒ với người dùng nó là tính năng chết. Khối này
-// là chỗ duyệt thật: xem ảnh, chọn nhiều ảnh, rồi chốt / loại / đẩy lên bước kế tiếp trong MỘT lượt.
-const reviewOpen = ref(false);
-const reviewBusy = ref(false);
-const reviewNote = ref('');
-const reviewErrors = ref([]);
-const shotsSel = ref([]);
 const shots = computed(() => (applied.value ? (store.projectShots[applied.value.id]?.items || []) : []));
 const awaiting = computed(() => shots.value.filter((s) => s.shot_state === 'campaign_ready'));
 const approvedCount = computed(() => shots.value.filter((s) => s.shot_state === 'approved').length);
 const rejectedCount = computed(() => shots.value.filter((s) => s.shot_state === 'rejected').length);
+const shotsSel = ref([]);
 const selectedCount = computed(() => shotsSel.value.length);
-/** Màu theo trạng thái duyệt — giữ đúng cách nói của máy chủ (nhãn lấy từ Generation::SHOT_LABELS). */
+
+const reviewOpen = ref(false);
+const reviewBusy = ref(false);
+const reviewNote = ref('');
+const reviewErrors = ref([]);
+
+const shareOpen = ref(false);
+const shareBusy = ref(false);
+const shareInfo = ref(null);
+const shareDays = ref(30);
+
+const exportOpen = ref(false);
+const exportForm = ref({ sizes: '', note: '' });
+
+const createOpen = ref(false);
+const saving = ref(false);
+const form = ref({ name: '', season: '', deadline: '', brief: '' });
+
+const recent = computed(() => {
+  const list = (store.projects || []).slice();
+  const appliedId = applied.value ? Number(applied.value.id) : 0;
+  return list
+    .filter((p) => Number(p.id) !== appliedId)
+    .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
+    .slice(0, 4);
+});
+
+const SHOT_STATES = ['idea', 'drafted', 'selected', 'fitted', 'campaign_ready', 'approved'];
+const workflowProgress = computed(() => SHOT_STATES.map(state => ({
+  state,
+  label: state === 'campaign_ready' ? 'Chờ duyệt' : (state === 'idea' ? 'Ý tưởng' : state),
+  count: shots.value.filter(s => s.shot_state === state).length,
+})));
+
 function stateTone(state) {
   if (state === 'approved') return 'bg-emerald-500/80 text-ink-900';
   if (state === 'rejected') return 'bg-red-500/80 text-ink-900';
   if (state === 'campaign_ready') return 'bg-amber-500/85 text-ink-900';
   return 'bg-ink-800/85 text-cream-100';
 }
-async function loadShots() {
-  if (applied.value) await store.loadProjectShots(applied.value.id, true);
+function statusClass(p) {
+  return p && p.status_color ? '' : 'bg-ink-700 text-cream-300';
 }
-async function toggleReview() {
-  reviewOpen.value = !reviewOpen.value;
-  if (!reviewOpen.value) return;
+function statusStyle(p) {
+  return p && p.status_color ? { background: p.status_color + '26', color: p.status_color } : {};
+}
+function deadlineClass(iso) {
+  if (!iso) return 'bg-ink-700 text-cream-300';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return 'bg-ink-700 text-cream-300';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const target = new Date(d.getTime()); target.setHours(0, 0, 0, 0);
+  const days = Math.ceil((target.getTime() - today.getTime()) / 86400000);
+  if (days < 0) return 'bg-red-500/15 text-red-300';
+  if (days <= 3) return 'bg-amber-500/15 text-amber-300';
+  return 'bg-emerald-500/15 text-emerald-300';
+}
+function deadlineLabel(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const target = new Date(d.getTime()); target.setHours(0, 0, 0, 0);
+  const days = Math.ceil((target.getTime() - today.getTime()) / 86400000);
+  if (days < 0) return 'Quá hạn ' + Math.abs(days) + ' ngày';
+  if (days === 0) return 'Hạn hôm nay';
+  return 'Còn ' + days + ' ngày';
+}
+function daysLeft(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  return Math.ceil((d.getTime() - today.getTime()) / 86400000);
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+function goToStudio(p) {
+  const pid = (p || applied.value)?.id;
+  const qs = pid ? '?bo=' + pid + '&panel=collections' : '?panel=collections';
+  window.location.href = '/' + qs;
+}
+function pick(p) {
+  store.applyProject(p);
+  store.loadProjectStats(p.id);
+  store.loadProjectShots(p.id);
+  shotsSel.value = [];
   reviewErrors.value = [];
-  await store.loadProjectShots(applied.value.id);
-  // Mặc định chọn sẵn những ảnh ĐANG CHỜ DUYỆT — đúng việc của một buổi duyệt.
-  if (!shotsSel.value.length) shotsSel.value = awaiting.value.map((s) => s.id);
+}
+async function submit() {
+  if (!form.value.name.trim()) { store.toast('Nhập tên bộ sưu tập.', 'error'); return; }
+  saving.value = true;
+  const created = await store.createProject({
+    name: form.value.name.trim(),
+    brief: form.value.brief || null,
+    deadline: form.value.deadline || null,
+    tags: form.value.season ? [form.value.season] : [],
+  });
+  saving.value = false;
+  if (created) {
+    store.applyProject(created);
+    form.value = { name: '', season: '', deadline: '', brief: '' };
+    createOpen.value = false;
+  }
+}
+
+// ── Review ────────────────────────────────────────────────────────────────────
+function openReview() {
+  if (!applied.value) { store.toast('Chọn một bộ sưu tập trước.', 'error'); return; }
+  reviewOpen.value = true;
+  reviewErrors.value = [];
+  store.loadProjectShots(applied.value.id).then(() => {
+    if (!shotsSel.value.length) shotsSel.value = awaiting.value.map((s) => s.id);
+  });
 }
 function toggleShot(id) {
   shotsSel.value = shotsSel.value.includes(id)
@@ -80,10 +158,6 @@ function toggleShot(id) {
     : shotsSel.value.concat([id]);
 }
 function selectAwaiting() { shotsSel.value = awaiting.value.map((s) => s.id); }
-/**
- * Gửi một lượt duyệt. Máy chủ quyết định từng ảnh (quyền · ảnh thuộc bộ · ảnh đã xong · whitelist bước
- * chuyển) và trả kết quả TỪNG ẢNH ⇒ ở đây nói thật cái nào đổi được, cái nào không và vì sao.
- */
 async function reviewBatch(state) {
   if (!applied.value || !shotsSel.value.length || reviewBusy.value) return;
   reviewBusy.value = true;
@@ -95,24 +169,83 @@ async function reviewBatch(state) {
   reviewErrors.value = (d.results || []).filter((r) => !r.ok);
   shotsSel.value = [];
   store.toast('Đã ' + verb + ' ' + d.reviewed + '/' + ids.length + ' ảnh'
-    + (d.failed ? ' — ' + d.failed + ' ảnh không đổi được, xem lý do ngay dưới.' : '.'),
+    + (d.failed ? ' — ' + d.failed + ' ảnh không đổi được.' : '.'),
   d.failed ? 'error' : 'success');
   store.loadProjectStats(applied.value.id, true);
   if (!d.failed) reviewNote.value = '';
 }
 
-// ── PHÍM TẮT cho khối duyệt (Đợt 3) ──────────────────────────────────────────────
-// Một buổi duyệt thật là hàng chục ảnh: cứ phải rời tay khỏi bàn phím để bấm chuột từng lượt là chỗ
-// tốn thời gian nhất. Bốn phím, chỉ hoạt động khi khối duyệt ĐANG MỞ và người dùng KHÔNG đang gõ chữ:
-//   S = chọn ảnh chờ duyệt · N = chuyển bước tiếp · A = duyệt · R = loại · Esc = đóng khối.
-// Cố ý KHÔNG giành phím khi có công cụ canvas/modal đang chạy (Esc của modal vẫn phải đóng modal).
+// ── Share ─────────────────────────────────────────────────────────────────────
+async function openShare() {
+  if (!applied.value) return;
+  shareOpen.value = true;
+  shareInfo.value = null;
+  shareInfo.value = await store.loadShareStatus(applied.value.id);
+}
+async function createShare() {
+  if (!applied.value || shareBusy.value) return;
+  shareBusy.value = true;
+  if (await store.createShare(applied.value.id, shareDays.value)) await openShare();
+  shareBusy.value = false;
+}
+async function revokeShare() {
+  if (!applied.value || !shareInfo.value?.share || shareBusy.value) return;
+  shareBusy.value = true;
+  if (await store.revokeShare(applied.value.id, shareInfo.value.share.token)) await openShare();
+  shareBusy.value = false;
+}
+function copyShare() {
+  const url = shareInfo.value?.share?.url;
+  if (!url) return;
+  navigator.clipboard?.writeText(url)
+    .then(() => store.toast('Đã copy link chia sẻ.'))
+    .catch(() => store.toast('Không copy được — hãy chọn và copy thủ công.', 'error'));
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+function openExport() {
+  if (!applied.value) { store.toast('Chọn bộ sưu tập trước.', 'error'); return; }
+  exportOpen.value = true;
+  const tpl = store.pendingExport;
+  if (!tpl) return;
+  if (!exportForm.value.sizes.trim() && tpl.sizes) exportForm.value.sizes = tpl.sizes;
+  if (!exportForm.value.note.trim() && tpl.note) exportForm.value.note = tpl.note;
+}
+async function startExport() {
+  if (!applied.value) return;
+  const q = new URLSearchParams();
+  if (exportForm.value.sizes.trim()) q.set('sizes', exportForm.value.sizes.trim());
+  if (exportForm.value.note.trim()) q.set('note', exportForm.value.note.trim());
+  store.toast('Đang đóng gói — vui lòng đợi.', 'info');
+  try {
+    const res = await fetch('/api/projects/' + applied.value.id + '/export' + (q.toString() ? '?' + q.toString() : ''), { headers: { Accept: 'application/zip' } });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Không tạo được gói xuất (' + res.status + ').');
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^"]+)"?/);
+    const name = m ? m[1] : ('fabrikai-' + applied.value.id + '.zip');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+    store.toast('Đã tải gói ZIP về máy.', 'success');
+  } catch (e) {
+    store.toast(e.message || 'Lỗi khi tải gói xuất.', 'error');
+  }
+}
+
+// ── Phím tắt trong khối duyệt (chỉ khi card đang mở khối duyệt) ──────────────
 const REVIEW_KEYS = { s: 'select', n: 'next', a: 'approved', r: 'rejected', Escape: 'close' };
 function typingIn(el) {
-  // Không cướp phím khi người dùng đang gõ (ô prompt, ghi chú duyệt, đổi tên layer…).
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
 }
 function toolBusy() {
-  // Đang có modal/công cụ cần bàn phím riêng ⇒ nhường toàn bộ phím.
   return !!(store.viewer || store.promptOpen || store.planOpen || store.sourcePickerOpen
     || store.confirmDeleteOpen || store.confirmClearCanvasOpen || store.reframeOpen || store.filmOpen
     || store.cropMode || store.inpaintMaskMode !== 'none' || store.drawMode || store.eraseMode
@@ -132,423 +265,268 @@ function onReviewKey(e) {
 }
 onMounted(() => window.addEventListener('keydown', onReviewKey));
 onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
-
-// ── Form tạo bộ sưu tập mới ──
-const createOpen = ref(false);
-const saving = ref(false);
-const form = ref({ name: '', season: '', deadline: '', brief: '' });
-
-const applied = computed(() => store.appliedProject || null);
-
-// ── Xuất gói cho xưởng (Đợt 4) ─────────────────────────────────────────────────────
-// Người nhận là XƯỞNG MAY (không dùng FabrikAI) nên gói phải tự đủ nghĩa: ảnh + phiếu kỹ thuật +
-// bảng size. Bảng size và ghi chú do người dùng nhập ở đây rồi gửi kèm qua query (giới hạn 2000 ký tự
-// mỗi trường ở phía máy chủ).
-const exportOpen = ref(false);
-const exportForm = ref({ sizes: '', note: '' });
-
-// ── Chia sẻ cho khách duyệt (Đợt 4) ────────────────────────────────────────────────
-// Khách/nhân viên duyệt KHÔNG có tài khoản FabrikAI: tạo link công khai (có hạn, thu hồi được) để họ
-// xem ảnh + brief và gửi phản hồi Duyệt/Yêu cầu sửa. Phản hồi lưu vào bộ sưu tập để designer thấy ngay.
-const shareOpen = ref(false);
-const shareBusy = ref(false);
-const shareInfo = ref(null);   // { share: {url, expires_at, views} | null, feedback: [...] }
-const shareDays = ref(30);
-async function loadShare() {
-  if (!applied.value) return;
-  shareInfo.value = null;
-  shareInfo.value = await store.loadShareStatus(applied.value.id);
-}
-async function toggleShare() {
-  shareOpen.value = !shareOpen.value;
-  if (shareOpen.value) await loadShare();
-}
-async function createShare() {
-  if (!applied.value || shareBusy.value) return;
-  shareBusy.value = true;
-  const created = await store.createShare(applied.value.id, shareDays.value);
-  if (created) await loadShare();
-  shareBusy.value = false;
-}
-async function revokeShare() {
-  if (!applied.value || !shareInfo.value?.share || shareBusy.value) return;
-  shareBusy.value = true;
-  const ok = await store.revokeShare(applied.value.id, shareInfo.value.share.token);
-  if (ok) await loadShare();
-  shareBusy.value = false;
-}
-function copyShare() {
-  const url = shareInfo.value?.share?.url;
-  if (!url) return;
-  navigator.clipboard?.writeText(url).then(() => store.toast('Đã copy link chia sẻ.')).catch(() => store.toast('Không copy được — hãy chọn và copy thủ công.', 'error'));
-}
-/**
- * Mở/đóng khối xuất gói. Nếu người dùng vừa áp MẪU VIỆC có kèm bảng size (vd "Mẫu kỹ thuật gửi xưởng"),
- * điền sẵn vào form — nhưng KHÔNG ghi đè nội dung người dùng đã tự nhập.
- */
-function toggleExport() {
-  exportOpen.value = !exportOpen.value;
-  if (!exportOpen.value) return;
-  const tpl = store.pendingExport;
-  if (!tpl) return;
-  if (!exportForm.value.sizes.trim() && tpl.sizes) exportForm.value.sizes = tpl.sizes;
-  if (!exportForm.value.note.trim() && tpl.note) exportForm.value.note = tpl.note;
-  if (tpl.sizes || tpl.note) store.toast('Đã điền sẵn bảng size/ghi chú từ mẫu «' + tpl.from + '» — kiểm tra rồi tải gói.');
-}
-function startExport() {
-  if (!applied.value) { store.toast('Chọn bộ sưu tập trước khi xuất gói.', 'error'); return; }
-  const q = new URLSearchParams();
-  if (exportForm.value.sizes.trim()) q.set('sizes', exportForm.value.sizes.trim());
-  if (exportForm.value.note.trim()) q.set('note', exportForm.value.note.trim());
-  const url = '/api/projects/' + applied.value.id + '/export' + (q.toString() ? '?' + q.toString() : '');
-  window.open(url, '_blank', 'noopener');
-  store.toast('Đang đóng gói ZIP cho xưởng — trình duyệt sẽ tải về.');
-}
-
-/** Bộ sưu tập gần đây (mới cập nhật lên trước) — bỏ cái đang áp dụng để không trùng. */
-const recent = computed(() => {
-  const list = (store.projects || []).slice();
-  const appliedId = applied.value ? Number(applied.value.id) : 0;
-  return list
-    .filter((p) => Number(p.id) !== appliedId)
-    .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
-    .slice(0, 5);
-});
-
-/** Việc đang chạy: ảnh đang xếp hàng hoặc đang xử lý (số liệu THẬT từ danh sách generation). */
-const running = computed(() => (store.generations || []).filter((g) => g.status === 'pending' || g.status === 'processing'));
-const pendingCount = computed(() => running.value.filter((g) => g.status === 'pending').length);
-const processingCount = computed(() => running.value.filter((g) => g.status === 'processing').length);
-
-function daysLeft(iso) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const today = new Date();
-  return Math.ceil((d.getTime() - today.getTime()) / 86400000);
-}
-function deadlineLabel(iso) {
-  const n = daysLeft(iso);
-  if (n === null) return '';
-  if (n < 0) return 'Quá hạn ' + Math.abs(n) + ' ngày';
-  if (n === 0) return 'Hạn hôm nay';
-  return 'Còn ' + n + ' ngày';
-}
-function deadlineClass(iso) {
-  const n = daysLeft(iso);
-  if (n === null) return 'bg-ink-700 text-cream-300';
-  if (n < 0) return 'bg-red-500/15 text-red-300';
-  if (n <= 3) return 'bg-amber-500/15 text-amber-300';
-  return 'bg-emerald-500/15 text-emerald-300';
-}
-function statusClass(p) {
-  // Dùng màu máy chủ trả về (status_color) để UI không tự bịa trạng thái.
-  return p && p.status_color ? '' : 'bg-ink-700 text-cream-300';
-}
-function statusStyle(p) {
-  return p && p.status_color ? { background: p.status_color + '26', color: p.status_color } : {};
-}
-async function pick(p) {
-  store.applyProject(p);
-  store.loadProjectStats(p.id);   // nạp chi phí/tiến độ của bộ vừa chọn
-  shotsSel.value = [];            // đổi bộ thì bỏ lựa chọn duyệt của bộ cũ (tránh duyệt nhầm ảnh)
-  reviewErrors.value = [];
-  store.loadProjectShots(p.id);
-  store.toast('Đang làm bộ sưu tập «' + p.name + '» — ảnh mới sẽ tự gắn vào đây.');
-}
-function openWorkspace(p) {
-  if (p && (!applied.value || Number(applied.value.id) !== Number(p.id))) store.applyProject(p);
-  store.requestWorkspace();
-}
-async function submit() {
-  if (!form.value.name.trim()) { store.toast('Nhập tên bộ sưu tập.', 'error'); return; }
-  saving.value = true;
-  const payload = {
-    name: form.value.name.trim(),
-    brief: form.value.brief || null,
-    deadline: form.value.deadline || null,
-    tags: form.value.season ? [form.value.season] : [],
-  };
-  const created = await store.createProject(payload);
-  saving.value = false;
-  if (created) {
-    store.applyProject(created);
-    form.value = { name: '', season: '', deadline: '', brief: '' };
-    createOpen.value = false;
-    store.toast('Đã tạo «' + created.name + '» và áp dụng cho phiên làm việc.');
-  }
-}
 </script>
 
 <template>
-  <div class="card p-4" style="background: linear-gradient(160deg, rgba(56,129,90,.10), rgba(74,122,144,.05));">
-    <div class="flex items-center gap-2">
-      <span class="grid h-7 w-7 place-items-center rounded-md bg-brand-500/20 text-brand-300"><StudioIcon name="folderOpen" size="h-4 w-4" /></span>
-      <p class="text-sm font-semibold text-brand-300">Bộ sưu tập</p>
-      <button class="tool-btn ml-auto" :class="createOpen ? 'is-active' : ''" title="Tạo bộ sưu tập mới cho mùa/vụ hoặc đơn hàng" @click="createOpen = !createOpen">
+  <div class="card overflow-hidden" style="background: linear-gradient(160deg, rgba(56,129,90,.08), rgba(74,122,144,.04));">
+    <!-- ══ HEADER: gọn, có link sang trang đầy đủ ══ -->
+    <div class="flex items-center gap-2 px-4 py-3">
+      <span class="grid h-7 w-7 place-items-center rounded-lg bg-brand-500/15 text-brand-300">
+        <StudioIcon name="folderOpen" size="h-4 w-4" />
+      </span>
+      <span class="flex-1 text-sm font-semibold text-cream-100">Bộ sưu tập</span>
+      <a href="/bo-suu-tap" class="tool-btn" title="Mở trang Bộ sưu tập đầy đủ (tối ưu cho điện thoại / làm việc chi tiết)">
+        <StudioIcon name="panelRight" size="h-3.5 w-3.5" /> Trang
+      </a>
+      <button class="tool-btn" :class="createOpen ? 'is-active' : ''" title="Tạo bộ sưu tập mới" @click="createOpen = !createOpen">
         <StudioIcon name="plus" size="h-3.5 w-3.5" /> Mới
       </button>
     </div>
 
-    <!-- ── Đang làm ── -->
-    <div v-if="applied" class="mt-3 rounded-lg border border-brand-500/30 bg-brand-600/10 p-3">
-      <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-200">Đang làm</p>
-      <p class="mt-0.5 truncate text-sm font-semibold text-cream-50">{{ applied.name }}</p>
-      <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-        <span class="rounded-full px-2 py-0.5 font-semibold" :class="statusClass(applied)" :style="statusStyle(applied)">{{ applied.status_label || applied.status }}</span>
-        <span class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200">{{ applied.generations_count || 0 }} ảnh</span>
-        <span v-if="applied.deadline" class="rounded-full px-2 py-0.5 font-semibold" :class="deadlineClass(applied.deadline)">{{ deadlineLabel(applied.deadline) }}</span>
+    <!-- ══ BỘ ĐANG ÁP DỤNG + TIẾN TRÌNH DUYỆT MẪU 6 BƯỚC ══ -->
+    <div v-if="applied" class="mx-3 mb-3 rounded-xl border border-brand-500/25 bg-brand-600/8 p-3">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-200">Đang làm</p>
+          <p class="mt-0.5 truncate text-sm font-semibold text-cream-50">{{ applied.name }}</p>
+          <div class="mt-1.5 flex flex-wrap items-center gap-1 text-[10px]">
+            <span class="rounded-full px-2 py-0.5 font-semibold" :class="statusClass(applied)" :style="statusStyle(applied)">{{ applied.status_label || applied.status }}</span>
+            <span class="rounded-full bg-ink-800 px-2 py-0.5 text-cream-200">{{ applied.generations_count || 0 }} ảnh</span>
+            <span v-if="applied.deadline" class="rounded-full px-2 py-0.5 font-semibold" :class="deadlineClass(applied.deadline)">{{ deadlineLabel(applied.deadline) }}</span>
+          </div>
+        </div>
+        <button class="icon-btn !h-6 !w-6 shrink-0" title="Bỏ áp dụng — ảnh mới không gắn vào bộ này nữa" @click="store.unapplyProject()">
+          <StudioIcon name="pinOff" size="h-3 w-3" />
+        </button>
       </div>
-      <p v-if="applied.brief" class="mt-1.5 line-clamp-2 text-[11px] text-cream-300">{{ applied.brief }}</p>
 
-      <!-- Chi phí & tiến độ THẬT của bộ này (số liệu từ bảng generations, không đếm lại ở client) -->
-      <div class="mt-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2">
-        <div class="flex items-center gap-1.5">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Chi phí &amp; tiến độ</p>
-          <button class="icon-btn ml-auto !h-5 !w-5" title="Nạp lại số liệu" aria-label="Nạp lại số liệu bộ sưu tập" @click="loadStats()">
+      <!-- [R3] Tiến độ duyệt 6 bước — dạng CHIP NGANG, ngắn gọn cho sidebar -->
+      <div class="mt-2.5">
+        <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">Tiến trình duyệt</p>
+        <div class="flex items-center gap-1 overflow-x-auto scrollbar-hide">
+          <span
+            v-for="step in workflowProgress" :key="step.state"
+            class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold transition"
+            :class="step.count
+              ? 'border-brand-500/40 bg-brand-600/15 text-brand-100'
+              : 'border-ink-700/60 bg-ink-900/50 text-cream-300/40'"
+            :title="step.label + ': ' + step.count + ' ảnh'"
+          >
+            <span class="h-1.5 w-1.5 shrink-0 rounded-full" :class="step.count ? 'bg-brand-400' : 'bg-ink-700'"></span>
+            {{ step.label }}
+            <span v-if="step.count" class="rounded-full bg-brand-600/25 px-1 py-0.5 text-[9px]">{{ step.count }}</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Chi phí & tiến độ thật (từ máy chủ) -->
+      <div v-if="stats" class="mt-2.5 rounded-lg border border-ink-700/60 bg-ink-900/50 p-2">
+        <div class="flex items-center justify-between">
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">Chi phí &amp; tiến độ</p>
+          <button class="icon-btn !h-4 !w-4" title="Nạp lại" @click="store.loadProjectStats(applied.id, true)">
             <StudioIcon name="refresh" size="h-3 w-3" />
           </button>
         </div>
-        <template v-if="stats">
-          <div class="mt-1 flex flex-wrap gap-1 text-[10px]">
-            <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-300">{{ stats.images.completed }} ảnh xong</span>
-            <span v-if="stats.images.running" class="rounded-full bg-sky-500/15 px-2 py-0.5 font-semibold text-sky-300">{{ stats.images.running }} đang chạy</span>
-            <span v-if="stats.images.failed" class="rounded-full bg-red-500/15 px-2 py-0.5 font-semibold text-red-300">{{ stats.images.failed }} ảnh lỗi</span>
-            <span class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200">{{ stats.credits.used }} credit đã dùng</span>
-            <span v-if="stats.deadline" class="rounded-full px-2 py-0.5 font-semibold" :class="deadlineTone(stats.deadline.days_left)">
-              {{ stats.deadline.days_left < 0 ? 'Quá hạn ' + Math.abs(stats.deadline.days_left) + ' ngày' : (stats.deadline.days_left === 0 ? 'Hạn hôm nay' : 'Còn ' + stats.deadline.days_left + ' ngày') }}
+        <div class="mt-1.5 flex flex-wrap gap-1 text-[10px]">
+          <span class="rounded-full bg-emerald-500/12 px-2 py-0.5 font-semibold text-emerald-300">{{ stats.images.completed }} xong</span>
+          <span v-if="stats.images.running" class="rounded-full bg-sky-500/12 px-2 py-0.5 font-semibold text-sky-300">{{ stats.images.running }} chạy</span>
+          <span v-if="stats.images.failed" class="rounded-full bg-red-500/12 px-2 py-0.5 font-semibold text-red-300">{{ stats.images.failed }} lỗi</span>
+          <span class="rounded-full bg-ink-800 px-2 py-0.5 text-cream-200">{{ stats.credits.used }} credit</span>
+          <span v-if="stats.deadline" class="rounded-full px-2 py-0.5 font-semibold" :class="deadlineClass(stats.deadline.days_left)">
+            {{ stats.deadline.days_left < 0 ? 'Quá hạn ' + Math.abs(stats.deadline.days_left) : (stats.deadline.days_left === 0 ? 'Hạn hôm nay' : 'Còn ' + stats.deadline.days_left) }}
+          </span>
+        </div>
+        <p v-if="stats.feedback.latest && stats.feedback.latest.message" class="mt-1 text-[10px] leading-relaxed text-cream-300/80">
+          <b class="text-brand-200">Khách ({{ stats.feedback.latest.decision_label }}):</b> «{{ stats.feedback.latest.message }}»
+        </p>
+      </div>
+
+      <!-- Hành động chuyên sâu -->
+      <div class="mt-2.5 flex flex-wrap gap-1.5">
+        <button class="tool-btn btn-sm flex-1" :class="awaiting.length ? '!border-amber-500/40 !bg-amber-500/8 !text-amber-200' : ''" @click="openReview()">
+          <StudioIcon name="checkSquare" size="h-3.5 w-3.5" /> Duyệt<span v-if="awaiting.length"> · {{ awaiting.length }}</span>
+        </button>
+        <button class="tool-btn btn-sm" @click="openShare()">
+          <StudioIcon name="link" size="h-3.5 w-3.5" />
+        </button>
+        <button class="tool-btn btn-sm" @click="openExport()">
+          <StudioIcon name="download" size="h-3.5 w-3.5" />
+        </button>
+        <button class="tool-btn btn-sm" @click="goToStudio(applied)" title="Mở Studio để làm việc trên bộ này">
+          <StudioIcon name="arrowRight" size="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ CHƯA CHỌN BỘ NÀO ══ -->
+    <div v-else class="mx-3 mb-3 rounded-xl border border-dashed border-ink-600 bg-ink-900/30 p-3 text-center">
+      <p class="text-xs text-cream-300/70">Chưa chọn bộ sưu tập.</p>
+      <p class="mt-0.5 text-[10px] text-cream-300/50">Ảnh tạo ra không tự gắn vào đâu — chọn bộ bên dưới hoặc tạo mới.</p>
+    </div>
+
+    <!-- ══ DUYỆT MẪU (khối inline gọn) ══ -->
+    <div v-if="reviewOpen && applied" class="mx-3 mb-3 rounded-xl border border-ink-700 bg-ink-900/70 p-2.5">
+      <div class="flex items-center justify-between gap-2">
+        <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Duyệt mẫu</p>
+        <button class="icon-btn !h-5 !w-5" title="Đóng" @click="reviewOpen = false">
+          <StudioIcon name="x" size="h-3 w-3" />
+        </button>
+      </div>
+      <p class="mt-1 text-[10px] text-cream-300/70">
+        {{ shots.length }} ảnh · <span class="text-amber-300">{{ awaiting.length }} chờ</span> ·
+        <span class="text-emerald-300">{{ approvedCount }} duyệt</span> · <span class="text-red-300">{{ rejectedCount }} loại</span>
+      </p>
+      <div v-if="!shots.length" class="mt-2 rounded-lg border border-dashed border-ink-700 p-3 text-center text-[10px] text-cream-300/50">
+        Chưa có ảnh tạo xong — duyệt được ngay khi ảnh render xong.
+      </div>
+      <template v-else>
+        <div class="mt-2 flex max-h-48 flex-col gap-1.5 overflow-y-auto">
+          <button
+            v-for="s in shots" :key="s.id"
+            class="flex items-center gap-2 rounded-lg border p-1.5 text-left transition"
+            :class="shotsSel.includes(s.id) ? 'border-brand-400 bg-brand-600/10' : 'border-ink-700 hover:border-ink-600'"
+            @click="toggleShot(s.id)"
+          >
+            <img v-if="s.thumb" :src="s.thumb" :alt="'Ảnh ' + s.id" class="h-10 w-10 shrink-0 rounded-md object-cover">
+            <span v-else class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink-800 text-cream-300">
+              <StudioIcon name="image" size="h-4 w-4" />
             </span>
-            <span v-if="stats.feedback.count" class="rounded-full bg-brand-600/25 px-2 py-0.5 font-semibold text-brand-100">khách đã phản hồi {{ stats.feedback.count }} lần</span>
-          </div>
-          <p v-if="stats.feedback.latest && stats.feedback.latest.message" class="mt-1 text-[10px] text-cream-300">
-            «{{ stats.feedback.latest.decision_label }}» — {{ stats.feedback.latest.message }}
-          </p>
-          <p v-else-if="!stats.images.total" class="mt-1 text-[10px] text-cream-300">Bộ này chưa có ảnh nào — tạo ảnh trong Studio rồi số liệu sẽ hiện ở đây.</p>
-        </template>
-        <p v-else class="mt-1 text-[10px] text-cream-300">Đang tải số liệu…</p>
-      </div>
-      <div class="mt-2 flex flex-wrap gap-1.5">
-        <button class="tool-btn" @click="openWorkspace(applied)"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> Mở workspace</button>
-        <button class="tool-btn" :class="exportOpen ? 'is-active' : ''" title="Đóng gói ảnh + phiếu kỹ thuật + bảng size thành 1 file ZIP để gửi xưởng may" @click="toggleExport()">
-          <StudioIcon name="download" size="h-3.5 w-3.5" /> Xuất gói cho xưởng
-        </button>
-        <button class="tool-btn" :class="shareOpen ? 'is-active' : ''" title="Gửi link cho khách/nhân viên duyệt (không cần tài khoản FabrikAI)" @click="toggleShare()">
-          <StudioIcon name="link" size="h-3.5 w-3.5" /> Chia sẻ cho khách
-        </button>
-        <button class="tool-btn" :class="reviewOpen ? 'is-active' : ''" title="Xem lại ảnh của bộ này rồi chốt / loại / đẩy lên bước kế tiếp — duyệt nhiều ảnh trong một lượt" @click="toggleReview()">
-          <StudioIcon name="checkSquare" size="h-3.5 w-3.5" /> Duyệt mẫu<span v-if="awaiting.length"> ({{ awaiting.length }})</span>
-        </button>
-        <button class="tool-btn" title="Không gắn ảnh mới vào bộ này nữa" @click="store.unapplyProject()"><StudioIcon name="pinOff" size="h-3.5 w-3.5" /> Bỏ áp dụng</button>
-      </div>
-
-      <!-- Duyệt mẫu theo lô: chốt/loại/đẩy bước cho NHIỀU ảnh trong một lượt -->
-      <div v-if="reviewOpen" class="mt-2 rounded-lg border border-ink-700 bg-ink-900/70 p-2.5">
-        <div class="flex flex-wrap items-center gap-1.5">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Duyệt mẫu</p>
-          <span class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200">{{ shots.length }} ảnh đã tạo xong</span>
-          <span v-if="awaiting.length" class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">{{ awaiting.length }} chờ duyệt</span>
-          <span v-if="approvedCount" class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">{{ approvedCount }} đã duyệt</span>
-          <span v-if="rejectedCount" class="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-300">{{ rejectedCount }} đã loại</span>
-          <button class="icon-btn ml-auto !h-5 !w-5" title="Nạp lại danh sách ảnh" aria-label="Nạp lại danh sách ảnh của bộ sưu tập" @click="loadShots()">
-            <StudioIcon name="refresh" size="h-3 w-3" />
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-[11px] font-semibold text-cream-100">#{{ s.id }}</span>
+              <span class="block truncate text-[10px] text-cream-300/70">{{ s.shot_label }}</span>
+            </span>
+            <span class="rounded-full px-1.5 py-0.5 text-[9px] font-bold" :class="stateTone(s.shot_state)">{{ s.shot_label }}</span>
+            <span v-if="shotsSel.includes(s.id)" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500 text-ink-900">
+              <StudioIcon name="check" size="h-3 w-3" />
+            </span>
           </button>
         </div>
-        <p v-if="!shots.length" class="mt-1 text-[10px] text-cream-300">Bộ này chưa có ảnh nào tạo xong — duyệt được ngay khi ảnh render xong.</p>
-        <template v-else>
-          <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <button class="tool-btn !py-1 text-[10px]" title="Chọn tất cả ảnh đang chờ duyệt (phím S)" @click="selectAwaiting()"><StudioIcon name="selectAll" size="h-3 w-3" /> Chọn ảnh chờ duyệt</button>
-            <button class="tool-btn !py-1 text-[10px]" @click="shotsSel = []"><StudioIcon name="x" size="h-3 w-3" /> Bỏ chọn</button>
-            <span class="text-[10px] text-cream-300">đã chọn {{ selectedCount }}/{{ shots.length }}</span>
+        <div class="mt-2 flex flex-wrap gap-1.5">
+          <button class="tool-btn btn-sm flex-1" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('next')">
+            <StudioIcon name="chevronRight" size="h-3.5 w-3.5" /> Bước tiếp
+          </button>
+          <button class="btn-brand btn-sm flex-1" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('approved')">
+            <StudioIcon name="check" size="h-3.5 w-3.5" /> Duyệt {{ selectedCount }}
+          </button>
+          <button class="tool-btn btn-sm !text-red-300 hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('rejected')">
+            <StudioIcon name="ban" size="h-3.5 w-3.5" /> Loại {{ selectedCount }}
+          </button>
+        </div>
+        <p class="mt-1.5 text-[9px] text-cream-300/50">
+          Phím tắt: S chọn · N bước tiếp · A duyệt · R loại · Esc đóng
+        </p>
+      </template>
+    </div>
+
+    <!-- ══ CHIA SẺ ══ -->
+    <div v-if="shareOpen && applied" class="mx-3 mb-3 rounded-xl border border-ink-700 bg-ink-900/70 p-2.5">
+      <div class="flex items-center justify-between">
+        <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Chia sẻ cho khách</p>
+        <button class="icon-btn !h-5 !w-5" @click="shareOpen = false"><StudioIcon name="x" size="h-3 w-3" /></button>
+      </div>
+      <div v-if="!shareInfo" class="py-3 text-center text-[10px] text-cream-300/50">Đang tải…</div>
+      <template v-else>
+        <div v-if="shareInfo.share" class="space-y-1.5">
+          <input :value="shareInfo.share.url" readonly class="input !py-1.5 text-[10px]" @focus="$event.target.select()">
+          <div class="flex gap-1.5">
+            <button class="btn-brand btn-sm flex-1" @click="copyShare()"><StudioIcon name="copy" size="h-3.5 w-3.5" /> Copy</button>
+            <button class="tool-btn btn-sm !text-red-300 hover:!bg-red-500/15" :disabled="shareBusy" @click="revokeShare()"><StudioIcon name="ban" size="h-3.5 w-3.5" /> Thu hồi</button>
           </div>
-          <div class="mt-1.5 grid max-h-60 grid-cols-3 gap-1.5 overflow-y-auto">
-            <button
-              v-for="s in shots"
-              :key="s.id"
-              class="relative overflow-hidden rounded-md border"
-              :class="shotsSel.includes(s.id) ? 'border-brand-400 ring-1 ring-brand-400' : 'border-ink-700'"
-              :title="'Ảnh #' + s.id + ' — ' + s.shot_label + (s.prompt ? ': ' + s.prompt : '')"
-              @click="toggleShot(s.id)"
-            >
-              <img v-if="s.thumb" :src="s.thumb" :alt="'Ảnh ' + s.id" class="h-16 w-full object-cover" loading="lazy">
-              <span v-else class="grid h-16 w-full place-items-center bg-ink-800 text-cream-300"><StudioIcon name="image" size="h-4 w-4" /></span>
-              <span class="absolute left-1 top-1 rounded px-1 text-[9px] font-semibold" :class="stateTone(s.shot_state)">{{ s.shot_label }}</span>
-              <span v-if="shotsSel.includes(s.id)" class="absolute right-1 top-1 rounded bg-brand-500 p-0.5 text-ink-900"><StudioIcon name="check" size="h-3 w-3" /></span>
-            </button>
+        </div>
+        <div v-else class="space-y-2">
+          <p class="text-[10px] leading-relaxed text-cream-300/80">Tạo link công khai (không cần tài khoản) — khách xem ảnh + gửi phản hồi Duyệt / Yêu cầu sửa.</p>
+          <div class="flex items-end gap-2">
+            <select v-model.number="shareDays" class="input !py-1.5 text-[10px]">
+              <option :value="7">7 ngày</option>
+              <option :value="30">30 ngày</option>
+              <option :value="90">90 ngày</option>
+            </select>
+            <button class="btn-brand btn-sm" :disabled="shareBusy" @click="createShare()">Tạo link</button>
           </div>
-          <input v-model="reviewNote" class="input mt-1.5 !py-1 text-[10px]" maxlength="1000" placeholder="Ghi chú duyệt (tuỳ chọn) — vd: chốt 12 ảnh đợt 1, loại ảnh lệch màu">
-          <div class="mt-1.5 flex flex-wrap gap-1.5">
-            <button class="tool-btn" :disabled="reviewBusy || !selectedCount" title="Chuyển các ảnh đã chọn lên bước kế tiếp (phím N)" @click="reviewBatch('next')"><StudioIcon name="chevronRight" size="h-3.5 w-3.5" /> Chuyển bước tiếp</button>
-            <button class="tool-btn" :disabled="reviewBusy || !selectedCount" title="Chốt các ảnh đã chọn (phím A)" @click="reviewBatch('approved')"><StudioIcon name="check" size="h-3.5 w-3.5" /> Duyệt {{ selectedCount }} ảnh</button>
-            <button class="tool-btn !text-red-300 hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" title="Loại các ảnh đã chọn (phím R)" @click="reviewBatch('rejected')"><StudioIcon name="ban" size="h-3.5 w-3.5" /> Loại {{ selectedCount }} ảnh</button>
-          </div>
-          <p class="mt-1.5 text-[10px] leading-relaxed text-cream-300">
-            Ảnh đi theo từng bước: Bản nháp → Đã chọn → Đã lên phom → <b class="text-cream-100">Chờ duyệt</b> → <b class="text-cream-100">Đã duyệt</b>.
-            Ảnh chưa tới bước "Chờ duyệt" thì dùng <b class="text-cream-100">Chuyển bước tiếp</b> (không nhảy cóc) — máy chủ chặn mọi bước nhảy không hợp lệ và nói rõ lý do.
-          </p>
-          <p class="mt-1 text-[10px] text-cream-300">
-            Phím tắt khi khối này đang mở:
-            <b class="text-cream-100">S</b> chọn ảnh chờ duyệt ·
-            <b class="text-cream-100">N</b> chuyển bước tiếp ·
-            <b class="text-cream-100">A</b> duyệt ·
-            <b class="text-cream-100">R</b> loại ·
-            <b class="text-cream-100">Esc</b> đóng.
-          </p>
-          <ul v-if="reviewErrors.length" class="mt-1.5 space-y-1">
-            <li v-for="err in reviewErrors" :key="err.id" class="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] text-red-200">
-              Ảnh #{{ err.id }} ({{ store.shotLabel(err.shot_state) }}): {{ err.error }}
+        </div>
+        <div v-if="shareInfo.feedback?.length" class="mt-2 rounded-lg border border-brand-500/20 bg-brand-600/8 p-2">
+          <p class="text-[9px] font-bold uppercase tracking-wide text-brand-200">Phản hồi gần nhất</p>
+          <ul class="mt-1 space-y-1">
+            <li v-for="fb in shareInfo.feedback.slice(0, 2)" :key="fb.id" class="text-[10px]">
+              <span class="font-semibold text-cream-100">{{ fb.author_name }}</span>
+              <span class="ml-1 rounded-full px-1 py-0.5 text-[8px] font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'">{{ fb.decision_label }}</span>
+              <span v-if="fb.message" class="ml-1 text-cream-300/70">{{ fb.message }}</span>
             </li>
           </ul>
-        </template>
+        </div>
+      </template>
+    </div>
+
+    <!-- ══ XUẤT GÓI ══ -->
+    <div v-if="exportOpen && applied" class="mx-3 mb-3 rounded-xl border border-ink-700 bg-ink-900/70 p-2.5">
+      <div class="flex items-center justify-between">
+        <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Xuất gói cho xưởng</p>
+        <button class="icon-btn !h-5 !w-5" @click="exportOpen = false"><StudioIcon name="x" size="h-3 w-3" /></button>
       </div>
-
-      <!-- Chia sẻ cho khách duyệt: link công khai có hạn, thu hồi được, kèm phản hồi của khách -->
-      <div v-if="shareOpen" class="mt-2 space-y-2 rounded-lg border border-ink-700 bg-ink-900/70 p-2.5">
-        <p v-if="!shareInfo" class="text-[11px] text-cream-300">Đang tải trạng thái chia sẻ…</p>
-        <template v-else>
-          <div v-if="shareInfo.share" class="space-y-1.5">
-            <p class="text-[11px] font-semibold text-cream-100">Link đang hiệu lực</p>
-            <input :value="shareInfo.share.url" readonly class="input !py-1.5 text-[10px]" @focus="$event.target.select()">
-            <div class="flex flex-wrap items-center gap-1.5 text-[10px] text-cream-300">
-              <span class="rounded-full bg-ink-700 px-2 py-0.5">{{ shareInfo.share.views }} lượt xem</span>
-              <span v-if="shareInfo.share.expires_at" class="rounded-full bg-ink-700 px-2 py-0.5">hết hạn {{ shareInfo.share.expires_at }}</span>
-              <span v-if="shareInfo.share.last_viewed_at" class="rounded-full bg-ink-700 px-2 py-0.5">xem gần nhất {{ shareInfo.share.last_viewed_at }}</span>
-            </div>
-            <div class="flex flex-wrap gap-1.5">
-              <button class="tool-btn" @click="copyShare()"><StudioIcon name="copy" size="h-3.5 w-3.5" /> Copy link</button>
-              <button class="tool-btn !text-red-300 hover:!bg-red-500/15" :disabled="shareBusy" @click="revokeShare()"><StudioIcon name="ban" size="h-3.5 w-3.5" /> Thu hồi</button>
-            </div>
-          </div>
-          <div v-else class="space-y-2">
-            <p class="text-[11px] leading-relaxed text-cream-300">
-              Tạo link công khai để khách (hoặc người duyệt nội bộ) xem ảnh + yêu cầu và bấm <b class="text-cream-100">Duyệt</b>
-              hoặc <b class="text-cream-100">Yêu cầu sửa</b> — <b>không cần tài khoản FabrikAI</b>. Link có hạn và thu hồi được bất cứ lúc nào.
-            </p>
-            <div class="flex flex-wrap items-end gap-2">
-              <div class="w-32">
-                <label class="label" for="sh-days">Hiệu lực</label>
-                <select id="sh-days" v-model.number="shareDays" class="input !py-1.5 text-xs">
-                  <option :value="7">7 ngày</option>
-                  <option :value="30">30 ngày</option>
-                  <option :value="90">90 ngày</option>
-                </select>
-              </div>
-              <button class="btn-brand btn-sm flex-1" :disabled="shareBusy" @click="createShare()">
-                <StudioIcon name="link" size="h-3.5 w-3.5" /> {{ shareBusy ? 'Đang tạo…' : 'Tạo link chia sẻ' }}
-              </button>
-            </div>
-          </div>
-
-          <div v-if="shareInfo.feedback && shareInfo.feedback.length" class="rounded-lg border border-brand-500/25 bg-brand-600/10 p-2">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-200">Phản hồi của khách</p>
-            <ul class="mt-1 space-y-1.5">
-              <li v-for="fb in shareInfo.feedback.slice(0, 3)" :key="fb.id" class="text-[11px]">
-                <span class="font-semibold text-cream-100">{{ fb.author_name }}</span>
-                <span class="ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'">{{ fb.decision_label }}</span>
-                <span class="ml-1 text-cream-300">{{ fb.created_at }}</span>
-                <p v-if="fb.message" class="mt-0.5 whitespace-pre-line text-cream-200">{{ fb.message }}</p>
-              </li>
-            </ul>
-          </div>
-          <p v-else class="text-[10px] text-cream-300">Chưa có phản hồi nào từ khách.</p>
-        </template>
-      </div>
-
-      <!-- Xuất gói cho xưởng: gói ZIP gồm ảnh tham chiếu + phiếu kỹ thuật + bảng size + manifest -->
-      <div v-if="exportOpen" class="mt-2 space-y-2 rounded-lg border border-ink-700 bg-ink-900/70 p-2.5">
-        <p class="text-[10px] leading-relaxed text-cream-300">
-          Gói ZIP gồm: <b class="text-cream-100">ảnh tham chiếu</b> (đánh số) · <b class="text-cream-100">phiếu kỹ thuật</b>
-          từng mẫu (chất liệu · màu · đường may) · <b class="text-cream-100">bảng size</b> · thông tin bộ sưu tập ·
-          <b class="text-cream-100">manifest.json</b> cho hệ thống của xưởng. Ảnh nào không tải được sẽ được ghi rõ trong gói.
-        </p>
+      <p class="mt-1 text-[10px] leading-relaxed text-cream-300/80">Gói ZIP gồm: ảnh + phiếu kỹ thuật + bảng size + manifest.</p>
+      <div class="mt-2 space-y-2">
         <div>
-          <label class="label" for="ex-sizes">Bảng size — mỗi dòng một size (size, ngực, eo, hông, dài áo, dài tay)</label>
-          <textarea id="ex-sizes" v-model="exportForm.sizes" rows="3" class="input !py-1.5 text-xs" placeholder="S, 84, 68, 92, 58, 56&#10;M, 88, 72, 96, 59, 57"></textarea>
+          <label class="label mb-1 block text-[10px] uppercase tracking-wide text-ink-700" for="ex-sizes">Bảng size</label>
+          <textarea id="ex-sizes" v-model="exportForm.sizes" rows="2" class="input !py-1.5 text-[10px]" placeholder="S, 84, 68, 92, 58, 56&#10;M, 88, 72, 96, 59, 57"></textarea>
         </div>
         <div>
-          <label class="label" for="ex-note">Ghi chú kỹ thuật chung (chất liệu, màu, yêu cầu riêng)</label>
-          <textarea id="ex-note" v-model="exportForm.note" rows="2" class="input !py-1.5 text-xs" placeholder="VD: Vải linen 100%, màu trắng ngà, đường may 1cm, không dùng khoá kéo kim loại"></textarea>
+          <label class="label mb-1 block text-[10px] uppercase tracking-wide text-ink-700" for="ex-note">Ghi chú kỹ thuật</label>
+          <textarea id="ex-note" v-model="exportForm.note" rows="1" class="input !py-1.5 text-[10px]" placeholder="Vải linen 100%, màu trắng ngà, đường may 1cm"></textarea>
         </div>
-        <div class="flex flex-wrap gap-1.5">
-          <button class="btn-brand btn-sm flex-1" @click="startExport()">
-            <StudioIcon name="download" size="h-3.5 w-3.5" /> Tải gói ZIP
+        <div class="flex justify-end gap-2">
+          <button class="tool-btn btn-sm" @click="exportOpen = false">Đóng</button>
+          <button class="btn-brand btn-sm" @click="startExport()"><StudioIcon name="download" size="h-3.5 w-3.5" /> Tải ZIP</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TẠO MỚI ══ -->
+    <div v-if="createOpen" class="mx-3 mb-3 rounded-xl border border-ink-700 bg-ink-900/60 p-3">
+      <p class="text-xs font-semibold text-cream-100">Bộ sưu tập mới</p>
+      <form class="mt-2 space-y-2" @submit.prevent="submit">
+        <input v-model="form.name" class="input !py-1.5 text-xs" placeholder="Tên bộ (VD: Thu Đông 2026)" :disabled="saving">
+        <div class="grid grid-cols-2 gap-2">
+          <input v-model="form.season" class="input !py-1.5 text-[10px]" placeholder="Mùa / vụ" :disabled="saving">
+          <input v-model="form.deadline" type="date" class="input !py-1.5 text-[10px]" :disabled="saving">
+        </div>
+        <textarea v-model="form.brief" rows="2" class="input !py-1.5 text-[10px]" placeholder="Brief ngắn (tuỳ chọn)" :disabled="saving"></textarea>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="tool-btn btn-sm" :disabled="saving" @click="createOpen = false">Huỷ</button>
+          <button type="submit" class="btn-brand btn-sm" :disabled="saving">{{ saving ? 'Đang tạo…' : 'Tạo & áp dụng' }}</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ══ BỘ GẦN ĐÂY (RÚT GỌN) ══ -->
+    <div v-if="recent.length" class="border-t border-ink-700/60 px-4 py-3">
+      <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">Gần đây</p>
+      <ul class="space-y-1.5">
+        <li v-for="p in recent" :key="p.id" class="flex items-center justify-between gap-2">
+          <button class="min-w-0 flex-1 text-left" @click="pick(p)" :title="'Áp dụng «' + p.name + '»'">
+            <span class="block truncate text-xs font-medium text-cream-100 hover:text-white">{{ p.name }}</span>
+            <span class="text-[10px] text-cream-300/60">{{ p.generations_count || 0 }} ảnh · {{ p.status_label || p.status }}</span>
           </button>
-          <button class="tool-btn" @click="exportOpen = false">Đóng</button>
-        </div>
-        <p class="text-[10px] text-cream-300">
-          Ảnh AI là ảnh <b class="text-cream-100">tham chiếu</b> — README trong gói nhắc xưởng đối chiếu mẫu thật trước khi sản xuất hàng loạt.
-        </p>
-      </div>
-    </div>
-    <div v-else class="mt-3 rounded-lg border border-dashed border-ink-600 p-3 text-[11px] text-cream-300">
-      Chưa chọn bộ sưu tập. Ảnh tạo ra hiện không được gắn vào bộ nào — chọn một bộ bên dưới hoặc tạo mới để
-      giữ mọi thứ theo mùa vụ/đơn hàng.
-    </div>
-
-    <!-- ── Tạo mới ── -->
-    <form v-if="createOpen" class="mt-3 space-y-2 rounded-lg border border-ink-700 bg-ink-900/60 p-3" @submit.prevent="submit">
-      <div>
-        <label class="label" for="col-name">Tên bộ sưu tập</label>
-        <input id="col-name" v-model="form.name" class="input !py-1.5 text-xs" placeholder="VD: Thu Đông 2026 · Lookbook" :disabled="saving">
-      </div>
-      <div class="grid grid-cols-2 gap-2">
-        <div>
-          <label class="label" for="col-season">Mùa / vụ</label>
-          <input id="col-season" v-model="form.season" class="input !py-1.5 text-xs" placeholder="VD: Thu Đông 2026" :disabled="saving">
-        </div>
-        <div>
-          <label class="label" for="col-deadline">Hạn chót</label>
-          <input id="col-deadline" v-model="form.deadline" type="date" class="input !py-1.5 text-xs" :disabled="saving">
-        </div>
-      </div>
-      <div>
-        <label class="label" for="col-brief">Yêu cầu (brief)</label>
-        <textarea id="col-brief" v-model="form.brief" rows="2" class="input !py-1.5 text-xs" placeholder="VD: 12 SKU, nền trắng sàn TMĐT + 4 ảnh lookbook ngoài trời" :disabled="saving"></textarea>
-      </div>
-      <div class="flex gap-2">
-        <button type="submit" class="btn-brand btn-sm flex-1" :disabled="saving">
-          <StudioIcon name="save" size="h-3.5 w-3.5" /> {{ saving ? 'Đang tạo…' : 'Tạo & áp dụng' }}
-        </button>
-        <button type="button" class="tool-btn" :disabled="saving" @click="createOpen = false">Huỷ</button>
-      </div>
-    </form>
-
-    <!-- ── Bộ sưu tập gần đây ── -->
-    <div class="mt-3">
-      <p class="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300">Bộ sưu tập gần đây</p>
-      <p v-if="store.projectLoading && !store.projects.length" class="text-[11px] text-cream-300">Đang tải…</p>
-      <p v-else-if="!recent.length && !applied" class="rounded-lg border border-dashed border-ink-600 p-2.5 text-[11px] text-cream-300">
-        Chưa có bộ sưu tập nào. Bấm «Mới» để tạo bộ đầu tiên — mọi ảnh tạo sau đó sẽ tự gắn vào bộ đang làm.
-      </p>
-      <p v-else-if="!recent.length" class="text-[11px] text-cream-300">Chỉ có bộ đang làm — tạo thêm bộ mới bằng nút «Mới».</p>
-      <ul v-else class="space-y-1.5">
-        <li v-for="p in recent" :key="p.id" class="rounded-lg border border-ink-700 bg-ink-900/60 p-2">
-          <div class="flex items-center gap-2">
-            <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ background: p.color || '#559b78' }"></span>
-            <button type="button" class="min-w-0 flex-1 truncate text-left text-xs font-semibold text-cream-100 hover:text-white" :title="'Làm việc trên bộ «' + p.name + '»'" @click="pick(p)">{{ p.name }}</button>
-            <span class="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold" :class="statusClass(p)" :style="statusStyle(p)">{{ p.status_label || p.status }}</span>
-          </div>
-          <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-cream-300">
-            <span>{{ p.generations_count || 0 }} ảnh</span>
-            <span v-if="p.deadline" class="rounded-full px-1.5 py-0.5 font-semibold" :class="deadlineClass(p.deadline)">{{ deadlineLabel(p.deadline) }}</span>
-            <button type="button" class="ml-auto text-brand-200 hover:underline" @click="openWorkspace(p)">Mở</button>
-          </div>
+          <button class="icon-btn !h-6 !w-6 shrink-0" title="Mở trong Studio" @click="goToStudio(p)">
+            <StudioIcon name="arrowRight" size="h-3 w-3" />
+          </button>
         </li>
       </ul>
     </div>
 
-    <!-- ── Việc đang chạy ── -->
-    <div class="mt-3 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5">
-      <p class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300">
-        <StudioIcon name="clock" size="h-3 w-3" /> Việc đang chạy
+    <!-- ══ ONBOARDING (khi chưa có bộ nào) ══ -->
+    <div v-if="!store.projects.length && !store.projectLoading" class="border-t border-ink-700/60 px-4 py-3">
+      <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">Bắt đầu</p>
+      <p class="mt-1 text-[10px] leading-relaxed text-cream-300/70">
+        Chưa có bộ sưu tập nào. Tạo bộ đầu tiên để ảnh tạo sau này tự gắn vào đúng chỗ.
       </p>
-      <p v-if="!running.length" class="mt-1 text-[11px] text-cream-300">Không có ảnh nào đang chờ — hàng đợi trống.</p>
-      <div v-else class="mt-1 flex flex-wrap items-center gap-2">
-        <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">{{ pendingCount }} chờ xử lý</span>
-        <span class="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold text-sky-300">{{ processingCount }} đang tạo</span>
-        <button class="tool-btn ml-auto" title="Chạy ngay các ảnh đang chờ (không phải chờ tới lượt)" @click="store.processQueue()">
-          <StudioIcon name="play" size="h-3.5 w-3.5" /> Xử lý ngay
-        </button>
-      </div>
+      <a href="/bo-suu-tap" class="mt-2 block text-center text-[11px] font-semibold text-brand-300 underline decoration-dotted hover:text-brand-200">
+        Mở trang Bộ sưu tập đầy đủ →
+      </a>
     </div>
   </div>
 </template>
+
+<style scoped>
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+</style>

@@ -1445,6 +1445,41 @@ if (! function_exists('team_can_view_project')) {
     }
 }
 
+if (! function_exists('studio_project_writable_by')) {
+    /**
+     * [P0.3 — 2026-09-20] Ai được GHI ẢNH MỚI vào một bộ sưu tập: chủ bộ sưu tập, hoặc THÀNH VIÊN
+     * trong nhóm của chủ (ghế dùng chung).
+     *
+     * Vì sao cần: gói có SỐ GHẾ hứa với khách "cả nhóm dùng chung credit và chung bộ sưu tập"
+     * (resources/views/pricing.blade.php), ProjectController::index() cố ý trả bộ sưu tập của chủ
+     * nhóm cho thành viên, và giao diện hiện nút «Áp dụng bộ sưu tập này» cho mọi dòng. Nhưng
+     * /api/generate, /api/video và resolveProjectId() lại chỉ chấp nhận bộ sưu tập có
+     * `user_id = người bấm` ⇒ thành viên bấm vào là 422 (hoặc bị bỏ qua im lặng ở endpoint phái
+     * sinh) và ảnh rơi ra ngoài bộ sưu tập. Đây là mâu thuẫn giữa lời hứa và cổng quyền.
+     *
+     * Đọc thì đã mở cho thành viên (team_can_view_project) — ghi cũng phải mở tương ứng, nếu không
+     * "làm việc chung" là tính năng chết ngay ở bước đầu tiên.
+     */
+    function studio_project_writable_by($actor, $projectId): bool
+    {
+        $id = (int) $projectId;
+        if (! $actor || $id <= 0) {
+            return false;
+        }
+
+        $project = \App\Models\Project::find($id);
+        if (! $project) {
+            return false;
+        }
+
+        if ((int) $project->user_id === (int) $actor->id || $actor->isSuperAdmin()) {
+            return true;
+        }
+
+        return $actor->isTeamMember() && (int) $project->user_id === (int) $actor->team_owner_id;
+    }
+}
+
 if (! function_exists('team_can_manage_project')) {
     /** [Q4] Ai được XOÁ/ĐỔI TRẠNG THÁI bộ sưu tập: chủ bộ sưu tập hoặc Super Admin (thành viên: không). */
     function team_can_manage_project($actor, $project): bool

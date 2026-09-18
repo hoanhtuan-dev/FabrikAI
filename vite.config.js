@@ -19,6 +19,7 @@ export default defineConfig({
                 // 4 lối vào: /cai-dat/<mục> cùng các URL cũ /presets · /stylist-data · /model-settings.
                 'resources/js/studio/my-settings.js',
                 'resources/js/studio/admin.js',
+                'resources/js/studio/collections.js',
             ],
             refresh: true,
             publicDirectory: 'public_html',

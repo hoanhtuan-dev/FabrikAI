@@ -35,6 +35,7 @@ class ProjectController extends Controller
             abort_unless($user->isSuperAdmin(), 403);
 
             $pending = Project::query()
+                ->whereNull('deleted_at')
                 ->where('status', Project::STATUS_REVIEW)
                 ->where('archived', false)
                 ->with(['user:id,name', 'latestGeneration'])
@@ -60,6 +61,7 @@ class ProjectController extends Controller
         // danh sách việc, không phải mỗi người một danh sách rồi ngồi chép qua lại.
         $ownerIds = $user->isTeamMember() ? [(int) $user->team_owner_id] : [];
         $projects = Project::query()
+            ->whereNull('deleted_at')
             ->where(function ($q) use ($user, $ownerIds) {
                 $q->where('user_id', $user->id);
                 if ($ownerIds) {
@@ -67,8 +69,25 @@ class ProjectController extends Controller
                 }
             })
             ->where('archived', $archived)
-            ->with(['latestGeneration', 'user:id,name'])
-            ->withCount('generations')
+            // [P1.2] Kèm NGƯỜI PHỤ TRÁCH để thẻ bộ sưu tập nói được "ai đang làm".
+            ->with(['latestGeneration', 'user:id,name', 'assignee:id,name'])
+            ->withCount('generations');
+
+        // [P1.2] LỌC THEO NGƯỜI: "việc của tôi" và "theo thành viên". Không có bộ lọc này thì
+        // trường người phụ trách chỉ là nhãn trang trí — giao việc xong vẫn phải tự dò từng bộ.
+        $assignee = (string) $request->input('assignee', '');
+        if ($assignee !== '') {
+            if ($assignee === 'me') {
+                $projects = $projects->where('assignee_id', $user->id);
+            } elseif ($assignee === 'none') {
+                // Chưa giao cho ai (thường là chính chủ đang tự làm).
+                $projects = $projects->whereNull('assignee_id');
+            } elseif (ctype_digit($assignee)) {
+                $projects = $projects->where('assignee_id', (int) $assignee);
+            }
+        }
+
+        $projects = $projects
             ->orderBy('sort')
             ->orderByDesc('id')
             ->get()
@@ -80,6 +99,10 @@ class ProjectController extends Controller
             'archived' => $archived,
             'scope' => 'own',
             'can_review' => $user->isSuperAdmin(),
+            'assignee_filter' => $assignee,
+            // [P1.2] Danh sách người CÓ THỂ giao việc (chủ sở hữu + thành viên nhóm) để giao diện
+            // đổ vào ô chọn mà không phải đoán — máy chủ vẫn là nơi quyết định khi lưu.
+            'assignable' => $this->assignableUsers($user),
         ]);
     }
 
@@ -91,7 +114,7 @@ class ProjectController extends Controller
         // Owner hoặc Super Admin (reviewer cần xem dự án của Designer trước khi duyệt).
         $actor = $request->user();
         abort_unless(team_can_view_project($actor, $project), 403);
-        $project->load(['generations' => fn ($q) => $q->latest()->limit(60), 'assets', 'user:id,name']);
+        $project->load(['generations' => fn ($q) => $q->latest()->limit(60), 'assets', 'user:id,name', 'assignee:id,name']);
 
         return response()->json($this->serialize($project, $actor, true));
     }
@@ -307,7 +330,11 @@ class ProjectController extends Controller
             'tags.*' => ['string', 'max:40'],
             'color' => ['nullable', 'string', 'max:20'],
             'thumbnail_url' => ['nullable', 'string', 'max:2048'],
+            // [P1.2] Người phụ trách — giao việc ngay lúc tạo bộ sưu tập.
+            'assignee_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
+
+        $data['assignee_id'] = $this->resolveAssignee(null, $request->user(), $data['assignee_id'] ?? null);
 
         // `status` không còn fillable — Project::$attributes mặc định đã là
         // STATUS_DRAFT, mọi chuyển trạng thái sau này phải đi qua transition().
@@ -341,7 +368,13 @@ class ProjectController extends Controller
             'color' => ['nullable', 'string', 'max:20'],
             'thumbnail_url' => ['nullable', 'string', 'max:2048'],
             'sort' => ['nullable', 'integer', 'min:0'],
+            // [P1.2] Giao / đổi / bỏ người phụ trách. Gửi null = bỏ giao (về chủ bộ sưu tập).
+            'assignee_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
+
+        if (array_key_exists('assignee_id', $data)) {
+            $data['assignee_id'] = $this->resolveAssignee($project, $request->user(), $data['assignee_id']);
+        }
 
         if (isset($data['tags'])) {
             $data['tags'] = array_values(array_map('strval', $data['tags']));
@@ -369,7 +402,9 @@ class ProjectController extends Controller
             // ẢNH TẢI LÊN: bỏ liên kết bộ sưu tập (KHÔNG xoá file trên đĩa). Khai báo tường minh cho
             // cùng hành vi với generations ở trên, dù khoá ngoại đã có cascadeOnDelete.
             \App\Models\UploadProjectLink::where('project_id', $project->id)->delete();
-            $project->delete();
+            // [R6] Soft-delete thủ công: đánh dấu thay vì xoá vĩnh viễn — người dùng có thể khôi phục
+            // từ thùng rác (hoặc xoá vĩnh viễn sau 30 ngày).
+            $project->forceFill(['deleted_at' => now()])->save();
         });
 
         return response()->json(['ok' => true]);
@@ -416,27 +451,71 @@ class ProjectController extends Controller
      */
     public function attachGeneration(Request $request, Project $project)
     {
-        abort_unless(team_can_view_project($request->user(), $project), 403);
+        $actor = $request->user();
+        abort_unless(team_can_view_project($actor, $project), 403);
 
         $data = $request->validate([
-            'generation_id' => ['required', 'integer', 'exists:generations,id'],
+            // [P1.3] Nhận MỘT id (đường cũ) hoặc NHIỀU id — một buổi làm việc thật là "chọn 30 ảnh
+            // trong Thư viện rồi đưa cả vào bộ sưu tập", không phải 30 request lẻ.
+            'generation_id' => ['nullable', 'integer', 'exists:generations,id', 'required_without:ids'],
+            'ids' => ['nullable', 'array', 'max:100', 'required_without:generation_id'],
+            'ids.*' => ['integer'],
             'action' => ['nullable', 'string', 'in:attach,detach'],
         ]);
 
-        $gen = Generation::where('id', $data['generation_id'])
-            ->where('user_id', $request->user()->id)
-            ->first();
-        abort_unless($gen, 403);
+        $detach = ($data['action'] ?? 'attach') === 'detach';
+        $ids = $data['ids'] ?? [(int) $data['generation_id']];
+        $ids = array_values(array_unique(array_map('intval', $ids)));
 
-        if (($data['action'] ?? 'attach') === 'detach') {
-            $gen->update(['project_id' => null]);
+        // GẮN: chỉ gắn được ảnh CỦA CHÍNH MÌNH (không nhặt ảnh người khác vào bộ của mình).
+        // GỠ: chủ bộ sưu tập (hoặc Super Admin) gỡ được ẢNH CỦA NGƯỜI KHÁC khỏi bộ sưu tập của mình —
+        // đây là lỗ hổng vận hành đo được: nhân viên rời nhóm để lại ảnh mà chủ nhóm không có cách nào
+        // dọn, đường duy nhất là xoá cả bộ sưu tập.
+        $canDetachForeign = $detach && team_can_manage_project($actor, $project);
+
+        $query = Generation::query()->whereIn('id', $ids);
+        if ($detach) {
+            // Chỉ ảnh ĐANG thuộc bộ sưu tập này mới gỡ được (không đụng ảnh của bộ khác).
+            $query->where('project_id', $project->id);
+            if (! $canDetachForeign) {
+                $query->where('user_id', $actor->id);
+            }
         } else {
-            $gen->update(['project_id' => $project->id]);
+            $query->where('user_id', $actor->id);
         }
 
-        return response()->json(['ok' => true, 'generation' => [
-            'id' => $gen->id, 'project_id' => $gen->project_id,
-        ]]);
+        $affected = $query->update(['project_id' => $detach ? null : $project->id]);
+
+        // Trả kết quả TỪNG ảnh để giao diện nói thật cái nào đổi được, cái nào không — cùng nguyên
+        // tắc với /shots/review, không im lặng bỏ qua.
+        $results = [];
+        foreach ($ids as $id) {
+            $results[] = ['id' => $id, 'ok' => false];
+        }
+        $touched = Generation::query()->whereIn('id', $ids)
+            ->where(fn ($q) => $detach ? $q->whereNull('project_id') : $q->where('project_id', $project->id))
+            ->pluck('id')->all();
+        foreach ($results as &$row) {
+            $row['ok'] = in_array($row['id'], $touched, true);
+        }
+        unset($row);
+
+        $done = count(array_filter($results, fn ($r) => $r['ok']));
+
+        return response()->json([
+            'ok' => true,
+            'action' => $detach ? 'detach' : 'attach',
+            'project_id' => $detach ? null : (int) $project->id,
+            'changed' => $affected,
+            'done' => $done,
+            'failed' => count($results) - $done,
+            'results' => $results,
+            // Giữ khoá cũ cho client hiện tại (GalleryModal/ProjectWorkspace).
+            'generation' => count($ids) === 1 ? [
+                'id' => $ids[0],
+                'project_id' => $detach ? null : (int) $project->id,
+            ] : null,
+        ]);
     }
 
     /**
@@ -476,6 +555,64 @@ class ProjectController extends Controller
     }
 
     /**
+     * [P1.2] Danh sách người có thể được GIAO VIỆC: chính người dùng + chủ nhóm (nếu là thành viên)
+     * + các thành viên trong nhóm của chính người dùng (nếu là chủ nhóm).
+     *
+     * Chỉ trả id + tên — đủ để đổ vào ô chọn, không lộ email/SĐT của đồng nghiệp.
+     */
+    protected function assignableUsers($user): array
+    {
+        $ids = [(int) $user->id];
+
+        if ($user->isTeamMember()) {
+            $ids[] = (int) $user->team_owner_id;
+        }
+
+        $ids = array_merge($ids, \App\Models\User::query()
+            ->where('team_owner_id', $user->id)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all());
+
+        return \App\Models\User::query()
+            ->whereIn('id', array_values(array_unique($ids)))
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($u) => ['id' => (int) $u->id, 'name' => (string) $u->name])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * [P1.2] Kiểm tra người được giao phải NẰM TRONG nhóm làm việc của bộ sưu tập.
+     * Trả về id hợp lệ hoặc null; ném 422 kèm câu tiếng Việt nếu giao cho người ngoài nhóm.
+     */
+    protected function resolveAssignee(?Project $project, $owner, $assigneeId): ?int
+    {
+        if ($assigneeId === null || $assigneeId === '') {
+            return null;
+        }
+
+        $id = (int) $assigneeId;
+        if ($id <= 0) {
+            return null;
+        }
+
+        $allowed = $project
+            ? $project->assignableUserIds()
+            : array_map(fn ($row) => (int) $row['id'], $this->assignableUsers($owner));
+
+        if (! in_array($id, $allowed, true)) {
+            abort(response()->json([
+                'message' => 'Chỉ giao được việc cho thành viên trong nhóm làm việc của bộ sưu tập này.',
+                'code' => 'assignee_not_in_team',
+            ], 422));
+        }
+
+        return $id;
+    }
+
+    /**
      * Serialize Project + workflow metadata cho frontend.
      */
     protected function serialize(Project $project, $user, bool $withRelations = false): array
@@ -506,16 +643,35 @@ class ProjectController extends Controller
             'user_id' => $project->user_id,
             // owner_name chỉ có khi relation user được eager-load (show/pending scope).
             'owner_name' => $project->relationLoaded('user') ? $project->user?->name : null,
+            // [P1.2] Ai đang làm bộ sưu tập này. null = chủ bộ sưu tập tự làm.
+            'assignee_id' => $project->assignee_id ? (int) $project->assignee_id : null,
+            'assignee_name' => $project->relationLoaded('assignee') ? $project->assignee?->name : null,
             'generations_count' => $project->generations_count,
             'thumbnail' => $project->thumbnail,
             // workflow
             ...$desc,
         ];
+
+        if ($withRelations) {
+            // [P0.6] ẢNH TẢI LÊN THUỘC BỘ SƯU TẬP — trước đây gắn xong là mất dấu (xem
+            // StudioLibraryService::uploadsForProject). Trả về để workspace/export nói được
+            // "bộ này có 3 ảnh tham chiếu gốc".
+            $data['uploads'] = app(\App\Services\StudioLibraryService::class)->uploadsForProject((int) $project->id);
+        }
         if ($withRelations) {
             // Dùng relation đã eager-load (show) thay vì query lại lần hai.
             $generations = $project->relationLoaded('generations')
                 ? $project->generations
                 : $project->generations()->latest()->limit(60)->get();
+            // [P0.6] TRUNG THỰC VỀ SỐ LƯỢNG: workspace chỉ nạp 60 output mới nhất trong khi badge
+            // vẫn ghi tổng thật ⇒ bộ 100 ảnh hiển thị "100 ảnh" nhưng chỉ thấy 60, không lời giải
+            // thích. Trả đủ ba số để giao diện nói thật và chỉ người dùng sang Thư viện xem phần còn lại.
+            $data['generations_shown'] = $generations->count();
+            $data['generations_truncated'] = (int) $project->generations_count > $generations->count();
+            $data['generations_limit'] = (int) $project->generations_count > $generations->count()
+                ? $generations->count()
+                : null;
+
             $data['generations'] = $generations->map(fn ($g) => [
                 'id' => $g->id, 'type' => $g->type, 'status' => $g->status,
                 'media_url' => $g->media_url, 'prompt' => $g->prompt,

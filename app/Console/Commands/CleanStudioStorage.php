@@ -2,13 +2,12 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Generation;
+use App\Jobs\CleanOrphanFilesJob;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
 
 class CleanStudioStorage extends Command
 {
-    protected $signature = 'studio:clean-storage {--days=14 : minimum age in days for a file to be deleted} {--dry-run : only report, do not delete}';
+    protected $signature = 'studio:clean-storage {--days=14 : minimum age in days for a file to be deleted} {--dry-run : only report, do not delete} {--queue : dispatch as queued job instead of running synchronously}';
 
     protected $description = 'Delete intermediate/orphan files in storage/app/public/studio that are not referenced by any generation.';
 
@@ -16,40 +15,37 @@ class CleanStudioStorage extends Command
     {
         $days = max(1, (int) $this->option('days'));
         $dry = (bool) $this->option('dry-run');
-        $cutoff = now()->subDays($days);
+        $queue = (bool) $this->option('queue');
 
-        // 1) Collect every path referenced by generations (final results must never be deleted).
+        if ($queue) {
+            CleanOrphanFilesJob::dispatch($days, $dry);
+            $this->info('Dispatched CleanOrphanFilesJob (days='.$days.', dry-run='.($dry ? 'yes' : 'no').')');
+            return 0;
+        }
+
+        $cutoff = now()->subDays($days);
         $referenced = [];
-        Generation::query()->select(['media_url', 'base_image', 'mask_image'])->chunk(500, function ($gens) use (&$referenced) {
+        \App\Models\Generation::query()->select(['media_url', 'base_image', 'mask_image'])->chunk(500, function ($gens) use (&$referenced) {
             foreach ($gens as $g) {
                 foreach (['media_url', 'base_image', 'mask_image'] as $field) {
                     $url = (string) ($g->{$field} ?? '');
-                    if ($url === '') {
-                        continue;
-                    }
+                    if ($url === '') continue;
                     $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-                    // Normalize: /storage/studio/x.png  |  /public_html/storage/studio/x.png  ->  studio/x.png
                     $path = preg_replace('#^(public_html/)?(storage/)?#', '', $path);
                     $referenced[$path] = true;
                 }
             }
         });
-        $this->info('Referenced paths: '.count($referenced));
 
-        $disk = Storage::disk('public');
+        $disk = \Illuminate\Support\Facades\Storage::disk('public');
         $dir = 'studio';
         $protectedDirs = ['studio/dang-nguoi-mau', 'studio/khuon-mat', 'studio/assets', 'studio/ref', 'studio/logo'];
-        // Tiền tố được so với basename() nên CHỈ dùng được loại "tên file bắt đầu bằng ...".
-        // Trước đây danh sách có thêm 'ref/' — mục này KHÔNG BAO GIỜ khớp vì basename() đã bỏ phần
-        // thư mục (không còn '/'), tức một lớp bảo vệ chết gây hiểu nhầm. Việc bảo vệ studio/ref/
-        // đã do $protectedDirs đảm nhiệm (so trên ĐƯỜNG DẪN ĐẦY ĐỦ).
         $protectedPrefixes = ['background-'];
 
         $deleted = 0; $bytes = 0; $orphan = 0; $skipped = 0;
         $files = $disk->allFiles($dir);
 
         foreach ($files as $file) {
-            // Skip protected dirs / prefixes (user resources, not intermediates).
             $skip = false;
             foreach ($protectedDirs as $pd) {
                 if (str_starts_with($file, $pd.'/')) { $skip = true; break; }
@@ -58,11 +54,7 @@ class CleanStudioStorage extends Command
                 if (str_starts_with(basename($file), $pfx)) { $skip = true; break; }
             }
             if ($skip) { $skipped++; continue; }
-
-            // Keep anything still referenced by a generation.
             if (isset($referenced[$file]) || isset($referenced['storage/'.$file])) { $skipped++; continue; }
-
-            // Only touch files older than the cutoff.
             if ($disk->lastModified($file) > $cutoff->timestamp) { $skipped++; continue; }
 
             $size = $disk->size($file);

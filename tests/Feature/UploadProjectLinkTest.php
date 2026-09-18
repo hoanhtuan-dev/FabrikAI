@@ -152,6 +152,14 @@ class UploadProjectLinkTest extends TestCase
         $rel = $this->putUpload($this->admin);
         $this->attach($project, $rel)->assertOk();
 
+        // [P0.1] Ảnh ĐANG thuộc bộ sưu tập thì KHÔNG xoá được (đó là ảnh gốc của bộ, không phải rác):
+        // nút "Dọn file mồ côi" trước đây xoá thẳng nó khỏi đĩa và xoá luôn dòng liên kết.
+        $this->postJson('/api/uploads/delete', ['rels' => [$rel]])->assertOk();
+        $this->assertDatabaseHas('upload_project_links', ['rel' => $rel]);
+        $this->assertFileExists(storage_path('app/public/'.$rel));
+
+        // Gỡ khỏi bộ sưu tập trước, rồi xoá ⇒ lúc đó mới sạch cả file lẫn liên kết (không để dòng mồ côi).
+        $this->attach($project, $rel, 'detach')->assertOk();
         $this->postJson('/api/uploads/delete', ['rels' => [$rel]])->assertOk();
 
         // (tham số 3 của assertDatabaseMissing là CONNECTION, không phải thông báo — đừng truyền vào)

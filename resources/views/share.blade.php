@@ -25,10 +25,18 @@
         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">Bộ sưu tập</p>
         <h1 class="mt-1 font-display text-3xl font-semibold text-cream-50">{{ $project->name }}</h1>
         <div class="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-            <span class="rounded-full px-2.5 py-1 font-semibold" style="background: {{ ($project->status_color ?? '#559b78') }}26; color: {{ $project->status_color ?? '#85bd9f' }}">
-                {{ $project->status_label ?? $project->status }}
+            {{-- [P0.5] Nhãn trạng thái lấy từ ProjectWorkflowService (nguồn duy nhất sinh nhãn tiếng
+                 Việt). Bản trước đọc $project->status_label / $project->status_color — hai thuộc tính
+                 KHÔNG tồn tại trên model ⇒ khách luôn thấy slug tiếng Anh ("draft"/"review"). --}}
+            <span class="rounded-full bg-ink-700 px-2.5 py-1 font-semibold text-cream-100">{{ $statusLabel }}</span>
+            <span class="rounded-full bg-ink-700 px-2.5 py-1 text-cream-200">
+                {{ $imagesTotal }} ảnh{{ $referenceImages ? ' · '.count($referenceImages).' ảnh gốc' : '' }}
             </span>
-            <span class="rounded-full bg-ink-700 px-2.5 py-1 text-cream-200">{{ $images->count() }} ảnh</span>
+            @if($imagesTruncated)
+                <span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 font-semibold text-amber-200">
+                    Trang này hiển thị {{ $images->count() }}/{{ $imagesTotal }} ảnh mới nhất
+                </span>
+            @endif
             @if($project->deadline)
                 <span class="rounded-full bg-ink-700 px-2.5 py-1 text-cream-200">Hạn: {{ $project->deadline->format('d/m/Y') }}</span>
             @endif
@@ -41,6 +49,25 @@
             <div class="card mt-5 p-4">
                 <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300">Yêu cầu của khách</p>
                 <p class="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-cream-100">{{ $project->brief }}</p>
+            </div>
+        @endif
+
+        {{-- ── Ảnh gốc / ảnh tải lên thuộc bộ sưu tập ── --}}
+        {{-- [P1.3] Trước đây gắn ảnh tải lên vào bộ sưu tập xong là mất dấu: không workspace, không
+             gói xuất, không trang chia sẻ nào nhắc tới. Khách duyệt cần thấy ảnh gốc (vải, mẫu thật)
+             để đối chiếu với ảnh AI. --}}
+        @if(!empty($referenceImages))
+            <h2 class="mt-8 font-display text-xl font-semibold text-cream-50">Ảnh gốc của bộ sưu tập</h2>
+            <p class="mt-1 text-[11px] text-cream-300">Ảnh do người thiết kế tải lên — dùng làm chuẩn đối chiếu (chất liệu, màu, chi tiết).</p>
+            <div class="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                @foreach($referenceImages as $ref)
+                    <figure class="card overflow-hidden">
+                        <a href="{{ $ref['url'] }}" target="_blank" rel="noopener" class="block bg-ink-900">
+                            <img src="{{ $ref['url'] }}" alt="{{ $ref['name'] }}" loading="lazy" class="h-40 w-full object-cover">
+                        </a>
+                        <figcaption class="truncate p-2 text-[10px] text-cream-300">{{ $ref['name'] }}</figcaption>
+                    </figure>
+                @endforeach
             </div>
         @endif
 

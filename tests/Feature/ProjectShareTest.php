@@ -131,7 +131,10 @@ class ProjectShareTest extends TestCase
 
         $this->get('/chia-se/'.$token)->assertOk();
 
-        $this->actingAs($u)->deleteJson('/api/projects/'.$p->id.'/share/'.$share->id)->assertOk();
+        // [P0.7] Giao diện thu hồi bằng TOKEN (store.js: revokeShare dùng đúng token API trả về).
+        // Bản trước model không khai getRouteKeyName() nên bind theo id ⇒ 404 trước khi vào
+        // controller ⇒ nút "Thu hồi" chưa bao giờ chạy. Test cũ dùng id nên che mất lỗi đó.
+        $this->actingAs($u)->deleteJson('/api/projects/'.$p->id.'/share/'.$token)->assertOk();
         $this->get('/chia-se/'.$token)->assertNotFound();
     }
 

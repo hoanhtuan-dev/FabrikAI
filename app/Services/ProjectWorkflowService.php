@@ -15,12 +15,20 @@ use Illuminate\Support\Carbon;
  *        │            │               │        │
  *        └────────────┴───────────────┘        └──▶ (reopen về review, rare)
  *
- * Quy tắc:
- *  - Chỉ SUPER ADMIN mới được APPROVE / ARCHIVE (reviewer gate).
- *  - Tách nhiệm vụ (separation of duties): owner KHÔNG được approve/archive dự án
- *    của chính mình khi hệ thống có Super Admin thứ hai. Ngoại lệ chống lockout:
- *    nếu actor là Super Admin DUY NHẤT của hệ thống, self-approval vẫn được phép
- *    và bị đánh dấu `self_approved` trong status_history để audit.
+ * Quy tắc (P0.2 — 2026-09-20, sửa lại sau khi đo được ngõ cụt):
+ *  - CHỦ BỘ SƯU TẬP luôn chuyển được bộ sưu tập CỦA MÌNH qua trọn vòng đời, kể cả
+ *    approved / archived; lần tự duyệt được đánh dấu `self_approved` trong status_history
+ *    để vẫn có vết kiểm toán.
+ *  - NGƯỜI KHÔNG PHẢI CHỦ thì phải là Super Admin mới duyệt/lưu trữ được bộ sưu tập của
+ *    người khác (hàng đợi "Chờ duyệt" của agency — không đổi).
+ *  - Tách nhiệm vụ (separation of duties) chỉ còn áp cho TẦNG CAO NHẤT: một Super Admin
+ *    không được tự duyệt bộ sưu tập của chính mình khi hệ thống còn Super Admin khác.
+ *    Đây là chốt chống leo thang đặc quyền, không phải chốt chặn khách hàng.
+ *
+ * Vì sao đổi: bản trước yêu cầu SUPER ADMIN cho MỌI lần approve/archive, kể cả khi người
+ * thao tác là chủ bộ sưu tập. Với khách tự phục vụ (role=customer) điều đó tạo NGÕ CỤT ĐO
+ * ĐƯỢC: ở trạng thái "Chờ duyệt", availableTransitions() chỉ còn ["in_progress"] — khách
+ * không bao giờ chốt được bộ sưu tập của chính mình, mãi mãi không đóng được việc.
  *  - Mỗi transition có thể chạy side-effect: cập nhật started_at / completed_at,
  *    bump sort (đưa dự án đang hoạt động lên đầu), v.v.
  *  - Trạng thái hợp lệ được dẫn dắt duy nhất bởi service này để Controller/UI không tự ý.
@@ -55,7 +63,7 @@ class ProjectWorkflowService
         Project::STATUS_REVIEW => [
             'label' => 'Chờ duyệt',
             'color' => '#b56a37',
-            'hint' => 'Gửi lên Super Admin / khách duyệt mẫu.',
+            'hint' => 'Gửi khách (hoặc người duyệt nội bộ) xem mẫu trước khi chốt.',
             'stage' => 2,
         ],
         Project::STATUS_APPROVED => [
@@ -117,16 +125,23 @@ class ProjectWorkflowService
         if (! in_array($to, $allowed, true)) {
             return [false, sprintf('Không thể chuyển từ "%s" sang "%s".', $this->label($from), $this->label($to))];
         }
-        // Reviewer gate: chỉ Super Admin được APPROVE / ARCHIVE.
+        // Reviewer gate cho approve/archive.
         if (in_array($to, self::REVIEWER_GATES, true)) {
-            if (! $user->isSuperAdmin()) {
-                return [false, 'Chỉ Super Admin mới được duyệt / lưu trữ dự án.'];
+            $isOwner = (int) $project->user_id === (int) $user->id;
+
+            // (a) CHỦ bộ sưu tập: được tự chốt — trừ chốt chống leo thang đặc quyền ở tầng
+            //     Super Admin (một Super Admin không tự duyệt bài của mình khi còn Super khác).
+            if ($isOwner) {
+                if ($user->isSuperAdmin() && ! $this->isOnlySuperAdmin($user)) {
+                    return [false, 'Không thể tự duyệt / lưu trữ bộ sưu tập của chính mình khi hệ thống còn Super Admin khác — cần người đó duyệt thay.'];
+                }
+
+                return [true, null];
             }
-            // Tách nhiệm vụ: owner không tự duyệt dự án của mình khi tồn tại
-            // Super Admin khác. Super Admin duy nhất được phép (chống lockout,
-            // có đánh dấu self_approved trong status_history khi transition chạy).
-            if ((int) $project->user_id === (int) $user->id && ! $this->isOnlySuperAdmin($user)) {
-                return [false, 'Không thể tự duyệt / lưu trữ dự án của chính mình — cần một Super Admin khác.'];
+
+            // (b) KHÔNG phải chủ: chỉ Super Admin duyệt được bài của người khác (hàng đợi agency).
+            if (! $user->isSuperAdmin()) {
+                return [false, 'Chỉ chủ bộ sưu tập hoặc Super Admin mới được duyệt / lưu trữ bộ sưu tập này.'];
             }
         }
         return [true, null];

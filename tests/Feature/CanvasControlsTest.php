@@ -443,44 +443,75 @@ class CanvasControlsTest extends TestCase
             'Hàm kẹp phải dùng vùng cho phép (đã trừ lớp phủ), không chỉ kẹp vào vùng canvas.');
     }
 
-    public function test_handles_and_visibility_work_in_single_layer_edit_mode(): void
+    public function test_single_layer_edit_mode_keeps_handles_and_visibility_visible(): void
     {
         $app = $this->src('js/studio/StudioApp.vue');
+        $bar = $this->vue('CanvasStatusBar.vue');
 
-        // ĐO ĐƯỢC: bật một công cụ canvas (Vẽ tự do · Xóa vùng · vùng chọn inpaint) là canvas chuyển sang
-        // chế độ CHỈNH 1 LAYER. Ở chế độ đó trước đây: (a) KHÔNG có tay cầm nào, (b) bấm con mắt KHÔNG
-        // đổi gì trên canvas vì khung xem rơi về ảnh dự phòng ⇒ hai khiếu nại "không có tay cầm" và
-        // "bật/tắt layer chưa đúng" cùng lúc.
+        // Chế độ "chỉnh 1 layer" (công cụ vẽ/xóa/vùng chọn) không được làm mất tay cầm.
         $this->assertStringNotContainsString('isolateActive.value) return null', $app,
-            'Tay cầm KHÔNG được ẩn chỉ vì đang ở chế độ chỉnh 1 layer — đó chính là lúc người dùng mất tay cầm.');
+            'Tay cầm KHÔNG được ẩn chỉ vì đang ở chế độ chỉnh 1 layer.');
         $this->assertMatchesRegularExpression('/store\.cropMode \|\| store\.reframeOpen\) return \[\]/', $app,
             'Chỉ ẩn tay cầm khi đang Crop/Reframe (khung crop có tay cầm riêng).');
 
-        // Khung xem 1 layer phải hiện ĐÚNG ảnh của layer đang chọn, không rơi về ảnh khác.
-        $this->assertStringContainsString(':src="store.activeLayer.image"', $app,
-            'Chế độ 1 layer phải hiện ảnh của CHÍNH layer đang chọn (dùng upscaleSrc thì có đường lùi sang '
-            .'ảnh khác nên bấm con mắt không thấy gì đổi).');
-        $this->assertStringContainsString('đang bị <b>ẨN</b>', $app,
-            'Layer đang chọn bị ẩn thì phải NÓI RÕ trên canvas, không im lặng hiện ảnh khác.');
+        // Khung xem 1 layer GIỮ nguyên nguồn ảnh cũ (không đổi luồng crop/inpaint) nhưng phải TÔN TRỌNG
+        // ẩn/hiện — trước đây layer bị ẩn vẫn hiện ảnh dự phòng nên bấm con mắt không thấy gì đổi.
+        $this->assertStringContainsString(':src="store.upscaleSrc"', $app, 'Giữ nguyên nguồn ảnh của khung xem 1 layer.');
+        $this->assertStringContainsString('store.upscaleSrc && store.activeLayer.visible !== false', $app,
+            'Khung xem 1 layer phải TÔN TRỌNG trạng thái ẩn/hiện của layer đang chọn.');
+        $this->assertStringContainsString('đang bị <b>ẨN</b>', $app, 'Layer bị ẩn thì phải nói rõ, không im lặng hiện ảnh khác.');
 
-        // Và phải có nhãn chế độ + nút thoát một chạm, nếu không người dùng tưởng "mất layer".
-        $this->assertStringContainsString('Đang chỉnh 1 layer', $app, 'Thiếu nhãn cho biết canvas đang ở chế độ chỉnh 1 layer.');
-        $this->assertStringContainsString('isolateToolLabel', $app, 'Nhãn chế độ phải nói rõ công cụ nào đang bật.');
-        $this->assertStringContainsString('store.exitCanvasTools()', $app, 'Thiếu nút thoát công cụ để thấy lại toàn bộ canvas.');
+        // Thông tin chế độ nằm ở THANH TRẠNG THÁI (không dán nhãn lên canvas cho đỡ rối không gian làm việc).
+        $this->assertStringContainsString('Đang VẼ TỰ DO', $bar, 'Thanh trạng thái phải nói rõ đang ở chế độ vẽ 1 layer.');
+        $this->assertStringContainsString('Đang XÓA VÙNG', $bar, 'Thanh trạng thái phải nói rõ đang ở chế độ xóa vùng.');
+        $this->assertStringNotContainsString('Đang chỉnh 1 layer', $app,
+            'Không dán nhãn chế độ lên canvas nữa — thông tin này ở thanh trạng thái.');
     }
 
-    public function test_canvas_says_when_no_layer_is_selected(): void
+    public function test_status_bar_says_when_no_layer_is_selected(): void
+    {
+        $bar = $this->vue('CanvasStatusBar.vue');
+
+        // Bấm ra vùng trống là BỎ CHỌN; khi đó tay cầm chỉ hiện lúc TRỎ vào một layer (điểm ngọt: không
+        // rối mắt mà vẫn không bao giờ "không có tay cầm"). Nhắc cách lấy lại, đặt ở THANH TRẠNG THÁI
+        // để không thêm chữ lên vùng làm việc.
+        $this->assertStringContainsString('Chưa chọn layer — bấm vào một layer để chỉnh kích cỡ', $bar,
+            'Thanh trạng thái phải nhắc cách lấy lại tay cầm khi chưa chọn layer nào.');
+    }
+
+    public function test_layers_dock_is_resizable_and_animates_when_toggled(): void
     {
         $app = $this->src('js/studio/StudioApp.vue');
+        $store = $this->src('js/studio/store.js');
+        $composable = $this->src('js/studio/composables/useDockResize.js');
+        $panel = $this->vue('LayersPanel.vue');
 
-        // Bấm ra vùng trống là BỎ CHỌN (hành vi sẵn có); không có layer đang chọn thì không có tay cầm
-        // chỉnh kích cỡ. Không nói rõ thì người dùng đọc thành "tay cầm biến mất".
-        $this->assertMatchesRegularExpression(
-            '/v-if="!store.activeLayer && store.visibleLayers.length && !isolateActive"/',
-            $app,
-            'Thiếu nhãn "chưa chọn layer nào" khi canvas có layer nhưng không layer nào đang chọn.'
-        );
-        $this->assertStringContainsString('Chưa chọn layer nào', $app,
-            'Nhãn phải nói rõ cách lấy lại tay cầm (bấm vào một layer hoặc một hàng trong bảng Lớp).');
+        // YÊU CẦU GỐC: bảng Layers (dock phải trong khung canvas) phải KÉO ĐƯỢC bề rộng và phải có hiệu
+        // ứng khi bật/tắt. Trước đây: bề rộng là hằng số w-64 và dock bị gỡ khỏi DOM bằng v-if ⇒ không có
+        // tay cầm nào để kéo, và bật/tắt là "giật" tức thì.
+        $this->assertStringContainsString("inspector: {", $composable, 'Thiếu preset bề rộng cho dock Layers.');
+        $this->assertStringContainsString('defaultWidth: 256', $composable,
+            'Mặc định dock Layers phải là 256px (= w-64 cũ) để bố cục không đổi khi vào trang.');
+        $this->assertStringContainsString('inspectorWidth: 256', $store, 'Store phải giữ bề rộng dock Layers (nguồn sự thật).');
+        $this->assertStringContainsString('inspectorWidth: this.inspectorWidth', $store,
+            'Bề rộng dock Layers phải được LƯU BỀN cùng cài đặt thanh trạng thái.');
+        $this->assertStringContainsString('if (d.inspectorWidth != null) this.inspectorWidth', $store,
+            'Bề rộng dock Layers phải được KHÔI PHỤC sau khi tải lại trang.');
+
+        $this->assertStringContainsString("DOCK_PRESETS.inspector", $app, 'Dock Layers phải dùng cơ sở chung useDockResize.');
+        $this->assertStringContainsString('panelId: \'dock-inspector\'', $app, 'Dock Layers phải khai panelId cho aria-controls.');
+        $this->assertStringContainsString('id="dock-inspector"', $app, 'Thiếu id của dock Layers.');
+        $this->assertStringContainsString('class="dock-panel', $app, 'Dock Layers phải dùng class .dock-panel (có hiệu ứng).');
+        $this->assertStringContainsString(':data-collapsed="store.inspectorOpen ? \'false\' : \'true\'"', $app,
+            'Dock Layers phải đánh dấu trạng thái thu gọn — đó là thứ chạy hiệu ứng bật/tắt.');
+        $this->assertStringContainsString('<DockResizer v-if="store.inspectorOpen" :dock="inspectorDock" controls="dock-inspector"', $app,
+            'Thiếu VÁCH NGĂN KÉO cho dock Layers — đây chính là "tay cầm điều chỉnh kích cỡ".');
+        // Không được gỡ dock khỏi DOM khi tắt: gỡ là mất cả hiệu ứng lẫn trạng thái bên trong.
+        $this->assertStringNotContainsString('v-if="store.inspectorOpen" data-covers-canvas', $app,
+            'Dock Layers không được ẩn bằng v-if (mất hiệu ứng bật/tắt).');
+
+        // Bảng Lớp không được tự đặt bề rộng cứng nữa — bề rộng do dock quy định.
+        $this->assertStringNotContainsString('w-64', $panel, 'Bảng Layers không được giữ bề rộng cứng w-64.');
+        $this->assertStringContainsString('w-full', $panel, 'Bảng Layers phải co giãn theo bề rộng dock.');
     }
 }
