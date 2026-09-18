@@ -269,4 +269,77 @@ class CanvasControlsTest extends TestCase
         $this->assertStringContainsString('bg-brand-600 text-white', $layers,
             'Trạng thái có ảnh mới phải là nút SÁNG (màu thương hiệu).');
     }
+
+    public function test_layer_handles_are_always_reachable(): void
+    {
+        $app = $this->src('js/studio/StudioApp.vue');
+        $css = $this->src('css/app.css');
+
+        // Tay cầm KHÔNG được là con của thẻ layer: vùng canvas có overflow:hidden nên khi layer phóng
+        // to / kéo ra mép, góc layer rơi ra ngoài vùng nhìn thấy ⇒ tay cầm bị CẮT MẤT (đo được: tâm tay
+        // cầm nằm đè lên thanh trạng thái z-30 nên bấm vào là bấm thanh trạng thái).
+        $this->assertStringContainsString('const activeHandles = computed(', $app,
+            'Phải có computed toạ độ tay cầm (lớp phủ theo toạ độ màn hình).');
+        $this->assertStringContainsString('const keep = (p) =>', $app,
+            'Toạ độ tay cầm phải được KẸP vào trong vùng nhìn thấy — nếu không, tay cầm lại bị cắt.');
+        $this->assertMatchesRegularExpression('/isolateActive\.value\)\s*return null/', $app,
+            'Chế độ isolate (crop/inpaint/vẽ) không dùng tay cầm layer ⇒ phải ẩn.');
+        $this->assertStringContainsString('pointer-events-none absolute inset-0 z-40', $app,
+            'Tay cầm phải nằm trong lớp phủ riêng, không chặn chuột ra toàn canvas.');
+
+        // BẪY ĐÃ DÍNH THẬT: pointer-events là thuộc tính KẾ THỪA — thiếu dòng này thì tay cầm vẽ ra
+        // nhưng không bấm/kéo được (đo được bằng elementFromPoint: trả về phần tử khác).
+        preg_match('/\.layer-handle\s*\{([^}]*)\}/', $css, $m);
+        $this->assertNotEmpty($m[1] ?? '', 'app.css thiếu định nghĩa .layer-handle.');
+        $this->assertStringContainsString('pointer-events: auto', $m[1],
+            'Tay cầm PHẢI bật pointer-events (lớp phủ cha là none và thuộc tính này kế thừa).');
+        $this->assertStringContainsString('translate: -50% -50%', $m[1],
+            'Tay cầm định vị theo TÂM (toạ độ do JS tính).');
+
+        // Layer KHÓA vẫn phải có tay cầm, bấm vào là mở khóa — trước đây điều kiện "&& !l.locked"
+        // làm tay cầm BIẾN MẤT không lời giải thích.
+        $this->assertStringContainsString('layer-handle--locked', $app, 'Thiếu trạng thái tay cầm của layer khóa.');
+        $this->assertStringContainsString('unlockFromHandle', $app, 'Bấm tay cầm của layer khóa phải mở khóa được.');
+        $this->assertStringNotContainsString('&& !l.locked', $app,
+            'Tay cầm không được ẩn khi layer khóa — đó chính là lỗi "không có tay cầm".');
+
+        // Kéo chỉnh kích cỡ phải chốt HƯỚNG ngay lúc bấm: tay cầm bị kẹp nên điểm bấm có thể không
+        // nằm đúng góc layer, dùng "khoảng cách tới tâm" trực tiếp sẽ làm layer thu nhỏ ngược ý.
+        preg_match('/function onScalePointerDown\(l, e\)\s*\{(.*?)\n\}/s', $app, $sp);
+        $this->assertNotEmpty($sp[1] ?? '', 'Không đọc được onScalePointerDown().');
+        $this->assertStringContainsString('ux', $sp[1], 'Thiếu hướng kéo đã chốt (ux) trong onScalePointerDown.');
+        $this->assertStringContainsString('* ux', $sp[1], 'Hệ số scale phải chiếu chuyển động lên hướng đã chốt.');
+    }
+
+    public function test_hiding_a_layer_keeps_it_selected(): void
+    {
+        $store = $this->src('js/studio/store.js');
+
+        preg_match('/toggleLayerVisible\(id\)\s*\{(.*?)\n    \},/s', $store, $m);
+        $this->assertNotEmpty($m[1] ?? '', 'Không đọc được toggleLayerVisible().');
+        $this->assertStringNotContainsString('setActiveLayer', $m[1],
+            'Ẩn layer không được chuyển layer đang chọn sang layer khác: tay cầm sẽ nhảy sang layer khác '
+            .'(trông như mất tay cầm) và bật lại layer cũ vẫn không có tay cầm.');
+    }
+
+    public function test_motion_of_layer_visibility_does_not_delay_the_opacity_slider(): void
+    {
+        $css = $this->src('css/app.css');
+
+        // --layer-vis phải được ĐĂNG KÝ thì mới nội suy được; chuyển động đặt lên CHÍNH BIẾN đó để
+        // thanh trượt Độ mờ (đổi --layer-opacity) vẫn tức thì.
+        $this->assertMatchesRegularExpression('/@property\s+--layer-vis\s*\{[^}]*syntax:\s*[\'"]<number>[\'"]/s', $css,
+            'Thiếu @property --layer-vis — không đăng ký thì không chuyển động mượt được biến này.');
+        $this->assertMatchesRegularExpression('/--layer-vis:\s*1;?/', $css, 'Thiếu giá trị khởi tạo cho --layer-vis.');
+
+        preg_match('/\.layer-el\s*\{([^}]*)\}/', $css, $m);
+        $this->assertNotEmpty($m[1] ?? '', 'Không đọc được .layer-el.');
+        $this->assertStringContainsString('transition: --layer-vis', $m[1],
+            'Phải chuyển động BIẾN --layer-vis, KHÔNG chuyển động thẳng opacity (làm thanh trượt Độ mờ bị trễ).');
+
+        // Màn hình trống phải nằm DƯỚI các layer, nếu không nó che mất hiệu ứng mờ của layer cuối.
+        $empty = $this->vue('CanvasEmptyState.vue');
+        $this->assertStringContainsString('absolute inset-0 z-0', $empty,
+            'Màn hình trống phải ở z-0 (dưới layer) — để z-20 thì nó che hiệu ứng mờ của layer đang tắt.');
+    }
 }

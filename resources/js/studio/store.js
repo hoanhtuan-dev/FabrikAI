@@ -3314,11 +3314,11 @@ export const useStudioStore = defineStore('studio', {
       const l = this.canvasLayers.find((x) => x.id === id);
       if (!l) return;
       l.visible = !l.visible;
-      if (!l.visible && this.activeLayerId === id) {
-        const next = this.canvasLayers.find((x) => x.visible !== false && x.id !== id);
-        if (next) this.setActiveLayer(next.id);
-        else { this.activeLayerId = ''; this.editSource = null; this.previewId = null; this.preview = null; }
-      }
+      // [2026-09-20] Ẩn layer KHÔNG chuyển "đang chọn" sang layer khác nữa — GIỮ nguyên layer đó.
+      // Vì sao: người dùng vừa ẩn ĐÚNG layer đang làm việc; chuyển active đi thì tay cầm chỉnh kích cỡ
+      // nhảy sang một layer khác (trông như "mất tay cầm"), và bật lại layer cũ cũng vẫn không có tay
+      // cầm vì nó không còn là layer đang chọn. Các trình chỉnh ảnh (Photoshop…) cũng giữ layer đang
+      // chọn khi ẩn. Hàng trong bảng Lớp vẫn sáng nên luôn biết đang chọn layer nào.
       this.saveLayerLayout();
     },
     // Khóa/mở khóa layer (chống xóa/đổi tên/di chuyển nhầm).

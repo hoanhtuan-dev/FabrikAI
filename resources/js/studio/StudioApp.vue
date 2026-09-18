@@ -335,6 +335,54 @@ function onHistoryKeys(e) {
   if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); if (e.shiftKey) store.redo(); else store.undo(); }
   else if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); store.redo(); }
 }
+/**
+ * TAY CẦM CHỈNH KÍCH CỠ / XOAY của layer đang chọn — vẽ ở LỚP PHỦ theo TOẠ ĐỘ MÀN HÌNH, và KẸP
+ * vào trong vùng nhìn thấy của khung canvas.
+ *
+ * Vì sao KHÔNG để tay cầm làm con của thẻ layer (cách cũ): vùng canvas có overflow:hidden, nên khi
+ * layer bị phóng to · kéo ra mép · hoặc zoom lên, góc dưới-phải của layer rơi RA NGOÀI vùng nhìn thấy
+ * ⇒ tay cầm bị CẮT MẤT. Đo được: tâm tay cầm nằm đè lên thanh trạng thái (z-30) nên bấm vào là bấm
+ * thanh trạng thái, kéo không có gì xảy ra — người dùng kết luận "không có tay cầm chỉnh kích cỡ".
+ * Kẹp vào trong ⇒ tay cầm LUÔN nhìn thấy và LUÔN bấm được, kể cả khi layer nằm phần lớn ngoài khung.
+ * Vị trí tính bằng số liệu store (x · y · scale · rotation · baseW/baseH · zoom · pan) nên vẫn bám
+ * đúng góc ĐÃ XOAY của layer mà không cần đo DOM.
+ */
+const activeHandles = computed(() => {
+  const l = store.activeLayer;
+  const el = store.canvasZoom;
+  if (!l || !el || l.visible === false || isolateActive.value) return null;
+  const fl = store.frameLayout;                       // kích thước layout của ảnh layer
+  if (!fl) return null;
+  const r = el.getBoundingClientRect();
+  if (!r.width || !r.height) return null;
+
+  const z = store.zoom || 1;
+  const s = Math.abs(Number(l.scale) || 1);
+  const rad = ((Number(l.rotation) || 0) * Math.PI) / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const cx = r.width / 2 + ((Number(l.x) || 0) * z + store.pan.x);
+  const cy = r.height / 2 + ((Number(l.y) || 0) * z + store.pan.y);
+  const hw = (fl.w * s * z) / 2, hh = (fl.h * s * z) / 2;
+  // Điểm trong hệ trục CỦA LAYER → toạ độ màn hình (đã tính cả xoay).
+  const at = (dx, dy) => ({ x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos });
+  const M = 14;   // lề: không dán sát mép khung, vẫn đủ chỗ cho ngón tay
+  const keep = (p) => ({
+    x: Math.max(M, Math.min(r.width - M, p.x)),
+    y: Math.max(M, Math.min(r.height - M, p.y)),
+  });
+
+  const size = keep(at(hw, hh));                       // góc dưới-phải
+  const top = at(0, -hh);                              // đỉnh giữa
+  // Tay cầm xoay nằm TRÊN đỉnh 30px MÀN HÌNH (không nhân theo scale/zoom cho khỏi xa tít khi thu nhỏ).
+  const rotateAt = keep({ x: top.x + 30 * sin, y: top.y - 30 * cos });
+
+  return {
+    locked: !!l.locked,
+    sizeStyle: { left: size.x + 'px', top: size.y + 'px' },
+    rotateStyle: { left: rotateAt.x + 'px', top: rotateAt.y + 'px' },
+  };
+});
+
 // Nền canvas — dùng CHUNG class .canvas-bg-* trong app.css với ô màu ở CanvasStatusBar. Trước đây chỗ
 // này trỏ tới một class bàn cờ không hề được định nghĩa (nền "lưới" thành trong suốt) và ô màu ở status
 // bar tự vẽ màu riêng nên lệch với màu thật. Một nguồn ⇒ không thể lệch nữa.
@@ -538,6 +586,13 @@ const drawOverlayStyle = computed(() => {
     touchAction: 'none',
   };
 });
+// Bấm tay cầm của layer đang KHÓA = mở khóa luôn. Vì sao không chỉ hiện thông báo: người dùng đã
+// nhắm đúng tay cầm rồi, bắt họ đi tìm nút ổ khóa ở bảng Lớp là thêm một bước vô nghĩa.
+function unlockFromHandle(l) {
+  if (!l || !l.locked) return;
+  store.toggleLayerLock(l.id);
+  store.toast('Đã mở khóa layer — kéo lại tay cầm để chỉnh kích cỡ hoặc xoay.');
+}
 function onLayerPointerDown(l, e) {
   // panMode: không bao giờ kéo/thao tác layer — chỉ pan canvas.
   if (store.panMode) { store.panStart(e); bgDownPos = { x: e.clientX, y: e.clientY }; marquee.value = null; return; }
@@ -575,9 +630,24 @@ function layerCenterScreen(l) {
 function onScalePointerDown(l, e) {
   e.stopPropagation();
   const c = unitCenterScreen(); if (!c) return;
-  const startDist = Math.hypot(e.clientX - c.cx, e.clientY - c.cy) || 1;
-  const snap = store._snapshot(); let lastRatio = 1;
-  const move = (ev) => { const ratio = Math.hypot(ev.clientX - c.cx, ev.clientY - c.cy) / startDist; const k = ratio / lastRatio; lastRatio = ratio; store.scaleSelectionBy(k); };
+  const snap = store._snapshot();
+  // HƯỚNG KÉO được CHỐT ngay lúc bấm: kéo XA tâm là to lên, kéo VỀ tâm là nhỏ đi.
+  //
+  // Vì sao không dùng thẳng "khoảng cách tới tâm chia khoảng cách lúc bấm" như trước: tay cầm nay
+  // được KẸP vào trong khung (xem activeHandles), nên điểm bấm có thể KHÔNG nằm đúng góc layer —
+  // khi layer bị đẩy ra ngoài khung, "cùng hướng kéo" lại làm khoảng cách tới tâm GIẢM và layer
+  // thu nhỏ ngược ý người dùng. Chiếu chuyển động lên hướng đã chốt thì luôn đúng chiều.
+  const d0 = Math.hypot(e.clientX - c.cx, e.clientY - c.cy);
+  if (d0 < 12) return;                              // bấm quá sát tâm: không xác định được hướng
+  const ux = (e.clientX - c.cx) / d0, uy = (e.clientY - c.cy) / d0;
+  let lastT = d0;
+  const move = (ev) => {
+    const t = Math.max(4, (ev.clientX - c.cx) * ux + (ev.clientY - c.cy) * uy);  // hình chiếu lên hướng đã chốt
+    const k = t / lastT;
+    if (!Number.isFinite(k) || k <= 0) return;
+    lastT = t;
+    store.scaleSelectionBy(k);
+  };
   const up = () => { if (snap) { store.undoStack.push(snap); if (store.undoStack.length > 50) store.undoStack.shift(); store.redoStack = []; } store.saveLayerLayout(); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
@@ -1127,10 +1197,9 @@ function onTouchEnd(e) {
               <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
                 <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="layer-el absolute left-0 top-0" :class="l.visible === false ? 'layer-el--hidden' : ''" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
                   <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :title="l.groupId ? 'Thuộc nhóm — Alt+click để chỉnh sửa riêng layer này' : l.name" :class="[l.id === store.activeLayerId ? 'outline outline-2 -outline-offset-2 outline-sky-400' : (store.isSelected(l.id) ? 'outline outline-2 -outline-offset-2 outline-sky-400/70' : ''), l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']" draggable="false" />
-                  <template v-if="l.id === store.activeLayerId && !l.locked">
-                    <div class="absolute -bottom-3 -right-3 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onScalePointerDown(l, $event)" title="Kéo để phóng to/thu nhỏ"></div>
-                    <div class="absolute -top-7 left-1/2 h-4 w-4 -translate-x-1/2 cursor-crosshair rounded-full border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onRotatePointerDown(l, $event)" title="Kéo để xoay"></div>
-                  </template>
+                  <!-- (Tay cầm chỉnh kích cỡ / xoay KHÔNG còn nằm trong thẻ layer — xem lớp phủ
+                       "layer-handle" ở dưới: để trong thẻ thì bị overflow:hidden của vùng canvas cắt mất
+                       khi layer phóng to hoặc kéo ra mép.) -->
                   <!-- Nhãn nhóm trên canvas (icon + tên, nhấn đúp để đổi tên) -->
                   <template v-if="store.groupLabel(l)">
                     <span @dblclick.stop="startGroupRename(l.groupId)" class="absolute -top-7 left-0 flex max-w-[140px] items-center gap-1 rounded-full border border-ink-600 bg-ink-900/95 px-1.5 py-0.5 text-[9px] font-semibold text-cream-100 shadow" :title="'Nhóm: ' + store.groupLabel(l) + ' — nhấn đúp đổi tên · Alt+click layer trong nhóm để chỉnh sửa riêng'">
@@ -1145,6 +1214,28 @@ function onTouchEnd(e) {
               </div>
               <CanvasEmptyState v-if="!store.visibleLayers.length && !store.generating" />
             </div>
+            <!-- TAY CẦM CHỈNH KÍCH CỠ + XOAY của layer đang chọn: lớp phủ RIÊNG, toạ độ màn hình đã
+                 kẹp vào trong khung (xem activeHandles) nên không bao giờ bị cắt. Layer KHÓA vẫn có tay
+                 cầm (màu hổ phách) — bấm vào là mở khóa luôn, thay vì biến mất không lời giải thích. -->
+            <div v-if="activeHandles" class="pointer-events-none absolute inset-0 z-40">
+              <div
+                class="layer-handle layer-handle--size"
+                :class="activeHandles.locked ? 'layer-handle--locked' : ''"
+                :style="activeHandles.sizeStyle"
+                @pointerdown.stop="activeHandles.locked ? unlockFromHandle(store.activeLayer) : onScalePointerDown(store.activeLayer, $event)"
+                :title="activeHandles.locked ? 'Layer đang KHÓA — bấm để mở khóa rồi kéo chỉnh kích cỡ' : 'Kéo để phóng to/thu nhỏ'"
+                :aria-label="activeHandles.locked ? 'Layer đang khóa — bấm để mở khóa' : 'Kéo để phóng to/thu nhỏ'"
+              ></div>
+              <div
+                class="layer-handle layer-handle--rotate"
+                :class="activeHandles.locked ? 'layer-handle--locked' : ''"
+                :style="activeHandles.rotateStyle"
+                @pointerdown.stop="activeHandles.locked ? unlockFromHandle(store.activeLayer) : onRotatePointerDown(store.activeLayer, $event)"
+                :title="activeHandles.locked ? 'Layer đang KHÓA — bấm để mở khóa rồi kéo xoay' : 'Kéo để xoay'"
+                :aria-label="activeHandles.locked ? 'Layer đang khóa — bấm để mở khóa' : 'Kéo để xoay'"
+              ></div>
+            </div>
+
             <!-- Overlay canvas xóa: bám đúng vùng ảnh hiển thị (chịu zoom/pan) -->
             <canvas v-if="store.eraseMode" ref="eraseOverlay" class="absolute z-30 cursor-crosshair rounded bg-red-500/10" :style="eraseOverlayStyle" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
             <!-- Overlay canvas vẽ (paint): tô màu lên layer -->

@@ -97,7 +97,10 @@ onMounted(() => { loadTemplates(); });
 <template>
   <!-- [2026-09-20] Hiệu ứng vào dùng CƠ SỞ CHUNG (app.css: .motion-*) thay vì số ms viết cứng:
        nền mờ dần, nội dung nhô lên — và tự tắt khi người dùng bật "giảm chuyển động". -->
-  <div class="motion-fade-in absolute inset-0 z-20 flex flex-col items-center justify-center overflow-y-auto bg-gradient-to-b from-ink-950/95 via-ink-950/90 to-ink-950/95 p-4 backdrop-blur-sm">
+  <!-- z-0 (không phải z-20): lớp này phải nằm DƯỚI các layer. Ẩn layer CUỐI cùng thì màn hình trống
+       hiện ra ngay và che mất hiệu ứng mờ của layer đang tắt (layer ở z 1..N) — nhìn như "hiệu ứng
+       không chạy". Layer ẩn không nhận chuột (pointer-events:none) nên màn hình trống vẫn bấm được. -->
+  <div class="motion-fade-in absolute inset-0 z-0 flex flex-col items-center justify-center overflow-y-auto bg-gradient-to-b from-ink-950/95 via-ink-950/90 to-ink-950/95 p-4 backdrop-blur-sm">
     <!-- Header -->
     <div class="motion-rise-in mb-6 text-center">
       <div class="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600/20 text-brand-300">

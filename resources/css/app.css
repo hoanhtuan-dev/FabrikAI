@@ -299,6 +299,17 @@
     }
 }
 
+/* Đăng ký --layer-vis là SỐ có thể NỘI SUY. Nhờ vậy CSS chuyển động được chính biến này
+   (thay vì chuyển động thuộc tính opacity gộp), nên:
+     · bật/tắt layer ⇒ --layer-vis chạy 1 → 0 và độ mờ đi theo từng frame (hiệu ứng mượt);
+     · kéo thanh trượt ĐỘ MỜ của layer ⇒ --layer-opacity đổi NGAY, không bị trễ 220ms.
+   Gộp cả hai vào một thuộc tính opacity rồi transition sẽ làm thanh trượt opacity "dính tay". */
+@property --layer-vis {
+    syntax: '<number>';
+    inherits: false;
+    initial-value: 1;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    CƠ SỞ CHUNG CHO CHUYỂN ĐỘNG — "motion foundation" (2026-09-20)
    ═══════════════════════════════════════════════════════════════════════════
@@ -396,7 +407,9 @@
     .layer-el {
         --layer-vis: 1;
         opacity: calc(var(--layer-opacity, 1) * var(--layer-vis));
-        transition: opacity var(--motion-dur-base) var(--motion-ease-standard),
+        /* Chuyển động CHÍNH BIẾN --layer-vis (đã đăng ký ở đầu file), KHÔNG chuyển động opacity:
+           làm vậy độ mờ riêng của layer (thanh trượt Opacity) vẫn đổi tức thì. */
+        transition: --layer-vis var(--motion-dur-base) var(--motion-ease-standard),
                     scale var(--motion-dur-base) var(--motion-ease-emphasized);
     }
     /* Layer đã tắt: mờ hẳn, thu nhẹ, và KHÔNG nhận chuột nữa (bấm xuyên qua như khi không có layer). */
@@ -406,7 +419,33 @@
         pointer-events: none;
     }
 
-    /* ── 4. Hiệu ứng XUẤT HIỆN cho lớp phủ · ngăn kéo · popup ───────────────
+    /* ── 4. TAY CẦM CHỈNH KÍCH CỠ · XOAY của layer đang chọn ────────────────────────────
+       Trước đây là 16px vuông nhỏ, và BIẾN MẤT HOÀN TOÀN khi layer bị khóa ⇒ người dùng kết luận
+       "không có tay cầm". Nay: 18px, có quầng tối để nổi trên mọi nền, phóng nhẹ khi trỏ vào, và
+       khi layer KHÓA thì hiện màu hổ phách + bấm vào là mở khóa (kèm lời nhắc) thay vì biến mất. */
+    .layer-handle {
+        position: absolute;
+        /* Định vị theo TÂM: toạ độ do JS tính và ĐÃ KẸP vào vùng nhìn thấy (xem activeHandles trong
+           StudioApp.vue) — nhờ vậy tay cầm không bao giờ bị overflow:hidden của vùng canvas cắt mất. */
+        translate: -50% -50%;
+        /* BẮT BUỘC: lớp phủ bao quanh là pointer-events:none (để không chặn canvas) và pointer-events
+           là thuộc tính KẾ THỪA — thiếu dòng này thì tay cầm vẽ ra mà không bấm/kéo được. */
+        pointer-events: auto;
+        width: 18px;
+        height: 18px;
+        border: 2px solid #fff;
+        border-radius: 4px;
+        background: var(--color-brand-400);
+        box-shadow: 0 0 0 1px rgba(14, 13, 9, 0.65), 0 2px 6px rgba(0, 0, 0, 0.35);
+        transition: scale var(--motion-dur-fast) var(--motion-ease-emphasized),
+                    background-color var(--motion-dur-fast) var(--motion-ease-standard);
+    }
+    .layer-handle:hover { scale: 1.15; }
+    .layer-handle--size { cursor: nwse-resize; }
+    .layer-handle--rotate { border-radius: 999px; cursor: crosshair; }
+    .layer-handle--locked { background: var(--color-gold-500); cursor: pointer; }
+
+    /* ── 5. Hiệu ứng XUẤT HIỆN cho lớp phủ · ngăn kéo · popup ───────────────
        Đặt lên phần tử được mount bằng v-if: nó chạy một lần lúc xuất hiện. */
     .motion-fade-in { animation: motion-fade-in var(--motion-dur-fast) var(--motion-ease-standard) both; }
     .motion-pop-in { animation: motion-pop-in var(--motion-dur-base) var(--motion-ease-emphasized) both; }
@@ -414,7 +453,7 @@
     .motion-slide-in-left { animation: motion-slide-in-left var(--motion-dur-slow) var(--motion-ease-emphasized) both; }
     .motion-slide-in-right { animation: motion-slide-in-right var(--motion-dur-slow) var(--motion-ease-emphasized) both; }
 
-    /* ── 5. DOCK CO/GIÃN ĐƯỢC (bảng trái · dock Outputs · …) ─────────────────
+    /* ── 6. DOCK CO/GIÃN ĐƯỢC (bảng trái · dock Outputs · …) ─────────────────
        Một class dùng chung cho MỌI dock, để mọi dock có cùng nhịp và cùng cách ẩn.
        Bề rộng thật do JS đặt qua inline style (store là nguồn sự thật) — CSS ở đây
        lo phần chuyển động + phần "ẩn mà không gỡ khỏi DOM". */
