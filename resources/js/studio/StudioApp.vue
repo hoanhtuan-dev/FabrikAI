@@ -25,6 +25,9 @@ import GalleryModal from './components/GalleryModal.vue';
 import ProjectWorkspace from './components/ProjectWorkspace.vue';
 import StudioIcon from './components/StudioIcon.vue';
 import LayersPanel from './components/LayersPanel.vue';
+// [2026-09-20] Vách ngăn kéo + bộ điều khiển dock DÙNG CHUNG cho mọi dock co/giãn được.
+import DockResizer from './components/DockResizer.vue';
+import { useDockResize, DOCK_PRESETS } from './composables/useDockResize.js';
 import CanvasStatusBar from './components/CanvasStatusBar.vue';
 import AuthNotice from './components/AuthNotice.vue';
 import CanvasEmptyState from './components/CanvasEmptyState.vue';
@@ -210,6 +213,37 @@ function openApplyPopover() {
   if (applyOpen.value && !store.projectLoaded) store.loadProjects();
 }
 function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++; }); }
+// ═════════════════════════════════════════════════════════════════════════════
+// DOCK CO/GIÃN ĐƯỢC (bảng trái · dock Outputs) — cùng một cơ sở: useDockResize + DockResizer.
+// Bề rộng là state của STORE (lưu bền cùng cài đặt status bar) nên composable chỉ đọc/ghi qua
+// writable computed — không có bản sao trạng thái thứ hai để lệch nhau.
+// ═════════════════════════════════════════════════════════════════════════════
+const leftDockWidth = computed({ get: () => store.leftDockWidth, set: (v) => { store.leftDockWidth = v; } });
+const outputDockWidth = computed({ get: () => store.outputDockWidth, set: (v) => { store.outputDockWidth = v; } });
+// Ẩn/hiện VẪN dùng cờ cũ (activity bar · bảng lệnh · nút chevron đều ghi vào nó) — chỉ bọc lại
+// thành writable computed để Enter/Space trên vách ngăn bật tắt đúng cờ ấy, không sinh cờ mới.
+const leftDockCollapsed = computed({ get: () => !store.leftPanelOpen, set: (v) => { store.leftPanelOpen = !v; } });
+const outputDockCollapsed = computed({ get: () => !store.outputDockOpen, set: (v) => { store.outputDockOpen = !v; } });
+const leftDock = useDockResize({
+  ...DOCK_PRESETS.left,
+  width: leftDockWidth,
+  collapsed: leftDockCollapsed,
+  panelId: 'dock-left',
+  // Ẩn bằng bàn phím xong thì focus về nút mở lại CHÍNH activity đang xem (bấm Enter lần nữa là
+  // mở lại đúng bảng cũ) — nếu không, người dùng bàn phím bị bỏ rơi giữa thanh công cụ.
+  focusAfterCollapse: () => document.querySelector('[data-activity="' + activeActivity.value + '"]'),
+  onCommit: () => store.saveBarSettings(),  // chỉ lưu khi thả tay, không ghi localStorage mỗi pixel kéo
+  onSettle: () => onCanvasResize(),         // co/giãn xong mới đo lại canvas (overlay xóa/vẽ bám đúng ảnh)
+});
+const outputDock = useDockResize({
+  ...DOCK_PRESETS.outputs,
+  width: outputDockWidth,
+  collapsed: outputDockCollapsed,
+  panelId: 'dock-outputs',
+  focusAfterCollapse: '[data-dock-toggle="outputs"]',   // nút Outputs ở rail phải (mở lại dock)
+  onCommit: () => store.saveBarSettings(),
+  onSettle: () => onCanvasResize(),
+});
 function onBeforeUnload() { try { store.saveLayerLayout(); } catch (e) { /* bỏ qua */ } }
 onMounted(async () => { loadGuiConfig(); await store.load(); if (new URLSearchParams(window.location.search).get('view') === 'library') store.studioView = 'library'; activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'variation' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('keydown', onGlobalKey); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); });
 onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); window.removeEventListener('resize', onCanvasResize); window.removeEventListener('beforeunload', onBeforeUnload); });
@@ -947,6 +981,7 @@ function onTouchEnd(e) {
           <!-- [Modules] Mục bị khoá theo gói: vẫn hiện (khách biết có tính năng) nhưng bấm là mời nâng cấp,
                kèm ổ khoá nhỏ ở góc — không để khách bấm vào rồi bị máy chủ chặn mà không hiểu vì sao. -->
           <button v-if="a.kind === 'panel'" @click="a.locked ? openUpgradeFor(a.id) : selectActivity(a.id)"
+                  :data-activity="a.id"
                   class="activity-btn relative" :class="[activeActivity === a.id ? 'is-active' : '', a.locked ? 'opacity-55' : '']"
                   :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label" :aria-label="a.label">
             <StudioIcon :name="a.icon" size="h-5 w-5" />
@@ -967,7 +1002,7 @@ function onTouchEnd(e) {
           <button @click="settingsOpen = !settingsOpen" class="activity-btn" :class="settingsOpen ? 'is-active' : ''" :title="settingsEntry.label + ' — preset, khuôn mặt, dáng pose, trợ lý thiết kế'" :aria-label="settingsEntry.label" aria-haspopup="menu" :aria-expanded="settingsOpen ? 'true' : 'false'">
             <StudioIcon :name="settingsEntry.icon" size="h-5 w-5" />
           </button>
-          <div v-if="settingsOpen" role="menu" class="absolute bottom-0 left-full z-50 ml-2 w-64 overflow-hidden rounded-xl border border-ink-700 bg-ink-900 p-1.5 shadow-2xl">
+          <div v-if="settingsOpen" role="menu" class="motion-pop-in absolute bottom-0 left-full z-50 ml-2 w-64 overflow-hidden rounded-xl border border-ink-700 bg-ink-900 p-1.5 shadow-2xl">
             <p class="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">Cài đặt của tôi</p>
             <!-- [2026-09-20] 4 lối vào nay trỏ về KHU HỢP NHẤT /cai-dat/<mục>. Giữ đủ 4 dòng thay vì
                  gộp còn một: người dùng đã quen bấm thẳng vào mục mình cần, và đích đến vẫn là khu hợp
@@ -987,7 +1022,21 @@ function onTouchEnd(e) {
           </div>
         </div>
       </nav>
-      <aside v-if="store.leftPanelOpen" class="scrollbar-hide hidden w-72 shrink-0 flex-col overflow-y-auto border-r border-ink-700 bg-ink-900/70 lg:flex">
+      <!-- ═ DOCK TRÁI — KÉO ĐƯỢC (vách ngăn nằm ngay bên phải nó) ═════════════════
+           Ẩn/hiện KHÔNG còn gỡ khỏi DOM như v-if trước đây mà thu bề rộng về 0 kèm
+           data-collapsed: nhờ vậy hiệu ứng co/giãn chạy mượt (token --motion-dur-dock) và card
+           bên trong GIỮ NGUYÊN trạng thái (ô đang gõ, vị trí cuộn) thay vì bị dựng lại.
+           Về "inert": Vue gán thuộc tính này theo GIÁ TRỊ TỒN TẠI, nên khi mở phải truyền null
+           (gỡ hẳn thuộc tính) — truyền false sẽ thành inert="false" và bảng chết cứng. -->
+      <aside
+        id="dock-left"
+        class="dock-panel scrollbar-hide hidden shrink-0 flex-col overflow-y-auto bg-ink-900/70 lg:flex"
+        :style="leftDock.panelStyle"
+        :data-collapsed="store.leftPanelOpen ? 'false' : 'true'"
+        :data-resizing="leftDock.resizing ? 'true' : 'false'"
+        :aria-hidden="store.leftPanelOpen ? null : 'true'"
+        :inert="store.leftPanelOpen ? null : true"
+      >
         <div class="panel-head border-b border-ink-700">
           <span class="panel-title"><StudioIcon :name="activeActivityDef.icon" size="h-4 w-4" class="text-brand-400" /> {{ activeActivityDef.label }}</span>
           <div class="flex shrink-0 items-center gap-1.5">
@@ -999,6 +1048,10 @@ function onTouchEnd(e) {
           <component :is="c" v-for="(c,i) in panel" :key="i" />
         </div>
       </aside>
+      <!-- Vách ngăn kéo của bảng trái: kéo · ←/→ (Shift = bước lớn) · Home/End · nhấp đúp về mặc
+           định · Enter ẩn/hiện. Chỉ hiện khi bảng đang mở (bảng đã ẩn thì không còn gì để kéo) và
+           chỉ ở desktop — dưới lg bảng dùng ngăn kéo trượt nên không co giãn. -->
+      <DockResizer v-if="store.leftPanelOpen" :dock="leftDock" controls="dock-left" class="hidden lg:block" />
       <!-- Center canvas -->
       <main class="relative flex-1 min-w-0 p-3">
         <div class="relative flex h-full flex-col overflow-hidden rounded-lg border border-ink-700 bg-ink-900">
@@ -1125,11 +1178,25 @@ function onTouchEnd(e) {
         </div>
       </main>
       <!-- Right dock (desktop): chỉ hiển thị Outputs; Nguồn ảnh & Thư viện là nút HÀNH ĐỘNG ở rail -->
-      <!-- [Yêu cầu 2026-09-20] Bề rộng dock Outputs: 115px → 118px (+3%) → nay đặt hẳn 156px để ảnh
-           thumbnail trong danh sách đủ rộng nhìn rõ, và tên ảnh không bị cắt quá ngắn. -->
-      <aside v-if="store.outputDockOpen" class="scrollbar-hide hidden w-[156px] shrink-0 flex-col border-l border-ink-700 bg-ink-900/70 lg:flex">
+      <!-- [Yêu cầu 2026-09-20] Bề rộng dock Outputs: 115px → 118px (+3%) → 156px. Từ 2026-09-20
+           đó chỉ còn là MẶC ĐỊNH: người dùng KÉO được vách ngăn và bề rộng được nhớ lại
+           (store.outputDockWidth → localStorage), nên ảnh thumbnail không còn bị ép trong một
+           con số cứng do lập trình viên chọn hộ. -->
+      <DockResizer v-if="store.outputDockOpen" :dock="outputDock" controls="dock-outputs" class="hidden lg:block" />
+      <aside
+        id="dock-outputs"
+        class="dock-panel scrollbar-hide hidden shrink-0 flex-col bg-ink-900/70 lg:flex"
+        :style="outputDock.panelStyle"
+        :data-collapsed="store.outputDockOpen ? 'false' : 'true'"
+        :data-resizing="outputDock.resizing ? 'true' : 'false'"
+        :aria-hidden="store.outputDockOpen ? null : 'true'"
+        :inert="store.outputDockOpen ? null : true"
+      >
         <div class="panel-head shrink-0 border-b border-ink-700">
           <span class="panel-title"><StudioIcon name="grid" size="h-3.5 w-3.5" class="text-brand-400" /> Outputs</span>
+          <!-- Nút ẩn dock NGAY TRONG dock (đối xứng với nút chevron của bảng trái); mở lại bằng
+               nút Outputs ở rail phải — người dùng không phải nhớ phím tắt nào. -->
+          <button @click="store.toggleOutputDock()" class="icon-btn !h-7 !w-7 shrink-0" title="Ẩn dock Outputs" aria-label="Ẩn dock Outputs"><StudioIcon name="chevronRight" size="h-4 w-4" /></button>
         </div>
         <div class="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-2">
           <OutputModule />
@@ -1150,7 +1217,7 @@ function onTouchEnd(e) {
         <button @click="openPalette()" class="activity-btn mt-auto" aria-keyshortcuts="Control+K" title="Bảng lệnh (Ctrl+K) — tìm lệnh, dự án, mẫu việc, ảnh" aria-label="Bảng lệnh">
           <StudioIcon name="search" size="h-5 w-5" />
         </button>
-        <button @click="store.toggleOutputDock()" class="activity-btn" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">
+        <button @click="store.toggleOutputDock()" data-dock-toggle="outputs" class="activity-btn" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">
           <StudioIcon name="grid" size="h-5 w-5" />
           <span v-if="store.generations.length" class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[8px] font-bold leading-none text-white">{{ store.generations.length }}</span>
         </button>
@@ -1159,8 +1226,8 @@ function onTouchEnd(e) {
 
     <!-- Mobile menu overlay -->
     <div v-if="menuOpen" role="dialog" aria-modal="true" aria-label="Menu Studio" class="fixed inset-0 z-50 lg:hidden" @click="menuOpen=false">
-      <div class="absolute inset-0 bg-black/60"></div>
-      <div class="absolute left-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
+      <div class="motion-fade-in absolute inset-0 bg-black/60"></div>
+      <div class="motion-slide-in-left absolute left-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span><button @click="menuOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng menu" aria-label="Đóng menu"><StudioIcon name="x" size="h-4 w-4" /></button></div>
         <div class="mb-3 flex gap-1.5 overflow-x-auto">
           <!-- [Sửa 2026-09-17] Panel + nút popup đều sinh từ CÙNG cấu hình owner quản lý, nên
@@ -1201,8 +1268,8 @@ function onTouchEnd(e) {
     <!-- Mobile outputs overlay: [Đợt 0.5] trước đây drawer này RỖNG (div trong suông) dù OutputModule
          đã import sẵn — người dùng điện thoại bấm "Kết quả" nhận một ngăn trống. Nay render đúng lưới kết quả. -->
     <div v-if="outputOpen" role="dialog" aria-modal="true" aria-label="Kết quả tạo ảnh" class="fixed inset-0 z-50 lg:hidden">
-      <div class="absolute inset-0 bg-black/60"></div>
-      <div class="absolute right-0 top-0 flex h-full w-80 flex-col scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
+      <div class="motion-fade-in absolute inset-0 bg-black/60"></div>
+      <div class="motion-slide-in-right absolute right-0 top-0 flex h-full w-80 flex-col scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="panel-head -mx-3 mb-2 flex shrink-0 items-center justify-between border-b border-ink-700 px-3">
           <span class="panel-title"><StudioIcon name="grid" size="h-3.5 w-3.5" class="text-brand-400" /> Kết quả</span>
           <button @click="outputOpen = false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
@@ -1221,7 +1288,7 @@ function onTouchEnd(e) {
     <!-- Prompt Tạo Ảnh (ConceptCard): popup độc lập — nút sparkles ở right toolbar (dưới cùng) -->
     <!-- ══ Command Palette (VSCode-style) ══ -->
     <div v-if="paletteOpen" role="dialog" aria-modal="true" aria-label="Bảng lệnh" class="fixed inset-0 z-[110] flex items-start justify-center pt-[12vh]" @click.self="paletteOpen = false">
-      <div class="w-full max-w-lg overflow-hidden rounded-xl border border-ink-600 bg-ink-900 shadow-2xl">
+      <div class="motion-pop-in w-full max-w-lg overflow-hidden rounded-xl border border-ink-600 bg-ink-900 shadow-2xl">
         <div class="flex items-center gap-2 border-b border-ink-700 px-3 py-2.5">
           <StudioIcon name="search" size="h-4 w-4" class="text-cream-300/60" />
           <input ref="paletteInput" v-model="paletteQuery" class="min-w-0 flex-1 bg-transparent text-sm text-cream-100 placeholder:text-cream-300/40 focus:outline-none" placeholder="Tìm lệnh, dự án, mẫu việc, ảnh…  ( > lệnh · # dự án · @ ảnh )" @keydown.esc="paletteOpen = false" />

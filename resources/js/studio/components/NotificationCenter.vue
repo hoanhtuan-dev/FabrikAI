@@ -94,10 +94,10 @@ const progress = computed(() => {
     <TransitionGroup
       tag="div"
       class="flex flex-col gap-2"
-      enter-active-class="transition duration-200 ease-out"
+      enter-active-class="motion-ui motion-ui--emphasized"
       enter-from-class="translate-x-4 opacity-0"
       enter-to-class="translate-x-0 opacity-100"
-      leave-active-class="transition duration-150 ease-in"
+      leave-active-class="motion-ui"
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >

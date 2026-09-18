@@ -309,6 +309,12 @@ export const useStudioStore = defineStore('studio', {
     inspectorOpen: (typeof window !== 'undefined' && window.innerWidth < 1024) ? false : true,
     leftPanelOpen: true,   // sidebar card trái (ẩn/mở bằng nút chevron)
     outputDockOpen: true,  // dock phải Outputs (ẩn/mở)
+    // [2026-09-20] BỀ RỘNG DOCK (px) — kéo được ở vách ngăn, xem composables/useDockResize.js.
+    // Đây là NGUỒN SỰ THẬT duy nhất về bề rộng; composable kẹp lại trong [min, max] khi khôi
+    // phục nên giá trị cũ/rác trong localStorage không phá bố cục. Mặc định giữ ĐÚNG bề rộng
+    // đang dùng trước đây (w-72 = 288px · w-[156px]) để vào trang không thấy xa lạ.
+    leftDockWidth: 288,
+    outputDockWidth: 156,
     sourcePickerOpen: false, // popup chọn nguồn ảnh (mở trực tiếp từ activity bar)
     undoStack: [],   // lịch sử hoàn tác (snapshot layers + activeLayerId)
     redoStack: [],   // lịch sử làm lại
@@ -3327,9 +3333,9 @@ export const useStudioStore = defineStore('studio', {
     },
     // Lưu VẬT LÝ (nút Save): flush toàn bộ trạng thái + thông báo thành công.
     saveNow() { this.saveLayerLayout(); this.toast('Đã lưu trang.'); },
-    // ── Cài đặt status bar (snap · nền canvas · inspector) ──
-    saveBarSettings() { try { localStorage.setItem('fabrikai.bar', JSON.stringify({ snapGrid: this.snapGrid, canvasBg: this.canvasBg, inspectorOpen: this.inspectorOpen, leftPanelOpen: this.leftPanelOpen, outputDockOpen: this.outputDockOpen })); } catch (e) { /* bỏ qua */ } },
-    restoreBarSettings() { try { const d = JSON.parse(localStorage.getItem('fabrikai.bar') || 'null'); if (!d) return; if (d.snapGrid != null) this.snapGrid = Number(d.snapGrid) || 0; if (d.canvasBg) this.canvasBg = d.canvasBg; if (d.inspectorOpen != null) this.inspectorOpen = !!d.inspectorOpen; if (d.leftPanelOpen != null) this.leftPanelOpen = !!d.leftPanelOpen; if (d.outputDockOpen != null) this.outputDockOpen = !!d.outputDockOpen; } catch (e) { /* bỏ qua */ } },
+    // ── Cài đặt status bar (snap · nền canvas · inspector · bề rộng dock) ──
+    saveBarSettings() { try { localStorage.setItem('fabrikai.bar', JSON.stringify({ snapGrid: this.snapGrid, canvasBg: this.canvasBg, inspectorOpen: this.inspectorOpen, leftPanelOpen: this.leftPanelOpen, outputDockOpen: this.outputDockOpen, leftDockWidth: this.leftDockWidth, outputDockWidth: this.outputDockWidth })); } catch (e) { /* bỏ qua */ } },
+    restoreBarSettings() { try { const d = JSON.parse(localStorage.getItem('fabrikai.bar') || 'null'); if (!d) return; if (d.snapGrid != null) this.snapGrid = Number(d.snapGrid) || 0; if (d.canvasBg) this.canvasBg = d.canvasBg; if (d.inspectorOpen != null) this.inspectorOpen = !!d.inspectorOpen; if (d.leftPanelOpen != null) this.leftPanelOpen = !!d.leftPanelOpen; if (d.outputDockOpen != null) this.outputDockOpen = !!d.outputDockOpen; if (d.leftDockWidth != null) this.leftDockWidth = Number(d.leftDockWidth) || this.leftDockWidth; if (d.outputDockWidth != null) this.outputDockWidth = Number(d.outputDockWidth) || this.outputDockWidth; } catch (e) { /* bỏ qua */ } },
     // ── Ghi nhớ cài đặt prompt của người dùng (localStorage) — ƯU TIÊN hơn dữ liệu DB ──
     // Lưu negative prompt + prefix/suffix + 3 checkbox bật/tắt. Khi load lại trang,
     // giá trị local ghi đè lên defaults từ database (nếu đã từng chỉnh sửa ở đây).

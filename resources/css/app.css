@@ -125,12 +125,9 @@
     }
 }
 
-/* VSCode-style subtle transitions on interactive elements */
-@layer base {
-    a, button, input, select, textarea {
-        transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
-    }
-}
+/* [2026-09-20] Quy tắc chuyển động cho phần tử tương tác nay nằm trong khối
+   "CƠ SỞ CHUNG CHO CHUYỂN ĐỘNG" ở dưới (dùng token --motion-*) — không khai báo
+   số ms cứng ở đây nữa, tránh hai nguồn lệch nhau. */
 
 @layer components {
     .container-x {
@@ -268,6 +265,182 @@
         width: 3px;
         border-radius: 9999px;
         background: var(--color-brand-400);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CƠ SỞ CHUNG CHO CHUYỂN ĐỘNG — "motion foundation" (2026-09-20)
+   ═══════════════════════════════════════════════════════════════════════════
+   Vì sao có khối này: mỗi component trước đây tự viết số ms + đường cong riêng
+   (0.15s ease · 0.3s · cubic-bezier chép tay), nên (a) cùng một hành vi mà nhịp
+   khác nhau, (b) đổi "gu" chuyển động phải sửa hàng chục chỗ, (c) người dùng bật
+   "giảm chuyển động" của hệ điều hành thì phần lớn hiệu ứng VẪN chạy.
+
+   Nay: MỘT chỗ khai báo token (thời lượng + đường cong) và một bộ class dùng lại.
+   · CSS dùng trực tiếp var(--motion-*).
+   · JS đọc lại CHÍNH biến đó (xem resources/js/studio/motion.js) ⇒ không có hai
+     con số lệch nhau giữa hiệu ứng và thời điểm đo lại bố cục.
+   · Bật prefers-reduced-motion ⇒ mọi token về 0ms: cả app tắt chuyển động cùng lúc,
+     không phải đi tìm từng chỗ. */
+
+@layer base {
+    :root {
+        /* Thời lượng — chọn theo KÍCH THƯỚC vùng thay đổi, không theo cảm hứng. */
+        --motion-dur-instant: 90ms;   /* phản hồi chạm: hover/active trên nút nhỏ */
+        --motion-dur-fast: 150ms;     /* đổi màu · viền · opacity của phần tử tương tác */
+        --motion-dur-base: 220ms;     /* mặt UI chung: card · popup · tab · tooltip */
+        --motion-dur-slow: 320ms;     /* mặt LỚN: ngăn kéo (drawer) · modal */
+        --motion-dur-dock: 260ms;     /* co/giãn dock — JS đọc lại đúng biến này */
+
+        /* Đường cong: vào nhanh rồi dừng êm (không dùng ease-in-out mặc định vì
+           cảm giác "chờ" ở đầu chuyển động). */
+        --motion-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);    /* di chuyển thường */
+        --motion-ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);  /* bung ra (entrance) */
+        --motion-ease-exit: cubic-bezier(0.4, 0, 0.9, 0.3);        /* thu lại (exit) */
+    }
+
+    /* Phần tử tương tác cơ bản: đổi màu/viền/độ mờ theo token chung. */
+    a, button, input, select, textarea {
+        transition: background-color var(--motion-dur-fast) var(--motion-ease-standard),
+                    border-color var(--motion-dur-fast) var(--motion-ease-standard),
+                    color var(--motion-dur-fast) var(--motion-ease-standard),
+                    opacity var(--motion-dur-fast) var(--motion-ease-standard);
+    }
+}
+
+@layer components {
+    /* ─ 1. Lớp chuyển động cho MẶT UI tương tác ─────────────────────────────
+       Dùng class này thay cho việc chép tay 'transition' rải rác: nó chỉ khai báo
+       đúng bộ thuộc tính hay đổi (KHÔNG dùng transition-all — transition-all kéo
+       theo cả width/height, gây giật bố cục khi panel đang co). Vẫn ghi đè được
+       bằng tiện ích Tailwind (duration-* · ease-* · transition-none). */
+    .motion-ui {
+        transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter;
+        transition-duration: var(--motion-dur-fast);
+        transition-timing-function: var(--motion-ease-standard);
+    }
+    .motion-ui--base { transition-duration: var(--motion-dur-base); }
+    .motion-ui--slow { transition-duration: var(--motion-dur-slow); }
+    .motion-ui--emphasized { transition-timing-function: var(--motion-ease-emphasized); }
+
+    /* ── 2. Hiệu ứng XUẤT HIỆN cho lớp phủ · ngăn kéo · popup ───────────────
+       Đặt lên phần tử được mount bằng v-if: nó chạy một lần lúc xuất hiện. */
+    .motion-fade-in { animation: motion-fade-in var(--motion-dur-fast) var(--motion-ease-standard) both; }
+    .motion-pop-in { animation: motion-pop-in var(--motion-dur-base) var(--motion-ease-emphasized) both; }
+    .motion-rise-in { animation: motion-rise-in var(--motion-dur-slow) var(--motion-ease-emphasized) both; }
+    .motion-slide-in-left { animation: motion-slide-in-left var(--motion-dur-slow) var(--motion-ease-emphasized) both; }
+    .motion-slide-in-right { animation: motion-slide-in-right var(--motion-dur-slow) var(--motion-ease-emphasized) both; }
+
+    /* ── 3. DOCK CO/GIÃN ĐƯỢC (bảng trái · dock Outputs · …) ─────────────────
+       Một class dùng chung cho MỌI dock, để mọi dock có cùng nhịp và cùng cách ẩn.
+       Bề rộng thật do JS đặt qua inline style (store là nguồn sự thật) — CSS ở đây
+       lo phần chuyển động + phần "ẩn mà không gỡ khỏi DOM". */
+    .dock-panel {
+        /* BẮT BUỘC: flex item mặc định là min-width:auto ⇒ không co được xuống 0,
+           panel sẽ kẹt ở bề rộng nội dung và hiệu ứng co trông như bị đứng. */
+        min-width: 0;
+        /* Nội dung không được đẩy ngang khi dock hẹp (dock là nơi chứa, không phải
+           vùng cuộn ngang). */
+        overflow-x: hidden;
+        transition: width var(--motion-dur-dock) var(--motion-ease-standard),
+                    opacity var(--motion-dur-dock) var(--motion-ease-standard),
+                    visibility 0s linear 0s;
+    }
+    /* ĐANG KÉO: tắt hẳn transition — ngón tay/con trỏ phải đi trước, dock theo sau
+       tức thì; bật transition lúc này là cảm giác "dock trễ tay". */
+    .dock-panel[data-resizing='true'] {
+        transition: none;
+        will-change: width;
+    }
+    /* ĐÃ THU GỌN: ẩn khỏi chuột + bàn phím + trình đọc màn hình, nhưng CHỈ sau khi
+       chạy xong hiệu ứng co (visibility trễ đúng bằng thời lượng) — ẩn ngay thì
+       người dùng thấy panel "biến mất" rồi mới thấy khoảng trống co lại. */
+    .dock-panel[data-collapsed='true'] {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: width var(--motion-dur-dock) var(--motion-ease-exit),
+                    opacity var(--motion-dur-dock) var(--motion-ease-exit),
+                    visibility 0s linear var(--motion-dur-dock);
+    }
+
+    /* Vách ngăn kéo của dock (DockResizer.vue). Vùng bắt chuột rộng 7px cho dễ trúng,
+       nhưng chỉ VẼ 1 đường kẻ — vừa đủ để biết chỗ kéo. */
+    .dock-resizer {
+        position: relative;
+        display: block;
+        flex: 0 0 7px;
+        width: 7px;
+        cursor: col-resize;
+        /* Chạm/kéo trên tablet không được cuộn trang theo. */
+        touch-action: none;
+    }
+    .dock-resizer__grip {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 3px;
+        width: 1px;
+        background: var(--color-ink-700);
+        transition: left var(--motion-dur-fast) var(--motion-ease-standard),
+                    width var(--motion-dur-fast) var(--motion-ease-standard),
+                    background-color var(--motion-dur-fast) var(--motion-ease-standard);
+    }
+    /* Hover · đang focus bàn phím · đang kéo: đường kẻ dày lên và đổi sang màu thương hiệu. */
+    .dock-resizer:hover .dock-resizer__grip,
+    .dock-resizer:focus-visible .dock-resizer__grip,
+    .dock-resizer[data-resizing='true'] .dock-resizer__grip {
+        left: 2px;
+        width: 3px;
+        background: var(--color-brand-400);
+    }
+    /* Đường kẻ đổi màu đã là chỉ báo focus ⇒ bỏ vòng focus mặc định cho khỏi chồng 2 tín hiệu. */
+    .dock-resizer:focus-visible { outline: none; }
+
+    /* Đang kéo: con trỏ col-resize giữ trên TOÀN TRANG (con trỏ thường xuyên rời khỏi
+       vách ngăn 7px) và khoá bôi đen văn bản — nếu không, kéo qua panel là bôi đen chữ. */
+    body.is-dock-resizing { cursor: col-resize; user-select: none; }
+    body.is-dock-resizing * { cursor: col-resize !important; }
+}
+
+@keyframes motion-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes motion-pop-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes motion-rise-in {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes motion-slide-in-left {
+    from { opacity: 0.4; transform: translateX(-100%); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes motion-slide-in-right {
+    from { opacity: 0.4; transform: translateX(100%); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Một công tắc cho TOÀN BỘ chuyển động: token về 0ms ⇒ mọi hiệu ứng dùng token
+   thành tức thời; hiệu ứng chạy vòng lặp hoặc viết cứng phải tắt tường minh. */
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --motion-dur-instant: 0ms;
+        --motion-dur-fast: 0ms;
+        --motion-dur-base: 0ms;
+        --motion-dur-slow: 0ms;
+        --motion-dur-dock: 0ms;
+    }
+    html { scroll-behavior: auto; }
+    .motion-fade-in,
+    .motion-pop-in,
+    .motion-rise-in,
+    .motion-slide-in-left,
+    .motion-slide-in-right {
+        animation: none;
     }
 }
 

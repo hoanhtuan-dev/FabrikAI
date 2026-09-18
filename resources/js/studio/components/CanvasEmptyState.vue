@@ -95,9 +95,11 @@ onMounted(() => { loadTemplates(); });
 </script>
 
 <template>
-  <div class="absolute inset-0 z-20 flex flex-col items-center justify-center overflow-y-auto bg-gradient-to-b from-ink-950/95 via-ink-950/90 to-ink-950/95 p-4 backdrop-blur-sm">
+  <!-- [2026-09-20] Hiệu ứng vào dùng CƠ SỞ CHUNG (app.css: .motion-*) thay vì số ms viết cứng:
+       nền mờ dần, nội dung nhô lên — và tự tắt khi người dùng bật "giảm chuyển động". -->
+  <div class="motion-fade-in absolute inset-0 z-20 flex flex-col items-center justify-center overflow-y-auto bg-gradient-to-b from-ink-950/95 via-ink-950/90 to-ink-950/95 p-4 backdrop-blur-sm">
     <!-- Header -->
-    <div class="mb-6 text-center">
+    <div class="motion-rise-in mb-6 text-center">
       <div class="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600/20 text-brand-300">
         <StudioIcon name="sparkles" size="h-8 w-8" />
       </div>
