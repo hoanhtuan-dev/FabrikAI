@@ -2303,16 +2303,41 @@ export const useStudioStore = defineStore('studio', {
       const l = this.activeLayer;
       if (!l || !l.image) { this.toast('Chưa có layer để lưu.', 'error'); return; }
       try {
-        const blob = await (await fetch(l.image)).blob();
-        const fd = new FormData();
-        fd.append('image', new File([blob], 'layer-' + Date.now() + '.png', { type: 'image/png' }));
-        const res = await fetch('/api/upload-ref', { method: 'POST', headers: { 'X-XSRF-TOKEN': CSRF(), Accept: 'application/json' }, body: fd });
-        const d = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(d.message || 'Không lưu được.');
-        const gid = 'layer-' + Date.now();
-        // Thêm generation vào Output mà KHÔNG tạo layer canvas trùng (layer active đã có trên canvas).
-        this.generations.unshift({ id: gid, type: 'image', status: 'completed', model: 'layer', provider: 'layer', media_url: d.url, error: null, credits_cost: 0, created_at: 'Vừa lưu' });
-        this.toast('Đã lưu layer vào Output.');
+        // Ảnh ĐÃ nằm trên máy chủ (layer lấy từ Output / ảnh nguồn) ⇒ gửi ĐƯỜNG DẪN, KHÔNG tải lại byte nào.
+        // Trước đây luôn tải lên lại: đo thật layer 2K ≈ 0,9 MB và layer ghép 2400×2400 ≈ 4,4 MB cho MỘT
+        // thao tác lưu — trên mạng thật là hàng chục giây chờ vô ích.
+        const raw = String(l.image);
+        const isServerUrl = raw.startsWith('/storage/') || raw.startsWith(location.origin + '/storage/');
+        let d;
+        if (isServerUrl) {
+          d = await this.api('/api/layers/save', {
+            source_url: raw.replace(location.origin, ''),
+            name: l.name || '',
+            ...this.projectField(),
+          });
+        } else {
+          // Layer GHÉP trên canvas (data URL): chưa có trên máy chủ nên buộc phải tải lên.
+          const blob = await (await fetch(raw)).blob();
+          const fd = new FormData();
+          fd.append('image', new File([blob], 'layer-' + Date.now() + '.png', { type: 'image/png' }));
+          fd.append('name', l.name || '');
+          const pid = this.appliedProjectId();
+          if (pid) fd.append('project_id', String(pid));
+          const res = await fetch('/api/layers/save', { method: 'POST', headers: { 'X-XSRF-TOKEN': CSRF(), Accept: 'application/json' }, body: fd });
+          d = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(d.message || 'Không lưu được.');
+        }
+        if (!d || !d.generation_id) throw new Error((d && d.message) || 'Không lưu được.');
+        // Bản ghi THẬT (id trong CSDL) ⇒ ảnh vào được Thư viện và còn nguyên sau khi tải lại trang.
+        // Dùng unshift trực tiếp thay vì addGen: addGen đẩy thêm một layer canvas nữa, mà layer đang lưu
+        // đã có sẵn trên canvas rồi (sẽ thành hai layer trùng nhau).
+        this.generations.unshift({
+          id: d.generation_id, type: 'image', status: 'completed', model: 'layer', provider: 'layer',
+          media_url: d.media_url, prompt: 'Lưu layer từ canvas', error: null, credits_cost: 0,
+          created_at: 'Vừa lưu', project_id: d.project_id ?? null,
+          project: (d.project_id && this.appliedProject && Number(this.appliedProject.id) === Number(d.project_id)) ? this.appliedProject.name : null,
+        });
+        this.toast('Đã lưu layer vào Output và Thư viện.');
       } catch (e) { this.toast(e.message || 'Không lưu được.', 'error'); }
     },
     // Đo kích thước thật của ảnh rồi xếp theo flow: hàng ngang (có gap), tự xuống hàng khi quá rộng.

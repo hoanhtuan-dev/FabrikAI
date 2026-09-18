@@ -183,6 +183,8 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::post('/assets', [StudioController::class, 'assetStore'])->name('assets.store');
     Route::delete('/assets/{asset}', [StudioController::class, 'assetDestroy'])->name('assets.destroy');
     Route::post('/upload-ref', [StudioController::class, 'uploadRef'])->name('uploadRef');
+    // [Yeu cau 2026-09-20] Nut "Luu Output" phai TAO BAN GHI THAT, va khong tai lai anh da co tren may chu.
+    Route::post('/layers/save', [StudioController::class, 'saveLayer'])->name('layers.save');
 
     // ── Thư viện Prompt phân tích ("Gợi ý từ ảnh") — bảng `suggest_results` có user_id ──
     Route::get('/suggest-library/data', [StudioController::class, 'suggestLibraryData'])->name('suggest-library.data');

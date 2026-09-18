@@ -2366,6 +2366,83 @@ RULES:
     }
 
     /**
+     * LU LAYER CANVAS THÀNH OUTPUT THẬT — có dòng trong CSDL.
+     *
+     * Vì sao có endpoint này: nút "Lưu Output" trước đây chỉ TẢI FILE lên rồi tự chèn một bản ghi
+     * GIẢ vào bộ nhớ trình duyệt (id dạng `layer-<số>`, KHÔNG có dòng nào trong CSDL). Hệ quả đo được:
+     *   · KHÔNG bao giờ vào được Thư viện — `/api/library/data` đọc bảng `generations`, mà ở đó không
+     *     có gì; tải lại trang là ảnh BIẾN MẤT, trong khi giao diện vẫn báo đã lưu.
+     *   · RT CHẬM: mỗi lần lưu phải TẢI LÊN LẠI toàn bộ ảnh, kể cả khi ảnh ĐÃ nằm trên máy chủ
+     *     (đo thật: layer 2K ≈ 0,9 MB; layer ghép 2400×2400 ≈ 4,4 MB).
+     *
+     * Nay: có `source_url` (ảnh đã ở trên máy chủ) ⇒ CHỈ ghi dòng CSDL, không tải byte nào. Chỉ khi
+     * layer được GHÉP trên canvas (data URL) mới thật sự cần tải lên.
+     */
+    public function saveLayer(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'source_url' => ['nullable', 'string', 'max:2048'],
+            'image' => ['nullable', 'image', 'max:8192'],
+            'name' => ['nullable', 'string', 'max:255'],
+            'project_id' => ['nullable'],
+        ]);
+
+        $sourceUrl = trim((string) ($data['source_url'] ?? ''));
+
+        if ($sourceUrl !== '') {
+            $rel = $this->storageRelFromUrl($sourceUrl);
+            // Chỉ nhận file CÓ THẬT trên máy chủ và người dùng được phép đọc. Không hợp lệ thì trả 422
+            // chứ KHÔNG âm thầm tạo một output trỏ vào hư không — đó đúng là kiểu lỗi vừa sửa.
+            if ($rel === null || ! studio_upload_visible_to($rel, auth()->id(), (bool) auth()->user()->isAdmin())) {
+                return response()->json(['message' => 'Không đọc được ảnh để lưu.'], 422);
+            }
+            $mediaUrl = '/storage/'.$rel;
+        } elseif ($request->hasFile('image')) {
+            // Layer GHÉP trên canvas: chưa có trên máy chủ nên buộc phải tải lên.
+            $dir = studio_ref_user_dir(auth()->id());
+            $fname = 'layer-'.Str::uuid()->toString().'.'.$request->file('image')->extension();
+            $request->file('image')->storeAs($dir, $fname, 'public');
+            $mediaUrl = '/storage/'.$dir.'/'.$fname;
+        } else {
+            return response()->json(['message' => 'Chưa có ảnh để lưu.'], 422);
+        }
+
+        $label = trim((string) ($data['name'] ?? ''));
+
+        $gen = auth()->user()->generations()->create([
+            'type' => 'image', 'status' => 'completed',
+            'media_url' => $mediaUrl,
+            'prompt' => 'Lưu layer từ canvas'.($label !== '' ? ': '.$label : ''),
+            'model' => 'layer', 'provider' => 'layer', 'credits_cost' => 0,
+            'project_id' => $this->resolveProjectId($request),
+        ]);
+
+        return response()->json([
+            'generation_id' => $gen->id,
+            'media_url' => $mediaUrl,
+            'project_id' => $gen->project_id,
+        ]);
+    }
+
+    /**
+     * URL công khai (/storage/…) → đường dẫn TƯƠNG ĐỐI trong disk `public`, sau khi đã kiểm
+     * containment bằng safeLocalFile() (chặn leo thư mục, giải symlink). Trả null nếu không phải
+     * file thật nằm trong storage public.
+     */
+    private function storageRelFromUrl(string $url): ?string
+    {
+        $abs = $this->resolveLocalImage($url, true);
+        if (! $abs) {
+            return null;
+        }
+
+        $root = rtrim(str_replace('\\', '/', \Illuminate\Support\Facades\Storage::disk('public')->path('')), '/').'/';
+        $abs = str_replace('\\', '/', $abs);
+
+        return str_starts_with($abs, $root) ? substr($abs, strlen($root)) : null;
+    }
+
+    /**
      * Translate a prompt between Vietnamese and English (used by the "Chỉnh sửa prompt tiếng Việt" popup).
      */
     /**

@@ -94,7 +94,8 @@ class ModuleRegistry
             'id' => 'compose', 'name' => 'Ghép ảnh', 'group' => 'Chỉnh ảnh',
             'kind' => self::KIND_PANEL, 'gui' => true, 'icon' => 'layers',
             'summary' => 'Ghép nhiều ảnh thành một bố cục hoàn chỉnh.',
-            'endpoints' => ['compose'], 'depends_on' => [],
+            // `layers` là nút "Lưu Output" của bảng Lớp (LayersPanel) — cùng không gian canvas với Ghép ảnh.
+            'endpoints' => ['compose', 'layers'], 'depends_on' => [],
             'plans' => ['*'],
         ],
         [
