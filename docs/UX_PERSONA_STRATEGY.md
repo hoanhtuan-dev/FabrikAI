@@ -523,3 +523,98 @@ Xoá file ⇒ xoá liên kết; xoá dự án ⇒ ảnh rời khỏi bộ sưu t
   (một loại là dòng CSDL, một loại là file trên đĩa).
 - **Không nới bảo mật để tiện.** `studio_assets` là đường tắt hấp dẫn nhưng sẽ làm rò ảnh cá nhân vào picker chung;
   và mọi thao tác ghi lên ảnh tải lên đều phải đi qua đúng hai lớp kiểm tra mà đường xoá đang dùng.
+
+## 12. Đợt 8 — Nút “Lưu Output” RẤT CHẬM và KHÔNG lưu được vào Thư viện (2026-09-20)
+
+### 12.1 Vấn đề — đo được, không suy đoán
+
+Nút **“Lưu Output”** ở bảng Lớp (`LayersPanel` → `store.saveActiveLayerToOutput()`) có hai lỗi cùng lúc:
+
+**a) Không hề lưu — chỉ DIỄN.** Hàm chỉ TẢI FILE lên rồi tự chèn một bản ghi **GIẢ** vào bộ nhớ trình duyệt:
+`id: 'layer-' + Date.now()` — một CHUỖI, không có dòng nào trong CSDL. Đo thật trên dev:
+
+| Đo | Kết quả |
+|---|---|
+| Bản ghi tạo ra | `{ id: "layer-1789726248857", provider: "layer" }` — id KHÔNG phải số |
+| Có trong `/api/library/data` | **false** |
+| Có trong `/api/latest` | **false** |
+| Sau khi tải lại trang | **0 bản ghi còn lại** — biến mất hoàn toàn |
+
+Trong khi giao diện vẫn báo *“Đã lưu layer vào Output.”* Bản thân mã nguồn đã **tự biết** điều này:
+`deleteGen()` có một nhánh riêng cho các bản ghi giả ấy (nhận diện bằng `id.startsWith('layer-')`) và chỉ xoá
+cục bộ, kèm chú thích *“KHÔNG có record server”*. Tức là hệ thống đã quen với việc bản ghi này không tồn tại —
+thay vì sửa nó cho tồn tại thật.
+
+**b) Rất chậm — vì tải lên lại một ảnh ĐÃ Ở TRÊN MÁY CHỦ.** Đo thật:
+
+| Trường hợp | Kích thước phải tải lên |
+|---|---|
+| Layer lấy từ Output (2K) | **889.470 B ≈ 0,9 MB** |
+| Layer ghép 2400×2400 trên canvas | **4.576.401 B ≈ 4,4 MB** |
+
+Với ảnh vốn đã nằm sẵn dưới `/storage/…`, việc tải lại từng byte là **hoàn toàn vô ích**: thao tác chỉ cần ghi
+một dòng CSDL. Trên mạng thật, 4,4 MB ở đường lên của người dùng là hàng chục giây chờ cho một cú bấm “Lưu”.
+Thêm nữa, file tải lên đó còn bị tính là **file mồ côi** trong tab “Ảnh tải lên” — tốn đĩa cho một thao tác
+không lưu được gì.
+
+### 12.2 Đã làm
+
+**a) Endpoint mới `POST /api/layers/save` — TẠO BẢN GHI THẬT.**
+
+- Có `source_url` (ảnh đã ở trên máy chủ) ⇒ **CHỈ ghi dòng CSDL, không tải byte nào** (đường nhanh).
+- Chỉ khi layer được **GHÉP trên canvas** (data URL — ảnh chưa hề có trên máy chủ) mới thật sự tải lên.
+- Trả về `generation_id` **thật** + `media_url` + `project_id`.
+- Ghi luôn vào **bộ sưu tập đang áp dụng** qua `resolveProjectId()` — cùng cơ chế với 9 phép phái sinh ở mục 11.
+
+**b) Bảo mật — không nhận đường dẫn tuỳ tiện.** `source_url` phải: (1) đi qua `safeLocalFile()` (chặn leo thư mục,
+giải symlink, chỉ nhận file thật trong vùng `storage/app/public`/`public`), và (2) qua `studio_upload_visible_to()`
+(chặn lưu ảnh trong thư mục riêng của người khác). Sai ⇒ **422**, chứ KHÔNG âm thầm tạo một output trỏ vào hư
+không — đúng kiểu lỗi vừa sửa.
+
+**c) Client** — `saveActiveLayerToOutput()` nhận biết ảnh đã ở trên máy chủ (`/storage/…`) và gửi đường dẫn thay
+vì tải file; dùng `generation_id` THẬT thay cho chuỗi `layer-…`. Vẫn `unshift` trực tiếp (KHÔNG dùng `addGen`) vì
+`addGen` sẽ đẩy thêm một layer canvas trùng với layer đang lưu.
+
+**d) Khai module** — route mới được khai vào `ModuleRegistry` (module `compose`, cùng không gian canvas với bảng Lớp).
+
+> Đây không phải việc tuỳ chọn: `ModuleRegistryTest::test_every_studio_api_route_is_claimed_by_a_module` **đỏ ngay**
+> khi thêm route mà quên khai — nhờ vậy một endpoint không thuộc module nào (⇒ công tắc gói không chặn được) không
+> thể lọt vào sản phẩm.
+
+### 12.3 Ràng buộc đã giữ
+
+- Hai đường dùng `upload-ref` còn lại **vẫn đúng và không bị đụng tới**: *Gộp layer* và *Tải ảnh nguồn* đều tạo ảnh
+  MỚI thật sự, nên tải lên là cần thiết.
+- Layer ghép vẫn dùng đúng định dạng PNG như trước (giữ kênh trong suốt) — không đổi chất lượng ảnh.
+- Không đổi route/định dạng phản hồi cũ nào; endpoint cũ giữ nguyên.
+
+### 12.4 Đo được
+
+| Đo | Trước | Sau |
+|---|---|---|
+| Thời gian lưu layer 2K (cùng một ảnh 889 KB) | **85 ms** (kèm tải lên 0,9 MB) | **22 ms** |
+| Byte phải tải lên khi ảnh đã ở trên máy chủ | 889.470 B | **0** |
+| `id` tạo ra | chuỗi `layer-…` | **số thật** (10) |
+| Có trong `/api/library/data` | **false** | **true** |
+| Có trong `/api/latest` | **false** | **true** |
+| Sau khi tải lại trang | **0** bản ghi | **còn nguyên** (id 10) |
+| Layer ghép 2400×2400 | 4,4 MB tải lên | vẫn tải lên (buộc phải thế) nhưng **ghi bản ghi thật** (id 11) |
+
+- `vendor/bin/phpunit`: **666 test / 4115 khẳng định — XANH** (thêm 8 test cho đường lưu layer).
+- `npm run build`: thoát 0.
+- Kiểm bằng Chrome thật: đường nhanh **22 ms**, vào Thư viện + Outputs, **còn sau khi tải lại**; layer ghép ghi được
+  bản ghi thật với file nằm đúng thư mục riêng của người dùng.
+- Dọn dp: dev trở lại **5 generation / 0 layer / 0 liên kết**. Ảnh nguồn có sẵn **không** bị xoá (đường nhanh dùng
+  lại file cũ nên việc dọn phải phân biệt file do thao tác lưu tạo ra với ảnh gốc của người dùng).
+
+### 12.5 Bài học tự bắt được trong đợt này
+
+- **“Báo thành công” mà không ghi gì là lỗi nặng hơn “báo lỗi”.** Người dùng tin là đã lưu, đóng tab, và mất ảnh.
+  Đây là lần thứ hai trong hai đợt liên tiếp gốc rễ nằm ở chỗ *thao tác trông như thành công nhưng không có dòng
+  nào trong CSDL* — nên quy tắc rút ra: **mọi nút “Lưu” phải kết thúc bằng một dòng CSDL, hoặc một lỗi rõ ràng.**
+- **Nghi ngờ con số “chậm” bằng cách đo byte, không đo cảm giác.** 85 ms trên localhost nghe rất nhanh — nhưng đó
+  là 0,9 MB đi qua vòng lặp của bộ. Điều đáng đo không phải mili-giây mà là **số byte phải đi qua mạng**: nó mới là
+  thứ quyết định trải nghiệm thật, và ở đây nó bằng 0 thay vì 0,9–4,4 MB.
+- **Rào chắn của dự án đã bắt lỗi thay tôi.** Thêm route mới mà quên khai module ⇒ test đỏ ngay lập tức. Giữ những
+  bài test kiểu này đáng giá hơn nhiều bài test chỉ kiểm tra đúng thứ vừa viết.
+
