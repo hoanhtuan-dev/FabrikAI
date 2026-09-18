@@ -86,7 +86,7 @@
     "name": "pageBoot"
   },
   "resources/css/app.css": {
-    "file": "assets/app-BnqkB-wD.css",
+    "file": "assets/app-YovWx2Gz.css",
     "name": "app",
     "names": [
       "app.css"
@@ -108,7 +108,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-DYipnhS6.js",
+    "file": "assets/main-BfiG-91K.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,

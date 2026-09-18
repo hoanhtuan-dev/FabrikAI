@@ -408,7 +408,11 @@ const activeHandles = computed(() => {
   void viewportTick.value;                            // đổi kích thước vùng canvas ⇒ tính lại vị trí tay cầm
   const l = store.activeLayer;
   const el = store.canvasZoom;
-  if (!l || !el || l.visible === false || isolateActive.value) return null;
+  // Hiện tay cầm ở CẢ HAI chế độ xem (nhiều layer và "chỉnh 1 layer"). Trước đây chế độ "chỉnh 1 layer"
+  // — bật bởi công cụ Vẽ tự do / Xóa vùng / vùng chọn inpaint — KHÔNG có tay cầm nào, nên ai đang bật
+  // một công cụ là mất hẳn tay cầm chỉnh kích cỡ mà không hiểu vì sao. Chỉ ẩn khi đang Crop/Reframe
+  // (khung crop có tay cầm riêng của nó) hoặc khi layer đang ẩn (không thấy thì không chỉnh được).
+  if (!l || !el || l.visible === false || store.cropMode || store.reframeOpen) return null;
   const fl = layerBaseSize(l);                        // kích thước layout của ảnh layer
   if (!fl) return null;
   const r = el.getBoundingClientRect();
@@ -451,6 +455,19 @@ const activeHandles = computed(() => {
 // Nền canvas — dùng CHUNG class .canvas-bg-* trong app.css với ô màu ở CanvasStatusBar. Trước đây chỗ
 // này trỏ tới một class bàn cờ không hề được định nghĩa (nền "lưới" thành trong suốt) và ô màu ở status
 // bar tự vẽ màu riêng nên lệch với màu thật. Một nguồn ⇒ không thể lệch nữa.
+// Tên công cụ đang khiến canvas ở chế độ "chỉnh 1 layer" — hiện trong nhãn chế độ (xem template).
+const isolateToolLabel = computed(() => {
+  if (store.cropMode || store.reframeOpen) return 'Crop/Reframe';
+  if (store.drawMode) return 'Vẽ tự do';
+  if (store.eraseMode) return 'Xóa vùng';
+  const m = store.inpaintMaskMode;
+  if (m === 'rect') return 'vùng chữ nhật';
+  if (m === 'freehand') return 'lasso';
+  if (m === 'path') return 'đường cong';
+  if (m === 'magic') return 'Magic Wand';
+  if (m === 'brush') return 'cọ sửa';
+  return 'công cụ canvas';
+});
 const CANVAS_BGS = ['grid', 'dark', 'white', 'cream'];
 const bgClass = computed(() => 'canvas-bg-' + (CANVAS_BGS.includes(store.canvasBg) ? store.canvasBg : 'grid'));
 const activeActivityDef = computed(() => activityNav.value.find(a => a.id === activeActivity.value) || activityNav.value[0]);
@@ -1238,15 +1255,27 @@ function onTouchEnd(e) {
           <CanvasMaskTools />
           <!-- Nút "Bỏ ảnh nguồn khỏi canvas" đã xóa — ảnh nguồn tự động clear khi chọn layer khác hoặc dùng nút X ở SourcePanel -->
           
+          <!-- Nhãn CHẾ ĐỘ: khi một công cụ canvas đang bật, canvas chỉ hiện layer đang chọn — nếu không
+               nói rõ, người dùng tưởng "mất layer" và tưởng "bật/tắt layer không có tác dụng". -->
+          <div v-if="isolateActive && store.activeLayer" class="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2">
+            <div class="pointer-events-auto flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-2.5 py-1 text-[10px] font-semibold text-amber-100 shadow-lg">
+              <StudioIcon name="info" size="h-3 w-3" class="shrink-0" />
+              <span>Đang chỉnh 1 layer ({{ isolateToolLabel }}) — canvas chỉ hiện layer đang chọn</span>
+              <button @click="store.exitCanvasTools()" class="rounded-full bg-amber-400/20 px-1.5 py-0.5 hover:bg-amber-400/35" title="Thoát công cụ để thấy toàn bộ canvas">Thoát</button>
+            </div>
+          </div>
           <div ref="canvasZoom" class="absolute inset-0" :class="store.selectTool ? 'cursor-crosshair active:cursor-crosshair' : 'cursor-grab active:cursor-grabbing'" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="onCanvasBgMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="onCanvasBgUp($event)" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
             <!-- Chế độ isolate (crop/inpaint/erase): chỉ khi có layer active — không có layer thì hiện composite (không ẩn hết) -->
             <div v-if="isolateActive && store.activeLayer" class="absolute inset-0">
-              <div v-if="store.upscaleSrc" class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
+              <div v-if="store.activeLayer.visible !== false && store.activeLayer.image" class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
                 <div class="absolute left-0 top-0" :style="isolateLayerStyle">
-                  <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" :class="store.activeLayerId === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : ''" draggable="false" @load="store.onCanvasImgLoad()" />
+                  <!-- Hiện ĐÚNG ảnh của layer đang chọn. Trước đây dùng store.upscaleSrc — hàm này có
+                       ĐƯỜNG LÙI sang ảnh khác khi layer đang chọn bị ẩn ⇒ bấm con mắt mà canvas KHÔNG
+                       đổi gì, nhìn như "bật/tắt layer không có tác dụng". -->
+                  <img ref="cvImg" :src="store.activeLayer.image" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" :class="store.activeLayerId === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : ''" draggable="false" @load="store.onCanvasImgLoad()" />
                 </div>
               </div>
-              <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
+              <p v-else class="text-sm text-cream-300/60">Layer đang chọn đang bị <b>ẨN</b> — bấm con mắt trong bảng Lớp để hiện lại.</p>
             </div>
             <!-- Chế độ stack: composite tất cả layer.
                  BẬT/TẮT LAYER ẩn/hiện bằng CHÍNH thẻ layer (class .layer-el / .layer-el--hidden):

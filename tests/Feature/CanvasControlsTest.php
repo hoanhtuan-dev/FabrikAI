@@ -281,8 +281,10 @@ class CanvasControlsTest extends TestCase
             'Phải có computed toạ độ tay cầm (lớp phủ theo toạ độ màn hình).');
         $this->assertStringContainsString('const keep = (p) =>', $app,
             'Toạ độ tay cầm phải được KẸP vào trong vùng nhìn thấy — nếu không, tay cầm lại bị cắt.');
-        $this->assertMatchesRegularExpression('/isolateActive\.value\)\s*return null/', $app,
-            'Chế độ isolate (crop/inpaint/vẽ) không dùng tay cầm layer ⇒ phải ẩn.');
+        // [SỬA 2026-09-20] Trước đây tay cầm bị ẩn ở MỌI chế độ "chỉnh 1 layer" (crop/inpaint/vẽ) — chính
+        // là lúc người dùng mất tay cầm mà không hiểu vì sao. Nay chỉ ẩn khi đang Crop/Reframe.
+        $this->assertStringNotContainsString('isolateActive.value) return null', $app,
+            'Không được ẩn tay cầm chỉ vì đang ở chế độ chỉnh 1 layer.');
         $this->assertStringContainsString('pointer-events-none absolute inset-0 z-40', $app,
             'Tay cầm phải nằm trong lớp phủ riêng, không chặn chuột ra toàn canvas.');
 
@@ -431,5 +433,31 @@ class CanvasControlsTest extends TestCase
         $segment = substr($app, max(0, $keep[0][1] - 700), 700);
         $this->assertStringContainsString('handleClampBox(r)', $segment,
             'Hàm kẹp phải dùng vùng cho phép (đã trừ lớp phủ), không chỉ kẹp vào vùng canvas.');
+    }
+
+    public function test_handles_and_visibility_work_in_single_layer_edit_mode(): void
+    {
+        $app = $this->src('js/studio/StudioApp.vue');
+
+        // ĐO ĐƯỢC: bật một công cụ canvas (Vẽ tự do · Xóa vùng · vùng chọn inpaint) là canvas chuyển sang
+        // chế độ CHỈNH 1 LAYER. Ở chế độ đó trước đây: (a) KHÔNG có tay cầm nào, (b) bấm con mắt KHÔNG
+        // đổi gì trên canvas vì khung xem rơi về ảnh dự phòng ⇒ hai khiếu nại "không có tay cầm" và
+        // "bật/tắt layer chưa đúng" cùng lúc.
+        $this->assertStringNotContainsString('isolateActive.value) return null', $app,
+            'Tay cầm KHÔNG được ẩn chỉ vì đang ở chế độ chỉnh 1 layer — đó chính là lúc người dùng mất tay cầm.');
+        $this->assertMatchesRegularExpression('/store\.cropMode \|\| store\.reframeOpen\) return null/', $app,
+            'Chỉ ẩn tay cầm khi đang Crop/Reframe (khung crop có tay cầm riêng).');
+
+        // Khung xem 1 layer phải hiện ĐÚNG ảnh của layer đang chọn, không rơi về ảnh khác.
+        $this->assertStringContainsString(':src="store.activeLayer.image"', $app,
+            'Chế độ 1 layer phải hiện ảnh của CHÍNH layer đang chọn (dùng upscaleSrc thì có đường lùi sang '
+            .'ảnh khác nên bấm con mắt không thấy gì đổi).');
+        $this->assertStringContainsString('đang bị <b>ẨN</b>', $app,
+            'Layer đang chọn bị ẩn thì phải NÓI RÕ trên canvas, không im lặng hiện ảnh khác.');
+
+        // Và phải có nhãn chế độ + nút thoát một chạm, nếu không người dùng tưởng "mất layer".
+        $this->assertStringContainsString('Đang chỉnh 1 layer', $app, 'Thiếu nhãn cho biết canvas đang ở chế độ chỉnh 1 layer.');
+        $this->assertStringContainsString('isolateToolLabel', $app, 'Nhãn chế độ phải nói rõ công cụ nào đang bật.');
+        $this->assertStringContainsString('store.exitCanvasTools()', $app, 'Thiếu nút thoát công cụ để thấy lại toàn bộ canvas.');
     }
 }
