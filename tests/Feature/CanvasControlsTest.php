@@ -277,8 +277,16 @@ class CanvasControlsTest extends TestCase
         // Tay cầm KHÔNG được là con của thẻ layer: vùng canvas có overflow:hidden nên khi layer phóng
         // to / kéo ra mép, góc layer rơi ra ngoài vùng nhìn thấy ⇒ tay cầm bị CẮT MẤT (đo được: tâm tay
         // cầm nằm đè lên thanh trạng thái z-30 nên bấm vào là bấm thanh trạng thái).
-        $this->assertStringContainsString('const activeHandles = computed(', $app,
+        $this->assertStringContainsString('const layerHandles = computed(', $app,
             'Phải có computed toạ độ tay cầm (lớp phủ theo toạ độ màn hình).');
+        // TAY CẦM KHÔNG CÓ ĐIỀU KIỆN: mọi layer đang hiện đều có tay cầm chỉnh kích cỡ, nên không còn
+        // trạng thái nào (chưa chọn layer · đang bật công cụ · vừa bỏ chọn) mà "không có tay cầm".
+        $this->assertStringContainsString('store.canvasLayers.forEach((l) => {', $app,
+            'Phải duyệt MỌI layer để mỗi layer đều có tay cầm — không chỉ layer đang chọn.');
+        $this->assertStringContainsString('layer-handle--other', $app,
+            'Layer không được chọn vẫn phải có tay cầm (mờ hơn) — thiếu là quay lại lỗi "không có tay cầm".');
+        $this->assertStringContainsString('startResizeFromHandle', $app,
+            'Kéo tay cầm của layer chưa chọn phải tự CHỌN layer đó rồi mới chỉnh kích cỡ.');
         $this->assertStringContainsString('const keep = (p) =>', $app,
             'Toạ độ tay cầm phải được KẸP vào trong vùng nhìn thấy — nếu không, tay cầm lại bị cắt.');
         // [SỬA 2026-09-20] Trước đây tay cầm bị ẩn ở MỌI chế độ "chỉnh 1 layer" (crop/inpaint/vẽ) — chính
@@ -400,10 +408,10 @@ class CanvasControlsTest extends TestCase
         $this->assertStringContainsString('const viewportTick = ref(0)', $app,
             'Thiếu nhịp khung nhìn để tay cầm tính lại vị trí.');
         $this->assertStringContainsString('viewportTick.value++', $app, 'Nhịp khung nhìn phải được tăng khi vùng canvas đổi.');
-        preg_match('/const activeHandles = computed\(\(\) => \{(.*?)return null;/s', $app, $m);
-        $this->assertNotEmpty($m[1] ?? '', 'Không đọc được đầu hàm activeHandles.');
+        preg_match('/const layerHandles = computed\(\(\) => \{(.*?)return \[\];/s', $app, $m);
+        $this->assertNotEmpty($m[1] ?? '', 'Không đọc được đầu hàm layerHandles.');
         $this->assertStringContainsString('viewportTick.value', $m[1],
-            'activeHandles PHẢI phụ thuộc nhịp khung nhìn — nếu không, toạ độ tay cầm bị "đóng băng" theo khung cũ.');
+            'layerHandles PHẢI phụ thuộc nhịp khung nhìn — nếu không, toạ độ tay cầm bị "đóng băng" theo khung cũ.');
         $this->assertStringContainsString('new ResizeObserver', $app,
             'Phải theo dõi kích thước phần tử canvas (dock co/giãn, bảng Lớp bật/tắt cũng đổi kích thước).');
     }
@@ -445,7 +453,7 @@ class CanvasControlsTest extends TestCase
         // "bật/tắt layer chưa đúng" cùng lúc.
         $this->assertStringNotContainsString('isolateActive.value) return null', $app,
             'Tay cầm KHÔNG được ẩn chỉ vì đang ở chế độ chỉnh 1 layer — đó chính là lúc người dùng mất tay cầm.');
-        $this->assertMatchesRegularExpression('/store\.cropMode \|\| store\.reframeOpen\) return null/', $app,
+        $this->assertMatchesRegularExpression('/store\.cropMode \|\| store\.reframeOpen\) return \[\]/', $app,
             'Chỉ ẩn tay cầm khi đang Crop/Reframe (khung crop có tay cầm riêng).');
 
         // Khung xem 1 layer phải hiện ĐÚNG ảnh của layer đang chọn, không rơi về ảnh khác.

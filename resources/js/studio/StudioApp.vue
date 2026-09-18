@@ -404,33 +404,18 @@ function handleClampBox(canvasRect) {
   return { left, top, right, bottom };
 }
 
-const activeHandles = computed(() => {
+const layerHandles = computed(() => {
   void viewportTick.value;                            // đổi kích thước vùng canvas ⇒ tính lại vị trí tay cầm
-  const l = store.activeLayer;
   const el = store.canvasZoom;
-  // Hiện tay cầm ở CẢ HAI chế độ xem (nhiều layer và "chỉnh 1 layer"). Trước đây chế độ "chỉnh 1 layer"
-  // — bật bởi công cụ Vẽ tự do / Xóa vùng / vùng chọn inpaint — KHÔNG có tay cầm nào, nên ai đang bật
-  // một công cụ là mất hẳn tay cầm chỉnh kích cỡ mà không hiểu vì sao. Chỉ ẩn khi đang Crop/Reframe
-  // (khung crop có tay cầm riêng của nó) hoặc khi layer đang ẩn (không thấy thì không chỉnh được).
-  if (!l || !el || l.visible === false || store.cropMode || store.reframeOpen) return null;
-  const fl = layerBaseSize(l);                        // kích thước layout của ảnh layer
-  if (!fl) return null;
+  // Chỉ ẩn khi đang Crop/Reframe (khung crop có tay cầm riêng của nó).
+  if (!el || store.cropMode || store.reframeOpen) return [];
   const r = el.getBoundingClientRect();
-  if (!r.width || !r.height) return null;
+  if (!r.width || !r.height) return [];
 
   const z = store.zoom || 1;
-  const s = Math.abs(Number(l.scale) || 1);
-  const rad = ((Number(l.rotation) || 0) * Math.PI) / 180;
-  const cos = Math.cos(rad), sin = Math.sin(rad);
-  const cx = r.width / 2 + ((Number(l.x) || 0) * z + store.pan.x);
-  const cy = r.height / 2 + ((Number(l.y) || 0) * z + store.pan.y);
-  const hw = (fl.w * s * z) / 2, hh = (fl.h * s * z) / 2;
-  // Điểm trong hệ trục CỦA LAYER → toạ độ màn hình (đã tính cả xoay).
-  const at = (dx, dy) => ({ x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos });
   const M = 14;   // lề: không dán sát mép khung, vẫn đủ chỗ cho ngón tay
   const box = handleClampBox(r);
-  // Đổi vùng cho phép (toạ độ trang) về toạ độ trong canvasZoom; nếu vùng co lại quá nhỏ (màn hình hẹp
-  // + ngăn kéo mở) thì lùi về giữa khung để tay cầm vẫn còn chỗ bấm.
+  // Vùng cho phép (toạ độ trang) → toạ độ trong canvasZoom; co quá nhỏ thì lùi về giữa khung.
   let minX = box.left - r.left + M, maxX = box.right - r.left - M;
   let minY = box.top - r.top + M, maxY = box.bottom - r.top - M;
   if (maxX - minX < 8) { minX = maxX = (box.left + box.right) / 2 - r.left; }
@@ -440,16 +425,38 @@ const activeHandles = computed(() => {
     y: Math.max(minY, Math.min(maxY, p.y)),
   });
 
-  const size = keep(at(hw, hh));                       // góc dưới-phải
-  const top = at(0, -hh);                              // đỉnh giữa
-  // Tay cầm xoay nằm TRÊN đỉnh 30px MÀN HÌNH (không nhân theo scale/zoom cho khỏi xa tít khi thu nhỏ).
-  const rotateAt = keep({ x: top.x + 30 * sin, y: top.y - 30 * cos });
-
-  return {
-    locked: !!l.locked,
-    sizeStyle: { left: size.x + 'px', top: size.y + 'px' },
-    rotateStyle: { left: rotateAt.x + 'px', top: rotateAt.y + 'px' },
-  };
+  const out = [];
+  store.canvasLayers.forEach((l) => {
+    if (l.visible === false) return;                  // layer vô hình thì không có gì để kéo
+    // Chế độ 1 layer CHỈ giới hạn khi thật sự có layer đang chọn (lúc đó canvas chỉ hiện layer đó).
+    // Không có layer nào đang chọn thì canvas hiện dạng nhiều layer ⇒ tay cầm của mọi layer đều đúng.
+    if (isolateActive.value && store.activeLayerId && l.id !== store.activeLayerId) return;
+    const fl = layerBaseSize(l);
+    if (!fl) return;
+    const s = Math.abs(Number(l.scale) || 1);
+    const rad = ((Number(l.rotation) || 0) * Math.PI) / 180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    const cx = r.width / 2 + ((Number(l.x) || 0) * z + store.pan.x);
+    const cy = r.height / 2 + ((Number(l.y) || 0) * z + store.pan.y);
+    const hw = (fl.w * s * z) / 2, hh = (fl.h * s * z) / 2;
+    // Điểm trong hệ trục CỦA LAYER → toạ độ màn hình (đã tính cả xoay).
+    const at = (dx, dy) => ({ x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos });
+    const size = keep(at(hw, hh));                    // góc dưới-phải
+    const top = at(0, -hh);                           // đỉnh giữa
+    // Tay cầm xoay nằm TRÊN đỉnh 30px MÀN HÌNH (không nhân theo scale/zoom cho khỏi xa tít khi thu nhỏ).
+    const rotateAt = keep({ x: top.x + 30 * sin, y: top.y - 30 * cos });
+    const isActive = l.id === store.activeLayerId;
+    out.push({
+      id: l.id,
+      layer: l,
+      active: isActive,
+      locked: !!l.locked,
+      sizeStyle: { left: size.x + 'px', top: size.y + 'px' },
+      rotateStyle: { left: rotateAt.x + 'px', top: rotateAt.y + 'px' },
+    });
+  });
+  // Layer đang chọn lên CUỐI để vẽ trên cùng (tay cầm của nó không bị tay cầm layer khác đè).
+  return out.sort((a, b) => (a.active === b.active ? 0 : (a.active ? 1 : -1)));
 });
 
 // Nền canvas — dùng CHUNG class .canvas-bg-* trong app.css với ô màu ở CanvasStatusBar. Trước đây chỗ
@@ -673,6 +680,17 @@ function unlockFromHandle(l) {
   if (!l || !l.locked) return;
   store.toggleLayerLock(l.id);
   store.toast('Đã mở khóa layer — kéo lại tay cầm để chỉnh kích cỡ hoặc xoay.');
+}
+/**
+ * Kéo tay cầm CHỈNH KÍCH CỠ của bất kỳ layer nào: chọn đúng layer đó rồi mới chỉnh.
+ * Vì sao cần: tay cầm nay có ở MỌI layer đang hiện (không chỉ layer đang chọn), nên phải tự chọn layer
+ * trước khi gọi phần scale — phần đó luôn tác động lên "đơn vị đang được xử lý" trong store.
+ */
+function startResizeFromHandle(l, e) {
+  if (!l) return;
+  if (store.activeLayerId !== l.id) store.setActiveLayer(l.id);
+  if (l.locked) { unlockFromHandle(l); return; }
+  onScalePointerDown(l, e);
 }
 function onLayerPointerDown(l, e) {
   // panMode: không bao giờ kéo/thao tác layer — chỉ pan canvas.
@@ -1322,23 +1340,29 @@ function onTouchEnd(e) {
             <!-- TAY CẦM CHỈNH KÍCH CỠ + XOAY của layer đang chọn: lớp phủ RIÊNG, toạ độ màn hình đã
                  kẹp vào trong khung (xem activeHandles) nên không bao giờ bị cắt. Layer KHÓA vẫn có tay
                  cầm (màu hổ phách) — bấm vào là mở khóa luôn, thay vì biến mất không lời giải thích. -->
-            <div v-if="activeHandles" class="pointer-events-none absolute inset-0 z-40">
-              <div
-                class="layer-handle layer-handle--size"
-                :class="activeHandles.locked ? 'layer-handle--locked' : ''"
-                :style="activeHandles.sizeStyle"
-                @pointerdown.stop="activeHandles.locked ? unlockFromHandle(store.activeLayer) : onScalePointerDown(store.activeLayer, $event)"
-                :title="activeHandles.locked ? 'Layer đang KHÓA — bấm để mở khóa rồi kéo chỉnh kích cỡ' : 'Kéo để phóng to/thu nhỏ'"
-                :aria-label="activeHandles.locked ? 'Layer đang khóa — bấm để mở khóa' : 'Kéo để phóng to/thu nhỏ'"
-              ></div>
-              <div
-                class="layer-handle layer-handle--rotate"
-                :class="activeHandles.locked ? 'layer-handle--locked' : ''"
-                :style="activeHandles.rotateStyle"
-                @pointerdown.stop="activeHandles.locked ? unlockFromHandle(store.activeLayer) : onRotatePointerDown(store.activeLayer, $event)"
-                :title="activeHandles.locked ? 'Layer đang KHÓA — bấm để mở khóa rồi kéo xoay' : 'Kéo để xoay'"
-                :aria-label="activeHandles.locked ? 'Layer đang khóa — bấm để mở khóa' : 'Kéo để xoay'"
-              ></div>
+            <div v-if="layerHandles.length" class="pointer-events-none absolute inset-0 z-40">
+              <template v-for="h in layerHandles" :key="h.id">
+                <!-- MỌI layer đang hiện đều có tay cầm chỉnh kích cỡ (layer đang chọn: đậm + có thêm tay
+                     cầm xoay; layer khác: mờ hơn). Nhờ vậy KHÔNG còn trạng thái nào "không có tay cầm" —
+                     kéo tay cầm của layer nào là layer đó được chọn rồi chỉnh luôn. -->
+                <div
+                  class="layer-handle layer-handle--size"
+                  :class="[h.locked ? 'layer-handle--locked' : '', h.active ? '' : 'layer-handle--other']"
+                  :style="h.sizeStyle"
+                  @pointerdown.stop="startResizeFromHandle(h.layer, $event)"
+                  :title="h.locked ? 'Layer đang KHÓA — bấm để mở khóa rồi kéo chỉnh kích cỡ' : (h.active ? 'Kéo để phóng to/thu nhỏ' : 'Kéo để chọn và phóng to/thu nhỏ layer này')"
+                  :aria-label="h.locked ? 'Layer đang khóa — bấm để mở khóa' : 'Kéo để phóng to/thu nhỏ'"
+                ></div>
+                <div
+                  v-if="h.active"
+                  class="layer-handle layer-handle--rotate"
+                  :class="h.locked ? 'layer-handle--locked' : ''"
+                  :style="h.rotateStyle"
+                  @pointerdown.stop="h.locked ? unlockFromHandle(h.layer) : onRotatePointerDown(h.layer, $event)"
+                  :title="h.locked ? 'Layer đang KHÓA — bấm để mở khóa rồi kéo xoay' : 'Kéo để xoay'"
+                  :aria-label="h.locked ? 'Layer đang khóa — bấm để mở khóa' : 'Kéo để xoay'"
+                ></div>
+              </template>
             </div>
 
             <!-- Overlay canvas xóa: bám đúng vùng ảnh hiển thị (chịu zoom/pan) -->

@@ -187,7 +187,9 @@ async function copyColor(c) {
         <button @click.stop="store.toggleLayerVisible(l.id)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-200 hover:bg-ink-700" :title="l.visible !== false ? 'Ẩn layer' : 'Hiện layer'" :aria-label="l.visible !== false ? 'Ẩn layer' : 'Hiện layer'">
           <StudioIcon :name="l.visible !== false ? 'eye' : 'eyeOff'" size="h-3.5 w-3.5" />
         </button>
-        <img :src="l.image" :alt="l.name" class="h-8 w-8 shrink-0 rounded bg-ink-950 object-cover ring-1 ring-ink-700">
+        <!-- Ảnh thu nhỏ MỜ + mất màu khi layer bị tắt, có chuyển động theo token ⇒ bật/tắt layer thấy
+             được ngay trong bảng Lớp, không chỉ trên canvas. -->
+        <img :src="l.image" :alt="l.name" class="motion-ui h-8 w-8 shrink-0 rounded bg-ink-950 object-cover ring-1 ring-ink-700" :class="l.visible === false ? 'opacity-40 grayscale' : ''">
         <span v-if="renamingId !== l.id" class="min-w-0 flex-1 truncate text-[11px] text-cream-100" :title="l.name" @dblclick.stop="startRename(l)">{{ l.name }}</span>
         <input v-else v-model="renameValue" class="min-w-0 flex-1 rounded bg-ink-950 px-1 py-0.5 text-[11px] text-cream-100 outline-none ring-1 ring-brand-500" aria-label="Đổi tên layer" @keyup.enter="commitRename()" @keyup.esc="cancelRename()" @blur="commitRename()" @click.stop>
         <div class="flex shrink-0 items-center gap-0.5">

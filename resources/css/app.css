@@ -438,6 +438,10 @@
     .layer-handle:hover { scale: 1.15; }
     .layer-handle--size { cursor: nwse-resize; }
     .layer-handle--rotate { border-radius: 999px; cursor: crosshair; }
+    /* Tay cầm của layer KHÔNG được chọn: nhỏ và mờ hơn để không rối mắt, nhưng VẪN có ⇒ không bao
+       giờ có cảnh "không có tay cầm chỉnh kích cỡ". Kéo vào là layer đó được chọn và chỉnh luôn. */
+    .layer-handle--other { width: 15px; height: 15px; opacity: 0.55; }
+    .layer-handle--other:hover { opacity: 1; }
     .layer-handle--locked { background: var(--color-gold-500); cursor: pointer; }
 
     /* ── 5. Hiệu ứng XUẤT HIỆN cho lớp phủ · ngăn kéo · popup ───────────────
