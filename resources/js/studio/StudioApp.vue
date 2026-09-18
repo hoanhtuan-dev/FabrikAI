@@ -254,6 +254,21 @@ const outputDock = useDockResize({
   onCommit: () => store.saveBarSettings(),
   onSettle: () => onCanvasResize(),
 });
+// ── DOCK LAYERS (bảng Lớp trong khung canvas) ──
+// Trước đây: bề rộng là hằng số w-64 và dock bị gỡ khỏi DOM khi tắt (v-if) ⇒ vừa KHÔNG có tay cầm
+// điều chỉnh kích cỡ, vừa KHÔNG có hiệu ứng khi bật/tắt. Nay dùng đúng cơ sở chung: kéo vách ngăn ·
+// ←/→ · Enter ẩn/hiện · nhấp đúp về mặc định · bề rộng nhớ lại, và ẩn/hiện là THU BỀ RỘNG có hiệu ứng.
+const inspectorWidth = computed({ get: () => store.inspectorWidth, set: (v) => { store.inspectorWidth = v; } });
+const inspectorCollapsed = computed({ get: () => !store.inspectorOpen, set: (v) => { store.inspectorOpen = !v; } });
+const inspectorDock = useDockResize({
+  ...DOCK_PRESETS.inspector,
+  width: inspectorWidth,
+  collapsed: inspectorCollapsed,
+  panelId: 'dock-inspector',
+  focusAfterCollapse: '[data-dock-toggle="inspector"]',   // nút bật/tắt panel Layers ở thanh trạng thái
+  onCommit: () => store.saveBarSettings(),
+  onSettle: () => onCanvasResize(),
+});
 function onBeforeUnload() { try { store.saveLayerLayout(); } catch (e) { /* bỏ qua */ } }
 onMounted(async () => { loadGuiConfig(); await store.load(); if (new URLSearchParams(window.location.search).get('view') === 'library') store.studioView = 'library'; activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'variation' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('keydown', onGlobalKey); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); });
 onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); window.removeEventListener('resize', onCanvasResize); window.removeEventListener('beforeunload', onBeforeUnload); });
@@ -404,6 +419,8 @@ function handleClampBox(canvasRect) {
   return { left, top, right, bottom };
 }
 
+// Layer đang được TRỎ VÀO trên canvas — dùng để hiện tay cầm mờ cho layer đó (xem layerHandles).
+const hoveredLayerId = ref('');
 const layerHandles = computed(() => {
   void viewportTick.value;                            // đổi kích thước vùng canvas ⇒ tính lại vị trí tay cầm
   const el = store.canvasZoom;
@@ -428,8 +445,12 @@ const layerHandles = computed(() => {
   const out = [];
   store.canvasLayers.forEach((l) => {
     if (l.visible === false) return;                  // layer vô hình thì không có gì để kéo
+    // ĐIỂM NGỌT: tay cầm cho layer ĐANG CHỌN (đậm, đủ kích cỡ + xoay) và cho layer ĐANG TRỎ VÀO (mờ) —
+    // vừa không rối mắt khi có nhiều layer, vừa không bao giờ rơi vào cảnh "không có tay cầm": chỉ cần
+    // trỏ vào layer là thấy tay cầm của nó, kéo là layer đó được chọn và chỉnh luôn.
+    const isActive = l.id === store.activeLayerId;
+    if (!isActive && l.id !== hoveredLayerId.value) return;
     // Chế độ 1 layer CHỈ giới hạn khi thật sự có layer đang chọn (lúc đó canvas chỉ hiện layer đó).
-    // Không có layer nào đang chọn thì canvas hiện dạng nhiều layer ⇒ tay cầm của mọi layer đều đúng.
     if (isolateActive.value && store.activeLayerId && l.id !== store.activeLayerId) return;
     const fl = layerBaseSize(l);
     if (!fl) return;
@@ -445,7 +466,6 @@ const layerHandles = computed(() => {
     const top = at(0, -hh);                           // đỉnh giữa
     // Tay cầm xoay nằm TRÊN đỉnh 30px MÀN HÌNH (không nhân theo scale/zoom cho khỏi xa tít khi thu nhỏ).
     const rotateAt = keep({ x: top.x + 30 * sin, y: top.y - 30 * cos });
-    const isActive = l.id === store.activeLayerId;
     out.push({
       id: l.id,
       layer: l,
@@ -1273,35 +1293,19 @@ function onTouchEnd(e) {
           <CanvasMaskTools />
           <!-- Nút "Bỏ ảnh nguồn khỏi canvas" đã xóa — ảnh nguồn tự động clear khi chọn layer khác hoặc dùng nút X ở SourcePanel -->
           
-          <!-- Nhãn CHẾ ĐỘ: khi một công cụ canvas đang bật, canvas chỉ hiện layer đang chọn — nếu không
-               nói rõ, người dùng tưởng "mất layer" và tưởng "bật/tắt layer không có tác dụng". -->
-          <div v-if="isolateActive && store.activeLayer" class="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2">
-            <div class="pointer-events-auto flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-2.5 py-1 text-[10px] font-semibold text-amber-100 shadow-lg">
-              <StudioIcon name="info" size="h-3 w-3" class="shrink-0" />
-              <span>Đang chỉnh 1 layer ({{ isolateToolLabel }}) — canvas chỉ hiện layer đang chọn</span>
-              <button @click="store.exitCanvasTools()" class="rounded-full bg-amber-400/20 px-1.5 py-0.5 hover:bg-amber-400/35" title="Thoát công cụ để thấy toàn bộ canvas">Thoát</button>
-            </div>
-          </div>
-          <!-- Nhãn "chưa chọn layer": bấm ra vùng trống là BỎ CHỌN, mà không có layer đang chọn thì không
-               có tay cầm chỉnh kích cỡ — không nói rõ thì người dùng tưởng tay cầm biến mất. -->
-          <div v-if="!store.activeLayer && store.visibleLayers.length && !isolateActive" class="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2">
-            <div class="flex items-center gap-1.5 rounded-full border border-ink-600 bg-ink-900/95 px-2.5 py-1 text-[10px] font-semibold text-cream-200 shadow-lg">
-              <StudioIcon name="cursor" size="h-3 w-3" class="shrink-0 text-brand-300" />
-              <span>Chưa chọn layer nào — bấm vào một layer (hoặc một hàng trong bảng Lớp) để chỉnh kích cỡ · xoay</span>
-            </div>
-          </div>
           <div ref="canvasZoom" class="absolute inset-0" :class="store.selectTool ? 'cursor-crosshair active:cursor-crosshair' : 'cursor-grab active:cursor-grabbing'" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="onCanvasBgMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="onCanvasBgUp($event)" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
             <!-- Chế độ isolate (crop/inpaint/erase): chỉ khi có layer active — không có layer thì hiện composite (không ẩn hết) -->
             <div v-if="isolateActive && store.activeLayer" class="absolute inset-0">
-              <div v-if="store.activeLayer.visible !== false && store.activeLayer.image" class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
+              <div v-if="store.upscaleSrc && store.activeLayer.visible !== false" class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
                 <div class="absolute left-0 top-0" :style="isolateLayerStyle">
-                  <!-- Hiện ĐÚNG ảnh của layer đang chọn. Trước đây dùng store.upscaleSrc — hàm này có
-                       ĐƯỜNG LÙI sang ảnh khác khi layer đang chọn bị ẩn ⇒ bấm con mắt mà canvas KHÔNG
-                       đổi gì, nhìn như "bật/tắt layer không có tác dụng". -->
-                  <img ref="cvImg" :src="store.activeLayer.image" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" :class="store.activeLayerId === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : ''" draggable="false" @load="store.onCanvasImgLoad()" />
+                  <!-- Giữ nguyên nguồn ảnh cũ (upscaleSrc) để KHÔNG đổi luồng crop/inpaint; chỉ thêm điều
+                       kiện ẩn/hiện: trước đây layer bị ẩn vẫn hiện ảnh dự phòng nên bấm con mắt không thấy
+                       gì đổi. -->
+                  <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" :class="store.activeLayerId === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : ''" draggable="false" @load="store.onCanvasImgLoad()" />
                 </div>
               </div>
-              <p v-else class="text-sm text-cream-300/60">Layer đang chọn đang bị <b>ẨN</b> — bấm con mắt trong bảng Lớp để hiện lại.</p>
+              <p v-else-if="store.activeLayer.visible === false" class="text-sm text-cream-300/60">Layer đang chọn đang bị <b>ẨN</b> — bấm con mắt trong bảng Lớp để hiện lại.</p>
+              <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
             </div>
             <!-- Chế độ stack: composite tất cả layer.
                  BẬT/TẮT LAYER ẩn/hiện bằng CHÍNH thẻ layer (class .layer-el / .layer-el--hidden):
@@ -1314,7 +1318,7 @@ function onTouchEnd(e) {
                  Layer ẩn bị chặn pointer (pointer-events:none) nên vẫn bấm xuyên qua được như cũ. -->
             <div v-else class="absolute inset-0">
               <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
-                <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="layer-el absolute left-0 top-0" :class="l.visible === false ? 'layer-el--hidden' : ''" :data-layer-id="l.id" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
+                <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="layer-el absolute left-0 top-0" :class="l.visible === false ? 'layer-el--hidden' : ''" :data-layer-id="l.id" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)" @pointerenter="hoveredLayerId = l.id" @pointerleave="hoveredLayerId = hoveredLayerId === l.id ? '' : hoveredLayerId">
                   <!-- .layer-body: ĐỘ MỜ RIÊNG của layer (inline, không chuyển động) — nhờ tách hai
                        tầng mà thanh trượt Độ mờ vẫn tức thì trong khi bật/tắt layer vẫn mờ mượt. -->
                   <div class="layer-body" :style="{ opacity: l.opacity != null ? l.opacity : 1 }">
@@ -1424,9 +1428,22 @@ function onTouchEnd(e) {
           <!-- ══ Inspector Layers: dock phải (desktop) · drawer đè canvas (mobile) ══ -->
           <!-- data-covers-canvas: trên mobile bảng Lớp là ngăn kéo ĐÈ LÊN canvas ⇒ tay cầm layer phải
                tránh vùng bị nó che (xem handleClampBox trong script). -->
-          <div v-if="store.inspectorOpen" data-covers-canvas="right" class="absolute inset-y-0 right-0 z-50 lg:static lg:z-auto">
+          <!-- Vách ngăn kéo của BẢNG LAYERS (desktop): kéo · ←/→ · Enter ẩn/hiện · nhấp đúp mặc định. -->
+          <DockResizer v-if="store.inspectorOpen" :dock="inspectorDock" controls="dock-inspector" class="hidden lg:block" />
+          <!-- Dock Layers: KHÔNG dùng v-if nữa — giữ trong DOM để ẩn/hiện là THU BỀ RỘNG có hiệu ứng
+               (trước đây gỡ khỏi DOM nên bật/tắt là "giật" tức thì, và không có gì để kéo). -->
+          <aside
+            id="dock-inspector"
+            data-covers-canvas="right"
+            class="dock-panel scrollbar-hide absolute inset-y-0 right-0 z-50 flex flex-col bg-ink-900/95 lg:static lg:z-auto"
+            :style="inspectorDock.panelStyle"
+            :data-collapsed="store.inspectorOpen ? 'false' : 'true'"
+            :data-resizing="inspectorDock.resizing ? 'true' : 'false'"
+            :aria-hidden="store.inspectorOpen ? null : 'true'"
+            :inert="store.inspectorOpen ? null : true"
+          >
             <LayersPanel />
-          </div>
+          </aside>
           </div><!-- /flex row: canvas + inspector -->
           <!-- ══ Toolbar ngữ cảnh floating trên mobile (12px trên status bar) ══ -->
           <div v-if="toolActive" data-covers-canvas="bottom" class="absolute bottom-12 left-1/2 z-40 max-w-[calc(100%-1rem)] -translate-x-1/2 lg:hidden">

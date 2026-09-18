@@ -86,7 +86,7 @@
     "name": "pageBoot"
   },
   "resources/css/app.css": {
-    "file": "assets/app-BKl0lVGq.css",
+    "file": "assets/app-CuPJ2P1E.css",
     "name": "app",
     "names": [
       "app.css"
@@ -108,7 +108,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-BkepwMZN.js",
+    "file": "assets/main-BNBXWfhU.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -118,7 +118,7 @@
       "_StylistSection-DyF9ohAW.js"
     ],
     "css": [
-      "assets/main-C-tBt5Ty.css"
+      "assets/main-BMtMCJ1R.css"
     ]
   },
   "resources/js/studio/my-settings.js": {

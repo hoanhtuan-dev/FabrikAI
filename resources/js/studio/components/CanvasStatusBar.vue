@@ -9,6 +9,13 @@ const store = useStudioStore();
 
 // Gợi ý công cụ theo chế độ đang dùng (Krita-style) — hiện khi có công cụ active.
 const toolHint = computed(() => {
+  // Chế độ "chỉnh 1 layer" (bật bởi công cụ vẽ/xóa/vùng chọn) — nói ở ĐÂY thay vì dán nhãn lên canvas:
+  // người dùng vẫn hiểu vì sao chỉ thấy một layer, mà không gian làm việc không bị thêm chữ.
+  if (store.drawMode) return 'Đang VẼ TỰ DO trên layer đang chọn — canvas chỉ hiện layer đó · thoát công cụ (Esc) để thấy toàn bộ';
+  if (store.eraseMode) return 'Đang XÓA VÙNG trên layer đang chọn — canvas chỉ hiện layer đó · thoát công cụ (Esc) để thấy toàn bộ';
+  if (store.cropMode) return 'Đang CẮT KHUNG — canvas chỉ hiện layer đang chọn';
+  // Không có layer nào đang chọn (bấm ra vùng trống là bỏ chọn): nói rõ cách lấy lại tay cầm chỉnh kích cỡ.
+  if (!store.activeLayer && store.visibleLayers.length) return 'Chưa chọn layer — bấm vào một layer để chỉnh kích cỡ · xoay';
   const m = store.inpaintMaskMode;
   if (m === 'path') {
     const n = store.inpaintPathPoints.length;
@@ -107,6 +114,7 @@ const BG_OPTIONS = [
     <!-- 9. Toggle inspector (lg+) — nút tải ảnh đang chọn ở thanh này đã bỏ theo yêu cầu: việc tải ảnh
          đã có đường riêng ở bảng Lớp (Xuất PNG) và ở Kết quả/Thư viện, để đây chỉ gây trùng và bấm nhầm. -->
     <button
+      data-dock-toggle="inspector"
       @click="store.toggleInspector()"
       class="grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700 disabled:opacity-30"
       :class="store.inspectorOpen ? 'bg-brand-600/20 text-brand-300' : ''"

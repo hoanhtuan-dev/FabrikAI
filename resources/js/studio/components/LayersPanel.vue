@@ -88,7 +88,9 @@ async function copyColor(c) {
 </script>
 
 <template>
-  <aside class="flex h-full w-64 shrink-0 flex-col border-l border-ink-700 bg-ink-900/95">
+  <!-- Bề rộng do DOCK quy định (dock-panel #dock-inspector trong StudioApp) — trước đây bề rộng là hằng
+       số nên không có cách nào kéo rộng/thu hẹp bảng này. -->
+  <div class="flex h-full min-h-0 w-full flex-col">
     <!-- 1. Header: tiêu đề + đếm + thêm layer / dọn canvas / ẩn panel -->
     <div class="flex shrink-0 items-center justify-between border-b border-ink-700 px-3 py-2">
       <p class="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-cream-100">
@@ -310,7 +312,7 @@ async function copyColor(c) {
     >
       Tất cả <b>{{ store.canvasLayers.length }} layer</b> và <b>{{ store.layerGroups.length }} nhóm</b> sẽ bị xóa khỏi canvas. Ảnh kết quả vẫn còn trong <b>Output/Thư viện</b>. Có thể hoàn tác (Ctrl+Z).
     </ConfirmDialog>
-  </aside>
+  </div>
 </template>
 
 <style scoped>

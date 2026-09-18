@@ -45,6 +45,18 @@ export const DOCK_PRESETS = {
         maxWidth: 420,
         maxViewportFactor: 0.30,
     },
+    // Dock LAYERS (bảng Lớp trong khung canvas, bên phải). Trước đây bề rộng là hằng số w-64 và dock
+    // bị gỡ khỏi DOM khi tắt (v-if) nên KHÔNG có tay cầm kéo và KHÔNG có hiệu ứng bật/tắt — nay dùng
+    // đúng cơ sở chung của hai dock kia.
+    inspector: {
+        side: 'right',
+        label: 'Bề rộng bảng Layers',
+        hint: 'Kéo để đổi bề rộng · nhấp đúp để về mặc định · Enter để ẩn/hiện bảng Layers',
+        defaultWidth: 256,   // = w-64
+        minWidth: 200,
+        maxWidth: 560,
+        maxViewportFactor: 0.42,
+    },
 };
 
 const hasDom = typeof window !== 'undefined' && typeof document !== 'undefined';
