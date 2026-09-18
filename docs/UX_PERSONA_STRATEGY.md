@@ -1214,6 +1214,75 @@ Mỗi trạng thái đều "hợp lệ" — nên thay vì thêm nhãn giải th�
 - **Sửa theo từng trạng thái không bao giờ đủ nếu còn điều kiện chung.** Ba vòng trước tôi sửa ba trạng thái
   cụ thể; trạng thái thứ tư (chưa chọn layer) vẫn hỏng. Bỏ điều kiện chung thì mọi trạng thái cùng đúng.
 
+---
+
+## 22. Đợt 18 — ĐÚNG THỨ ĐƯỢC YÊU CẦU: **DOCK LAYERS kéo được + có hiệu ứng bật/tắt** · canvas lấy ĐIỂM NGỌT (2026-09-20)
+
+### 22.1 Tôi đã hiểu sai yêu cầu ở đâu
+
+Yêu cầu gốc là **"layer dock"** — bảng Layers ở cạnh phải khung canvas. Tôi lại đọc thành "layer trên canvas"
+nên suốt nhiều đợt đã đi sửa tay cầm chỉnh kích cỡ **của layer vẽ trên canvas**, trong khi việc cần làm là:
+**bảng Layers phải kéo được bề rộng và phải có hiệu ứng khi bật/tắt**. Đo lại mã nguồn thì đúng như vậy:
+
+| Sự thật trong mã (trước đợt này) | Hệ quả người dùng thấy |
+|---|---|
+| Bảng Layers có bề rộng HẰNG SỐ `w-64` | **không có tay cầm nào để kéo** bề rộng bảng |
+| Dock Layers ẩn bằng `v-if="store.inspectorOpen"` (gỡ khỏi DOM) | **bật/tắt là "giật"**: không có hiệu ứng thu/mở, mất luôn trạng thái bên trong panel |
+
+### 22.2 Đã làm — dock Layers dùng ĐÚNG cơ sở chung của hai dock kia
+
+1. **Preset `DOCK_PRESETS.inspector`** (mặc định 256px = đúng `w-64` cũ ⇒ vào trang không thấy xa lạ;
+   min 200 · max 560 · trần mềm 42% bề rộng cửa sổ).
+2. **Bề rộng là state của store** (`inspectorWidth`) và **lưu bền** cùng cài đặt thanh trạng thái ⇒ kéo xong
+   tải lại trang vẫn đúng bề rộng.
+3. **Vách ngăn kéo `<DockResizer controls="dock-inspector">`** ở mép trái bảng: kéo chuột · ←/→ · Enter
+   ẩn/hiện · nhấp đúp về mặc định — y hệt hai dock kia (cùng một composable, không chép logic).
+4. **Bỏ `v-if`**: dock vẫn nằm trong DOM, ẩn/hiện là **thu bề rộng về 0 có hiệu ứng** (`.dock-panel` +
+   `data-collapsed` + `inert` để Tab không vào vùng vô hình). Bảng Layers bỏ luôn `w-64` — bề rộng do dock quy định.
+
+### 22.3 Canvas: lấy ĐIỂM NGỌT giữa các bước (không revert cứng)
+
+Giữ những gì các bước trước đã làm TỐT, bỏ những gì gây ồn:
+
+| Giữ | Bỏ |
+|---|---|
+| Hiệu ứng MỜ khi bật/tắt layer (mượt, chạy trên mọi trình duyệt, thanh trượt Độ mờ vẫn tức thì) | Tay cầm cho **MỌI** layer cùng lúc (rối mắt) |
+| Tay cầm chỉnh kích cỡ **không bị `overflow:hidden` cắt** (lớp phủ, kẹp vào vùng nhìn thấy) | Hai **nhãn chữ** dán trên canvas (chế độ · chưa chọn layer) — chuyển xuống thanh trạng thái |
+| Vá kích thước cho layer cũ (baseW/baseH) · tôn trọng ẩn/hiện trong chế độ 1 layer | Đổi nguồn ảnh của chế độ 1 layer (giữ `upscaleSrc` như cũ, chỉ thêm điều kiện ẩn/hiện) |
+| Vá lỗi `ensureLayerSizes` cho dữ liệu cũ | — |
+
+Quy tắc tay cầm nay: **layer đang chọn** (đủ kích cỡ + xoay) và **layer đang trỏ vào** (mờ). Trỏ vào layer nào
+là thấy tay cầm của layer đó, kéo là layer đó được chọn và chỉnh luôn ⇒ không rối mắt mà vẫn không bao giờ
+"không có tay cầm".
+
+### 22.4 Đo được (Chrome thật 1600×1000 + MOBILE 390×844)
+
+| Đo | Trước | Sau |
+|---|---|---|
+| Bề rộng bảng Layers | **256px cứng** (`w-64`) | kéo được: **256 → 376px**, và `inspectorWidth=376` được lưu vào localStorage |
+| Tay cầm của bảng Layers | **không có** | vách ngăn **7×692px** ở mép trái, bấm/kéo được |
+| Bật/tắt bảng Layers (bấm nút ở thanh trạng thái) | **giật tức thì** (gỡ khỏi DOM) | chuỗi `bề rộng/độ mờ`: 375/0.99 → 361/0.96 → 330/0.87 → 277/0.73 → 186/0.49 → **0/0**; bật lại: 0 → 292/0.77 → 336/0.89 → 373/0.99 → **376/1** (đúng bề rộng đã nhớ) |
+| Sau khi tắt | — | `data-collapsed=true` · `inert` · `visibility:hidden` |
+| MOBILE 390×844 | — | dock là ngăn kéo 216px (đúng sàn min+step), **có vách ngăn**, canvas tránh vùng bị che |
+| Tay cầm canvas | mọi layer (ồn) | **layer đang chọn** (kích cỡ + xoay) + **layer đang trỏ** (mờ) |
+| Độ mờ khi bật/tắt layer | — | `1 → 0.43 → 0.10 → 0.02 → 0.00 → 0` (mượt) |
+| Nhắc khi chưa chọn layer / đang bật công cụ | nhãn trên canvas | **thanh trạng thái**: "Chưa chọn layer — bấm vào một layer để chỉnh kích cỡ · xoay" · "Đang VẼ TỰ DO …" |
+| Lỗi console | — | không có |
+| `vendor/bin/phpunit` | 700 test | **701 test / 4675 khẳng định — XANH** |
+| `npm run build` | — | thoát 0; build lặp lại cho **đúng hash cũ** |
+
+### 22.5 Bài học tự bắt được trong đợt này
+
+- **"Layer" trong yêu cầu phải được hỏi lại ngay từ đầu.** Người dùng nói "layer dock" — đó là DOCK, không
+  phải layer trên canvas. Tôi đã tiêu nhiều đợt sửa sai đối tượng chỉ vì không hỏi một câu. Quy tắc: khi
+  danh từ có thể trỏ vào hai thứ trong cùng một sản phẩm (layer vẽ · bảng Layers), **hỏi trước khi sửa**.
+- **Cơ sở chung chỉ có giá trị khi dock THỨ BA dùng nó.** Việc dock Layers nay chỉ cần khai preset + gắn vách
+  ngăn (không chép logic kéo/kẹp/lưu/trả focus) là bằng chứng cơ sở ở mục 13–14 đã đúng thiết kế.
+- **Sửa quá tay cũng là một loại lỗi.** Các đợt trước tôi thêm dần: tay cầm mọi layer, nhãn trên canvas, đổi
+  nguồn ảnh chế độ 1 layer — đều không được yêu cầu và làm không gian làm việc rối hơn. "Điểm ngọt" là giữ
+  phần sửa đúng lỗi, bỏ phần trang trí thêm vào.
+
+
 
 
 
