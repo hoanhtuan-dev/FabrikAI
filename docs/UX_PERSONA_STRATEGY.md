@@ -903,6 +903,77 @@ hành vẫn nhận đủ hiệu ứng.
   lưu xong ảnh vẫn là chính nó nên so sánh kiểu "có trong danh sách chưa" luôn trả "chưa" ⇒ phải đánh dấu
   ngay trên layer vừa lưu.
 
+---
+
+## 17. Đợt 13 — TAY CẦM CHỈNH KÍCH CỠ luôn bấm được · hiệu ứng bật/tắt layer hết "che" và hết trễ (2026-09-20)
+
+### 17.1 Vấn đề — đo được, không suy đoán
+
+| Sự thật | Bằng chứng (đo trên máy, không suy luận) |
+|---|---|
+| **Tay cầm bị CẮT mất** | Tay cầm là CON của thẻ layer, mà vùng canvas có `overflow:hidden` ⇒ layer phóng to / kéo ra mép / zoom lên là góc layer rơi ra ngoài vùng nhìn thấy và tay cầm biến mất. Đo tại tâm tay cầm: `elementFromPoint` trả về **`DIV.relative z-30 …` = THANH TRẠNG THÁI** (không phải tay cầm) ⇒ bấm/kéo không có gì xảy ra |
+| **Layer KHÓA là tay cầm BIẾN MẤT** | Điều kiện render là `l.id === activeLayerId && !l.locked` ⇒ khóa layer xong không còn tay cầm nào và không có lời giải thích nào |
+| **Ẩn layer là mất tay cầm** | `toggleLayerVisible` chuyển "đang chọn" sang layer KHÁC khi ẩn layer đang chọn; bật lại layer cũ thì nó vẫn không phải layer đang chọn ⇒ vẫn không có tay cầm |
+| **Hiệu ứng mờ bị màn hình trống che** | Ẩn layer CUỐI cùng thì `CanvasEmptyState` hiện ngay ở **z-20**, còn layer đang mờ ở **z-1** ⇒ người dùng không thấy hiệu ứng, chỉ thấy màn hình đổi phắt |
+| **Thanh trượt Độ mờ bị TRỄ 220ms** | Đợt trước tôi gộp độ mờ riêng của layer và hệ số ẩn/hiện vào CÙNG thuộc tính `opacity` rồi transition ⇒ kéo thanh trượt Độ mờ bị "dính tay" (hồi quy do chính đợt trước) |
+
+### 17.2 Đã làm
+
+1. **Tay cầm chuyển sang LỚP PHỦ theo toạ độ màn hình và được KẸP vào trong khung**
+   (`activeHandles` trong `StudioApp.vue`): vị trí tính từ số liệu store (x · y · scale · rotation ·
+   baseW/baseH · zoom · pan) nên vẫn bám đúng **góc đã xoay** của layer, nhưng luôn nằm trong vùng nhìn
+   thấy (lề 14px) ⇒ **luôn bấm được**, kể cả khi layer nằm phần lớn ngoài khung. Tay cầm to hơn (18px),
+   có quầng tối để nổi trên mọi nền, phóng nhẹ khi trỏ vào (theo token).
+2. **Layer KHÓA vẫn có tay cầm** — đổi sang màu hổ phách, chú thích "bấm để mở khóa", và bấm vào là
+   **mở khóa luôn** kèm lời nhắc (thay vì biến mất không giải thích).
+3. **Kéo chỉnh kích cỡ CHỐT HƯỚNG ngay lúc bấm**: hệ số scale tính bằng **hình chiếu** chuyển động lên
+   hướng đã chốt, không dùng thẳng khoảng cách tới tâm. Vì tay cầm có thể bị kẹp (điểm bấm không còn
+   nằm đúng góc layer), cách cũ cho ra chiều NGƯỢC: kéo ra xa mà layer nhỏ đi (đo được 1.35 → 0.9).
+4. **Ẩn layer GIỮ NGUYÊN layer đang chọn** (`toggleLayerVisible` không còn `setActiveLayer`): bật lại là
+   có tay cầm ngay, và không còn cảnh viền chọn/tay cầm "nhảy" sang layer khác giữa lúc mờ.
+5. **Màn hình trống xuống `z-0`** (nằm DƯỚI các layer) ⇒ hiệu ứng mờ của layer cuối vẫn nhìn thấy; layer
+   ẩn không nhận chuột nên màn hình trống vẫn bấm được bình thường.
+6. **Tách hai nguồn độ mờ và chuyển động đúng nguồn**: đăng ký `@property --layer-vis` và cho
+   `.layer-el` chuyển động **chính biến này** (không chuyển động thẳng `opacity`) ⇒ bật/tắt layer vẫn
+   mượt, mà kéo thanh trượt Độ mờ thì **tức thì**.
+
+### 17.3 Ràng buộc đã giữ
+
+- Toạ độ tay cầm tính thuần bằng số liệu store (không đo DOM trong computed) ⇒ không gây vòng lặp render.
+- Tay cầm không chặn canvas: lớp phủ là `pointer-events:none`, chỉ hai tay cầm bật `pointer-events:auto`.
+- Chế độ isolate (crop · inpaint · tẩy · vẽ) vẫn không hiện tay cầm layer như trước.
+- Composite/xuất ảnh vẫn theo `visibleLayers`; hiệu ứng dùng token nên tắt được bằng công tắc giảm chuyển động.
+
+### 17.4 Đo được (Chrome thật 1600×1000 + phpunit)
+
+| Đo | Trước | Sau |
+|---|---|---|
+| `elementFromPoint` tại tâm tay cầm | trả về **thanh trạng thái** (tay cầm bị cắt, không bấm được) | trả về **chính tay cầm** (`nhan: true`) ở mọi trạng thái: thường · sau khi phóng to · sau khi kéo layer ra mép · khi khóa |
+| Kéo tay cầm +96px | không đổi gì (bấm vào thanh trạng thái) | scale **1 → 2** (đúng chiều); kéo tiếp ra tới trần |
+| Kéo tay cầm khi layer KHÓA | (không có tay cầm) | có tay cầm hổ phách `rgb(201,164,95)`; bấm ⇒ toast "Đã mở khóa layer…" và mở khóa thật |
+| Kéo tay cầm XOAY | — | xoay **0° → 8°**, sau đó cả hai tay cầm vẫn bấm được |
+| Ẩn layer rồi bật lại | layer đang chọn **đổi sang layer khác** ⇒ không có tay cầm | vẫn là **đúng layer đó**, tay cầm còn nguyên (2 tay cầm) |
+| Ẩn layer CUỐI (chuỗi 45ms) | màn hình trống z-20 che hết | layer mờ dần `0.267 → 0.070 → 0.016 → 0.0035 → 0` **trên** màn hình trống (empty state `z=0`, layer `z=1..N`), bấm được vào màn hình trống |
+| Thanh trượt Độ mờ | trễ 220ms (dính tay) | **0.5 ngay sau 30ms** |
+| `vendor/bin/phpunit` | 692 test / 4570 khẳng định | **695 test / 4619 khẳng định — XANH** (12 test bất biến cho khung canvas) |
+| `npm run build` | — | thoát 0; build lặp lại cho **đúng hash cũ** |
+
+### 17.5 Bài học tự bắt được trong đợt này
+
+- **`pointer-events` là thuộc tính KẾ THỪA.** Lớp phủ để `pointer-events:none` (cho khỏi chặn canvas) làm
+  hai tay cầm con CÂM luôn: vẽ ra đủ, toạ độ đúng, kích thước đúng, mà bấm/kéo không có gì xảy ra. Chỉ
+  `elementFromPoint` mới lộ ra — kiểm "có phần tử" và "có kích thước" là KHÔNG đủ.
+- **`overflow:hidden` + phần tử con định vị ngoài khung = mất chức năng im lặng.** Tay cầm nằm ngoài vùng
+  nhìn thấy thì không có lỗi nào cả, chỉ là người dùng không bao giờ thấy nó.
+- **Kẹp vị trí làm sai GIẢ ĐỊNH của thuật toán kéo.** Thuật toán cũ giả định "điểm bấm nằm đúng góc";
+  sau khi kẹp, giả định đó sai và kết quả là kéo ra xa mà layer NHỎ đi. Sửa bằng cách chốt HƯỚNG lúc bấm.
+- **Hai nguồn dữ liệu khác nhau không được dùng chung một thuộc tính đang chuyển động.** Gộp "độ mờ riêng
+  của layer" và "hệ số ẩn/hiện" vào một `opacity` rồi transition ⇒ thanh trượt bị trễ. Tách ra và
+  chuyển động đúng nguồn cần chuyển động (`@property` + transition trên chính biến đó).
+- **Giữ nguyên "đang chọn" khi ẩn/hiện là quyết định UX, không phải chi tiết kỹ thuật.** Chuyển active đi
+  chỗ khác khiến tay cầm "biến mất" theo mắt người dùng — và đó là toàn bộ nội dung khiếu nại.
+
+
 
 
 
