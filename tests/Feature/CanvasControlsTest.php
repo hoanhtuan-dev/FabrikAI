@@ -387,4 +387,49 @@ class CanvasControlsTest extends TestCase
             'Thẻ layer phải có data-layer-id để đo được đúng ảnh của nó.');
         $this->assertStringContainsString(':data-layer-id="l.id"', $app, 'Thiếu ràng buộc data-layer-id trên thẻ layer.');
     }
+
+    public function test_handles_are_recomputed_when_the_canvas_resizes(): void
+    {
+        $app = $this->src('js/studio/StudioApp.vue');
+
+        // ĐO ĐƯỢC: trên khung 390px, tay cầm còn ở "left: 734px" trong khi vùng canvas chỉ rộng 364px
+        // ⇒ nằm ngoài màn hình, không bấm được. Nguyên nhân: computed không có phụ thuộc nào đổi khi
+        // vùng canvas đổi kích thước (không phải cửa sổ đổi là đủ — kéo dock, mở/đóng bảng cũng đổi).
+        $this->assertStringContainsString('const viewportTick = ref(0)', $app,
+            'Thiếu nhịp khung nhìn để tay cầm tính lại vị trí.');
+        $this->assertStringContainsString('viewportTick.value++', $app, 'Nhịp khung nhìn phải được tăng khi vùng canvas đổi.');
+        preg_match('/const activeHandles = computed\(\(\) => \{(.*?)return null;/s', $app, $m);
+        $this->assertNotEmpty($m[1] ?? '', 'Không đọc được đầu hàm activeHandles.');
+        $this->assertStringContainsString('viewportTick.value', $m[1],
+            'activeHandles PHẢI phụ thuộc nhịp khung nhìn — nếu không, toạ độ tay cầm bị "đóng băng" theo khung cũ.');
+        $this->assertStringContainsString('new ResizeObserver', $app,
+            'Phải theo dõi kích thước phần tử canvas (dock co/giãn, bảng Lớp bật/tắt cũng đổi kích thước).');
+    }
+
+    public function test_handles_avoid_overlays_that_cover_the_canvas(): void
+    {
+        $app = $this->src('js/studio/StudioApp.vue');
+
+        // ĐO ĐƯỢC: trên mobile, tay cầm bị kẹp vào đúng vùng bị NGĂN KÉO bảng Lớp che ⇒
+        // elementFromPoint trả về FOOTER của bảng Lớp: "có tay cầm" mà bấm không được.
+        $this->assertStringContainsString('function handleClampBox(', $app, 'Thiếu vùng cho phép đặt tay cầm.');
+        preg_match('/function handleClampBox\(canvasRect\)\s*\{(.*?)\n\}/s', $app, $box);
+        $this->assertStringContainsString('data-covers-canvas', $box[1] ?? '',
+            'Phải trừ đi những lớp phủ có khai data-covers-canvas.');
+        $this->assertStringContainsString("cs.display === 'none'", $box[1] ?? '',
+            'Lớp phủ đang ẩn (display:none) không được tính là che.');
+
+        // Hai lớp phủ đè lên canvas phải tự khai hướng che.
+        $this->assertStringContainsString('data-covers-canvas="right"', $app,
+            'Ngăn kéo bảng Lớp (mobile) phải khai che phía phải.');
+        $this->assertStringContainsString('data-covers-canvas="bottom"', $app,
+            'Thanh công cụ floating (mobile) phải khai che phía dưới.');
+
+        // Và vùng đó phải được DÙNG khi kẹp toạ độ.
+        preg_match('/const keep = \(p\) => \(\{/', $app, $keep, PREG_OFFSET_CAPTURE);
+        $this->assertNotEmpty($keep, 'Thiếu hàm kẹp toạ độ tay cầm.');
+        $segment = substr($app, max(0, $keep[0][1] - 700), 700);
+        $this->assertStringContainsString('handleClampBox(r)', $segment,
+            'Hàm kẹp phải dùng vùng cho phép (đã trừ lớp phủ), không chỉ kẹp vào vùng canvas.');
+    }
 }

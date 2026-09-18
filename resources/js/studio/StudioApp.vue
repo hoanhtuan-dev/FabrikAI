@@ -216,7 +216,13 @@ function openApplyPopover() {
   applyOpen.value = !applyOpen.value;
   if (applyOpen.value && !store.projectLoaded) store.loadProjects();
 }
-function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++; }); }
+// Nhịp KHUNG NHÌN: tay cầm layer tính vị trí theo kích thước vùng canvas và KẸP vào trong đó, nên khi
+// vùng canvas đổi kích thước (đổi cửa sổ · mở/đóng dock · xoay máy · bàn phím ảo) thì phải TÍNH LẠI.
+// Thiếu nhịp này, computed không có phụ thuộc nào đổi ⇒ giữ nguyên toạ độ cũ: đo được trên khung 390px,
+// tay cầm còn ở "left: 734px" trong khi vùng canvas chỉ rộng 364px ⇒ nằm NGOÀI màn hình, không bấm được
+// — đúng hiện tượng "không có tay cầm chỉnh kích cỡ" khi dùng màn hình nhỏ.
+const viewportTick = ref(0);
+function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++; viewportTick.value++; }); }
 // ═════════════════════════════════════════════════════════════════════════════
 // DOCK CO/GIÃN ĐƯỢC (bảng trái · dock Outputs) — cùng một cơ sở: useDockResize + DockResizer.
 // Bề rộng là state của STORE (lưu bền cùng cài đặt status bar) nên composable chỉ đọc/ghi qua
@@ -256,6 +262,16 @@ watch(() => store.upscaleSrc, (url) => { store.loadPaletteFromImage(url); });
 // Template refs -> store: StudioApp owns the canvas DOM; the store needs the elements for crop geometry.
 const cvImg = ref(null);
 const canvasZoom = ref(null);
+// Theo dõi kích thước phần tử canvas bằng ResizeObserver: cửa sổ không đổi nhưng vùng canvas vẫn có thể
+// đổi (kéo dock, bật/tắt panel Layers, thanh trạng thái xuống dòng…). Tay cầm layer phụ thuộc kích thước
+// này nên phải tính lại — xem viewportTick.
+let canvasRo = null;
+onMounted(() => {
+  if (typeof ResizeObserver === 'undefined') return;
+  canvasRo = new ResizeObserver(() => onCanvasResize());
+  if (canvasZoom.value) canvasRo.observe(canvasZoom.value);
+});
+onBeforeUnmount(() => { if (canvasRo) { canvasRo.disconnect(); canvasRo = null; } });
 const eraseOverlay = ref(null);
 const drawOverlay = ref(null);
 watch([cvImg, canvasZoom], ([img, zoom]) => { store.setCanvasRefs(img, zoom); });
@@ -362,7 +378,34 @@ function layerBaseSize(l) {
   if (img && img.offsetWidth > 0 && img.offsetHeight > 0) return { w: img.offsetWidth, h: img.offsetHeight };
   return store.frameLayout;
 }
+/**
+ * Vùng ĐƯỢC PHÉP đặt tay cầm = vùng canvas TRỪ những lớp phủ đang đè lên nó.
+ *
+ * Vì sao cần: trên mobile bảng Lớp là ngăn kéo đè lên nửa phải canvas (z-50), thanh công cụ floating nằm
+ * ở đáy. Tay cầm chỉ kẹp vào vùng canvas thì vẫn có thể rơi ĐÚNG chỗ bị che — đo được: elementFromPoint
+ * tại tâm tay cầm trả về FOOTER của bảng Lớp ⇒ "có tay cầm" mà bấm không được.
+ * Mỗi lớp phủ tự khai hướng che qua [data-covers-canvas="right|bottom"].
+ */
+function handleClampBox(canvasRect) {
+  let left = canvasRect.left, top = canvasRect.top, right = canvasRect.right, bottom = canvasRect.bottom;
+  const overlays = typeof document !== 'undefined' ? document.querySelectorAll('[data-covers-canvas]') : [];
+  overlays.forEach((ov) => {
+    const cs = getComputedStyle(ov);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) return;
+    const o = ov.getBoundingClientRect();
+    if (!o.width || !o.height) return;
+    if (o.right <= left || o.left >= right || o.bottom <= top || o.top >= bottom) return;   // không giao nhau
+    const side = ov.getAttribute('data-covers-canvas');
+    if (side === 'right') right = Math.min(right, o.left);
+    else if (side === 'left') left = Math.max(left, o.right);
+    else if (side === 'bottom') bottom = Math.min(bottom, o.top);
+    else if (side === 'top') top = Math.max(top, o.bottom);
+  });
+  return { left, top, right, bottom };
+}
+
 const activeHandles = computed(() => {
+  void viewportTick.value;                            // đổi kích thước vùng canvas ⇒ tính lại vị trí tay cầm
   const l = store.activeLayer;
   const el = store.canvasZoom;
   if (!l || !el || l.visible === false || isolateActive.value) return null;
@@ -381,9 +424,16 @@ const activeHandles = computed(() => {
   // Điểm trong hệ trục CỦA LAYER → toạ độ màn hình (đã tính cả xoay).
   const at = (dx, dy) => ({ x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos });
   const M = 14;   // lề: không dán sát mép khung, vẫn đủ chỗ cho ngón tay
+  const box = handleClampBox(r);
+  // Đổi vùng cho phép (toạ độ trang) về toạ độ trong canvasZoom; nếu vùng co lại quá nhỏ (màn hình hẹp
+  // + ngăn kéo mở) thì lùi về giữa khung để tay cầm vẫn còn chỗ bấm.
+  let minX = box.left - r.left + M, maxX = box.right - r.left - M;
+  let minY = box.top - r.top + M, maxY = box.bottom - r.top - M;
+  if (maxX - minX < 8) { minX = maxX = (box.left + box.right) / 2 - r.left; }
+  if (maxY - minY < 8) { minY = maxY = (box.top + box.bottom) / 2 - r.top; }
   const keep = (p) => ({
-    x: Math.max(M, Math.min(r.width - M, p.x)),
-    y: Math.max(M, Math.min(r.height - M, p.y)),
+    x: Math.max(minX, Math.min(maxX, p.x)),
+    y: Math.max(minY, Math.min(maxY, p.y)),
   });
 
   const size = keep(at(hw, hh));                       // góc dưới-phải
@@ -1311,12 +1361,14 @@ function onTouchEnd(e) {
           </div>
           </div><!-- /vùng canvas -->
           <!-- ══ Inspector Layers: dock phải (desktop) · drawer đè canvas (mobile) ══ -->
-          <div v-if="store.inspectorOpen" class="absolute inset-y-0 right-0 z-50 lg:static lg:z-auto">
+          <!-- data-covers-canvas: trên mobile bảng Lớp là ngăn kéo ĐÈ LÊN canvas ⇒ tay cầm layer phải
+               tránh vùng bị nó che (xem handleClampBox trong script). -->
+          <div v-if="store.inspectorOpen" data-covers-canvas="right" class="absolute inset-y-0 right-0 z-50 lg:static lg:z-auto">
             <LayersPanel />
           </div>
           </div><!-- /flex row: canvas + inspector -->
           <!-- ══ Toolbar ngữ cảnh floating trên mobile (12px trên status bar) ══ -->
-          <div v-if="toolActive" class="absolute bottom-12 left-1/2 z-40 max-w-[calc(100%-1rem)] -translate-x-1/2 lg:hidden">
+          <div v-if="toolActive" data-covers-canvas="bottom" class="absolute bottom-12 left-1/2 z-40 max-w-[calc(100%-1rem)] -translate-x-1/2 lg:hidden">
             <ContextToolbar />
           </div>
           <!-- ══ Status bar dock dưới khung canvas ══ -->
