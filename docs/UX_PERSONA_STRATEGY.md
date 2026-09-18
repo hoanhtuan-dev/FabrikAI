@@ -766,5 +766,74 @@ hành vẫn nhận đủ hiệu ứng.
   kiểm tra TRẠNG THÁI trang trước khi chụp, và khi không xem được ảnh thì phân tích điểm ảnh (lưới độ
   sáng) là cách đọc ảnh bằng số.
 
+---
+
+## 15. Đợt 11 — XÓA đối tượng đang chọn · nền canvas CHÍNH XÁC · bật/tắt layer có hiệu ứng (2026-09-20)
+
+### 15.1 Vấn đề — đo được, không suy đoán
+
+| Sự thật | Bằng chứng (đo trên mã nguồn trước đợt này) |
+|---|---|
+| **Bấm Delete / nút thùng rác KHÔNG có gì xảy ra** | `deleteSelection()` đặt `confirmDeleteOpen = true`, nhưng **không có popup nào render cờ đó**: grep `confirmDeleteOpen` toàn repo chỉ ra state + 2 chỗ chặn phím + nơi bật cờ. Tệ hơn: cờ treo lại và `onLayerKeys` `return` sớm ⇒ **mất luôn phím tắt layer** cho tới khi tải lại trang |
+| Xóa theo lựa chọn **bỏ qua layer KHÓA** | `confirmDeleteSelection()` lọc theo `ids` không hề kiểm `locked`, trong khi nút xóa ở bảng Lớp thì `disabled` và `deleteLayer()` thì từ chối — hai đường, hai luật |
+| Nền canvas "lưới" **trong suốt** | `bgClass` trỏ tới class bàn cờ mà **không hề có định nghĩa nào** trong toàn bộ CSS ⇒ bấm nút "lưới" trông như nút hỏng |
+| Ô màu nền **lệch màu thật của canvas** | ô "tối" một sắc, canvas `ink-950` một sắc khác; ô "kem" một sắc, canvas `cream-100` một sắc khác — vì ô màu tự vẽ bằng inline style |
+| Nút **tải ảnh đang chọn** trùng chức năng | đã có *Xuất PNG* ở bảng Lớp và nút tải ở Kết quả/Thư viện |
+| Bật/tắt layer **biến mất tức thì** | layer ẩn bị gỡ khỏi `visibleLayers` nên phần tử rời DOM ngay: bấm mắt xong không thấy vừa tắt cái gì |
+
+### 15.2 Đã làm
+
+1. **`ConfirmDialog.vue` — popup xác nhận DÙNG CHUNG**, kế thừa đúng hình dáng popup "⚠️ Dọn toàn bộ canvas?"
+   (nền đen mờ · khung `max-w-xs` · viền đỏ khi nguy hiểm · hai nút [hành động | Hủy]). Kèm trợ năng mà các
+   popup chép tay trước đây không có: **Esc** để hủy (bắt ở pha capture để không chạy tiếp phím tắt của app),
+   bấm nền để hủy, **focus vào nút hành động khi mở và TRẢ focus về chỗ cũ khi đóng**.
+2. **Ba nơi dùng nó**: dọn toàn bộ canvas · xóa nền AI · **XÓA ĐỐI TƯỢNG ĐANG CHỌN** (mới). Popup xóa đặt ở
+   shell chứ không trong bảng Lớp — vì bảng Lớp có thể đang bị thu gọn mà phím Delete vẫn phải chạy.
+3. **Xóa nói RÕ sắp xóa gì**: `selectionUnitLabels` (group = 1 đối tượng, hiện tên) + `lockedSelectionCount`
+   (báo trước "N đối tượng đang KHÓA sẽ được giữ lại"). `confirmDeleteSelection()` **tôn trọng khóa** và
+   **hạ cờ ở MỌI nhánh** (không có gì để xóa · toàn bộ bị khóa · xóa xong) ⇒ không còn trạng thái treo.
+4. **Nền canvas MỘT NGUỒN**: bốn class `.canvas-bg-{grid,dark,white,cream}` trong `app.css`, dùng cho **cả**
+   vùng canvas **và** ô màu ở thanh trạng thái (bỏ hẳn inline style). Ô màu thêm nhãn tiếng Việt + `aria-pressed`.
+5. **Gỡ nút tải ảnh đang chọn** ở thanh trạng thái, kèm hàm `downloadActive()` đã thành mã chết.
+6. **Bật/tắt layer có hiệu ứng**: `TransitionGroup` cho danh sách layer + lớp `.layer-vis-*` theo token
+   (mờ dần + thu nhẹ 0.94). Kỹ thuật đáng nhớ: hiệu ứng **opacity phải đặt lên `<img>` bên trong** thẻ layer,
+   vì chính thẻ đó mang opacity riêng của từng layer bằng inline style; còn `scale` đặt lên thẻ (Tailwind v4
+   dùng thuộc tính riêng nên không đụng `transform` inline). Hàng trong bảng Lớp cũng mờ dần theo.
+
+### 15.3 Ràng buộc đã giữ
+
+- Đường tải ảnh KHÁC vẫn nguyên: *Xuất PNG* (bảng Lớp) và nút tải layer đang chọn trên thanh công cụ.
+- Popup dọn canvas giữ nguyên câu hỏi và nhãn nút — chỉ đổi chỗ khai báo sang component dùng chung.
+- Mọi hiệu ứng mới đều dùng token chuyển động ⇒ tự tắt khi người dùng bật "giảm chuyển động".
+- Không thêm endpoint, không đụng CSDL, không đổi định dạng dữ liệu nào.
+
+### 15.4 Đo được (Chrome thật 1600×1000 + phpunit)
+
+| Đo | Trước | Sau |
+|---|---|---|
+| Bấm Delete khi chọn 1 đối tượng | **không có gì xảy ra** (cờ treo, chặn phím tắt layer) | popup **"⚠️ Xóa 1 đối tượng?"** + tên đối tượng; Esc/Hủy ⇒ giữ nguyên 2 lớp; Xóa ⇒ còn **1 lớp** + toast "Đã xóa 1 đối tượng." |
+| Layer đang KHÓA | bị xóa (đường lựa chọn bỏ qua khóa) | popup báo trước "1 đối tượng đang KHÓA sẽ được giữ lại"; xác nhận ⇒ **giữ nguyên 1 lớp** + toast "Đối tượng đang KHÓA — mở khóa rồi mới xóa được." |
+| Nền canvas vs ô màu | ô "lưới" ⇒ nền **trong suốt**; ô "tối"/"kem" lệch màu | cả 4 nền **khớp từng ký tự** computed style: grid `repeating-conic-gradient` · dark `rgb(14,13,9)` · white `rgb(255,255,255)` · cream `rgb(244,242,236)` |
+| `aria-pressed` trên ô màu | không có | ô đang chọn = `true` |
+| Nút tải ảnh đang chọn ở status bar | có | **không còn** (danh sách aria-label đã hết mục này) |
+| Bật/tắt layer | biến mất tức thì | lớp `layer-vis-leave-active+leave-to`, `transition-duration` **0.22s** (thẻ + `<img>`); giữa hiệu ứng: `scale` 0.966 · `opacity` 0.435; sau 700ms phần tử rời canvas; bật lại ⇒ `opacity` 0.306 → **1.0** |
+| `vendor/bin/phpunit` | 683 test / 4461 khẳng định | **689 test / 4539 khẳng định — XANH** (thêm 6 test bất biến) |
+| `npm run build` | — | thoát 0; build lặp lại cho **đúng hash cũ** (tất định) |
+
+### 15.5 Bài học tự bắt được trong đợt này
+
+- **"Đặt cờ rồi quên render" là loại lỗi âm thầm tệ nhất.** Không có exception, không có log — chỉ là bấm nút
+  không thấy gì. Nặng hơn: cờ đó còn được dùng làm điều kiện CHẶN phím tắt, nên nó biến một nút hỏng thành
+  *cả bàn phím hỏng*. Từ nay quy tắc: **mỗi cờ mở modal phải có một test bất biến "cờ này có nơi render"**.
+- **Class CSS không tồn tại thì không ai báo lỗi.** Tên class bàn cờ nằm trong template từ lâu mà không có
+  định nghĩa nào trong CSS — trình duyệt im lặng bỏ qua. Test quét class phải **đối chiếu với CSS**, không chỉ
+  kiểm sự có mặt của chuỗi trong template.
+- **Sao chép màu là tạo nguồn lệch thứ hai.** Ô swatch tự vẽ màu bằng inline style nên chỉ cần một lần đổi token
+  là lệch ngay. Cách sửa rẻ và bền: cho cả hai dùng **cùng một class**.
+- **Đo computed style phải đợi DOM cập nhật.** Lần đo đầu của tôi cho ra "canvas trễ một nhịp" — thực ra là do
+  đọc ngay sau `.click()` khi Vue chưa patch xong. Bài học: kết quả đo bất thường thì nghi cách ĐO trước khi
+  nghi sản phẩm (đúng vệt với vụ ảnh chụp đen thui ở mục 14).
+
+
 
 
