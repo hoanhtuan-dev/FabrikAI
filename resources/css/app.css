@@ -66,6 +66,35 @@
     --color-gold-500: #c9a45f;
 
     --radius-4xl: 2rem;
+
+    /* ─ [2026-09-20] CHUYỂN ĐỘNG — nối bộ tiện ích `transition*` của Tailwind vào CÙNG một nguồn ─
+       Tailwind v4 phát ra:
+         .transition{transition-duration:var(--tw-duration,var(--default-transition-duration));
+                     transition-timing-function:var(--tw-ease,var(--default-transition-timing-function))}
+       Nên ghi đè ĐÚNG hai biến theme này là MỌI chỗ dùng transition · transition-colors ·
+       transition-transform · transition-all (đo được: 199 chỗ trong class của studio + các shell) tự
+       chạy theo token bên dưới, và tự về 0ms khi người dùng bật "giảm chuyển động" — KHÔNG phải sửa
+       từng component.
+       Vì sao phải nằm ở @theme: đây là chỗ Tailwind đọc biến, sửa một dòng là toàn app đổi nhịp. */
+    --default-transition-duration: var(--motion-dur-fast);
+    --default-transition-timing-function: var(--motion-ease-standard);
+
+    /* Thời lượng thành TIỆN ÍCH theo TÊN NGHĨA (duration-instant · duration-fast · duration-base ·
+       duration-slow · duration-dock · duration-reveal) — viết trong markup là biết ngay nhịp gì, và
+       KHÔNG ai phải nhớ con số. Tất cả trỏ về token --motion-dur-* ⇒ một công tắc giảm chuyển động
+       tắt được cả những chỗ này. */
+    --transition-duration-instant: var(--motion-dur-instant);
+    --transition-duration-fast: var(--motion-dur-fast);
+    --transition-duration-base: var(--motion-dur-base);
+    --transition-duration-slow: var(--motion-dur-slow);
+    --transition-duration-dock: var(--motion-dur-dock);
+    --transition-duration-reveal: var(--motion-dur-reveal);
+
+    /* Đường cong cũng thành TIỆN ÍCH dùng được ngay trong markup (ease-standard · ease-emphasized ·
+       ease-exit) nhưng vẫn TRỎ VỀ đúng token ⇒ thêm cách dùng, không thêm nguồn thứ hai. */
+    --ease-standard: var(--motion-ease-standard);
+    --ease-emphasized: var(--motion-ease-emphasized);
+    --ease-exit: var(--motion-ease-exit);
 }
 
 @layer base {
@@ -165,7 +194,9 @@
     }
 
     .card-hover {
-        @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-ink-900/10;
+        @apply transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-ink-900/10;
+        /* Nhấc thẻ là chuyển động MT LỚN ⇒ nhịp base; thời lượng lấy từ token, không viết số. */
+        transition-duration: var(--motion-dur-base);
     }
 
     .badge { @apply inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide;
@@ -291,6 +322,7 @@
         --motion-dur-base: 220ms;     /* mặt UI chung: card · popup · tab · tooltip */
         --motion-dur-slow: 320ms;     /* mặt LỚN: ngăn kéo (drawer) · modal */
         --motion-dur-dock: 260ms;     /* co/giãn dock — JS đọc lại đúng biến này */
+        --motion-dur-reveal: 600ms;   /* hiệu ứng cuộn (v-reveal): nhịp dài có chủ đích */
 
         /* Đường cong: vào nhanh rồi dừng êm (không dùng ease-in-out mặc định vì
            cảm giác "chờ" ở đầu chuyển động). */
@@ -315,13 +347,31 @@
        theo cả width/height, gây giật bố cục khi panel đang co). Vẫn ghi đè được
        bằng tiện ích Tailwind (duration-* · ease-* · transition-none). */
     .motion-ui {
-        transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter;
+        /* Danh sách thuộc tính KHỚP tiện ích transition của Tailwind v4 — kể cả translate/scale/rotate,
+           vì v4 dùng thuộc tính RIÊNG cho chúng (không gộp vào transform): thiếu chúng thì hiệu ứng
+           "nhấc thẻ lên khi hover" (hover:-translate-y-1) đứng im mà không báo lỗi gì.
+           KHÔNG gồm width/height: co giãn kích thước là việc của .motion-ui--size, để mặc định
+           không kéo theo giật bố cục. */
+        transition-property: color, background-color, border-color, outline-color, text-decoration-color,
+                             fill, stroke, opacity, box-shadow, transform, translate, scale, rotate,
+                             filter, backdrop-filter;
         transition-duration: var(--motion-dur-fast);
         transition-timing-function: var(--motion-ease-standard);
     }
+    .motion-ui--instant { transition-duration: var(--motion-dur-instant); }
     .motion-ui--base { transition-duration: var(--motion-dur-base); }
     .motion-ui--slow { transition-duration: var(--motion-dur-slow); }
     .motion-ui--emphasized { transition-timing-function: var(--motion-ease-emphasized); }
+    .motion-ui--exit { transition-timing-function: var(--motion-ease-exit); }
+    /* Kích thước CH chuyển động khi nói rõ (thanh tiến trình, hàng mở rộng…). */
+    .motion-ui--size {
+        transition-property: width, min-width, max-width, height, min-height, max-height, flex-basis;
+    }
+    /* Hàng/cell trong bảng: chỉ đổi nền khi hover — dùng cho <tr> để bảng không "giật" màu. */
+    .motion-row {
+        transition: background-color var(--motion-dur-fast) var(--motion-ease-standard),
+                    color var(--motion-dur-fast) var(--motion-ease-standard);
+    }
 
     /* ── 2. Hiệu ứng XUẤT HIỆN cho lớp phủ · ngăn kéo · popup ───────────────
        Đặt lên phần tử được mount bằng v-if: nó chạy một lần lúc xuất hiện. */
@@ -364,8 +414,13 @@
                     visibility 0s linear var(--motion-dur-dock);
     }
 
-    /* Vách ngăn kéo của dock (DockResizer.vue). Vùng bắt chuột rộng 7px cho dễ trúng,
-       nhưng chỉ VẼ 1 đường kẻ — vừa đủ để biết chỗ kéo. */
+    /* Vách ngăn kéo của dock (DockResizer.vue). Vùng bắt chuột rộng 7px cho dễ trúng; bên trong vẽ
+       1 đường kẻ và 1 TAY CẦM có icon grip.
+
+       Vì sao có tay cầm: một đường kẻ 1px thì người đã biết mới thấy — người mới không có cách nào
+       đoán được chỗ đó kéo được. Tay cầm hiện SẴN ở mức mờ (0.45) ngay từ lúc tải trang, rồi rõ dần
+       khi trỏ vào · focus bàn phím · đang kéo. Tay cầm KHÔNG chặn sự kiện: pointerdown vẫn bắt ở
+       vách ngăn (composable dùng e.currentTarget) nên kéo từ chính tay cầm vẫn chạy. */
     .dock-resizer {
         position: relative;
         display: block;
@@ -382,17 +437,56 @@
         left: 3px;
         width: 1px;
         background: var(--color-ink-700);
+        pointer-events: none;
         transition: left var(--motion-dur-fast) var(--motion-ease-standard),
                     width var(--motion-dur-fast) var(--motion-ease-standard),
                     background-color var(--motion-dur-fast) var(--motion-ease-standard);
     }
-    /* Hover · đang focus bàn phím · đang kéo: đường kẻ dày lên và đổi sang màu thương hiệu. */
+    /* TAY CẦM: nằm giữa vách ngăn, rộng hơn vách nên nhìn thấy rõ; icon grip nói "chỗ này kéo được". */
+    .dock-resizer__knob {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        z-index: 1;
+        display: grid;
+        place-items: center;
+        width: 14px;
+        height: 30px;
+        border: 1px solid var(--color-ink-600);
+        border-radius: 999px;
+        background: var(--color-ink-900);
+        color: var(--color-cream-300);
+        opacity: 0.45;
+        translate: -50% -50%;
+        transition: opacity var(--motion-dur-fast) var(--motion-ease-standard),
+                    scale var(--motion-dur-fast) var(--motion-ease-emphasized),
+                    color var(--motion-dur-fast) var(--motion-ease-standard),
+                    border-color var(--motion-dur-fast) var(--motion-ease-standard),
+                    background-color var(--motion-dur-fast) var(--motion-ease-standard),
+                    box-shadow var(--motion-dur-base) var(--motion-ease-standard);
+    }
+    /* Hover · focus bàn phím · đang kéo: đường kẻ dày lên + tay cầm sáng rõ và nở ra một nhịp. */
     .dock-resizer:hover .dock-resizer__grip,
     .dock-resizer:focus-visible .dock-resizer__grip,
     .dock-resizer[data-resizing='true'] .dock-resizer__grip {
         left: 2px;
         width: 3px;
         background: var(--color-brand-400);
+    }
+    .dock-resizer:hover .dock-resizer__knob,
+    .dock-resizer:focus-visible .dock-resizer__knob,
+    .dock-resizer[data-resizing='true'] .dock-resizer__knob {
+        opacity: 1;
+        scale: 1.12;
+        color: var(--color-brand-200);
+        border-color: var(--color-brand-400);
+        background: var(--color-ink-800);
+        box-shadow: 0 0 0 4px rgba(85, 155, 120, 0.22);
+    }
+    /* Đang kéo thì tay cầm đổi màu thương hiệu đậm hơn — tay đang nắm chỗ nào là thấy ngay. */
+    .dock-resizer[data-resizing='true'] .dock-resizer__knob {
+        color: var(--color-brand-100);
+        background: var(--color-brand-600);
     }
     /* Đường kẻ đổi màu đã là chỉ báo focus ⇒ bỏ vòng focus mặc định cho khỏi chồng 2 tín hiệu. */
     .dock-resizer:focus-visible { outline: none; }
@@ -433,8 +527,18 @@
         --motion-dur-base: 0ms;
         --motion-dur-slow: 0ms;
         --motion-dur-dock: 0ms;
+        --motion-dur-reveal: 0ms;
     }
     html { scroll-behavior: auto; }
+    /* Hiệu ứng CHẠY VÒNG LẶP (nhấp nháy, pulse, quay…) không tự tắt theo token vì không dùng
+       token — phải tắt tường minh. Với người bị rối loạn tiền đình, một chấm nhấp nháy liên tục
+       khó chịu hơn hẳn một hiệu ứng chuyển cảnh. Giữ 1 vòng lặp tức thời (thay vì animation:none)
+       để trạng thái cuối của keyframes vẫn được áp — nếu không, vài chỉ báo có thể trở nên vô hình. */
+    *, *::before, *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
+    }
     .motion-fade-in,
     .motion-pop-in,
     .motion-rise-in,
@@ -450,7 +554,7 @@
 ::-webkit-scrollbar-thumb {
     background: rgba(107, 99, 88, 0.32);
     border-radius: 999px;
-    transition: background .2s ease;
+    transition: background-color var(--motion-dur-base) var(--motion-ease-standard);
 }
 ::-webkit-scrollbar-thumb:hover { background: rgba(107, 99, 88, 0.55); }
 ::-webkit-scrollbar-thumb:active { background: rgba(51, 103, 77, 0.7); }
@@ -461,7 +565,7 @@ aside::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); }
 aside::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
 * { scrollbar-width: thin; scrollbar-color: rgba(107, 99, 88, 0.35) transparent; }
 
-@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
 }
 
 @layer utilities {
@@ -518,7 +622,8 @@ aside::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
 }
 
 .card-surface-hover {
-    @apply transition-all duration-300 hover:-translate-y-1;
+    @apply transition-all hover:-translate-y-1;
+    transition-duration: var(--motion-dur-base);
 }
 .card-surface-hover:hover {
     box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 26px 60px -22px rgba(11, 18, 16, 0.34);
@@ -530,7 +635,7 @@ aside::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
 
 /* --- Buttons --- */
 .sf-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
 }
 .sf-btn-primary {
     @apply bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-lg shadow-brand-900/20 hover:from-brand-700 hover:to-brand-600 active:scale-[.98];
@@ -577,7 +682,9 @@ aside::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
 .reveal-anim {
     opacity: 0;
     transform: translateY(20px);
-    transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    /* Nhịp dài có chủ đích của hiệu ứng cuộn — vẫn là TOKEN, không viết số tại chỗ. */
+    transition: opacity var(--motion-dur-reveal) var(--motion-ease-emphasized),
+                transform var(--motion-dur-reveal) var(--motion-ease-emphasized);
 }
 .reveal-anim.is-revealed {
     opacity: 1;

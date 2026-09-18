@@ -99,8 +99,8 @@ function openSettings() { settingsOpen.value = true; }
         <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-cream-300/60">Chọn loại trang phục</p>
         <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
           <button v-for="t in types" :key="t.id" type="button" @click="pickType(t)"
-            class="group relative aspect-square overflow-hidden rounded-md border-2 border-ink-700 bg-ink-900 transition-all duration-150 hover:border-brand-400 hover:shadow-lg hover:shadow-brand-500/15 active:scale-[0.97]">
-            <img :src="t.thumb || t.img" :alt="t.name" loading="lazy" decoding="async" class="h-full w-full object-cover opacity-90 transition-transform duration-200 group-hover:scale-105">
+            class="group relative aspect-square overflow-hidden rounded-md border-2 border-ink-700 bg-ink-900 transition-all duration-fast hover:border-brand-400 hover:shadow-lg hover:shadow-brand-500/15 active:scale-[0.97]">
+            <img :src="t.thumb || t.img" :alt="t.name" loading="lazy" decoding="async" class="h-full w-full object-cover opacity-90 transition-transform duration-base group-hover:scale-105">
             <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-1.5 pb-1.5 pt-6 text-center text-[10px] font-medium leading-tight text-white">{{ t.name }}</span>
           </button>
         </div>

@@ -86,7 +86,7 @@ const progress = computed(() => {
         <span class="shrink-0 text-[11px] font-semibold tabular-nums text-brand-300">{{ progress.pct }}%</span>
       </div>
       <div class="h-1 w-full bg-ink-800">
-        <div class="h-full bg-gradient-to-r from-brand-500 to-brand-300 transition-all duration-500 ease-out" :style="{ width: progress.pct + '%' }"></div>
+        <div class="h-full bg-gradient-to-r from-brand-500 to-brand-300 transition-all duration-slow ease-emphasized" :style="{ width: progress.pct + '%' }"></div>
       </div>
     </div>
 

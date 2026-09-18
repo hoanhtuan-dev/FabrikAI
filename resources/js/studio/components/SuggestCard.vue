@@ -120,15 +120,15 @@ watch(() => store.generating, (g, old) => {
     <!-- Checkbox bỏ qua phân tích (mặc định bật = AI bỏ qua) -->
     <div class="mt-2 space-y-1.5 rounded-lg border border-white/10 bg-white/5 p-2.5 text-[11px]">
       <p class="mb-1 text-[10px] font-semibold text-cream-300/50">Bỏ qua phân tích</p>
-      <label class="flex items-center gap-2 cursor-pointer text-cream-200 hover:text-cream-100">
+      <label class="motion-ui flex items-center gap-2 cursor-pointer text-cream-200 hover:text-cream-100">
         <input type="checkbox" v-model="store.suggestSkipLogo" class="h-3.5 w-3.5 accent-brand-500 rounded" />
         <span>Không phân tích logo, chữ, watermark</span>
       </label>
-      <label class="flex items-center gap-2 cursor-pointer text-cream-200 hover:text-cream-100">
+      <label class="motion-ui flex items-center gap-2 cursor-pointer text-cream-200 hover:text-cream-100">
         <input type="checkbox" v-model="store.suggestSkipHair" class="h-3.5 w-3.5 accent-brand-500 rounded" />
         <span>Không phân tích kiểu tóc</span>
       </label>
-      <label class="flex items-center gap-2 cursor-pointer text-cream-200 hover:text-cream-100">
+      <label class="motion-ui flex items-center gap-2 cursor-pointer text-cream-200 hover:text-cream-100">
         <input type="checkbox" v-model="store.suggestSkipBackground" class="h-3.5 w-3.5 accent-brand-500 rounded" />
         <span>Không phân tích bối cảnh</span>
       </label>
@@ -230,7 +230,8 @@ watch(() => store.generating, (g, old) => {
   background: linear-gradient(120deg, #4a7890, #5b9d6e, #4a7890);
   background-size: 200% 100%;
   animation: genflow-gradient 3s ease infinite;
-  transition: transform 0.15s, opacity 0.2s;
+  transition: transform var(--motion-dur-fast) var(--motion-ease-standard),
+              opacity var(--motion-dur-fast) var(--motion-ease-standard);
   box-shadow: 0 4px 14px -4px rgba(91, 157, 110, 0.5);
 }
 .btn-genflow:hover:not(:disabled) { transform: translateY(-1px); }
@@ -263,7 +264,9 @@ watch(() => store.generating, (g, old) => {
 .genflow-step {
   display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
   flex: 0 0 auto;
-  opacity: 0.45; transition: opacity 0.35s, transform 0.35s;
+  opacity: 0.45;
+  transition: opacity var(--motion-dur-slow) var(--motion-ease-standard),
+              transform var(--motion-dur-slow) var(--motion-ease-emphasized);
 }
 .genflow-step.active { opacity: 1; transform: scale(1.06); }
 .genflow-step.done { opacity: 0.85; }
@@ -273,7 +276,7 @@ watch(() => store.generating, (g, old) => {
   font-size: 12px; line-height: 1;
   background: rgba(255,255,255,0.08);
   border: 1.5px solid rgba(255,255,255,0.2);
-  transition: all 0.35s;
+  transition: all var(--motion-dur-slow) var(--motion-ease-standard);
 }
 .genflow-step.active .genflow-dot {
   background: linear-gradient(135deg, #5b9d6e, #4a7890);
@@ -321,7 +324,7 @@ watch(() => store.generating, (g, old) => {
   background: linear-gradient(90deg, #5b9d6e, #6ec9a8, #4a7890);
   background-size: 200% 100%;
   animation: genflow-shimmer 1.8s linear infinite;
-  transition: width 0.4s ease;
+  transition: width var(--motion-dur-slow) var(--motion-ease-standard);
   box-shadow: 0 0 8px rgba(110,201,168,0.5);
 }
 @keyframes genflow-shimmer {
@@ -331,6 +334,9 @@ watch(() => store.generating, (g, old) => {
 .genflow-pct { margin-top: 0.35rem; font-size: 10px; color: rgba(245,241,232,0.6); text-align: center; }
 
 /* Transition xuất/biến mất của panel */
-.genfade-enter-active, .genfade-leave-active { transition: opacity 0.3s ease, transform 0.3s ease; }
+.genfade-enter-active, .genfade-leave-active {
+  transition: opacity var(--motion-dur-base) var(--motion-ease-standard),
+              transform var(--motion-dur-base) var(--motion-ease-emphasized);
+}
 .genfade-enter-from, .genfade-leave-to { opacity: 0; transform: translateY(-6px); }
 </style>

@@ -970,7 +970,7 @@ onMounted(async () => {
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-ink-700/60">
-                      <tr v-for="u in usersData.users" :key="u.id" class="hover:bg-ink-800/50">
+                      <tr v-for="u in usersData.users" :key="u.id" class="motion-row hover:bg-ink-800/50">
                         <td class="px-4 py-3">
                           <div class="flex items-center gap-2.5">
                             <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-600/25 text-xs font-bold text-brand-100">{{ (u.name || '?').charAt(0).toUpperCase() }}</span>
@@ -1165,7 +1165,7 @@ onMounted(async () => {
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-ink-700/60">
-                    <tr v-for="t in ledgerData.transactions" :key="t.id" class="hover:bg-ink-800/50">
+                    <tr v-for="t in ledgerData.transactions" :key="t.id" class="motion-row hover:bg-ink-800/50">
                       <td class="px-4 py-2.5 whitespace-nowrap text-cream-300/85">{{ t.created_at }}</td>
                       <td class="px-3 py-2.5">
                         <p class="font-semibold text-cream-50">{{ t.user ? t.user.name : '—' }}</p>
@@ -1293,7 +1293,7 @@ onMounted(async () => {
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-ink-700/60">
-                    <tr v-for="r in upgradesData.requests" :key="r.id" class="align-top hover:bg-ink-800/40">
+                    <tr v-for="r in upgradesData.requests" :key="r.id" class="motion-row align-top hover:bg-ink-800/40">
                       <td class="px-4 py-3">
                         <span class="font-mono text-[11px] font-semibold text-cream-100">{{ r.code }}</span>
                         <span class="mt-0.5 block text-[10px] text-cream-300/75">{{ r.created_at }}</span>
@@ -1851,7 +1851,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-active, .fade-leave-active { transition: opacity var(--motion-dur-base) var(--motion-ease-standard); }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .fade-enter-active, .fade-leave-active { transition: none; }

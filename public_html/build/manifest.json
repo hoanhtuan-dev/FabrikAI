@@ -86,7 +86,7 @@
     "name": "pageBoot"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CnRIQN5S.css",
+    "file": "assets/app-Ctvedfsb.css",
     "name": "app",
     "names": [
       "app.css"
@@ -95,7 +95,7 @@
     "isEntry": true
   },
   "resources/js/studio/admin.js": {
-    "file": "assets/admin-r3GMcwi5.js",
+    "file": "assets/admin-Cootp1YK.js",
     "name": "admin",
     "src": "resources/js/studio/admin.js",
     "isEntry": true,
@@ -104,11 +104,11 @@
       "__plugin-vue_export-helper-SKlaRojG.js"
     ],
     "css": [
-      "assets/admin-jUYc91rI.css"
+      "assets/admin-EhP9k8MQ.css"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-BeC7Rr8o.js",
+    "file": "assets/main-D0pmjpcF.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -118,7 +118,7 @@
       "_StylistSection-DyF9ohAW.js"
     ],
     "css": [
-      "assets/main-BqAcHxGJ.css"
+      "assets/main-BeqZ7P8B.css"
     ]
   },
   "resources/js/studio/my-settings.js": {
@@ -132,7 +132,7 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-CdXJzE5i.js",
+    "file": "assets/settings-DlU41piV.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
@@ -141,7 +141,7 @@
       "__plugin-vue_export-helper-SKlaRojG.js"
     ],
     "css": [
-      "assets/settings-CD0a66op.css"
+      "assets/settings-DvUtX_yy.css"
     ]
   }
 }

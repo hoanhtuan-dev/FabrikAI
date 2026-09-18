@@ -328,7 +328,7 @@ onBeforeUnmount(() => {
           <Transition name="cf">
             <img v-if="shown.url" ref="imgEl" :src="shown.url" :key="'img-' + shown.id"
                  class="absolute inset-0 m-auto max-h-full max-w-full select-none object-contain"
-                 :class="dragging ? 'transition-none' : 'transition-transform duration-100 ease-out'"
+                 :class="dragging ? 'transition-none' : 'transition-transform duration-instant ease-standard'"
                  :style="{ transform: 'translate(' + viewerPan.x + 'px, ' + viewerPan.y + 'px) scale(' + viewerZoom + ')' }"
                  draggable="false" @dblclick="toggleZoom" @error="imgError = true" @load="onImgLoad" />
           </Transition>
@@ -520,9 +520,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* Crossfade khi chuyển ảnh — không chớp trắng (ảnh mới chỉ vào sau khi load xong) */
-.cf-enter-active, .cf-leave-active { transition: opacity .18s ease; }
+.cf-enter-active, .cf-leave-active { transition: opacity var(--motion-dur-fast) var(--motion-ease-standard); }
 .cf-enter-from, .cf-leave-to { opacity: 0; }
 /* Bảng thông tin ảnh thu gọn / mở rộng */
-.aside-enter-active, .aside-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.aside-enter-active, .aside-leave-active {
+  transition: opacity var(--motion-dur-base) var(--motion-ease-emphasized),
+              transform var(--motion-dur-base) var(--motion-ease-emphasized);
+}
 .aside-enter-from, .aside-leave-to { opacity: 0; transform: translateX(28px); }
 </style>

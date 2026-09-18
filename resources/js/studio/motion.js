@@ -14,7 +14,7 @@
  */
 
 /** Thời lượng dự phòng (ms) — chỉ dùng khi KHÔNG đọc được biến CSS. */
-const FALLBACK_MS = { instant: 90, fast: 150, base: 220, slow: 320, dock: 260 };
+const FALLBACK_MS = { instant: 90, fast: 150, base: 220, slow: 320, dock: 260, reveal: 600 };
 
 /**
  * Người dùng có bật "giảm chuyển động" của hệ điều hành không.
@@ -34,7 +34,7 @@ export function prefersReducedMotion() {
  * Thời lượng hiệu ứng đang có hiệu lực, tính bằng ms — đọc từ biến CSS --motion-dur-<name>.
  * Trả 0 khi người dùng bật giảm chuyển động (lúc đó CSS đã đặt token về 0ms).
  *
- * @param {'instant'|'fast'|'base'|'slow'|'dock'} name
+ * @param {'instant'|'fast'|'base'|'slow'|'dock'|'reveal'} name
  * @returns {number} ms (0 = không có hiệu ứng, việc "sau hiệu ứng" phải chạy ngay)
  */
 export function motionDurationMs(name = 'base') {

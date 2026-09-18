@@ -67,7 +67,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     <!-- Vẽ mask -->
     <div v-if="activeImg" class="mt-3 space-y-2">
       <button @click="store.toggleInpaintMask('path')"
-              class="group flex w-full items-center justify-center gap-2.5 rounded-lg border px-4 py-3 text-sm font-semibold transition-all duration-200"
+              class="group flex w-full items-center justify-center gap-2.5 rounded-lg border px-4 py-3 text-sm font-semibold transition-all duration-base"
               :class="store.inpaintMaskMode === 'path'
                 ? 'border-emerald-400 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-900/30'
                 : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200 hover:border-emerald-400/80 hover:bg-emerald-500/20 hover:shadow-md hover:shadow-emerald-900/20 active:scale-[.98]'">

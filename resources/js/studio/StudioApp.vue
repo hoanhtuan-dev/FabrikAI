@@ -1147,7 +1147,7 @@ function onTouchEnd(e) {
           <div v-if="store.showBatch && store.activeBatch.length > 1" class="batch-slider absolute bottom-14 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
             <div class="flex items-center gap-1.5">
               <span class="text-[10px] text-cream-300/60">{{ store.activeBatch.length }} biến thể</span>
-              <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2 transition-all duration-300" :class="store.previewId === v.id ? 'border-brand-500 scale-105' : 'border-ink-700 hover:border-brand-400'">
+              <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2 transition-all duration-base" :class="store.previewId === v.id ? 'border-brand-500 scale-105' : 'border-ink-700 hover:border-brand-400'">
                 <template v-if="v.status === 'completed' && v.media_url">
                   <img :src="v.media_url" class="batch-thumb h-full w-full bg-ink-900 object-cover" loading="lazy">
                 </template>

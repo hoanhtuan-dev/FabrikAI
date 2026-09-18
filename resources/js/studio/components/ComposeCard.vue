@@ -248,7 +248,7 @@ function saveSettings() {
           <span v-if="slotImgError[i-1]" class="absolute inset-0 grid place-items-center bg-ink-900 text-2xl" title="Ảnh không tải được — bấm × để bỏ">🖼️</span>
           <span class="absolute left-1 top-1 rounded-full bg-brand-500 px-1.5 text-[9px] font-bold text-white">{{ i }}</span>
           <span class="absolute inset-x-0 bottom-0 bg-black/65 px-1 py-0.5 text-center text-[9px] font-semibold text-cream-100">{{ slotRoles[i-1] }}</span>
-          <span @click.stop="removeSlot(i-1)" title="Bỏ ảnh khỏi slot" class="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-red-600/90 text-[11px] text-white hover:bg-red-500"><StudioIcon name="x" size="h-3.5 w-3.5" /></span>
+          <span @click.stop="removeSlot(i-1)" title="Bỏ ảnh khỏi slot" class="motion-ui absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-red-600/90 text-[11px] text-white hover:bg-red-500"><StudioIcon name="x" size="h-3.5 w-3.5" /></span>
           <span v-if="i > 1" @click.stop="makeBase(i-1)" class="absolute bottom-6 right-1 grid h-5 w-5 place-items-center rounded-full bg-ink-800/90 text-[9px] text-white" title="Đưa lên làm @image1">⤴</span>
         </template>
         <template v-else>
@@ -294,7 +294,7 @@ function saveSettings() {
       <div class="mt-1 flex flex-wrap gap-1.5">
         <button v-for="p in stylePresets" :key="p.name" @click="applyPreset(p)" class="group inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2.5 py-1 text-[10px] font-medium text-cream-200 transition hover:border-brand-400">
           {{ p.name }}
-          <span @click.stop="deletePreset(p)" class="grid h-4 w-4 place-items-center rounded-full text-cream-400 hover:bg-red-600 hover:text-white" title="Xóa preset">×</span>
+          <span @click.stop="deletePreset(p)" class="motion-ui grid h-4 w-4 place-items-center rounded-full text-cream-400 hover:bg-red-600 hover:text-white" title="Xóa preset">×</span>
         </button>
         <span v-if="!stylePresets.length" class="text-[10px] text-cream-300/50">Chưa có preset — lưu phong cách + trang trí + sáng tạo hiện tại để tái dùng cho cả bộ sưu tập.</span>
       </div>

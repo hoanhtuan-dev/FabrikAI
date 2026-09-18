@@ -315,7 +315,7 @@ watch(() => open.value, (v) => {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-ink-800">
-                  <tr v-for="p in store.projects" :key="p.id" class="bg-ink-900/40 hover:bg-ink-800/60" :class="openingId === p.id ? 'opacity-60' : ''">
+                  <tr v-for="p in store.projects" :key="p.id" class="motion-row bg-ink-900/40 hover:bg-ink-800/60" :class="openingId === p.id ? 'opacity-60' : ''">
                     <td class="px-3 py-2.5">
                       <button class="text-left" :disabled="openingId === p.id" @click="openProject(p)">
                         <span class="font-semibold text-cream-50">{{ p.name }}</span>

@@ -598,7 +598,7 @@ const bodyHipsLabel = computed(() => {
         <span class="font-semibold text-brand-300">{{ Math.round(store.generateProgress) }}%</span>
       </div>
       <div class="h-2 w-full overflow-hidden rounded-full bg-ink-800">
-        <div class="h-full rounded-full bg-gradient-to-r from-brand-500 to-purple-400 transition-all duration-500 ease-out" :style="{ width: store.generateProgress + '%' }"></div>
+        <div class="h-full rounded-full bg-gradient-to-r from-brand-500 to-purple-400 transition-all duration-slow ease-emphasized" :style="{ width: store.generateProgress + '%' }"></div>
       </div>
       <p v-if="store.generateStage === 'done'" class="mt-1.5 flex items-center gap-1 text-[10px] text-emerald-300/70"><StudioIcon name="check" size="h-3 w-3" /> Đã tạo {{ store.generatedCount }} ảnh</p>
       <p v-if="store.generateStage === 'failed'" class="mt-1.5 text-[10px] text-red-400">Không ảnh nào tạo thành công — bấm "Tạo lại" hoặc kiểm tra cấu hình model/API key.</p>

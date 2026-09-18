@@ -182,7 +182,7 @@ onMounted(() => { loadTemplates(); });
           class="group rounded-xl border border-ink-700 bg-ink-900/80 p-3 text-left transition hover:border-brand-500 hover:bg-brand-600/10"
           :title="tpl.hint || tpl.title"
         >
-          <span class="mb-1 flex items-center gap-1.5 text-sm font-semibold text-cream-100 group-hover:text-brand-200">
+          <span class="motion-ui mb-1 flex items-center gap-1.5 text-sm font-semibold text-cream-100 group-hover:text-brand-200">
             <StudioIcon :name="tpl.icon || 'folderOpen'" size="h-4 w-4" class="text-brand-400" />
             {{ tpl.title }}
           </span>

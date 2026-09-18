@@ -1461,7 +1461,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
 </template>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-active, .fade-leave-active { transition: opacity var(--motion-dur-base) var(--motion-ease-standard); }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .fade-enter-active, .fade-leave-active { transition: none; }

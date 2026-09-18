@@ -231,7 +231,7 @@ class StudioDockResizeTest extends TestCase
         $zeroed = array_map(static fn ($row) => $row[1], $rows);
         sort($zeroed);
 
-        $this->assertSame(['base', 'dock', 'fast', 'instant', 'slow'], $zeroed,
+        $this->assertSame(['base', 'dock', 'fast', 'instant', 'reveal', 'slow'], $zeroed,
             'Khối prefers-reduced-motion phải đưa MỌI token --motion-dur-* về 0ms.');
 
         // Hiệu ứng viết bằng animation không tự tắt theo token ⇒ phải tắt tường minh.
