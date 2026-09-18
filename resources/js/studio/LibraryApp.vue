@@ -115,8 +115,26 @@ function openViewer(g) { store.openViewer(g); }
 
 function switchTab(tab) {
   store.libraryTab = tab;
-  if (tab === 'uploads' && !store.uploadItems.length) store.loadUploads();
+  if (tab === 'uploads') {
+    if (!store.uploadItems.length) store.loadUploads();
+    // Cần danh sách dự án để gắn ảnh tải lên vào bộ sưu tập (loadProjects tự bỏ qua nếu đã nạp).
+    if (!store.projectLoaded) store.loadProjects();
+  }
   else if (tab === 'suggest' && !store.suggestLibItems.length) store.loadSuggestLib();
+}
+
+// ── Gắn ẢNH TẢI LÊN vào B SU TẬP ─
+// Hai loại ảnh nằm cùng một Thư viện; trước đây chỉ ảnh do AI tạo mới vào được bộ sưu tập.
+const projectOptions = computed(() => store.projects || []);
+
+async function onUploadProject(f, value) {
+  const target = Number(value) || 0;
+  if (!target) {
+    if (f.project_id) await store.attachUploadProject(f.project_id, f.rel, 'detach');
+    return;
+  }
+  if (target === Number(f.project_id)) return;
+  await store.attachUploadProject(target, f.rel, 'attach');
 }
 function refresh() {
   if (store.libraryTab === 'uploads') store.loadUploads();
@@ -583,6 +601,14 @@ onMounted(async () => {
                 <p class="truncate text-[9px] text-cream-300/75">{{ f.width }}×{{ f.height }} · {{ fmtBytes(f.size) }} · {{ f.kind === 'asset' ? 'tài nguyên' : 'ảnh nguồn' }}</p>
               </div>
             </div>
+            <div class="border-t border-ink-700/60 bg-ink-800/80 px-2 py-1.5">
+              <select :value="f.project_id || ''" @change="onUploadProject(f, $event.target.value)"
+                      class="w-full rounded-md border border-ink-700 bg-ink-900 px-1.5 py-1 text-[10px] text-cream-200 outline-none focus:border-brand-500"
+                      :title="f.project_id ? 'Đang thuộc một bộ sưu tập — đổi hoặc bỏ gắn' : 'Gắn ảnh này vào một bộ sưu tập'">
+                <option value="">— Chưa gắn bộ sưu tập —</option>
+                <option v-for="p in projectOptions" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
+            </div>
             <button v-if="store.libraryManage && !f.used" @click.stop="store.toggleUploadSelect(f.rel)"
                     class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-lg border text-sm"
                     :class="isUploadSelected(f.rel) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
@@ -614,6 +640,12 @@ onMounted(async () => {
               <span v-else class="shrink-0 rounded-full border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-red-200">chưa dùng</span>
             </div>
             <p class="truncate text-[10px] text-cream-300/50">{{ f.width }}×{{ f.height }} · {{ fmtBytes(f.size) }} · {{ f.kind === 'asset' ? 'tài nguyên' : 'ảnh nguồn' }}</p>
+            <select :value="f.project_id || ''" @change="onUploadProject(f, $event.target.value)"
+                    class="mt-1 w-full max-w-[220px] rounded-md border border-ink-700 bg-ink-900 px-1.5 py-0.5 text-[10px] text-cream-200 outline-none focus:border-brand-500"
+                    :title="f.project_id ? 'Đang thuộc một bộ sưu tập — đổi hoặc bỏ gắn' : 'Gắn ảnh này vào một bộ sưu tập'">
+              <option value="">— Chưa gắn bộ sưu tập —</option>
+              <option v-for="p in projectOptions" :key="p.id" :value="p.id">{{ p.name }}</option>
+            </select>
           </div>
           <button v-if="store.libraryManage && !f.used" @click.stop="store.toggleUploadSelect(f.rel)"
                   class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border text-sm"

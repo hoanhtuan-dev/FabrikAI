@@ -366,6 +366,9 @@ class ProjectController extends Controller
         // đã có nullOnDelete nhưng explicit detach giữ hành vi giống nhau trên mọi DB).
         DB::transaction(function () use ($project) {
             $project->generations()->update(['project_id' => null]);
+            // ẢNH TẢI LÊN: bỏ liên kết bộ sưu tập (KHÔNG xoá file trên đĩa). Khai báo tường minh cho
+            // cùng hành vi với generations ở trên, dù khoá ngoại đã có cascadeOnDelete.
+            \App\Models\UploadProjectLink::where('project_id', $project->id)->delete();
             $project->delete();
         });
 
@@ -434,6 +437,42 @@ class ProjectController extends Controller
         return response()->json(['ok' => true, 'generation' => [
             'id' => $gen->id, 'project_id' => $gen->project_id,
         ]]);
+    }
+
+    /**
+     * Gắn / bỏ gắn một ẢNH TẢI LÊN vào dự án (bộ sưu tập).
+     *
+     * Vì sao có endpoint này: ảnh tải lên là FILE trên đĩa, không có dòng trong CSDL, nên trước đây
+     * KHÔNG có cách nào đưa chúng vào bộ sưu tập — trong khi ảnh do AI tạo thì gắn được. Hai loại ảnh
+     * nằm cùng một Thư viện nhưng chỉ một loại vào được bộ sưu tập là điều vô lý với người dùng.
+     *
+     * KHÁC thao tác sinh ảnh ở chỗ: gắn bộ sưu tập CHÍNH LÀ mục đích của request, nên đường dẫn sai
+     * phải trả 403 thay vì im lặng bỏ qua (im lặng ở đây nghĩa là người dùng bấm mà không có gì xảy ra).
+     */
+    public function attachUpload(Request $request, Project $project)
+    {
+        abort_unless(team_can_view_project($request->user(), $project), 403);
+
+        $data = $request->validate([
+            'rel' => ['required', 'string', 'max:255'],
+            'action' => ['nullable', 'string', 'in:attach,detach'],
+        ]);
+
+        $rel = app(\App\Services\StudioLibraryService::class)->ownedUploadRel($request->user(), (string) $data['rel']);
+        abort_if($rel === '', 403, 'Ảnh không hợp lệ hoặc không thuộc về bạn.');
+
+        $detach = ($data['action'] ?? 'attach') === 'detach';
+
+        if ($detach) {
+            \App\Models\UploadProjectLink::where('user_id', $request->user()->id)->where('rel', $rel)->delete();
+        } else {
+            \App\Models\UploadProjectLink::updateOrCreate(
+                ['user_id' => $request->user()->id, 'rel' => $rel],
+                ['project_id' => $project->id],
+            );
+        }
+
+        return response()->json(['ok' => true, 'rel' => $rel, 'project_id' => $detach ? null : $project->id]);
     }
 
     /**

@@ -385,6 +385,9 @@ class StudioController extends Controller
 
         $cost = studio_credit_cost('image');
 
+        // [Yêu cầu 2026-09-20] Ảnh SỬA XONG phải ở lại đúng bộ sưu tập của ảnh gốc.
+        $data['project_id'] = $this->resolveProjectId($request, $generation);
+
         return $this->queueGeneration('image', $data, $cost, $generation);
     }
 
@@ -578,6 +581,7 @@ class StudioController extends Controller
                 // Chỉ forward khi có giá trị — rỗng ⇒ queueGeneration dùng Qwen Edit mặc định.
                 'provider' => $provider !== '' ? $provider : null,
                 'model' => $model !== '' ? $model : null,
+                'project_id' => $this->resolveProjectId($request),
             ], $cost)->getData(true);
         }
 
@@ -624,6 +628,7 @@ class StudioController extends Controller
             'mask_image' => $maskUrl,
             'edit' => true,
             'mode' => 'remove-bg',
+            'project_id' => $this->resolveProjectId($request),
         ], $cost);
     }
 
@@ -814,6 +819,7 @@ class StudioController extends Controller
                 'model' => $model !== '' ? $model : null,
                 // Kế thừa khuôn mặt mẫu: ảnh khuôn mặt (nếu có) được gửi kèm như face_ref → generateFromReference.
                 'face_ref' => $faceImageUrl,
+                'project_id' => $this->resolveProjectId($request),
             ], $cost)->getData(true);
         }
 
@@ -879,6 +885,7 @@ class StudioController extends Controller
                 'creative_level' => $parts['creative_level'],
                 'style' => $parts['style'],
                 'ornament_level' => $parts['ornament_level'],
+                'project_id' => $this->resolveProjectId($request),
             ], $cost)->getData(true);
         }
 
@@ -1271,8 +1278,9 @@ class StudioController extends Controller
         $gen = auth()->user()->generations()->create([
             'type' => 'image', 'status' => 'completed', 'media_url' => '/storage/'.$name,
             'prompt' => 'Xóa vùng chọn (tái tạo nền)', 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0,
+            'project_id' => $this->resolveProjectId($request, $generation),
         ]);
-        return response()->json(['generation_id' => $gen->id, 'status' => 'completed', 'media_url' => '/storage/'.$name, 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0]);
+        return response()->json(['generation_id' => $gen->id, 'project_id' => $gen->project_id, 'status' => 'completed', 'media_url' => '/storage/'.$name, 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0]);
     }
 
     /**
@@ -1493,6 +1501,8 @@ RULES:
 
         return response()->json([
             'id' => $g->id,
+            'project_id' => $g->project_id,
+            'project' => $g->project?->name,
             'type' => $g->type,
             'status' => $g->status,
             'model' => $g->model,
@@ -1860,6 +1870,38 @@ RULES:
         ]);
     }
 
+    /**
+     * Dự án để GẮN cho ảnh sinh ra từ thao tác này.
+     *
+     * Vì sao cần: trước đây CHỈ `/api/generate` và `/api/render-video` nhận `project_id`. Mọi thao
+     * tác phái sinh (sửa ảnh · biến thể · xoá nền · tạo lại · ghép · nâng cấp · look · sửa vùng ·
+     * cắt) đều tạo generation với `project_id = null`, nên kết quả RƠI RA NGOÀI bộ sưu tập ngay cả
+     * khi người dùng đang áp dụng một dự án — trái với lời hứa ghi ngay trong `store.applyProject()`
+     * ("ảnh/video tạo mới sẽ tự gắn vào"). Đo trên dữ liệu thật trước khi sửa: 5 generation,
+     * 3 dự án của cùng một tài khoản, 0 ảnh gắn dự án.
+     *
+     * CỐ Ý KHÔNG dùng `Rule::exists` như 2 endpoint tạo ảnh chính: dự án có thể đã bị xoá ở tab
+     * khác trong khi client còn giữ id cũ. Với thao tác SỬA ảnh thì việc sửa phải THÀNH CÔNG —
+     * không được để một id dự án cũ làm hỏng cả thao tác. Id không thuộc về người dùng ⇒ bỏ qua
+     * (không gắn) chứ không báo lỗi; đây không phải lỗ hổng vì ta chỉ ĐỌC để kiểm quyền sở hữu.
+     */
+    private function resolveProjectId(Request $request, ?Generation $source = null): ?int
+    {
+        $raw = $request->input('project_id');
+
+        if ($raw !== null && $raw !== '') {
+            $id = (int) $raw;
+            if ($id > 0 && \App\Models\Project::where('id', $id)->where('user_id', auth()->id())->exists()) {
+                return $id;
+            }
+        }
+
+        // Không gửi id (hoặc id không hợp lệ) ⇒ THỪA HƯỞNG dự án của ảnh nguồn: sửa một ảnh thuộc
+        // bộ sưu tập nào thì kết quả phải nằm cùng bộ sưu tập đó, nếu không người dùng mất dấu ảnh
+        // ngay sau khi sửa — đúng thứ khiến bộ sưu tập trở nên vô dụng.
+        return $source?->project_id ? (int) $source->project_id : null;
+    }
+
     protected function queueGeneration(string $type, array $data, int $cost, ?Generation $source = null)
     {
         $user = auth()->user();
@@ -1995,6 +2037,9 @@ RULES:
 
         return response()->json([
             'generation_id' => $fresh->id,
+            // [Yeu cau 2026-09-20] Tra ve de client luu NGAY: khong co truong nay thi anh vua tao
+            // vo hinh voi bo loc "chi outputs cua du an dang ap dung" cho toi khi /api/latest ve.
+            'project_id' => $fresh->project_id,
             'status' => $fresh->status,
             'model' => $fresh->model,
             'provider' => $fresh->provider,
@@ -2635,9 +2680,10 @@ RULES:
             'media_url' => '/storage/'.$name,
             'prompt' => 'Nâng cấp ảnh ('.$scale.'x'.($refine ? ', refine '.$refine : '').')',
             'model' => 'upscale', 'provider' => 'upscale', 'credits_cost' => 0,
+            'project_id' => $this->resolveProjectId($request),
         ]);
 
-        return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id]);
+        return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id, 'project_id' => $gen->project_id]);
     }
 
     /**
@@ -2664,8 +2710,9 @@ RULES:
         $gen = auth()->user()->generations()->create([
             'type' => 'image', 'status' => 'completed', 'media_url' => '/storage/'.$name,
             'prompt' => 'Film Look · '.$data['look'], 'model' => 'look', 'provider' => 'look', 'credits_cost' => 0,
+            'project_id' => $this->resolveProjectId($request),
         ]);
-        return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id]);
+        return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id, 'project_id' => $gen->project_id]);
     }
 
     public function reframe(Request $request): \Illuminate\Http\JsonResponse
@@ -2690,13 +2737,13 @@ RULES:
                 imagecopy($out, $img, 0, 0, $x, $y, $cw, $ch);
                 imagedestroy($img);
                 return $out;
-            }, 'Crop canvas', 'reframe');
+            }, 'Crop canvas', 'reframe', $this->resolveProjectId($request));
         }
         $ratio = in_array($data['ratio'] ?? '', ['1:1', '3:4', '4:5', '9:16', '16:9', '2:3', '3:2', '4:3'], true) ? $data['ratio'] : '3:4';
-        return $this->processAndStore($data['image'], function (\GdImage $img) use ($ratio) { return $this->cropReframe($img, $ratio); }, 'Reframe '.$ratio, 'reframe');
+        return $this->processAndStore($data['image'], function (\GdImage $img) use ($ratio) { return $this->cropReframe($img, $ratio); }, 'Reframe '.$ratio, 'reframe', $this->resolveProjectId($request));
     }
 
-    protected function processAndStore(string $srcUrl, callable $cb, string $prompt, string $model): \Illuminate\Http\JsonResponse
+    protected function processAndStore(string $srcUrl, callable $cb, string $prompt, string $model, ?int $projectId = null): \Illuminate\Http\JsonResponse
     {
         $file = $this->resolveLocalImage($srcUrl);
         if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
@@ -2709,8 +2756,9 @@ RULES:
         $gen = auth()->user()->generations()->create([
             'type' => 'image', 'status' => 'completed', 'media_url' => '/storage/'.$name,
             'prompt' => $prompt, 'model' => $model, 'provider' => $model, 'credits_cost' => 0,
+            'project_id' => $projectId,
         ]);
-        return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id]);
+        return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id, 'project_id' => $gen->project_id]);
     }
 
     /**

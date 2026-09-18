@@ -440,7 +440,24 @@ export const useStudioStore = defineStore('studio', {
       }
       return data;
     },
+    /**
+     * Dự án đang áp dụng — gửi kèm MỌI thao tác SINH ẢNH để kết quả nằm đúng bộ sưu tập.
+     *
+     * Vì sao: trước đây chỉ tạo ảnh mới và video gửi `project_id`; sửa ảnh · biến thể · xoá nền ·
+     * ghép · nâng cấp · look · sửa vùng · cắt đều KHÔNG gửi, nên kết quả rơi ra ngoài bộ sưu tập
+     * dù người dùng đang áp dụng một dự án.
+     *
+     * Gửi null khi không áp dụng dự án: server hiểu là "không chỉ định" và sẽ THỪA HƯỞNG dự án của
+     * ảnh nguồn — sửa một ảnh thuộc bộ sưu tập nào thì kết quả ở lại bộ sưu tập đó.
+     */
+    projectField() { return { project_id: this.appliedProjectId() }; },
     addGen(g) {
+      // Ảnh vừa tạo phải mang theo dự án NGAY, không chờ lần nạp lại kế tiếp: thiếu trường này thì
+      // nó vô hình với bộ lọc "chỉ outputs của dự án đang áp dụng" cho tới khi /api/latest về.
+      if (g.project_id === undefined) {
+        const pid = this.appliedProjectId();
+        if (pid) { g.project_id = pid; g.project = this.appliedProject ? this.appliedProject.name : null; }
+      }
       const existing = this.generations.find(x => x.id === g.id);
       if (existing) Object.assign(existing, g);
       else this.generations.unshift(g);
@@ -907,7 +924,7 @@ export const useStudioStore = defineStore('studio', {
     async reimagine(image, prompt, similarity = 70, variants = 1, process = true, model = null) {
       if (!image || !(prompt || '').trim()) { this.toast('Chọn ảnh + nhập mô tả.', 'error'); return null; }
       try {
-        const payload = { image, prompt, similarity: Number(similarity) || 70, variants: Number(variants) || 1 };
+        const payload = { image, prompt, similarity: Number(similarity) || 70, variants: Number(variants) || 1, ...this.projectField() };
         if (model && model.provider && model.model) { payload.provider = model.provider; payload.model = model.model; }
         const d = await this.api('/api/reimagine', payload);
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
@@ -928,7 +945,7 @@ export const useStudioStore = defineStore('studio', {
     async refgen(image, prompt = '', similarity = 70, variants = 1, model = null, tryon = false, body = null, faceModelId = '', poseId = '', background = '', angle = '') {
       if (!image) { this.toast('Chọn ảnh tham chiếu.', 'error'); return null; }
       try {
-        const payload = { image, prompt: prompt || '', similarity: Number(similarity) || 70, variants: Number(variants) || 1 };
+        const payload = { image, prompt: prompt || '', similarity: Number(similarity) || 70, variants: Number(variants) || 1, ...this.projectField() };
         // Ưu tiên: model truyền từ card > default nhóm image (Cài đặt → 🎯 Nhóm công việc).
         const taskModel = this.selectedTaskModel('image');
         const eff = (model && model.provider && model.model) ? model : taskModel;
@@ -971,6 +988,7 @@ export const useStudioStore = defineStore('studio', {
           image: l.image,
           mask_data: this.inpaintBrushData || undefined, // lasso tuỳ chọn — không có thì AI tự nhận diện chủ thể
           prompt: '',
+          ...this.projectField(),
         });
         if (d.generation_id) {
           this.addGen({ id: d.generation_id, type: 'image', status: d.status || 'pending', model: d.model || 'qwen-image-edit', provider: d.provider || 'qwen', media_url: d.media_url, error: d.error, credits_cost: d.credits_cost ?? 1, created_at: 'Vừa xóa nền' });
@@ -988,7 +1006,7 @@ export const useStudioStore = defineStore('studio', {
       this.composeStartTs = Date.now();
       const n = Number(variants) || 1;
       try {
-        const payload = { images, prompt, variants: n, mode, creative_level: Number(creativeLevel) || 6, style: style || '', ornament_level: Number(ornamentLevel) ?? 3 };
+        const payload = { images, prompt, variants: n, mode, creative_level: Number(creativeLevel) || 6, style: style || '', ornament_level: Number(ornamentLevel) ?? 3, ...this.projectField() };
         if (overridePrompt && String(overridePrompt).trim()) payload.final_prompt = String(overridePrompt).trim();
         const d = await this.api('/api/compose', payload);
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
@@ -1331,7 +1349,7 @@ export const useStudioStore = defineStore('studio', {
       const w = Math.max(1, Math.min(iw - x, Math.round(b.w * iw))), h = Math.max(1, Math.min(ih - y, Math.round(b.h * ih)));
       this.reframing = true;
       try {
-        const d = await this.api('/api/reframe', { image: this.upscaleSrc, ratio: this.reframeRatio, x, y, w, h });
+        const d = await this.api('/api/reframe', { image: this.upscaleSrc, ratio: this.reframeRatio, x, y, w, h, ...this.projectField() });
         this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'reframe', provider: 'reframe', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa cắt' });
         this.cropMode = false; this._cropStop(null);
         this.toast('Đã cắt vùng đã chọn.');
@@ -1342,7 +1360,7 @@ export const useStudioStore = defineStore('studio', {
       if (!this.upscaleSrc || this.reframing) return;
       this.reframing = true;
       try {
-        const d = await this.api('/api/reframe', { image: this.upscaleSrc, ratio: this.reframeRatio });
+        const d = await this.api('/api/reframe', { image: this.upscaleSrc, ratio: this.reframeRatio, ...this.projectField() });
         this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'reframe', provider: 'reframe', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa cắt' });
         this.toast('Đã cắt giữa ' + this.reframeRatio + '.');
       } catch (e) { this.toast(e.message || 'Lỗi cắt.', 'error'); }
@@ -1352,7 +1370,7 @@ export const useStudioStore = defineStore('studio', {
       if (!this.upscaleSrc || this.looking) return;
       this.looking = true;
       try {
-        const d = await this.api('/api/look', { image: this.upscaleSrc, look: this.lookPreset, level: Number(this.lookLevel) || 5 });
+        const d = await this.api('/api/look', { image: this.upscaleSrc, look: this.lookPreset, level: Number(this.lookLevel) || 5, ...this.projectField() });
         this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'look', provider: 'look', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa áp dụng' });
         this.toast('Đã áp dụng Look ' + this.lookPreset + '.');
       } catch (e) { this.toast(e.message || 'Lỗi áp dụng Look.', 'error'); }
@@ -1618,6 +1636,26 @@ export const useStudioStore = defineStore('studio', {
         this.uploadStats = d.stats || null;
       } catch (e) { this.toast(e.message || 'Không tải được danh sách file.', 'error'); }
       finally { this.uploadLoading = false; }
+    },
+    /**
+     * Gắn / bỏ gắn một ẢNH TẢI LÊN vào bộ sưu tập (dự án).
+     *
+     * nh tải lên là FILE trên đĩa (không có dòng trong CSDL) nên quan hệ này nằm ở bảng riêng
+     * `upload_project_links` — xem POST /api/projects/{project}/uploads.
+     *
+     * Vì sao cần: hai loại ảnh nằm CÙNG một Thư viện nhưng trước đây chỉ ảnh do AI tạo mới vào được
+     * bộ sưu tập; ảnh người dùng tự tải lên thì không, dù đó thường là ảnh gốc của cả bộ.
+     */
+    async attachUploadProject(projectId, rel, action = 'attach') {
+      if (!rel) return false;
+      if (action === 'attach' && !projectId) return false;
+      try {
+        const d = await this.api('/api/projects/' + projectId + '/uploads', { rel, action });
+        const it = this.uploadItems.find(f => f.rel === rel);
+        if (it) it.project_id = (d && d.project_id != null) ? d.project_id : null;
+        this.toast(action === 'detach' ? 'Đã bỏ ảnh khỏi bộ sưu tập.' : 'Đã gắn ảnh vào bộ sưu tập.');
+        return true;
+      } catch (e) { this.toast(e.message || 'Không gắn được ảnh vào bộ sưu tập.', 'error'); return false; }
     },
     toggleUploadSelect(rel) {
       const i = this.uploadSelection.indexOf(rel);
@@ -3481,7 +3519,9 @@ export const useStudioStore = defineStore('studio', {
           if (!res.ok) { delete this._pollTimers[id]; return; }
           const g = await res.json();
           const item = this.generations.find(x => x.id === Number(g.id));
-          if (item) { item.status = g.status; item.media_url = g.media_url; item.error = g.error; item.model = g.model; item.provider = g.provider; item.elapsed_ms = g.elapsed_ms; if (g.meta && typeof g.meta === 'object') item.meta = g.meta; item.is_demo = !!g.is_demo; item.demo_reason = g.demo_reason || null; }
+          if (item) { item.status = g.status; item.media_url = g.media_url; item.error = g.error; item.model = g.model; item.provider = g.provider; item.elapsed_ms = g.elapsed_ms; if (g.meta && typeof g.meta === 'object') item.meta = g.meta; item.is_demo = !!g.is_demo; item.demo_reason = g.demo_reason || null;
+            // Dự án có thể đã đổi ở tab khác (gắn/bỏ gắn) — show() trả về nên đồng bộ lại.
+            if (g.project_id !== undefined) { item.project_id = g.project_id; item.project = g.project; } }
           // [Đợt 0.2] trạng thái THẬT vừa đổi ⇒ cập nhật thanh tiến trình của lô (không mô phỏng).
           this.syncBatchProgress();
           if (['completed', 'failed', 'cancelled'].includes(g.status)) {
@@ -3514,7 +3554,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintStage = 'send';
       this.inpaintStartTs = Date.now();
       try {
-        const body = { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace, source_url: src, feather: Number(this.inpaintFeather) || 0 };
+        const body = { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace, source_url: src, feather: Number(this.inpaintFeather) || 0, ...this.projectField() };
         // Model do người dùng CHỌN trên card Sửa ảnh ('' = mặc định: Qwen Edit trong Cài đặt).
         const selModel = this.inpaintModel ? this.inpaintModels.find(o => o.provider + ':' + o.model === this.inpaintModel) : null;
         if (selModel) { body.provider = selModel.provider; body.model = selModel.model; }

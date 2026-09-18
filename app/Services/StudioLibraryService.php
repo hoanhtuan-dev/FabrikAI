@@ -249,6 +249,10 @@ class StudioLibraryService
             $files = array_merge($files, glob($assetBase.'/*.{png,jpg,jpeg,webp,gif}', GLOB_BRACE) ?: []);
         }
 
+        // Bộ sưu tập mà từng ảnh đang thuộc về (nếu có). Ảnh tải lên không có dòng trong CSDL nên
+        // quan hệ này nằm ở bảng riêng upload_project_links — xem migration 2026_09_20_000002.
+        $links = \App\Models\UploadProjectLink::mapForUser($user?->id);
+
         $items = [];
 
         {
@@ -269,6 +273,7 @@ class StudioLibraryService
                     'size' => (int) filesize($file),
                     'mtime' => (int) filemtime($file),
                     'used' => isset($referenced[$rel]),
+                    'project_id' => $links[$rel] ?? null,
                     'width' => $dims[0] ?? 0,
                     'height' => $dims[1] ?? 0,
                 ];
@@ -293,6 +298,23 @@ class StudioLibraryService
     /**
      * Xóa hàng loạt file đã tải lên (chỉ cho phép xóa file KHÔNG còn được dùng).
      */
+    /**
+     * Đường dẫn ảnh tải lên HỢP LỆ và THUỘC VỀ người dùng này — dùng cho thao tác GHI.
+     *
+     * Trả '' nếu không hợp lệ hoặc không có quyền; nơi gọi tự quyết định cách báo lỗi. Dùng lại
+     * đúng hai lớp đã có của đường XOÁ (normalizeUploadRel chặn leo thư mục,
+     * studio_upload_visible_to chặn thao tác lên ảnh của người khác) để hai đường không lệch nhau.
+     */
+    public function ownedUploadRel(\App\Models\User $user, string $rel): string
+    {
+        $rel = $this->normalizeUploadRel($rel);
+        if ($rel === '') {
+            return '';
+        }
+
+        return studio_upload_visible_to($rel, $user->id, (bool) $user->isAdmin()) ? $rel : '';
+    }
+
     public function deleteUploadedFiles(array $rels, ?\App\Models\User $user = null): array
     {
         $referenced = $this->referencedPaths();
@@ -315,6 +337,9 @@ class StudioLibraryService
             }
             $size = (int) filesize($abs);
             if ($this->safeUnlink($abs)) {
+                // File không còn ⇒ liên kết bộ sưu tập cũng hết nghĩa; giữ lại chỉ tạo dòng mồ côi
+                // trỏ tới đường dẫn không tồn tại.
+                \App\Models\UploadProjectLink::where('rel', $rel)->delete();
                 $deleted++;
                 $freed += $size;
             }

@@ -16,6 +16,8 @@ async function runUpscale() {
       scale: Number(store.upscaleScale) || 2,
       refine: Number(store.upscaleRefine) || 0,
       vibrance: Number(store.vibrance) || 0,
+      // Nâng cấp ảnh cũng là một KẾT QUẢ — phải ở lại đúng bộ sưu tập của ảnh gốc.
+      project_id: store.appliedProjectId(),
     });
     // §5.2: trước đây hardcode status:'completed' + credits_cost:0, bỏ qua trạng thái/chi phí thật
     // từ response -> item hiện "Hoàn tất" kể cả khi server trả trạng thái khác.

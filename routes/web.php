@@ -101,6 +101,8 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
     Route::post('/projects/{project}/transition', [ProjectController::class, 'transition'])->name('projects.transition');
     Route::post('/projects/{project}/generations', [ProjectController::class, 'attachGeneration'])->name('projects.attach');
+    // [Yeu cau 2026-09-20] Anh TAI LEN cung phai vao duoc bo suu tap nhu anh do AI tao.
+    Route::post('/projects/{project}/uploads', [ProjectController::class, 'attachUpload'])->name('projects.uploads.attach');
 
     // [Đợt 4 — 2026-09-19] XUẤT GÓI CHO XƯỞNG: ảnh tham chiếu + phiếu kỹ thuật + bảng size + manifest,
     // đóng thành 1 file ZIP. Chủ xưởng may cần "gói đủ để cắt may", không chỉ một tấm ảnh.
