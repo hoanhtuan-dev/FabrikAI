@@ -1043,6 +1043,75 @@ Studio mount** (ở trang đăng nhập) rồi mới điều hướng vào.
 - **Gieo dữ liệu kiểm thử phải làm TRƯỚC khi app mount.** App có handler `beforeunload` ghi đè localStorage;
   gieo sai thời điểm thì bài test đo chính cái rỗng do mình vừa tạo.
 
+---
+
+## 19. Đợt 15 — AUDIT TOÀN BỘ TRẠNG THÁI: tay cầm lệch khi vùng canvas đổi kích thước · bị ngăn kéo che trên mobile (2026-09-20)
+
+### 19.1 Vì sao phải audit thay vì sửa tiếp theo phỏng đoán
+
+Khiếu nại lặp lại y nguyên sau hai vòng sửa ⇒ cách làm "đoán chỗ hỏng rồi sửa" đã hết tác dụng. Lần này tôi
+**duyệt có hệ thống 12 trạng thái** của khung canvas và ghi lại với mỗi trạng thái: có tay cầm không · có bấm
+được không · bị phần tử nào che (đo bằng `elementFromPoint`) · layer nào đang chọn.
+
+Kết quả audit (trước khi sửa):
+
+| Trạng thái | Tay cầm | Bấm được |
+|---|---|---|
+| mặc định desktop 1600 · công cụ Lựa chọn · Di chuyển canvas · Reframe/Crop · zoom 2 bước · layer KHÓA | 2 | ✅ |
+| Vẽ tự do (drawMode) · Xóa vùng (eraseMode) | 0 | — (chế độ isolate: chỉ hiện 1 ảnh, **cố ý** không có tay cầm layer) |
+| layer đang chọn bị ẨN | 0 | — (cố ý: layer vô hình thì không có tay cầm) |
+| **khung nhìn MOBILE 390×844** | 2 | ❌ **bị FOOTER của bảng Lớp che** |
+
+Và khi đo toạ độ ở khung 390px thì lộ ra lỗi thứ hai, nặng hơn: tay cầm có `left: 734px` trong khi
+**vùng canvas chỉ rộng 364px** ⇒ nằm ngoài màn hình (`elementFromPoint` trả về `null`).
+
+### 19.2 Hai nguyên nhân
+
+1. **Toạ độ tay cầm bị "đóng băng" theo khung cũ.** `activeHandles` là computed chỉ tính lại khi phụ thuộc
+   reactive đổi — mà đổi kích thước vùng canvas (đổi cửa sổ · kéo dock · mở/đóng bảng Lớp · xoay máy) thì
+   `zoom`/`pan`/dữ liệu layer KHÔNG đổi ⇒ không có gì kích hoạt tính lại. Phép KẸP vì thế chỉ đúng ở lần
+   tính đầu tiên; sau đó toạ độ cũ được giữ nguyên và rơi ra ngoài màn hình.
+2. **Kẹp vào vùng canvas chưa đủ** vì còn lớp phủ ĐÈ LÊN canvas: trên mobile bảng Lớp là ngăn kéo (`z-50`)
+   phủ nửa phải, thanh công cụ floating nằm ở đáy. Tay cầm kẹp vào đúng chỗ bị che ⇒ có tay cầm mà bấm không được.
+
+### 19.3 Đã làm
+
+1. **Nhịp khung nhìn `viewportTick`**: tăng khi vùng canvas đổi (hàm xử lý `resize` sẵn có) **và** bằng
+   `ResizeObserver` trên chính phần tử canvas — vì cửa sổ có thể không đổi mà vùng canvas vẫn đổi (kéo dock,
+   bật/tắt bảng Lớp, thanh trạng thái xuống dòng). `activeHandles` phụ thuộc nhịp này nên **luôn tính lại**.
+2. **Kẹp vào vùng ĐƯỢC PHÉP = vùng canvas TRỪ các lớp phủ đang che nó**: mỗi lớp phủ tự khai hướng che qua
+   `[data-covers-canvas="right|bottom"]` (ngăn kéo bảng Lớp · thanh công cụ floating của mobile); hàm
+   `handleClampBox()` bỏ qua lớp phủ đang ẩn và chỉ co trần khi THẬT SỰ giao nhau. Vùng co lại quá nhỏ thì
+   lùi về giữa khung để tay cầm vẫn còn chỗ bấm.
+
+### 19.4 Đo được (Chrome thật)
+
+| Khung nhìn | Trước | Sau |
+|---|---|---|
+| MOBILE 390×844 (bảng Lớp mở) | tay cầm 2 nhưng **bị FOOTER bảng Lớp che** | cả hai tay cầm **trong màn hình** và `elementFromPoint` trả về **chính tay cầm** |
+| MOBILE (đóng bảng Lớp) | — | cả hai bấm được |
+| DESKTOP 1600×1000 | ✅ | ✅ |
+| ĐỔI CỬA SỔ 1024×700 | toạ độ cũ ⇒ lệch/ra ngoài | cả hai **trong màn hình**, bấm được |
+| ĐỔI CỬA SỔ 800×600 | — | cả hai **trong màn hình**, bấm được |
+| Chuỗi mờ khi ẩn (40ms) | — | `1 → 0.436 → 0.109 → 0.045 → 0.008 → 0.001 → 0`; khi hiện `0 → 0.565 → 0.891 → 0.955 → 0.992` |
+| `vendor/bin/phpunit` | 696 test / 4627 khẳng định | **698 test / 4639 khẳng định — XANH** (15 test bất biến cho khung canvas) |
+
+### 19.5 Bài học tự bắt được trong đợt này
+
+- **Computed có ĐO DOM thì phải có phụ thuộc cho mọi thứ nó đo.** Toạ độ tay cầm phụ thuộc kích thước vùng
+  canvas, nhưng computed chỉ biết `zoom`/`pan`/dữ liệu layer ⇒ "đóng băng" sau lần tính đầu. Cách sửa đúng
+  là thêm một NGUỒN SỰ THẬT cho kích thước (nhịp + ResizeObserver), không phải rải `getBoundingClientRect`
+  khắp nơi.
+- **Kẹp vào "vùng của tôi" chưa đủ — phải kẹp vào "vùng còn nhìn thấy".** Lớp phủ của chính ứng dụng (ngăn
+  kéo, thanh công cụ) cũng che mất điều khiển; muốn biết chỗ nào bấm được thì phải hỏi `elementFromPoint`,
+  và các lớp phủ nên TỰ KHAI vùng chúng chiếm.
+- **Audit theo trạng thái hiệu quả hơn sửa theo phỏng đoán.** 12 dòng kết quả chỉ ra ngay 2 lỗi mà 3 vòng
+  sửa trước không thấy, vì mỗi lần tôi chỉ thử đúng một trạng thái quen thuộc (desktop, layer mới).
+- **Một bản deploy KHÔNG cập nhật tab đang mở.** Ứng dụng là SPA: tab đang chạy giữ nguyên JS cũ cho tới khi
+  tải lại. Đây là lý do rất có thể khiến người dùng vẫn thấy hành vi cũ sau nhiều lần deploy — cần nói rõ
+  "tải lại trang" mỗi lần giao bản sửa, và nên có chỉ báo "có bản mới" trong ứng dụng.
+
+
 
 
 
