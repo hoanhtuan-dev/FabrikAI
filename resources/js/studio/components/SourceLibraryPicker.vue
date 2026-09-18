@@ -33,6 +33,8 @@ function close() { emit('update:modelValue', false); }
 async function loadRefs() {
   try { const r = await fetch('/api/ref-images?_=' + Date.now(), { headers: { Accept: 'application/json' } }); if (!r.ok) throw new Error('HTTP ' + r.status); const d = await r.json(); refs.value = d.items || []; } catch (e) { refs.value = []; }
 }
+// [CÙNG LỖI ĐÃ SỬA Ở SourcePickerPopup 2026-09-20] thiếu immediate:true ⇒ component mount bằng v-if
+// (modelValue đã true sẵn) nên watch không chạy lần đầu ⇒ loadRefs() không được gọi ⇒ lưới ảnh luôn rỗng.
 watch(() => props.modelValue, (open) => {
   if (open) {
     query.value = '';
@@ -40,7 +42,7 @@ watch(() => props.modelValue, (open) => {
     selRefs.value = []; selOutput.value = [];
     loadRefs();
   }
-});
+}, { immediate: true });
 
 // Kết quả (output library) — các ảnh đã sinh, chỉ lấy ảnh hoàn tất.
 const output = computed(() => store.generations

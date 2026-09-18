@@ -204,13 +204,18 @@ function onKeydown(e) {
   if (zoomItem.value) { closeZoom(); return; }
   close();
 }
+// [SỬA LỖI BẮT ĐƯỢC KHI VERIFY PRODUCTION 2026-09-20] watch này thiếu immediate:true.
+// Popup được mount bằng v-if (v-model="store.sourcePickerOpen") nên ở thời điểm setup modelValue ĐÃ là true
+// — watch không có immediate sẽ KHÔNG BAO GIỜ chạy lần đầu ⇒ loadRefs() không được gọi ⇒ thư viện ảnh
+// đã tải lên LUÔN rỗng dù người dùng có ảnh. Đây chính là "popup thiếu tính năng" mà khách gặp.
+// immediate:true chạy loadRefs() ngay khi mount; watch vẫn bắt các lần bật/tắt sau.
 watch(() => props.modelValue, (open) => {
   if (open) {
     // Reset bộ lọc + lựa chọn mỗi lần mở (y hệt các picker cũ).
     query.value = ''; sortKey.value = 'newest'; selRefs.value = []; selOutput.value = []; zoomItem.value = null;
     loadRefs();
   }
-});
+}, { immediate: true });
 onMounted(() => window.addEventListener('keydown', onKeydown));
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
 
