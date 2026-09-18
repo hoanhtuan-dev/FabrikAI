@@ -1121,9 +1121,9 @@ function onTouchEnd(e) {
         </div>
       </main>
       <!-- Right dock (desktop): chỉ hiển thị Outputs; Nguồn ảnh & Thư viện là nút HÀNH ĐỘNG ở rail -->
-      <!-- [Yêu cầu 2026-09-20] Bề rộng dock Outputs +3%: 115px → 118px (làm tròn từ 118,45).
-           115 × 1,03 = 118,45 — không dùng số thập phân trong class Tailwind để tránh làm tròn lạ. -->
-      <aside v-if="store.outputDockOpen" class="scrollbar-hide hidden w-[118px] shrink-0 flex-col border-l border-ink-700 bg-ink-900/70 lg:flex">
+      <!-- [Yêu cầu 2026-09-20] Bề rộng dock Outputs: 115px → 118px (+3%) → nay đặt hẳn 156px để ảnh
+           thumbnail trong danh sách đủ rộng nhìn rõ, và tên ảnh không bị cắt quá ngắn. -->
+      <aside v-if="store.outputDockOpen" class="scrollbar-hide hidden w-[156px] shrink-0 flex-col border-l border-ink-700 bg-ink-900/70 lg:flex">
         <div class="panel-head shrink-0 border-b border-ink-700">
           <span class="panel-title"><StudioIcon name="grid" size="h-3.5 w-3.5" class="text-brand-400" /> Outputs</span>
         </div>
@@ -1131,24 +1131,24 @@ function onTouchEnd(e) {
           <OutputModule />
         </div>
       </aside>
-      <nav class="activity-bar right hidden lg:flex" aria-label="Nguồn · Thư viện · Outputs">
+      <nav class="activity-bar right hidden lg:flex" aria-label="Nguồn · Thư viện · Bảng lệnh · Outputs">
         <button @click="store.sourcePickerOpen = true" class="activity-btn" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm" aria-label="Nguồn ảnh">
           <StudioIcon name="imagePlus" size="h-5 w-5" />
         </button>
         <button @click="goLibrary" class="activity-btn" title="Thư viện — xem ảnh đã tạo & file tải lên" aria-label="Thư viện">
           <StudioIcon name="library" size="h-5 w-5" />
         </button>
-        <!-- [Yêu cầu 2026-09-20] mt-auto ghim nhóm dưới xuống đáy rail: Outputs rồi tới Bảng lệnh.
-             Trước đây chỉ Outputs nằm dưới; nay thêm nút Bảng lệnh NGAY DƯỚI Outputs, đúng yêu cầu
-             "thêm nút mở Command palette bên phải phía dưới". -->
-        <button @click="store.toggleOutputDock()" class="activity-btn mt-auto" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">
-          <StudioIcon name="grid" size="h-5 w-5" />
-          <span v-if="store.generations.length" class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[8px] font-bold leading-none text-white">{{ store.generations.length }}</span>
-        </button>
+        <!-- [Yêu cầu 2026-09-20 — bố cục cuối] mt-auto nằm ở nút ĐẦU của nhóm dưới, ghim cả nhóm xuống
+             đáy rail; Outputs đặt CUỐI CÙNG nên nằm sát đáy và được ghim ở đáy đúng yêu cầu.
+             Thứ tự từ trên xuống: Nguồn ảnh · Thư viện · …khoảng trống… · Bảng lệnh · Outputs. -->
         <!-- Bảng lệnh (Ctrl+K / Ctrl+Shift+P / F1): nút hiện diện để người dùng KHÔNG cần biết phím tắt.
              aria-keyshortcuts để trình đọc màn hình đọc được phím tắt kèm nút. -->
-        <button @click="openPalette()" class="activity-btn" aria-keyshortcuts="Control+K" title="Bảng lệnh (Ctrl+K) — tìm lệnh, dự án, mẫu việc, ảnh" aria-label="Bảng lệnh">
+        <button @click="openPalette()" class="activity-btn mt-auto" aria-keyshortcuts="Control+K" title="Bảng lệnh (Ctrl+K) — tìm lệnh, dự án, mẫu việc, ảnh" aria-label="Bảng lệnh">
           <StudioIcon name="search" size="h-5 w-5" />
+        </button>
+        <button @click="store.toggleOutputDock()" class="activity-btn" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">
+          <StudioIcon name="grid" size="h-5 w-5" />
+          <span v-if="store.generations.length" class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[8px] font-bold leading-none text-white">{{ store.generations.length }}</span>
         </button>
       </nav>
     </div>
