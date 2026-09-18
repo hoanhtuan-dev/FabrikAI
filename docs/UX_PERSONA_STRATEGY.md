@@ -360,3 +360,86 @@ từng chặng với **bằng chứng đo được**, không phải mô tả ý 
   để điền chữ — cách đó vỡ ngay khi card đổi bố cục. Đã thay bằng kênh store `requestBatchPrompts()`.
 
 
+## 10. Đt 6 — Khu "Cài đặt của tôi" HP NHẤT + tùy chỉnh lưu theo TÀI KHOẢN (2026-09-20)
+
+### 10.1 Vấn đề (đo được, không suy đoán)
+
+Cài đặt của người dùng là **4 trang SPA rời rạc**: `/presets` · `/stylist-data` · `/model-settings?tab=model` ·
+`?tab=pose`. Mỗi trang một app riêng, chỉ có một lối thoát "← Về FabrikAI": muốn sang mục khác phải quay về
+Studio rồi mở lại menu bánh răng. Đo trên mã nguồn:
+
+| Lỗi | Bằng chứng trước khi sửa |
+|---|---|
+| Không có điều hướng giữa 4 mục | mỗi app chỉ render 1 link `href="/"` |
+| 4 kiểu tiêu đề | `text-xl` + emoji 🗂️ ở một trang, `text-xl` + ⚙️ ở trang khác, 2 trang còn lại khác nữa |
+| 3 khay thông báo tự chế | 2400ms (stylist) · 2600ms (presets) · 2800ms (model) — 3 vị trí, 3 kiểu |
+| 2 kiểu hộp thoại xác nhận | `window.confirm()` ở presets + model · modal tự chế ở stylist |
+| 2 lối vào cho CÙNG một trang | menu có 2 dòng `/model-settings?tab=model` và `?tab=pose` |
+| Không tìm kiếm được | 9 danh mục × nhiều preset, phải cuộn bằng mắt |
+| Tải không có khung xương | chữ "Đang tải…" trần; rỗng thì không nói phải làm gì |
+
+Và lỗi nặng nhất, không phải giao diện: **tùy chỉnh nằm trong `localStorage`** ⇒ đổi máy hoặc đổi trình duyệt
+là **mất sạch** preset, loại trang phục và câu hỏi người dùng đã tạo. Với người dùng làm việc trên nhiều máy
+thì đây là mất dữ liệu thật.
+
+### 10.2 Đã làm
+
+**Một khu thay cho bốn trang.** Một app duy nhất (`resources/js/studio/my-settings.js`) + một sidebar trái +
+một khay thông báo + một hộp thoại xác nhận. Bốn mục: **Preset · Khuôn mặt · Dáng pose · Trợ lý thiết kế**.
+Thêm địa chỉ chính thức `/cai-dat` và `/cai-dat/{mục}`; đổi mục thì `history.pushState` sang `/cai-dat/<mục>`
+nên vẫn deep-link và back/forward được.
+
+**Giữ 4 URL cũ thay vì chuyển hướng hết.** Chuyển hướng sẽ phá hợp đồng "trang cũ trả 200" đã khoá bằng
+`tests/Feature/UserCatalogTest.php`, và làm chết bookmark đang dùng. Cả 4 URL cùng render MỘT blade; server
+truyền `data-section` để app mở đúng mục — nhờ vậy `/model-settings?tab=pose` mở đúng *Dáng pose* mà không
+phải đoán từ URL.
+
+**Tùy chỉnh chuyển lên server theo tài khoản.** Bảng `user_catalogs` + `GET/PUT /api/user-catalogs/{name}`
+(whitelist đúng 3 tên, trần 256 KB / 500 mục, mọi truy vấn khoá theo `auth()->id()`). Giữ nguyên mô hình 3 phần
+`custom` / `edits` / `hidden` và toàn bộ ngữ nghĩa ghép `baseline ⊕ bản của user`.
+
+**Di trú một lần, không bỏ rơi ai.** Máy nào còn bản cũ trong `localStorage` thì lần mở đầu tiên tự đẩy lên
+server rồi xoá bản cũ — đã kiểm riêng đường này (7 phép kiểm, gồm cả "mở lại KHÔNG nhập trùng").
+
+**Studio dùng LẠI `StylistSection`** thay vì bản sao `StylistDataManager`: một cách cài đặt duy nhất cho cả
+khu Cài đặt lẫn thẻ Trợ lý thiết kế trong Studio.
+
+### 10.3 Ràng buộc đã giữ
+
+- **Không đổi luồng generate.** Không đụng tới đường tạo ảnh.
+- **Không thêm endpoint nào ngoài thoả thuận.** Đúng 2 route mới `/api/user-catalogs/{name}` (GET · PUT).
+- **`merge()` và `create()` vẫn ĐỒNG BỘ.** `create()` trả về id ngay, `merge()` đồng bộ — chỉ việc gửi mạng là
+  lùi lại (debounce 350ms). Nhờ vậy component không phải chờ mạng mỗi lần render, và `merge()` giữ nguyên
+  thứ tự "baseline trước, mục tự tạo nối vào cuối".
+- **Module mới phải đăng ký vào gói cước.** `user-catalogs` được thêm vào cả module `prompt` lẫn `stylist` ở
+  `ModuleRegistry` — bỏ qua bước này thì tài khoản ở gói không có module sẽ bị **403**, đúng loại lỗi đã gặp
+  với `/api/job-templates` trước đây.
+
+### 10.4 Đo được
+
+| Kiểm chứng | Kết quả |
+|---|---|
+| Test tự động | **639 test / 4.039 assert — XANH** (trước 614/3908 ⇒ **+25 test, +131 assert**) |
+| Guard `scripts/check-local-catalog.mjs` | **23/23 ĐẠT** (ngữ nghĩa ghép giữ nguyên) |
+| Build production | `npm run build` xanh · entry 3 cái gộp còn 1 |
+| Điều hướng (Chrome CDP) | **21/21** — mỗi lối vào mở đúng mục, sidebar 4 mục, bấm mục đổi cả nội dung lẫn URL |
+| Lưu trữ theo tài khoản (dev) | **10/10** — thấy `PUT /api/user-catalogs/presets`, preset **còn sau khi tải lại trang**, `GET` trả về đúng, xoá được qua hộp thoại |
+| Di trú localStorage → server | **7/7** — preset cũ hiện ra, được đẩy lên server, bản cũ bị xoá, mở lại không nhập trùng |
+| Bố cục | 1600×1000: sidebar 256px, không tràn ngang · 900×800: sidebar ẩn, có nút chọn mục · panel sidebar `sticky`, bám lại ở đỉnh sau khi cuộn 900px |
+| Tương phản chữ (WCAG AA) | **0 chỗ dưới chuẩn** trên cả 3 mục (đo bằng công thức độ chói tương đối) |
+| Production (tài khoản thật) | **10/10** — đăng nhập · sidebar 4 mục · ghi lên server · còn sau khi tải lại · cả 3 mục render, 0 lỗi console |
+| Dọn dẹp | tài khoản tạm đã xoá · `user_catalogs` = **0 dòng** · log ERROR giữ nguyên mức **7** |
+
+### 10.5 Bài học tự bắt được trong đợt này
+
+- **Kiểm chứng trên môi trường THẬT bắt được lỗi mà test xanh không thấy.** `UserCatalogApiTest` (23 test) xanh
+  hoàn toàn — vì `RefreshDatabase` tự chạy migration. Nhưng DB dev **chưa migrate** nên `GET /api/user-catalogs/presets`
+  trả **500**, `load()` thất bại và **không có lệnh ghi nào được gửi**. Nếu chỉ tin vào test xanh rồi deploy thì
+  production cũng 500 y hệt. Vì vậy migration đã được chạy tường minh khi deploy.
+- **Test ĐỎ chưa chắc là sản phẩm sai.** Hai lần báo đỏ trong đợt này đều do **đo nhầm thứ**: (a) đo chiều cao
+  `<aside>` — vốn là flex item bị kéo giãn theo nội dung — trong khi phần tử `sticky` mới là thứ phải nằm trong
+  khung nhìn; (b) dò `#app` trong khi phần tử gốc thật là `#studio-root`. Sửa TEST, không sửa sản phẩm.
+- **Chuyển lớp lưu trữ là thay đổi có thể mất dữ liệu — phải có đường lùi.** Chỉ cần quên `await catalog.load()`
+  ở một chỗ là người dùng **không thấy tùy chỉnh của chính mình** (baseline hiện ra như chưa từng sửa). Đã biến
+  điều này thành một khẳng định trong test, và chính nó phát hiện `StylistDataManager` cũ (dùng trong Studio)
+  không gọi `load()` — nếu để nguyên thì thẻ Trợ lý thiết kế sẽ hiện thiếu dữ liệu của người dùng.
