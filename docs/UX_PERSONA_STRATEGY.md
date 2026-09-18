@@ -1165,6 +1165,56 @@ nhiều lần deploy: chỉ cần một công cụ canvas đang bật là mọi 
 - **Một lần nữa: deploy không cập nhật tab đang mở.** Ghi lại ở đây để lần sau câu hỏi đầu tiên luôn là
   "đã tải lại trang chưa", trước khi đi sửa mã.
 
+---
+
+## 21. Đợt 17 — BỎ ĐIỀU KIỆN TIÊN QUYẾT: tay cầm chỉnh kích cỡ có ở MỌI layer (2026-09-20)
+
+### 21.1 Vì sao lại phải bỏ điều kiện thay vì giải thích thêm
+
+Sau khi đã sửa ba nguyên nhân đo được (layer cũ thiếu `baseW/baseH` · toạ độ đóng băng khi vùng canvas đổi ·
+chế độ "chỉnh 1 layer" không có tay cầm), khiếu nại vẫn lặp lại. Nhìn lại toàn bộ các trạng thái thì thấy
+một **điều kiện tiên quyết ngầm** vẫn còn: tay cầm chỉ có cho **layer ĐANG CHỌN**. Mọi trạng thái làm mất
+"đang chọn" đều dẫn tới "không có tay cầm":
+
+| Trạng thái | Tay cầm (trước đợt này) |
+|---|---|
+| Bấm ra vùng trống (bỏ chọn) | **0** |
+| Vừa mở trang, chưa chọn layer nào | **0** |
+| Đang bật công cụ canvas mà chưa chọn layer | **0** |
+| Chọn layer A, muốn chỉnh layer B | phải chọn B trước mới có tay cầm |
+
+Mỗi trạng thái đều "hợp lệ" — nên thay vì thêm nhãn giải thích cho từng cái, cách bền hơn là **bỏ điều kiện**.
+
+### 21.2 Đã làm
+
+1. `layerHandles` (thay `activeHandles`): **MỌI layer đang hiện đều có tay cầm chỉnh kích cỡ**. Layer đang
+   chọn có thêm tay cầm XOAY và tay cầm đậm hơn; layer khác mờ hơn (`.layer-handle--other`) nhưng **luôn có**.
+2. **Kéo tay cầm của layer chưa chọn = tự chọn layer đó rồi chỉnh luôn** (`startResizeFromHandle`) ⇒ không
+   cần chọn trước; tay cầm nào cũng dùng được ngay.
+3. Chế độ "chỉnh 1 layer" chỉ giới hạn khi THẬT SỰ có layer đang chọn (lúc đó canvas chỉ hiện layer đó);
+   không chọn gì thì canvas hiện dạng nhiều layer nên tay cầm của mọi layer đều đúng chỗ.
+4. Bảng Lớp: ảnh thu nhỏ **mờ + mất màu** khi layer bị tắt (theo token) ⇒ bật/tắt layer thấy được ngay
+   trong bảng, không chỉ trên canvas.
+
+### 21.3 Đo được (Chrome thật)
+
+| Trạng thái | Tay cầm | Bấm được |
+|---|---|---|
+| 2 layer, 1 layer đang chọn | 3 (2 của layer đang chọn + 1 mờ của layer kia) | ✅ (tay cầm của layer bị layer trên che thì vẫn chọn được layer đó từ bảng Lớp) |
+| **Bỏ chọn hết** | **2** (trước: 0) | ✅ |
+| Chế độ 1 layer, chưa chọn layer | **2** (trước: 0) | ✅ |
+| Chế độ 1 layer, đã chọn layer | 2 (kích cỡ + xoay) | ✅ — kéo ⇒ scale **1 → 1.25** |
+| `vendor/bin/phpunit` | — | **700 test / 4654 khẳng định — XANH** (17 test bất biến cho khung canvas) |
+
+### 21.4 Bài học tự bắt được trong đợt này
+
+- **Điều kiện tiên quyết ngầm là nguồn của "tính năng không tồn tại".** Tay cầm *có* trong mã, *có* hiệu ứng,
+  *có* test — nhưng chỉ khi một điều kiện khác đã đúng. Với người dùng, "chỉ hiện khi X" đọc thành "không có".
+  Khi một điều khiển bị phàn nàn là "không có", hãy **bỏ điều kiện** trước khi viết thêm hướng dẫn.
+- **Sửa theo từng trạng thái không bao giờ đủ nếu còn điều kiện chung.** Ba vòng trước tôi sửa ba trạng thái
+  cụ thể; trạng thái thứ tư (chưa chọn layer) vẫn hỏng. Bỏ điều kiện chung thì mọi trạng thái cùng đúng.
+
+
 
 
 
