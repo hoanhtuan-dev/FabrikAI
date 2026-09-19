@@ -165,7 +165,7 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-pUga9t1G.js",
+    "file": "assets/settings-DUaARTJu.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
@@ -175,7 +175,7 @@
       "_BaseModal-PHVY4UFI.js"
     ],
     "css": [
-      "assets/settings-CAdhARG4.css"
+      "assets/settings-BKFyUyhA.css"
     ]
   }
 }

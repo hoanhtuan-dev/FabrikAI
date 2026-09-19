@@ -842,24 +842,51 @@ if (! function_exists('dashscope_base_url')) {
     }
 }
 
+if (! function_exists('studio_provider_families')) {
+    /**
+     * MỌI nhóm provider hợp lệ trong luồng ưu tiên — NGUỒN DUY NHẤT.
+     *
+     * Thứ tự ở đây = thứ tự mặc định của luồng ('other' luôn cuối vì là nhóm hứng
+     * provider ngoài luồng). Thêm nhóm mới (vd một hãng khác) chỉ cần thêm token ở
+     * đây + gán 'family' cho provider trong studio_provider_catalog(); cả
+     * studio_provider_default_flow(), validate ở Settings và UI đều theo.
+     */
+    function studio_provider_families(): array
+    {
+        return ['qwen', 'custom', 'flux', 'deepseek', 'gemini', 'other'];
+    }
+}
+
+if (! function_exists('studio_provider_default_flow')) {
+    /**
+     * Luồng mặc định khi admin chưa cấu hình gì: mọi nhóm theo thứ tự chuẩn, TRỪ
+     * 'other' (nhóm hứng, chỉ dùng khi được gán default riêng).
+     */
+    function studio_provider_default_flow(): array
+    {
+        return array_values(array_diff(studio_provider_families(), ['other']));
+    }
+}
+
 if (! function_exists('studio_provider_priority_flow')) {
     /**
      * Luồng ưu tiên NHÓM provider (fallback chain) — DeepSeek Harness style.
      *
-     * Mặc định: qwen → custom → flux → gemini. Đọc từ setting DB (tab "Luồng ưu
-     * tiên" của trang Cài đặt) → env STUDIO_PROVIDER_PRIORITY → config. Token hợp
-     * lệ: qwen | custom | flux | gemini | other (mọi token khác bị bỏ).
+     * Mặc định: qwen → custom → flux → deepseek → gemini. Đọc từ setting DB (tab
+     * "Luồng ưu tiên" của trang Cài đặt) → env STUDIO_PROVIDER_PRIORITY → config.
+     * Token không nằm trong studio_provider_families() bị bỏ.
      */
     function studio_provider_priority_flow(): array
     {
-        $raw = (string) studio_config('provider_priority', (string) config('studio.provider_priority', 'qwen,custom,flux,gemini'));
-        $valid = ['qwen', 'custom', 'flux', 'gemini', 'other'];
+        $fallback = implode(',', studio_provider_default_flow());
+        $raw = (string) studio_config('provider_priority', (string) config('studio.provider_priority', $fallback));
+        $valid = studio_provider_families();
         $tokens = array_values(array_filter(
             array_map('trim', explode(',', $raw)),
             fn ($t) => $t !== '' && in_array($t, $valid, true)
         ));
 
-        return $tokens ?: ['qwen', 'custom', 'flux', 'gemini'];
+        return $tokens ?: studio_provider_default_flow();
     }
 }
 
@@ -1022,7 +1049,7 @@ if (! function_exists('studio_provider_catalog')) {
             'veo' => ['name' => 'Google Veo — video', 'protocol' => 'gemini', 'family' => 'gemini', 'priority' => 9, 'hint' => 'GOOGLE_VEO_KEY'],
             'fal' => ['name' => 'Fal.ai — Flux (fallback ảnh)', 'protocol' => 'openai', 'family' => 'flux', 'priority' => 10, 'hint' => 'FAL_KEY (fal.ai/dashboard/keys) — queue.fal.run, auth "Key …"'],
             'replicate' => ['name' => 'Replicate — Flux (ảnh)', 'protocol' => 'openai', 'family' => 'flux', 'priority' => 5, 'hint' => 'REPLICATE_API_TOKEN (dùng qua custom provider để gọi trực tiếp)'],
-            'deepseek' => ['name' => 'DeepSeek — ngôn ngữ / suy luận', 'protocol' => 'openai', 'family' => 'other', 'priority' => 5, 'hint' => 'DEEPSEEK_API_KEY · model deepseek-chat'],
+            'deepseek' => ['name' => 'DeepSeek — ngôn ngữ / suy luận', 'protocol' => 'openai', 'family' => 'deepseek', 'priority' => 5, 'hint' => 'DEEPSEEK_API_KEY · model deepseek-chat/reasoner · đứng trước Gemini trong luồng'],
         ];
     }
 }
@@ -1794,10 +1821,13 @@ if (! function_exists('studio_model_catalog')) {
             // ── PROMPT — Giám đốc sáng tạo / Thuật sỹ ảo ──
             ['group' => 'prompt', 'name' => 'Qwen 3.8 Flash', 'provider' => 'qwen', 'model_id' => 'qwen3.8-flash', 'api_key_ref' => 'qwen', 'priority' => 10, 'note' => '1M context, agentic, tiếng Việt tốt'],
             ['group' => 'prompt', 'name' => 'Qwen 3.8 Max', 'provider' => 'qwen', 'model_id' => 'qwen3.8-max', 'api_key_ref' => 'qwen', 'priority' => 8, 'note' => 'Suy luận sâu hơn (snapshot 0902)'],
+            ['group' => 'prompt', 'name' => 'DeepSeek Chat', 'provider' => 'deepseek', 'model_id' => 'deepseek-chat', 'api_key_ref' => 'deepseek', 'priority' => 5, 'note' => 'Nhóm DeepSeek đứng TRƯỚC Gemini — suy luận prompt, giá rẻ'],
+            ['group' => 'prompt', 'name' => 'DeepSeek Reasoner', 'provider' => 'deepseek', 'model_id' => 'deepseek-reasoner', 'api_key_ref' => 'deepseek', 'priority' => 4, 'note' => 'Suy luận sâu (chain-of-thought), chậm hơn chat'],
             ['group' => 'prompt', 'name' => 'Gemini 2.5 Flash', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash', 'api_key_ref' => 'gemini', 'priority' => 1, 'note' => 'Tùy chọn cuối'],
 
             // ── TRANSLATE — dịch prompt VI ↔ EN ──
             ['group' => 'translate', 'name' => 'Qwen 3.8 Flash (dịch)', 'provider' => 'qwen', 'model_id' => 'qwen3.8-flash', 'api_key_ref' => 'qwen', 'priority' => 10, 'note' => 'Dịch VI↔EN tự nhiên, rẻ'],
+            ['group' => 'translate', 'name' => 'DeepSeek Chat (dịch)', 'provider' => 'deepseek', 'model_id' => 'deepseek-chat', 'api_key_ref' => 'deepseek', 'priority' => 5, 'note' => 'Nhóm DeepSeek đứng TRƯỚC Gemini — dịch VI↔EN'],
             ['group' => 'translate', 'name' => 'Gemini 2.5 Flash (dịch)', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash', 'api_key_ref' => 'gemini', 'priority' => 1, 'note' => 'Tùy chọn cuối'],
 
             // ── INFERENCE (legacy key — giữ cho đường resolve_studio_model cũ) ──
@@ -1819,12 +1849,17 @@ if (! function_exists('studio_sync_model_catalog')) {
      * trong trang Cài đặt (tab Luồng ưu tiên). Khi QwenCloud thêm model mới: cập
      * nhật studio_model_catalog() rồi chạy lại — cache tự xoá qua model events.
      */
-    function studio_sync_model_catalog(): array
+    function studio_sync_model_catalog(?string $provider = null): array
     {
         $created = 0;
         $updated = 0;
 
         foreach (studio_model_catalog() as $row) {
+            // Lọc theo provider: hữu ích khi chỉ muốn nhập MỘT nhóm provider mới mà
+            // không hồi sinh những dòng catalog admin đã cố ý xoá.
+            if ($provider !== null && $provider !== '' && ($row['provider'] ?? null) !== $provider) {
+                continue;
+            }
             $existing = \App\Models\StudioModel::query()
                 ->where('group', $row['group'])
                 ->where('provider', $row['provider'])

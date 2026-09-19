@@ -51,9 +51,10 @@ return [
     'remote_image_hosts' => env('STUDIO_REMOTE_IMAGE_HOSTS', ''),
     'video_credits' => (int) env('STUDIO_VIDEO_CREDITS', 10),
     'processing' => env('STUDIO_PROCESSING', 'sync'), // sync | queue (async + worker)
-    // [2026-09-17] Luồng ưu tiên provider mặc định: qwen → custom → flux → gemini.
+    // [2026-09-17] Luồng ưu tiên provider mặc định: qwen → custom → flux → deepseek → gemini.
     // 'qwen' = QwenCloud/DashScope (nhà cung cấp chính), 'custom' = provider tự khai báo trong
-    // Settings (vd CKEY — api.xah.io), 'flux' = Fal.ai fallback, 'gemini' = tùy chọn cuối.
+    // Settings (vd CKEY — api.xah.io), 'flux' = Fal.ai fallback, 'deepseek' = suy luận/ngôn ngữ
+    // (đứng TRƯỚC gemini), 'gemini' = tùy chọn cuối.
     'image_provider' => env('STUDIO_IMAGE_PROVIDER', 'qwen'), // flux | wan | qwen | gemini | slug custom
 
     /*
@@ -64,12 +65,14 @@ return [
     |   qwen   → Qwen/DashScope/Wan (nhà cung cấp chính, model QwenCloud mới nhất)
     |   custom → provider tự khai báo trong Settings (vd CKEY — https://api.xah.io/v1)
     |   flux   → Fal.ai / Replicate (fallback Flux khi Qwen lỗi/hết hạn mức)
+    |   deepseek → DeepSeek (suy luận/ngôn ngữ — đứng trước Gemini)
     |   gemini → Google Gemini (tùy chọn — chỉ dùng khi có GEMINI_API_KEY)
+    | (Còn nhóm 'other' là nhóm HỨNG provider lạ, không nằm trong luồng mặc định.)
     | Model mặc định gán cho từng nhóm (studio_task_<group>_model) vẫn luôn đứng trước
     | chuỗi này; bên dưới sắp theo rank nhóm, rồi priority model. Đổi thứ tự bằng
     | setting này (hoặc tab Luồng ưu tiên trong Cài đặt) — không cần sửa code.
     */
-    'provider_priority' => env('STUDIO_PROVIDER_PRIORITY', 'qwen,custom,flux,gemini'),
+    'provider_priority' => env('STUDIO_PROVIDER_PRIORITY', 'qwen,custom,flux,deepseek,gemini'),
 
     /*
     |--------------------------------------------------------------------------

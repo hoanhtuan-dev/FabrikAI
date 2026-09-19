@@ -70,10 +70,12 @@ class ProviderPriorityFlowTest extends TestCase
 
     // ── 1. Luồng mặc định ────────────────────────────────────────────────
 
-    public function test_default_flow_is_qwen_custom_flux_gemini(): void
+    public function test_default_flow_is_qwen_custom_flux_deepseek_gemini(): void
     {
-        $this->assertSame(['qwen', 'custom', 'flux', 'gemini'], studio_provider_priority_flow());
+        $this->assertSame(['qwen', 'custom', 'flux', 'deepseek', 'gemini'], studio_provider_priority_flow());
         $this->assertSame('qwen', config('studio.image_provider'));
+        // 'other' là nhóm HỨNG, không nằm trong luồng mặc định.
+        $this->assertNotContains('other', studio_provider_default_flow());
     }
 
     public function test_provider_ranks_follow_the_flow(): void
@@ -81,8 +83,20 @@ class ProviderPriorityFlowTest extends TestCase
         $this->assertSame(0, studio_provider_rank('qwen'));
         $this->assertSame(0, studio_provider_rank('wan'));
         $this->assertSame(20, studio_provider_rank('fal'));
-        $this->assertSame(30, studio_provider_rank('gemini'));
-        $this->assertSame(990, studio_provider_rank('deepseek'));
+        $this->assertSame(30, studio_provider_rank('deepseek'), 'deepseek phải đứng TRƯỚC gemini');
+        $this->assertSame(40, studio_provider_rank('gemini'));
+        $this->assertLessThan(studio_provider_rank('gemini'), studio_provider_rank('deepseek'));
+    }
+
+    public function test_deepseek_has_its_own_family_not_other(): void
+    {
+        $this->assertSame('deepseek', studio_provider_family('deepseek'));
+        $this->assertContains('deepseek', studio_provider_families());
+        // Nhóm deepseek được vẽ trong tab Luồng ưu tiên nên flow_counts phải có khoá này.
+        $this->actingAs($this->admin());
+        $data = $this->getJson('/api/settings-vue/data')->assertOk()->json();
+        $this->assertArrayHasKey('deepseek', $data['flow_counts']);
+        $this->assertSame(5, collect($data['providers'])->firstWhere('slug', 'deepseek')['priority']);
     }
 
     // ── 2. Thứ tự model theo luồng ────────────────────────────────────────
@@ -147,6 +161,17 @@ class ProviderPriorityFlowTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_reordering_flow_accepts_deepseek(): void
+    {
+        $this->actingAs($this->admin())
+            ->postJson('/api/settings-vue/provider-priority', ['value' => 'qwen,deepseek,gemini'])
+            ->assertOk();
+
+        $this->assertSame(['qwen', 'deepseek', 'gemini'], studio_provider_priority_flow());
+        $this->assertSame(10, studio_provider_rank('deepseek'));
+        $this->assertSame(20, studio_provider_rank('gemini'));
+    }
+
     // ── 4. Đồng bộ catalog ────────────────────────────────────────────────
 
     public function test_sync_catalog_imports_latest_qwen_models(): void
@@ -154,10 +179,17 @@ class ProviderPriorityFlowTest extends TestCase
         $this->actingAs($this->admin())
             ->postJson('/api/settings-vue/sync-catalog')
             ->assertOk()
-            ->assertJson(['ok' => true, 'created' => 27]);
+            ->assertJson(['ok' => true, 'created' => 30]);
 
         $this->assertDatabaseHas('studio_models', [
             'group' => 'image', 'provider' => 'qwen', 'model_id' => 'qwen-image-3.0-pro',
+        ]);
+        // DeepSeek có mặt trong catalog cho nhóm văn bản (đứng trước gemini trong luồng).
+        $this->assertDatabaseHas('studio_models', [
+            'group' => 'prompt', 'provider' => 'deepseek', 'model_id' => 'deepseek-chat',
+        ]);
+        $this->assertDatabaseHas('studio_models', [
+            'group' => 'translate', 'provider' => 'deepseek', 'model_id' => 'deepseek-chat',
         ]);
         $this->assertDatabaseHas('studio_models', [
             'group' => 'edit', 'provider' => 'qwen_edit', 'model_id' => 'qwen-image-edit-2511',
@@ -288,7 +320,7 @@ class ProviderPriorityFlowTest extends TestCase
         $this->actingAs($this->admin());
         $data = $this->getJson('/api/settings-vue/data')->assertOk()->json();
 
-        $this->assertSame('qwen,custom,flux,gemini', $data['provider_priority']);
+        $this->assertSame('qwen,custom,flux,deepseek,gemini', $data['provider_priority']);
         $this->assertArrayHasKey('qwen', $data['flow_counts']);
 
         $qwen = collect($data['providers'])->firstWhere('slug', 'qwen');
@@ -476,5 +508,71 @@ class ProviderPriorityFlowTest extends TestCase
 
         $qwen = collect($data['providers'])->firstWhere('slug', 'qwen');
         $this->assertSame(10, $qwen['priority']);
+    }
+    // ── Migration: chèn deepseek vào luồng ĐÃ LƯU (trước gemini) ─────────────
+
+    public function test_migration_inserts_deepseek_before_gemini_in_stored_flow(): void
+    {
+        set_setting('studio_provider_priority', 'custom,qwen,flux,gemini');
+
+        $migration = require database_path('migrations/2026_09_22_000002_add_deepseek_to_provider_flow.php');
+        $migration->up();
+
+        // Giữ nguyên thứ tự admin đã đặt, chỉ chèn deepseek ngay TRƯỚC gemini.
+        $this->assertSame('custom,qwen,flux,deepseek,gemini', setting('studio_provider_priority'));
+        $this->assertSame(['custom', 'qwen', 'flux', 'deepseek', 'gemini'], studio_provider_priority_flow());
+
+        // Idempotent: chạy lần hai không nhân đôi.
+        $migration->up();
+        $this->assertSame('custom,qwen,flux,deepseek,gemini', setting('studio_provider_priority'));
+    }
+
+    public function test_migration_skips_when_no_flow_was_configured(): void
+    {
+        // Không có setting ⇒ default của config đã có deepseek, migration không tạo rác.
+        $migration = require database_path('migrations/2026_09_22_000002_add_deepseek_to_provider_flow.php');
+        $migration->up();
+
+        $this->assertNull(setting('studio_provider_priority'));
+        $this->assertSame(['qwen', 'custom', 'flux', 'deepseek', 'gemini'], studio_provider_priority_flow());
+    }
+    public function test_sync_can_be_limited_to_one_provider(): void
+    {
+        // Admin đã xoá dòng flux (không dùng Fal.ai nữa) và registry CHƯA có deepseek.
+        studio_sync_model_catalog();
+        StudioModel::where('provider', 'fal')->delete();
+        StudioModel::where('provider', 'deepseek')->delete();
+        $this->assertSame(0, StudioModel::where('provider', 'fal')->count());
+        $this->assertSame(0, StudioModel::where('provider', 'deepseek')->count());
+
+        // Đồng bộ CHỈ nhóm deepseek ⇒ dòng fal đã xoá KHÔNG bị hồi sinh.
+        $result = studio_sync_model_catalog('deepseek');
+        $this->assertSame(3, $result['created']);
+        $this->assertSame(0, StudioModel::where('provider', 'fal')->count());
+        $this->assertSame(3, StudioModel::where('provider', 'deepseek')->count());
+
+        // Idempotent khi lọc.
+        $again = studio_sync_model_catalog('deepseek');
+        $this->assertSame(0, $again['created']);
+    }
+
+    public function test_deepseek_models_come_after_qwen_and_before_gemini_in_text_groups(): void
+    {
+        studio_sync_model_catalog();
+
+        foreach (['prompt', 'translate'] as $group) {
+            $providers = array_map(fn ($c) => $c['provider'], studio_task_group_models($group));
+            $qwen = array_search('qwen', $providers, true);
+            $deepseek = array_search('deepseek', $providers, true);
+            $gemini = array_search('gemini', $providers, true);
+
+            $this->assertNotFalse($deepseek, $group.' phải có provider deepseek');
+            if ($qwen !== false) {
+                $this->assertLessThan($deepseek, $qwen, $group.': qwen đứng trước deepseek');
+            }
+            if ($gemini !== false) {
+                $this->assertLessThan($gemini, $deepseek, $group.': deepseek đứng TRƯỚC gemini');
+            }
+        }
     }
 }

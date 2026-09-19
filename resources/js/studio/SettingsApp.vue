@@ -80,8 +80,9 @@ const FLOW_META = {
   qwen:   { label: 'QwenCloud / DashScope', short: 'Qwen',   icon: 'zap',      desc: 'Provider chính — ảnh, video, suy luận, đọc ảnh.' },
   custom: { label: 'Custom provider',       short: 'Custom', icon: 'globe',    desc: 'Route tự khai báo (protocol + base URL) — ví dụ CKEY (api.xah.io).' },
   flux:   { label: 'Flux — Fal.ai',         short: 'Flux',   icon: 'sparkles', desc: 'Fallback tạo ảnh khi Qwen lỗi hoặc hết hạn mức.' },
+  deepseek: { label: 'DeepSeek',            short: 'DeepSeek', icon: 'bot',    desc: 'Suy luận / ngôn ngữ — đứng TRƯỚC Gemini: dùng khi Qwen hết hạn mức mà Gemini đắt hơn.' },
   gemini: { label: 'Gemini · Veo',          short: 'Gemini', icon: 'wand',     desc: 'Nhóm cuối — chỉ dùng khi đã cấu hình key.' },
-  other:  { label: 'Khác (DeepSeek…)',      short: 'Khác',   icon: 'bot',      desc: 'Ngoài luồng — chỉ dùng khi được gán làm mặc định.' },
+  other:  { label: 'Khác (ngoài luồng)',    short: 'Khác',   icon: 'globe',    desc: 'Nhóm HỨNG provider lạ — chỉ dùng khi được gán làm mặc định cho một nhóm công việc.' },
 };
 const flowMeta = (token) => FLOW_META[token] || { label: token, short: token, icon: 'bot', desc: 'Nhóm provider ngoài luồng chuẩn.' };
 

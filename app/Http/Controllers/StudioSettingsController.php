@@ -117,11 +117,13 @@ class StudioSettingsController extends Controller
             'value' => ['required', 'string', 'max:120'],
         ]);
 
-        $valid = ['qwen', 'custom', 'flux', 'gemini', 'other'];
+        // Danh sách nhóm lấy từ studio_provider_families() — một nguồn duy nhất với
+        // studio_provider_priority_flow(), nên thêm nhóm mới không phải sửa chỗ này.
+        $valid = studio_provider_families();
         $tokens = array_values(array_filter(array_map('trim', explode(',', (string) $data['value']))));
         $tokens = array_values(array_intersect($tokens, $valid));
         if (! $tokens) {
-            return response()->json(['message' => 'Luồng ưu tiên cần ít nhất một nhóm: qwen, custom, flux, gemini.'], 422);
+            return response()->json(['message' => 'Luồng ưu tiên cần ít nhất một nhóm: '.implode(', ', studio_provider_default_flow()).'.'], 422);
         }
 
         set_setting('studio_provider_priority', implode(',', $tokens));
@@ -147,7 +149,7 @@ class StudioSettingsController extends Controller
      */
     protected function flowCounts(): array
     {
-        $counts = ['qwen' => 0, 'custom' => 0, 'flux' => 0, 'gemini' => 0, 'other' => 0];
+        $counts = array_fill_keys(studio_provider_families(), 0);
         try {
             foreach (StudioModel::query()->where('enabled', true)->get() as $m) {
                 $family = studio_provider_family((string) $m->provider);

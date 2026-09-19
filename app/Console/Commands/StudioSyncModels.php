@@ -19,9 +19,9 @@ use Illuminate\Console\Command;
  */
 class StudioSyncModels extends Command
 {
-    protected $signature = 'studio:sync-models';
+    protected $signature = 'studio:sync-models {--provider= : Chỉ nhập model của MỘT provider (vd: deepseek) — không đụng các provider khác}';
 
-    protected $description = 'Import the built-in QwenCloud model catalog (latest Qwen models, Flux fallback, optional Gemini) into the studio_models registry. Idempotent.';
+    protected $description = 'Import the built-in QwenCloud model catalog (latest Qwen models, Flux fallback, optional Gemini/DeepSeek) into the studio_models registry. Idempotent.';
 
     public function handle(): int
     {
@@ -31,10 +31,12 @@ class StudioSyncModels extends Command
             return self::FAILURE;
         }
 
-        $result = studio_sync_model_catalog();
+        $provider = $this->option('provider');
+        $result = studio_sync_model_catalog($provider ?: null);
 
         $this->info(sprintf(
-            'Đồng bộ catalog model QwenCloud: +%d mới, ~%d cập nhật (registry: %d model).',
+            'Đồng bộ catalog model QwenCloud%s: +%d mới, ~%d cập nhật (registry: %d model).',
+            $provider ? ' (chỉ provider '.$provider.')' : '',
             $result['created'],
             $result['updated'],
             $result['total'],
