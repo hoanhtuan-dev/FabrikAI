@@ -35,6 +35,13 @@ const CSRF = () => {
   return m ? decodeURIComponent(m[1]) : '';
 };
 
+/**
+ * 3 danh mục được card STUDIO đọc làm CHIP NHANH (xem App\Services\PhotoStudioService::CHIP_CATEGORIES).
+ * Đánh dấu ngay ở đây để người dùng biết phải chọn danh mục nào thì preset mới thành chip trong Studio —
+ * trước đây không có dấu hiệu nào, thêm preset vào "Chất liệu" rồi không hiểu vì sao Studio không thấy.
+ */
+const STUDIO_CATEGORIES = ['background', 'camera', 'lens'];
+
 const catalog = useLocalCatalog('presets');
 const isAdmin = isAdminUser();
 const mode = ref('mine');   // 'mine' | 'global' — admin mới thấy công tắc này
@@ -208,11 +215,18 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
         Tất cả <span class="text-cream-300/60">{{ merged.length }}</span>
       </button>
       <button v-for="cat in allCategories" :key="cat" @click="catFilter = cat"
+              :title="STUDIO_CATEGORIES.includes(cat) ? 'Danh mục này là CHIP NHANH trong card Studio' : ''"
               :class="catFilter === cat ? 'border-brand-400 bg-brand-600/20 text-brand-100' : 'border-ink-600 bg-ink-800/60 text-cream-300 hover:border-ink-500'"
               class="rounded-full border px-2.5 py-1 text-[11px] font-medium transition">
         {{ CAT_LABELS[cat] || cat }} <span class="text-cream-300/60">{{ countFor(cat) }}</span>
+        <span v-if="STUDIO_CATEGORIES.includes(cat)" class="ml-1 rounded bg-brand-600/25 px-1 py-0.5 text-[9px] font-bold text-brand-100">Studio</span>
       </button>
     </div>
+
+    <p class="mb-4 -mt-2 text-[11px] leading-5 text-cream-300/55">
+      Danh mục có nhãn <span class="rounded bg-brand-600/25 px-1 py-0.5 text-[9px] font-bold text-brand-100">Studio</span>
+      (Bối cảnh · Góc máy · Ống kính) trở thành <strong class="text-cream-200">chip nhanh</strong> trong card Studio.
+    </p>
 
     <!-- ── Thân ──────────────────────────────────────────────────────────── -->
     <SettingsSkeleton v-if="loading" :rows="4" />
@@ -294,8 +308,13 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
           <div>
             <label class="label" for="np-cat">Danh mục</label>
             <select id="np-cat" v-model="form.category" class="input !py-2">
-              <option v-for="cat in allCategories" :key="cat" :value="cat">{{ CAT_LABELS[cat] || cat }}</option>
+              <option v-for="cat in allCategories" :key="cat" :value="cat">
+                {{ CAT_LABELS[cat] || cat }}{{ STUDIO_CATEGORIES.includes(cat) ? ' · chip Studio' : '' }}
+              </option>
             </select>
+            <p v-if="STUDIO_CATEGORIES.includes(form.category)" class="mt-1 text-[10px] leading-4 text-brand-200">
+              Preset này sẽ hiện thành chip nhanh trong card Studio.
+            </p>
           </div>
           <div>
             <label class="label" for="np-order">Thứ tự</label>

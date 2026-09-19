@@ -92,6 +92,46 @@ class PhotoStudioTest extends TestCase
         $this->assertFalse($flat->has((string) $other->id), 'Mục người dùng đã ẨN không được lộ ra trong Studio.');
     }
 
+    /**
+     * BẢO ĐẢM ĐẦU-CUỐI: preset người dùng thêm ở /cai-dat/presets phải thành CHIP trong Studio và đoạn
+     * chèn của nó phải đi thẳng vào prompt. Test đi ĐÚNG đường mà trang Cài đặt dùng
+     * (PUT /api/user-catalogs/presets — xem resources/js/studio/composables/useLocalCatalog.js).
+     */
+    public function test_a_preset_added_in_my_settings_becomes_a_studio_chip(): void
+    {
+        $user = $this->customer();
+
+        $this->actingAs($user)->putJson('/api/user-catalogs/presets', [
+            'data' => [
+                'custom' => [[
+                    'id' => 'local-test-1', 'category' => 'background',
+                    'ui_label' => 'Sân thượng hoàng hôn', 'prompt_injection' => 'rooftop at golden hour, city skyline behind',
+                    'note' => 'Thử nghiệm', 'sort_order' => 0,
+                ]],
+                'edits' => [],
+                'hidden' => [],
+            ],
+        ])->assertOk();
+
+        $groups = collect($this->actingAs($user)->postJson('/api/studio/shoot/catalog')->assertOk()->json('groups'));
+        $background = $groups->firstWhere('id', 'background');
+
+        $this->assertNotNull($background, 'Nhóm Bối cảnh phải có trong chip của Studio.');
+        $this->assertTrue(
+            collect($background['items'])->contains(fn ($i) => $i['id'] === 'local-test-1' && $i['label'] === 'Sân thượng hoàng hôn'),
+            'Preset vừa thêm ở /cai-dat/presets phải hiện thành chip trong Studio.'
+        );
+
+        $plan = $this->actingAs($user)->postJson('/api/studio/shoot/plan', [
+            'prompt' => 'đổi bối cảnh',
+            'chips' => ['local-test-1'],
+            'image_count' => 2,
+        ])->assertOk();
+
+        $this->assertStringContainsString('rooftop at golden hour', (string) $plan->json('prompt'));
+        $this->assertSame('local-test-1', $plan->json('used_chips.0.id'));
+    }
+
     public function test_plan_endpoint_builds_the_prompt_without_calling_any_model(): void
     {
         $user = $this->customer();

@@ -147,6 +147,11 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
       </div>
     </div>
 
+    <!-- Vai trò từng ô ảnh, viết theo đúng cách của card "Ghép trang phục" để nhất quán toàn Studio -->
+    <p class="mt-2 rounded-md border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
+      @image1 = người mẫu mặc trang phục (giữ nguyên) · @image2 = bối cảnh (tùy chọn) · @image3 = tham chiếu thêm (tùy chọn)
+    </p>
+
     <p v-if="plan && plan.image_ready === false" role="status"
        class="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[10px] leading-4 text-amber-100">
       Chưa cấu hình model tạo/sửa ảnh (nhóm “edit”) — kết quả sẽ là ẢNH MẪU (chế độ demo), không phải ảnh do AI tạo.
