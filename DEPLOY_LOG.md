@@ -382,3 +382,84 @@ nên commit `198065b` KHÔNG chứa WIP của họ — 6 file WIP của họ v�
 - [ ] Chưa có UI cho `suggest_provider` (auto/qwen/gemini/deepseek/custom) trong tab Cài đặt.
 - [ ] Phiên Collections/Canvas: sửa 6 test đỏ (CollectionsCard/CollectionsPage thiếu `.motion-ui` ở `hover:text-white`).
 
+---
+
+## Phiên 2026-09-22 (Đợt 5 — "MỘT CỬA" cho mọi lời gọi model AI: tôn trọng Cài đặt + linh hoạt)
+
+**Commit:** `60e639f`. **Đã deploy production** (không migration, **không đổi frontend ⇒ không rebuild asset**).
+Production `198065b` → `60e639f` (fast-forward).
+
+### Vấn đề (audit sâu mọi call-site gọi model)
+
+Nhiều đường tự chọn provider/model bằng **hằng số hoặc setting rời**, nên đổi Model Registry / Nhóm công việc /
+Luồng ưu tiên / Custom Provider trong Cài đặt **không tác động gì**: cấu hình hiển thị một đằng, gọi model một nẻo.
+
+| Đường | Trước đây tự chọn bằng | Hệ quả |
+|---|---|---|
+| Giám đốc sáng tạo (`GeminiService`) | `prompt_provider` + `studio_api_key('qwen'\|'gemini')` | Không có key qwen/gemini ⇒ **luôn rơi về STUB**, DeepSeek không bao giờ được gọi |
+| Thuật sỹ ảo (`StylistService::chat`) | cứng Qwen → Gemini | Cùng lý do ⇒ luôn `null` |
+| Video catwalk (`VideoAIService::render`) | `studio_qwen_credentials('video')` + setting `video_model` | Model video gán trong Registry bị bỏ qua |
+| Sửa ảnh / Inpaint (`ImageAIService`) | đúng MỘT model: setting `qwen_edit_model` | Model edit trong Registry không bao giờ chạy, không failover |
+| Thử đồ (`VirtualTryOnService`) | `studio_swap_model()` | Model swap trong Registry bị bỏ qua |
+| Vision QA (thử đồ + QA swap) | `studio_qwen_vision_models()` + key qwen\|dashscope | Model vision khác (DeepSeek…) không bao giờ chạy |
+| Moderation / Super-resolution / Face-enhance | 3 slot `studio_api_key('dashscope'\|'qwen'\|'qwen_edit')` | Key gán cho một nhóm khác bị bỏ qua |
+
+### Cách làm
+
+`app/Services/AiModelGateway.php` (mới, 371 dòng) — **một cửa duy nhất**:
+
+- `candidates($group)` lấy từ `studio_task_group_models()` ⇒ tôn trọng **default nhóm → Model Registry → luồng ưu tiên provider → ưu tiên model**;
+- provider **không có key dùng được bị bỏ NGAY** (không gọi rồi mới lỗi), key lấy qua `studio_candidate_key()` (đúng scope nhóm/model);
+- **custom provider** dùng đúng `protocol` + `base_url` + `api_key_ref` của nó;
+- `text()` / `vision()` gọi lần lượt candidate × key, trả về **provider/model THẬT**;
+- `credentials()` / `key()` / `dashscopeKey()` cho các đường không-phải-chat (video async, edit multimodal, moderation…).
+
+Call-site đã chuyển: `translate()` → nhóm `translate` · `StylistService` + `GeminiService` → nhóm `prompt` ·
+`VideoAIService` → nhóm `video` · `ImageAIService::editModelChain()` → nhóm `edit` · `VirtualTryOnService` → `vision` + `swap` ·
+moderation/super-resolution/face-enhance → `dashscopeKey()` · `defaultProviderModel()` + `/api/defaults` → nhận đúng nhóm `edit`.
+**Ròng −105 dòng** (xoá hẳn 2 nhánh provider viết tay trong `StylistService`/`GeminiService`).
+
+### Đo THẬT trên production sau deploy (probe bằng cách bootstrap app rồi hỏi gateway)
+
+```json
+{
+  "image": [], "edit": [], "video": [], "swap": [],
+  "vision":    ["deepseek:deepseek-flash (openai, 1 keys)"],
+  "prompt":    ["deepseek:deepseek-flash", "deepseek:deepseek-chat", "deepseek:deepseek-reasoner"],
+  "translate": ["deepseek:deepseek-chat"],
+  "dashscopeKey": "none"
+}
+```
+
+⇒ Trên production hiện **chỉ có key DeepSeek**. Trước đợt này: Giám đốc sáng tạo + Thuật sỹ ảo **luôn trả STUB**
+dù DeepSeek hoạt động (vì chúng chỉ tìm key qwen/gemini). Sau đợt này chúng **gọi DeepSeek thật** theo nhóm `prompt`.
+Các nhóm `image/edit/video/swap` rỗng ⇒ giữ nguyên chế độ demo trung thực (`is_demo` + ảnh mẫu/ảnh gốc), **không hồi quy**.
+
+### Verify production
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `60e639f` |
+| Lớp mới | `class_exists(App\Services\AiModelGateway)` = **true** |
+| Trang | `/` `/dang-nhap` `/up` → **200** (qua https) · `build/manifest.json` → **200** |
+| Log | Số dòng ERROR vẫn **8**, mục mới nhất vẫn từ 17–19/09 — **không phát sinh lỗi mới** |
+
+### Test
+
+**12 test mới** `tests/Feature/AiModelGatewayTest.php`: DeepSeek được gọi thật khi là default nhóm `prompt` · custom provider
+(CKEY/`api.xah.io`) được gọi thật · `/api/translate` theo nhóm `translate` · `video` submit đúng model của nhóm ·
+chuỗi model Sửa ảnh theo nhóm `edit` (và **rỗng khi không có key**) · model thử đồ theo nhóm `swap` ·
+QA thử đồ chạy trên model nhóm `vision` · `dashscopeKey()` lấy từ nhóm đang cấu hình.
+
+Full suite: **761 pass / 6 fail** — 6 fail vẫn đúng 6 lỗi **SẴN CÓ** ở HEAD (CollectionsHub · JobTemplates · MotionFoundation ·
+ShotReview ×2 · StaticIntegrity), không liên quan đợt này (trước đợt: 749 pass / 6 fail).
+
+### Còn lại (đề xuất)
+
+- [ ] Nhánh **refgen / ảnh mới từ ảnh mẫu** chỉ chạy được trên DashScope-family (API multimodal nguyên bản) — candidate của
+      custom provider/gemini trong nhóm `image` bị bỏ qua **có chủ ý**; muốn dùng cần viết transport i2i tương ứng.
+- [ ] Khi thêm key Qwen/DashScope cho production: `vision` sẽ bật **best-of-N** cho Thử đồ (`swap_candidates`, mặc định 2) ⇒
+      số lần gọi model edit tăng theo cấu hình đó — cân nhắc chỉnh `swap_candidates` = 1 nếu muốn tiết kiệm.
+- [ ] 6 test đỏ sẵn có của phiên Collections/Canvas vẫn chưa sửa (thiếu `.motion-ui` ở `hover:text-white`).
+
+
