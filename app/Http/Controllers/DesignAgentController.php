@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CollectionPlanService;
 use App\Services\DesignAgentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -25,6 +26,94 @@ class DesignAgentController extends Controller
     }
 
     public function collection(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $this->validatedCollectionInput($request);
+
+        return response()->json($this->agents->collectionBrief(
+            $data, $request->user(), (bool) ($data['ai'] ?? true)
+        ));
+    }
+
+    /**
+     * KẾ HOẠCH SẢN XUẤT & LỢI NHUẬN (giá thành · lệnh cắt · đợt sản xuất · bảng size).
+     *
+     * Cố ý KHÔNG gọi model AI: đây là tầng TIỀN, mọi con số phải tái lập được và phải do chủ xưởng
+     * kiểm soát qua đơn giá họ nhập. Cùng đầu vào với brief nên cấu trúc danh mục / bảng size / dải
+     * giá luôn khớp đúng cái đang hiển thị ở bước Định hướng.
+     */
+    public function plan(Request $request, CollectionPlanService $planner): \Illuminate\Http\JsonResponse
+    {
+        $data = $this->validatedCollectionInput($request);
+        $assumptions = Validator::make($request->all(), [
+            'assumptions' => ['nullable', 'array'],
+            'assumptions.*' => ['nullable', 'numeric', 'min:0', 'max:1000000000'],
+        ])->validate()['assumptions'] ?? [];
+
+        // brief ở chế độ TẤT ĐỊNH (không AI) — cấu trúc/size/giá là dữ liệu vào của kế hoạch,
+        // không cần tới model nên phản hồi tức thì.
+        $brief = $this->agents->collectionBrief($data, $request->user(), false);
+
+        return response()->json([
+            'engine' => 'plan-v1',
+            'model' => [
+                'group' => null,
+                'mode' => 'rule',
+                'provider' => null,
+                'model' => null,
+                'candidates' => 0,
+                'latency_ms' => 0,
+                'cached' => false,
+                'reason' => 'plan_is_deterministic',
+                'note' => 'Giá thành, lệnh cắt và lợi nhuận do hệ thống TÍNH từ đơn giá bạn nhập — AI không tham gia vào con số.',
+            ],
+            'plan' => $planner->plan($brief, is_array($assumptions) ? $assumptions : []),
+            'brief_basis' => [
+                'structure' => $brief['structure'],
+                'size_distribution' => $brief['size_distribution'],
+                'price_bands' => $brief['price_bands'],
+                'brand_narrative' => $brief['brand_narrative'],
+                'project_payload' => $brief['project_payload'],
+                'engine' => $brief['engine'],
+            ],
+        ]);
+    }
+
+    /**
+     * DỮ LIỆU BÁN HÀNG THẬT của shop (nhập tay hoặc dán từ Excel/POS).
+     *
+     * Đây là phần khiến Agent Studio gắn bó lâu dài: càng nhập nhiều kỳ, cơ cấu SKU, dải giá và lời
+     * khuyên càng sát cái shop THẬT SỰ bán được. Chỉ ghi vào dữ liệu của CHÍNH người dùng.
+     */
+    public function shopSignals(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'rows' => ['present', 'array', 'max:200'],
+            'rows.*.name' => ['nullable', 'string', 'max:160'],
+            'rows.*.category' => ['nullable', 'string', 'max:80'],
+            'rows.*.units_sold' => ['nullable', 'integer', 'min:0', 'max:10000000'],
+            'rows.*.stock_on_hand' => ['nullable', 'integer', 'min:0', 'max:10000000'],
+            'rows.*.returns' => ['nullable', 'integer', 'min:0', 'max:10000000'],
+            'rows.*.price_vnd' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
+            'rows.*.period_days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'source' => ['nullable', 'string', 'in:manual,paste'],
+        ]);
+
+        $result = $this->agents->saveShopSignals(
+            $request->user(), $data['rows'], (string) ($data['source'] ?? 'manual')
+        );
+
+        return response()->json([
+            'saved' => count($result['rows']),
+            'rows' => $result['rows'],
+            'shop' => $result['shop'],
+        ]);
+    }
+
+    /**
+     * Validate dùng CHUNG cho brief và kế hoạch sản xuất — hai đường luôn nhận đúng một dạng đầu vào
+     * nên không thể lệch nhau về cấu trúc danh mục, bảng size hay dải giá.
+     */
+    private function validatedCollectionInput(Request $request): array
     {
         $payload = $request->only([
             'prompt', 'region', 'trend_ids', 'brief', 'size_distribution', 'ai',
@@ -79,8 +168,6 @@ class DesignAgentController extends Controller
             ->mapWithKeys(fn ($count, $size) => [strtoupper(substr((string) $size, 0, 8)) => (int) $count])
             ->all();
 
-        return response()->json($this->agents->collectionBrief(
-            $data, $request->user(), (bool) ($data['ai'] ?? true)
-        ));
+        return $data;
     }
 }

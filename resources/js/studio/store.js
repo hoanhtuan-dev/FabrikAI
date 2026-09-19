@@ -18,6 +18,26 @@ function bootProjectStatuses() {
   return (readBoot() && readBoot().project_statuses) || null;
 }
 
+/**
+ * Đơn giá/định mức MẶC ĐỊNH của kế hoạch sản xuất — PHẢI khớp CollectionPlanService::DEFAULTS.
+ * Chủ xưởng sửa được toàn bộ; đây chỉ là điểm khởi đầu để họ thấy ngay con số mà sửa.
+ */
+const PLAN_ASSUMPTION_DEFAULTS = {
+  units_per_sku: 30,
+  fabric_price_per_m: 85000,
+  fabric_width_cm: 150,
+  fabric_safety_pct: 5,
+  wastage_pct: 12,
+  trim_cost: 25000,
+  sewing_cost: 65000,
+  packaging_cost: 8000,
+  defect_pct: 3,
+  channel_discount_pct: 18,
+  target_margin_pct: 55,
+  daily_capacity: 25,
+  fixed_cost: 0,
+};
+
 // Shared studio store — each card component reads/writes this so they can share data.
 export const useStudioStore = defineStore('studio', {
   state: () => ({
@@ -285,6 +305,18 @@ export const useStudioStore = defineStore('studio', {
     // Bật/tắt SUY LUẬN AI cho Agent Studio (nhóm công việc 'prompt'). Tắt ⇒ engine tất định,
     // nhanh và không tốn lượt gọi model — người dùng chủ động chọn.
     designAgentAi: true,
+    // Kế hoạch SẢN XUẤT & LỢI NHUẬN (giá thành · lệnh cắt · đợt · bảng size) — tính TẤT ĐỊNH ở
+    // backend từ chính đơn giá chủ xưởng nhập, nên đổi đơn giá là bấm tính lại, không tốn model.
+    plan: null,
+    planBasis: null,
+    planLoading: false,
+    planError: '',
+    planAssumptions: { ...PLAN_ASSUMPTION_DEFAULTS },
+    // Dữ liệu bán hàng THẬT của shop (nhập tay / dán Excel).
+    shopRows: [],
+    shopSignal: null,
+    shopSaving: false,
+    shopDataDirty: false,
     trendRadar: null,
     trendRadarCache: {},      // region → payload đã tải (tránh gọi lại khi đổi tab/đổi vùng)
     trendRadarRequest: 0,     // chống race: chỉ nhận kết quả của lần gọi MỚI NHẤT
@@ -2150,6 +2182,61 @@ export const useStudioStore = defineStore('studio', {
       this.batchFillRequest = { prompts: list, meta, n: ((this.batchFillRequest && this.batchFillRequest.n) || 0) + 1 };
       this.requestActivity('concept');
     },
+    /**
+     * Tính LẠI kế hoạch sản xuất theo đơn giá hiện tại. Tất định nên nhanh và không tốn lượt gọi AI.
+     * Truyền đúng đầu vào của brief để cấu trúc danh mục / bảng size / dải giá luôn khớp màn hình.
+     */
+    async loadPlan(payload = {}) {
+      this.planLoading = true;
+      this.planError = '';
+      try {
+        const data = await this.api('/api/design-agent/plan', {
+          ...payload,
+          assumptions: { ...this.planAssumptions },
+        });
+        this.plan = data?.plan || null;
+        this.planBasis = data?.brief_basis || null;
+        return data;
+      } catch (error) {
+        this.planError = error.message || 'Không tính được kế hoạch sản xuất.';
+        this.plan = null;
+        throw error;
+      } finally {
+        this.planLoading = false;
+      }
+    },
+    setPlanAssumption(key, value) {
+      if (!(key in PLAN_ASSUMPTION_DEFAULTS)) return;
+      const number = Number(value);
+      this.planAssumptions = {
+        ...this.planAssumptions,
+        [key]: Number.isFinite(number) ? Math.max(0, number) : PLAN_ASSUMPTION_DEFAULTS[key],
+      };
+    },
+    resetPlanAssumptions() {
+      this.planAssumptions = { ...PLAN_ASSUMPTION_DEFAULTS };
+    },
+    /**
+     * Lưu dữ liệu bán hàng thật của shop. Càng nhiều kỳ dữ liệu, cơ cấu SKU và dải giá càng sát
+     * thực tế — đây là phần khiến Agent Studio dùng càng lâu càng có giá trị.
+     */
+    async saveShopSignals(rows = [], source = 'manual') {
+      this.shopSaving = true;
+      try {
+        const data = await this.api('/api/design-agent/shop-signals', { rows, source });
+        this.shopRows = Array.isArray(data?.rows) ? data.rows : [];
+        this.shopSignal = data?.shop || null;
+        this.shopDataDirty = true;
+        const saved = Number(data?.saved) || 0;
+        this.toast(saved ? 'Đã lưu ' + saved + ' dòng dữ liệu shop.' : 'Đã xoá dữ liệu shop.');
+        return data;
+      } catch (error) {
+        this.toast(error.message || 'Không lưu được dữ liệu shop.', 'error');
+        throw error;
+      } finally {
+        this.shopSaving = false;
+      }
+    },
     /** Wizard Agent Studio: radar → brief → canvas. Giữ designAgentTab để tương thích code cũ. */
     setDesignAgentStep(step) {
       const allowed = ['radar', 'brief', 'canvas'];
@@ -2187,6 +2274,13 @@ export const useStudioStore = defineStore('studio', {
         if (requestId !== this.trendRadarRequest) return null; // có request mới hơn đang chạy
         this.trendRadar = data || null;
         if (data) this.trendRadarCache = { ...this.trendRadarCache, [cacheKey]: data };
+        // Nạp sẵn dữ liệu bán hàng của shop để chủ xưởng thấy ngay mình đã nhập gì (không cần
+        // thêm endpoint đọc riêng: radar đã trả về tín hiệu nội bộ của chính tài khoản này).
+        const signal = data?.internal_brand_signal;
+        if (signal) {
+          if (Array.isArray(signal.shop_rows)) this.shopRows = signal.shop_rows;
+          if (signal.shop) this.shopSignal = signal.shop;
+        }
         return data;
       } catch (error) {
         if (requestId === this.trendRadarRequest) {
@@ -2219,6 +2313,9 @@ export const useStudioStore = defineStore('studio', {
         const data = await this.api('/api/design-agent/collection', { ...(payload || {}), ai: this.designAgentAi });
         this.collectionBrief = data || null;
         this.collectionBriefInput = this.designBriefInput(payload);
+        this.plan = null;          // cấu trúc/SKU đổi ⇒ kế hoạch cũ không còn đúng
+        this.planError = '';
+        this.shopDataDirty = false;
         this.toast('CollectionBot đã xây dựng brief bộ sưu tập.');
         return data;
       } catch (error) {

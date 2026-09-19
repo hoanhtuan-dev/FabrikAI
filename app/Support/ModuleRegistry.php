@@ -146,7 +146,7 @@ class ModuleRegistry
             'id' => 'collection_bot', 'name' => 'CollectionBot', 'group' => 'Nội dung',
             'kind' => self::KIND_FEATURE, 'gui' => false, 'icon' => 'palette',
             'summary' => 'Brief, mood board, cấu trúc SKU, size và pricing từ prompt + TrendRadar.',
-            'endpoints' => ['design-agent/collection'], 'depends_on' => ['collections'],
+            'endpoints' => ['design-agent/collection', 'design-agent/plan', 'design-agent/shop-signals'], 'depends_on' => ['collections'],
             'plans' => ['pro', 'studio', 'factory_season'],
         ],
         [

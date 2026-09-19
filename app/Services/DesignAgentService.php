@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\Generation;
+use App\Models\ShopSignal;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -137,7 +139,7 @@ class DesignAgentService
         $categoryMix = $this->categoryMix($prompt, $brand);
         $moodboard = $this->moodboard($prompt, $selected, $palette);
         $outfits = $this->outfitMatching($palette);
-        $priceBands = $this->priceBands($prompt);
+        $priceBands = $this->priceBands($prompt, $brand);
         $sizeDistribution = $this->sizeDistribution($data);
 
         $trendNames = collect($selected)->pluck('title')->filter()->all();
@@ -157,6 +159,19 @@ class DesignAgentService
             'brand_narrative' => $brand['narrative'],
             'brand_top_categories' => $brand['top_categories'],
             'brand_top_colors' => $brand['top_colors'],
+            // Dữ liệu BÁN HÀNG THẬT của shop (data_mode=local) — chỉ gửi ở đường brief vì đường này
+            // KHÔNG dùng cache chung; model được phép nhắc tới chúng như số liệu của chính shop.
+            'shop_data' => [
+                'data_mode' => $brand['data_mode'] ?? 'empty',
+                'row_count' => $brand['shop']['row_count'] ?? 0,
+                'units_sold' => $brand['shop']['units_sold'] ?? 0,
+                'stock_on_hand' => $brand['shop']['stock_on_hand'] ?? 0,
+                'return_rate_pct' => $brand['shop']['return_rate_pct'] ?? null,
+                'avg_price_vnd' => $brand['shop']['avg_price_vnd'] ?? null,
+                'best_sellers' => $brand['shop']['best_sellers'] ?? [],
+                'slow_movers' => $brand['shop']['slow_movers'] ?? [],
+                'category_demand' => $brand['shop']['category_demand'] ?? [],
+            ],
             'selected_trends' => array_map(fn (array $trend) => [
                 'id' => $trend['id'],
                 'title' => $trend['title'],
@@ -258,7 +273,10 @@ class DesignAgentService
             'structure' => [
                 'total_skus' => array_sum(array_column($categoryMix, 'count')),
                 'categories' => $categoryMix,
-                'rationale' => 'Số lượng SKU cân bằng giữa nhóm bán chạy lịch sử và xu hướng đang lên.',
+                'basis' => ($brand['shop']['row_count'] ?? 0) > 0 ? 'shop_data' : 'heuristic',
+                'rationale' => ($brand['shop']['row_count'] ?? 0) > 0
+                    ? 'Số lượng SKU bám theo DỮ LIỆU BÁN HÀNG THẬT của shop ('.number_format((int) $brand['shop']['units_sold']).' cái đã bán, tồn '.number_format((int) $brand['shop']['stock_on_hand']).'), có đối chiếu xu hướng đang lên.'
+                    : 'Số lượng SKU cân bằng giữa nhóm bán chạy lịch sử và xu hướng đang lên. Nhập dữ liệu bán hàng của shop để cơ cấu này sát thực tế hơn.',
             ],
             'outfit_matching' => $outfits,
             'size_distribution' => $sizeDistribution,
@@ -879,6 +897,14 @@ class DesignAgentService
             ->all();
     }
 
+    /**
+     * Tín hiệu nội bộ của shop = DỮ LIỆU BÁN HÀNG THẬT (bảng shop_signals) + dấu vết dự án/ảnh đã tạo.
+     *
+     * Trước đây hàm này chỉ đếm project/generation rồi DÒ TỪ KHOÁ trong prompt để đoán nhóm hàng —
+     * đoán mò nên không dùng được cho quyết định sản xuất. Dữ liệu bán hàng thật (bán bao nhiêu,
+     * còn tồn bao nhiêu, đổi trả bao nhiêu, giá bao nhiêu) là thứ chủ xưởng có sẵn và là thứ duy
+     * nhất khiến lời khuyên "nên làm gì" trở nên đáng tiền.
+     */
     private function internalBrandSignal(?User $user): array
     {
         if (!$user) {
@@ -886,6 +912,7 @@ class DesignAgentService
                 'product_count' => 0, 'generation_count' => 0, 'approved_count' => 0,
                 'narrative' => 'Chưa có dữ liệu shop; đang dùng DNA mặc định: tối giản, dễ phối, chất liệu thoáng.',
                 'top_categories' => [], 'top_colors' => [],
+                'data_mode' => 'empty', 'shop_rows' => [], 'shop' => null,
             ];
         }
 
@@ -902,9 +929,14 @@ class DesignAgentService
         $categoryCandidates = ['áo', 'blouse', 'váy', 'quần', 'phụ kiện', 'linen', 'cotton', 'lụa'];
         $topColors = collect($colorCandidates)->filter(fn ($word) => str_contains($text, $word))->take(4)->values()->all();
         $topCategories = collect($categoryCandidates)->filter(fn ($word) => str_contains($text, $word))->take(5)->values()->all();
-        $narrative = $topCategories || $topColors
-            ? sprintf('DNA shop hiện có %s và thiên về màu %s.', implode(', ', $topCategories) ?: 'sản phẩm dễ phối', implode(', ', $topColors) ?: 'trung tính')
-            : 'Chưa đủ lịch sử; dùng DNA mặc định: tối giản, dễ phối, chất liệu thoáng.';
+
+        $rows = $this->shopRows($user);
+        $shop = $this->shopSignalSummary($rows);
+        $narrative = $shop['row_count'] > 0
+            ? $shop['narrative']
+            : ($topCategories || $topColors
+                ? sprintf('DNA shop hiện có %s và thiên về màu %s.', implode(', ', $topCategories) ?: 'sản phẩm dễ phối', implode(', ', $topColors) ?: 'trung tính')
+                : 'Chưa đủ lịch sử; dùng DNA mặc định: tối giản, dễ phối, chất liệu thoáng.');
 
         return [
             'product_count' => $projects,
@@ -913,6 +945,187 @@ class DesignAgentService
             'narrative' => $narrative,
             'top_categories' => $topCategories,
             'top_colors' => $topColors,
+            // Dữ liệu THẬT của shop: đây là phần khiến Agent Studio khác một chatbot.
+            'data_mode' => $shop['row_count'] > 0 ? 'local' : 'empty',
+            'shop_rows' => array_slice($rows, 0, 100),
+            'shop' => $shop,
+        ];
+    }
+
+    /**
+     * Đọc dữ liệu bán hàng của CHÍNH người dùng đang đăng nhập (tối đa 200 dòng).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function shopRows(?User $user): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        return ShopSignal::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('units_sold')
+            ->orderBy('id')
+            ->limit(200)
+            ->get()
+            ->map(fn (ShopSignal $row) => $row->only([
+                'name', 'category', 'units_sold', 'stock_on_hand', 'returns', 'price_vnd', 'period_days', 'source', 'note',
+            ]))
+            ->all();
+    }
+
+    /**
+     * Lưu dữ liệu bán hàng của shop (nhập tay hoặc dán từ Excel/POS). Thay TOÀN BỘ dữ liệu cũ của
+     * chính người dùng — màn hình gửi lên đúng những gì đang hiển thị, nên kết quả luôn khớp mắt thấy.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return array{rows: list<array<string, mixed>>, shop: array}
+     */
+    public function saveShopSignals(?User $user, array $rows, string $source = 'manual'): array
+    {
+        if (! $user) {
+            return ['rows' => [], 'shop' => $this->shopSignalSummary([])];
+        }
+
+        $source = in_array($source, ['manual', 'paste'], true) ? $source : 'manual';
+
+        DB::transaction(function () use ($user, $rows, $source) {
+            ShopSignal::query()->where('user_id', $user->id)->delete();
+            foreach (array_slice($rows, 0, 200) as $row) {
+                $name = trim((string) ($row['name'] ?? ''));
+                if ($name === '') {
+                    continue;
+                }
+                ShopSignal::create([
+                    'user_id' => $user->id,
+                    'name' => Str::limit($name, 160, ''),
+                    'category' => Str::limit(trim((string) ($row['category'] ?? '')), 80, ''),
+                    'units_sold' => max(0, (int) ($row['units_sold'] ?? 0)),
+                    'stock_on_hand' => max(0, (int) ($row['stock_on_hand'] ?? 0)),
+                    'returns' => max(0, (int) ($row['returns'] ?? 0)),
+                    'price_vnd' => max(0, (int) ($row['price_vnd'] ?? 0)),
+                    'period_days' => max(1, min(365, (int) ($row['period_days'] ?? 30))),
+                    'source' => $source,
+                    'note' => Str::limit(trim((string) ($row['note'] ?? '')), 255, ''),
+                ]);
+            }
+        });
+
+        $saved = $this->shopRows($user);
+
+        return ['rows' => $saved, 'shop' => $this->shopSignalSummary($saved)];
+    }
+
+    /**
+     * Tổng hợp dữ liệu bán hàng thật thành các chỉ số dùng được cho quyết định sản xuất.
+     * Hàm THUẦN (không DB, không AI) để test được và để con số luôn tái lập được.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function shopSignalSummary(array $rows): array
+    {
+        $units = 0;
+        $stock = 0;
+        $returns = 0;
+        $revenue = 0;
+        $period = 30;
+        $lines = [];
+        $byCategory = [];
+
+        foreach ($rows as $row) {
+            $name = trim((string) ($row['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $rowUnits = max(0, (int) ($row['units_sold'] ?? 0));
+            $rowStock = max(0, (int) ($row['stock_on_hand'] ?? 0));
+            $rowReturns = max(0, (int) ($row['returns'] ?? 0));
+            $rowPrice = max(0, (int) ($row['price_vnd'] ?? 0));
+            $period = max(1, (int) ($row['period_days'] ?? 30));
+
+            $units += $rowUnits;
+            $stock += $rowStock;
+            $returns += $rowReturns;
+            $revenue += $rowUnits * $rowPrice;
+
+            $lines[] = [
+                'name' => $name,
+                'category' => trim((string) ($row['category'] ?? '')),
+                'units_sold' => $rowUnits,
+                'stock_on_hand' => $rowStock,
+                'return_rate_pct' => $rowUnits > 0 ? round($rowReturns / $rowUnits * 100, 1) : null,
+                'price_vnd' => $rowPrice,
+                'sell_through_pct' => ($rowUnits + $rowStock) > 0 ? (int) round($rowUnits / ($rowUnits + $rowStock) * 100) : null,
+            ];
+
+            $key = mb_strtolower(trim((string) ($row['category'] ?? '')));
+            if ($key === '') {
+                $key = mb_strtolower($name);
+            }
+            $label = trim((string) ($row['category'] ?? '')) ?: $name;
+            $byCategory[$key]['name'] = $label;
+            $byCategory[$key]['units_sold'] = ($byCategory[$key]['units_sold'] ?? 0) + $rowUnits;
+            $byCategory[$key]['stock_on_hand'] = ($byCategory[$key]['stock_on_hand'] ?? 0) + $rowStock;
+        }
+
+        if ($lines === []) {
+            return [
+                'row_count' => 0, 'period_days' => 30, 'units_sold' => 0, 'stock_on_hand' => 0,
+                'returns' => 0, 'return_rate_pct' => null, 'sell_through_pct' => null,
+                'avg_price_vnd' => null, 'revenue_vnd' => 0,
+                'best_sellers' => [], 'slow_movers' => [], 'category_demand' => [],
+                'narrative' => 'Chưa có dữ liệu bán hàng của shop — mọi con số bên dưới là GIẢ ĐỊNH, hãy nhập dữ liệu thật để lời khuyên sát hơn.',
+            ];
+        }
+
+        $best = $lines;
+        usort($best, fn (array $a, array $b) => [$b['units_sold'], $b['name']] <=> [$a['units_sold'], $a['name']]);
+        $slow = array_values(array_filter($lines, fn (array $line) => $line['stock_on_hand'] > 0));
+        usort($slow, fn (array $a, array $b) => [$b['stock_on_hand'], $a['units_sold']] <=> [$a['stock_on_hand'], $b['units_sold']]);
+
+        $demand = [];
+        foreach ($byCategory as $row) {
+            $demand[] = $row + [
+                'sell_through_pct' => ($row['units_sold'] + $row['stock_on_hand']) > 0
+                    ? (int) round($row['units_sold'] / ($row['units_sold'] + $row['stock_on_hand']) * 100)
+                    : null,
+            ];
+        }
+        usort($demand, fn (array $a, array $b) => $b['units_sold'] <=> $a['units_sold']);
+        $shareTotal = array_sum(array_column($demand, 'units_sold')) ?: 1;
+        foreach ($demand as $index => $row) {
+            $demand[$index]['share_pct'] = (int) round($row['units_sold'] / $shareTotal * 100);
+        }
+
+        $avgPrice = $units > 0 ? (int) round($revenue / $units) : null;
+        $top = $best[0];
+        $narrative = sprintf(
+            'Dữ liệu bán hàng THẬT của shop: %d dòng · %s cái đã bán · tồn %s · đổi trả %s%% · giá bán bình quân %s%s. Bán chạy nhất: %s (%s cái).',
+            count($lines),
+            number_format($units),
+            number_format($stock),
+            $units > 0 ? round($returns / $units * 100, 1) : 0,
+            $avgPrice ? number_format($avgPrice) : '—',
+            $avgPrice ? 'đ' : '',
+            $top['name'],
+            number_format($top['units_sold']),
+        );
+
+        return [
+            'row_count' => count($lines),
+            'period_days' => $period,
+            'units_sold' => $units,
+            'stock_on_hand' => $stock,
+            'returns' => $returns,
+            'return_rate_pct' => $units > 0 ? round($returns / $units * 100, 1) : null,
+            'sell_through_pct' => ($units + $stock) > 0 ? (int) round($units / ($units + $stock) * 100) : null,
+            'avg_price_vnd' => $avgPrice,
+            'revenue_vnd' => $revenue,
+            'best_sellers' => array_slice($best, 0, 5),
+            'slow_movers' => array_slice($slow, 0, 5),
+            'category_demand' => $demand,
+            'narrative' => $narrative,
         ];
     }
 
@@ -948,28 +1161,118 @@ class DesignAgentService
     {
         $lower = mb_strtolower($prompt);
         $base = [
-            ['category' => 'Áo / blouse', 'count' => 4, 'rationale' => 'Nhóm dễ thử biến thể và có tần suất mặc cao.'],
-            ['category' => 'Quần', 'count' => 3, 'rationale' => 'Cân bằng bộ và tăng giá trị đơn hàng.'],
-            ['category' => 'Váy', 'count' => 3, 'rationale' => 'Hero SKU cho mood board và lookbook.'],
-            ['category' => 'Phụ kiện', 'count' => 2, 'rationale' => 'Tăng khả năng phối và cross-sell.'],
+            ['category' => 'Áo / blouse', 'count' => 4, 'source' => 'default', 'rationale' => 'Nhóm dễ thử biến thể và có tần suất mặc cao.'],
+            ['category' => 'Quần', 'count' => 3, 'source' => 'default', 'rationale' => 'Cân bằng bộ và tăng giá trị đơn hàng.'],
+            ['category' => 'Váy', 'count' => 3, 'source' => 'default', 'rationale' => 'Hero SKU cho mood board và lookbook.'],
+            ['category' => 'Phụ kiện', 'count' => 2, 'source' => 'default', 'rationale' => 'Tăng khả năng phối và cross-sell.'],
         ];
         if (str_contains($lower, 'váy') || str_contains($lower, 'dress')) {
             $base[2]['count'] = 5;
             $base[0]['count'] = 3;
+            $base[2]['source'] = 'prompt';
         }
         if (str_contains($lower, 'quần') || str_contains($lower, 'pants')) {
             $base[1]['count'] = 5;
             $base[3]['count'] = 1;
+            $base[1]['source'] = 'prompt';
         }
         if (str_contains($lower, 'công sở') || str_contains($lower, 'văn phòng')) {
             $base[0]['count'] = 5;
             $base[2]['count'] = 2;
+            $base[0]['source'] = 'prompt';
         }
+
+        // DỮ LIỆU THẬT CỦA SHOP thắng từ khoá trong prompt: dịch 1 SKU về nhóm BÁN CHẠY NHẤT và
+        // lấy 1 SKU khỏi nhóm TỒN NHIỀU mà bán chậm. Đây là lý do chủ xưởng nhập dữ liệu bán hàng —
+        // càng dùng lâu, cơ cấu SKU càng sát cái shop thật sự bán được.
+        $shop = is_array($brand['shop'] ?? null) ? $brand['shop'] : null;
+        if ($shop && ($shop['row_count'] ?? 0) > 0) {
+            $demand = null;
+            foreach (($shop['category_demand'] ?? []) as $row) {
+                $index = $this->matchMixCategory((string) ($row['name'] ?? ''));
+                if ($index !== null) {
+                    $demand = ['index' => $index, 'row' => $row];
+                    break;   // category_demand đã xếp theo số bán giảm dần
+                }
+            }
+            if ($demand !== null) {
+                $index = $demand['index'];
+                $base[$index]['count'] = min(6, $base[$index]['count'] + 1);
+                $base[$index]['source'] = 'shop';
+                $base[$index]['rationale'] = sprintf(
+                    'Bán chạy nhất theo dữ liệu THẬT của shop: %s cái đã bán, chiếm %s%% cơ cấu, tồn %s cái.',
+                    number_format((int) ($demand['row']['units_sold'] ?? 0)),
+                    (int) ($demand['row']['share_pct'] ?? 0),
+                    number_format((int) ($demand['row']['stock_on_hand'] ?? 0)),
+                );
+
+                $slowIndex = $this->slowestMixCategory($shop, $index);
+                if ($slowIndex !== null && $base[$slowIndex]['count'] > 1) {
+                    $base[$slowIndex]['count']--;
+                    $base[$slowIndex]['source'] = 'shop';
+                    $base[$slowIndex]['rationale'] = 'Dữ liệu shop cho thấy nhóm này còn tồn nhiều mà bán chậm — giảm 1 SKU đợt này.';
+                }
+            }
+        }
+
         $total = array_sum(array_column($base, 'count')) ?: 1;
         foreach ($base as &$row) {
             $row['share'] = (int) round($row['count'] / $total * 100);
         }
+        unset($row);
         return $base;
+    }
+
+    /** Nhóm hàng trong cơ cấu SKU khớp với nhãn nhóm của shop (áo/quần/váy/phụ kiện…). */
+    private function matchMixCategory(string $label): ?int
+    {
+        $lower = mb_strtolower(trim($label));
+        if ($lower === '') {
+            return null;
+        }
+        $words = preg_split('/[^\p{L}\p{N}]+/u', $lower, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $map = [
+            0 => ['áo', 'blouse', 'shirt', 'top', 'sơ mi', 'khoác', 'vest', 'jacket'],
+            1 => ['quần', 'pant', 'jean', 'short', 'legging'],
+            2 => ['váy', 'đầm', 'dress', 'skirt', 'jumpsuit'],
+            3 => ['phụ kiện', 'túi', 'bag', 'belt', 'thắt lưng', 'mũ', 'khăn', 'accessor'],
+        ];
+        foreach ($map as $index => $tokens) {
+            foreach ($tokens as $token) {
+                $hit = preg_match('/[^\x00-\x7F]/', $token) === 1
+                    ? str_contains($lower, $token)      // token có dấu: so khớp chuỗi con
+                    : in_array($token, $words, true);   // token ascii: phải là MỘT từ riêng
+                if ($hit) {
+                    return $index;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Nhóm tồn nhiều mà bán chậm nhất (bỏ qua nhóm vừa được tăng) — để lấy bớt 1 SKU. */
+    private function slowestMixCategory(array $shop, int $excludeIndex): ?int
+    {
+        $demand = $shop['category_demand'] ?? [];
+        $candidates = [];
+        foreach ($demand as $row) {
+            $index = $this->matchMixCategory((string) ($row['name'] ?? ''));
+            if ($index === null || $index === $excludeIndex) {
+                continue;
+            }
+            $sellThrough = $row['sell_through_pct'];
+            if ($sellThrough === null || (int) $sellThrough > 40) {
+                continue;
+            }
+            $candidates[] = ['index' => $index, 'stock' => (int) ($row['stock_on_hand'] ?? 0)];
+        }
+        if ($candidates === []) {
+            return null;
+        }
+        usort($candidates, fn (array $a, array $b) => $b['stock'] <=> $a['stock']);
+
+        return $candidates[0]['index'];
     }
 
     private function moodboard(string $prompt, array $trends, array $palette): array
@@ -1016,16 +1319,35 @@ class DesignAgentService
         ])->values()->all();
     }
 
-    private function priceBands(string $prompt): array
+    /**
+     * Dải giá ĐỀ XUẤT. Khi shop đã có dữ liệu bán hàng, dải giá được NEO quanh giá bán bình quân
+     * THẬT của shop (±20%) thay vì bám vào vài từ khoá trong prompt — vì giá bán thật là thứ thị
+     * trường đã trả tiền, còn từ khoá chỉ là mong muốn.
+     */
+    private function priceBands(string $prompt, array $brand = []): array
     {
         $lower = mb_strtolower($prompt);
-        if (str_contains($lower, 'cao cấp') || str_contains($lower, 'luxury') || str_contains($lower, 'premium')) {
-            return ['recommended' => 'premium', 'recommended_label' => 'Premium', 'min_vnd' => 900000, 'max_vnd' => 1800000, 'rationale' => 'Chất liệu và độ hoàn thiện cho phép định vị cao hơn.'];
+        $band = str_contains($lower, 'cao cấp') || str_contains($lower, 'luxury') || str_contains($lower, 'premium')
+            ? ['recommended' => 'premium', 'recommended_label' => 'Premium', 'min_vnd' => 900000, 'max_vnd' => 1800000, 'rationale' => 'Chất liệu và độ hoàn thiện cho phép định vị cao hơn.']
+            : (str_contains($lower, 'giá rẻ') || str_contains($lower, 'bình dân')
+                ? ['recommended' => 'entry', 'recommended_label' => 'Entry', 'min_vnd' => 250000, 'max_vnd' => 550000, 'rationale' => 'Tập trung volume và phối lớp cơ bản.']
+                : ['recommended' => 'mid', 'recommended_label' => 'Mid-range', 'min_vnd' => 550000, 'max_vnd' => 1200000, 'rationale' => 'Cân bằng chất liệu, độ dễ mặc và biên lợi nhuận.']);
+
+        $shop = is_array($brand['shop'] ?? null) ? $brand['shop'] : null;
+        $avg = (int) ($shop['avg_price_vnd'] ?? 0);
+        if ($avg > 0) {
+            return [
+                'recommended' => $avg < 400000 ? 'entry' : ($avg < 900000 ? 'mid' : 'premium'),
+                'recommended_label' => 'Neo theo giá bán thật của shop',
+                'min_vnd' => (int) round($avg * 0.8 / 10000) * 10000,
+                'max_vnd' => (int) round($avg * 1.2 / 10000) * 10000,
+                'avg_shop_vnd' => $avg,
+                'basis' => 'shop_data',
+                'rationale' => 'Neo quanh giá bán bình quân THẬT '.number_format($avg).'đ của shop (±20%). Kiểm tra lại với giá vốn ở tab «Sản xuất & lợi nhuận» trước khi chốt.',
+            ];
         }
-        if (str_contains($lower, 'giá rẻ') || str_contains($lower, 'bình dân')) {
-            return ['recommended' => 'entry', 'recommended_label' => 'Entry', 'min_vnd' => 250000, 'max_vnd' => 550000, 'rationale' => 'Tập trung volume và phối lớp cơ bản.'];
-        }
-        return ['recommended' => 'mid', 'recommended_label' => 'Mid-range', 'min_vnd' => 550000, 'max_vnd' => 1200000, 'rationale' => 'Cân bằng chất liệu, độ dễ mặc và biên lợi nhuận.'];
+
+        return $band + ['avg_shop_vnd' => null, 'basis' => 'heuristic'];
     }
 
     private function promptVi(string $prompt, array $trends, array $palette): string

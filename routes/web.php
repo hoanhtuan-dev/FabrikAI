@@ -141,6 +141,13 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
         ->middleware('throttle:30,1')->name('design-agent.radar');
     Route::post('/design-agent/collection', [DesignAgentController::class, 'collection'])
         ->middleware('throttle:30,1')->name('design-agent.collection');
+    // Kế hoạch SẢN XUẤT & LỢI NHUẬN (giá thành, lệnh cắt, đợt sản xuất, bảng size) — tất định,
+    // không gọi model nên throttle rộng hơn (người dùng chỉnh đơn giá và xem lại nhiều lần).
+    Route::post('/design-agent/plan', [DesignAgentController::class, 'plan'])
+        ->middleware('throttle:60,1')->name('design-agent.plan');
+    // Dữ liệu bán hàng THẬT của shop (nhập tay / dán Excel) — nền tảng cho gợi ý sát thực tế.
+    Route::post('/design-agent/shop-signals', [DesignAgentController::class, 'shopSignals'])
+        ->middleware('throttle:30,1')->name('design-agent.shop-signals');
     Route::post('/upscale', [StudioController::class, 'upscale'])->name('upscale');
     Route::post('/look', [StudioController::class, 'look'])->name('look');
     Route::post('/reframe', [StudioController::class, 'reframe'])->name('reframe');

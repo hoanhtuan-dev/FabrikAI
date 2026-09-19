@@ -38,9 +38,29 @@ const STEPS = [
 ];
 const BRIEF_TABS = [
   { id: 'overview', label: 'Tổng quan' },
+  { id: 'money', label: 'Sản xuất & lãi' },
   { id: 'moodboard', label: 'Mood board' },
   { id: 'structure', label: 'Cấu trúc' },
   { id: 'fit', label: 'Phối & size' },
+];
+/**
+ * Đơn giá & định mức của kế hoạch sản xuất — CHỦ XƯỞNG TỰ NHẬP. Đây là điểm khác biệt cốt lõi:
+ * con số tiền phải do người bỏ vốn kiểm soát, không phải do model đoán.
+ */
+const PLAN_FIELDS = [
+  { key: 'units_per_sku', label: 'Số lượng mỗi mã', suffix: 'cái', hint: 'Mỗi SKU dự kiến sản xuất bao nhiêu cái.' },
+  { key: 'fabric_price_per_m', label: 'Giá vải', suffix: 'đ/m', hint: 'Giá mét vải theo khổ đang dùng.' },
+  { key: 'fabric_width_cm', label: 'Khổ vải', suffix: 'cm', hint: 'Khổ vải dùng để tính định mức.' },
+  { key: 'wastage_pct', label: 'Tiêu hao khi cắt', suffix: '%', hint: 'Hao hụt khi trải vải và cắt.' },
+  { key: 'fabric_safety_pct', label: 'Đặt dư vải', suffix: '%', hint: 'Dự phòng đầu khúc, canh sợi.' },
+  { key: 'trim_cost', label: 'Phụ liệu', suffix: 'đ/cái', hint: 'Khoá, chỉ, bo, dựng, nhãn…' },
+  { key: 'sewing_cost', label: 'Giá công may', suffix: 'đ/cái', hint: 'Tiền công xưởng cho mỗi cái.' },
+  { key: 'packaging_cost', label: 'Bao bì', suffix: 'đ/cái', hint: 'Túi, tag, hộp.' },
+  { key: 'defect_pct', label: 'Tỉ lệ lỗi', suffix: '%', hint: 'Phải làm lại — cộng thẳng vào giá vốn.' },
+  { key: 'channel_discount_pct', label: 'Chiết khấu kênh', suffix: '%', hint: 'Sàn/affiliate/CTV ăn bao nhiêu trên giá bán.' },
+  { key: 'target_margin_pct', label: 'Lãi mong muốn', suffix: '%', hint: 'Trên giá vốn, để tính giá bán gợi ý.' },
+  { key: 'daily_capacity', label: 'Năng lực xưởng', suffix: 'cái/ngày', hint: 'Để tính số ngày ra hàng mỗi đợt.' },
+  { key: 'fixed_cost', label: 'Chi phí cố định', suffix: 'đ', hint: 'Rập, mẫu, chụp ảnh… cho cả bộ sưu tập.' },
 ];
 const SIZE_PRESETS = [
   { id: 'standard', label: 'Chuẩn S–XL', values: { S: 20, M: 35, L: 30, XL: 15 } },
@@ -210,6 +230,152 @@ function focusDirections() {
 function toggleAi() {
   store.setDesignAgentAi(!store.designAgentAi);
   loadRadar(selectedRegion.value, { force: true });
+}
+
+// ── KẾ HOẠCH SẢN XUẤT & LỢI NHUẬN ────────────────────────────────────────────
+const plan = computed(() => store.plan);
+const planTotals = computed(() => plan.value?.totals || null);
+const planWaves = computed(() => plan.value?.waves || []);
+const planLines = computed(() => plan.value?.cut_lines || []);
+const planSizeChart = computed(() => plan.value?.size_chart || []);
+const planScenarios = computed(() => plan.value?.selling || []);
+const planInput = computed(() => ({
+  prompt: prompt.value.trim(),
+  region: selectedRegion.value,
+  trend_ids: selectedTrendIds.value,
+  size_distribution: sizeDistribution.value,
+}));
+let planTimer = null;
+/** Tính lại kế hoạch (gộp nhiều lần gõ số liên tiếp thành 1 lượt gọi — backend tất định, rất nhanh). */
+function schedulePlan() {
+  if (planTimer) clearTimeout(planTimer);
+  planTimer = setTimeout(() => { loadPlanNow(); }, 500);
+}
+async function loadPlanNow() {
+  if (prompt.value.trim().length < 3) {
+    store.planError = 'Nhập prompt bộ sưu tập (tối thiểu 3 ký tự) trước khi lập kế hoạch sản xuất.';
+    return;
+  }
+  try { await store.loadPlan(planInput.value); } catch (error) { /* store giữ lỗi */ }
+}
+function planFieldValue(key) { return store.planAssumptions[key]; }
+
+// ── DỮ LIỆU BÁN HÀNG THẬT CỦA SHOP ──────────────────────────────────────────
+const shopPaste = ref('');
+const shopParseError = ref('');
+const shopOpen = ref(false);
+const shopSummary = computed(() => store.shopSignal || radar.value?.internal_brand_signal?.shop || null);
+const shopRowCount = computed(() => (store.shopRows || []).filter((row) => String(row.name || '').trim()).length);
+
+/** Dán từ Excel: chấp nhận Tab, dấu phẩy hoặc dấu chấm phẩy; bỏ dòng tiêu đề nếu có. */
+function parseShopRows(text) {
+  const lines = String(text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const rows = [];
+  const toInt = (value) => {
+    const n = Number(String(value ?? '').replace(/[^\d.-]/g, ''));
+    return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
+  };
+  for (const line of lines) {
+    const cells = line.split(/\t|;|,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((c) => c.trim().replace(/^"|"$/g, ''));
+    const name = String(cells[0] || '').trim();
+    if (!name) continue;
+    if (rows.length === 0 && /^(t[eê]n|name|s[aả]n ph[aẩ]m)\b/i.test(name)) continue;
+    rows.push({
+      name: name.slice(0, 160),
+      category: String(cells[1] || '').trim().slice(0, 80),
+      units_sold: toInt(cells[2]),
+      stock_on_hand: toInt(cells[3]),
+      returns: toInt(cells[4]),
+      price_vnd: toInt(cells[5]),
+      period_days: 30,
+      source: 'paste',
+    });
+  }
+  return rows;
+}
+function importShopPaste() {
+  shopParseError.value = '';
+  const rows = parseShopRows(shopPaste.value);
+  if (!rows.length) {
+    shopParseError.value = 'Không đọc được dòng nào. Mỗi dòng theo thứ tự: Tên, Nhóm, Đã bán, Tồn, Đổi trả, Giá bán.';
+    return;
+  }
+  store.shopRows = [...store.shopRows, ...rows].slice(0, 200);
+  shopPaste.value = '';
+  store.toast('Đã thêm ' + rows.length + ' dòng nháp — kiểm tra lại rồi bấm «Lưu dữ liệu shop».');
+}
+function addShopRow() {
+  if (store.shopRows.length >= 200) { store.toast('Tối đa 200 dòng dữ liệu shop.', 'error'); return; }
+  store.shopRows = [...store.shopRows, { name: '', category: '', units_sold: 0, stock_on_hand: 0, returns: 0, price_vnd: 0, period_days: 30, source: 'manual' }];
+}
+function removeShopRow(index) { store.shopRows = store.shopRows.filter((_, i) => i !== index); }
+async function saveShop() {
+  const rows = (store.shopRows || []).filter((row) => String(row.name || '').trim());
+  await store.saveShopSignals(rows, 'manual');
+  await loadRadar(selectedRegion.value, { force: true });
+  if (collection.value && !briefStale.value) await createBrief();
+}
+
+// ── XUẤT FILE CHO THỢ CẮT / XƯỞNG ────────────────────────────────────────────
+function csvCell(value) {
+  const text = String(value ?? '');
+  return /[",;\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+}
+function downloadCsv(filename, rows) {
+  // BOM UTF-8 để Excel trên Windows hiển thị đúng tiếng Việt.
+  const csv = '\uFEFF' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  store.toast('Đã tải ' + filename + '.');
+}
+function exportCutSheet() {
+  if (!plan.value) return;
+  const rows = [
+    ['LỆNH CẮT — ' + (collection.value?.project_payload?.name || 'bộ sưu tập')],
+    ['Nhóm hàng', 'Size', 'Số lượng', 'Vải/cái (m)', 'Tổng vải (m)', 'Giá vốn/cái', 'Giá bán', 'Lãi/cái', '% lãi'],
+  ];
+  planLines.value.forEach((line) => rows.push([
+    line.category, line.size, line.qty, line.fabric_m_per_unit, line.fabric_m_total,
+    line.unit_cost, line.sell_price_vnd, line.profit_unit, line.margin_pct,
+  ]));
+  rows.push([]);
+  rows.push(['TỔNG', '', planTotals.value.units, '', planTotals.value.fabric_order_m, planTotals.value.avg_unit_cost_vnd, '', planTotals.value.avg_profit_unit_vnd, planTotals.value.margin_pct]);
+  rows.push(['Vải cần đặt (m)', planTotals.value.fabric_order_m, 'Vốn cần', planTotals.value.capital_needed_vnd, 'Lãi dự kiến', planTotals.value.profit_vnd]);
+  planWaves.value.forEach((wave) => rows.push([wave.name, wave.share_pct + '%', wave.units, '', wave.fabric_order_m, wave.cost_vnd, wave.revenue_vnd, wave.profit_vnd, wave.days + ' ngày']));
+  downloadCsv('lenh-cat-' + Date.now() + '.csv', rows);
+}
+function exportSizeChart() {
+  if (!plan.value || !planSizeChart.value.length) return;
+  const rows = [['BẢNG SIZE (cm) — đối chiếu với rập thật của xưởng']];
+  planSizeChart.value.forEach((chart) => {
+    rows.push([]);
+    rows.push([chart.category]);
+    const measures = Object.keys(chart.rows[0]?.measures || {});
+    rows.push(['Size', 'Số cái', ...measures]);
+    chart.rows.forEach((row) => rows.push([row.size, row.units_planned, ...measures.map((m) => row.measures[m])]));
+  });
+  downloadCsv('bang-size-' + Date.now() + '.csv', rows);
+}
+function copyCutSheet() {
+  if (!plan.value) return;
+  const lines = planLines.value.map((line) => [
+    line.category + ' · ' + line.size + ': ' + line.qty + ' cái',
+    line.fabric_m_total + 'm vải',
+    'vốn ' + formatVnd(line.unit_cost) + '/cái',
+    'bán ' + formatVnd(line.sell_price_vnd),
+  ].join(' — '));
+  copyText([
+    'LỆNH CẮT — ' + (collection.value?.project_payload?.name || ''),
+    ...lines,
+    'Tổng: ' + planTotals.value.units + ' cái · vải cần đặt ' + planTotals.value.fabric_order_m + 'm · vốn ' + formatVnd(planTotals.value.capital_needed_vnd) + ' · lãi dự kiến ' + formatVnd(planTotals.value.profit_vnd),
+  ].join('\n'), 'lệnh cắt');
 }
 
 function setStep(id) {
@@ -635,6 +801,83 @@ watch(() => store.designAgentOpen, (open) => {
                   <span v-for="(item, index) in [...(radar.internal_brand_signal?.top_categories || []), ...(radar.internal_brand_signal?.top_colors || [])]" :key="index + '-' + item" class="rounded bg-brand-500/15 px-2 py-0.5 text-[10px] text-brand-100">{{ item }}</span>
                 </div>
               </div>
+
+              <div class="card p-4">
+                <button
+                  type="button"
+                  class="motion-ui flex w-full items-start justify-between gap-2 text-left transition"
+                  :aria-expanded="shopOpen"
+                  @click="shopOpen = !shopOpen"
+                >
+                  <span class="min-w-0">
+                    <span class="block text-xs font-semibold text-cream-100">Dữ liệu bán hàng của shop</span>
+                    <span class="mt-0.5 block text-[10px] leading-4 text-cream-300/50">
+                      {{ shopRowCount ? shopRowCount + ' dòng — cơ cấu SKU và dải giá bám theo số bán THẬT' : 'Nhập tay hoặc dán từ Excel để lời khuyên sát shop của bạn' }}
+                    </span>
+                  </span>
+                  <StudioIcon name="chevronDown" size="h-3.5 w-3.5" class="mt-0.5 shrink-0 text-cream-300/50 transition" :class="shopOpen ? 'rotate-180' : ''" />
+                </button>
+
+                <div v-if="shopOpen" class="mt-3 space-y-3">
+                  <div v-if="shopSummary && shopSummary.row_count" class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-[11px] leading-5 text-emerald-100">
+                    {{ shopSummary.narrative }}
+                  </div>
+                  <p v-else class="rounded-lg border border-ink-700 bg-ink-800 p-3 text-[11px] leading-5 text-cream-300/60">
+                    Chưa có dữ liệu. Nhập 2–3 dòng cũng đã giúp cơ cấu SKU bám đúng nhóm bán chạy của shop thay vì đoán theo từ khoá.
+                  </p>
+
+                  <label class="block">
+                    <span class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">Dán từ Excel: Tên, Nhóm, Đã bán, Tồn, Đổi trả, Giá bán</span>
+                    <textarea
+                      v-model="shopPaste"
+                      rows="3"
+                      class="input mt-1 w-full resize-none !text-[11px]"
+                      placeholder="Áo linen tay dài, Áo, 120, 18, 5, 520000"
+                    ></textarea>
+                  </label>
+                  <div class="flex flex-wrap gap-2">
+                    <button type="button" class="tool-btn" @click="importShopPaste"><StudioIcon name="plus" size="h-3 w-3" /> Đọc &amp; thêm dòng</button>
+                    <button type="button" class="tool-btn" @click="addShopRow">Thêm dòng trống</button>
+                  </div>
+                  <p v-if="shopParseError" role="alert" class="text-[11px] text-red-300">{{ shopParseError }}</p>
+
+                  <div v-if="store.shopRows.length" class="max-h-64 overflow-auto rounded-lg border border-ink-700">
+                    <table class="w-full min-w-[26rem] text-left text-[10px]">
+                      <thead class="sticky top-0 bg-ink-800 text-cream-300/60">
+                        <tr>
+                          <th class="p-1.5 font-semibold">Tên</th>
+                          <th class="p-1.5 font-semibold">Nhóm</th>
+                          <th class="p-1.5 font-semibold">Bán</th>
+                          <th class="p-1.5 font-semibold">Tồn</th>
+                          <th class="p-1.5 font-semibold">Đổi</th>
+                          <th class="p-1.5 font-semibold">Giá</th>
+                          <th class="p-1.5"></th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-ink-800">
+                        <tr v-for="(row, index) in store.shopRows" :key="index">
+                          <td class="p-1"><input v-model="row.name" class="input !py-1 !text-[10px]" placeholder="Tên sản phẩm"></td>
+                          <td class="p-1"><input v-model="row.category" class="input !w-20 !py-1 !text-[10px]" placeholder="Áo"></td>
+                          <td class="p-1"><input v-model.number="row.units_sold" type="number" min="0" class="input !w-16 !py-1 !text-[10px] tabular-nums"></td>
+                          <td class="p-1"><input v-model.number="row.stock_on_hand" type="number" min="0" class="input !w-16 !py-1 !text-[10px] tabular-nums"></td>
+                          <td class="p-1"><input v-model.number="row.returns" type="number" min="0" class="input !w-14 !py-1 !text-[10px] tabular-nums"></td>
+                          <td class="p-1"><input v-model.number="row.price_vnd" type="number" min="0" class="input !w-24 !py-1 !text-[10px] tabular-nums"></td>
+                          <td class="p-1">
+                            <button type="button" class="tool-btn !px-1.5 !py-1" title="Xoá dòng" @click="removeShopRow(index)"><StudioIcon name="trash" size="h-3 w-3" /></button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div class="flex flex-wrap gap-2">
+                    <button type="button" class="btn-brand btn-sm" :disabled="store.shopSaving || !shopRowCount" @click="saveShop">
+                      {{ store.shopSaving ? 'Đang lưu…' : 'Lưu dữ liệu shop' }}
+                    </button>
+                    <button v-if="store.shopRows.length" type="button" class="tool-btn" @click="store.shopRows = []">Xoá hết</button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="min-w-0">
@@ -674,6 +917,170 @@ watch(() => store.designAgentOpen, (open) => {
                 <div v-if="briefTab === 'overview'" class="mt-4 grid gap-4 md:grid-cols-2">
                   <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Câu chuyện thương hiệu</h3><p class="mt-2 text-xs leading-5 text-cream-200">{{ collection.brand_narrative?.narrative || '—' }}</p></div>
                   <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Gợi ý cấu hình Canvas</h3><div v-if="canvasSettings" class="mt-2 flex flex-wrap gap-1.5 text-[10px]"><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">Tỉ lệ {{ canvasSettings.ratio }}</span><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">{{ canvasSettings.variant_count }} biến thể</span><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">Negative prompt</span></div><p class="mt-2 text-[11px] leading-5 text-cream-300/60">{{ canvasSettings?.note }}</p></div>
+                </div>
+
+                <div v-else-if="briefTab === 'money'" class="mt-4 space-y-4">
+                  <div class="card p-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <h3 class="text-sm font-semibold text-cream-100">Đơn giá &amp; định mức của xưởng bạn</h3>
+                        <p class="mt-0.5 text-[11px] leading-5 text-cream-300/55">
+                          Con số tiền do BẠN quyết định: sửa ô nào là kế hoạch tính lại ngay. Giá thành và lợi nhuận do hệ thống tính từ đúng những ô này — không dùng model AI cho con số.
+                        </p>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" class="tool-btn" @click="store.resetPlanAssumptions(); schedulePlan()">Về mặc định</button>
+                        <button type="button" class="btn-brand btn-sm flex items-center gap-2" :disabled="store.planLoading || briefStale" @click="loadPlanNow">
+                          <StudioIcon name="refresh" size="h-3.5 w-3.5" :class="store.planLoading ? 'animate-spin' : ''" />
+                          {{ store.planLoading ? 'Đang tính…' : 'Tính lại kế hoạch' }}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <label v-for="field in PLAN_FIELDS" :key="field.key" class="block" :title="field.hint">
+                        <span class="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">
+                          {{ field.label }}<span class="text-cream-300/40">{{ field.suffix }}</span>
+                        </span>
+                        <input
+                          type="number" min="0" step="1"
+                          class="input mt-1 w-full !py-1.5 !text-xs tabular-nums"
+                          :value="planFieldValue(field.key)"
+                          @input="store.setPlanAssumption(field.key, $event.target.value); schedulePlan()"
+                        >
+                      </label>
+                    </div>
+
+                    <p v-if="briefStale" role="status" class="mt-3 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-[11px] leading-5 text-amber-100">
+                      <StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Brief đã cũ so với prompt/trend hiện tại — bấm «Tạo lại brief» rồi mới tin kế hoạch này.</span>
+                    </p>
+                    <p v-if="store.planError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-[11px] leading-5 text-red-200">
+                      <StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ store.planError }}</span>
+                    </p>
+                  </div>
+
+                  <template v-if="planTotals">
+                    <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                      <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-[10px] text-cream-300/50">Tổng sản xuất</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatNumber(planTotals.units) }} cái</p></div>
+                      <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-[10px] text-cream-300/50">Vải cần đặt</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatNumber(planTotals.fabric_order_m) }} m</p><p class="text-[10px] text-cream-300/50">{{ formatVnd(planTotals.fabric_order_cost_vnd) }}</p></div>
+                      <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-[10px] text-cream-300/50">Vốn cần</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatVnd(planTotals.capital_needed_vnd) }}</p><p class="text-[10px] text-cream-300/50">Giá vốn TB {{ formatVnd(planTotals.avg_unit_cost_vnd) }}/cái</p></div>
+                      <div class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5"><p class="text-[10px] text-emerald-200/80">Lãi gộp dự kiến</p><p class="mt-1 text-lg font-semibold tabular-nums text-emerald-100">{{ formatVnd(planTotals.profit_vnd) }}</p><p class="text-[10px] text-emerald-200/70">{{ planTotals.margin_pct }}% · {{ formatVnd(planTotals.avg_profit_unit_vnd) }}/cái</p></div>
+                    </div>
+
+                    <div class="card p-5">
+                      <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 class="text-sm font-semibold text-cream-100">Lệnh cắt — {{ planLines.length }} dòng</h3>
+                          <p class="mt-0.5 text-[11px] text-cream-300/55">
+                            Số cái mỗi mã theo từng size, vải cần cho mỗi dòng và giá vốn/cái. Đây là bảng đưa thẳng cho thợ cắt.
+                            <span v-if="planTotals.days_total" class="text-cream-300/45"> · khoảng {{ planTotals.days_total }} ngày nếu chạy {{ plan.assumptions.daily_capacity }} cái/ngày.</span>
+                          </p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                          <button type="button" class="tool-btn" @click="exportCutSheet"><StudioIcon name="download" size="h-3 w-3" /> Lệnh cắt (CSV)</button>
+                          <button type="button" class="tool-btn" @click="exportSizeChart"><StudioIcon name="download" size="h-3 w-3" /> Bảng size (CSV)</button>
+                          <button type="button" class="tool-btn" @click="copyCutSheet"><StudioIcon name="copy" size="h-3 w-3" /> Sao chép lệnh</button>
+                        </div>
+                      </div>
+
+                      <div class="mt-3 overflow-x-auto">
+                        <table class="w-full min-w-[46rem] text-left text-[11px]">
+                          <thead>
+                            <tr class="border-b border-ink-700 text-cream-300/50">
+                              <th class="pb-2 pr-2 font-semibold">Nhóm hàng</th>
+                              <th class="pb-2 pr-2 font-semibold">Size</th>
+                              <th class="pb-2 pr-2 text-right font-semibold">Cái</th>
+                              <th class="pb-2 pr-2 text-right font-semibold">Vải/cái</th>
+                              <th class="pb-2 pr-2 text-right font-semibold">Tổng vải</th>
+                              <th class="pb-2 pr-2 text-right font-semibold">Giá vốn/cái</th>
+                              <th class="pb-2 pr-2 text-right font-semibold">Giá bán</th>
+                              <th class="pb-2 pr-2 text-right font-semibold">Lãi/cái</th>
+                              <th class="pb-2 text-right font-semibold">% lãi</th>
+                            </tr>
+                          </thead>
+                          <tbody class="divide-y divide-ink-800">
+                            <tr v-for="(line, index) in planLines" :key="index" class="text-cream-200">
+                              <td class="py-2 pr-2">
+                                {{ line.category }}
+                                <span v-if="line.source === 'shop'" class="ml-1 rounded bg-emerald-500/15 px-1 py-0.5 text-[9px] text-emerald-200">theo shop</span>
+                                <span v-else-if="line.source === 'prompt'" class="ml-1 rounded bg-brand-500/15 px-1 py-0.5 text-[9px] text-brand-100">theo prompt</span>
+                              </td>
+                              <td class="py-2 pr-2 font-semibold">{{ line.size }}</td>
+                              <td class="py-2 pr-2 text-right tabular-nums">{{ formatNumber(line.qty) }}</td>
+                              <td class="py-2 pr-2 text-right tabular-nums text-cream-300/70">{{ line.fabric_m_per_unit }}m</td>
+                              <td class="py-2 pr-2 text-right tabular-nums text-cream-300/70">{{ line.fabric_m_total }}m</td>
+                              <td class="py-2 pr-2 text-right tabular-nums">{{ formatVnd(line.unit_cost) }}</td>
+                              <td class="py-2 pr-2 text-right tabular-nums">{{ formatVnd(line.sell_price_vnd) }}</td>
+                              <td class="py-2 pr-2 text-right tabular-nums" :class="line.profit_unit > 0 ? 'text-emerald-200' : 'text-red-300'">{{ formatVnd(line.profit_unit) }}</td>
+                              <td class="py-2 text-right tabular-nums text-cream-300/70">{{ line.margin_pct }}%</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div class="grid gap-3 lg:grid-cols-3">
+                      <div v-for="wave in planWaves" :key="wave.id" class="card p-4">
+                        <div class="flex items-center justify-between gap-2">
+                          <h4 class="text-xs font-semibold text-cream-100">{{ wave.name }}</h4>
+                          <span class="rounded bg-ink-800 px-2 py-0.5 text-[10px] text-cream-300/60">{{ wave.share_pct }}%</span>
+                        </div>
+                        <p class="mt-2 text-xl font-semibold tabular-nums text-cream-100">{{ formatNumber(wave.units) }} cái</p>
+                        <p class="text-[11px] text-cream-300/60">Vải {{ wave.fabric_order_m }}m · vốn {{ formatVnd(wave.cost_vnd) }}<span v-if="wave.days"> · {{ wave.days }} ngày</span></p>
+                        <p class="mt-1 text-[11px] text-emerald-200/80">Lãi dự kiến {{ formatVnd(wave.profit_vnd) }}</p>
+                        <p class="mt-2 text-[10px] leading-4 text-cream-300/50">{{ wave.note }}</p>
+                        <details class="mt-2">
+                          <summary class="cursor-pointer text-[10px] font-semibold text-cream-300/60">Chi tiết {{ wave.lines.length }} dòng</summary>
+                          <ul class="mt-1.5 space-y-0.5 text-[10px] text-cream-300/70">
+                            <li v-for="(row, index) in wave.lines" :key="index">{{ row.category }} · {{ row.size }}: {{ row.qty }}</li>
+                          </ul>
+                        </details>
+                      </div>
+                    </div>
+
+                    <div class="grid gap-4 lg:grid-cols-2">
+                      <div class="card p-5">
+                        <h3 class="text-sm font-semibold text-cream-100">Bảng size (cm)</h3>
+                        <p class="mt-0.5 text-[11px] leading-5 text-cream-300/55">Số đo tham chiếu dáng nữ VN — phải đối chiếu rập thật của xưởng và độ co của vải.</p>
+                        <div v-for="chart in planSizeChart" :key="chart.category" class="mt-3 overflow-x-auto">
+                          <p class="text-[11px] font-semibold text-brand-200">{{ chart.category }}</p>
+                          <table class="mt-1 w-full text-left text-[10px]">
+                            <thead><tr class="text-cream-300/50"><th class="pr-2 font-semibold">Size</th><th class="pr-2 font-semibold">Cái</th><th v-for="(value, name) in chart.rows[0].measures" :key="name" class="pr-2 font-semibold">{{ name }}</th></tr></thead>
+                            <tbody class="divide-y divide-ink-800 text-cream-200">
+                              <tr v-for="row in chart.rows" :key="row.size">
+                                <td class="py-1.5 pr-2 font-semibold">{{ row.size }}</td>
+                                <td class="py-1.5 pr-2 tabular-nums">{{ row.units_planned }}</td>
+                                <td v-for="(value, name) in row.measures" :key="name" class="py-1.5 pr-2 tabular-nums">{{ value }}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div class="card p-5">
+                        <h3 class="text-sm font-semibold text-cream-100">Ba mức giá — lãi tương ứng</h3>
+                        <p class="mt-0.5 text-[11px] leading-5 text-cream-300/55">Đã trừ chiết khấu kênh {{ plan.assumptions.channel_discount_pct }}% và cộng chi phí cố định.</p>
+                        <div class="mt-3 space-y-2">
+                          <div v-for="scenario in planScenarios" :key="scenario.price_vnd" class="rounded-lg border border-ink-700 bg-ink-800 p-3">
+                            <div class="flex items-center justify-between gap-2">
+                              <span class="text-xs font-semibold text-cream-100">{{ formatVnd(scenario.price_vnd) }}</span>
+                              <span class="rounded px-2 py-0.5 text-[10px]" :class="scenario.profit_vnd > 0 ? 'bg-emerald-500/15 text-emerald-200' : 'bg-red-500/15 text-red-200'">{{ scenario.label }}</span>
+                            </div>
+                            <p class="mt-1 text-[11px] text-cream-300/70">Lãi {{ formatVnd(scenario.profit_vnd) }} · biên {{ scenario.margin_pct }}%<span v-if="scenario.breakeven_units"> · hoà vốn ở {{ formatNumber(scenario.breakeven_units) }} cái</span></p>
+                          </div>
+                        </div>
+                        <ul class="mt-3 space-y-1 text-[10px] leading-4 text-cream-300/50">
+                          <li v-for="(note, index) in plan.notes" :key="index">• {{ note }}</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </template>
+
+                  <div v-else-if="!store.planLoading" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-8 text-center">
+                    <StudioIcon name="receipt" size="h-7 w-7" class="mx-auto text-brand-400/70" />
+                    <p class="mt-3 text-sm font-semibold text-cream-100">Chưa có kế hoạch sản xuất</p>
+                    <p class="mt-1 text-xs leading-5 text-cream-300/55">Bấm «Tính lại kế hoạch» để ra lệnh cắt, giá thành và lợi nhuận từ cấu trúc SKU ở tab «Cấu trúc».</p>
+                  </div>
                 </div>
 
                 <div v-else-if="briefTab === 'moodboard'" class="mt-4 card p-5">
