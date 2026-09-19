@@ -652,3 +652,64 @@ các user · validate). Full suite **793 pass**; 6 fail vẫn đúng 6 lỗi S�
 - [ ] **Đối chiếu dự đoán với thực tế**: lưu kế hoạch tại thời điểm chốt rồi sau 2–4 tuần so với số bán thật để biết hướng
       nào đúng/sai (hiện mới có chiều nhập dữ liệu vào).
 - [ ] Dữ liệu xu hướng vẫn là catalog mẫu (`evidence_mode: demo`) — chưa có connector thật, và điều đó vẫn phải nói thật.
+
+---
+
+## Phiên 2026-09-22 (Đợt 8 — Vùng toolbar cao CỐ ĐỊNH + mọi thanh ngữ cảnh phải tôn trọng, cuộn trục X)
+
+**Phạm vi:** 2 file nguồn + 1 file test + asset build. **KHÔNG migration, KHÔNG route mới, KHÔNG lớp PHP mới.**
+Commit `2c393b6` (`b3507ca → 2c393b6`).
+
+### 1. Lỗi
+
+Vùng toolbar phía trên canvas **cao theo công cụ**: rail dùng `min-h-12` (chiều cao TỐI THIỂU) còn mỗi thanh
+ngữ cảnh tự đặt `flex flex-wrap … py-2` nên tự do xuống dòng. Đổi công cụ là thân canvas bị đẩy xuống.
+
+### 2. Đo THẬT trước/sau (Chrome headless · component THẬT + CSS build THẬT · 10 biến thể)
+
+| Biến thể | TRƯỚC | SAU |
+|---|---|---|
+| Không công cụ (placeholder) | 36px | **47px** |
+| Vùng chọn · crop · film look · chọn layer · quét chọn · di chuyển · xoá vùng | 52–56px | **47px** |
+| **Vẽ tự do** (9 ô thông số) | **94px** (dồn thành 2 hàng) | **47px** |
+
+47px = `h-12` trừ `border-b` 1px. Mọi thanh cao đúng 36px (`h-9`); `childOverflowY = 0` — **không phần tử nào
+thò ra ngoài** khuôn. Khi tràn bề ngang thì rail **cuộn trục X**: "Vẽ tự do" rộng 1351px trong rail 1254px ⇒
+`scrollWidth 1375 > clientWidth 1254`. Mobile: khối nổi cao cố định 44px, cuộn X ở "Vẽ tự do" và "Quét chọn".
+
+### 3. Sửa
+
+- `ContextToolbar.vue`: 9 biến thể + placeholder dùng **CHUNG một khuôn** `bar`
+  (`h-9 w-max shrink-0 flex-nowrap whitespace-nowrap`) thay cho `flex-wrap py-2` riêng lẻ.
+- `StudioApp.vue`: rail desktop **`h-12` cố định** + lớp trong `mx-auto flex w-max` để cuộn trục X
+  (`justify-center` trên khung cuộn sẽ đẩy mép **TRÁI** ra ngoài tầm với — bấm/kéo không tới được);
+  `scrollbar-hide` để thanh cuộn không ăn mất chiều cao đã cố định. Khối nổi mobile: `h-11` + cuộn X.
+- `tests/Feature/ToolbarAreaTest.php` (mới, 4 test): rail cao cố định (cấm `min-h-12`/`py-`) · cuộn X không cuộn Y ·
+  **MỌI gốc template** của thanh ngữ cảnh phải theo khuôn chung. Đã **thử đột biến**: cho `bar` quay lại `flex-wrap`
+  → ĐỎ; cho rail quay lại `min-h-12` + `justify-center` → ĐỎ.
+
+### 4. Verify production (đã chạy thật)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `2c393b6` (trước pull: `6367796`) |
+| Migration | `Nothing to migrate` (đúng — không có migration mới) |
+| Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` → **exit=0** cả bốn |
+| Trang | `/` `/dang-nhap` `/up` `/bang-gia` → **200** |
+| Asset mới | `app-DBHwKOWn.css` **200 · 165.897 B** · `main-CAUgn08q.js` **200 · 558.717 B** — **md5 GIỐNG bản build ở máy** |
+| Asset cũ | `app-BS-WmmGX.css` → **404** (đã thay) |
+| CSS phục vụ thật | có `.h-12` `.h-11` `.w-max` `.items-stretch` `.flex-nowrap` — **không còn** `.min-h-12` |
+| JS phục vụ thật | chứa `flex h-9 w-max shrink-0 flex-nowrap` + `mx-auto flex w-max items-center gap-2 px-3` |
+| Nhật ký | **không phát sinh ERROR mới** (8 dòng cũ: 17–19/09 — Eloquent cache · generation failed · qwen hết quota) |
+
+**Test:** full suite **803 test / 5561 assert**, 6 fail — **đúng 6 lỗi SẴN CÓ** (đã đối chiếu bằng cách stash thay đổi
+rồi chạy lại trên HEAD sạch: CollectionsHub · JobTemplates · MotionFoundation · ShotReview ×2 · StaticIntegrity).
+Nhóm test thanh công cụ (CanvasControls · StudioGuiConfig · BatchGeneration): **45/45 xanh**.
+
+### 5. Ghi chú vận hành (không do đợt này)
+
+- `jobs = 1` · `failed_jobs = 0` · `generations pending = 0` — job cũ 1 ngày vẫn nằm trong hàng đợi, **không có
+  generation nào kẹt** ⇒ không ảnh hưởng người dùng.
+- `storage/logs/worker.log` **không tồn tại** ⇒ cron worker (DEPLOY.md §3) vẫn chưa được tạo; hệ thống đang chạy
+  bằng lưới an toàn 90 giây. Vẫn đúng như đã ghi ở §8.3, **chưa xử lý trong đợt này**.
+- Đồng hồ máy chủ lệch (báo `Sat Sep 19 15:50 UTC`) — giờ địa phương lúc deploy: `2026-09-19 22:50 +07`.
