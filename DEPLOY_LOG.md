@@ -462,4 +462,105 @@ ShotReview ×2 · StaticIntegrity), không liên quan đợt này (trước đ�
       số lần gọi model edit tăng theo cấu hình đó — cân nhắc chỉnh `swap_candidates` = 1 nếu muốn tiết kiệm.
 - [ ] 6 test đỏ sẵn có của phiên Collections/Canvas vẫn chưa sửa (thiếu `.motion-ui` ở `hover:text-white`).
 
+---
 
+## Phiên 2026-09-22 (Đợt 6 — Agent Studio BIẾT MODEL: hai agent suy luận thật qua nhóm 'prompt')
+
+**Commit:** `b98b2c4` (feat) + `06ee658` (đọc JSON) + `da35124` (thang thử lại). **Đã deploy production**
+(không migration; có thay đổi frontend ⇒ đã rebuild asset `main-B3d2N_ZM.js`).
+
+### Vấn đề người dùng báo
+
+«Agent Studio chưa nhận biết model hoặc chưa hoạt động.» — **đúng theo nghĩa đen**: cả `TrendRadar` lẫn
+`CollectionBot` chạy **100% rule-based**, KHÔNG gọi model nào (`engine: rule-based-v1`), và giao diện không có
+bất kỳ dấu hiệu nào cho biết AI có đang chạy. Đổi Model Registry / Nhóm công việc trong Cài đặt xong kết quả y nguyên.
+
+### Kiến trúc mới: HAI TẦNG TÁCH BẠCH
+
+| Tầng | Nguồn | Vai trò |
+|---|---|---|
+| **Số liệu** | catalog mẫu + project/generation của chính user | Quyết định MỌI con số. Luôn `source_mode=demo` / `evidence_mode=demo` |
+| **Suy luận** | `AiModelGateway` → nhóm công việc **`prompt`** | Viết định hướng / brief / caption / prompt. **Chỉ trả về CHỮ** |
+
+⇒ AI **không thể bịa số liệu thị trường**: mọi con số vẫn do tầng dữ liệu quyết định (test khoá điều này).
+
+### Backend
+
+- `DesignAgentService` nhận `AiModelGateway` (tham số **bắt buộc**, xem mục bẫy bên dưới).
+- `radar()`: model viết **5–10 định hướng** (title/thesis/why_now/action/risk/price_band/confidence/trend_ids),
+  mỗi hướng bám vào id xu hướng **có thật** trong catalog (id bịa bị loại, confidence được kẹp 0..1);
+  cache **10 phút** theo vùng + model (payload gửi model KHÔNG chứa dữ liệu nội bộ của shop nên cache dùng chung an toàn).
+- `collectionBrief()`: model viết narrative · brief · **24 caption mood board** · lý do từng nhóm hàng · mục tiêu từng look ·
+  prompt VI/EN · 3 bước tiếp theo. **Brief người dùng tự viết luôn thắng.**
+- Mọi phản hồi có khối `model`: `{group, mode, provider, model, candidates, available, latency_ms, cached, attempts, reason, attempted}`
+  — `reason` là `no_model_key` | `model_error` | `invalid_output` | `ai_disabled` khi phải quay về tất định.
+- Endpoint nhận cờ `ai` (mặc định **bật**): tắt ⇒ engine tất định, **không gọi model** (test xác nhận `assertNothingSent`).
+
+### Frontend (Agent Studio)
+
+- **Chip model ngay header**: `AI · deepseek · deepseek-flash` (xanh) hoặc `Engine tất định` (vàng) + tooltip nói rõ
+  provider:model, nhóm công việc, số ms, có lấy từ cache không.
+- Khi chạy tất định: dải **giải thích LÝ DO** + chỉ thẳng nơi cấu hình (Cài đặt → Nhóm công việc → “Suy luận prompt”).
+- Công tắc **“Suy luận AI: BẬT/TẮT”** (bỏ cache radar khi đổi để kết quả không lẫn giữa 2 chế độ).
+- Khối **ĐỊNH HƯỚNG** mới ở bước Tín hiệu: từng hướng ghi rõ nguồn `AI`/`tất định`, nút “Chọn trend theo 3 hướng đầu”,
+  chip trend bấm được ngay trong thẻ.
+- Bước Định hướng: hiện model + **những phần AI đã viết** (DNA, brief, 24 caption, …) + cảnh báo khi brief được dựng ở chế độ khác công tắc.
+- Trạng thái chờ nói thẳng: “Đang gọi model của nhóm “prompt” để viết định hướng…”.
+
+### Chẩn đoán THẬT trên production (3 vòng deploy)
+
+| Vòng | Quan sát | Kết luận |
+|---|---|---|
+| 1 (`b98b2c4`) | cả hai agent chạm tới model (3 candidate deepseek) nhưng `reason=invalid_output` | model CÓ trả lời, bộ đọc JSON mới là chỗ hỏng |
+| 2 (`06ee658`, thêm log đầu ra thô) | radar: model trả về đúng **6 ký tự** `{"dire`; collection: `content` **RỖNG**, chỉ còn `reasoning_content` là văn xuôi suy luận | `deepseek-flash` là model **SUY LUẬN** — token suy luận tính VÀO `max_tokens`, prompt dài ⇒ cạn ngân sách trước khi viết xong JSON |
+| 3 (`da35124`) | `engine=ai-v1`, **6/6 định hướng do AI**, brief đầy đủ | xong |
+
+Sửa ở vòng 2–3: đọc JSON chịu được **code fence** và **JSON bị cắt** (đếm ngoặc thật + cắt về phần tử hoàn chỉnh cuối rồi đóng ngoặc),
+`max_tokens` 2048→3000 / 3000→4000, yêu cầu model viết ngắn, và **thang thử lại**: lần đầu không đọc được JSON ⇒ gọi lại MỘT lần
+với ngân sách 8000 + timeout gấp đôi (`AiModelGateway::text()` nay trả thêm `finish_reason` + `reasoning_only` để biết vì sao).
+
+```
+⚠️ BẪY LARAVEL đã dính và đã sửa:
+   __construct(?AiModelGateway $gateway = null)  -> container KHÔNG inject, luôn truyền default null
+   __construct(?AiModelGateway $gateway)         -> inject đúng (tham số BẮT BUỘC, kiểu nullable)
+   Triệu chứng: service im lặng chạy tất định dù Cài đặt đã có model. Đã khoá bằng test.
+```
+
+### Bằng chứng production sau deploy (gọi thật, không mock)
+
+```json
+{ "radar": { "engine": "ai-v1", "provider_model": "deepseek:deepseek-flash", "attempts": 1,
+             "directions": 6, "ai_directions": 6,
+             "first": { "title": "Blazer linen tối giản làm hero SKU",
+                        "why_now": "Cả tailoring tối giản và linen đều đang ở đỉnh tín hiệu…",
+                        "action": "May 3 màu trung tính, 2 form, dồn 60% lượng vải cho mã này.",
+                        "risk": "Linen dễ nhăn, cần chọn vải pha để giữ form và giảm đổi trả.",
+                        "price_band": "mid", "confidence": 0.88 } },
+  "collection": { "engine": "ai-v1", "ai_applied": { "narrative": true, "brief": true,
+                  "moodboard_captions": 24, "category_rationale": 4, "outfit_goals": 3,
+                  "prompts": true, "next_steps": true }, "wall_ms": 12575 } }
+```
+
+Số liệu trong brief AI vẫn là số của HỆ THỐNG (12 SKU = 5 áo/blouse + 3 quần + 2 váy + 2 phụ kiện) — AI chỉ diễn đạt lại.
+
+### Verify production
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `da35124` |
+| Trang | `/` `/dang-nhap` `/up` → **200** |
+| Bundle | `main-B3d2N_ZM.js` chứa “Suy luận AI” · “Engine tất định” · “Định hướng từ TrendRadar” · “Chọn trend theo 3 hướng đầu” |
+| Log | ERROR vẫn **8** dòng (không phát sinh lỗi mới); các WARNING cũ của 2 vòng chẩn đoán đã ngừng sinh |
+| Độ trễ | radar ~13.6 s (lần đầu mỗi vùng, sau đó **cache 10 phút**), brief ~12.6 s |
+
+### Test
+
+**15 test** `DesignAgentAiTest` (mới) + 12 test `AiModelGatewayTest` (đợt 5). Full suite **776 pass / 6 fail** —
+vẫn đúng 6 lỗi SẴN CÓ ở HEAD (Collections/Canvas), không liên quan đợt này.
+
+### Còn lại (đề xuất)
+
+- [ ] Radar mất ~13 s ở lần gọi đầu cho mỗi vùng: có thể hạ bằng model không-suy-luận (đặt `studio_task_prompt_model`,
+      ví dụ `deepseek:deepseek-chat`) hoặc tăng thời gian cache.
+- [ ] `DesignAgentService::radar()` gọi model cho CẢ khối catalog; nếu sau này có connector thật thì nên chunk theo nguồn.
+- [ ] 6 test đỏ sẵn có của phiên Collections/Canvas vẫn chưa sửa.
