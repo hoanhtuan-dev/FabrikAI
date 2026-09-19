@@ -1,233 +1,212 @@
 <script setup>
 /**
- * [Trục 1 — 2026-09-20] Canvas Empty State — OpenArt-style.
+ * Canvas Empty State — thiết kế lại toàn diện (2026-09-20).
  *
- * Thay thế dòng text "Chọn/hiện một ảnh..." bằng một màn hình khởi động giàu nội dung:
- *   · Thanh prompt nhanh (OpenArt-style) — nhập ngay, không cần mở popup
- *   · Mẫu việc theo ngành (job-templates) — bấm một cái là có bộ prompt để tạo hàng loạt
- *   · Ảnh gần đây — kéo thả ngay vào canvas hoặc nhấn để mở viewer
- *   · Gợi ý phím tắt — giảm thời gian học
+ * Màn hình canvas trống giờ là một "command center" gọn:
+ *   · composer tạo ảnh là trọng tâm (prompt, tỉ lệ, biến thể, credit),
+ *   · Agent Studio 3 bước nằm cùng chỗ để người dùng đi từ hướng đi → ảnh,
+ *   · quick actions tới Nguồn ảnh · Thư viện · Bộ sưu tập · Prompt đầy đủ · Gói,
+ *   · bối cảnh hiện tại (gói, credit, dự án, số lớp) luôn hiển thị,
+ *   · phím tắt gom trong mục mở rộng.
  *
- * Tất cả đều dùng state/store hiện có — KHÔNG thêm endpoint, KHÔNG thay đổi hành vi generate.
+ * ĐÃ XÓA theo yêu cầu: khối mẫu việc theo ngành và khối ảnh cũ.
+ * — mẫu việc vẫn dùng được trong Prompt Tạo Ảnh; ảnh cũ vẫn nằm ở Thư viện/Outputs.
+ *
+ * Giữ nguyên: vị trí z-0 (dưới layer), hành vi generate, state store hiện có.
  */
-import { ref, computed, onMounted } from 'vue'; // ref: còn dùng cho templatesLoading
+import { computed } from 'vue';
 import { useStudioStore } from '../store.js';
-import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import StudioIcon from './StudioIcon.vue';
 
 const store = useStudioStore();
 
-// ── Prompt bar (OpenArt-style) ──
 const promptText = computed({
   get: () => store.imagePromptEn || '',
-  set: (v) => { store.imagePromptEn = v; },
+  set: (value) => { store.imagePromptEn = value; },
 });
 
 const variantCount = computed({
   get: () => store.variantCount || 1,
-  set: (v) => { store.variantCount = Math.max(1, Math.min(4, Number(v) || 1)); },
+  set: (value) => { store.variantCount = Math.max(1, Math.min(4, Number(value) || 1)); },
 });
 
-const creditEstimate = computed(() => {
-  const base = store.planCostImage || 1;
-  return base * variantCount.value;
-});
+const creditEstimate = computed(() => (store.planCostImage || 1) * variantCount.value);
+const canGenerate = computed(() => (store.imagePromptEn || '').trim().length > 0 && !store.generating);
+const ratioOptions = ['1:1', '4:5', '3:4', '16:9', '9:16'];
 
-const canGenerate = computed(() => {
-  return (store.imagePromptEn || '').trim().length > 0 && !store.generating;
-});
+const projectName = computed(() => store.appliedProject?.name || '');
+const layerCount = computed(() => (store.canvasLayers || []).length);
 
-const ratioOptions = ['1:1', '4:3', '3:4', '9:16', '16:9', '4:5', '21:9'];
+const AGENT_STEPS = [
+  { id: 'radar', icon: 'scan', title: 'Tín hiệu', text: 'Đọc xu hướng theo khu vực, chọn hướng phù hợp DNA shop.' },
+  { id: 'brief', icon: 'briefcase', title: 'Định hướng', text: 'Dựng brief, mood board, cấu trúc SKU và dải giá.' },
+  { id: 'canvas', icon: 'wand', title: 'Thực thi', text: 'Chốt prompt, tỉ lệ, biến thể rồi mở Tạo ảnh.' },
+];
+
+const quickActions = [
+  { id: 'prompt', icon: 'sliders', label: 'Prompt Tạo Ảnh', hint: 'Bảng đầy đủ: prefix, negative, phom dáng, mẫu việc', run: () => { store.promptOpen = true; } },
+  { id: 'source', icon: 'imagePlus', label: 'Nguồn ảnh', hint: 'Chọn ảnh từ Outputs, Thư viện hoặc tải lên', run: () => { store.sourcePickerOpen = true; } },
+  { id: 'library', icon: 'library', label: 'Thư viện', hint: 'Xem và quản lý ảnh đã tạo trước đây', run: () => { store.studioView = 'library'; } },
+  { id: 'collections', icon: 'folderOpen', label: 'Bộ sưu tập', hint: 'Mở bảng thiết kế và bộ sưu tập hiện tại', run: () => { store.requestWorkspace(); } },
+];
+
+function openAgent(step = 'radar') {
+  if (store.moduleLocked('stylist')) {
+    store.toast('Agent thiết kế không có trong gói của bạn. Mở «Gói & credit» để nâng cấp.', 'error');
+    store.planOpen = true;
+    store.planCatalogOpen = true;
+    store.loadPlanStatus && store.loadPlanStatus(true);
+    return;
+  }
+  store.designAgentOpen = true;
+  store.setDesignAgentStep(step);
+}
 
 function generate() {
   if (!canGenerate.value) return;
   store.generateImage();
 }
 
-function onPromptKeydown(e) {
-  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-    e.preventDefault();
+function onPromptKeydown(event) {
+  if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
     generate();
   }
 }
 
-// ── Job templates (Đợt 2) ──
-const templatesLoading = ref(false);
-async function loadTemplates() {
-  if (store.jobTemplatesLoaded || templatesLoading.value) return;
-  templatesLoading.value = true;
-  try { await store.loadJobTemplates(); } finally { templatesLoading.value = false; }
-}
-
-/**
- * Áp mẫu việc: đặt tỉ lệ/độ phân giải (store.applyJobTemplate) rồi gửi TOÀN BỘ prompt của mẫu vào
- * tab "Hàng loạt" của ConceptCard qua kênh store — màn hình này không sở hữu ô dán danh sách nên
- * không tự ý sửa DOM (cách cũ vỡ ngay khi card đổi bố cục).
- */
-function applyTemplate(tpl) {
-  const prompts = store.applyJobTemplate(tpl);
-  if (!prompts.length) return;
-  store.requestBatchPrompts(prompts, { from: tpl.title });
-}
-
-// ── Recent generations ──
-const recentGens = computed(() => {
-  return (store.generations || [])
-    .filter(g => g.status === 'completed' && g.media_url)
-    .slice(0, 6);
-});
-
-function openGen(g) {
-  store.openViewer(g);
-}
-
-// ── Keyboard shortcuts hint ──
 const shortcuts = [
-  { key: 'Ctrl+K', label: 'Mở Command Palette' },
-  { key: 'S', label: 'Chọn ảnh chờ duyệt' },
-  { key: 'N', label: 'Chuyển bước tiếp' },
-  { key: 'V', label: 'Di chuyển canvas' },
+  { key: 'Ctrl+K', label: 'Command Palette' },
+  { key: 'Enter', label: 'Tạo ảnh từ ô mô tả' },
   { key: 'Ctrl+Z', label: 'Hoàn tác' },
   { key: 'Ctrl+Shift+Z', label: 'Làm lại' },
+  { key: 'V', label: 'Di chuyển canvas' },
 ];
-
-onMounted(() => { loadTemplates(); });
 </script>
 
 <template>
-  <!-- [2026-09-20] Hiệu ứng vào dùng CƠ SỞ CHUNG (app.css: .motion-*) thay vì số ms viết cứng:
-       nền mờ dần, nội dung nhô lên — và tự tắt khi người dùng bật "giảm chuyển động". -->
-  <!-- z-0 (không phải z-20): lớp này phải nằm DƯỚI các layer. Ẩn layer CUỐI cùng thì màn hình trống
-       hiện ra ngay và che mất hiệu ứng mờ của layer đang tắt (layer ở z 1..N) — nhìn như "hiệu ứng
-       không chạy". Layer ẩn không nhận chuột (pointer-events:none) nên màn hình trống vẫn bấm được. -->
-  <div class="motion-fade-in absolute inset-0 z-0 flex flex-col items-center justify-center overflow-y-auto bg-gradient-to-b from-ink-950/95 via-ink-950/90 to-ink-950/95 p-4 backdrop-blur-sm">
-    <!-- Header -->
-    <div class="motion-rise-in mb-6 text-center">
-      <div class="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600/20 text-brand-300">
-        <StudioIcon name="sparkles" size="h-8 w-8" />
-      </div>
-      <h2 class="text-xl font-semibold text-cream-50">Bắt đầu tạo ảnh</h2>
-      <p class="mt-1 text-sm text-cream-300/60">Nhập mô tả hoặc chọn mẫu việc để bắt đầu</p>
-    </div>
-
-    <!-- Prompt Bar (OpenArt-style) -->
-    <div class="pointer-events-auto w-full max-w-2xl">
-      <div class="rounded-2xl border border-ink-700 bg-ink-900/90 p-4 shadow-2xl backdrop-blur">
-        <!-- Prompt input -->
-        <div class="relative">
-          <textarea
-            v-model="promptText"
-            rows="3"
-            class="input w-full resize-none !rounded-xl !border-ink-700 !bg-ink-800 !py-3 !pr-24 !text-sm"
-            placeholder="Mô tả trang phục, phong cách, bối cảnh, ánh sáng…"
-            @keydown="onPromptKeydown"
-          ></textarea>
-          <div class="absolute bottom-3 right-3 flex items-center gap-2">
-            <span class="text-[10px] font-semibold text-cream-300/40" title="Số credit ước tính">
-              ~{{ creditEstimate }} credit
-            </span>
-            <button
-              @click="generate"
-              :disabled="!canGenerate"
-              class="flex h-10 items-center gap-1.5 rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-500 disabled:opacity-40 disabled:hover:bg-brand-600"
-              title="Tạo ảnh (Enter)"
-            >
-              <StudioIcon name="zap" size="h-4 w-4" />
-              Tạo ảnh
-            </button>
+  <!-- z-0 (không phải z-20): lớp này nằm DƯỚI các layer. Ẩn layer cuối cùng thì màn hình trống
+       hiện ra ngay và không che hiệu ứng mờ của layer đang tắt. Layer ẩn không nhận chuột nên
+       màn hình trống vẫn bấm được. -->
+  <div class="motion-fade-in absolute inset-0 z-0 overflow-y-auto bg-gradient-to-b from-ink-950/97 via-ink-950/94 to-ink-950/97 p-4 backdrop-blur-sm sm:p-6" role="region" aria-label="Canvas trống">
+    <div class="mx-auto flex w-full max-w-6xl flex-col gap-5">
+      <!-- Đầu trang: trạng thái canvas + bối cảnh -->
+      <header class="motion-rise-in flex flex-wrap items-center justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-3">
+          <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand-600/20 text-brand-300">
+            <StudioIcon name="imagePlus" size="h-5 w-5" />
+          </span>
+          <div class="min-w-0">
+            <h2 class="text-lg font-semibold text-cream-50">Canvas trống</h2>
+            <p class="mt-0.5 text-xs text-cream-300/55">Tạo ảnh từ mô tả, hoặc để Agent Studio dựng hướng đi trước.</p>
           </div>
         </div>
-
-        <!-- Quick options row -->
-        <div class="mt-3 flex flex-wrap items-center gap-2">
-          <!-- Variant count -->
-          <div class="flex items-center gap-1 rounded-lg bg-ink-800 px-2 py-1" title="Số biến thể">
-            <span class="text-[10px] text-cream-300/50">Biến thể:</span>
-            <button
-              v-for="n in [1, 2, 4]"
-              :key="n"
-              @click="variantCount = n"
-              class="h-6 min-w-6 rounded-md px-1.5 text-[11px] font-semibold transition"
-              :class="variantCount === n ? 'bg-brand-600 text-white' : 'text-cream-300/60 hover:text-cream-100'"
-            >{{ n }}</button>
-          </div>
-          <!-- Aspect ratio -->
-          <div class="flex items-center gap-1 rounded-lg bg-ink-800 px-2 py-1" title="Tỷ lệ khung hình">
-            <span class="text-[10px] text-cream-300/50">Tỷ lệ:</span>
-            <button
-              v-for="r in ratioOptions"
-              :key="r"
-              @click="store.imageRatio = r"
-              class="h-6 rounded-md px-2 text-[11px] font-semibold transition"
-              :class="store.imageRatio === r ? 'bg-brand-600 text-white' : 'text-cream-300/60 hover:text-cream-100'"
-            >{{ r }}</button>
-          </div>
-          <!-- Credits left -->
-          <div class="ml-auto flex items-center gap-1.5 rounded-lg bg-ink-800 px-2.5 py-1.5" title="Credit còn lại">
-            <StudioIcon name="coins" size="h-3.5 w-3.5" class="text-brand-300" />
-            <span class="text-[11px] font-semibold text-cream-200">{{ store.creditsLeft }}</span>
-            <span v-if="store.planName" class="text-[10px] text-cream-300/50">{{ store.planName }}</span>
-          </div>
+        <div class="flex flex-wrap items-center gap-2 text-[11px]">
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-ink-800 px-2.5 py-1 text-cream-200" :title="'Credit còn lại'">
+            <StudioIcon name="coins" size="h-3.5 w-3.5" class="text-brand-300" /> {{ store.creditsLeft }}
+          </span>
+          <span v-if="store.planName" class="rounded-full bg-ink-800 px-2.5 py-1 text-cream-300/70">{{ store.planName }}</span>
+          <span v-if="projectName" class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/15 px-2.5 py-1 text-brand-100" :title="'Bộ sưu tập đang áp dụng'">
+            <StudioIcon name="folderOpen" size="h-3.5 w-3.5" /> {{ projectName }}
+          </span>
+          <span class="rounded-full bg-ink-800 px-2.5 py-1 text-cream-300/70">{{ layerCount }} lớp</span>
         </div>
-      </div>
-    </div>
+      </header>
 
-    <!-- Job Templates -->
-    <div v-if="store.jobTemplates.length" class="pointer-events-auto mt-6 w-full max-w-2xl">
-      <p class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-cream-300/50">
-        <StudioIcon name="template" size="h-3.5 w-3.5" /> Bắt đầu từ mẫu việc
-      </p>
-      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <button
-          v-for="tpl in store.jobTemplates"
-          :key="tpl.id"
-          @click="applyTemplate(tpl)"
-          class="group rounded-xl border border-ink-700 bg-ink-900/80 p-3 text-left transition hover:border-brand-500 hover:bg-brand-600/10"
-          :title="tpl.hint || tpl.title"
-        >
-          <span class="motion-ui mb-1 flex items-center gap-1.5 text-sm font-semibold text-cream-100 group-hover:text-brand-200">
-            <StudioIcon :name="tpl.icon || 'folderOpen'" size="h-4 w-4" class="text-brand-400" />
-            {{ tpl.title }}
-          </span>
-          <span class="block text-[10px] leading-snug text-cream-300/50">
-            {{ tpl.prompts?.length || 0 }} prompt · {{ tpl.ratio }} · {{ tpl.resolution }}
-          </span>
-        </button>
-      </div>
-    </div>
-    <div v-else-if="templatesLoading" class="mt-6 w-full max-w-2xl">
-      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div v-for="i in 4" :key="i" class="h-20 animate-pulse rounded-xl bg-ink-800"></div>
-      </div>
-    </div>
+      <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+        <!-- Cột chính: composer + lối vào nhanh -->
+        <div class="space-y-4">
+          <section class="motion-rise-in rounded-2xl border border-ink-700 bg-ink-900/90 p-4 shadow-2xl sm:p-5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 class="text-sm font-semibold text-cream-100">Tạo ảnh từ mô tả</h3>
+                <p class="mt-0.5 text-[11px] text-cream-300/50">Mô tả trang phục, phong cách, bối cảnh và ánh sáng.</p>
+              </div>
+              <button type="button" class="tool-btn" @click="store.promptOpen = true" title="Mở bảng Prompt Tạo Ảnh đầy đủ">
+                <StudioIcon name="sliders" size="h-3.5 w-3.5" /> Bảng đầy đủ
+              </button>
+            </div>
 
-    <!-- Recent generations -->
-    <div v-if="recentGens.length" class="pointer-events-auto mt-6 w-full max-w-2xl">
-      <p class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-cream-300/50">
-        <StudioIcon name="history" size="h-3.5 w-3.5" /> Ảnh gần đây
-      </p>
-      <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
-        <button
-          v-for="g in recentGens"
-          :key="g.id"
-          @click="openGen(g)"
-          class="group relative aspect-square overflow-hidden rounded-lg border border-ink-700 bg-ink-900 transition hover:border-brand-500"
-          :title="'Mở viewer — ' + store.genName(g)"
-        >
-          <img :src="thumbUrl(g.media_url)" class="h-full w-full object-cover" loading="lazy" @error="onThumbError($event, g.media_url)">
-          <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-1 text-[9px] text-cream-200 opacity-0 transition group-hover:opacity-100">
-            {{ store.genName(g) }}
-          </span>
-        </button>
-      </div>
-    </div>
+            <div class="relative mt-3">
+              <label for="canvas-quick-prompt" class="sr-only">Mô tả ảnh cần tạo</label>
+              <textarea
+                id="canvas-quick-prompt"
+                v-model="promptText"
+                rows="4"
+                class="input w-full resize-none !rounded-xl !py-3 !pr-28 !text-sm"
+                placeholder="Ví dụ: Bộ sưu tập linen pastel, nữ văn phòng, ánh sáng mềm, nền studio sáng…"
+                @keydown="onPromptKeydown"
+              ></textarea>
+              <div class="absolute bottom-3 right-3 flex items-center gap-2">
+                <span class="text-[10px] font-semibold text-cream-300/45" title="Số credit ước tính">~{{ creditEstimate }} credit</span>
+                <button type="button" class="btn-brand btn-sm flex items-center gap-1.5" :disabled="!canGenerate" @click="generate" title="Tạo ảnh (Enter)">
+                  <StudioIcon name="zap" size="h-3.5 w-3.5" /> Tạo ảnh
+                </button>
+              </div>
+            </div>
 
-    <!-- Keyboard shortcuts -->
-    <div class="pointer-events-auto mt-6 flex flex-wrap items-center justify-center gap-3 text-[10px] text-cream-300/40">
-      <span v-for="s in shortcuts" :key="s.key" class="flex items-center gap-1">
-        <kbd class="rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[9px] text-cream-300">{{ s.key }}</kbd>
-        {{ s.label }}
-      </span>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <div class="flex items-center gap-1 rounded-lg bg-ink-800 p-1" role="group" aria-label="Số biến thể">
+                <span class="px-1 text-[10px] text-cream-300/50">Biến thể</span>
+                <button v-for="n in [1, 2, 4]" :key="n" type="button" class="h-6 min-w-6 rounded-md px-1.5 text-[11px] font-semibold transition" :class="Number(variantCount) === n ? 'bg-brand-600 text-white' : 'text-cream-300/60 hover:text-cream-100'" @click="variantCount = n">{{ n }}</button>
+              </div>
+              <div class="flex items-center gap-1 rounded-lg bg-ink-800 p-1" role="group" aria-label="Tỉ lệ khung hình">
+                <span class="px-1 text-[10px] text-cream-300/50">Tỉ lệ</span>
+                <button v-for="r in ratioOptions" :key="r" type="button" class="h-6 rounded-md px-2 text-[11px] font-semibold transition" :class="store.imageRatio === r ? 'bg-brand-600 text-white' : 'text-cream-300/60 hover:text-cream-100'" @click="store.imageRatio = r">{{ r }}</button>
+              </div>
+              <span class="ml-auto text-[10px] text-cream-300/40">Enter để tạo nhanh · Shift+Enter xuống dòng</span>
+            </div>
+          </section>
+
+          <section class="motion-rise-in rounded-2xl border border-ink-700 bg-ink-900/80 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 class="text-sm font-semibold text-cream-100">Hoặc bắt đầu có định hướng</h3>
+                <p class="mt-0.5 text-[11px] text-cream-300/50">Agent Studio dẫn từ tín hiệu thị trường đến prompt tạo ảnh.</p>
+              </div>
+              <button type="button" class="btn-brand btn-sm flex items-center gap-2" @click="openAgent('radar')">
+                <StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Mở Agent Studio
+              </button>
+            </div>
+            <div class="mt-3 grid gap-2 sm:grid-cols-3">
+              <div v-for="(stepItem, index) in AGENT_STEPS" :key="stepItem.id" class="rounded-xl border border-ink-700 bg-ink-800/70 p-3">
+                <div class="flex items-center gap-2">
+                  <span class="grid h-6 w-6 place-items-center rounded-full bg-ink-900 text-[10px] font-bold text-brand-200">{{ index + 1 }}</span>
+                  <StudioIcon :name="stepItem.icon" size="h-3.5 w-3.5" class="text-brand-300" />
+                  <span class="text-xs font-semibold text-cream-100">{{ stepItem.title }}</span>
+                </div>
+                <p class="mt-2 text-[11px] leading-4 text-cream-300/60">{{ stepItem.text }}</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Cột phụ: hành động nhanh + phím tắt -->
+        <aside class="space-y-4">
+          <section class="motion-rise-in rounded-2xl border border-ink-700 bg-ink-900/80 p-4">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-cream-300/60">Đi nhanh</h3>
+            <div class="mt-3 space-y-2">
+              <button v-for="action in quickActions" :key="action.id" type="button" class="tool-btn w-full justify-start !px-3 !py-2.5 text-left" :title="action.hint" @click="action.run()">
+                <StudioIcon :name="action.icon" size="h-4 w-4" class="shrink-0 text-brand-300" />
+                <span class="min-w-0"><span class="block text-xs font-semibold text-cream-100">{{ action.label }}</span><span class="block truncate text-[10px] text-cream-300/50">{{ action.hint }}</span></span>
+              </button>
+              <button type="button" class="tool-btn w-full justify-start !px-3 !py-2.5 text-left" title="Xem gói và nâng cấp" @click="store.planOpen = true">
+                <StudioIcon name="coins" size="h-4 w-4" class="shrink-0 text-brand-300" />
+                <span class="min-w-0"><span class="block text-xs font-semibold text-cream-100">Gói &amp; credit</span><span class="block truncate text-[10px] text-cream-300/50">Hạn mức, chi phí, nâng cấp</span></span>
+              </button>
+            </div>
+          </section>
+
+          <details class="motion-rise-in rounded-2xl border border-ink-700 bg-ink-900/80 p-4">
+            <summary class="cursor-pointer text-xs font-semibold text-cream-200">Phím tắt canvas</summary>
+            <ul class="mt-3 space-y-1.5">
+              <li v-for="item in shortcuts" :key="item.key" class="flex items-center justify-between gap-3 text-[11px] text-cream-300/65">
+                <span>{{ item.label }}</span>
+                <kbd class="rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[10px] text-cream-200">{{ item.key }}</kbd>
+              </li>
+            </ul>
+          </details>
+        </aside>
+      </div>
     </div>
   </div>
 </template>

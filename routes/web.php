@@ -7,6 +7,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectShareController;
 use App\Http\Controllers\StudioController;
 use App\Http\Controllers\StudioSettingsController;
+use App\Http\Controllers\DesignAgentController;
 use App\Http\Controllers\StylistDataController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\UserCatalogController;
@@ -136,6 +137,10 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     // Không có call-site nào tham chiếu route name 'studio.asset' hay URL /studiosample.
     Route::post('/stylist', [StudioController::class, 'stylist'])->name('stylist');
     Route::post('/stylist/refine', [StudioController::class, 'stylistRefine'])->name('stylist.refine');
+    Route::post('/design-agent/radar', [DesignAgentController::class, 'radar'])
+        ->middleware('throttle:30,1')->name('design-agent.radar');
+    Route::post('/design-agent/collection', [DesignAgentController::class, 'collection'])
+        ->middleware('throttle:30,1')->name('design-agent.collection');
     Route::post('/upscale', [StudioController::class, 'upscale'])->name('upscale');
     Route::post('/look', [StudioController::class, 'look'])->name('look');
     Route::post('/reframe', [StudioController::class, 'reframe'])->name('reframe');

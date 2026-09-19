@@ -123,14 +123,30 @@ class ModuleRegistry
             'plans' => ['*'],
         ],
         [
-            'id' => 'stylist', 'name' => 'Trợ lý thiết kế', 'group' => 'Nội dung',
-            'kind' => self::KIND_ACTION, 'gui' => true, 'icon' => 'shirt',
-            'summary' => 'Tư vấn phối đồ, chất liệu và bối cảnh theo bộ sưu tập.',
+            // [2026-09-20] Hợp nhất Trợ lý thiết kế + Canvas empty thành flow hai agent:
+            // TrendRadar (radar xu hướng) → CollectionBot (brief/mood board/cấu trúc bộ).
+            'id' => 'stylist', 'name' => 'Agent thiết kế', 'group' => 'Nội dung',
+            'kind' => self::KIND_ACTION, 'gui' => true, 'icon' => 'bot',
+            'summary' => 'TrendRadar phát hiện xu hướng; CollectionBot biến insight thành bộ sưu tập và prompt Canvas.',
             // 'user-catalogs' phục vụ CẢ /presets lẫn /stylist-data (bản tùy chỉnh của từng tài
             // khoản) ⇒ cả hai module đều là chủ sở hữu, đúng như 'refgen' dùng chung cho
             // 'variation' + 'tryon': gói có MỘT trong hai là dùng được.
             'endpoints' => ['stylist', 'stylist-data', 'user-catalogs'],
-            'depends_on' => [],
+            'depends_on' => ['trend_radar', 'collection_bot'],
+            'plans' => ['pro', 'studio', 'factory_season'],
+        ],
+        [
+            'id' => 'trend_radar', 'name' => 'TrendRadar', 'group' => 'Nội dung',
+            'kind' => self::KIND_FEATURE, 'gui' => false, 'icon' => 'scan',
+            'summary' => 'Radar xu hướng theo khu vực: màu sắc, dáng, chất liệu, giá và vòng đời.',
+            'endpoints' => ['design-agent/radar'], 'depends_on' => [],
+            'plans' => ['pro', 'studio', 'factory_season'],
+        ],
+        [
+            'id' => 'collection_bot', 'name' => 'CollectionBot', 'group' => 'Nội dung',
+            'kind' => self::KIND_FEATURE, 'gui' => false, 'icon' => 'palette',
+            'summary' => 'Brief, mood board, cấu trúc SKU, size và pricing từ prompt + TrendRadar.',
+            'endpoints' => ['design-agent/collection'], 'depends_on' => ['collections'],
             'plans' => ['pro', 'studio', 'factory_season'],
         ],
         [

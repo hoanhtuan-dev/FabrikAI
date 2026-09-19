@@ -514,4 +514,40 @@ class CanvasControlsTest extends TestCase
         $this->assertStringNotContainsString('w-64', $panel, 'Bảng Layers không được giữ bề rộng cứng w-64.');
         $this->assertStringContainsString('w-full', $panel, 'Bảng Layers phải co giãn theo bề rộng dock.');
     }
+
+    /**
+     * Canvas trống là "command center" mới: composer + Agent Studio + đi nhanh.
+     *
+     * [Yêu cầu 2026-09-20] ĐÃ XÓA hai khối khỏi màn hình này:
+     *   · "Bắt đầu từ mẫu việc" (job templates) — vẫn còn trong tab Hàng loạt của ConceptCard,
+     *   · "Ảnh gần đây" — ảnh cũ vẫn nằm ở Thư viện/Outputs.
+     * Test này khoá cả hai việc: KHÔNG quay lại Canvas, VÀ vẫn còn lối vào Agent Studio + generate.
+     */
+    public function test_canvas_empty_state_is_a_command_center_without_template_or_recent_blocks(): void
+    {
+        $empty = $this->vue('CanvasEmptyState.vue');
+
+        // Vẫn nằm dưới layer (bất biến cũ) và vẫn tạo ảnh được.
+        $this->assertStringContainsString('absolute inset-0 z-0', $empty,
+            'Canvas trống phải ở z-0 để không che hiệu ứng mờ của layer.');
+        $this->assertStringContainsString('store.generateImage()', $empty, 'Composer vẫn phải gọi được generateImage().');
+
+        // Hai khối đã xóa — không được quay lại Canvas.
+        $this->assertStringNotContainsString('Bắt đầu từ mẫu việc', $empty,
+            'Khối "Bắt đầu từ mẫu việc" phải bị xóa khỏi Canvas trống.');
+        $this->assertStringNotContainsString('Ảnh gần đây', $empty,
+            'Khối "Ảnh gần đây" phải bị xóa khỏi Canvas trống.');
+        $this->assertStringNotContainsString('store.jobTemplates', $empty,
+            'Canvas trống không được đọc store.jobTemplates nữa.');
+        $this->assertStringNotContainsString('recentGens', $empty,
+            'Canvas trống không được giữ danh sách recentGens nữa.');
+
+        // Lối vào mới: Agent Studio + đi nhanh.
+        $this->assertStringContainsString('Agent Studio', $empty, 'Canvas trống phải mời mở Agent Studio.');
+        $this->assertStringContainsString("setDesignAgentStep", $empty, 'Nút Agent Studio phải mở đúng bước wizard.');
+        $this->assertStringContainsString('Prompt Tạo Ảnh', $empty, 'Phải có lối vào bảng Prompt Tạo Ảnh đầy đủ.');
+        $this->assertStringContainsString('Nguồn ảnh', $empty, 'Phải có đi nhanh tới Nguồn ảnh.');
+        $this->assertStringContainsString('Thư viện', $empty, 'Phải có đi nhanh tới Thư viện.');
+        $this->assertStringContainsString('Bộ sưu tập', $empty, 'Phải có đi nhanh tới Bộ sưu tập.');
+    }
 }

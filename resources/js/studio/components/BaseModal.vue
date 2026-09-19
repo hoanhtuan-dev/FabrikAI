@@ -6,6 +6,7 @@ const props = defineProps({
   modelValue: { type: Boolean, default: false },
   title: { type: String, default: '' },
   wide: { type: Boolean, default: false },
+  full: { type: Boolean, default: false },  // workspace lớn (Agent Studio): gần toàn màn hình, nội dung tự chia cột
   height: { type: String, default: '' },  // chiều cao cố định (vd '80vh') -> header/tab cố định, body cuộn
 });
 const emit = defineEmits(['update:modelValue']);
@@ -39,15 +40,15 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey, true); trap
     <div
       v-if="height"
       class="w-full overflow-hidden rounded-lg border border-brand-500/40 bg-ink-900 shadow-2xl"
-      :class="wide ? 'max-w-3xl' : 'max-w-lg'"
-      :style="{ display: 'flex', flexDirection: 'column', height: height, maxHeight: 'calc(100vh - 2rem)' }"
+      :class="full ? 'w-[min(1440px,calc(100vw-1rem))] max-w-none' : (wide ? 'max-w-3xl' : 'max-w-lg')"
+      :style="{ display: 'flex', flexDirection: 'column', height: full ? 'min(94vh, 960px)' : height, maxHeight: 'calc(100vh - 2rem)' }"
       @click.stop
     >
       <div class="flex h-14 shrink-0 items-center justify-between border-b border-ink-700 bg-ink-900 px-5">
         <span class="text-sm font-semibold text-brand-300">{{ title }}</span>
         <button @click="close" aria-label="Đóng" class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink-700 text-cream-200 transition hover:bg-red-600 hover:text-white" title="Đóng">✕</button>
       </div>
-      <div style="flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain;">
+      <div :style="{ flex: '1 1 0', minHeight: 0, overflowY: full ? 'hidden' : 'auto', overscrollBehavior: 'contain' }">
         <slot />
       </div>
     </div>

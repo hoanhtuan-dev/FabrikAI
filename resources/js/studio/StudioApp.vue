@@ -4,7 +4,7 @@ import { useStudioStore } from './store.js';
 import CollectionsCard from './components/CollectionsCard.vue';
 import SuggestCard from './components/SuggestCard.vue';
 import ConceptCard from './components/ConceptCard.vue';
-import StylistCard from './components/StylistCard.vue';
+import DesignAgents from './components/DesignAgents.vue';
 import UpscaleCard from './components/UpscaleCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
 import ComposeCard from './components/ComposeCard.vue';
@@ -103,7 +103,7 @@ const ACTIVITY_FALLBACK = [
   { id: 'upscale', kind: 'panel', icon: 'maximize', label: 'Upscale' },
   { id: 'director', kind: 'panel', icon: 'film', label: 'Kịch bản quay' },
   { id: 'prompt', kind: 'action', icon: 'sparkles', label: 'Prompt Tạo Ảnh' },
-  { id: 'stylist', kind: 'action', icon: 'shirt', label: 'Trợ lý thiết kế' },
+  { id: 'stylist', kind: 'action', icon: 'bot', label: 'Agent thiết kế' },
   { id: 'settings', kind: 'menu', icon: 'gear', label: 'Cài đặt' },
 ];
 
@@ -138,13 +138,13 @@ const settingsEntry = computed(() => activityBar.value.find((a) => a.kind === 'm
 
 /** Nút KHÔNG đổi panel mà mở POPUP độc lập (Prompt Tạo Ảnh · Trợ lý thiết kế). */
 function runToolbarAction(id) {
-  if (id === 'prompt') { store.promptOpen = true; stylistPopupOpen.value = false; outputOpen.value = false; settingsOpen.value = false; }
-  else if (id === 'stylist') { stylistPopupOpen.value = true; store.promptOpen = false; outputOpen.value = false; settingsOpen.value = false; }
+  if (id === 'prompt') { store.promptOpen = true; store.designAgentOpen = false; outputOpen.value = false; settingsOpen.value = false; }
+  else if (id === 'stylist') { store.designAgentOpen = true; store.setDesignAgentStep('radar'); store.promptOpen = false; outputOpen.value = false; settingsOpen.value = false; }
 }
 
 function isToolbarActionActive(id) {
   if (id === 'prompt') return store.promptOpen;
-  if (id === 'stylist') return stylistPopupOpen.value;
+  if (id === 'stylist') return store.designAgentOpen;
   return false;
 }
 
@@ -207,7 +207,7 @@ const projectsOpen = ref(false);
 const promptPopupOpen = ref(false);  // popup độc lập cho Prompt Tạo Ảnh (ConceptCard)
 // [P0] Chờ boot async xong mới render UI thật — tránh flash cấu hình sai (panel lộn, activity lỗi).
 const booting = ref(true);
-const stylistPopupOpen = ref(false); // popup độc lập cho Trợ lý Thiết kế (StylistCard)
+// Trợ lý thiết kế hợp nhất được mở qua store.designAgentOpen.
 // [Yêu cầu 2026-09-17] Menu Cài đặt ở GÓC TRÁI DƯỚI CÙNG của activity bar.
 const settingsOpen = ref(false);
 // Backdrop chỉ là <div> bắt click (không nhận bàn phím) nên phải tự lo đóng bằng Escape.
@@ -609,8 +609,8 @@ const baseCommands = computed(() => ([
   { id: 'toggle-outputs', label: 'Bật/tắt dock Outputs', hint: 'outputs', icon: 'grid', run: () => store.toggleOutputDock() },
   { id: 'library', label: 'Mở Thư viện', hint: 'library', icon: 'library', run: () => goLibrary() },
   { id: 'projects', label: 'Mở bảng thiết kế', hint: 'projects', icon: 'kanban', run: () => { projectsOpen.value = true; } },
-  { id: 'prompt', label: 'Mở Prompt Tạo Ảnh', hint: 'prompt', icon: 'sparkles', run: () => { store.promptOpen = true; } },
-  { id: 'stylist', label: 'Mở Trợ lý thiết kế', hint: 'stylist', icon: 'shirt', run: () => { stylistPopupOpen.value = true; } },
+  { id: 'prompt', label: 'Mở Prompt Tạo Ảnh', hint: 'prompt', icon: 'sparkles', run: () => runToolbarAction('prompt') },
+  { id: 'stylist', label: 'Mở Agent thiết kế', hint: 'stylist', icon: 'bot', run: () => runToolbarAction('stylist') },
   { id: 'source', label: 'Mở Nguồn ảnh', hint: 'source', icon: 'imagePlus', run: () => { store.sourcePickerOpen = true; } },
   { id: 'settings', label: 'Mở Cài đặt', hint: 'settings', icon: 'gear', run: () => { window.location.href = '/settings'; } },
   { id: 'presets', label: 'Mở Prompt Templates', hint: 'presets', icon: 'template', run: () => { window.location.href = '/presets'; } },
@@ -1647,7 +1647,7 @@ function onTouchEnd(e) {
       </div>
     </div>
     <ConceptCard popup />
-    <!-- Trợ lý thiết kế (StylistCard): popup độc lập — nút shirt ở right toolbar (dưới cùng) -->
-    <StylistCard popup v-model="stylistPopupOpen" />
+    <!-- Trợ lý thiết kế hợp nhất: TrendRadar + CollectionBot -->
+    <DesignAgents v-model="store.designAgentOpen" />
   </div>
 </template>

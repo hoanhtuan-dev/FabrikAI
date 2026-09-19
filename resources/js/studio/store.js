@@ -264,6 +264,20 @@ export const useStudioStore = defineStore('studio', {
     suggestLibSelection: [],   // danh sách id đang được chọn (checkbox)
     suggestLibManage: false,   // bật chế độ quản lý (chọn/xóa hàng loạt)
     promptOpen: false,
+    // Agent thiết kế hợp nhất: TrendRadar → CollectionBot → Canvas.
+    designAgentOpen: false,
+    designAgentTab: 'trend',   // tương thích cũ: trend | collection
+    designAgentStep: 'radar',   // wizard mới: radar → brief → canvas
+    trendRadar: null,
+    trendRadarCache: {},      // region → payload đã tải (tránh gọi lại khi đổi tab/đổi vùng)
+    trendRadarRequest: 0,     // chống race: chỉ nhận kết quả của lần gọi MỚI NHẤT
+    trendRadarLoading: false,
+    trendRadarError: '',
+    collectionBrief: null,
+    collectionBriefLoading: false,
+    collectionBriefError: '',
+    collectionBriefInput: null, // input đã sinh brief hiện tại — để UI phát hiện brief cũ
+    selectedTrendIds: [],
     viewer: null,
     flashMsg: '',
     flashType: 'info',
@@ -2114,6 +2128,115 @@ export const useStudioStore = defineStore('studio', {
       if (!list.length) return;
       this.batchFillRequest = { prompts: list, meta, n: ((this.batchFillRequest && this.batchFillRequest.n) || 0) + 1 };
       this.requestActivity('concept');
+    },
+    /** Wizard Agent Studio: radar → brief → canvas. Giữ designAgentTab để tương thích code cũ. */
+    setDesignAgentStep(step) {
+      const allowed = ['radar', 'brief', 'canvas'];
+      this.designAgentStep = allowed.includes(step) ? step : 'radar';
+      this.designAgentTab = this.designAgentStep === 'brief' ? 'collection' : 'trend';
+    },
+    /**
+     * Nạp TrendRadar cho một khu vực. Có cache theo vùng + chống race:
+     * đổi vùng liên tục thì kết quả cũ không được ghi đè kết quả mới.
+     */
+    async loadTrendRadar(region = 'all', { force = false } = {}) {
+      const key = String(region || 'all');
+      if (!force && this.trendRadarCache[key]) {
+        this.trendRadar = this.trendRadarCache[key];
+        this.trendRadarError = '';
+        return this.trendRadar;
+      }
+
+      const requestId = (this.trendRadarRequest || 0) + 1;
+      this.trendRadarRequest = requestId;
+      this.trendRadarLoading = true;
+      this.trendRadarError = '';
+      try {
+        const data = await this.api('/api/design-agent/radar', { region: key });
+        if (requestId !== this.trendRadarRequest) return null; // có request mới hơn đang chạy
+        this.trendRadar = data || null;
+        if (data) this.trendRadarCache = { ...this.trendRadarCache, [key]: data };
+        return data;
+      } catch (error) {
+        if (requestId === this.trendRadarRequest) {
+          this.trendRadarError = error.message || 'Không tải được TrendRadar.';
+          this.trendRadar = null;
+          this.toast(this.trendRadarError, 'error');
+        }
+        throw error;
+      } finally {
+        if (requestId === this.trendRadarRequest) this.trendRadarLoading = false;
+      }
+    },
+    /** Chuẩn hoá input để so sánh brief hiện tại với input đang nhập (phát hiện brief cũ). */
+    designBriefInput(payload = {}) {
+      return {
+        prompt: String(payload.prompt || '').trim(),
+        region: String(payload.region || 'all'),
+        trend_ids: [...new Set((payload.trend_ids || []).map(String))].sort(),
+      };
+    },
+    /** Brief hiện tại đã cũ so với prompt/trend người dùng đang chọn? */
+    collectionBriefStale(payload = {}) {
+      if (!this.collectionBrief || !this.collectionBriefInput) return false;
+      return JSON.stringify(this.designBriefInput(payload)) !== JSON.stringify(this.collectionBriefInput);
+    },
+    async createCollectionBrief(payload) {
+      this.collectionBriefLoading = true;
+      this.collectionBriefError = '';
+      try {
+        const data = await this.api('/api/design-agent/collection', payload || {});
+        this.collectionBrief = data || null;
+        this.collectionBriefInput = this.designBriefInput(payload);
+        this.toast('CollectionBot đã xây dựng brief bộ sưu tập.');
+        return data;
+      } catch (error) {
+        this.collectionBriefError = error.message || 'Không tạo được brief bộ sưu tập.';
+        this.collectionBrief = null;
+        this.toast(this.collectionBriefError, 'error');
+        throw error;
+      } finally {
+        this.collectionBriefLoading = false;
+      }
+    },
+    /**
+     * Đưa prompt + gợi ý cấu hình Canvas (tỉ lệ, số biến thể, negative prompt) vào ô Tạo Ảnh.
+     * Chỉ áp các giá trị hợp lệ; KHÔNG tự đổi resolution để tránh tăng chi phí ngoài ý muốn.
+     */
+    applyAgentPrompt(prompt, settings = {}) {
+      const value = String(prompt || '').trim();
+      if (!value) {
+        this.toast('Chưa có prompt để áp dụng vào Canvas.', 'error');
+        return false;
+      }
+      const applied = [];
+      this.imagePromptEn = value;
+      if (/^\d{1,2}:\d{1,2}$/.test(String(settings.ratio || ''))) {
+        this.imageRatio = settings.ratio;
+        applied.push('tỉ lệ ' + settings.ratio);
+      }
+      const variants = Number(settings.variant_count) || 0;
+      if (variants > 0) {
+        this.variantCount = Math.max(1, Math.min(4, variants));
+        applied.push(this.variantCount + ' biến thể');
+      }
+      const negative = String(settings.negative_prompt || '').trim();
+      // Chỉ điền negative prompt gợi ý khi người dùng CHƯA có cấu hình riêng — không ghi đè lựa chọn cũ.
+      if (negative && !String(this.negativePromptEn || '').trim()) {
+        this.negativePromptEn = negative;
+        this.promptUseNegative = true;
+        applied.push('negative prompt');
+      }
+      this.promptOpen = true;
+      this.designAgentOpen = false;
+      this.toast('Đã áp dụng prompt vào ô Tạo Ảnh'
+        + (applied.length ? ' · ' + applied.join(' · ') : '') + '.');
+      return true;
+    },
+    async createCollectionFromBrief(payload) {
+      const data = await this.createProject(payload || {});
+      if (data) this.designAgentOpen = false;
+      return data;
     },
     async createProject(payload) {
       try {
