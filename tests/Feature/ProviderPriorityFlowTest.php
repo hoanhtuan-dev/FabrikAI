@@ -347,4 +347,134 @@ class ProviderPriorityFlowTest extends TestCase
 
         $this->assertDatabaseHas('studio_providers', ['slug' => 'ckey', 'api_key_ref' => 'ckey-gateway']);
     }
+    // ── Xoá / sửa custom provider (route bind theo SLUG, không phải id) ───────
+
+    public function test_custom_provider_can_be_deleted_by_slug(): void
+    {
+        $this->actingAs($this->admin());
+        $p = StudioProvider::create([
+            'slug' => 'openrouter', 'name' => 'OpenRouter', 'protocol' => 'openai',
+            'base_url' => 'https://openrouter.ai/api/v1', 'auth_style' => 'bearer',
+            'api_key_ref' => 'openrouter', 'enabled' => true,
+        ]);
+
+        // Đường UI dùng: DELETE /providers/{slug}
+        $this->deleteJson('/api/settings-vue/providers/openrouter')->assertOk();
+        $this->assertDatabaseMissing('studio_providers', ['slug' => 'openrouter']);
+
+        // Gửi id số (lỗi cũ) phải là 404 chứ KHÔNG được xoá nhầm bản ghi khác.
+        $this->deleteJson('/api/settings-vue/providers/'.$p->id)->assertStatus(404);
+    }
+
+    public function test_custom_provider_can_be_edited_by_slug(): void
+    {
+        $this->actingAs($this->admin());
+        StudioProvider::create([
+            'slug' => 'together', 'name' => 'Together', 'protocol' => 'openai',
+            'base_url' => 'https://api.together.xyz/v1', 'auth_style' => 'bearer',
+            'api_key_ref' => 'together', 'enabled' => true,
+        ]);
+
+        $this->putJson('/api/settings-vue/providers/together', [
+            'name' => 'Together AI',
+            'protocol' => 'openai',
+            'base_url' => 'https://api.together.xyz/v1',
+            'api_key_ref' => 'together',
+            'priority' => 20,
+            'enabled' => true,
+        ])->assertOk();
+
+        $this->assertDatabaseHas('studio_providers', ['slug' => 'together', 'name' => 'Together AI', 'priority' => 20]);
+    }
+
+    // ── Ưu tiên TRONG NỘI BỘ nhóm custom provider ────────────────────────────
+
+    public function test_custom_providers_are_ordered_by_their_own_priority(): void
+    {
+        // Ba custom provider cùng nhóm: priority quyết định route nào thử trước.
+        $cheap = StudioProvider::create([
+            'slug' => 'zeta', 'name' => 'Zeta', 'protocol' => 'openai',
+            'base_url' => 'https://zeta.test/v1', 'auth_style' => 'bearer',
+            'api_key_ref' => 'zeta', 'priority' => 5, 'enabled' => true,
+        ]);
+        StudioProvider::create([
+            'slug' => 'alpha', 'name' => 'Alpha', 'protocol' => 'openai',
+            'base_url' => 'https://alpha.test/v1', 'auth_style' => 'bearer',
+            'api_key_ref' => 'alpha', 'priority' => 30, 'enabled' => true,
+        ]);
+        StudioProvider::create([
+            'slug' => 'mid', 'name' => 'Mid', 'protocol' => 'openai',
+            'base_url' => 'https://mid.test/v1', 'auth_style' => 'bearer',
+            'api_key_ref' => 'mid', 'priority' => 15, 'enabled' => true,
+        ]);
+
+        foreach (['alpha', 'mid', 'zeta'] as $slug) {
+            StudioModel::create([
+                'group' => 'image', 'name' => ucfirst($slug).' image', 'provider' => $slug,
+                'model_id' => $slug.'-image', 'api_key_ref' => $slug, 'priority' => 5, 'enabled' => true,
+            ]);
+        }
+
+        // Cả ba cùng nhóm 'custom' (rank 10) nên thứ tự do priority CỦA PROVIDER quyết định.
+        $order = array_map(fn ($c) => $c['provider'], studio_model_candidates('image'));
+        $custom = array_values(array_filter($order, fn ($p) => in_array($p, ['alpha', 'mid', 'zeta'], true)));
+
+        $this->assertSame(['alpha', 'mid', 'zeta'], $custom);
+        $this->assertSame(30, studio_provider_priority('alpha'));
+        $this->assertSame(5, studio_provider_priority('zeta'));
+
+        // Đổi priority: zeta lên đầu ngay (memo phải được xoá qua model event).
+        $cheap->update(['priority' => 99]);
+        $order2 = array_map(fn ($c) => $c['provider'], studio_model_candidates('image'));
+        $custom2 = array_values(array_filter($order2, fn ($p) => in_array($p, ['alpha', 'mid', 'zeta'], true)));
+        $this->assertSame(['zeta', 'alpha', 'mid'], $custom2);
+    }
+
+    public function test_builtin_providers_have_priority_inside_their_family(): void
+    {
+        // Trong nhóm qwen: qwen (10) trên qwen_edit (9) trên dashscope (8) trên wan (7).
+        $this->assertGreaterThan(studio_provider_priority('qwen_edit'), studio_provider_priority('qwen'));
+        $this->assertGreaterThan(studio_provider_priority('dashscope'), studio_provider_priority('qwen_edit'));
+        $this->assertGreaterThan(studio_provider_priority('wan'), studio_provider_priority('dashscope'));
+        $this->assertGreaterThan(studio_provider_priority('veo'), studio_provider_priority('gemini'));
+    }
+
+    // ── Template khai báo provider (CKEY chỉ là một mục, không hardcode) ──────
+
+    public function test_provider_templates_are_exposed_and_generic(): void
+    {
+        $templates = studio_provider_templates();
+        $this->assertArrayHasKey('ckey', $templates);
+        $this->assertGreaterThanOrEqual(5, count($templates), 'Phải có nhiều mẫu, không chỉ CKEY');
+
+        foreach ($templates as $key => $tpl) {
+            $this->assertArrayHasKey('label', $tpl, $key);
+            $this->assertArrayHasKey('protocol', $tpl, $key);
+            $this->assertArrayHasKey('base_url', $tpl, $key);
+            $this->assertContains($tpl['protocol'], ['openai', 'dashscope', 'gemini'], $key);
+        }
+
+        $this->actingAs($this->admin());
+        $data = $this->getJson('/api/settings-vue/data')->assertOk()->json();
+        $this->assertArrayHasKey('provider_templates', $data);
+        $this->assertArrayHasKey('ckey', $data['provider_templates']);
+    }
+
+    public function test_provider_registry_rows_carry_priority(): void
+    {
+        StudioProvider::create([
+            'slug' => 'mid', 'name' => 'Mid', 'protocol' => 'openai',
+            'base_url' => 'https://mid.test/v1', 'auth_style' => 'bearer',
+            'api_key_ref' => 'mid', 'priority' => 42, 'enabled' => true,
+        ]);
+
+        $this->actingAs($this->admin());
+        $data = $this->getJson('/api/settings-vue/data')->assertOk()->json();
+        $mid = collect($data['providers'])->firstWhere('slug', 'mid');
+        $this->assertSame(42, $mid['priority']);
+        $this->assertSame(10, $mid['rank']); // nhóm custom
+
+        $qwen = collect($data['providers'])->firstWhere('slug', 'qwen');
+        $this->assertSame(10, $qwen['priority']);
+    }
 }

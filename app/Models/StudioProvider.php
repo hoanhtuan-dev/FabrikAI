@@ -16,10 +16,10 @@ class StudioProvider extends Model
 
     protected $fillable = [
         'slug', 'name', 'protocol', 'base_url', 'auth_style',
-        'api_key_ref', 'enabled', 'note',
+        'api_key_ref', 'priority', 'enabled', 'note',
     ];
 
-    protected $casts = ['enabled' => 'boolean'];
+    protected $casts = ['enabled' => 'boolean', 'priority' => 'integer'];
 
     /**
      * Xoá memo danh sách custom provider ở MỌI đường ghi qua Eloquent — nếu không,
@@ -29,7 +29,9 @@ class StudioProvider extends Model
     protected static function booted(): void
     {
         $forget = static function () {
-            if (function_exists('studio_custom_provider_slugs')) {
+            if (function_exists('studio_custom_provider_map')) {
+                studio_custom_provider_map(true);
+            } elseif (function_exists('studio_custom_provider_slugs')) {
                 studio_custom_provider_slugs(true);
             }
         };
@@ -38,9 +40,16 @@ class StudioProvider extends Model
         static::deleted($forget);
     }
 
-    /** Route key used by StudioModel.provider / StudioApiKey.provider. */
-    public function routeKey(): string
+    /**
+     * Bind route theo SLUG (không phải id số) — slug mới là khoá mà StudioModel.provider
+     * và StudioApiKey.provider tham chiếu, và là thứ payload /settings-vue/data trả về.
+     *
+     * ⚠️ Laravel chỉ đọc getRouteKeyName(); một method tên routeKey() KHÔNG có tác dụng
+     * bind (trước đây model khai routeKey() nên bind vẫn theo id, trong khi UI chỉ có slug
+     * ⇒ DELETE/PUT luôn 404 và không xoá/sửa được provider).
+     */
+    public function getRouteKeyName(): string
     {
-        return $this->slug;
+        return 'slug';
     }
 }

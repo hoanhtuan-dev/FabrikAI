@@ -334,8 +334,10 @@ async function toggleKey(k) {
 }
 
 // ─────────────────────────── Hộp thoại: custom provider ───────────────────────────
-const blankProv = () => ({ name: '', protocol: 'openai', base_url: '', auth_style: 'bearer', api_key_ref: '', note: '', enabled: true, slug: '' });
-const provModal = reactive({ open: false, mode: 'create', id: null, form: blankProv(), errors: {}, saving: false });
+const blankProv = () => ({ name: '', protocol: 'openai', base_url: '', auth_style: 'bearer', api_key_ref: '', priority: 5, note: '', enabled: true, slug: '' });
+// slugKey = KHOÁ ĐỊNH TUYẾN của bản ghi (routeKey của model là slug, KHÔNG phải id số)
+// — trước đây form gửi id nên PUT/DELETE đều 404 (không sửa/xoá được provider).
+const provModal = reactive({ open: false, mode: 'create', id: null, slugKey: null, form: blankProv(), errors: {}, saving: false });
 const PROTOCOL_HINT = {
   openai: 'OpenAI-compatible — POST {base}/chat/completions · auth Bearer. Dùng cho OpenRouter, Together, Groq, vLLM, CKEY (api.xah.io/v1)…',
   dashscope: 'DashScope-compatible — POST {base}/api/v1/…/generation (sinh ảnh/video).',
@@ -346,10 +348,11 @@ function openProvModal(row = null, preset = null) {
     open: true,
     mode: row ? 'edit' : 'create',
     id: row ? row.id : null,
+    slugKey: row ? row.slug : null,
     errors: {},
     saving: false,
     form: row
-      ? { slug: row.slug, name: row.name, protocol: row.protocol, base_url: row.base_url, auth_style: row.auth_style, api_key_ref: row.api_key_ref, note: row.note || '', enabled: !!row.enabled }
+      ? { slug: row.slug, name: row.name, protocol: row.protocol, base_url: row.base_url, auth_style: row.auth_style, api_key_ref: row.api_key_ref, priority: row.priority ?? 5, note: row.note || '', enabled: !!row.enabled }
       : Object.assign(blankProv(), preset || {}),
   });
 }
@@ -371,24 +374,40 @@ async function submitProv() {
   const f = provModal.form;
   const payload = {
     name: f.name.trim(), protocol: f.protocol, base_url: f.base_url.trim(), auth_style: f.auth_style,
-    api_key_ref: f.api_key_ref.trim(), note: f.note, enabled: !!f.enabled,
+    api_key_ref: f.api_key_ref.trim(), priority: Number(f.priority) || 0, note: f.note, enabled: !!f.enabled,
   };
   if (provModal.mode === 'create') payload.slug = f.slug.trim();
   const ok = await run(async () => {
     if (provModal.mode === 'create') await api('/providers', 'POST', payload);
-    else await api('/providers/' + provModal.id, 'PUT', payload);
+    // Route bind theo SLUG (routeKey của StudioProvider) — gửi id số sẽ 404.
+    else await api('/providers/' + provModal.slugKey, 'PUT', payload);
   }, provModal.mode === 'create' ? 'Đã thêm custom provider.' : 'Đã cập nhật custom provider.');
   provModal.saving = false;
   if (ok) closeProvModal();
 }
-// Preset CKEY (ckey.vn/docs): gateway OpenAI-compatible api.xah.io/v1 — chỉ điền sẵn, không tự tạo.
-function applyCkeyPreset() {
+// MẪU khai báo provider: dữ liệu do backend trả về (studio_provider_templates) — CKEY chỉ
+// là MỘT mục ngang hàng OpenRouter/Together/Groq…, không còn nhánh code riêng cho hãng nào.
+// Thứ tự THỰC TẾ của một custom provider trong nhóm Custom (priority giảm dần) —
+// cho admin thấy ngay số ưu tiên biến thành thứ tự gọi như thế nào.
+function customOrder(p) {
+  const list = [...(customProviders.value || [])].sort((a, b) => (b.priority ?? 5) - (a.priority ?? 5) || String(a.slug).localeCompare(String(b.slug)));
+  return list.findIndex((x) => x.slug === p.slug) + 1;
+}
+const providerTemplates = computed(() => data.value?.provider_templates || {});
+const tplPick = ref('');
+function applyProviderTemplate(key) {
+  const tpl = providerTemplates.value[key];
+  if (!tpl) return;
   openProvModal(null, {
-    slug: 'ckey', name: 'CKEY — gateway VN (api.xah.io)', protocol: 'openai', base_url: 'https://api.xah.io/v1',
-    auth_style: 'bearer', api_key_ref: 'ckey',
-    note: 'https://ckey.vn/docs · ảnh: /v1/images/generations · chat: /v1/chat/completions · giá VND',
+    slug: tpl.slug || '',
+    name: tpl.label || '',
+    protocol: tpl.protocol || 'openai',
+    base_url: tpl.base_url || '',
+    auth_style: tpl.auth_style || 'bearer',
+    api_key_ref: tpl.api_key_ref || '',
+    note: tpl.note || '',
   });
-  flash('Đã điền sẵn preset CKEY — kiểm tra Base URL rồi bấm "Thêm provider" (KHÔNG dán khoá API vào ô Key ref).');
+  flash('Đã điền mẫu « ' + (tpl.label || key) + ' » — kiểm tra Base URL rồi bấm "Thêm provider" (KHÔNG dán khoá API vào ô Key ref).');
 }
 function gotoAddKey(slug) { closeProvModal(); openKeyModal(null, slug || ''); }
 
@@ -457,7 +476,7 @@ async function confirmRun() {
   confirmBox.open = false;
 }
 const askDeleteKey = (k) => askConfirm('Xoá API key?', 'Key «' + k.label + '» (' + providerName(k.provider) + ') sẽ bị xoá vĩnh viễn. Model trỏ tới provider này sẽ mất key và ngừng gọi được cho tới khi bạn thêm key khác.', 'Xoá key', async () => { await run(() => api('/keys/' + k.id, 'DELETE'), 'Đã xoá API key.'); });
-const askDeleteProv = (p) => askConfirm('Xoá custom provider?', 'Provider «' + p.name + '» (slug ' + p.slug + ') sẽ bị xoá. Mọi model tham chiếu slug này sẽ không còn gọi được — kể cả key bạn đã đăng ký cho nó.', 'Xoá provider', async () => { await run(() => api('/providers/' + p.id, 'DELETE'), 'Đã xoá custom provider.'); });
+const askDeleteProv = (p) => askConfirm('Xoá custom provider?', 'Provider «' + p.name + '» (slug ' + p.slug + ') sẽ bị xoá. Mọi model tham chiếu slug này sẽ không còn gọi được — kể cả key bạn đã đăng ký cho nó.', 'Xoá provider', async () => { await run(() => api('/providers/' + p.slug, 'DELETE'), 'Đã xoá custom provider.'); });
 const askDeleteModel = (m) => askConfirm('Xoá model?', 'Model «' + m.name + '» (' + m.provider + ' · ' + m.model_id + ') sẽ bị xoá khỏi registry. Nhóm công việc đang gán model này sẽ quay về tự động.', 'Xoá model', async () => { await run(() => api('/models/' + m.id, 'DELETE'), 'Đã xoá model.'); });
 
 // ─────────────────────────── Luồng ưu tiên ───────────────────────────
@@ -823,8 +842,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     </span>
                     <span v-if="!familyProviders(t).length" class="text-[11px] text-cream-300/75">Chưa có provider nào trong nhóm này.</span>
                     <template v-if="t === 'custom'">
-                      <button class="tool-btn" @click="applyCkeyPreset()"><StudioIcon name="zap" size="h-3.5 w-3.5" /> Preset CKEY</button>
-                      <button class="tool-btn" @click="goTo('providers')">Khai báo route khác <StudioIcon name="arrowRight" size="h-3.5 w-3.5" /></button>
+                      <button class="tool-btn" @click="goTo('providers')">Khai báo route (có mẫu sẵn) <StudioIcon name="arrowRight" size="h-3.5 w-3.5" /></button>
                     </template>
                   </div>
                 </li>
@@ -837,12 +855,12 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
             </div>
 
             <details class="card p-4">
-              <summary class="cursor-pointer text-sm font-semibold text-cream-100">Trợ giúp · Tương thích CKEY (ckey.vn/docs)</summary>
+              <summary class="cursor-pointer text-sm font-semibold text-cream-100">Trợ giúp · Custom provider &amp; gateway OpenAI-compatible</summary>
               <div class="mt-2 space-y-1.5 text-[11px] text-cream-300/80">
-                <p>· Gateway LLM của CKEY chạy ở <b class="text-cream-100">https://api.xah.io/v1</b> (khác tên miền ckey.vn) — xác thực <b class="text-cream-100">Bearer &lt;API key&gt;</b> lấy tại trang Profile của ckey.vn.</p>
-                <p>· Ảnh: <code class="rounded bg-ink-800 px-1">POST /v1/images/generations</code> (OpenAI Images API) — dùng được model Qwen image trên CKEY (id dạng user/qwen-image-…, ~120–1.100 ₫/ảnh).</p>
-                <p>· Chat/vision/prompt: <code class="rounded bg-ink-800 px-1">POST /v1/chat/completions</code> — bấm "Preset CKEY" ở nhóm Custom bên trên, rồi thêm key với provider = <code>ckey</code>.</p>
-                <p>· Bảng giá &amp; danh sách model sống: <code class="rounded bg-ink-800 px-1">GET https://api.xah.io/v1/models</code> (công khai, VND).</p>
+                <p>· Mọi gateway <b class="text-cream-100">OpenAI-compatible</b> đều dùng được ngay: khai báo Base URL (kết thúc bằng <code class="rounded bg-ink-800 px-1">/v1</code>), chọn protocol <b class="text-cream-100">openai</b> + auth <b class="text-cream-100">Bearer</b>. Chat/vision/prompt đi qua <code class="rounded bg-ink-800 px-1">POST /chat/completions</code>.</p>
+                <p>· Ảnh: nếu gateway phục vụ OpenAI Images API thì FabrikAI gọi <code class="rounded bg-ink-800 px-1">POST /images/generations</code> (trả <code class="rounded bg-ink-800 px-1">data[0].url</code> hoặc <code class="rounded bg-ink-800 px-1">b64_json</code>) — không cần cấu hình thêm.</p>
+                <p>· Ví dụ có sẵn trong <b class="text-cream-100">danh sách mẫu</b>: CKEY (api.xah.io/v1 · giá VND · ~120–1.100 ₫/ảnh qwen-image), OpenRouter, Together, Groq, SiliconFlow, DeepInfra, DashScope quốc tế.</p>
+                <p>· Chọn mẫu ở ô <b class="text-cream-100">Mẫu khai báo</b> phía trên để điền sẵn form, rồi bấm <b class="text-cream-100">Thêm provider</b>. Thêm gateway mới cho mọi người dùng = thêm một mục trong <code class="rounded bg-ink-800 px-1">studio_provider_templates()</code>.</p>
               </div>
             </details>
           </section>
@@ -935,8 +953,14 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     Route tự khai báo <b class="text-cream-100">protocol + base URL + cách xác thực</b>. Provider tích hợp (Qwen, Gemini, Fal…) không sửa được — chỉ route bạn thêm ở đây.
                   </p>
                 </div>
-                <div class="flex flex-wrap gap-2">
-                  <button class="tool-btn" @click="applyCkeyPreset()"><StudioIcon name="zap" size="h-3.5 w-3.5" /> Preset CKEY</button>
+                <div class="flex flex-wrap items-center gap-2">
+                  <select v-model="tplPick" aria-label="Chọn mẫu khai báo provider" class="input !w-auto !py-2 text-xs">
+                    <option value="">📋 Mẫu khai báo…</option>
+                    <option v-for="(tpl, key) in providerTemplates" :key="key" :value="key">{{ tpl.label }}</option>
+                  </select>
+                  <button class="tool-btn" :disabled="!tplPick" :class="!tplPick ? 'opacity-50' : ''" @click="applyProviderTemplate(tplPick)">
+                    <StudioIcon name="zap" size="h-3.5 w-3.5" /> Dùng mẫu
+                  </button>
                   <button class="btn-brand btn-sm" @click="openProvModal()"><StudioIcon name="plus" size="h-3.5 w-3.5" /> Thêm provider</button>
                 </div>
               </div>
@@ -962,7 +986,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
               </div>
 
               <ul v-else class="mt-4 space-y-2">
-                <li v-for="p in filteredCustomProviders" :key="p.id" class="rounded-lg border border-ink-700 bg-ink-900/40 p-3.5">
+                <li v-for="p in filteredCustomProviders" :key="p.slug" class="rounded-lg border border-ink-700 bg-ink-900/40 p-3.5">
                   <div class="flex flex-wrap items-center gap-2">
                     <span class="h-2 w-2 rounded-full" :class="p.configured ? 'bg-emerald-400' : 'bg-amber-400'"></span>
                     <span class="text-sm font-semibold text-cream-50">{{ p.name }}</span>
@@ -970,6 +994,8 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     <span :class="[BADGE, BADGE_TONE.custom]">{{ p.protocol }}</span>
                     <span :class="[BADGE, p.enabled ? BADGE_TONE.ok : BADGE_TONE.warn]">{{ p.enabled ? 'Đang bật' : 'Đang tắt' }}</span>
                     <span :class="[BADGE, p.configured ? BADGE_TONE.ok : BADGE_TONE.warn]">{{ p.configured ? p.key_count + ' key' : 'chưa có key' }}</span>
+                    <span :class="[BADGE, BADGE_TONE.neutral]" :title="'Ưu tiên trong nhóm Custom — lớn hơn được thử trước'">Ưu tiên {{ p.priority ?? 5 }}</span>
+                    <span class="text-[10px] text-cream-300/70" :title="'Thứ tự thực tế khi chọn model trong nhóm Custom'">#{{ customOrder(p) }}</span>
                     <span class="ml-auto flex flex-wrap items-center gap-1.5">
                       <button class="tool-btn" @click="gotoAddKey(p.slug)"><StudioIcon name="key" size="h-3.5 w-3.5" /> Thêm key</button>
                       <button class="tool-btn" @click="openProvModal(p)"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa</button>
@@ -989,7 +1015,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
 
               <p class="mt-3 flex items-start gap-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5 text-[11px] text-cream-300/85">
                 <StudioIcon name="info" size="h-3.5 w-3.5 shrink-0 mt-px text-sky-300" />
-                <span><b class="text-cream-100">Luồng 2 bước:</b> (1) tạo provider — ô <b>Key ref</b> chỉ là <b>TÊN NHÓM KEY</b> (vd ckey), KHÔNG dán khoá API vào; (2) thêm khoá thật ở mục <b>API Keys</b> với provider = slug. Provider ID cố định sau khi tạo vì mọi model tham chiếu theo nó.</span>
+                <span><b class="text-cream-100">Luồng 2 bước:</b> (1) tạo provider — ô <b>Key ref</b> chỉ là <b>TÊN NHÓM KEY</b> (vd ckey), KHÔNG dán khoá API vào; (2) thêm khoá thật ở mục <b>API Keys</b> với provider = slug. Provider ID cố định sau khi tạo vì mọi model tham chiếu theo nó. Nhiều route cùng nhóm Custom thì <b>Ưu tiên</b> quyết định route nào thử trước.</span>
               </p>
             </div>
           </section>
@@ -1368,6 +1394,11 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           <input id="p-keyref" v-model="provModal.form.api_key_ref" class="input !py-2 font-mono text-xs" :class="provModal.errors.api_key_ref ? '!border-red-500/70' : ''" placeholder="vd: ckey — KHÔNG dán khoá API vào đây">
           <p v-if="provModal.errors.api_key_ref" class="mt-1 text-[11px] text-red-300">{{ provModal.errors.api_key_ref }}</p>
           <p v-else class="mt-1 text-[11px] text-cream-300/75">Khoá API thật thêm ở mục API Keys với provider = slug này.</p>
+        </div>
+        <div>
+          <label class="label" for="p-prio">Ưu tiên trong nhóm Custom <span class="font-normal normal-case text-cream-300/75">(lớn hơn = thử trước)</span></label>
+          <input id="p-prio" type="number" min="0" max="100" v-model.number="provModal.form.priority" class="input !py-2 sm:max-w-[10rem]">
+          <p class="mt-1 text-[11px] text-cream-300/75">Tab 🔥 quyết định THỨ TỰ NHÓM; số này phân định các route nằm CÙNG nhóm — ví dụ nhiều custom provider: route điểm cao được gọi trước, lỗi thì mới rơi xuống route dưới.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
           <label class="flex items-center gap-2 text-xs text-cream-200">

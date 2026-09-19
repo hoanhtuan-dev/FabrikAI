@@ -880,33 +880,69 @@ if (! function_exists('studio_provider_family')) {
     }
 }
 
-if (! function_exists('studio_custom_provider_slugs')) {
+if (! function_exists('studio_custom_provider_map')) {
     /**
-     * Slug của mọi custom provider (bảng studio_providers) — memo theo request để
-     * studio_provider_rank() không query lặp trong lúc sắp xếp (N log N lần gọi).
+     * slug => priority của mọi custom provider, memo theo request. Dùng chung cho
+     * studio_custom_provider_slugs() (nhận diện nhóm 'custom') và
+     * studio_provider_priority() (xếp thứ tự các route CÙNG nhóm).
      *
      * ⚠️ Memo PHẢI xoá được: worker queue sống qua nhiều job, còn admin thêm provider
      * mới ở request khác — cache tĩnh không có đường invalidate sẽ giữ danh sách cũ.
-     * StudioProvider model event gọi studio_custom_provider_slugs(true) ở mọi đường
-     * ghi (giống cách StudioModel/Setting xoá cache của chúng).
+     * StudioProvider model event gọi studio_custom_provider_map(true) ở mọi đường ghi.
      */
-    function studio_custom_provider_slugs(bool $forget = false): array
+    function studio_custom_provider_map(bool $forget = false): array
     {
-        static $slugs = null;
+        static $map = null;
 
         if ($forget) {
-            $slugs = null;
+            $map = null;
         }
 
-        if ($slugs === null) {
+        if ($map === null) {
+            $map = [];
             try {
-                $slugs = \App\Models\StudioProvider::pluck('slug')->all();
+                try {
+                    // Cột priority có thể chưa migrate ở deployment cũ — fallback bên dưới.
+                    $rows = \App\Models\StudioProvider::query()->get(['slug', 'priority']);
+                } catch (\Throwable $e) {
+                    $rows = \App\Models\StudioProvider::query()->get(['slug']);
+                }
+                foreach ($rows as $row) {
+                    $map[$row->slug] = (int) ($row->priority ?? 5);
+                }
             } catch (\Throwable $e) {
-                $slugs = [];
+                $map = [];
             }
         }
 
-        return $slugs;
+        return $map;
+    }
+}
+
+if (! function_exists('studio_custom_provider_slugs')) {
+    /**
+     * Slug của mọi custom provider (bảng studio_providers). Xem studio_custom_provider_map().
+     */
+    function studio_custom_provider_slugs(bool $forget = false): array
+    {
+        return array_keys(studio_custom_provider_map($forget));
+    }
+}
+
+if (! function_exists('studio_provider_priority')) {
+    /**
+     * Độ ưu tiên CỦA PROVIDER trong nội bộ nhóm (lớn hơn = thử trước). Built-in lấy từ
+     * catalog, custom lấy từ cột studio_providers.priority. Những provider cùng rank
+     * nhóm (ví dụ nhiều custom provider) được phân định bằng số này.
+     */
+    function studio_provider_priority(string $provider): int
+    {
+        $catalog = studio_provider_catalog();
+        if (isset($catalog[$provider])) {
+            return (int) ($catalog[$provider]['priority'] ?? 5);
+        }
+
+        return (int) (studio_custom_provider_map()[$provider] ?? 5);
     }
 }
 
@@ -930,8 +966,9 @@ if (! function_exists('studio_provider_rank')) {
 if (! function_exists('studio_sort_by_provider_rank')) {
     /**
      * Xếp danh sách model theo luồng ưu tiên: rank provider tăng dần (qwen trước,
-     * custom sau, rồi flux, gemini), cùng rank thì priority giảm dần, rồi id tăng
-     * (ổn định). Input/output: mảng các dòng registry (array) hoặc candidate.
+     * custom sau, rồi flux, gemini) → ưu tiên PROVIDER giảm dần (phân định các route
+     * cùng nhóm, vd nhiều custom provider) → priority model giảm dần → id tăng.
+     * Input/output: mảng các dòng registry (array) hoặc candidate.
      */
     function studio_sort_by_provider_rank(array $rows): array
     {
@@ -940,6 +977,13 @@ if (! function_exists('studio_sort_by_provider_rank')) {
             $rb = studio_provider_rank((string) ($b['provider'] ?? ''));
             if ($ra !== $rb) {
                 return $ra <=> $rb;
+            }
+            // Cùng nhóm (vd nhiều custom provider): ưu tiên CỦA PROVIDER quyết định
+            // route nào thử trước, rồi mới tới ưu tiên của từng model.
+            $qa = studio_provider_priority((string) ($a['provider'] ?? ''));
+            $qb = studio_provider_priority((string) ($b['provider'] ?? ''));
+            if ($qa !== $qb) {
+                return $qb <=> $qa;
             }
             $pa = (int) ($a['priority'] ?? 0);
             $pb = (int) ($b['priority'] ?? 0);
@@ -970,19 +1014,145 @@ if (! function_exists('studio_provider_catalog')) {
         // studio_provider_rank). Custom providers (bảng studio_providers) luôn thuộc
         // nhóm 'custom'.
         return [
-            'qwen' => ['name' => 'Qwen — QwenCloud (ảnh · video · suy luận)', 'protocol' => 'dashscope', 'family' => 'qwen', 'hint' => 'QWEN_API_KEY · home.qwencloud.com/api-keys · ảnh qua dashscope-intl, chat qua compatible-mode/v1'],
-            'qwen_edit' => ['name' => 'Qwen Edit — sửa ảnh / Inpaint / thử đồ', 'protocol' => 'dashscope', 'family' => 'qwen', 'hint' => 'QWEN_EDIT_KEY · qwen-image-edit-2511 / qwen-image-edit'],
-            'dashscope' => ['name' => 'DashScope — Wan/Qwen image & video (Alibaba)', 'protocol' => 'dashscope', 'family' => 'qwen', 'hint' => 'DASHSCOPE_API_KEY (pay-go sk-… / plan sk-sp-…)'],
-            'wan' => ['name' => 'Wan — video catwalk (Wan3.0)', 'protocol' => 'dashscope', 'family' => 'qwen', 'hint' => 'WAN_API_KEY / DASHSCOPE_API_KEY'],
-            'gemini' => ['name' => 'Gemini — suy luận / ảnh (tùy chọn)', 'protocol' => 'gemini', 'family' => 'gemini', 'hint' => 'GEMINI_API_KEY (aistudio.google.com) — nhóm CUỐI trong luồng ưu tiên'],
-            'veo' => ['name' => 'Google Veo — video', 'protocol' => 'gemini', 'family' => 'gemini', 'hint' => 'GOOGLE_VEO_KEY'],
-            'fal' => ['name' => 'Fal.ai — Flux (fallback ảnh)', 'protocol' => 'openai', 'family' => 'flux', 'hint' => 'FAL_KEY (fal.ai/dashboard/keys) — queue.fal.run, auth "Key …"'],
-            'replicate' => ['name' => 'Replicate — Flux (ảnh)', 'protocol' => 'openai', 'family' => 'flux', 'hint' => 'REPLICATE_API_TOKEN (dùng qua custom provider để gọi trực tiếp)'],
-            'deepseek' => ['name' => 'DeepSeek — ngôn ngữ / suy luận', 'protocol' => 'openai', 'family' => 'other', 'hint' => 'DEEPSEEK_API_KEY · model deepseek-chat'],
+            'qwen' => ['name' => 'Qwen — QwenCloud (ảnh · video · suy luận)', 'protocol' => 'dashscope', 'family' => 'qwen', 'priority' => 10, 'hint' => 'QWEN_API_KEY · home.qwencloud.com/api-keys · ảnh qua dashscope-intl, chat qua compatible-mode/v1'],
+            'qwen_edit' => ['name' => 'Qwen Edit — sửa ảnh / Inpaint / thử đồ', 'protocol' => 'dashscope', 'family' => 'qwen', 'priority' => 9, 'hint' => 'QWEN_EDIT_KEY · qwen-image-edit-2511 / qwen-image-edit'],
+            'dashscope' => ['name' => 'DashScope — Wan/Qwen image & video (Alibaba)', 'protocol' => 'dashscope', 'family' => 'qwen', 'priority' => 8, 'hint' => 'DASHSCOPE_API_KEY (pay-go sk-… / plan sk-sp-…)'],
+            'wan' => ['name' => 'Wan — video catwalk (Wan3.0)', 'protocol' => 'dashscope', 'family' => 'qwen', 'priority' => 7, 'hint' => 'WAN_API_KEY / DASHSCOPE_API_KEY'],
+            'gemini' => ['name' => 'Gemini — suy luận / ảnh (tùy chọn)', 'protocol' => 'gemini', 'family' => 'gemini', 'priority' => 10, 'hint' => 'GEMINI_API_KEY (aistudio.google.com) — nhóm CUỐI trong luồng ưu tiên'],
+            'veo' => ['name' => 'Google Veo — video', 'protocol' => 'gemini', 'family' => 'gemini', 'priority' => 9, 'hint' => 'GOOGLE_VEO_KEY'],
+            'fal' => ['name' => 'Fal.ai — Flux (fallback ảnh)', 'protocol' => 'openai', 'family' => 'flux', 'priority' => 10, 'hint' => 'FAL_KEY (fal.ai/dashboard/keys) — queue.fal.run, auth "Key …"'],
+            'replicate' => ['name' => 'Replicate — Flux (ảnh)', 'protocol' => 'openai', 'family' => 'flux', 'priority' => 5, 'hint' => 'REPLICATE_API_TOKEN (dùng qua custom provider để gọi trực tiếp)'],
+            'deepseek' => ['name' => 'DeepSeek — ngôn ngữ / suy luận', 'protocol' => 'openai', 'family' => 'other', 'priority' => 5, 'hint' => 'DEEPSEEK_API_KEY · model deepseek-chat'],
         ];
     }
 }
 
+if (! function_exists('studio_provider_templates')) {
+    /**
+     * MẪU khai báo custom provider — chỉ là DỮ LIỆU điền sẵn form, không phải đường
+     * code riêng cho từng hãng. Trước đây CKEY bị gắn cứng trong UI; nay nó chỉ là
+     * một mục trong danh sách này, ngang hàng với OpenRouter/Together/Groq…
+     *
+     * Mỗi mục: label (tên hiển thị), docs (link tài liệu), protocol, base_url,
+     * auth_style, api_key_ref (slug nhóm key gợi ý), note (ghi chú lưu vào registry),
+     * tags (nhãn nhỏ trong UI), image_path (endpoint sinh ảnh của gateway, nếu có).
+     *
+     * Thêm gateway mới = thêm một mục ở đây; không cần sửa transport hay service.
+     */
+    function studio_provider_templates(): array
+    {
+        return [
+            'openai-compatible' => [
+                'label' => 'OpenAI-compatible (tổng quát)',
+                'slug' => 'gateway',
+                'protocol' => 'openai',
+                'base_url' => 'https://api.example.com/v1',
+                'auth_style' => 'bearer',
+                'api_key_ref' => 'gateway',
+                'note' => 'Gateway OpenAI-compatible: chat /chat/completions · ảnh /images/generations',
+                'docs' => '',
+                'tags' => ['chung'],
+                'image_path' => '/images/generations',
+            ],
+            'ckey' => [
+                'label' => 'CKEY — gateway Việt Nam (api.xah.io)',
+                'slug' => 'ckey',
+                'protocol' => 'openai',
+                'base_url' => 'https://api.xah.io/v1',
+                'auth_style' => 'bearer',
+                'api_key_ref' => 'ckey',
+                'note' => 'CKEY · ảnh /v1/images/generations · chat /v1/chat/completions · bảng giá VND',
+                'docs' => 'https://ckey.vn/docs',
+                'tags' => ['VN', 'ảnh', 'chat'],
+                'image_path' => '/images/generations',
+            ],
+            'openrouter' => [
+                'label' => 'OpenRouter',
+                'slug' => 'openrouter',
+                'protocol' => 'openai',
+                'base_url' => 'https://openrouter.ai/api/v1',
+                'auth_style' => 'bearer',
+                'api_key_ref' => 'openrouter',
+                'note' => 'OpenRouter · 300+ model qua một khoá · chat /chat/completions',
+                'docs' => 'https://openrouter.ai/docs',
+                'tags' => ['chat', 'vision'],
+                'image_path' => null,
+            ],
+            'together' => [
+                'label' => 'Together AI',
+                'slug' => 'together',
+                'protocol' => 'openai',
+                'base_url' => 'https://api.together.xyz/v1',
+                'auth_style' => 'bearer',
+                'api_key_ref' => 'together',
+                'note' => 'Together AI · FLUX/SDXL + LLM mở · ảnh /images/generations',
+                'docs' => 'https://docs.together.ai',
+                'tags' => ['ảnh', 'flux'],
+                'image_path' => '/images/generations',
+            ],
+            'groq' => [
+                'label' => 'Groq (suy luận nhanh)',
+                'slug' => 'groq',
+                'protocol' => 'openai',
+                'base_url' => 'https://api.groq.com/openai/v1',
+                'auth_style' => 'bearer',
+                'api_key_ref' => 'groq',
+                'note' => 'Groq LPU · chat cực nhanh cho prompt/translate',
+                'docs' => 'https://console.groq.com/docs',
+                'tags' => ['chat', 'nhanh'],
+                'image_path' => null,
+            ],
+            'siliconflow' => [
+                'label' => 'SiliconFlow',
+                'slug' => 'siliconflow',
+                'protocol' => 'openai',
+                'base_url' => 'https://api.siliconflow.com/v1',
+                'auth_style' => 'bearer',
+                'api_key_ref' => 'siliconflow',
+                'note' => 'SiliconFlow · Qwen/FLUX + LLM mở',
+                'docs' => 'https://docs.siliconflow.com',
+                'tags' => ['ảnh', 'qwen'],
+                'image_path' => '/images/generations',
+            ],
+            'deepinfra' => [
+                'label' => 'DeepInfra',
+                'slug' => 'deepinfra',
+                'protocol' => 'openai',
+                'base_url' => 'https://api.deepinfra.com/v1/openai',
+                'auth_style' => 'bearer',
+                'api_key_ref' => 'deepinfra',
+                'note' => 'DeepInfra · FLUX/Qwen image + LLM mở',
+                'docs' => 'https://deepinfra.com/docs',
+                'tags' => ['ảnh', 'chat'],
+                'image_path' => null,
+            ],
+            'dashscope-intl' => [
+                'label' => 'DashScope quốc tế (QwenCloud)',
+                'slug' => 'dashscope_intl',
+                'protocol' => 'dashscope',
+                'base_url' => 'https://dashscope-intl.aliyuncs.com',
+                'auth_style' => 'bearer',
+                'api_key_ref' => 'dashscope_intl',
+                'note' => 'DashScope international · multimodal-generation + /api/v1/tasks',
+                'docs' => 'https://docs.qwencloud.com',
+                'tags' => ['qwen', 'ảnh', 'video'],
+                'image_path' => '/api/v1/services/aigc/multimodal-generation/generation',
+            ],
+            'custom-gemini' => [
+                'label' => 'Gemini-compatible (x-goog-api-key)',
+                'slug' => 'gemini_proxy',
+                'protocol' => 'gemini',
+                'base_url' => 'https://generativelanguage.googleapis.com/v1beta',
+                'auth_style' => 'x-goog-api-key',
+                'api_key_ref' => 'gemini_proxy',
+                'note' => 'Gemini generateContent qua proxy/tài khoản riêng',
+                'docs' => 'https://ai.google.dev/api',
+                'tags' => ['gemini'],
+                'image_path' => null,
+            ],
+        ];
+    }
+}
 if (! function_exists('studio_provider_registry')) {
     /**
      * The FULL provider directory: built-in catalog + user-declared custom routes
@@ -1002,6 +1172,7 @@ if (! function_exists('studio_provider_registry')) {
                 'hint' => $meta['hint'] ?? null,
                 'family' => $meta['family'] ?? 'other',
                 'rank' => studio_provider_rank($slug),
+                'priority' => studio_provider_priority($slug),
                 'custom' => false,
                 'enabled' => true,
             ];
@@ -1018,6 +1189,8 @@ if (! function_exists('studio_provider_registry')) {
                     'hint' => $p->note,
                     'family' => 'custom',
                     'rank' => studio_provider_rank($p->slug),
+                    'priority' => (int) ($p->priority ?? 5),
+                    'id' => (int) $p->id,
                     'custom' => true,
                     'enabled' => (bool) $p->enabled,
                 ];

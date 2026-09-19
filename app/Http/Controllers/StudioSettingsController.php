@@ -44,6 +44,9 @@ class StudioSettingsController extends Controller
                 'hint' => $meta['hint'],
                 'family' => $meta['family'] ?? 'other',
                 'rank' => $meta['rank'] ?? 990,
+                'priority' => (int) ($meta['priority'] ?? 5),
+                // id CHỈ để tham chiếu nội bộ UI; route bind theo slug (getRouteKeyName).
+                'id' => $meta['id'] ?? null,
                 'custom' => $meta['custom'],
                 'enabled' => $meta['enabled'],
                 'key_count' => $n,
@@ -63,6 +66,10 @@ class StudioSettingsController extends Controller
             // provider theo registry — cho tab "Luồng ưu tiên" vẽ chuỗi fallback.
             'provider_priority' => implode(',', studio_provider_priority_flow()),
             'flow_counts' => $this->flowCounts(),
+            // Mẫu khai báo custom provider (dữ liệu điền sẵn form; CKEY chỉ là 1 mục,
+            // không còn đường code riêng cho từng hãng).
+            'provider_templates' => studio_provider_templates(),
+            'provider_families' => config('studio.provider_priority'),
             'config' => [
                 'image_provider' => setting('studio_image_provider', 'qwen'),
                 'image_model' => setting('studio_image_model', config('studio.image_model')),
@@ -276,6 +283,7 @@ class StudioSettingsController extends Controller
             'base_url' => ['required', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+/'],
             'auth_style' => ['nullable', 'string', 'in:bearer,x-goog-api-key'],
             'api_key_ref' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9][A-Za-z0-9_-]*$/'],
+            'priority' => ['nullable', 'integer', 'min:0', 'max:100'],
             'note' => ['nullable', 'string', 'max:255'],
         ], [
             'api_key_ref.max' => 'API key ref là TÊN NHÓM KEY (slug), không phải khoá API — tối đa 60 ký tự. Đăng ký khoá thật ở tab 🔑 API Keys với provider = slug này.',
@@ -296,6 +304,7 @@ class StudioSettingsController extends Controller
             'base_url' => rtrim((string) $data['base_url'], '/'),
             'auth_style' => $data['auth_style'] ?? 'bearer',
             'api_key_ref' => $data['api_key_ref'] ?: $data['slug'],
+            'priority' => (int) ($data['priority'] ?? 5),
             'enabled' => true,
             'note' => $data['note'] ?? null,
         ]);
@@ -311,6 +320,7 @@ class StudioSettingsController extends Controller
             'base_url' => ['required', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+/'],
             'auth_style' => ['nullable', 'string', 'in:bearer,x-goog-api-key'],
             'api_key_ref' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9][A-Za-z0-9_-]*$/'],
+            'priority' => ['nullable', 'integer', 'min:0', 'max:100'],
             'enabled' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:255'],
         ], [
@@ -326,6 +336,7 @@ class StudioSettingsController extends Controller
             'base_url' => rtrim((string) $data['base_url'], '/'),
             'auth_style' => $data['auth_style'] ?? 'bearer',
             'api_key_ref' => $data['api_key_ref'] ?: $provider->slug,
+            'priority' => (int) ($data['priority'] ?? $provider->priority ?? 5),
             'enabled' => (bool) ($data['enabled'] ?? true),
             'note' => $data['note'] ?? null,
         ]);
@@ -490,6 +501,7 @@ class StudioSettingsController extends Controller
             'base_url' => $p->base_url,
             'auth_style' => $p->auth_style,
             'api_key_ref' => $p->api_key_ref,
+            'priority' => (int) ($p->priority ?? 5),
             'enabled' => (bool) $p->enabled,
             'note' => $p->note,
             'custom' => true,

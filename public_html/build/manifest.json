@@ -102,7 +102,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-h-Le2-4L.css",
+    "file": "assets/app-jWQec3Y_.css",
     "name": "app",
     "names": [
       "app.css"
@@ -165,7 +165,7 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-AVLz0MMs.js",
+    "file": "assets/settings-pUga9t1G.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
@@ -175,7 +175,7 @@
       "_BaseModal-PHVY4UFI.js"
     ],
     "css": [
-      "assets/settings-DvUtX_yy.css"
+      "assets/settings-CAdhARG4.css"
     ]
   }
 }
