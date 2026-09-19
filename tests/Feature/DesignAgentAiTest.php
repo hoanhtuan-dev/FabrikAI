@@ -176,6 +176,43 @@ class DesignAgentAiTest extends TestCase
         $this->assertContains('rule', $sources, 'Thiếu hướng thì phải bù bằng hướng tất định, không trả danh sách rỗng.');
     }
 
+    // ── 2b. Đầu ra "bẩn" của model vẫn phải dùng được ───────────────────────
+
+    public function test_radar_recovers_directions_from_a_truncated_response(): void
+    {
+        $this->configurePromptModel();
+        $full = json_encode(['directions' => array_map(fn ($i) => [
+            'title' => 'Hướng AI '.$i,
+            'thesis' => 'Luận điểm '.$i,
+            'why_now' => 'Vì sao '.$i,
+            'action' => 'Việc làm '.$i,
+            'risk' => 'Rủi ro '.$i,
+            'trend_ids' => ['linen-breeze'],
+        ], range(1, 5))], JSON_UNESCAPED_UNICODE);
+
+        // Mô phỏng model bị hết token giữa chừng: JSON bị cắt cụt.
+        $this->fakeChat(substr($full, 0, strlen($full) - 45));
+
+        $response = $this->actingAs($this->customer())->postJson('/api/design-agent/radar')->assertOk();
+
+        $this->assertSame('ai-v1', $response->json('engine'), 'JSON bị cắt vẫn phải cứu được, không được đẩy về tất định.');
+        $this->assertGreaterThanOrEqual(3, count($response->json('directions')));
+        $this->assertSame('ai', $response->json('directions.0.source'));
+        $this->assertSame('Hướng AI 1', $response->json('directions.0.title'));
+    }
+
+    public function test_radar_accepts_json_wrapped_in_a_code_fence(): void
+    {
+        $this->configurePromptModel();
+        $fence = '```json' . "\n" . $this->directionsJson(4) . "\n" . '```';
+        $this->fakeChat('Đây là kết quả:'."\n".$fence);
+
+        $response = $this->actingAs($this->customer())->postJson('/api/design-agent/radar')->assertOk();
+
+        $this->assertSame('ai-v1', $response->json('engine'));
+        $this->assertSame('Định hướng AI 1', $response->json('directions.0.title'));
+    }
+
     // ── 3. Lỗi model ⇒ quay về tất định và nói rõ lý do ─────────────────────
 
     public function test_radar_falls_back_when_the_model_returns_broken_json(): void

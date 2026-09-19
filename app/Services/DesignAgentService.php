@@ -349,7 +349,7 @@ class DesignAgentService
             .'các connector đó CHƯA được kết nối, dữ liệu là mẫu. Không tự nghĩ ra mã xu hướng mới ngoài danh mục. '
             .'Nhiệm vụ: viết 5-10 ĐỊNH HƯỚNG hành động cho khu vực "'.$region.'", mỗi định hướng bám vào 1-3 id xu hướng CÓ THẬT trong dữ liệu. '
             .'Chỉ trả về JSON đúng dạng: {"directions":[{"title":"...","thesis":"...","why_now":"...","action":"...","risk":"...","price_band":"entry|mid|premium","confidence":0.8,"trend_ids":["id-co-that"]}]}. '
-            .'Viết tiếng Việt, ngắn gọn, cụ thể, có thể hành động ngay.';
+            .'Viết tiếng Việt, ngắn gọn, cụ thể, có thể hành động ngay: MỖI trường tối đa 25 từ, KHÔNG xuống dòng trong giá trị, KHÔNG thêm chữ nào ngoài JSON.';
 
         $started = microtime(true);
         $answer = $this->gateway->text(self::AI_GROUP, [
@@ -369,7 +369,7 @@ class DesignAgentService
                     'recommended_action' => $trend['recommended_action'],
                 ], $trends),
             ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)],
-        ], ['response_format' => 'json_object', 'max_tokens' => 2048, 'timeout' => 45]);
+        ], ['response_format' => 'json_object', 'max_tokens' => 3000, 'timeout' => 60]);
         $latency = (int) round((microtime(true) - $started) * 1000);
         $attempted = $candidates[0]['provider'].':'.$candidates[0]['model'];
 
@@ -381,7 +381,14 @@ class DesignAgentService
 
         $directions = $this->normalizeDirections($this->decodeJson($answer['text']), $trends, $ruleDirections);
         if ($directions === []) {
-            logger()->warning('TrendRadar: model trả về định hướng không hợp lệ, dùng engine tất định', ['attempted' => $attempted]);
+            // Ghi lại ĐẦU ra thô (đã cắt) để lần sau biết chính xác vì sao không dùng được —
+            // đầu vào chỉ là catalog mẫu nên không có dữ liệu riêng của người dùng ở đây.
+            logger()->warning('TrendRadar: model trả về định hướng không hợp lệ, dùng engine tất định', [
+                'attempted' => $attempted,
+                'provider' => $answer['provider'],
+                'model' => $answer['model'],
+                'raw' => substr($answer['text'], 0, 800),
+            ]);
 
             return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted])];
         }
@@ -531,7 +538,7 @@ class DesignAgentService
         $answer = $this->gateway->text(self::AI_GROUP, [
             ['role' => 'system', 'content' => $instruction],
             ['role' => 'user', 'content' => "DỮ LIỆU:\n".json_encode($context, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)],
-        ], ['response_format' => 'json_object', 'max_tokens' => 3000, 'timeout' => 60]);
+        ], ['response_format' => 'json_object', 'max_tokens' => 4000, 'timeout' => 75]);
         $latency = (int) round((microtime(true) - $started) * 1000);
         $attempted = $candidates[0]['provider'].':'.$candidates[0]['model'];
 
@@ -543,7 +550,12 @@ class DesignAgentService
 
         $data = $this->normalizeAiBrief($this->decodeJson($answer['text']));
         if ($data === null) {
-            logger()->warning('CollectionBot: model trả về JSON không dùng được, dùng engine tất định', ['attempted' => $attempted]);
+            logger()->warning('CollectionBot: model trả về JSON không dùng được, dùng engine tất định', [
+                'attempted' => $attempted,
+                'provider' => $answer['provider'],
+                'model' => $answer['model'],
+                'raw' => substr($answer['text'], 0, 800),
+            ]);
 
             return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted]), 'data' => null];
         }
@@ -611,7 +623,14 @@ class DesignAgentService
         ];
     }
 
-    /** Model đôi khi bọc JSON trong code fence hoặc thêm lời dẫn — trích object JSON đầu tiên. */
+    /**
+     * Đọc JSON từ model — chịu được 3 kiểu trả về thường gặp của LLM:
+     *   1. JSON sạch;
+     *   2. JSON bọc trong code fence hoặc có lời dẫn quanh nó;
+     *   3. JSON bị CẮT vì hết token (finish_reason=length) — cắt về phần tử hoàn chỉnh cuối
+     *      cùng rồi đóng nốt ngoặc còn mở. Không có bước này thì một câu trả lời dài hơn dự kiến
+     *      sẽ âm thầm đẩy cả agent về engine tất định dù model hoàn toàn bình thường.
+     */
     private function decodeJson(string $text): ?array
     {
         $text = trim($text);
@@ -620,14 +639,136 @@ class DesignAgentService
             return $json;
         }
 
-        if (preg_match('/\{[\s\S]*\}/', $text, $m) === 1) {
-            $json = json_decode($m[0], true);
+        // (2) Bỏ code fence nếu có.
+        if (preg_match('/\x60{3}(?:json)?\s*([\s\S]*?)\x60{3}/i', $text, $m) === 1) {
+            $inner = trim($m[1]);
+            $json = json_decode($inner, true);
             if (is_array($json)) {
                 return $json;
+            }
+            $text = $inner;
+        }
+
+        // (3) Trích object JSON đầu tiên (đếm ngoặc, bỏ qua ngoặc nằm trong chuỗi).
+        $snippet = $this->jsonObjectSnippet($text);
+        if ($snippet !== null) {
+            $json = json_decode($snippet, true);
+            if (is_array($json)) {
+                return $json;
+            }
+            $repaired = $this->repairTruncatedJson($snippet);
+            if ($repaired !== null) {
+                $json = json_decode($repaired, true);
+                if (is_array($json)) {
+                    return $json;
+                }
             }
         }
 
         return null;
+    }
+
+    /** Trích object JSON đầu tiên trong một chuỗi văn bản (bỏ qua ngoặc bên trong chuỗi). */
+    private function jsonObjectSnippet(string $text): ?string
+    {
+        $start = strpos($text, '{');
+        if ($start === false) {
+            return null;
+        }
+
+        $depth = 0;
+        $inString = false;
+        $escaped = false;
+        for ($i = $start, $len = strlen($text); $i < $len; $i++) {
+            $char = $text[$i];
+            if ($inString) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ($char === '\\') {
+                    $escaped = true;
+                } elseif ($char === '"') {
+                    $inString = false;
+                }
+                continue;
+            }
+            if ($char === '"') {
+                $inString = true;
+            } elseif ($char === '{') {
+                $depth++;
+            } elseif ($char === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    return substr($text, $start, $i - $start + 1);
+                }
+            }
+        }
+
+        // Chưa đóng ngoặc ⇒ nhiều khả năng bị cắt vì hết token: trả phần còn lại để bước sau cứu.
+        return substr($text, $start);
+    }
+
+    /** Cứu JSON bị cắt: cắt về phần tử hoàn chỉnh cuối cùng rồi đóng nốt ngoặc còn mở. */
+    private function repairTruncatedJson(string $text): ?string
+    {
+        $start = strpos($text, '{');
+        if ($start === false) {
+            return null;
+        }
+        $text = substr($text, $start);
+
+        [$open, $lastSafeEnd] = $this->scanJsonStructure($text);
+        if ($open === []) {
+            return null;   // ngoặc đã cân bằng ⇒ lỗi không phải do bị cắt
+        }
+        if ($lastSafeEnd === null) {
+            return null;   // chưa có phần tử nào hoàn chỉnh để cắt về
+        }
+
+        $body = substr($text, 0, $lastSafeEnd);
+        [$open] = $this->scanJsonStructure($body);
+        $closers = '';
+        foreach (array_reverse($open) as $char) {
+            $closers .= $char === '{' ? '}' : ']';
+        }
+
+        return $body.$closers;
+    }
+
+    /**
+     * Quét cấu trúc JSON: trả về [danh sách ngoặc còn mở, vị trí kết thúc AN TOÀN cuối cùng]
+     * — bỏ qua mọi ký tự nằm trong chuỗi và ký tự được escape.
+     *
+     * @return array{0: list<string>, 1: ?int}
+     */
+    private function scanJsonStructure(string $text): array
+    {
+        $open = [];
+        $inString = false;
+        $escaped = false;
+        $lastSafeEnd = null;
+        for ($i = 0, $len = strlen($text); $i < $len; $i++) {
+            $char = $text[$i];
+            if ($inString) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ($char === '\\') {
+                    $escaped = true;
+                } elseif ($char === '"') {
+                    $inString = false;
+                }
+                continue;
+            }
+            if ($char === '"') {
+                $inString = true;
+            } elseif ($char === '{' || $char === '[') {
+                $open[] = $char;
+            } elseif ($char === '}' || $char === ']') {
+                array_pop($open);
+                $lastSafeEnd = $i + 1;
+            }
+        }
+
+        return [$open, $lastSafeEnd];
     }
 
     /** Danh sách ID ổn định để controller có thể validate trước khi gọi service. */
