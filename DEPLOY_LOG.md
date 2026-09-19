@@ -768,3 +768,87 @@ dự phòng) — cập nhật số panel 8 → 9 một cách có ý thức. Full
   mỗi lúc chỉ một card được render (activity bar chọn 1 mục) nên tiến độ không bị lẫn giữa hai card.
 - `compose()` truyền `mode='compose'` với `creative_level/style/ornament` trung tính: backend chỉ dùng ba tham số đó
   cho `mode='outfit'` nên hành vi ghép bố cục KHÔNG đổi.
+
+---
+
+## Phiên 2026-09-22 (Đợt 10 — "Ghép ảnh" → **STUDIO**: phòng chụp thời trang chuyên nghiệp)
+
+**Commit:** `75b13ec`. **Đã deploy production** (không migration), rebuild asset `main-DRHkRUDe.js`.
+
+### Phân tích sâu trước khi làm
+
+Một buổi chụp thật KHÔNG bắt đầu từ "ghép mấy tấm ảnh". Nó bắt đầu từ **bối cảnh chủ đề + sơ đồ đèn +
+ống kính + dáng**, rồi mới ra **danh sách ảnh (shot list)** — và mọi tấm trong bộ phải trông như **cùng một
+buổi chụp**. Ba thứ quyết định ảnh có bán được hay không:
+
+| # | Yếu tố | Trước đợt này | Sau đợt này |
+|---|---|---|---|
+| 1 | **Bối cảnh chủ đề** theo bộ sưu tập | không có (chỉ prompt tự do) | 14 preset bối cảnh + bối cảnh tự nhập |
+| 2 | **Tính nhất quán** giữa các tấm | không có | `look signature` giống hệt nhau ở MỌI prompt |
+| 3 | **Độ trung thực của trang phục** | không nêu rõ | điều khoản "100% fidelity" mở đầu mọi prompt |
+
+### Backend — `PhotoStudioService` (mới, TẤT ĐỊNH, không gọi model nào)
+
+- **14 bối cảnh chủ đề**: studio trắng vô cực · xám khói · đen kịch tính · tường vôi Hội An · phố cổ Hà Nội
+  mùa thu · biển Đà Nẵng · vườn nhiệt đới · quán cà phê Sài Gòn · đêm neon · Tết cổ truyền · công sở tối giản ·
+  đồi chè Tây Bắc · runway · vintage phim — mỗi bối cảnh có **bảng màu · đạo cụ · sơ đồ đèn gợi ý · mẹo dùng**.
+- **9 sơ đồ đèn** (softbox đều · beauty dish · cửa sổ mềm · nắng vàng · nắng gắt trưa · đèn cứng editorial ·
+  neon · flash runway · nắng lốm đốm), **6 ống kính** (85/50/35/medium-format/phim/tele), **8 dáng**, 
+  **9 loại ảnh** (kèm tỉ lệ gợi ý + mục đích), **6 phong cách hậu kỳ**.
+- `plan()`: mỗi tấm một prompt hoàn chỉnh; **`look_id` + `look_signature` dùng CHUNG cho mọi tấm**
+  (cùng người mẫu · nền · hướng sáng · grade) nên bộ ảnh đồng bộ; giữ trang phục là điều kiện số một.
+- Đếm **đúng** số ảnh/credit; cảnh báo khi thiếu ảnh tham chiếu, khi vượt trần 12 ảnh/buổi, và **NÓI THẬT**
+  khi chưa cấu hình model ảnh (`image_ready=false` ⇒ chế độ demo).
+- Endpoint **`POST /api/studio/shoot/catalog`** + **`POST /api/studio/shoot/plan`** (throttle 60/phút, KHÔNG tạo
+  generation, KHÔNG tốn credit). Module `compose` đổi **tên hiển thị → "Studio"**, icon `camera`, thêm endpoint
+  `studio/shoot` — **giữ nguyên id `compose`** để không phá cấu hình thanh công cụ đã lưu và các đường /compose sẵn có.
+
+### Frontend — `StudioCard.vue` (mới, thay `ComposeCard.vue` đã xoá)
+
+- 3 slot tham chiếu: **trang phục (giữ nguyên)** · người mẫu/dáng · bối cảnh.
+- Lưới **bối cảnh chủ đề** (màu + mùa + đèn gợi ý) và chế độ **bối cảnh tự nhập**.
+- Chips **ánh sáng · ống kính · dáng · hậu kỳ**; ánh sáng bỏ trống = theo bối cảnh.
+- **Checklist danh sách ảnh** 9 loại + biến thể + tỉ lệ (ghi đè hoặc theo từng loại).
+- Tên **bộ sưu tập** (tự điền từ bộ đang áp dụng) + ghi chú **người mẫu** / **trang phục (AI phải giữ đúng)**.
+- Khối kết quả: cảnh báo, xem/**sửa prompt từng tấm**, ước tính credit trước khi chạy, nút **"Chụp N ảnh"**.
+- `runShoot()` chạy MỖI TẤM một generation qua đúng pipeline `/api/compose` sẵn có ⇒ dùng lại credit, hàng đợi,
+  Outputs, bảng Lớp và huỷ giữa chừng.
+
+### Đo THẬT trên production sau deploy
+
+```
+activity_bar: … | Sửa ảnh[inpaint/pencil] | Studio[compose/camera] | Ghép trang phục[outfit/shirt] | Upscale …
+catalog: backdrops=14 lighting=9 cameras=6 poses=8 shots=9 styles=6
+image_ready = no  ⇒ cảnh báo: chạy CHẾ ĐỘ DEMO, trả ảnh mẫu (chưa có key nhóm 'edit')
+plan: LOOK-CCDC60 · 3 tấm · 3 ảnh · 6 credit
+setup: Tường vôi Hội An · Nắng vàng cuối ngày · 85mm f/1.8 · Bước đi · Lookbook theo mùa
+--- SHOT 1 ---
+Professional fashion photograph for a lookbook. The model wears the EXACT garment shown in the reference
+image — reproduce its fabric, colour, print, cut, seams, trims and proportions with 100% fidelity; do NOT
+redesign… FRAME: full body from head to toe… MODEL: model walking toward the camera mid-stride…
+--- SHOT 3 (cận chi tiết vải) --- … FRAME: tight macro detail of the fabric weave, stitching and finish …
+```
+
+### Verify production
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `75b13ec` |
+| Route | `POST api/studio/shoot/catalog` · `POST api/studio/shoot/plan` |
+| Thanh công cụ | nhãn **Studio** + icon `camera` (đã cập nhật cả bản cấu hình owner ĐÃ LƯU, vì `all()` ưu tiên nhãn đã lưu) |
+| Bundle | `main-DRHkRUDe.js` có "Phòng chụp thời trang" · "Bối cảnh chủ đề" · "Danh sách ảnh" · "Bối cảnh tự nhập"; **"Ghép ảnh" = 0** |
+| Trang | `/` `/up` → **200** |
+
+**Test:** 13 test mới — 8 unit `PhotoStudioServiceTest` (look signature dùng chung cho MỌI tấm · `look_id` chỉ đổi
+khi đổi bối cảnh · đếm ảnh/credit · cảnh báo thiếu ảnh + chế độ demo · id lạ về mặc định an toàn · khử trùng + trần 12
+ảnh · tỉ lệ) và 5 feature `PhotoStudioTest` (401 khách · catalog · plan KHÔNG gọi model · validate · module lock).
+Full suite **810 pass**; 6 fail vẫn là 6 lỗi SẴN CÓ ở HEAD.
+
+### Còn lại (đề xuất)
+
+- [ ] **Chưa có key model ảnh trên production** (nhóm `image`/`edit`/`video`/`swap` đều rỗng) ⇒ Studio chạy demo;
+      cần nối khoá để buổi chụp ra ảnh thật. Giao diện đã nói thẳng điều này thay vì trả ảnh mẫu im lặng.
+- [ ] Chưa có **bối cảnh theo bộ sưu tập lưu sẵn** (mỗi bộ sưu tập nhớ bối cảnh/đèn/dáng của nó); hiện setup được
+      chọn lại từng buổi. Nên gắn `look_id` vào project để mở lại đúng buổi chụp cũ.
+- [ ] Chưa hỗ trợ **nhiều người mẫu trong cùng khung** (lookbook đôi) và **đổi bối cảnh giữ nguyên ảnh gốc**
+      (retouch lại phần nền) — đều cần model ảnh thật mới kiểm chứng được.
