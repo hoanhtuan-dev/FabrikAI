@@ -575,4 +575,21 @@ class ProviderPriorityFlowTest extends TestCase
             }
         }
     }
+    // ── Migration phải XOÁ CACHE settings (lỗi thật khi deploy lần đầu) ──────
+
+    public function test_deepseek_migration_invalidates_settings_cache(): void
+    {
+        set_setting('studio_provider_priority', 'custom,qwen,flux,gemini');
+        // Mồi cache: đọc một lần để giá trị cũ nằm trong cache 'settings:all'.
+        $this->assertSame('custom,qwen,flux,gemini', setting('studio_provider_priority'));
+
+        $migration = require database_path('migrations/2026_09_22_000002_add_deepseek_to_provider_flow.php');
+        $migration->up();
+
+        // Nếu migration ghi thẳng bằng DB::table() thì cache cũ vẫn được trả về ⇒ test này đỏ.
+        $this->assertSame('custom,qwen,flux,deepseek,gemini', setting('studio_provider_priority'));
+        $this->assertSame(['custom', 'qwen', 'flux', 'deepseek', 'gemini'], studio_provider_priority_flow());
+        $this->assertSame(30, studio_provider_rank('deepseek'), 'deepseek phải được xếp hạng sau khi cache xoá');
+        $this->assertSame(40, studio_provider_rank('gemini'));
+    }
 }
