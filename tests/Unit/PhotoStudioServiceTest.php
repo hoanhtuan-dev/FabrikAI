@@ -93,23 +93,46 @@ class PhotoStudioServiceTest extends TestCase
         $this->assertSame('my own backdrop wording', $index['p1']['injection']);
     }
 
-    public function test_scene_maps_the_three_images_and_keeps_the_garment(): void
+    /**
+     * THỨ TỰ ẢNH: model nhận content = [ảnh tham chiếu…, ẢNH GỐC] nên ảnh người mẫu LUÔN NẰM CUỐI.
+     * Prompt phải gọi tên theo thứ tự đó, nếu không model sẽ coi ảnh bối cảnh là sản phẩm cần giữ nguyên.
+     */
+    public function test_scene_names_images_in_the_order_the_model_sees_them(): void
     {
         $index = $this->studio->chipIndex($this->baseline());
 
         $one = $this->studio->scene(['prompt' => 'đổi sang nền tường gạch'], $index, 1);
-        $this->assertStringContainsString('FIRST image is the model wearing the garment', $one['prompt']);
+        $this->assertStringContainsString('The image is the model wearing the garment', $one['prompt']);
         $this->assertStringContainsString('100% fidelity', $one['prompt']);
         $this->assertStringContainsString('do NOT redesign', $one['prompt']);
-        $this->assertStringNotContainsString('SECOND image', $one['prompt'], 'Chưa có ảnh bối cảnh thì không được nhắc ảnh 2.');
+        $this->assertStringNotContainsString('FIRST image', $one['prompt'], 'Chỉ một ảnh thì không được nhắc ảnh thứ hai.');
         $this->assertStringContainsString('DIRECTION: đổi sang nền tường gạch', $one['prompt']);
 
         $two = $this->studio->scene(['prompt' => 'ra ngoài trời'], $index, 2);
-        $this->assertStringContainsString('SECOND image', $two['prompt'], 'Có ảnh 2 ⇒ phải bám phối cảnh/ánh sáng của ảnh bối cảnh.');
-        $this->assertStringNotContainsString('THIRD image', $two['prompt']);
+        $this->assertStringContainsString('The SECOND (last) image is the model wearing the garment', $two['prompt']);
+        $this->assertStringContainsString('setting shown in the FIRST image', $two['prompt'], 'Ảnh bối cảnh là ảnh ĐẦU trong nội dung gửi model.');
+        $this->assertStringNotContainsString('THIRD', $two['prompt']);
 
         $three = $this->studio->scene([], $index, 3);
-        $this->assertStringContainsString('THIRD image', $three['prompt'], 'Có ảnh 3 ⇒ nêu rõ vai trò tham chiếu thêm.');
+        $this->assertStringContainsString('The THIRD (last) image is the model wearing the garment', $three['prompt']);
+        $this->assertStringContainsString('the SECOND image supports with detail', $three['prompt']);
+    }
+
+    /** Chip @imageN trong prompt phải được dịch sang cách gọi ảnh mà model hiểu. */
+    public function test_scene_translates_image_tags_in_the_user_prompt(): void
+    {
+        $index = $this->studio->chipIndex($this->baseline());
+
+        $two = $this->studio->scene(['prompt' => 'đặt cô ấy vào bối cảnh của @image2, giữ nguyên @image1'], $index, 2);
+        $this->assertStringContainsString('DIRECTION: đặt cô ấy vào bối cảnh của the FIRST image, giữ nguyên the SECOND (last) image', $two['prompt']);
+        $this->assertStringNotContainsString('@image', $two['prompt'], 'Không được để thẻ @imageN lọt tới model.');
+
+        $three = $this->studio->scene(['prompt' => 'bám @image3 và @image2'], $index, 3);
+        $this->assertStringContainsString('bám the SECOND image và the FIRST image', $three['prompt']);
+
+        // Chưa chọn ảnh 2/3 thì thẻ tương ứng để nguyên (không bịa ra ảnh không tồn tại).
+        $one = $this->studio->scene(['prompt' => 'giữ @image1, thêm hoa @image2'], $index, 1);
+        $this->assertStringContainsString('giữ the image, thêm hoa @image2', $one['prompt']);
     }
 
     public function test_scene_appends_selected_chips_from_my_settings(): void

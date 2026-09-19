@@ -153,7 +153,9 @@ class PhotoStudioTest extends TestCase
 
         $prompt = (string) $response->json('prompt');
         $this->assertStringContainsString('100% fidelity', $prompt);
-        $this->assertStringContainsString('SECOND image', $prompt, 'Có ảnh bối cảnh ⇒ bám phối cảnh ảnh 2.');
+        // Model nhận content = [ảnh bối cảnh, ẢNH GỐC] nên: ảnh người mẫu = ảnh CUỐI, ảnh bối cảnh = ảnh ĐẦU.
+        $this->assertStringContainsString('The SECOND (last) image is the model wearing the garment', $prompt);
+        $this->assertStringContainsString('setting shown in the FIRST image', $prompt, 'Có ảnh bối cảnh ⇒ bám phối cảnh ảnh đó.');
         $this->assertStringContainsString('DIRECTION: đặt cô ấy vào quán cà phê', $prompt);
         $this->assertSame($preset->prompt_injection, $response->json('used_chips.0.injection'), 'Đoạn chèn luôn tra từ Cài đặt, không lấy từ client.');
         $this->assertFalse($response->json('image_ready'), 'Test chưa có key model ảnh ⇒ phải nói thật là chế độ demo.');

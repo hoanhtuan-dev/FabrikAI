@@ -197,25 +197,66 @@ class PhotoStudioService
         ];
     }
 
+    /**
+     * TÊN ẢNH THEO THỨ TỰ MODEL NHÌN THẤY — khác thứ tự ô trên màn hình, và đây là chỗ dễ viết sai nhất.
+     *
+     * ImageAIService::editImage() gửi content = [ảnh tham chiếu…, ẢNH GỐC] — tức ảnh gốc (@image1, người mẫu)
+     * LUÔN NẰM CUỐI, còn @image2/@image3 đứng trước. Cùng quy ước với StudioController::assembleComposePrompt()
+     * (@image2 → "the FIRST image", @image1 → ảnh cuối). Nếu prompt gọi "the FIRST image" là ảnh người mẫu thì
+     * model bị chỉ SAI ảnh — nó sẽ coi ảnh bối cảnh là sản phẩm cần giữ nguyên.
+     *
+     * @return array{base: string, backdrop: ?string, extra: ?string}
+     */
+    private function imageRoles(int $imageCount): array
+    {
+        return match (true) {
+            $imageCount <= 1 => ['base' => 'the image', 'backdrop' => null, 'extra' => null],
+            $imageCount === 2 => ['base' => 'the SECOND (last) image', 'backdrop' => 'the FIRST image', 'extra' => null],
+            default => ['base' => 'the THIRD (last) image', 'backdrop' => 'the FIRST image', 'extra' => 'the SECOND image'],
+        };
+    }
+
+    /**
+     * Thẻ @imageN người dùng gõ trong prompt → tên ảnh đúng như model nhìn thấy.
+     * Nhờ vậy chip "@image1/@image2/@image3" trong giao diện là CÁCH VIẾT HỢP LỆ, không phải ký hiệu trang trí.
+     *
+     * @return array<string, string>
+     */
+    private function tagMap(array $roles): array
+    {
+        $map = ['@image1' => $roles['base']];
+        if ($roles['backdrop'] !== null) {
+            $map['@image2'] = $roles['backdrop'];
+        }
+        if ($roles['extra'] !== null) {
+            $map['@image3'] = $roles['extra'];
+        }
+
+        return $map;
+    }
+
     /** Prompt cuối cùng gửi cho model — dựng theo đúng thứ tự ưu tiên: giữ sản phẩm > bối cảnh > chỉ dẫn người dùng. */
     private function assemble(string $userPrompt, array $chips, int $imageCount): string
     {
+        $roles = $this->imageRoles($imageCount);
+        $userPrompt = $userPrompt !== '' ? trim(strtr($userPrompt, $this->tagMap($roles))) : '';
+
         $parts = [
-            'Professional fashion photograph. The FIRST image is the model wearing the garment: keep her identity, face, hair, '
+            'Professional fashion photograph. '.ucfirst($roles['base']).' is the model wearing the garment: keep her identity, face, hair, '
             .'body proportions and pose, and keep the garment EXACTLY as it is (fabric, colour, print, cut, seams, fit) with 100% fidelity — '
             .'do NOT redesign, restyle or alter the garment, and do not change its colour.',
         ];
 
-        if ($imageCount >= 2) {
-            $parts[] = 'SCENE: place the model naturally into the setting shown in the SECOND image — match its perspective, camera height, '
+        if ($roles['backdrop'] !== null) {
+            $parts[] = 'SCENE: place the model naturally into the setting shown in '.$roles['backdrop'].' — match its perspective, camera height, '
                 .'scale, ground contact and lighting direction so she belongs in it; keep the real architecture, materials and props of that setting.';
         } else {
-            $parts[] = 'SCENE: keep the original setting of the first image unless the direction below says otherwise; if the direction asks for a new setting, '
+            $parts[] = 'SCENE: keep the original setting of the image unless the direction below says otherwise; if the direction asks for a new setting, '
                 .'make it a clean professional fashion setting with believable light and a readable background.';
         }
 
-        if ($imageCount >= 3) {
-            $parts[] = 'EXTRA REFERENCE: the THIRD image is a supporting reference (detail, accessory or colour) — follow it faithfully where it applies.';
+        if ($roles['extra'] !== null) {
+            $parts[] = 'EXTRA REFERENCE: '.$roles['extra'].' supports with detail, accessory or colour — follow it faithfully where it applies.';
         }
 
         if ($userPrompt !== '') {
@@ -266,6 +307,7 @@ class PhotoStudioService
             'Chip nhanh lấy từ PRESET trong «Cài đặt của tôi» — sửa/thêm/ẩn ở đó là chip trong Studio đổi theo.',
             'Ảnh 1 luôn là sản phẩm: AI chỉ đổi bối cảnh/ánh sáng theo chỉ dẫn, không thiết kế lại trang phục.',
             'Ảnh 2 (bối cảnh) nên là nơi có thật — AI bám vào phối cảnh, mặt đất và hướng sáng của ảnh đó.',
+            'Gõ @image1 / @image2 / @image3 trong prompt để chỉ đích danh từng ảnh — hệ thống tự dịch sang cách gọi mà model hiểu.',
         ];
     }
 

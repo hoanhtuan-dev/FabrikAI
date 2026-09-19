@@ -32,6 +32,14 @@ const FALLBACK_SLOTS = [
 /** Số chip hiện trước khi phải bấm "xem thêm" — giữ khối chọn nhanh gọn mắt. */
 const CHIPS_VISIBLE = 6;
 
+/**
+ * Prompt mẫu — học đúng cách card "Ghép trang phục" làm: một nút chèn sẵn câu chỉ dẫn hoàn chỉnh để
+ * người mới không phải nghĩ cấu trúc câu, rồi sửa lại theo ý mình.
+ * Có thẻ @imageN vì backend dịch chúng sang cách gọi ảnh mà model hiểu.
+ */
+const SAMPLE_PROMPT = 'đặt cô ấy vào đúng bối cảnh trong @image2, giữ nguyên trang phục, gương mặt và tư thế; '
+  + 'ánh sáng, phối cảnh và mặt đất phải khớp với bối cảnh; nếu có @image3 thì bám theo chi tiết trong đó';
+
 const open = ref(false);
 const targetSlot = ref(0);
 const selected = ref([null, null, null]);
@@ -118,6 +126,15 @@ function toggleChip(id) {
   store.toggleSceneChip(id);
 }
 function chipActive(id) { return selectedChips.value.includes(String(id)); }
+/** Chèn thẻ @imageN vào cuối prompt (giống card Ghép trang phục). */
+function insertTag(tag) {
+  const current = String(setup.value.prompt || '');
+  store.setSceneSetup({ prompt: (current ? current.trimEnd() + ' ' : '') + tag + ' ' });
+}
+function useSamplePrompt() {
+  store.setSceneSetup({ prompt: SAMPLE_PROMPT });
+  store.toast('Đã chèn prompt mẫu — sửa lại theo ý bạn.');
+}
 function chipLabelOf(id) {
   for (const group of groups.value) {
     const hit = (group.items || []).find(i => String(i.id) === String(id));
@@ -256,7 +273,20 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
       <textarea :value="setup.prompt" rows="3" maxlength="2000" class="input mt-1.5 w-full resize-none !text-xs"
                 placeholder="VD: đặt cô ấy vào quán cà phê, ánh sáng cửa sổ, giữ nguyên tư thế…"
                 @input="store.setSceneSetup({ prompt: $event.target.value })"></textarea>
-      <p class="mt-1 text-[9px] leading-4 text-cream-300/45">Chip ở bước ③ được nối tự động vào prompt — không cần gõ lại.</p>
+
+      <!-- Chip thẻ ảnh + prompt mẫu (cùng cách card "Ghép trang phục") -->
+      <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <button v-for="n in 3" :key="n" type="button" @click="insertTag('@image' + n)"
+                class="motion-ui rounded-full bg-ink-800 px-2 py-0.5 text-[10px] font-semibold text-brand-300 transition hover:bg-brand-600 hover:text-white"
+                :title="'Chèn @image' + n + ' vào prompt'">@image{{ n }}</button>
+        <span class="text-cream-300/25">|</span>
+        <button type="button" @click="useSamplePrompt"
+                class="motion-ui rounded-full border border-ink-600 px-2 py-0.5 text-[10px] font-semibold text-cream-200 transition hover:border-brand-400"
+                title="Chèn một prompt mẫu hoàn chỉnh rồi sửa lại">Prompt mẫu</button>
+      </div>
+      <p class="mt-1 text-[9px] leading-4 text-cream-300/45">
+        Chip ở bước ③ được nối tự động — không cần gõ lại. Thẻ <span class="text-brand-300">@image1/@image2/@image3</span> giúp chỉ đích danh từng ảnh.
+      </p>
     </div>
 
     <!-- NÂNG CAO -->
