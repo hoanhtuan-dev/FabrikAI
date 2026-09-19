@@ -716,7 +716,7 @@ Nhóm test thanh công cụ (CanvasControls · StudioGuiConfig · BatchGeneratio
 
 ---
 
-## Phiên 2026-09-22 (Đợt 8 — Tách "Ghép trang phục" khỏi card "Ghép ảnh" thành CARD RIÊNG)
+## Phiên 2026-09-22 (Đợt 9 — Tách "Ghép trang phục" khỏi card "Ghép ảnh" thành CARD RIÊNG)
 
 **Commit:** `905ac49`. **Đã deploy production** (không migration), rebuild asset `main-DA-_QEtX.js`.
 
