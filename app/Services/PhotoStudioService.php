@@ -41,6 +41,16 @@ class PhotoStudioService
         ['id' => 3, 'name' => 'Tham chiếu thêm', 'hint' => 'Tùy chọn — chi tiết, phụ kiện hoặc màu cần bám', 'required' => false],
     ];
 
+    /**
+     * CHIP NHANH CHỈ DÙNG 3 NHÓM NÀY (chốt 2026-09-22): Bối cảnh · Góc máy · Ống kính.
+     *
+     * Vì sao chỉ 3: những nhóm còn lại trong Cài đặt của tôi (chất liệu · phom dáng · màu sắc · họa
+     * tiết…) mô tả CHÍNH SẢN PHẨM — mà sản phẩm trong Studio là ảnh 1 và phải được GIỮ NGUYÊN, nên
+     * đưa chúng vào đây vừa thừa vừa dễ khiến người mới hiểu sai rằng đang thiết kế lại trang phục.
+     * Ba nhóm còn lại đúng là ba thứ Studio THỰC SỰ thay đổi: khung cảnh, góc chụp, ống kính.
+     */
+    public const CHIP_CATEGORIES = ['background', 'camera', 'lens'];
+
     /** Nhãn nhóm chip — PHẢI khớp CAT_LABELS của mục "Preset" trong Cài đặt của tôi. */
     private const CHIP_CATEGORY_LABELS = [
         'fabric' => 'Chất liệu',
@@ -87,6 +97,9 @@ class PhotoStudioService
             if ($injection === '' || $label === '') {
                 continue;
             }
+            if (! in_array($category, self::CHIP_CATEGORIES, true)) {
+                continue;   // ngoài 3 nhóm của Studio (xem CHIP_CATEGORIES)
+            }
             if (! isset($groups[$category])) {
                 $groups[$category] = [
                     'id' => $category,
@@ -117,7 +130,8 @@ class PhotoStudioService
         foreach ($this->mergeCatalog($baseline, $userCatalog) as $item) {
             $id = (string) ($item['id'] ?? '');
             $injection = trim((string) ($item['prompt_injection'] ?? ''));
-            if ($id === '' || $injection === '') {
+            // Chỉ nhận chip thuộc 3 nhóm của Studio — chip cũ ngoài nhóm bị bỏ qua (và báo ở warnings).
+            if ($id === '' || $injection === '' || ! in_array((string) ($item['category'] ?? ''), self::CHIP_CATEGORIES, true)) {
                 continue;
             }
             $out[$id] = [

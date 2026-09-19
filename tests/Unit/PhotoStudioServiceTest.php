@@ -24,13 +24,17 @@ class PhotoStudioServiceTest extends TestCase
         $this->studio = new PhotoStudioService();
     }
 
-    /** Baseline giống bảng presets dùng chung. */
+    /**
+     * Baseline giống bảng presets dùng chung — CHỈ 3 nhóm của Studio (Bối cảnh · Góc máy · Ống kính)
+     * cộng một mục ngoài nhóm để chứng minh nó bị lọc bỏ.
+     */
     private function baseline(): array
     {
         return [
-            ['id' => 'p1', 'category' => 'fabric', 'ui_label' => 'Lụa mềm', 'prompt_injection' => 'soft silk fabric', 'note' => '', 'sort_order' => 1],
-            ['id' => 'p2', 'category' => 'background', 'ui_label' => 'Studio trắng', 'prompt_injection' => 'seamless white studio backdrop', 'note' => '', 'sort_order' => 2],
-            ['id' => 'p3', 'category' => 'style', 'ui_label' => 'Tối giản', 'prompt_injection' => 'minimal styling', 'note' => '', 'sort_order' => 3],
+            ['id' => 'p1', 'category' => 'background', 'ui_label' => 'Studio trắng', 'prompt_injection' => 'seamless white studio backdrop', 'note' => '', 'sort_order' => 1],
+            ['id' => 'p2', 'category' => 'camera', 'ui_label' => 'Ngang tầm mắt', 'prompt_injection' => 'eye-level camera angle', 'note' => '', 'sort_order' => 2],
+            ['id' => 'p3', 'category' => 'lens', 'ui_label' => '85mm', 'prompt_injection' => 'shot on 85mm', 'note' => '', 'sort_order' => 3],
+            ['id' => 'p9', 'category' => 'fabric', 'ui_label' => 'Lụa mềm', 'prompt_injection' => 'soft silk fabric', 'note' => '', 'sort_order' => 4],
         ];
     }
 
@@ -38,26 +42,38 @@ class PhotoStudioServiceTest extends TestCase
     {
         $groups = $this->studio->chipGroups($this->baseline(), [
             'hidden' => ['p3'],
-            'edits' => ['p1' => ['ui_label' => 'Lụa mềm (bản của tôi)', 'prompt_injection' => 'my own silk wording']],
-            'custom' => [['id' => 'local-1', 'category' => 'fabric', 'ui_label' => 'Vải thô', 'prompt_injection' => 'raw textured fabric', 'sort_order' => 0]],
+            'edits' => ['p1' => ['ui_label' => 'Nền trắng (bản của tôi)', 'prompt_injection' => 'my own backdrop wording']],
+            'custom' => [['id' => 'local-1', 'category' => 'background', 'ui_label' => 'Sân thượng', 'prompt_injection' => 'my rooftop at sunset', 'sort_order' => 0]],
         ]);
 
         $byId = collect($groups)->keyBy('id');
-        $this->assertSame(['fabric', 'background'], array_column($groups, 'id'), 'Nhóm ẩn hết mục thì biến mất; nhóm còn mục thì giữ.');
-        $this->assertSame('Chất liệu', $byId['fabric']['label']);
-        $this->assertCount(2, $byId['fabric']['items']);
-        $this->assertSame('Lụa mềm (bản của tôi)', $byId['fabric']['items'][0]['label'], 'Mục bị sửa phải dùng bản của người dùng.');
-        $this->assertSame('my own silk wording', $byId['fabric']['items'][0]['injection']);
-        $this->assertSame('Vải thô', $byId['fabric']['items'][1]['label'], 'Mục tự thêm nối vào CUỐI nhóm.');
-        $this->assertSame('seamless white studio backdrop', $byId['background']['items'][0]['injection']);
+        $this->assertSame(['background', 'camera'], array_column($groups, 'id'), 'Chỉ 3 nhóm của Studio; nhóm ẩn hết mục thì biến mất.');
+        $this->assertSame('Bối cảnh', $byId['background']['label']);
+        $this->assertCount(2, $byId['background']['items']);
+        $this->assertSame('Nền trắng (bản của tôi)', $byId['background']['items'][0]['label'], 'Mục bị sửa phải dùng bản của người dùng.');
+        $this->assertSame('my own backdrop wording', $byId['background']['items'][0]['injection']);
+        $this->assertSame('Sân thượng', $byId['background']['items'][1]['label'], 'Mục tự thêm nối vào CUỐI nhóm.');
+        $this->assertSame('eye-level camera angle', $byId['camera']['items'][0]['injection']);
+    }
+
+    public function test_chip_groups_only_keep_the_three_studio_categories(): void
+    {
+        $groups = $this->studio->chipGroups($this->baseline());
+
+        $this->assertSame(['background', 'camera', 'lens'], array_column($groups, 'id'),
+            'Chip nhanh CHỈ gồm Bối cảnh · Góc máy · Ống kính — các nhóm mô tả sản phẩm bị loại vì sản phẩm phải giữ nguyên.');
+        $this->assertSame(
+            array_values(array_filter(array_column($this->baseline(), 'id'), fn ($id) => $id !== 'p9')),
+            array_column(array_merge(...array_column($groups, 'items')), 'id'),
+        );
     }
 
     public function test_chip_groups_skip_incomplete_rows(): void
     {
         $groups = $this->studio->chipGroups([
-            ['id' => 'a', 'category' => 'fabric', 'ui_label' => '', 'prompt_injection' => 'x'],
-            ['id' => 'b', 'category' => 'fabric', 'ui_label' => 'Có nhãn', 'prompt_injection' => ''],
-            ['id' => 'c', 'category' => 'fabric', 'ui_label' => 'Hợp lệ', 'prompt_injection' => 'ok'],
+            ['id' => 'a', 'category' => 'background', 'ui_label' => '', 'prompt_injection' => 'x'],
+            ['id' => 'b', 'category' => 'background', 'ui_label' => 'Có nhãn', 'prompt_injection' => ''],
+            ['id' => 'c', 'category' => 'background', 'ui_label' => 'Hợp lệ', 'prompt_injection' => 'ok'],
         ]);
 
         $this->assertSame(1, count($groups));
@@ -68,12 +84,13 @@ class PhotoStudioServiceTest extends TestCase
     public function test_chip_index_prefers_the_users_own_catalog(): void
     {
         $index = $this->studio->chipIndex($this->baseline(), [
-            'edits' => ['p2' => ['prompt_injection' => 'my studio wording']],
-            'hidden' => ['p1'],
+            'edits' => ['p1' => ['prompt_injection' => 'my own backdrop wording']],
+            'hidden' => ['p2'],
         ]);
 
-        $this->assertArrayNotHasKey('p1', $index, 'Mục bị ẩn không được xuất hiện trong chip của Studio.');
-        $this->assertSame('my studio wording', $index['p2']['injection']);
+        $this->assertArrayNotHasKey('p2', $index, 'Mục bị ẩn không được xuất hiện trong chip của Studio.');
+        $this->assertArrayNotHasKey('p9', $index, 'Mục ngoài 3 nhóm của Studio bị loại khỏi chỉ mục chip.');
+        $this->assertSame('my own backdrop wording', $index['p1']['injection']);
     }
 
     public function test_scene_maps_the_three_images_and_keeps_the_garment(): void
@@ -103,10 +120,10 @@ class PhotoStudioServiceTest extends TestCase
             'chips' => ['p1', 'p2', 'khong-ton-tai'],
         ], $index, 2);
 
-        $this->assertStringContainsString('DETAILS: soft silk fabric · seamless white studio backdrop.', $scene['prompt']);
+        $this->assertStringContainsString('DETAILS: seamless white studio backdrop · eye-level camera angle.', $scene['prompt']);
         $this->assertCount(2, $scene['used_chips']);
-        $this->assertSame('fabric', $scene['used_chips'][0]['category']);
-        $this->assertSame('Chất liệu', $scene['used_chips'][0]['category_label'], 'Giao diện cần NHÃN nhóm, không phải mã nhóm.');
+        $this->assertSame('background', $scene['used_chips'][0]['category']);
+        $this->assertSame('Bối cảnh', $scene['used_chips'][0]['category_label'], 'Giao diện cần NHÃN nhóm, không phải mã nhóm.');
         $this->assertNotEmpty(array_filter($scene['warnings'], fn ($w) => str_contains($w['message'], 'không còn tồn tại')));
     }
 
@@ -138,7 +155,7 @@ class PhotoStudioServiceTest extends TestCase
     {
         $items = [];
         for ($i = 0; $i < 20; $i++) {
-            $items[] = ['id' => 'c'.$i, 'category' => 'style', 'ui_label' => 'Chip '.$i, 'prompt_injection' => 'injection '.$i];
+            $items[] = ['id' => 'c'.$i, 'category' => 'camera', 'ui_label' => 'Chip '.$i, 'prompt_injection' => 'injection '.$i];
         }
         $index = $this->studio->chipIndex($items);
         $scene = $this->studio->scene([

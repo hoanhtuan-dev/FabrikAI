@@ -42,6 +42,10 @@ class PhotoStudioTest extends TestCase
             ->assertOk();
 
         $this->assertNotEmpty($response->json('groups'), 'Phải có chip lấy từ PRESET trong Cài đặt của tôi.');
+        // CHIP NHANH CHỈ 3 NHÓM: Bối cảnh · Góc máy · Ống kính (các nhóm mô tả sản phẩm không dùng ở đây).
+        foreach ($response->json('groups') as $group) {
+            $this->assertContains($group['id'], ['background', 'camera', 'lens'], 'Nhóm chip lạ trong Studio: '.$group['id']);
+        }
         $this->assertSame(3, count($response->json('slots')), 'Ba ô ảnh: người mẫu · bối cảnh · tham chiếu thêm.');
         $this->assertSame('Người mẫu mặc trang phục', $response->json('slots.0.name'));
         $this->assertTrue($response->json('slots.0.required'));
@@ -62,8 +66,9 @@ class PhotoStudioTest extends TestCase
     public function test_catalog_respects_the_users_own_hidden_edits_and_custom_items(): void
     {
         $user = $this->customer();
-        $preset = Preset::orderBy('sort_order')->firstOrFail();
-        $other = Preset::orderBy('sort_order')->skip(1)->firstOrFail();
+        // Chỉ chọn preset thuộc 3 nhóm của Studio (nhóm khác bị lọc khỏi chip nhanh).
+        $preset = Preset::where('category', 'background')->orderBy('sort_order')->firstOrFail();
+        $other = Preset::where('category', 'camera')->orderBy('sort_order')->firstOrFail();
 
         UserCatalog::create([
             'user_id' => $user->id,
@@ -90,7 +95,7 @@ class PhotoStudioTest extends TestCase
     public function test_plan_endpoint_builds_the_prompt_without_calling_any_model(): void
     {
         $user = $this->customer();
-        $preset = Preset::orderBy('sort_order')->firstOrFail();
+        $preset = Preset::where('category', 'lens')->orderBy('sort_order')->firstOrFail();
 
         $response = $this->actingAs($user)
             ->postJson('/api/studio/shoot/plan', [

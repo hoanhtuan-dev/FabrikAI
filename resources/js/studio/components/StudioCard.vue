@@ -1,18 +1,18 @@
 <script setup>
 /**
- * STUDIO — dựng khung hình từ ẢNH NGƯỜI MẪU + BỐI CẢNH + PROMPT + CHIP NHANH.
+ * STUDIO — luồng 4 bước, thiết kế cho NGƯỜI MỚI.
  *
- * LUỒNG (chốt 2026-09-22):
- *   ảnh 1 = người mẫu mặc trang phục (kết quả từ bước trước — GIỮ NGUYÊN, đây là sản phẩm)
- *   ảnh 2 = bối cảnh (tùy chọn)  ·  ảnh 3 = tham chiếu thêm (tùy chọn)
- *   + ô nhập prompt  +  CHIP NHANH đọc từ PRESET trong "Cài đặt của tôi".
+ *  ① Ảnh người mẫu (bắt buộc — GIỮ NGUYÊN, đây là sản phẩm)
+ *  ② Bối cảnh & khung hình (tùy chọn: ảnh bối cảnh + ảnh tham chiếu thêm)
+ *  ③ Chọn nhanh (3 nhóm chip: Bối cảnh · Góc máy · Ống kính — lấy từ PRESET trong «Cài đặt của tôi»)
+ *  ④ Mô tả thêm (tùy chọn)
  *
- * Vì sao bỏ bối cảnh/ánh sáng/ống kính/dáng dựng sẵn: người dùng đã có nguồn chân lý riêng là PRESET
- * trong Cài đặt của tôi (nhãn + đoạn chèn vào prompt, chia theo nhóm). Chip ở đây đọc ĐÚNG dữ liệu đó
- * (kể cả phần tự thêm/sửa/ẩn) nên không còn hai nơi định nghĩa trùng nhau.
+ * Nguyên tắc trình bày: mỗi bước có SỐ THỨ TỰ + một câu giải thích ngắn, việc bắt buộc nằm riêng và
+ * to nhất, việc nâng cao (biến thể · tỉ lệ · prompt gửi AI) thu vào một khối — để người mới chỉ cần
+ * làm đúng 2 việc: chọn ảnh người mẫu, bấm Tạo ảnh.
  *
- * Prompt do backend dựng TẤT ĐỊNH (/api/studio/shoot/plan) nên xem/sửa được trước khi tốn credit;
- * chạy ảnh dùng lại đúng pipeline /api/compose sẵn có (base = ảnh 1, refs = ảnh 2/3).
+ * Vì sao chip chỉ 3 nhóm: các nhóm preset khác (chất liệu · phom dáng · màu sắc…) mô tả CHÍNH SẢN PHẨM,
+ * mà sản phẩm ở đây phải GIỮ NGUYÊN — đưa vào dễ khiến người mới tưởng đang thiết kế lại trang phục.
  */
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { useStudioStore } from '../store.js';
@@ -24,17 +24,22 @@ import LoadingSpinner from './LoadingSpinner.vue';
 const store = useStudioStore();
 
 const FALLBACK_SLOTS = [
-  { id: 1, name: 'Người mẫu mặc trang phục', hint: 'BẮT BUỘC — ảnh này được giữ nguyên', required: true },
-  { id: 2, name: 'Bối cảnh', hint: 'Tùy chọn — AI đưa người mẫu vào đúng bối cảnh này', required: false },
-  { id: 3, name: 'Tham chiếu thêm', hint: 'Tùy chọn — chi tiết, phụ kiện hoặc màu cần bám', required: false },
+  { id: 1, name: 'Người mẫu mặc trang phục', hint: 'Ảnh này được giữ nguyên', required: true },
+  { id: 2, name: 'Bối cảnh', hint: 'Nơi bạn muốn đặt người mẫu vào', required: false },
+  { id: 3, name: 'Tham chiếu thêm', hint: 'Chi tiết, phụ kiện hoặc màu cần bám', required: false },
 ];
+
+/** Số chip hiện trước khi phải bấm "xem thêm" — giữ khối chọn nhanh gọn mắt. */
+const CHIPS_VISIBLE = 6;
 
 const open = ref(false);
 const targetSlot = ref(0);
 const selected = ref([null, null, null]);
 const slotImgError = ref([false, false, false]);
 const busy = ref(false);
+const advancedOpen = ref(false);
 const promptOpen = ref(false);
+const expanded = ref({});          // nhóm chip đang mở rộng
 const baseUrl = ref('');
 const lastIds = ref([]);
 const compareOpen = ref(false);
@@ -47,22 +52,31 @@ const ratios = computed(() => (catalog.value && catalog.value.ratios) || []);
 const setup = computed(() => store.sceneSetup);
 const plan = computed(() => store.scenePlan);
 const warnings = computed(() => (plan.value && plan.value.warnings) || []);
+const visibleWarnings = computed(() => warnings.value.filter(w => w.level === 'error' || w.level === 'warning'));
 const selectedChips = computed(() => (setup.value.chips || []).map(String));
 const usedChips = computed(() => (plan.value && plan.value.used_chips) || []);
 const selectedCount = computed(() => selected.value.filter(Boolean).length);
 const images = computed(() => selected.value.filter(Boolean).map(g => g.url).filter(Boolean));
 const estimatedCredits = computed(() => (plan.value && plan.value.total_credits) || 0);
-const blocked = computed(() => warnings.value.some(w => w.level === 'error'));
-const canRun = computed(() => selectedCount.value >= 1 && !blocked.value && !busy.value && !!store.scenePrompt());
 const settingsUrl = computed(() => (catalog.value && catalog.value.settings_url) || '/cai-dat/presets');
 const maxChips = computed(() => (catalog.value && catalog.value.max_chips) || 12);
-const chipLabel = (id) => {
-  for (const group of groups.value) {
-    const hit = (group.items || []).find(i => String(i.id) === String(id));
-    if (hit) return hit.label;
-  }
-  return String(id);
-};
+const variants = computed(() => Number(setup.value.variants) || 1);
+
+/** Vì sao nút Tạo ảnh đang khoá — nói thẳng thay vì để người mới đoán. */
+const blockReason = computed(() => {
+  if (selectedCount.value < 1) return 'Chưa chọn ảnh ① người mẫu mặc trang phục.';
+  const blocking = warnings.value.find(w => w.level === 'error');
+  if (blocking) return blocking.message;
+  if (!store.scenePrompt()) return 'Chưa có nội dung để làm — chọn chip ở ③ hoặc viết mô tả ở ④.';
+  return '';
+});
+const canRun = computed(() => !blockReason.value && !busy.value);
+
+function groupItems(group) {
+  const items = (group.items || []);
+  return expanded.value[group.id] ? items : items.slice(0, CHIPS_VISIBLE);
+}
+function hiddenCount(group) { return Math.max(0, (group.items || []).length - CHIPS_VISIBLE); }
 
 // Tiến trình dùng CHUNG state với pipeline compose (chỉ một card mở tại một thời điểm).
 const now = ref(Date.now());
@@ -95,7 +109,7 @@ function openSlot(i) { targetSlot.value = i; open.value = true; }
 function onPick(img) { selected.value[targetSlot.value] = img; slotImgError.value[targetSlot.value] = false; open.value = false; }
 function removeSlot(i) { selected.value[i] = null; slotImgError.value[i] = false; }
 function onSlotImgError(i) { slotImgError.value[i] = true; }
-function roleLabel(i) { return '@image' + (i + 1); }
+function slotTitle(i) { return slots.value[i] ? slots.value[i].name : 'Ảnh'; }
 function toggleChip(id) {
   if (!selectedChips.value.includes(String(id)) && selectedChips.value.length >= maxChips.value) {
     store.toast('Tối đa ' + maxChips.value + ' chip một lần — bỏ bớt chip đã chọn.', 'error');
@@ -104,10 +118,16 @@ function toggleChip(id) {
   store.toggleSceneChip(id);
 }
 function chipActive(id) { return selectedChips.value.includes(String(id)); }
+function chipLabelOf(id) {
+  for (const group of groups.value) {
+    const hit = (group.items || []).find(i => String(i.id) === String(id));
+    if (hit) return hit.label;
+  }
+  return String(id);
+}
 
 async function run() {
-  if (selectedCount.value < 1) { store.toast('Chọn ảnh 1: ảnh người mẫu mặc trang phục.', 'error'); return; }
-  if (blocked.value) { store.toast('Còn lỗi cần sửa trước khi chạy.', 'error'); return; }
+  if (!canRun.value) { if (blockReason.value) store.toast(blockReason.value, 'error'); return; }
   busy.value = true;
   baseUrl.value = images.value[0] || '';
   const ids = await store.runScene(images.value);
@@ -119,134 +139,174 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
 
 <template>
   <div class="card p-4" style="background: linear-gradient(160deg, rgba(255,170,120,.13), rgba(74,122,144,.06));">
+    <!-- Đầu card: Studio làm gì, nói một câu cho người mới -->
     <div class="flex items-start justify-between gap-2">
       <div class="min-w-0">
         <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="camera" /> Studio</h2>
-        <p class="mt-0.5 text-[10px] leading-4 text-cream-300/55">Đưa người mẫu vào bối cảnh · giữ nguyên trang phục</p>
+        <p class="mt-0.5 text-[10px] leading-4 text-cream-300/60">Đặt người mẫu vào bối cảnh mới — <span class="text-cream-200">trang phục luôn được giữ nguyên</span>.</p>
       </div>
-      <a :href="settingsUrl" target="_blank" rel="noopener"
-         class="motion-ui shrink-0 rounded-full border border-ink-600 px-2 py-0.5 text-[9px] font-semibold text-cream-300/70 transition hover:border-brand-400 hover:text-brand-200"
-         title="Chip nhanh lấy từ PRESET trong Cài đặt của tôi — mở để thêm/sửa/ẩn">Sửa chip</a>
     </div>
 
     <p v-if="plan && plan.image_ready === false" role="status"
-       class="mt-2 flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[10px] leading-4 text-amber-100">
-      <StudioIcon name="alertTriangle" size="h-3.5 w-3.5" class="shrink-0" />
-      <span>Chưa cấu hình model tạo/sửa ảnh (nhóm “edit”) — kết quả sẽ là ẢNH MẪU (chế độ demo), không phải ảnh do AI tạo.</span>
+       class="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[10px] leading-4 text-amber-100">
+      Chưa cấu hình model tạo/sửa ảnh (nhóm “edit”) — kết quả sẽ là ẢNH MẪU (chế độ demo), không phải ảnh do AI tạo.
     </p>
 
-    <!-- 1. BA Ô ẢNH -->
-    <div class="mt-3 grid grid-cols-3 gap-2">
-      <button v-for="slot in slots" :key="slot.id" @click="openSlot(slot.id - 1)" :title="slot.hint"
-              class="relative flex h-24 flex-col items-center justify-center overflow-hidden rounded-md border transition"
-              :class="selected[slot.id-1] ? 'border-brand-500 bg-ink-900' : 'border-dashed border-ink-700 hover:border-brand-400 bg-ink-900/40'">
-        <template v-if="selected[slot.id-1]">
-          <img :src="selected[slot.id-1].url" class="h-full w-full object-cover" @error="onSlotImgError(slot.id-1)">
-          <span v-if="slotImgError[slot.id-1]" class="absolute inset-0 grid place-items-center bg-ink-900 text-2xl" title="Ảnh không tải được — bấm × để bỏ">🖼️</span>
-          <span class="absolute left-1 top-1 rounded-full bg-brand-500 px-1.5 text-[9px] font-bold text-white">{{ slot.id }}</span>
-          <span class="absolute inset-x-0 bottom-0 bg-black/65 px-1 py-0.5 text-center text-[9px] font-semibold text-cream-100">{{ slot.name }}</span>
-          <span @click.stop="removeSlot(slot.id-1)" title="Bỏ ảnh khỏi ô" class="motion-ui absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-red-600/90 text-[11px] text-white hover:bg-red-500"><StudioIcon name="x" size="h-3.5 w-3.5" /></span>
+    <!-- ① ẢNH NGƯỜI MẪU (bắt buộc) -->
+    <div class="mt-3">
+      <p class="flex items-center gap-1.5 text-[11px] font-semibold text-cream-100">
+        <span class="grid h-4 w-4 place-items-center rounded-full bg-brand-600 text-[9px] font-bold text-white">1</span>
+        Ảnh người mẫu <span class="rounded bg-ink-800 px-1.5 py-0.5 text-[9px] font-medium text-brand-200">bắt buộc</span>
+      </p>
+      <button type="button" @click="openSlot(0)" title="Chọn ảnh người mẫu đã tạo ở bước trước"
+              class="relative mt-1.5 flex h-32 w-full items-center justify-center overflow-hidden rounded-lg border transition"
+              :class="selected[0] ? 'border-brand-500 bg-ink-900' : 'border-dashed border-ink-600 hover:border-brand-400 bg-ink-900/50'">
+        <template v-if="selected[0]">
+          <img :src="selected[0].url" class="h-full w-full object-cover" @error="onSlotImgError(0)">
+          <span v-if="slotImgError[0]" class="absolute inset-0 grid place-items-center bg-ink-900 text-3xl">🖼️</span>
+          <span class="absolute inset-x-0 bottom-0 bg-black/70 px-2 py-1 text-[10px] font-semibold text-cream-100">Giữ nguyên ảnh này · bấm để đổi</span>
+          <span @click.stop="removeSlot(0)" title="Bỏ ảnh" class="motion-ui absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-red-600/90 text-white hover:bg-red-500"><StudioIcon name="x" size="h-3.5 w-3.5" /></span>
         </template>
-        <template v-else>
-          <span class="grid h-6 w-6 place-items-center text-ink-600"><StudioIcon :name="slot.id === 1 ? 'shirt' : (slot.id === 2 ? 'image' : 'imagePlus')" size="h-5 w-5" /></span>
-          <span class="px-1 text-center text-[9px] font-medium text-cream-300/60">{{ slot.name }}</span>
-          <span class="px-1 text-center text-[9px]" :class="slot.required ? 'text-brand-300' : 'text-cream-300/40'">{{ slot.required ? 'bắt buộc' : 'tùy chọn' }}</span>
-        </template>
+        <span v-else class="flex flex-col items-center gap-1 text-cream-300/70">
+          <StudioIcon name="shirt" size="h-6 w-6" />
+          <span class="text-[11px] font-semibold">Bấm để chọn ảnh người mẫu</span>
+          <span class="text-[10px] text-cream-300/45">Lấy từ Thư viện ảnh — kết quả ở bước 「Tạo ảnh」</span>
+        </span>
       </button>
     </div>
 
-    <!-- 2. Ô NHẬP PROMPT -->
-    <label class="label mt-4">Mô tả / chỉ dẫn</label>
-    <textarea :value="setup.prompt" rows="3" maxlength="2000" class="input w-full resize-none !text-xs"
-              placeholder="VD: đặt cô ấy vào quán cà phê với ánh sáng cửa sổ, giữ nguyên trang phục và tư thế…"
-              @input="store.setSceneSetup({ prompt: $event.target.value })"></textarea>
-    <div class="mt-1 flex items-center justify-between text-[10px] text-cream-300/45">
-      <span>Chip nhanh nối vào prompt khi gửi AI — bạn không cần gõ lại.</span>
-      <span class="tabular-nums">{{ (setup.prompt || '').length }}/2000</span>
+    <!-- ② BỐI CẢNH & KHUNG HÌNH (tùy chọn) -->
+    <div class="mt-4">
+      <p class="flex items-center gap-1.5 text-[11px] font-semibold text-cream-100">
+        <span class="grid h-4 w-4 place-items-center rounded-full bg-ink-700 text-[9px] font-bold text-cream-100">2</span>
+        Bối cảnh &amp; khung hình <span class="rounded bg-ink-800 px-1.5 py-0.5 text-[9px] font-medium text-cream-300/60">tùy chọn</span>
+      </p>
+      <div class="mt-1.5 grid grid-cols-2 gap-2">
+        <button v-for="i in [1, 2]" :key="i" type="button" @click="openSlot(i)" :title="slotTitle(i)"
+                class="relative flex h-20 items-center justify-center overflow-hidden rounded-lg border transition"
+                :class="selected[i] ? 'border-brand-500 bg-ink-900' : 'border-dashed border-ink-600 hover:border-brand-400 bg-ink-900/50'">
+          <template v-if="selected[i]">
+            <img :src="selected[i].url" class="h-full w-full object-cover" @error="onSlotImgError(i)">
+            <span v-if="slotImgError[i]" class="absolute inset-0 grid place-items-center bg-ink-900 text-2xl">🖼️</span>
+            <span class="absolute inset-x-0 bottom-0 bg-black/70 px-1 py-0.5 text-center text-[9px] font-semibold text-cream-100">{{ slotTitle(i) }}</span>
+            <span @click.stop="removeSlot(i)" title="Bỏ ảnh" class="motion-ui absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[10px] text-white hover:bg-red-500"><StudioIcon name="x" size="h-3 w-3" /></span>
+          </template>
+          <span v-else class="flex flex-col items-center gap-0.5 px-1 text-center">
+            <StudioIcon :name="i === 1 ? 'image' : 'imagePlus'" size="h-4 w-4" class="text-cream-300/60" />
+            <span class="text-[10px] font-medium text-cream-200">{{ slotTitle(i) }}</span>
+            <span class="text-[9px] leading-3 text-cream-300/45">{{ i === 1 ? 'nơi đặt người mẫu vào' : 'chi tiết cần bám' }}</span>
+          </span>
+        </button>
+      </div>
     </div>
 
-    <!-- 3. CHIP NHANH (từ Cài đặt của tôi) -->
-    <div class="mt-3">
+    <!-- ③ CHỌN NHANH: Bối cảnh · Góc máy · Ống kính -->
+    <div class="mt-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <span class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/60">
-          Chip nhanh <span class="font-normal normal-case text-cream-300/40">· {{ selectedChips.length }}/{{ maxChips }}</span>
-        </span>
-        <button v-if="selectedChips.length" type="button" class="tool-btn !px-2 !py-1 text-[10px]" @click="store.clearSceneChips()">Bỏ chọn tất cả</button>
-      </div>
-
-      <p v-if="!groups.length" class="mt-1.5 rounded-md border border-ink-700 bg-ink-900/60 p-2.5 text-[10px] leading-4 text-cream-300/60">
-        Chưa có preset nào trong «Cài đặt của tôi» → <a :href="settingsUrl" target="_blank" rel="noopener" class="text-brand-300 underline">thêm chip ở đây</a>.
-      </p>
-
-      <div v-for="group in groups" :key="group.id" class="mt-2">
-        <p class="text-[9px] font-semibold uppercase tracking-wide text-cream-300/40">{{ group.label }}</p>
-        <div class="mt-1 flex flex-wrap gap-1.5">
-          <button v-for="item in group.items" :key="item.id" type="button" :title="item.note || item.injection"
-                  class="motion-ui rounded-full border px-2 py-0.5 text-[10px] font-medium transition"
-                  :class="chipActive(item.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"
-                  @click="toggleChip(item.id)">{{ item.label }}</button>
+        <p class="flex items-center gap-1.5 text-[11px] font-semibold text-cream-100">
+          <span class="grid h-4 w-4 place-items-center rounded-full bg-ink-700 text-[9px] font-bold text-cream-100">3</span>
+          Chọn nhanh
+          <span v-if="selectedChips.length" class="rounded bg-brand-600 px-1.5 py-0.5 text-[9px] font-bold text-white">{{ selectedChips.length }}</span>
+        </p>
+        <div class="flex items-center gap-1.5">
+          <a :href="settingsUrl" target="_blank" rel="noopener"
+             class="motion-ui rounded-full border border-ink-600 px-2 py-0.5 text-[9px] font-semibold text-cream-300/70 transition hover:border-brand-400 hover:text-brand-200"
+             title="Chip lấy từ PRESET trong «Cài đặt của tôi» — mở để thêm/sửa">Sửa chip</a>
+          <button v-if="selectedChips.length" type="button" class="tool-btn !px-2 !py-0.5 text-[9px]" @click="store.clearSceneChips()">Bỏ chọn</button>
         </div>
       </div>
 
-      <div v-if="usedChips.length" class="mt-2 flex flex-wrap items-center gap-1.5">
-        <span class="text-[9px] uppercase tracking-wide text-cream-300/40">Đang dùng:</span>
-        <span v-for="chip in usedChips" :key="chip.id" class="rounded-full bg-ink-800 px-2 py-0.5 text-[9px] text-cream-200" :title="chip.injection">
-          {{ chip.category_label }} · {{ chip.label }}
-        </span>
-      </div>
-    </div>
-
-    <!-- 4. BIẾN THỂ + TỈ LỆ -->
-    <div class="mt-3 flex flex-wrap items-center gap-3">
-      <label class="flex items-center gap-2 text-[11px] text-cream-200">
-        <span>Số biến thể</span>
-        <select :value="setup.variants" class="input !w-auto !py-1 !text-[11px]" @change="store.setSceneSetup({ variants: Number($event.target.value) })">
-          <option v-for="n in [1, 2, 3, 4]" :key="n" :value="n">{{ n }}</option>
-        </select>
-      </label>
-      <label class="flex items-center gap-2 text-[11px] text-cream-200">
-        <span>Tỉ lệ</span>
-        <select :value="setup.ratio" class="input !w-auto !py-1 !text-[11px]" @change="store.setSceneSetup({ ratio: $event.target.value })">
-          <option value="">Mặc định</option>
-          <option v-for="r in ratios" :key="r.id" :value="r.id">{{ r.name }}</option>
-        </select>
-      </label>
-      <button type="button" class="tool-btn !px-2 !py-1 text-[10px]" @click="promptOpen = !promptOpen">
-        {{ promptOpen ? 'Ẩn prompt gửi AI' : 'Xem/sửa prompt gửi AI' }}
-      </button>
-    </div>
-
-    <div v-if="promptOpen" class="mt-2 rounded-lg border border-brand-500/30 bg-brand-900/20 p-3">
-      <div class="mb-1.5 flex items-center justify-between gap-2">
-        <span class="text-[11px] font-semibold text-brand-200">Prompt sẽ gửi cho AI</span>
-        <button type="button" class="btn-ghost btn-sm shrink-0" :disabled="store.sceneLoading" @click="store.planScene(selectedCount)">Làm mới</button>
-      </div>
-      <textarea :value="store.sceneEditedPrompt || (plan && plan.prompt) || ''" rows="7"
-                class="input w-full !text-[11px] leading-relaxed"
-                @input="store.sceneEditedPrompt = $event.target.value"></textarea>
-      <p class="mt-1 text-[10px] leading-4" :class="store.sceneEditedPrompt ? 'text-amber-300' : 'text-cream-300/50'">
-        <span v-if="store.sceneEditedPrompt">✓ Sẽ gửi bản bạn đã sửa.</span>
-        <span v-else>Tự dựng từ 3 ô ảnh + prompt + chip. Sửa tay ở đây thì bản sửa được ưu tiên.</span>
+      <p v-if="!groups.length" class="mt-1.5 rounded-md border border-ink-700 bg-ink-900/60 p-2.5 text-[10px] leading-4 text-cream-300/60">
+        Chưa có preset cho Bối cảnh / Góc máy / Ống kính → <a :href="settingsUrl" target="_blank" rel="noopener" class="text-brand-300 underline">thêm ở «Cài đặt của tôi」</a>.
       </p>
+
+      <div v-for="group in groups" :key="group.id" class="mt-2.5">
+        <p class="text-[9px] font-semibold uppercase tracking-wide text-cream-300/45">{{ group.label }}</p>
+        <div class="mt-1 flex flex-wrap gap-1.5">
+          <button v-for="item in groupItems(group)" :key="item.id" type="button" :title="item.note || item.injection"
+                  class="motion-ui rounded-full border px-2 py-1 text-[10px] font-medium transition"
+                  :class="chipActive(item.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"
+                  @click="toggleChip(item.id)">{{ item.label }}</button>
+          <button v-if="hiddenCount(group) && !expanded[group.id]" type="button"
+                  class="motion-ui rounded-full border border-ink-700 px-2 py-1 text-[10px] text-cream-300/60 transition hover:border-brand-400 hover:text-cream-100"
+                  @click="expanded = { ...expanded, [group.id]: true }">+{{ hiddenCount(group) }} nữa</button>
+        </div>
+      </div>
+
+      <div v-if="selectedChips.length" class="mt-2 flex flex-wrap gap-1.5">
+        <button v-for="id in selectedChips" :key="id" type="button"
+                class="motion-ui inline-flex items-center gap-1 rounded-full bg-ink-800 px-2 py-0.5 text-[9px] text-cream-200 transition hover:bg-red-600/25"
+                :title="'Bỏ chip: ' + chipLabelOf(id)" @click="toggleChip(id)">
+          {{ chipLabelOf(id) }} <span class="text-cream-300/60">×</span>
+        </button>
+      </div>
     </div>
 
-    <!-- 5. CẢNH BÁO -->
-    <ul v-if="warnings.length" class="mt-2 space-y-1">
-      <li v-for="(w, i) in warnings" :key="i" class="text-[10px] leading-4"
-          :class="w.level === 'error' ? 'text-red-300' : (w.level === 'warning' ? 'text-amber-200' : 'text-cream-300/60')">
-        • {{ w.message }}
-      </li>
+    <!-- ④ MÔ TẢ THÊM (tùy chọn) -->
+    <div class="mt-4">
+      <p class="flex items-center gap-1.5 text-[11px] font-semibold text-cream-100">
+        <span class="grid h-4 w-4 place-items-center rounded-full bg-ink-700 text-[9px] font-bold text-cream-100">4</span>
+        Mô tả thêm <span class="rounded bg-ink-800 px-1.5 py-0.5 text-[9px] font-medium text-cream-300/60">tùy chọn</span>
+      </p>
+      <textarea :value="setup.prompt" rows="3" maxlength="2000" class="input mt-1.5 w-full resize-none !text-xs"
+                placeholder="VD: đặt cô ấy vào quán cà phê, ánh sáng cửa sổ, giữ nguyên tư thế…"
+                @input="store.setSceneSetup({ prompt: $event.target.value })"></textarea>
+      <p class="mt-1 text-[9px] leading-4 text-cream-300/45">Chip ở bước ③ được nối tự động vào prompt — không cần gõ lại.</p>
+    </div>
+
+    <!-- NÂNG CAO -->
+    <details class="mt-3 rounded-lg border border-ink-700 bg-ink-900/50 p-2.5" @toggle="advancedOpen = $event.target.open">
+      <summary class="cursor-pointer text-[10px] font-semibold text-cream-300/70">Nâng cao: biến thể · tỉ lệ · prompt gửi AI</summary>
+      <div class="mt-2.5 flex flex-wrap items-center gap-3">
+        <label class="flex items-center gap-2 text-[11px] text-cream-200">
+          <span>Số biến thể</span>
+          <select :value="variants" class="input !w-auto !py-1 !text-[11px]" @change="store.setSceneSetup({ variants: Number($event.target.value) })">
+            <option v-for="n in [1, 2, 3, 4]" :key="n" :value="n">{{ n }}</option>
+          </select>
+        </label>
+        <label class="flex items-center gap-2 text-[11px] text-cream-200">
+          <span>Tỉ lệ</span>
+          <select :value="setup.ratio" class="input !w-auto !py-1 !text-[11px]" @change="store.setSceneSetup({ ratio: $event.target.value })">
+            <option value="">Mặc định</option>
+            <option v-for="r in ratios" :key="r.id" :value="r.id">{{ r.name }}</option>
+          </select>
+        </label>
+        <button type="button" class="tool-btn !px-2 !py-1 text-[10px]" @click="promptOpen = !promptOpen">
+          {{ promptOpen ? 'Ẩn prompt gửi AI' : 'Xem/sửa prompt gửi AI' }}
+        </button>
+      </div>
+
+      <div v-if="promptOpen" class="mt-2">
+        <textarea :value="store.sceneEditedPrompt || (plan && plan.prompt) || ''" rows="7"
+                  class="input w-full !text-[11px] leading-relaxed"
+                  @input="store.sceneEditedPrompt = $event.target.value"></textarea>
+        <p class="mt-1 text-[10px] leading-4" :class="store.sceneEditedPrompt ? 'text-amber-300' : 'text-cream-300/45'">
+          <span v-if="store.sceneEditedPrompt">✓ Sẽ gửi bản bạn đã sửa.</span>
+          <span v-else>Hệ thống tự dựng từ ảnh + chip + mô tả. Sửa tay ở đây thì bản sửa được ưu tiên.</span>
+        </p>
+      </div>
+
+      <ul v-if="plan && plan.notes && plan.notes.length" class="mt-2 space-y-0.5">
+        <li v-for="(n, i) in plan.notes" :key="i" class="text-[9px] leading-4 text-cream-300/45">• {{ n }}</li>
+      </ul>
+    </details>
+
+    <!-- CẢNH BÁO chặn/đáng chú ý -->
+    <ul v-if="visibleWarnings.length" class="mt-2.5 space-y-1">
+      <li v-for="(w, i) in visibleWarnings" :key="i" class="text-[10px] leading-4"
+          :class="w.level === 'error' ? 'text-red-300' : 'text-amber-200'">• {{ w.message }}</li>
     </ul>
-    <div v-if="store.sceneError" role="alert" class="mt-2 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2.5 text-[11px] text-red-200">
-      <StudioIcon name="alertTriangle" size="h-3.5 w-3.5" class="shrink-0" /><span>{{ store.sceneError }}</span>
+    <div v-if="store.sceneError" role="alert" class="mt-2.5 rounded-lg border border-red-500/40 bg-red-500/10 p-2.5 text-[11px] text-red-200">
+      {{ store.sceneError }}
     </div>
 
-    <!-- 6. CHẠY -->
+    <!-- NÚT CHẠY -->
     <button @click="run" :disabled="!canRun" class="btn-brand mt-3 w-full whitespace-nowrap">
-      {{ busy ? 'Đang dựng ảnh…' : ((plan && plan.variants > 1) ? 'Tạo ' + plan.variants + ' biến thể' : 'Tạo ảnh') }}
-      <span v-if="!busy" class="opacity-70">· ~{{ estimatedCredits }} credit</span>
+      <StudioIcon name="camera" size="h-3.5 w-3.5" />
+      {{ busy ? 'Đang tạo ảnh…' : (variants > 1 ? 'Tạo ' + variants + ' biến thể' : 'Tạo ảnh') }}
+      <span v-if="!busy && estimatedCredits" class="opacity-70">· ~{{ estimatedCredits }} credit</span>
     </button>
-    <p v-if="selectedCount < 1" class="mt-1 text-[10px] leading-4 text-amber-200/80">Cần ảnh 1: ảnh người mẫu mặc trang phục (kết quả từ bước trước).</p>
+    <p v-if="blockReason" class="mt-1.5 text-[10px] leading-4 text-amber-200/85">↳ {{ blockReason }}</p>
 
     <!-- Tiến độ -->
     <div v-if="running" class="mt-3 rounded-lg border border-brand-500/30 bg-brand-900/30 p-3">
@@ -259,30 +319,30 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
       </div>
     </div>
 
-    <div v-if="store.composeStage === 'done'" class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
-      Đã xong — ảnh đã được chọn trong Outputs và xếp vào bảng Lớp.
-      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
+    <div v-if="store.composeStage === 'done'" class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-[11px] leading-5 text-emerald-200">
+      Xong — ảnh đã vào <strong>Outputs</strong> (góc phải) và bảng Lớp.
+      <button @click="store.clearComposeStatus()" class="ml-1 rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
 
-    <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-lg border border-red-500/40 bg-red-900/25 p-3 text-xs text-red-200">
-      <p class="font-semibold">Studio thất bại</p>
-      <p class="mt-1 whitespace-pre-line leading-relaxed">{{ store.composeError }}</p>
+    <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-lg border border-red-500/40 bg-red-900/25 p-3 text-[11px] leading-5 text-red-200">
+      <p class="font-semibold">Studio không chạy được</p>
+      <p class="mt-1 whitespace-pre-line">{{ store.composeError }}</p>
       <div class="mt-2 flex gap-2">
         <button @click="retry" class="btn-brand btn-sm">Thử lại</button>
         <button @click="store.clearComposeStatus()" class="btn-ghost btn-sm">Đóng</button>
       </div>
     </div>
 
-    <div v-if="store.composeStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 p-3 text-xs text-cream-200">
-      Đã hủy yêu cầu.
+    <div v-if="store.composeStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 p-3 text-[11px] text-cream-200">
+      Đã hủy.
       <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
 
-    <button v-if="baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-1.5 w-full whitespace-nowrap">🔍 So sánh Trước/Sau</button>
+    <button v-if="baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-2 w-full whitespace-nowrap">🔍 So sánh Trước/Sau</button>
 
     <SourceLibraryPicker
       v-model="open"
-      :title="'Chọn ảnh cho ' + roleLabel(targetSlot) + ' · ' + (slots[targetSlot] ? slots[targetSlot].name : '')"
+      :title="'Chọn ảnh cho ô ' + (targetSlot + 1) + ' · ' + slotTitle(targetSlot)"
       mode="pick"
       @pick="onPick" />
 
