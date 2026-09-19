@@ -274,3 +274,47 @@ Log: không có lỗi mới (4 dòng gần nhất đều từ 18–19/09). `/` `
 - [ ] `faceDescription()` và `poseDescription()` (mô tả khuôn mặt/tư thế cho Thay khuôn mặt + Thử đồ) **vẫn chỉ dùng Qwen** qua `studio_suggest_qwen_models()` — với key qwen đang tắt thì hai đường này trả `null` (try-on chạy thiếu mô tả). Nên cho chúng dùng chung `registryVisionCandidates()`.
 - [ ] Cân nhắc hiện `suggest_provider` (auto/qwen/gemini/deepseek/custom) trong tab Cài đặt — hiện chỉ đổi được qua API `/api/settings/suggest`.
 
+---
+
+## Phiên 2026-09-20 (Agent Studio — TrendRadar + CollectionBot + Canvas command center)
+
+**Commit:** `997a81b` (push `b82ff50..997a81b`). **Đã deploy production** — không migration, có thay đổi frontend + build asset.
+
+### Phạm vi
+
+- Thêm `POST /api/design-agent/radar` và `POST /api/design-agent/collection` (module `trend_radar`, `collection_bot`; `stylist` phụ thuộc cả hai).
+- `DesignAgentService` + `DesignAgentController`: rule-based, `source_mode=demo`, nguồn ngoài `demo` / nội bộ `local`; brief có `canvas` (ratio, variants, negative prompt) + `input_signature`.
+- Agent Studio 3 bước (Tín hiệu → Định hướng → Thực thi) dùng `BaseModal full`, rail tiến trình, action bar.
+- Canvas trống thiết kế lại thành command center: composer + Agent Studio + đi nhanh; **xóa** khối mẫu việc và ảnh gần đây khỏi Canvas (mẫu việc vẫn còn trong tab Hàng loạt của Prompt Tạo Ảnh).
+
+### Deploy đã chạy
+
+```bash
+cd ~/domains/fabrikai.shop
+git pull --ff-only origin main                # b82ff50..997a81b
+composer dump-autoload -o --no-interaction    # exit=1 do proc_open; classmap đã ghi (grep DesignAgent = 2)
+php artisan package:discover
+php artisan migrate --force                   # Nothing to migrate
+php artisan config:cache && php artisan route:cache && php artisan view:cache
+php artisan queue:restart
+```
+
+### Verify trên production
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `997a81b` |
+| Route | `POST api/design-agent/radar` · `POST api/design-agent/collection` có trong `route:list` |
+| Classmap | 2 lớp `DesignAgentController` · `DesignAgentService` |
+| Trang | `/` `/dang-nhap` `/up` → **200** |
+| Asset | `manifest.json` → 200 · `main-CmvRKvs3.js` → 200, chứa **Agent Studio** + **Canvas trống** |
+| API khách | `POST /api/design-agent/radar` không đăng nhập → **419** (CSRF; route tồn tại và được bảo vệ) |
+| Log | Không phát sinh ERROR mới sau deploy (các ERROR cũ vẫn từ 17–19/09) |
+
+**Test trước deploy:** 52 test trọng tâm xanh (DesignAgent + Canvas command center + ModuleRegistry + GUI). Full suite vẫn 6 fail SẴN CÓ ở HEAD thuộc phiên Collections/Canvas cũ (không đổi).
+
+### Cần làm tiếp
+
+- [ ] Kiểm thử endpoint design-agent bằng tài khoản thật để xác nhận module gating theo gói trên production.
+- [ ] Phiên Collections/Canvas: sửa 6 test đỏ rồi rebuild asset (xem mục phiên trước).
+
