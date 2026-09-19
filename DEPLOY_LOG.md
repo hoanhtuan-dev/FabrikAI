@@ -986,3 +986,41 @@ feature cũng kiểm mọi nhóm trả về đều thuộc 3 nhóm đó). Full s
 - [ ] **Chưa có key model ảnh trên production** ⇒ Studio vẫn ở chế độ demo (đã cảnh báo trong giao diện).
 - [ ] Chưa ghi nhớ **chip đã chọn theo bộ sưu tập** (mở lại buổi chụp cũ phải chọn lại).
 - [ ] Nên thêm 1–2 chip mặc định cho người mới ngay cả khi Cài đặt của tôi trống (hiện chỉ hiện link thêm preset).
+
+---
+
+## Phiên 2026-09-22 (Đợt 13 — Studio: dòng vai trò @imageN + đánh dấu 3 danh mục chip tại «Cài đặt của tôi»)
+
+**Commit:** `cc4b74f`. **Đã deploy production**, rebuild `main-YP5vg-4V.js` + `my-settings-DIru5JkW.js`.
+
+### 1. Dòng vai trò ô ảnh — viết theo đúng cách của card «Ghép trang phục»
+
+Đầu card Studio nay có dòng giải thích ngay:
+
+```
+@image1 = người mẫu mặc trang phục (giữ nguyên) · @image2 = bối cảnh (tùy chọn) · @image3 = tham chiếu thêm (tùy chọn)
+```
+
+Cùng cách viết với card Ghép trang phục ⇒ người dùng đọc MỘT lần là hiểu ô nào làm gì, ở cả hai card.
+
+### 2. Bảo đảm chip đọc được từ `/cai-dat/presets`
+
+Vấn đề thật: form «Thêm preset» mặc định chọn danh mục **Chất liệu**, mà Studio chỉ lấy chip từ **Bối cảnh · Góc máy ·
+Ống kính** ⇒ người dùng thêm preset xong không thấy nó trong Studio và không có dấu hiệu nào giải thích. Đã sửa:
+
+- Trang Cài đặt gắn nhãn **`Studio`** cho đúng 3 danh mục đó — cả trên **chip lọc danh mục** lẫn trong **ô chọn danh mục**
+  khi thêm preset, kèm dòng gợi ý *«Preset này sẽ hiện thành chip nhanh trong card Studio»*.
+- Thêm **test đầu-cuối**: `PUT /api/user-catalogs/presets` (đúng đường trang Cài đặt dùng) → `POST /api/studio/shoot/catalog`
+  trả preset đó thành chip → chọn chip thì đoạn chèn đi thẳng vào prompt. Đây là bảo đảm bằng máy, không chỉ bằng mô tả.
+
+### Verify production
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `cc4b74f` |
+| Bundle Studio | có `@image1 = người mẫu mặc trang phục` · `@image3 = tham chiếu thêm` |
+| Bundle Cài đặt | có nhãn `chip Studio` + dòng `chip nhanh` |
+| Trang | `/` → **200** · `/cai-dat/presets` → **302** (yêu cầu đăng nhập, đúng như thiết kế) |
+
+**Test:** 17 test Studio (thêm `test_a_preset_added_in_my_settings_becomes_a_studio_chip`). Full suite **814 pass**;
+6 fail vẫn là lỗi SẴN CÓ ở HEAD.
