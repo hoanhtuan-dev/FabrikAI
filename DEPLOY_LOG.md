@@ -99,3 +99,75 @@ public_html/build/assets/collections-*.js   37.30 kB │ gzip: 11.26 kB
 - [ ] Kiểm tra `/bo-suu-tap` và card sidebar hoạt động
 - [ ] Kiểm tra F5 không flash (booting gate)
 - [ ] Kiểm tra panel/dock nhớ trạng thái sau F5
+
+---
+
+## Phiên 2026-09-22 (Provider: xoá/sửa custom provider · ưu tiên trong nhóm · template)
+
+**Commit:** `fb48d49` (trên `ac72756`). **Trạng thái: đã commit + push, CHƯA deploy production**
+(production vẫn ở `31c4667`).
+
+### Thay đổi chính
+
+| # | Thay đổi | File | Mô tả |
+|---|---|---|---|
+| 1 | Bind route theo slug | `app/Models/StudioProvider.php` | Thêm `getRouteKeyName() = 'slug'`. Model khai `routeKey()` trước đây là code CHẾT — Laravel chỉ đọc `getRouteKeyName()`, nên bind theo `id` trong khi payload không có `id` ⇒ PUT/DELETE luôn 404. |
+| 2 | `data()` trả `id` + `priority` | `StudioSettingsController` | Provider payload trước đây thiếu `id` (UI gọi `/providers/undefined`) và thiếu `priority`. |
+| 3 | Ưu tiên trong nội bộ nhóm | migration `2026_09_22_000001` + `helpers.php` | Cột `studio_providers.priority` (0–100, mặc định 5). Thứ tự xếp hạng mới: rank nhóm → **ưu tiên provider** → ưu tiên model. Trước đây mọi custom provider cùng rank 10 nên thứ tự rơi vào `id`. |
+| 4 | `studio_provider_priority()` + memo | `helpers.php` | Built-in lấy từ catalog (qwen 10 · qwen_edit 9 · dashscope 8 · wan 7 · gemini 10 · veo 9 · fal 10 · replicate 5 · deepseek 5); custom lấy từ cột DB. Memo `studio_custom_provider_map()` xoá được qua model event (an toàn cho worker queue). |
+| 5 | CKEY → template | `helpers.php` + `SettingsApp.vue` | `studio_provider_templates()`: 9 mẫu (OpenAI-compatible tổng quát, CKEY, OpenRouter, Together, Groq, SiliconFlow, DeepInfra, DashScope quốc tế, Gemini-compatible). Nút 'Preset CKEY' hardcode đã bị thay bằng ô chọn 'Mẫu khai báo' + nút 'Dùng mẫu'. |
+| 6 | UI provider modal | `SettingsApp.vue` | Ô 'Ưu tiên trong nhóm Custom', badge 'Ưu tiên N', chỉ số `#thứ-tự thực tế`, khoá `v-for` theo slug. |
+
+### ⚠️ Ghi chú phối hợp phiên song song (đọc trước khi deploy)
+
+- **Asset build:** `public_html/build` trong commit này được build từ **worktree sạch** (`HEAD` + chỉ thay đổi của phiên này) để KHÔNG đóng gói code đang làm dở của phiên khác. Vì vậy `app.css`/`base` chunk có thể khác bản build từ cây làm việc có WIP — đó là chủ ý, không phải lỗi.
+  → Phiên đang làm song song: chạy lại `npm run build` sau khi xong và commit asset của mình.
+- **KHÔNG đụng tới** các file WIP của phiên khác: `ModuleRegistry.php` · `StudioApp.vue` · `BaseModal.vue` · `CanvasEmptyState.vue` · `store.js` · `routes/web.php` · `CanvasControlsTest.php` · `DesignAgent*`.
+- **6 test đỏ ở HEAD** (đã kiểm chứng bằng cách chạy trong worktree sạch, KHÔNG do phiên này):
+  `CollectionsHubTest > hub card only uses existing store actions` ·
+  `JobTemplatesTest > applying a factory template also feeds the export dialog` ·
+  `MotionFoundationTest > every hover surface animates` (CollectionsCard.vue, CollectionsPage.vue: `hover:text-white` thiếu `.motion-ui`) ·
+  `ShotReviewTest > ui actually drives the shot lifecycle` · `review shortcuts are wired and safe` ·
+  `StaticIntegrityTest > full screen overlays declare their role`.
+- Nếu deploy `main` lúc này, production sẽ nhận CẢ commit `ac72756` (redesign Collections) của phiên kia — không chỉ phần provider.
+
+### Cần làm tiếp
+
+- [ ] Chạy migration: `php artisan migrate --force` (KHÔNG có migration nào khác đang chờ).
+- [ ] Sau deploy: kiểm tra xoá được custom provider + ô Ưu tiên + ô chọn mẫu trong `/settings`.
+- [ ] Phiên Collections/DesignAgent: sửa 6 test đỏ rồi rebuild asset.
+
+
+### Kết quả deploy (đã chạy thật)
+
+Production **trước đó đã ở `ac72756`** (phiên Collections đã deploy trước), nên `git pull` chỉ thêm `fb48d49`.
+
+```bash
+ssh -p 65002 u310846799@145.79.25.57
+cd ~/domains/fabrikai.shop
+mysqldump --socket=/tmp/mysql.sock … > ~/fabrikai-db-backup-20260919-165959.sql   # 156 KB (truoc migrate)
+git config core.fileMode false && git pull --ff-only origin main                  # ac72756 -> fb48d49
+php artisan migrate --force        # 2026_09_22_000001_add_priority_to_studio_providers
+php artisan package:discover
+php artisan config:cache && php artisan route:cache && php artisan view:cache
+php artisan queue:restart
+```
+
+**Verify E2E trên production (đăng nhập admin thật, HTTP thật):**
+
+| Thao tác | Kết quả |
+|---|---|
+| `POST /api/settings-vue/providers` (priority 25) | **201** |
+| `PUT /api/settings-vue/providers/tpltest` (đổi priority → 60) | **200** |
+| `DELETE /api/settings-vue/providers/tpltest` | **200** `{ok:true}` |
+| `GET /api/settings-vue/data` | **9 template** (`openai-compatible, ckey, openrouter, together, groq, siliconflow, deepinfra, dashscope-intl, custom-gemini`); provider `qwen` có `priority` |
+| `/` `/dang-nhap` `/up` | **200** · khách `/settings` **302** · khách `/bo-suu-tap` **302** |
+| `migrate:status` | 0 pending |
+
+### Quan sát vận hành (cho phiên sau)
+
+- Luồng ưu tiên trên production hiện là **`custom,qwen,flux,gemini`** (admin đã đổi qua tab 🔥, khác mặc định) ⇒ `rank(qwen)=10`, `rank(custom)=0`.
+- Log có **HTTP 429**: `qwen vision suggest failed: token-plan 1-week quota…` — hạn mức Qwen (token-plan) đã cạn.
+- Registry hiện **không còn dòng `fal:flux-1.1-schnell`** (admin đã xoá) ⇒ khi Qwen 429 thì KHÔNG còn fallback ảnh. Bấm **🔄 Đồng bộ catalog** ở tab 🔥 sẽ thêm lại (idempotent, không đè dòng đã sửa tay; muốn dùng thì bật lại dòng đó).
+- Có 2 custom provider: `ckey` (prio 5) và `deepseek-custom` (prio 5) — trùng ưu tiên nên thứ tự rơi về slug; đặt ưu tiên khác nhau nếu muốn route cụ thể thử trước.
+
