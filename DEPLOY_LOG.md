@@ -1024,3 +1024,66 @@ Vấn đề thật: form «Thêm preset» mặc định chọn danh mục **Ch�
 
 **Test:** 17 test Studio (thêm `test_a_preset_added_in_my_settings_becomes_a_studio_chip`). Full suite **814 pass**;
 6 fail vẫn là lỗi SẴN CÓ ở HEAD.
+
+---
+
+## Phiên 2026-09-22 (Đợt 14 — Studio: gọi TÊN ẢNH đúng thứ tự model nhìn thấy + chip thẻ @imageN & Prompt mẫu)
+
+**Commit:** `8ec57ca`. **Đã deploy production**, rebuild `main-VjeY-hLh.js`.
+
+### 1. SỬA LỖI THẬT: prompt gọi SAI ảnh
+
+Prompt cũ viết *"The FIRST image is the model wearing the garment"* — **sai**. `ImageAIService::editImage()` gửi
+`content = [ảnh tham chiếu…, ẢNH GỐC]`, tức **ảnh người mẫu (@image1) LUÔN NẰM CUỐI**, còn ảnh bối cảnh mới là ảnh ĐẦU.
+Prompt chỉ sai ảnh thì model coi **ảnh bối cảnh là sản phẩm cần giữ nguyên** — mất đúng thứ quan trọng nhất.
+
+Nay `imageRoles()` đặt tên theo đúng thứ tự model nhận (cùng quy ước với `assembleComposePrompt()` của pipeline `/api/compose`):
+
+| Số ảnh | Ảnh người mẫu | Ảnh bối cảnh | Ảnh tham chiếu |
+|---|---|---|---|
+| 1 | `the image` | — | — |
+| 2 | `the SECOND (last) image` | `the FIRST image` | — |
+| 3 | `the THIRD (last) image` | `the FIRST image` | `the SECOND image` |
+
+### 2. Học cách card «Ghép trang phục» dùng chip
+
+Dưới ô prompt nay có đúng bộ chip như card Ghép trang phục:
+
+```
+@image1 · @image2 · @image3   |   Prompt mẫu
+```
+
+- Thẻ `@imageN` được backend **DỊCH** sang tên ảnh đúng (`tagMap`) — nếu không dịch thì thẻ lọt nguyên văn tới model và vô nghĩa.
+  Chưa chọn ảnh 2/3 thì thẻ tương ứng **để nguyên** (không bịa ra ảnh không tồn tại).
+- `Prompt mẫu` chèn một câu chỉ dẫn hoàn chỉnh để người mới không phải nghĩ cấu trúc câu:
+  *«đặt cô ấy vào đúng bối cảnh trong @image2, giữ nguyên trang phục, gương mặt và tư thế; ánh sáng, phối cảnh và mặt đất
+  phải khớp với bối cảnh; nếu có @image3 thì bám theo chi tiết trong đó»*.
+
+### Đo THẬT trên production (prompt dựng từ `"…bối cảnh của @image2, giữ nguyên @image1…"`)
+
+```
+2 ảnh → "The SECOND (last) image is the model wearing the garment … SCENE: place the model naturally into the
+         setting shown in the FIRST image … DIRECTION: đặt cô ấy vào bối cảnh của the FIRST image,
+         giữ nguyên the SECOND (last) image"
+3 ảnh → "The THIRD (last) image is the model wearing the garment … the SECOND image supports with detail …"
+1 ảnh → "The image is the model wearing the garment … SCENE: keep the original setting of the image …"
+```
+
+Thẻ `@imageN` **không còn lọt** vào prompt cuối — đã dịch hết thành tên ảnh.
+
+### Verify production
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `8ec57ca` |
+| Bundle | `main-VjeY-hLh.js` có "Prompt mẫu" · "@image1/@image2/@image3" · "chỉ đích danh từng ảnh" |
+| Trang | `/` → **200** |
+
+**Test:** 18 test Studio (thêm `test_scene_names_images_in_the_order_the_model_sees_them` và
+`test_scene_translates_image_tags_in_the_user_prompt`; feature test cập nhật theo thứ tự đúng). Full suite
+**815 pass**; 6 fail vẫn là lỗi SẴN CÓ ở HEAD.
+
+### Ghi chú
+
+- Quy ước này áp dụng cho MỌI prompt của Studio, kể cả khi người dùng tự viết — nên viết `@imageN` là an toàn.
+- Card «Ghép trang phục» (`mode='outfit'`) vẫn để backend tự dựng prompt nên không bị ảnh hưởng bởi thay đổi này.
