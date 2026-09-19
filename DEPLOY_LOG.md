@@ -938,3 +938,51 @@ plan KHÔNG gọi model + validate · module lock · **compose nhận 1 ảnh**)
 - [ ] Nên thêm **chip "giữ nguyên"** mặc định (giữ tư thế/không đổi mặt) và **ô ghi chú chip** trong Cài đặt để
       người dùng tự soạn cụm chỉ dẫn dài mà không phải gõ lại mỗi lần.
 - [ ] Chưa lưu **preset đang chọn theo bộ sưu tập** (mở lại buổi chụp cũ phải chọn lại chip).
+
+---
+
+## Phiên 2026-09-22 (Đợt 12 — Studio: chip nhanh còn 3 nhóm + thiết kế lại UX/UI cho NGƯỜI MỚI)
+
+**Commit:** `25b6f01`. **Đã deploy production** (không migration), rebuild `main-C39ULzbm.js`.
+
+### 1. Chip nhanh chỉ còn 3 nhóm: Bối cảnh · Góc máy · Ống kính
+
+`PhotoStudioService::CHIP_CATEGORIES` lọc ở **cả** `chipGroups()` (chip hiển thị) và `chipIndex()` (tra ngược khi dựng
+prompt) nên hai đường không thể lệch nhau. Lý do chỉ 3 nhóm: các nhóm preset còn lại (chất liệu · phom dáng ·
+màu sắc · họa tiết…) mô tả **chính sản phẩm** — mà sản phẩm trong Studio là **ảnh 1 và phải GIỮ NGUYÊN**; để chung
+vừa thừa vừa dễ khiến người mới tưởng đang thiết kế lại trang phục.
+
+```
+Đo trên production: 198 preset → CHIP: Bối cảnh 18 · Góc máy 8 · Ống kính 7 = 33 chip
+ví dụ: Studio trắng / Phố cổ / Thiên nhiên xanh (có cả ghi chú của preset)
+```
+
+### 2. Thiết kế lại UX/UI cho người mới
+
+| Trước | Sau |
+|---|---|
+| 3 ô ảnh ngang nhau, chung một khối | **4 bước có số thứ tự ①②③④** + một câu giải thích mỗi bước |
+| Ô ảnh người mẫu ngang hàng hai ô phụ | Ô ảnh ① **TO NHẤT**, ghi rõ “Giữ nguyên ảnh này”, hướng dẫn lấy ảnh từ bước 「Tạo ảnh」 |
+| 17 nhóm chip (bức tường chip) | **3 nhóm**, mỗi nhóm hiện **6 chip đầu + “+N nữa”**; chip đã chọn hiện thành thẻ nhỏ bấm để bỏ |
+| Biến thể · tỉ lệ · prompt · ghi chú trộn lẫn trong luồng | Thu vào khối **“Nâng cao”** (mặc định đóng) |
+| Nút Tạo ảnh khoá không rõ vì sao | Nút khoá kèm **lý do cụ thể** ngay dưới (“Chưa chọn ảnh ①…” / “Chưa có nội dung…”) |
+| Cảnh báo lẫn với ghi chú | Trên nút chỉ còn **lỗi/cảnh báo**; ghi chú nằm trong khối Nâng cao |
+
+Người mới chỉ cần **2 việc**: chọn ảnh ① và bấm **Tạo ảnh** — mọi thứ khác là tùy chọn và nằm đúng chỗ.
+
+### Verify production
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `25b6f01` |
+| Bundle | có “Ảnh người mẫu” · “khung hình” · “Chọn nhanh” · “+N nữa” · “Bấm để chọn ảnh người mẫu” · “Sửa chip” |
+| Trang | `/` `/up` → **200** |
+
+**Test:** 16 test Studio (thêm `test_chip_groups_only_keep_the_three_studio_categories` khoá bất biến 3 nhóm; test
+feature cũng kiểm mọi nhóm trả về đều thuộc 3 nhóm đó). Full suite **813 pass**; 6 fail vẫn là lỗi SẴN CÓ ở HEAD.
+
+### Còn lại (đề xuất)
+
+- [ ] **Chưa có key model ảnh trên production** ⇒ Studio vẫn ở chế độ demo (đã cảnh báo trong giao diện).
+- [ ] Chưa ghi nhớ **chip đã chọn theo bộ sưu tập** (mở lại buổi chụp cũ phải chọn lại).
+- [ ] Nên thêm 1–2 chip mặc định cho người mới ngay cả khi Cài đặt của tôi trống (hiện chỉ hiện link thêm preset).
