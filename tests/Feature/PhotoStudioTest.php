@@ -3,14 +3,16 @@
 namespace Tests\Feature;
 
 use App\Models\Plan;
+use App\Models\Preset;
 use App\Models\User;
+use App\Models\UserCatalog;
 use App\Support\ModuleRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * [2026-09-22] STUDIO — hai endpoint của phòng chụp: catalog + dựng danh sách ảnh.
- * Cả hai đều TẤT ĐỊNH (không gọi model, không tốn credit) nên xem/sửa prompt thoải mái.
+ * [2026-09-22] STUDIO — hai endpoint của luồng mới: catalog CHIP (đọc từ "Cài đặt của tôi") + dựng
+ * prompt. Cả hai TẤT ĐỊNH (không gọi model, không tốn credit) nên xem/sửa prompt thoải mái.
  */
 class PhotoStudioTest extends TestCase
 {
@@ -30,53 +32,86 @@ class PhotoStudioTest extends TestCase
     public function test_guests_cannot_use_the_studio_endpoints(): void
     {
         $this->postJson('/api/studio/shoot/catalog')->assertUnauthorized();
-        $this->postJson('/api/studio/shoot/plan', ['shots' => ['full-body']])->assertUnauthorized();
+        $this->postJson('/api/studio/shoot/plan', ['prompt' => 'x'])->assertUnauthorized();
     }
 
-    public function test_catalog_endpoint_returns_the_whole_set(): void
+    public function test_catalog_serves_chips_from_my_settings(): void
     {
         $response = $this->actingAs($this->customer())
             ->postJson('/api/studio/shoot/catalog')
             ->assertOk();
 
-        $this->assertGreaterThanOrEqual(10, count($response->json('backdrops')));
-        $this->assertGreaterThanOrEqual(6, count($response->json('shots')));
-        $this->assertNotEmpty($response->json('lighting'));
-        $this->assertNotEmpty($response->json('cameras'));
-        $this->assertNotEmpty($response->json('poses'));
-        $this->assertNotEmpty($response->json('styles'));
+        $this->assertNotEmpty($response->json('groups'), 'Phải có chip lấy từ PRESET trong Cài đặt của tôi.');
+        $this->assertSame(3, count($response->json('slots')), 'Ba ô ảnh: người mẫu · bối cảnh · tham chiếu thêm.');
+        $this->assertSame('Người mẫu mặc trang phục', $response->json('slots.0.name'));
+        $this->assertTrue($response->json('slots.0.required'));
+        $this->assertFalse($response->json('slots.1.required'), 'Ảnh bối cảnh là TÙY CHỌN.');
+        $this->assertSame('/cai-dat/presets', $response->json('settings_url'));
         $this->assertNotEmpty($response->json('ratios'));
-        $this->assertNotEmpty($response->json('backdrops.0.light_name'));
+
+        // Mọi chip đều phải có nhãn + đoạn chèn (không có chip rỗng).
+        foreach ($response->json('groups') as $group) {
+            $this->assertNotEmpty($group['items']);
+            foreach ($group['items'] as $item) {
+                $this->assertNotSame('', (string) $item['label']);
+                $this->assertNotSame('', (string) $item['injection']);
+            }
+        }
     }
 
-    public function test_plan_endpoint_builds_the_shot_list_without_calling_any_model(): void
+    public function test_catalog_respects_the_users_own_hidden_edits_and_custom_items(): void
     {
-        $response = $this->actingAs($this->customer())
+        $user = $this->customer();
+        $preset = Preset::orderBy('sort_order')->firstOrFail();
+        $other = Preset::orderBy('sort_order')->skip(1)->firstOrFail();
+
+        UserCatalog::create([
+            'user_id' => $user->id,
+            'name' => 'presets',
+            'data' => [
+                'custom' => [[
+                    'id' => 'local-1', 'category' => 'background',
+                    'ui_label' => 'Sân thượng của tôi', 'prompt_injection' => 'my rooftop at sunset', 'sort_order' => 0,
+                ]],
+                'edits' => [(string) $preset->id => ['ui_label' => 'Nhãn tôi đổi', 'prompt_injection' => 'my edited injection']],
+                'hidden' => [(string) $other->id],
+            ],
+        ]);
+
+        $groups = collect($this->actingAs($user)->postJson('/api/studio/shoot/catalog')->assertOk()->json('groups'));
+        $flat = $groups->flatMap(fn ($g) => $g['items'])->keyBy('id');
+
+        $this->assertSame('Nhãn tôi đổi', $flat[(string) $preset->id]['label'], 'Studio phải thấy bản CHỈNH của người dùng.');
+        $this->assertSame('my edited injection', $flat[(string) $preset->id]['injection']);
+        $this->assertTrue($flat->has('local-1'), 'Mục người dùng TỰ THÊM trong Cài đặt phải thành chip trong Studio.');
+        $this->assertFalse($flat->has((string) $other->id), 'Mục người dùng đã ẨN không được lộ ra trong Studio.');
+    }
+
+    public function test_plan_endpoint_builds_the_prompt_without_calling_any_model(): void
+    {
+        $user = $this->customer();
+        $preset = Preset::orderBy('sort_order')->firstOrFail();
+
+        $response = $this->actingAs($user)
             ->postJson('/api/studio/shoot/plan', [
-                'backdrop' => 'danang-beach',
-                'camera' => 'mf-80',
-                'pose' => 'walking',
-                'style' => 'lookbook-season',
-                'shots' => ['full-body', 'three-quarter', 'movement'],
-                'collection' => 'Hè 2026 · Linen',
-                'model_note' => 'nữ 25 tuổi, tóc dài đen',
+                'prompt' => 'đặt cô ấy vào quán cà phê, giữ nguyên trang phục',
+                'chips' => [(string) $preset->id],
                 'image_count' => 2,
                 'variants' => 1,
+                'ratio' => '4:5',
             ])
             ->assertOk();
 
-        $response->assertJsonPath('total_shots', 3)
-            ->assertJsonPath('setup.backdrop', 'danang-beach')
-            ->assertJsonPath('setup.camera_name', 'Medium format f/8 — thương mại nét căng')
-            ->assertJsonPath('setup.collection', 'Hè 2026 · Linen');
+        $response->assertJsonPath('engine', 'studio-scene-v2')
+            ->assertJsonPath('ratio', '4:5')
+            ->assertJsonPath('image_count', 2);
 
-        $this->assertSame(3, $response->json('total_images'));
-        $this->assertGreaterThan(0, $response->json('total_credits'));
-        $this->assertStringContainsString('Hè 2026', (string) $response->json('shots.0.prompt'));
-        $this->assertStringContainsString('nữ 25 tuổi', (string) $response->json('shots.0.prompt'));
-
-        // Test không cấu hình model ảnh ⇒ phải NÓI THẬT là chạy ở chế độ demo.
-        $this->assertFalse($response->json('image_ready'));
+        $prompt = (string) $response->json('prompt');
+        $this->assertStringContainsString('100% fidelity', $prompt);
+        $this->assertStringContainsString('SECOND image', $prompt, 'Có ảnh bối cảnh ⇒ bám phối cảnh ảnh 2.');
+        $this->assertStringContainsString('DIRECTION: đặt cô ấy vào quán cà phê', $prompt);
+        $this->assertSame($preset->prompt_injection, $response->json('used_chips.0.injection'), 'Đoạn chèn luôn tra từ Cài đặt, không lấy từ client.');
+        $this->assertFalse($response->json('image_ready'), 'Test chưa có key model ảnh ⇒ phải nói thật là chế độ demo.');
     }
 
     public function test_plan_endpoint_validates_input(): void
@@ -89,9 +124,9 @@ class PhotoStudioTest extends TestCase
             ->assertJsonValidationErrors('ratio');
 
         $this->actingAs($user)
-            ->postJson('/api/studio/shoot/plan', ['shots' => array_fill(0, 13, 'full-body')])
+            ->postJson('/api/studio/shoot/plan', ['chips' => array_fill(0, 25, 'x')])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('shots');
+            ->assertJsonValidationErrors('chips');
     }
 
     public function test_module_switch_blocks_the_studio_endpoints(): void
@@ -105,5 +140,19 @@ class PhotoStudioTest extends TestCase
             ->postJson('/api/studio/shoot/catalog')
             ->assertForbidden()
             ->assertJsonPath('code', 'module_locked');
+    }
+
+    public function test_compose_accepts_a_single_reference_image(): void
+    {
+        // Studio chỉ có ảnh người mẫu (chưa chọn ảnh bối cảnh) vẫn phải chạy được: prompt của Studio
+        // được gửi nguyên văn qua final_prompt nên phần "ghép nhiều ảnh" không dùng tới.
+        $response = $this->actingAs($this->customer())
+            ->postJson('/api/compose', [
+                'images' => ['/samples/studio-demo.jpg'],
+                'prompt' => 'scene prompt',
+                'final_prompt' => 'Professional fashion photograph. keep the garment exactly.',
+            ]);
+
+        $this->assertNotSame(422, $response->status(), 'Một ảnh duy nhất không được coi là dữ liệu sai.');
     }
 }

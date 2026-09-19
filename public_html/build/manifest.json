@@ -85,8 +85,8 @@
     "file": "assets/pageBoot-jPX8vMva.js",
     "name": "pageBoot"
   },
-  "_useStudioThumb-DZl9eFLX.js": {
-    "file": "assets/useStudioThumb-DZl9eFLX.js",
+  "_useStudioThumb-DYHrqBiO.js": {
+    "file": "assets/useStudioThumb-DYHrqBiO.js",
     "name": "useStudioThumb",
     "imports": [
       "_pageBoot-jPX8vMva.js",
@@ -94,7 +94,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-BVPglpuQ.css",
+    "file": "assets/app-DBHwKOWn.css",
     "name": "app",
     "names": [
       "app.css"
@@ -117,28 +117,28 @@
     ]
   },
   "resources/js/studio/collections.js": {
-    "file": "assets/collections-kT15fw6D.js",
+    "file": "assets/collections-GFYSSatR.js",
     "name": "collections",
     "src": "resources/js/studio/collections.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-jPX8vMva.js",
       "__plugin-vue_export-helper-WymA_VkE.js",
-      "_useStudioThumb-DZl9eFLX.js"
+      "_useStudioThumb-DYHrqBiO.js"
     ],
     "css": [
       "assets/collections-BQ_koDaR.css"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-DRHkRUDe.js",
+    "file": "assets/main-508WxgnN.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-jPX8vMva.js",
       "__plugin-vue_export-helper-WymA_VkE.js",
-      "_useStudioThumb-DZl9eFLX.js",
+      "_useStudioThumb-DYHrqBiO.js",
       "_BaseModal-DlTw-u4R.js"
     ],
     "css": [

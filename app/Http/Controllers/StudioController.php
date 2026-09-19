@@ -773,7 +773,9 @@ class StudioController extends Controller
     public function compose(Request $request)
     {
         $data = $request->validate([
-            'images' => ['required', 'array', 'min:2', 'max:3'],
+            // min:1 — Studio gửi ĐÚNG MỘT ảnh khi người dùng chưa chọn ảnh bối cảnh; khi đó
+            // final_prompt (prompt của Studio) được gửi nguyên văn nên phần "ghép nhiều ảnh" không dùng tới.
+            'images' => ['required', 'array', 'min:1', 'max:3'],
             'images.*' => ['string', 'max:2048'],
             'prompt' => ['required', 'string', 'max:4000'],
             'final_prompt' => ['nullable', 'string', 'max:4000'],
@@ -837,7 +839,7 @@ class StudioController extends Controller
     public function composePreview(Request $request)
     {
         $data = $request->validate([
-            'images' => ['required', 'array', 'min:2', 'max:3'],
+            'images' => ['required', 'array', 'min:1', 'max:3'],
             'images.*' => ['string', 'max:2048'],
             'prompt' => ['required', 'string', 'max:4000'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
@@ -958,9 +960,34 @@ class StudioController extends Controller
      * STUDIO — PHÒNG CHỤP: danh mục bối cảnh chủ đề · sơ đồ đèn · ống kính · dáng · loại ảnh · hậu kỳ.
      * Không tạo generation, không tốn credit — chỉ trả catalog cho giao diện.
      */
-    public function shootCatalog(PhotoStudioService $studio): \Illuminate\Http\JsonResponse
+    public function shootCatalog(Request $request, PhotoStudioService $studio): \Illuminate\Http\JsonResponse
     {
-        return response()->json($studio->catalog());
+        return response()->json([
+            // Chip nhanh = PRESET trong "Cài đặt của tôi" (dùng chung ⊕ bản riêng của tài khoản).
+            'groups' => $studio->chipGroups($this->presetBaseline(), $this->presetUserCatalog((int) $request->user()->id)),
+            'slots' => PhotoStudioService::SLOTS,
+            'ratios' => $studio->ratioOptions(),
+            'image_ready' => app(\App\Services\AiModelGateway::class)->has('edit'),
+            'settings_url' => '/cai-dat/presets',
+            'max_chips' => PhotoStudioService::MAX_CHIPS,
+        ]);
+    }
+
+    /** Preset DÙNG CHUNG — cùng nguồn với /api/presets nên chip trong Studio không lệch với Cài đặt. */
+    private function presetBaseline(): array
+    {
+        return \App\Models\Preset::orderBy('sort_order')->get()
+            ->map(fn ($preset) => $preset->only(['id', 'category', 'ui_label', 'prompt_injection', 'note', 'sort_order']))
+            ->all();
+    }
+
+    /** Bản tùy chỉnh của CHÍNH người dùng (custom/edits/hidden) — cùng bảng với "Cài đặt của tôi". */
+    private function presetUserCatalog(int $userId): array
+    {
+        $row = \App\Models\UserCatalog::query()->where('user_id', $userId)->where('name', 'presets')->first();
+        $data = $row ? $row->data : [];
+
+        return is_array($data) ? $data : [];
     }
 
     /**
@@ -970,29 +997,24 @@ class StudioController extends Controller
     public function shootPlan(Request $request, PhotoStudioService $studio): \Illuminate\Http\JsonResponse
     {
         $data = $request->validate([
-            'backdrop' => ['nullable', 'string', 'max:60'],
-            'backdrop_note' => ['nullable', 'string', 'max:400'],
-            'lighting' => ['nullable', 'string', 'max:60'],
-            'camera' => ['nullable', 'string', 'max:60'],
-            'pose' => ['nullable', 'string', 'max:60'],
-            'style' => ['nullable', 'string', 'max:60'],
-            'shots' => ['nullable', 'array', 'max:12'],
-            'shots.*' => ['string', 'max:60'],
-            'ratio' => ['nullable', 'string', 'in:1:1,4:5,3:4,9:16,4:3'],
-            'collection' => ['nullable', 'string', 'max:120'],
-            'model_note' => ['nullable', 'string', 'max:300'],
-            'garment_note' => ['nullable', 'string', 'max:300'],
-            'extra' => ['nullable', 'string', 'max:400'],
-            'variants' => ['nullable', 'integer', 'min:1', 'max:3'],
+            'prompt' => ['nullable', 'string', 'max:2000'],
+            'chips' => ['nullable', 'array', 'max:24'],
+            'chips.*' => ['string', 'max:120'],
             'image_count' => ['nullable', 'integer', 'min:0', 'max:3'],
+            'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
+            'ratio' => ['nullable', 'string', 'in:1:1,4:5,3:4,9:16,4:3'],
         ]);
 
-        // Nói THẬT nếu chưa có model tạo/sửa ảnh: khi đó buổi chụp chỉ trả ảnh mẫu (demo).
+        // Chip gửi lên chỉ là ID; đoạn chèn luôn tra từ Cài đặt của tôi ⇒ không tin nội dung client gửi.
+        $index = $studio->chipIndex($this->presetBaseline(), $this->presetUserCatalog((int) $request->user()->id));
+
+        // Nói THẬT nếu chưa có model tạo/sửa ảnh: khi đó kết quả là ảnh mẫu (demo).
         $imageReady = app(\App\Services\AiModelGateway::class)->has('edit');
 
-        return response()->json($studio->plan(
+        return response()->json($studio->scene(
             $data,
-            (int) ($data['image_count'] ?? 2),
+            $index,
+            (int) ($data['image_count'] ?? 1),
             $imageReady,
             (int) studio_credit_cost('image'),
         ));

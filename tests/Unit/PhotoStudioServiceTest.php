@@ -6,12 +6,13 @@ use App\Services\PhotoStudioService;
 use PHPUnit\Framework\TestCase;
 
 /**
- * [2026-09-22] STUDIO — phòng chụp thời trang: catalog + dựng danh sách ảnh (shot list).
+ * [2026-09-22] STUDIO (luồng mới): ảnh người mẫu + bối cảnh + prompt + CHIP NHANH.
  *
- * Ba bất biến phải khoá bằng test:
- *   1. MỌI tấm trong một buổi chụp dùng CHUNG một "look signature" (ảnh phải đồng bộ như một bộ);
- *   2. prompt luôn có điều khoản GIỮ NGUYÊN TRANG PHỤC (sản phẩm không bị AI thiết kế lại);
- *   3. catalog/số ảnh/credit tính TẤT ĐỊNH — xem trước đúng bằng cái sẽ chạy.
+ * Bất biến phải khoá bằng test:
+ *   1. chip lấy ĐÚNG dữ liệu "Cài đặt của tôi" — bản ghép phải giống hệt logic useLocalCatalog.merge()
+ *      (ẩn · ghi đè · mục tự thêm nối cuối), nếu không chip trong Studio sẽ khác thứ người dùng thấy;
+ *   2. prompt luôn giữ SẢN PHẨM nguyên vẹn và chỉ bám bối cảnh khi có ảnh 2;
+ *   3. số ảnh/credit tính TẤT ĐỊNH — xem trước đúng bằng cái sẽ chạy.
  */
 class PhotoStudioServiceTest extends TestCase
 {
@@ -23,127 +24,131 @@ class PhotoStudioServiceTest extends TestCase
         $this->studio = new PhotoStudioService();
     }
 
-    public function test_catalog_covers_a_full_photo_shoot(): void
+    /** Baseline giống bảng presets dùng chung. */
+    private function baseline(): array
     {
-        $catalog = $this->studio->catalog();
+        return [
+            ['id' => 'p1', 'category' => 'fabric', 'ui_label' => 'Lụa mềm', 'prompt_injection' => 'soft silk fabric', 'note' => '', 'sort_order' => 1],
+            ['id' => 'p2', 'category' => 'background', 'ui_label' => 'Studio trắng', 'prompt_injection' => 'seamless white studio backdrop', 'note' => '', 'sort_order' => 2],
+            ['id' => 'p3', 'category' => 'style', 'ui_label' => 'Tối giản', 'prompt_injection' => 'minimal styling', 'note' => '', 'sort_order' => 3],
+        ];
+    }
 
-        foreach (['backdrops', 'lighting', 'cameras', 'poses', 'shots', 'styles', 'ratios'] as $key) {
-            $this->assertNotEmpty($catalog[$key], 'Thiếu nhóm: '.$key);
+    public function test_chip_groups_mirror_the_my_settings_catalog(): void
+    {
+        $groups = $this->studio->chipGroups($this->baseline(), [
+            'hidden' => ['p3'],
+            'edits' => ['p1' => ['ui_label' => 'Lụa mềm (bản của tôi)', 'prompt_injection' => 'my own silk wording']],
+            'custom' => [['id' => 'local-1', 'category' => 'fabric', 'ui_label' => 'Vải thô', 'prompt_injection' => 'raw textured fabric', 'sort_order' => 0]],
+        ]);
+
+        $byId = collect($groups)->keyBy('id');
+        $this->assertSame(['fabric', 'background'], array_column($groups, 'id'), 'Nhóm ẩn hết mục thì biến mất; nhóm còn mục thì giữ.');
+        $this->assertSame('Chất liệu', $byId['fabric']['label']);
+        $this->assertCount(2, $byId['fabric']['items']);
+        $this->assertSame('Lụa mềm (bản của tôi)', $byId['fabric']['items'][0]['label'], 'Mục bị sửa phải dùng bản của người dùng.');
+        $this->assertSame('my own silk wording', $byId['fabric']['items'][0]['injection']);
+        $this->assertSame('Vải thô', $byId['fabric']['items'][1]['label'], 'Mục tự thêm nối vào CUỐI nhóm.');
+        $this->assertSame('seamless white studio backdrop', $byId['background']['items'][0]['injection']);
+    }
+
+    public function test_chip_groups_skip_incomplete_rows(): void
+    {
+        $groups = $this->studio->chipGroups([
+            ['id' => 'a', 'category' => 'fabric', 'ui_label' => '', 'prompt_injection' => 'x'],
+            ['id' => 'b', 'category' => 'fabric', 'ui_label' => 'Có nhãn', 'prompt_injection' => ''],
+            ['id' => 'c', 'category' => 'fabric', 'ui_label' => 'Hợp lệ', 'prompt_injection' => 'ok'],
+        ]);
+
+        $this->assertSame(1, count($groups));
+        $this->assertCount(1, $groups[0]['items']);
+        $this->assertSame('Hợp lệ', $groups[0]['items'][0]['label'], 'Preset thiếu nhãn hoặc thiếu đoạn chèn thì bỏ (không tạo chip rỗng).');
+    }
+
+    public function test_chip_index_prefers_the_users_own_catalog(): void
+    {
+        $index = $this->studio->chipIndex($this->baseline(), [
+            'edits' => ['p2' => ['prompt_injection' => 'my studio wording']],
+            'hidden' => ['p1'],
+        ]);
+
+        $this->assertArrayNotHasKey('p1', $index, 'Mục bị ẩn không được xuất hiện trong chip của Studio.');
+        $this->assertSame('my studio wording', $index['p2']['injection']);
+    }
+
+    public function test_scene_maps_the_three_images_and_keeps_the_garment(): void
+    {
+        $index = $this->studio->chipIndex($this->baseline());
+
+        $one = $this->studio->scene(['prompt' => 'đổi sang nền tường gạch'], $index, 1);
+        $this->assertStringContainsString('FIRST image is the model wearing the garment', $one['prompt']);
+        $this->assertStringContainsString('100% fidelity', $one['prompt']);
+        $this->assertStringContainsString('do NOT redesign', $one['prompt']);
+        $this->assertStringNotContainsString('SECOND image', $one['prompt'], 'Chưa có ảnh bối cảnh thì không được nhắc ảnh 2.');
+        $this->assertStringContainsString('DIRECTION: đổi sang nền tường gạch', $one['prompt']);
+
+        $two = $this->studio->scene(['prompt' => 'ra ngoài trời'], $index, 2);
+        $this->assertStringContainsString('SECOND image', $two['prompt'], 'Có ảnh 2 ⇒ phải bám phối cảnh/ánh sáng của ảnh bối cảnh.');
+        $this->assertStringNotContainsString('THIRD image', $two['prompt']);
+
+        $three = $this->studio->scene([], $index, 3);
+        $this->assertStringContainsString('THIRD image', $three['prompt'], 'Có ảnh 3 ⇒ nêu rõ vai trò tham chiếu thêm.');
+    }
+
+    public function test_scene_appends_selected_chips_from_my_settings(): void
+    {
+        $index = $this->studio->chipIndex($this->baseline());
+        $scene = $this->studio->scene([
+            'prompt' => 'đổi bối cảnh',
+            'chips' => ['p1', 'p2', 'khong-ton-tai'],
+        ], $index, 2);
+
+        $this->assertStringContainsString('DETAILS: soft silk fabric · seamless white studio backdrop.', $scene['prompt']);
+        $this->assertCount(2, $scene['used_chips']);
+        $this->assertSame('fabric', $scene['used_chips'][0]['category']);
+        $this->assertSame('Chất liệu', $scene['used_chips'][0]['category_label'], 'Giao diện cần NHÃN nhóm, không phải mã nhóm.');
+        $this->assertNotEmpty(array_filter($scene['warnings'], fn ($w) => str_contains($w['message'], 'không còn tồn tại')));
+    }
+
+    public function test_scene_needs_an_image_and_a_direction(): void
+    {
+        $empty = $this->studio->scene([], [], 0);
+        $levels = array_column($empty['warnings'], 'level');
+        $this->assertContains('error', $levels);
+
+        $messages = implode(' | ', array_column($empty['warnings'], 'message'));
+        $this->assertStringContainsString('ảnh người mẫu', $messages);
+        $this->assertStringContainsString('prompt hoặc chọn ít nhất một chip', $messages);
+    }
+
+    public function test_scene_counts_credits_and_flags_demo_mode(): void
+    {
+        $index = $this->studio->chipIndex($this->baseline());
+        $scene = $this->studio->scene(['prompt' => 'x', 'variants' => 3, 'ratio' => '9:16'], $index, 2, false, 2);
+
+        $this->assertFalse($scene['image_ready']);
+        $this->assertSame(3, $scene['total_images']);
+        $this->assertSame(6, $scene['total_credits']);
+        $this->assertSame('9:16', $scene['ratio']);
+        $this->assertSame(3, $scene['variants']);
+        $this->assertNotEmpty(array_filter($scene['warnings'], fn ($w) => str_contains($w['message'], 'demo')));
+    }
+
+    public function test_scene_caps_chips_and_ignores_a_bad_ratio(): void
+    {
+        $items = [];
+        for ($i = 0; $i < 20; $i++) {
+            $items[] = ['id' => 'c'.$i, 'category' => 'style', 'ui_label' => 'Chip '.$i, 'prompt_injection' => 'injection '.$i];
         }
-        $this->assertGreaterThanOrEqual(10, count($catalog['backdrops']), 'Bối cảnh chủ đề phải đủ dùng cho nhiều bộ sưu tập.');
-        $this->assertGreaterThanOrEqual(6, count($catalog['shots']), 'Danh sách loại ảnh phải đủ cho một bộ lookbook.');
-        $this->assertSame(12, PhotoStudioService::MAX_SHOTS);
+        $index = $this->studio->chipIndex($items);
+        $scene = $this->studio->scene([
+            'prompt' => 'x',
+            'chips' => array_column($items, 'id'),
+            'ratio' => '16:9',
+        ], $index, 1);
 
-        foreach ($catalog['backdrops'] as $backdrop) {
-            $this->assertNotEmpty($backdrop['name']);
-            $this->assertNotEmpty($backdrop['prompt'], 'Bối cảnh phải có mô tả tiếng Anh để đưa vào prompt.');
-            $this->assertNotEmpty($backdrop['palette']);
-            $this->assertNotEmpty($backdrop['light_name'], 'Bối cảnh phải gợi ý sơ đồ đèn.');
-        }
-    }
-
-    public function test_all_shots_share_one_look_signature(): void
-    {
-        $plan = $this->studio->plan([
-            'backdrop' => 'hanoi-autumn',
-            'lighting' => 'golden-hour',
-            'camera' => '85-18',
-            'pose' => 'walking',
-            'style' => 'magazine',
-            'shots' => ['full-body', 'three-quarter', 'fabric-detail', 'back-view'],
-        ], 2);
-
-        $this->assertSame(4, $plan['total_shots']);
-        $this->assertStringStartsWith('LOOK-', $plan['look_id']);
-
-        foreach ($plan['shots'] as $shot) {
-            $this->assertStringContainsString($plan['look_signature'], $shot['prompt'], 'Mọi tấm phải mang CÙNG look signature.');
-            $this->assertStringContainsString('100% fidelity', $shot['prompt'], 'Prompt phải yêu cầu giữ nguyên trang phục.');
-            $this->assertStringContainsString('No text, no watermark', $shot['prompt']);
-        }
-
-        // Mỗi tấm phải khác nhau ở phần KHUNG HÌNH (nếu không thì cả bộ là một ảnh lặp lại).
-        $prompts = array_column($plan['shots'], 'prompt');
-        $this->assertCount(4, array_unique($prompts));
-    }
-
-    public function test_look_id_tracks_the_set_but_not_the_shot_list(): void
-    {
-        $base = ['backdrop' => 'studio-white', 'lighting' => 'softbox-even', 'camera' => '50-28', 'pose' => 'stand-34', 'style' => 'ecommerce-clean'];
-
-        $a = $this->studio->plan($base + ['shots' => ['full-body']], 2);
-        $b = $this->studio->plan($base + ['shots' => ['full-body', 'back-view']], 2);
-        $c = $this->studio->plan(array_merge($base, ['backdrop' => 'tet-red']) + ['shots' => ['full-body']], 2);
-
-        $this->assertSame($a['look_id'], $b['look_id'], 'Thêm/bớt loại ảnh KHÔNG đổi look — vẫn cùng buổi chụp.');
-        $this->assertNotSame($a['look_id'], $c['look_id'], 'Đổi bối cảnh là đổi look.');
-    }
-
-    public function test_plan_counts_images_and_credits_deterministically(): void
-    {
-        $plan = $this->studio->plan([
-            'shots' => ['full-body', 'three-quarter', 'ecommerce'],
-            'variants' => 2,
-        ], 2, true, 3);
-
-        $this->assertSame(3, $plan['total_shots']);
-        $this->assertSame(6, $plan['total_images'], 'Số ảnh = số loại × biến thể.');
-        $this->assertSame(18, $plan['total_credits'], 'Credit = số ảnh × giá mỗi ảnh.');
-        foreach ($plan['shots'] as $shot) {
-            $this->assertSame(2, $shot['variants']);
-        }
-    }
-
-    public function test_plan_warns_when_inputs_are_missing(): void
-    {
-        $few = $this->studio->plan(['shots' => ['full-body']], 1, true);
-        $demo = $this->studio->plan(['shots' => ['full-body']], 2, false);
-
-        $this->assertSame('error', $few['warnings'][0]['level'], 'Thiếu ảnh tham chiếu phải là LỖI (không chạy được).');
-        $this->assertSame(false, $demo['image_ready']);
-        $this->assertNotEmpty(array_filter($demo['warnings'], fn ($w) => str_contains($w['message'], 'demo')));
-    }
-
-    public function test_plan_falls_back_safely_on_unknown_ids(): void
-    {
-        $plan = $this->studio->plan([
-            'backdrop' => 'khong-ton-tai',
-            'lighting' => 'khong-ton-tai',
-            'camera' => 'khong-ton-tai',
-            'pose' => 'khong-ton-tai',
-            'style' => 'khong-ton-tai',
-            'shots' => ['khong-ton-tai'],
-        ], 2);
-
-        $this->assertSame('studio-white', $plan['setup']['backdrop'], 'Bối cảnh lạ ⇒ về studio trắng (an toàn cho ảnh bán hàng).');
-        $this->assertSame(1, $plan['total_shots'], 'Không có loại ảnh hợp lệ ⇒ dùng loại đầu tiên.');
-        $this->assertSame('full-body', $plan['shots'][0]['id']);
-        $this->assertNotEmpty($plan['setup']['lighting']);
-    }
-
-    public function test_plan_caps_the_shot_list_and_uses_custom_backdrop(): void
-    {
-        $all = array_column($this->studio->shots(), 'id');
-        $plan = $this->studio->plan([
-            'shots' => array_merge($all, $all),          // gửi trùng + vượt trần
-            'backdrop' => 'custom',
-            'backdrop_note' => 'sân thượng Sài Gòn lúc hoàng hôn, lan can sắt',
-        ], 2);
-
-        $this->assertLessThanOrEqual(12, $plan['total_shots']);
-        $this->assertCount($plan['total_shots'], array_unique(array_column($plan['shots'], 'id')), 'Loại ảnh phải được khử trùng.');
-        $this->assertStringContainsString('sân thượng Sài Gòn', $plan['shots'][0]['prompt'], 'Bối cảnh tự nhập phải vào prompt.');
-    }
-
-    public function test_ratio_override_applies_to_every_shot(): void
-    {
-        $plan = $this->studio->plan(['shots' => ['full-body', 'fabric-detail'], 'ratio' => '9:16'], 2);
-
-        foreach ($plan['shots'] as $shot) {
-            $this->assertSame('9:16', $shot['ratio']);
-        }
-        $default = $this->studio->plan(['shots' => ['full-body', 'fabric-detail']], 2);
-        $this->assertSame('4:5', $default['shots'][0]['ratio'], 'Không chọn tỉ lệ ⇒ theo gợi ý từng loại ảnh.');
-        $this->assertSame('1:1', $default['shots'][1]['ratio']);
+        $this->assertCount(PhotoStudioService::MAX_CHIPS, $scene['used_chips']);
+        $this->assertNull($scene['ratio'], 'Tỉ lệ lạ bị bỏ (không truyền xuống pipeline).');
+        $this->assertNotEmpty(array_filter($scene['warnings'], fn ($w) => str_contains($w['message'], 'tối đa')));
     }
 }
