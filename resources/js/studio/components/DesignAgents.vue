@@ -967,6 +967,21 @@ watch(() => store.designAgentOpen, (open) => {
                       <div class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5"><p class="text-[10px] text-emerald-200/80">Lãi gộp dự kiến</p><p class="mt-1 text-lg font-semibold tabular-nums text-emerald-100">{{ formatVnd(planTotals.profit_vnd) }}</p><p class="text-[10px] text-emerald-200/70">{{ planTotals.margin_pct }}% · {{ formatVnd(planTotals.avg_profit_unit_vnd) }}/cái</p></div>
                     </div>
 
+                    <div
+                      v-if="plan.price_check && plan.price_check.status !== 'within_band' && plan.price_check.status !== 'unknown'"
+                      role="status"
+                      class="flex gap-2 rounded-lg border p-3 text-[11px] leading-5"
+                      :class="plan.price_check.status === 'above_band' ? 'border-red-500/40 bg-red-500/10 text-red-100' : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'"
+                    >
+                      <StudioIcon :name="plan.price_check.status === 'above_band' ? 'alertTriangle' : 'info'" size="h-4 w-4" class="shrink-0" />
+                      <span>
+                        {{ plan.price_check.message }}
+                        <span class="mt-0.5 block opacity-70">
+                          Giá bán gợi ý theo giá vốn: {{ formatVnd(plan.price_check.suggested_price_vnd) }} · dải giá brief: {{ formatVnd(plan.price_check.band_min_vnd) }} – {{ formatVnd(plan.price_check.band_max_vnd) }}
+                        </span>
+                      </span>
+                    </div>
+
                     <div class="card p-5">
                       <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>

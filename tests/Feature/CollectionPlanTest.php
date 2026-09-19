@@ -131,6 +131,27 @@ class CollectionPlanTest extends TestCase
         }
     }
 
+    public function test_plan_flags_when_the_cost_price_sits_outside_the_market_band(): void
+    {
+        $planner = app(CollectionPlanService::class);
+
+        // Giá vải + giá công quá cao ⇒ muốn đủ lãi thì phải bán CAO HƠN dải giá thị trường.
+        $expensive = $planner->plan($this->brief(), ['fabric_price_per_m' => 900000, 'sewing_cost' => 400000]);
+        $this->assertSame('above_band', $expensive['price_check']['status']);
+        $this->assertGreaterThan($expensive['price_check']['band_max_vnd'], $expensive['price_check']['suggested_price_vnd']);
+        $this->assertStringContainsString('CAO HƠN', $expensive['price_check']['message']);
+
+        // Giá vải rất rẻ ⇒ giá vốn thấp hơn hẳn dải giá: dư địa lãi, nhưng phải cảnh báo để không bán rẻ.
+        $cheap = $planner->plan($this->brief(), [
+            'fabric_price_per_m' => 20000, 'sewing_cost' => 20000, 'trim_cost' => 5000, 'packaging_cost' => 1000,
+        ]);
+        $this->assertSame('below_band', $cheap['price_check']['status']);
+        $this->assertStringContainsString('dư địa lãi', (string) $cheap['price_check']['message']);
+
+        // Kết luận này phải xuất hiện trong danh sách ghi chú để người dùng không bỏ sót.
+        $this->assertStringContainsString('Đối chiếu giá:', implode(' ', $expensive['notes']));
+    }
+
     public function test_plan_clamps_absurd_assumptions(): void
     {
         $plan = app(CollectionPlanService::class)->plan($this->brief(), [

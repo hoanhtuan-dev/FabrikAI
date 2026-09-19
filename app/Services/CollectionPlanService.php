@@ -137,7 +137,8 @@ class CollectionPlanService
             'waves' => $this->waves($lines, $a),
             'size_chart' => $this->sizeChart($categories, $sizes, $lines),
             'selling' => $this->sellingScenarios($lines, $a, $priceBand),
-            'notes' => $this->notes($a, $lines),
+            'price_check' => $this->priceCheck($lines, $priceBand),
+            'notes' => $this->notes($a, $lines, $this->priceCheck($lines, $priceBand)),
         ];
     }
 
@@ -404,6 +405,65 @@ class CollectionPlanService
         return (int) (ceil($value / 10000) * 10000);
     }
 
+    /**
+     * ĐỐI CHIẾU GIÁ: giá bán gợi ý từ giá vốn (× lãi mong muốn) so với dải giá thị trường của brief.
+     *
+     * Vì sao cần: kế hoạch có thể đẹp trên giấy mà vẫn chết — giá vốn quá cao so với mức thị trường
+     * trả, hoặc giá vốn quá thấp khiến chủ xưởng bỏ tiền trên bàn. Chủ xưởng phải thấy NGAY độ lệch
+     * này thay vì tin vào một biên lợi nhuận tưởng tượng.
+     */
+    private function priceCheck(array $lines, array $priceBand): array
+    {
+        $units = array_sum(array_column($lines, 'qty'));
+        $bandMin = (int) ($priceBand['min_vnd'] ?? 0);
+        $bandMax = (int) ($priceBand['max_vnd'] ?? 0);
+        if ($units === 0 || $bandMax <= 0) {
+            return [
+                'status' => 'unknown',
+                'suggested_price_vnd' => null,
+                'band_min_vnd' => $bandMin ?: null,
+                'band_max_vnd' => $bandMax ?: null,
+                'message' => 'Chưa đủ dữ liệu để đối chiếu giá bán với thị trường.',
+            ];
+        }
+
+        $weighted = 0;
+        foreach ($lines as $line) {
+            $weighted += $line['suggested_price_vnd'] * $line['qty'];
+        }
+        $suggested = (int) round($weighted / $units);
+
+        if ($suggested > $bandMax) {
+            return [
+                'status' => 'above_band',
+                'suggested_price_vnd' => $suggested,
+                'band_min_vnd' => $bandMin,
+                'band_max_vnd' => $bandMax,
+                'gap_pct' => (int) round(($suggested - $bandMax) / $bandMax * 100),
+                'message' => 'Giá vốn của bạn cần bán ở mức '.number_format($suggested).'đ mới đạt lãi mong muốn — CAO HƠN dải giá thị trường (tối đa '.number_format($bandMax).'đ). Nên giảm giá vải/định mức, hoặc định vị lại sản phẩm trước khi cắt.',
+            ];
+        }
+        if ($bandMin > 0 && $suggested < $bandMin) {
+            return [
+                'status' => 'below_band',
+                'suggested_price_vnd' => $suggested,
+                'band_min_vnd' => $bandMin,
+                'band_max_vnd' => $bandMax,
+                'gap_pct' => (int) round(($bandMin - $suggested) / max(1, $bandMin) * 100),
+                'message' => 'Giá vốn của bạn chỉ cần bán ở mức '.number_format($suggested).'đ là đủ lãi, THẤP HƠN dải giá thị trường (từ '.number_format($bandMin).'đ). Đây là dư địa lãi — nhưng đừng bán thấp hơn mức khách chấp nhận trả.',
+            ];
+        }
+
+        return [
+            'status' => 'within_band',
+            'suggested_price_vnd' => $suggested,
+            'band_min_vnd' => $bandMin,
+            'band_max_vnd' => $bandMax,
+            'gap_pct' => 0,
+            'message' => 'Giá bán gợi ý theo giá vốn ('.number_format($suggested).'đ) nằm trong dải giá thị trường — phương án khả thi.',
+        ];
+    }
+
     private function normalizeAssumptions(array $input): array
     {
         $out = self::DEFAULTS;
@@ -421,9 +481,10 @@ class CollectionPlanService
     }
 
     /** @return list<string> */
-    private function notes(array $a, array $lines): array
+    private function notes(array $a, array $lines, array $priceCheck = []): array
     {
         $notes = [
+            ($priceCheck['message'] ?? '') !== '' ? 'Đối chiếu giá: '.$priceCheck['message'] : null,
             'Mọi đơn giá/định mức ở đây là GIẢ ĐỊNH bạn nhập — sửa được ngay trên màn hình và kế hoạch tính lại tức thì.',
             'Định mức vải là số tham chiếu theo khổ '.$a['fabric_width_cm'].'cm; vải sọc/họa tiết hoa văn cần cộng thêm 10–20%.',
             'Đợt 2 và đợt 3 nên chốt lại theo số bán THẬT của đợt 1, không nên cắt đủ ngay từ đầu.',
@@ -438,6 +499,6 @@ class CollectionPlanService
             $notes[] = 'Chưa có dòng cắt nào — kiểm tra lại số lượng mỗi mã và bảng size.';
         }
 
-        return $notes;
+        return array_values(array_filter($notes, 'strlen'));
     }
 }
