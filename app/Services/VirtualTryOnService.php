@@ -236,7 +236,7 @@ class VirtualTryOnService
     public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, string $tone = 'none', ?string $poseRefUrl = null, bool $changeFace = false): ?string
     {
         // $changeFace=false: GIỮ NGUYÊN khuôn mặt gốc. $changeFace=true: đổi mặt theo người mẫu (PASS 1b).
-        $swapModel = studio_swap_model();
+        $swapModel = $this->swapModel();
         $this->calls = 0; // bộ đếm cộng dồn: PASS1 candidates + face + background
         $this->lastModel = null;
 
@@ -325,7 +325,10 @@ class VirtualTryOnService
         // Best-of-N: model edit không deterministic — sinh tối đa N candidates rồi chọn bản đẹp
         // nhất bằng vision QA (so với ảnh thiết kế gốc). Không có key vision thì chỉ sinh 1 bản
         // để không lãng phí lượt gọi.
-        $hasVision = (bool) (studio_api_key('qwen') ?: studio_api_key('dashscope'));
+        // "Có vision hay không" phải hỏi NHÓM CÔNG VIỆC 'vision' (Model Registry / luồng ưu tiên /
+        // custom provider) — trước đây chỉ kiểm tra key qwen|dashscope nên cấu hình vision khác
+        // trong Cài đặt bị bỏ qua (QA tắt lặng lẽ dù có key dùng được).
+        $hasVision = app(AiModelGateway::class)->has('vision');
         $candidates = $hasVision ? max(1, min(3, (int) studio_config('swap_candidates', 2))) : 1;
         $urls = [];
         $calls = 0;
@@ -400,6 +403,26 @@ class VirtualTryOnService
     }
 
     /**
+     * Model thử đồ (Fitting Room) — lấy từ NHÓM CÔNG VIỆC 'swap' (default nhóm → Model Registry
+     * theo luồng ưu tiên provider → legacy setting swap_model/qwen_edit_model).
+     *
+     * Trước đây hàm gọi thẳng studio_swap_model() nên model thử đồ gán trong Model Registry
+     * KHÔNG bao giờ được dùng — cấu hình một đằng, chạy một nẻo. Chỉ nhận model edit-capable
+     * (swapEdit gửi ảnh vào model edit) và provider Qwen-family (DashScope /api/v1).
+     */
+    protected function swapModel(): string
+    {
+        $imageSvc = app(ImageAIService::class);
+        foreach (app(AiModelGateway::class)->credentials('swap', ['qwen']) as $row) {
+            if ($imageSvc->isImageEditCapableModel((string) $row['model'])) {
+                return (string) $row['model'];
+            }
+        }
+
+        return studio_swap_model();
+    }
+
+    /**
      * Chọn bản đẹp nhất trong các PASS 1 candidates bằng vision QA (so với ảnh thiết kế gốc).
      * Trả null nếu không score được → giữ bản đầu tiên.
      */
@@ -423,7 +446,7 @@ class VirtualTryOnService
             // Phân biệt rõ "không có key" với "có key nhưng score hỏng".
             logger()->warning('Swap QA degraded to first candidate', [
                 'candidates' => count($urls),
-                'vision_key_present' => (bool) (studio_api_key('qwen') ?: studio_api_key('dashscope')),
+                'vision_key_present' => app(AiModelGateway::class)->has('vision'),
             ]);
         }
         return $best;
@@ -434,11 +457,6 @@ class VirtualTryOnService
      */
     protected function scoreCandidate(string $imageUrl, string $designImage): ?array
     {
-        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
-        if (! $key) { return null; }
-        $base = dashscope_base_url($key).'/compatible-mode/v1/chat/completions';
-        $designUri = studio_vision_image_data_uri($designImage, 1600) ?: studio_vision_image_url($designImage);
-        $candUri = studio_vision_image_data_uri($imageUrl, 1600) ?: studio_vision_image_url($imageUrl);
         $instruction = 'You are a fashion photography evaluator. The FIRST image is the ORIGINAL design (its garment is the product and must be preserved). The SECOND image is a virtual try-on result. Rate the result 1-10 on:'
             .'\n1. garment_preservation: how identical is the garment in image 2 to image 1 (colors, patterns, silhouette, length)'
             .'\n2. face_quality: sharp, natural, photorealistic face'
@@ -446,37 +464,21 @@ class VirtualTryOnService
             .'\n4. overall_aesthetic: overall appeal, lighting, composition'
             .'\nReturn ONLY valid JSON: {"garment_preservation":N,"face_quality":N,"pose_accuracy":N,"overall_aesthetic":N}';
 
-        foreach (studio_qwen_vision_models() as $model) {
-            try {
-                $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(45)
-                    ->post($base, [
-                        'model' => $model,
-                        'messages' => [[
-                            'role' => 'user',
-                            'content' => [
-                                ['type' => 'image_url', 'image_url' => ['url' => $designUri]],
-                                ['type' => 'image_url', 'image_url' => ['url' => $candUri]],
-                                ['type' => 'text', 'text' => $instruction],
-                            ],
-                        ]],
-                        'temperature' => 0.1,
-                    ]);
-                if ($resp->successful()) {
-                    $raw = trim((string) data_get($resp->json(), 'choices.0.message.content'));
-                    if (preg_match('/\{[^}]+\}/s', $raw, $m)) {
-                        $scores = json_decode($m[0], true);
-                        if (is_array($scores) && isset($scores['garment_preservation'])) {
-                            return $scores;
-                        }
-                    }
-                }
-                if ($resp->status() === 404 || str_contains(strtolower((string) $resp->body()), 'not found')
-                    || $resp->status() === 429 || $resp->status() >= 500) {
-                    if ($resp->status() === 429) { sleep(2); }
-                    continue;
-                }
-            } catch (\Throwable $e) { /* next model */ }
+        // Vision QA đi qua NHÓM CÔNG VIỆC 'vision' — trước đây tự vòng qua
+        // studio_qwen_vision_models() + key qwen|dashscope nên model vision gán trong Model
+        // Registry, luồng ưu tiên provider và custom provider đều bị bỏ qua ở đây.
+        $answer = app(AiModelGateway::class)->vision('vision', $instruction, [$designImage, $imageUrl], ['max_tokens' => 512, 'timeout' => 45]);
+        if ($answer === null) {
+            return null;
         }
+
+        if (preg_match('/\{[^}]+\}/s', $answer['text'], $m)) {
+            $scores = json_decode($m[0], true);
+            if (is_array($scores) && isset($scores['garment_preservation'])) {
+                return $scores;
+            }
+        }
+
         return null;
     }
 

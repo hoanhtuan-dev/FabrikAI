@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
-
 /**
  * "Giám đốc sáng tạo" — turns a Vietnamese idea + fashion presets into a canonical
  * Creative Direction: professional English prompts (image + video) that describe the
@@ -24,20 +22,60 @@ class GeminiService
 
     public function generateCreativeDirector(string $idea, array $injections = [], int $creativeLevel = 6): array
     {
-        $provider = (string) studio_config('prompt_provider', 'gemini');
-        $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        // MỘT cửa duy nhất: NHÓM CÔNG VIỆC 'prompt' (Cài đặt → Nhóm công việc / Model Registry /
+        // Luồng ưu tiên provider / Custom Providers). Trước đây hàm này tự đọc setting rời
+        // prompt_provider + studio_api_key('qwen'|'gemini') ⇒ đổi Registry / thêm custom provider
+        // trong Cài đặt KHÔNG có tác dụng: cấu hình hiển thị một đằng, gọi model một nẻo.
+        $answer = app(AiModelGateway::class)->text('prompt', [
+            ['role' => 'system', 'content' => $this->systemPrompt($creativeLevel)],
+            ['role' => 'user', 'content' => $this->userInstruction($idea, $injections, $creativeLevel)],
+        ], ['response_format' => 'json_object', 'max_tokens' => 2048, 'timeout' => 90]);
 
-        if ($provider === 'qwen' && $qwenKey) {
-            return $this->callQwen($idea, $injections, $creativeLevel);
+        if ($answer === null) {
+            // Chưa cấu hình key nào dùng được cho nhóm 'prompt' -> stub tất định (nói thật, không bịa).
+            return $this->stub($idea, $injections, $creativeLevel);
         }
 
-        $key = studio_api_key('gemini');
-
-        if ($key) {
-            return $this->callGemini($idea, $injections, $creativeLevel, $key);
+        $json = $this->decodeJson($answer['text']);
+        if ($json === null) {
+            logger()->warning('GeminiService: model trả về không phải JSON hợp lệ', [
+                'provider' => $answer['provider'],
+                'model' => $answer['model'],
+                'body' => substr($answer['text'], 0, 200),
+            ]);
         }
 
-        return $this->stub($idea, $injections, $creativeLevel);
+        return $this->normalize($json, $idea, $injections, $creativeLevel, $answer['provider']);
+    }
+
+    /** Câu lệnh người dùng dùng chung cho mọi provider (trước đây lặp lại ở callQwen + callGemini). */
+    protected function userInstruction(string $idea, array $injections, int $creativeLevel): string
+    {
+        return 'Idea: '.$idea."\n"
+            .'Creative level: '.$creativeLevel."/10\n"
+            .'Tags: '.json_encode($injections, JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Model đôi khi bọc JSON trong markdown code fence hoặc thêm lời dẫn quanh object.
+     * Trích object JSON đầu tiên; trả null nếu không có JSON dùng được.
+     */
+    protected function decodeJson(string $text): ?array
+    {
+        $text = trim($text);
+        $json = json_decode($text, true);
+        if (is_array($json)) {
+            return $json;
+        }
+
+        if (preg_match('/\{[\s\S]*\}/', $text, $m) === 1) {
+            $json = json_decode($m[0], true);
+            if (is_array($json)) {
+                return $json;
+            }
+        }
+
+        return null;
     }
 
     protected function systemPrompt(int $creativeLevel): string
@@ -52,105 +90,6 @@ class GeminiService
             .'phrases to avoid: low quality, distortions, extra limbs, cropped garment, inconsistent face, watermark), '
             .'concept_en (short English garment concept), category (object with fabric/silhouette/style/background/pose/camera), '
             .'keywords (array), mood, color_palette (array), style_notes.';
-    }
-
-    protected function callQwen(string $idea, array $injections, int $creativeLevel): array
-    {
-        $system = $this->systemPrompt($creativeLevel);
-        $prompt = 'Idea: '.$idea."
-Creative level: {$creativeLevel}/10
-Tags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
-
-        $raw = null;
-        $last = null;
-        foreach (studio_qwen_text_models() as $model) {
-            foreach (studio_qwen_credentials('prompt') as $key) {
-                $base = dashscope_base_url($key).'/compatible-mode/v1';
-                try {
-                    $resp = Http::withToken($key)->timeout(90)
-                        ->post($base.'/chat/completions', [
-                            'model' => $model,
-                            'messages' => [
-                                ['role' => 'system', 'content' => $system],
-                                ['role' => 'user', 'content' => $prompt],
-                            ],
-                            'response_format' => ['type' => 'json_object'],
-                        ]);
-
-                if ($resp->successful()) {
-                    $text = (string) data_get($resp->json(), 'choices.0.message.content');
-                    $json = json_decode(trim($text), true);
-                    if (is_array($json)) {
-                        $raw = $json;
-                        break 2; // đã có kết quả -> thoát cả vòng model lẫn vòng key
-                    }
-                    $last = 'Bad JSON from Qwen.';
-                } elseif (is_qwen_quota_error((string) $resp->body())) {
-                    $last = 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 180);
-                    continue; // Token Plan quota exhausted -> try Pay-As-You-Go next
-                } else {
-                    $last = 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 180);
-                    break; // non-quota -> don't rotate
-                }
-            } catch (\Throwable $e) {
-                $last = $e->getMessage();
-                logger()->error('Qwen prompt failed: '.$e->getMessage());
-                break;
-                }
-            }
-        }
-        if ($raw === null && $last) {
-            logger()->warning('Qwen prompt failed all keys', ['last' => $last]);
-        }
-
-        return $this->normalize($raw, $idea, $injections, $creativeLevel, 'qwen');
-    }
-
-    protected function callGemini(string $idea, array $injections, int $creativeLevel, string $key): array
-    {
-        $system = $this->systemPrompt($creativeLevel);
-        $prompt = "Idea: {$idea}
-Creative level: {$creativeLevel}/10
-Tags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
-
-        $raw = null;
-
-        try {
-            $model = studio_config('prompt_model', 'gemini-2.5-flash');
-
-            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(60)
-                ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
-                    'contents' => [['parts' => [['text' => $system."
-
-".$prompt]]]],
-                    'generationConfig' => ['responseMimeType' => 'application/json'],
-                ]);
-
-            if ($resp->successful()) {
-                $text = (string) data_get($resp->json(), 'candidates.0.content.parts.0.text');
-                $json = json_decode(trim($text), true);
-                if (is_array($json)) {
-                    $raw = $json;
-                } else {
-                    logger()->warning('GeminiService: response không phải JSON hợp lệ', [
-                        'model' => $model, 'body' => substr($text, 0, 200),
-                    ]);
-                }
-            } else {
-                // M12: non-2xx TRƯỚC ĐÂY im lặng hoàn toàn (không log, không backoff) — 429 quota
-                // và 401/403 key hỏng đều rơi vào đây rồi lặng lẽ trả stub, không ai biết vì sao.
-                // Nhánh Qwen đã log status từ trước; nay Gemini ngang bằng.
-                logger()->warning('GeminiService: HTTP '.$resp->status(), [
-                    'model' => $model,
-                    'rate_limited' => $resp->status() === 429,
-                    'body' => substr((string) $resp->body(), 0, 200),
-                ]);
-            }
-        } catch (\Throwable $e) {
-            logger()->error('GeminiService failed: '.$e->getMessage());
-        }
-
-        return $this->normalize($raw, $idea, $injections, $creativeLevel, 'gemini');
     }
 
     protected function stub(string $idea, array $injections, int $creativeLevel): array

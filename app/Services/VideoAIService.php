@@ -16,27 +16,38 @@ class VideoAIService
 {
     public function render(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution = null, ?string $duration = null, ?int $generationId = null, ?string $model = null, ?string $provider = null): string
     {
-        // Failover: try Token Plan first, then Pay-As-You-Go on a quota error (studio_qwen_credentials('video')).
-        $keys = studio_qwen_credentials('video');
-        if ($keys) {
-            $last = null;
-            foreach ($keys as $key) {
-                try {
-                    return $this->callDashscopeVideo($prompt, $imageUrl, $cameraPreset, $resolution, $duration, $key, $generationId, $model, $provider);
-                } catch (\Throwable $e) {
-                    $last = $e->getMessage();
-                    capture_provider_quota_reset($last);
-                    $lower = strtolower((string) $last);
-                    // Rotate to the next key/host on quota exhaustion OR a model-not-exist (wrong host/key type),
-                    // so a pay-go error falls through to the plan slot (and vice versa) before giving up.
-                    if (! is_qwen_quota_error($last) && ! str_contains($lower, 'model not exist') && ! str_contains($lower, 'invalidparameter')) {
-                        throw $e;
-                    }
+        // NHÓM CÔNG VIỆC 'video' (Cài đặt → Nhóm công việc / Model Registry / Luồng ưu tiên provider).
+        // Trước đây đường này tự đọc studio_qwen_credentials('video') + setting video_model ⇒ gán
+        // model video khác trong Registry hoặc đổi luồng ưu tiên KHÔNG có tác dụng gì.
+        // Chỉ nhận candidate transport 'qwen' (DashScope/Wan/Qwen-family): video async dùng API
+        // nguyên bản /api/v1 của DashScope, không đi qua base_url của custom provider.
+        $gateway = app(AiModelGateway::class);
+        $rows = collect($gateway->credentials('video', ['qwen']));
+        if ($provider) {
+            $matched = $rows->where('provider', $provider)->values();
+            if ($matched->isNotEmpty()) {
+                $rows = $matched;   // override provider của người dùng, nếu nhóm thật sự có provider đó
+            }
+        }
+
+        $last = null;
+        foreach ($rows as $row) {
+            try {
+                return $this->callDashscopeVideo($prompt, $imageUrl, $cameraPreset, $resolution, $duration, (string) $row['key'], $generationId, $model ?: (string) $row['model'], (string) $row['provider']);
+            } catch (\Throwable $e) {
+                $last = $e->getMessage();
+                capture_provider_quota_reset($last);
+                $lower = strtolower((string) $last);
+                // Rotate to the next key/host/model on quota exhaustion OR a model-not-exist
+                // (wrong host/key type), so a pay-go error falls through to the plan slot
+                // (and vice versa) — and to the next candidate of the group — before giving up.
+                if (! is_qwen_quota_error($last) && ! str_contains($lower, 'model not exist') && ! str_contains($lower, 'invalidparameter')) {
+                    throw $e;
                 }
             }
-            if ($last) {
-                throw new \RuntimeException($last);
-            }
+        }
+        if ($last) {
+            throw new \RuntimeException($last);
         }
 
         // N9 (đã vá): stub DEMO MODE khi chưa cấu hình khoá — giữ đúng quy ước của module

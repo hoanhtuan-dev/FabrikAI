@@ -1,0 +1,293 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\StudioApiKey;
+use App\Models\StudioModel;
+use App\Models\StudioProvider;
+use App\Models\User;
+use App\Services\AiModelGateway;
+use App\Services\GeminiService;
+use App\Services\ImageAIService;
+use App\Services\VideoAIService;
+use App\Services\VirtualTryOnService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+/**
+ * [2026-09-22] "MỘT CỬA" cho mọi lời gọi model AI — kiểm tra sâu việc dùng model.
+ *
+ * Lỗi thật trước đây: rất nhiều đường tự chọn provider/model bằng hằng số hoặc setting rời
+ * (GeminiService đọc prompt_provider; VideoAIService đọc studio_qwen_credentials('video');
+ * ImageAIService Sửa ảnh chỉ biết setting qwen_edit_model; Fitting Room đọc studio_swap_model;
+ * vision QA + QA thử đồ cứng qwen|dashscope; moderation/super-resolution cứng 3 slot key).
+ * Hệ quả: đổi Model Registry / Nhóm công việc / Luồng ưu tiên / Custom Provider trong Cài đặt
+ * KHÔNG tác động tới các đường đó — Settings hiển thị một đằng, gọi model một nẻo.
+ *
+ * Các test dưới đây KHOÁ hành vi mới: cấu hình đổi ⇒ đường gọi đổi theo.
+ */
+class AiModelGatewayTest extends TestCase
+{
+    use RefreshDatabase;
+
+    /** @var list<string> */
+    private array $tempFiles = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->tempFiles as $abs) {
+            if (is_file($abs)) {
+                @unlink($abs);
+            }
+        }
+        $this->tempFiles = [];
+        parent::tearDown();
+    }
+
+    private function admin(): User
+    {
+        return User::where('email', 'admin@fabrikai.shop')->firstOrFail();
+    }
+
+    private function model(string $group, string $provider, string $modelId, int $priority = 5): StudioModel
+    {
+        return StudioModel::create([
+            'group' => $group, 'name' => $provider.' '.$modelId, 'provider' => $provider,
+            'model_id' => $modelId, 'api_key_ref' => $provider, 'priority' => $priority, 'enabled' => true,
+        ]);
+    }
+
+    private function key(string $provider, string $value): StudioApiKey
+    {
+        return StudioApiKey::create([
+            'provider' => $provider, 'label' => $provider, 'value' => $value,
+            'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+        ]);
+    }
+
+    /** PNG thật trong storage/app/public — đường vision cần ảnh đọc được, không phải chuỗi rỗng. */
+    private function png(string $name): string
+    {
+        $abs = storage_path('app/public/studio/'.$name);
+        if (! is_dir(dirname($abs))) {
+            mkdir(dirname($abs), 0777, true);
+        }
+        $im = imagecreatetruecolor(48, 48);
+        imagepng($im, $abs);
+        imagedestroy($im);
+        $this->tempFiles[] = $abs;
+
+        return '/storage/studio/'.$name;
+    }
+
+    private function creativeJson(string $marker): string
+    {
+        return json_encode([
+            'concept_en' => 'a silk midi dress',
+            'image_prompt_en' => 'Editorial photo of a silk midi dress, '.$marker.'.',
+            'video_prompt_en' => 'Catwalk video of the same silk midi dress, '.$marker.'.',
+            'keywords' => ['silk', 'midi'],
+            'mood' => 'luxury',
+            'color_palette' => ['ivory'],
+            'style_notes' => 'minimal',
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
+    // ── 1. Nhóm 'prompt' (Giám đốc sáng tạo) ────────────────────────────────
+
+    public function test_creative_director_uses_the_prompt_task_group(): void
+    {
+        $this->model('prompt', 'deepseek', 'deepseek-chat', 5);
+        $this->key('deepseek', 'sk-deepseek-test');
+        set_setting('studio_task_prompt_model', 'deepseek:deepseek-chat');
+
+        Http::fake([
+            'api.deepseek.com/*' => Http::response(['choices' => [['message' => ['content' => $this->creativeJson('deepseek')]]]], 200),
+        ]);
+
+        $out = app(GeminiService::class)->generateCreativeDirector('đầm lụa ngọc trai', [], 6);
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'api.deepseek.com/chat/completions'));
+        $this->assertSame('deepseek', $out['provider'], 'Provider trả về phải là provider THẬT của nhóm prompt.');
+        $this->assertStringContainsString('deepseek', (string) $out['image_prompt_en']);
+    }
+
+    public function test_custom_provider_is_used_when_it_is_the_prompt_default(): void
+    {
+        StudioProvider::create([
+            'slug' => 'ckey', 'name' => 'CKEY', 'protocol' => 'openai',
+            'base_url' => 'https://api.xah.io/v1', 'auth_style' => 'bearer',
+            'api_key_ref' => 'ckey', 'priority' => 5, 'enabled' => true,
+        ]);
+        $this->model('prompt', 'ckey', 'custom-chat', 5);
+        $this->key('ckey', 'ckey-secret');
+        set_setting('studio_task_prompt_model', 'ckey:custom-chat');
+
+        Http::fake([
+            'api.xah.io/*' => Http::response(['choices' => [['message' => ['content' => $this->creativeJson('ckey')]]]], 200),
+        ]);
+
+        $out = app(GeminiService::class)->generateCreativeDirector('áo dệt kim', [], 6);
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'api.xah.io/v1/chat/completions'));
+        $this->assertSame('ckey', $out['provider']);
+    }
+
+    // ── 2. Nhóm 'translate' qua endpoint thật ───────────────────────────────
+
+    public function test_translate_endpoint_follows_the_translate_group(): void
+    {
+        $this->model('translate', 'deepseek', 'deepseek-chat', 5);
+        $this->key('deepseek', 'sk-deepseek-test');
+        set_setting('studio_task_translate_model', 'deepseek:deepseek-chat');
+
+        Http::fake([
+            'api.deepseek.com/*' => Http::response(['choices' => [['message' => ['content' => 'Editorial photo of a silk dress']]]], 200),
+        ]);
+
+        $this->actingAs($this->admin())
+            ->postJson('/api/translate', ['text' => 'ảnh đầm lụa', 'direction' => 'en'])
+            ->assertOk()
+            ->assertJsonPath('provider', 'deepseek');
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'api.deepseek.com/chat/completions'));
+    }
+
+    // ── 3. Nhóm 'video' ─────────────────────────────────────────────────────
+
+    public function test_video_render_submits_the_video_group_model(): void
+    {
+        $this->model('video', 'wan', 'wan2.7-i2v', 5);
+        $this->key('dashscope', 'sk-dashscope-paygo-key');
+        set_setting('studio_task_video_model', 'wan:wan2.7-i2v');
+
+        Http::fake(['*' => Http::response(['message' => 'model not exist'], 400)]);
+
+        try {
+            app(VideoAIService::class)->render('catwalk prompt', '/samples/a.jpg', 'orbit', '720', 5);
+            $this->fail('Provider từ chối model ⇒ phải ném lỗi, không được im lặng trả video demo.');
+        } catch (\RuntimeException $e) {
+            // đúng như mong đợi: lỗi được nêu ra
+        }
+
+        Http::assertSent(function ($r) {
+            return str_contains($r->url(), 'video-generation/video-synthesis')
+                && ($r->data()['model'] ?? null) === 'wan2.7-i2v';
+        });
+    }
+
+    // ── 4. Nhóm 'edit' (Sửa ảnh / Inpaint) ──────────────────────────────────
+
+    public function test_inpaint_chain_follows_the_edit_task_group(): void
+    {
+        $this->key('dashscope', 'sk-dashscope-paygo-key');
+        set_setting('studio_qwen_edit_model', 'qwen-image-edit');       // setting legacy cũ
+        set_setting('studio_task_edit_model', 'qwen:qwen-image-edit-max'); // default MỚI của nhóm edit
+
+        $chain = $this->callProtected(ImageAIService::class, 'editModelChain', []);
+
+        $this->assertSame('qwen-image-edit-max', $chain[0] ?? null,
+            'Default của NHÓM edit phải đứng đầu chuỗi — trước đây hàm chỉ biết setting qwen_edit_model.');
+    }
+
+    public function test_inpaint_chain_includes_edit_models_from_the_registry(): void
+    {
+        $this->key('dashscope', 'sk-dashscope-paygo-key');
+        set_setting('studio_qwen_edit_model', 'qwen-image-edit');
+        $this->model('edit', 'qwen', 'qwen-image-edit-plus', 9);
+
+        $chain = $this->callProtected(ImageAIService::class, 'editModelChain', []);
+
+        $this->assertContains('qwen-image-edit-plus', $chain,
+            'Model edit đăng ký trong Model Registry phải vào chuỗi thử của card Sửa ảnh.');
+    }
+
+    public function test_inpaint_chain_is_empty_without_any_usable_key(): void
+    {
+        set_setting('studio_qwen_edit_model', 'qwen-image-edit');
+
+        $chain = $this->callProtected(ImageAIService::class, 'editModelChain', []);
+
+        $this->assertSame([], $chain, 'Không có key nào dùng được ⇒ không thử model (giữ nguyên đường stub).');
+    }
+
+    // ── 5. Nhóm 'swap' (Fitting Room) ───────────────────────────────────────
+
+    public function test_fitting_room_swap_model_follows_the_swap_task_group(): void
+    {
+        $this->key('dashscope', 'sk-dashscope-paygo-key');
+        set_setting('studio_swap_model', 'qwen-image-edit');            // setting legacy cũ
+        set_setting('studio_task_swap_model', 'qwen:qwen-image-edit-max'); // default MỚI của nhóm swap
+
+        $model = $this->callProtected(VirtualTryOnService::class, 'swapModel', []);
+
+        $this->assertSame('qwen-image-edit-max', $model,
+            'Model thử đồ phải theo NHÓM swap — trước đây hàm gọi thẳng studio_swap_model().');
+    }
+
+    // ── 6. Nhóm 'vision' (vision QA) ────────────────────────────────────────
+
+    public function test_swap_quality_qa_uses_the_vision_task_group(): void
+    {
+        $this->model('vision', 'deepseek', 'deepseek-chat', 5);
+        $this->key('deepseek', 'sk-deepseek-test');
+        set_setting('studio_task_vision_model', 'deepseek:deepseek-chat');
+
+        Http::fake([
+            'api.deepseek.com/*' => Http::response(['choices' => [['message' => ['content' =>
+                '{"garment_preservation":9,"face_quality":8,"pose_accuracy":7,"overall_aesthetic":8}']]]], 200),
+        ]);
+
+        $design = $this->png('qa-design.png');
+        $candidate = $this->png('qa-candidate.png');
+
+        $scores = $this->callProtected(VirtualTryOnService::class, 'scoreCandidate', [$candidate, $design]);
+
+        $this->assertSame(9, $scores['garment_preservation'] ?? null,
+            'QA thử đồ phải chạy trên model của NHÓM vision (đây là DeepSeek), không cứng qwen-vl.');
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'api.deepseek.com'));
+    }
+
+    public function test_vision_group_reports_no_candidates_without_keys(): void
+    {
+        $this->model('vision', 'qwen', 'qwen3.8-flash', 5);
+
+        $this->assertFalse(app(AiModelGateway::class)->has('vision'),
+            'Model trong registry nhưng KHÔNG có key enabled ⇒ nhóm coi như không khả dụng.');
+    }
+
+    // ── 7. Khóa cho dịch vụ DashScope nguyên bản (moderation / super-resolution) ──
+
+    public function test_dashscope_native_services_take_the_key_from_the_configured_groups(): void
+    {
+        $this->model('edit', 'qwen', 'qwen-image-edit', 5);
+        $this->key('qwen_edit', 'sk-qwen-edit-secret');
+
+        $this->assertSame('sk-qwen-edit-secret', app(AiModelGateway::class)->dashscopeKey(),
+            'Khóa DashScope phải lấy từ nhóm đang cấu hình, không chỉ 3 slot studio_api_key cứng.');
+    }
+
+    public function test_dashscope_native_services_return_null_without_any_key(): void
+    {
+        $this->assertNull(app(AiModelGateway::class)->dashscopeKey());
+    }
+
+    /**
+     * Gọi method protected bằng reflection — các hàm chọn model là NỘI BỘ, không public API,
+     * nhưng chính chúng là nơi từng bỏ qua cài đặt.
+     */
+    private function callProtected(string $class, string $method, array $args): mixed
+    {
+        $ref = new \ReflectionMethod($class, $method);
+        $ref->setAccessible(true);
+
+        return $ref->invokeArgs(app($class), $args);
+    }
+}

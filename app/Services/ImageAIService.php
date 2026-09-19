@@ -95,24 +95,25 @@ class ImageAIService
 
         // Inpaint: when a source (base) image is supplied, use the dedicated Qwen image-edit model
         // WITH that image as input so the change applies to it (real editing), not a fresh text2image.
-        if ($baseImage && (studio_api_key('qwen_edit') || $this->providerKey() || $dashscopeKey)) {
-            // A requested model that is itself edit-capable (e.g. qwen-image-3.0-pro picked in the
-            // "Sửa ảnh" card) wins over the configured Qwen Edit model; anything else (text/vision
-            // models, unknown ids) keeps the configured edit model so editing never breaks.
+        $editChain = $baseImage ? $this->editModelChain($modelOverride) : [];
+        if ($editChain !== []) {
+            // Thử LẦN LƯỢT các model edit của nhóm công việc 'edit' — model người dùng chọn trên card
+            // trước, rồi default nhóm → Model Registry → legacy (setting qwen_edit_model). Model đứng
+            // trước thất bại ở MỌI key (hết hạn mức, 403/404…) thì tự chuyển sang model kế tiếp —
+            // đúng cơ chế "tự chuyển model" của Tạo ảnh 2D. Hạn mức DashScope tính THEO MODEL nên
+            // model edit chuyên dụng (qwen-image-edit…) thường vẫn còn hạn mức khi model sinh ảnh đã hết.
             $configuredEdit = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
-            $editModel = ($modelOverride && $this->isImageEditCapableModel($modelOverride))
-                ? $modelOverride
-                : $configuredEdit;
-            $triedModels = [$editModel];
-            $edited = $this->editImage($prompt, $baseImage, $editModel, $faceRef, null, $maskImage, $refImages);
-            // Model được chọn (vd qwen-image-3.0-pro) thất bại ở MỌI key (hết hạn mức, 403/404…) →
-            // tự fallback sang model Qwen Edit cấu hình — đúng cơ chế "tự chuyển sang model kế tiếp"
-            // của Tạo ảnh 2D. Hạn mức DashScope tính THEO MODEL nên model edit chuyên dụng
-            // (qwen-image-edit…) thường vẫn còn hạn mức khi model sinh ảnh đã hết.
-            if (! $edited && $editModel !== $configuredEdit && $this->isImageEditCapableModel($configuredEdit)) {
-                logger()->info('Inpaint: selected edit model failed, falling back to configured Qwen Edit model', ['from' => $editModel, 'to' => $configuredEdit]);
-                $triedModels[] = $configuredEdit;
-                $edited = $this->editImage($prompt, $baseImage, $configuredEdit, $faceRef, null, $maskImage, $refImages);
+            $triedModels = [];
+            $edited = null;
+            foreach ($editChain as $editModel) {
+                $triedModels[] = $editModel;
+                $edited = $this->editImage($prompt, $baseImage, $editModel, $faceRef, null, $maskImage, $refImages);
+                if ($edited) {
+                    if (count($triedModels) > 1) {
+                        logger()->info('Inpaint: chuyển sang model edit kế tiếp thành công', ['model' => $editModel, 'tried' => $triedModels]);
+                    }
+                    break;
+                }
             }
             if ($edited) {
                 // Model edit đôi khi trả ảnh tỷ lệ/kích thước hơi khác ảnh gốc — chuẩn hóa
@@ -947,6 +948,51 @@ class ImageAIService
         return 'data:'.$mime.';base64,'.$b64;
     }
 
+    /**
+     * Chuỗi model edit sẽ thử, theo đúng thứ tự ưu tiên của NHÓM CÔNG VIỆC 'edit'
+     * (Cài đặt → Nhóm công việc / Model Registry / Luồng ưu tiên provider).
+     *
+     * Trước đây đường Sửa ảnh chỉ biết ĐÚNG MỘT model — setting qwen_edit_model — nên model edit
+     * gán trong Model Registry không bao giờ được dùng và không có failover nào khác.
+     * Chỉ nhận provider Qwen-family vì postMultimodalEdit nói chuyện với DashScope /api/v1.
+     *
+     * @return list<string>
+     */
+    protected function editModelChain(?string $modelOverride = null): array
+    {
+        $chain = [];
+        $add = function (?string $provider, ?string $model) use (&$chain) {
+            $provider = (string) $provider;
+            $model = trim((string) $model);
+            if ($model === '' || ! in_array($provider, ['qwen', 'wan', 'dashscope', 'qwen_edit'], true)) {
+                return;
+            }
+            if (! $this->isImageEditCapableModel($model)) {
+                return;
+            }
+            // Model không có key nào dùng được cho nhóm 'edit' -> bỏ NGAY, không gọi rồi mới lỗi.
+            if (studio_qwen_credentials('edit', $model) === []) {
+                return;
+            }
+            if (! in_array($model, $chain, true)) {
+                $chain[] = $model;
+            }
+        };
+
+        // 1. Model người dùng chọn ngay trên card Sửa ảnh — ý định tường minh thắng.
+        if ($modelOverride) {
+            $add('qwen', $modelOverride);
+        }
+
+        // 2. Nhóm 'edit': default nhóm → Model Registry (theo luồng ưu tiên) → legacy
+        //    (setting qwen_edit_model + model sinh ảnh edit-capable khi nhóm chưa gán gì).
+        foreach (studio_task_group_models('edit') as $row) {
+            $add($row['provider'] ?? null, $row['model'] ?? null);
+        }
+
+        return $chain;
+    }
+
     protected function editImage(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null, ?string $poseRefUrl = null, ?string $maskImage = null, array $refImages = []): ?string
     {
         $model = $modelOverride ?: (string) studio_config('qwen_edit_model', 'qwen-image-edit');
@@ -1131,8 +1177,12 @@ class ImageAIService
         foreach ($candidates as $c) {
             $provider = (string) ($c['provider'] ?? '');
             $model = (string) ($c['model'] ?? '');
+            // PHẠM VI CÓ Ý THỨC: nhánh i2i/refgen dùng API multimodal NGUYÊN BẢN của DashScope
+            // (/services/aigc/multimodal-generation/generation), nên chỉ model Qwen-family chạy
+            // được. Candidate của nhóm 'image' thuộc provider khác (custom openai, gemini…) bị bỏ
+            // qua CÓ CHỦ Ý — không phải quên: chúng không có transport tương ứng ở đây.
             if (! in_array($provider, ['qwen', 'wan', 'dashscope'], true)) {
-                continue; // nhánh i2i chỉ hỗ trợ DashScope-family (qwen-image-3.0-pro…)
+                continue;
             }
 
             foreach (studio_candidate_key($c, 'image') as $key) {

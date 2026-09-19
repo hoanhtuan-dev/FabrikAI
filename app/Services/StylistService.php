@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
-
 /**
  * "Thuật sỹ ảo" — an AI fashion stylist that walks a SKELETON question matrix then
  * gives deep, specific advice per step. Never dumps a preset list; it interviews.
@@ -253,86 +251,32 @@ PROMPT;
         }
 
         $timeout = 15; // seconds — tight per-call so total latency stays low
-        $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
-        if ($qwenKey) {
-            // Chỉ thử model đầu tiên (flash) + key đầu tiên — nhanh nhất.
-            // Các model khác chỉ thử khi flash thất bại (model not found / quota).
-            $models = studio_qwen_text_models();
-            $firstModel = array_shift($models);
-            $models = array_merge([$firstModel], $models); // put first back
 
-            foreach ($models as $qm) {
-                $keys = studio_qwen_credentials('prompt');
-                $firstKey = array_shift($keys);
-                $keys = array_merge([$firstKey], $keys);
+        // MỘT nguồn duy nhất: nhóm công việc 'prompt' (Cài đặt → Nhóm công việc + Model Registry +
+        // Luồng ưu tiên + custom provider). Trước đây đường này cứng Qwen → Gemini nên đổi
+        // model/nhóm/custom provider trong Cài đặt không có tác dụng với Thuật sỹ ảo.
+        $result = app(\App\Services\AiModelGateway::class)->text('prompt', [
+            ['role' => 'user', 'content' => $instruction],
+        ], [
+            'timeout' => $timeout,
+            'max_tokens' => 1024,
+            'response_format' => 'json_object',
+        ]);
 
-                foreach ($keys as $key) {
-                    $base = dashscope_base_url($key).'/compatible-mode/v1';
-                    try {
-                        $resp = Http::withToken($key)->timeout($timeout)
-                            ->post($base.'/chat/completions', [
-                                'model' => $qm,
-                                'messages' => [['role' => 'user', 'content' => $instruction]],
-                                'response_format' => ['type' => 'json_object'],
-                                'max_tokens' => 1024, // Giới hạn output để response nhanh hơn
-                            ]);
-                        if ($resp->successful()) {
-                            $out = trim((string) data_get($resp->json(), 'choices.0.message.content'));
-                            $decoded = $this->decodeJson($out);
-                            if ($decoded) {
-                                $this->cacheChatResult($cacheKey, $decoded);
-                                return $decoded;
-                            }
-                        } elseif (is_qwen_quota_error((string) $resp->body())) {
-                            continue; // quota -> thử key tiếp theo
-                        } elseif ($resp->status() === 404
-                            || str_contains(strtolower((string) $resp->body()), 'model_not_found')
-                            || str_contains(strtolower((string) $resp->body()), 'model not exist')) {
-                            break; // model không tồn tại -> thử model kế tiếp
-                        }
-                        logger()->warning('Stylist Qwen('.$qm.') HTTP '.$resp->status().' '.substr((string) $resp->body(), 0, 160));
-                    } catch (\Throwable $e) {
-                        logger()->warning('Stylist Qwen('.$qm.') failed: '.$e->getMessage());
-                        break;
-                    }
-                }
-            }
+        if ($result === null) {
+            return null;
         }
 
-        // ── Gemini (fast failover) ──
-        $geminiKey = studio_api_key('gemini');
-        if ($geminiKey) {
-            $gemModels = array_values(array_unique(array_filter([
-                'gemini-2.5-flash',
-                (string) studio_config('translate_model', ''),
-                'gemini-2.0-flash',
-            ])));
-            foreach ($gemModels as $gm) {
-                if (! $gm) continue;
-                try {
-                    $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout($timeout)
-                        ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$gm.':generateContent', [
-                            'contents' => [['parts' => [['text' => $instruction]]]],
-                            'generationConfig' => [
-                                'responseMimeType' => 'application/json',
-                                'maxOutputTokens' => 1024,
-                            ],
-                        ]);
-                    if ($resp->successful()) {
-                        $out = trim((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
-                        $decoded = $this->decodeJson($out);
-                        if ($decoded) {
-                            $this->cacheChatResult($cacheKey, $decoded);
-                            return $decoded;
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    logger()->warning('Stylist Gemini('. $gm.') failed: '.$e->getMessage());
-                }
-            }
+        $decoded = $this->decodeJson($result['text']);
+        if (! $decoded) {
+            logger()->warning('Stylist: model '.$result['provider'].':'.$result['model'].' không trả JSON hợp lệ.');
+
+            return null;
         }
 
-        return null;
+        $this->cacheChatResult($cacheKey, $decoded);
+
+        return $decoded;
     }
 
     /** Cache a successful chat result for 5 minutes to avoid repeated calls. */
