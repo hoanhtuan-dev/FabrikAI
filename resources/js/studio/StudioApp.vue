@@ -1330,9 +1330,19 @@ function onTouchEnd(e) {
       <!-- Center canvas -->
       <main class="relative flex-1 min-w-0 p-3">
         <div class="relative flex h-full flex-col overflow-hidden rounded-lg border border-ink-700 bg-ink-900">
-          <!-- ══ Toolbar dock (phía trên, full width) — desktop only ══ -->
-          <div class="relative z-40 hidden min-h-12 shrink-0 items-center justify-center gap-2 overflow-x-auto overflow-y-hidden border-b border-ink-700/40 px-3 py-1.5 lg:flex">
-            <ContextToolbar />
+          <!-- ══ Toolbar dock (phía trên, full width) — desktop only ══
+               CHIỀU CAO CỐ ĐỊNH h-12: mọi thanh ngữ cảnh (ContextToolbar) đều cao đúng h-9 và
+               KHÔNG xuống dòng (khuôn 'bar' trong ContextToolbar.vue), nên vùng này không bao giờ
+               phình lên khi công cụ có nhiều thông số — thân canvas vì thế không bị đẩy/nhảy.
+               Nội dung dài hơn bề ngang thì RAIL CUỘN THEO TRỤC X: lớp trong w-max để rail có thứ
+               để cuộn, và nó dùng margin auto (mx-auto) thay cho justify-center — căn giữa khi đủ
+               chỗ, nhưng khi tràn thì mép TRÁI vẫn kéo tới được (justify-center trên khung cuộn sẽ
+               đẩy phần đầu ra ngoài vùng cuộn, không bao giờ xem tới được).
+               scrollbar-hide: thanh cuộn của rail không được chiếm mất chiều cao đã cố định. -->
+          <div class="scrollbar-hide relative z-40 hidden h-12 shrink-0 items-stretch overflow-x-auto overflow-y-hidden border-b border-ink-700/40 lg:flex">
+            <div class="mx-auto flex w-max items-center gap-2 px-3">
+              <ContextToolbar />
+            </div>
           </div>
           <!-- ══ Thân frame: vùng canvas + inspector Layers dock phải (desktop) ══ -->
           <div class="flex min-h-0 flex-1">
@@ -1503,8 +1513,8 @@ function onTouchEnd(e) {
           </aside>
           </div><!-- /flex row: canvas + inspector -->
           <!-- ══ Toolbar ngữ cảnh floating trên mobile (12px trên status bar) ══ -->
-          <div v-if="toolActive" data-covers-canvas="bottom" class="absolute bottom-12 left-1/2 z-40 max-w-[calc(100%-1rem)] -translate-x-1/2 lg:hidden">
-            <ContextToolbar />
+          <div v-if="toolActive" data-covers-canvas="bottom" class="scrollbar-hide absolute bottom-12 left-1/2 z-40 flex h-11 max-w-[calc(100%-1rem)] -translate-x-1/2 items-center overflow-x-auto overflow-y-hidden lg:hidden">
+            <div class="mx-auto w-max"><ContextToolbar /></div>
           </div>
           <!-- ══ Status bar dock dưới khung canvas ══ -->
           <CanvasStatusBar />

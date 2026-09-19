@@ -24,6 +24,14 @@ const chipOn = 'border-cream-100 bg-cream-100 font-semibold text-ink-900';
 const chipOff = 'border-ink-700 text-cream-200 hover:border-cream-300 hover:text-cream-100';
 const sep = 'mx-0.5 h-3.5 w-px shrink-0 bg-ink-600';
 const ring = 'ring-ink-600/70';
+// ── KHUÔN CHUNG cho MỌI thanh ngữ cảnh ───────────────────────────────────────────────────
+// Vùng toolbar phía trên canvas cao CỐ ĐỊNH (h-12) và chỉ cuộn theo TRỤC X. Nên mỗi biến thể ở
+// đây BẮT BUỘC dùng chung khuôn này: MỘT hàng ngang (flex-nowrap), cao đúng h-9, rộng bằng nội
+// dung (w-max + shrink-0) → thanh không bao giờ tự xuống dòng làm vùng toolbar cao lên; phần
+// tràn bề ngang do rail bên ngoài cuộn ngang.
+// (Trước đây mỗi thanh tự đặt flex-wrap + py-2: công cụ nhiều thông số — ví dụ Vẽ tự do — đẩy
+// vùng toolbar cao lên rồi bị chính overflow-y-hidden của rail cắt mất.)
+const bar = 'flex h-9 w-max shrink-0 flex-nowrap items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-ink-900/95 px-2.5 text-xs font-semibold shadow-xl ring-1';
 // Widget pill cho thông số
 const pill = 'flex items-center justify-between gap-1.5 rounded-lg bg-ink-800/70 px-1.5 py-1';
 const pillL = 'flex items-center gap-1 pr-1 text-[9px] text-cream-300/70';
@@ -33,7 +41,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
 </script>
 <template>
   <!-- ══ Vùng chọn (rect/freehand/path/magic/brush) ══ -->
-  <div v-if="store.inpaintMaskMode !== 'none'" class="flex flex-wrap items-center justify-center gap-1.5 rounded-lg bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-if="store.inpaintMaskMode !== 'none'" :class="[bar, ring]">
     <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path' || store.inpaintMaskMode === 'magic'">
       <template v-if="store.inpaintMaskMode === 'path'">
         <!-- Đang CHỈNH SỬA vùng đã đóng → nút "Xong" để hoàn thành việc sửa (cập nhật vùng + re-bake). -->
@@ -75,14 +83,14 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ Đã lưu vùng ══ -->
-  <div v-else-if="store.inpaintMaskDone" class="flex items-center gap-1.5 rounded-lg bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-else-if="store.inpaintMaskDone" :class="[bar, ring]">
     <span class="flex items-center gap-1 px-1 text-[10px] font-medium text-cream-200"><StudioIcon name="check" :size="I"/>Đã lưu vùng</span>
     <button @click="store.toggleInpaintMask('path')" :class="[lbl, btn]" title="Mở lại để chỉnh sửa"><StudioIcon name="pencil" :size="I"/>Chỉnh lại</button>
     <button @click="store.clearInpaintMask()" :class="iconBtnDanger" title="Bỏ mask" aria-label="Bỏ mask"><StudioIcon name="x" :size="I"/></button>
   </div>
 
   <!-- ══ Xóa vùng (erase) ══ -->
-  <div v-else-if="store.eraseMode" class="flex flex-wrap items-center justify-center gap-1.5 rounded-lg bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-else-if="store.eraseMode" :class="[bar, ring]">
     <div class="flex items-center justify-center gap-0.5 rounded-lg bg-ink-800/70 px-1.5 py-0.5"><StudioIcon name="brush" size="h-3 w-3" class="text-brand-300"/><input type="range" min="3" max="150" step="1" :value="store.eraseBrushSize" @input="store.eraseBrushSize = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-8 text-right text-[9px] tabular-nums text-cream-100">{{ store.eraseBrushSize }}px</span></div>
     <div class="flex items-center justify-center gap-0.5 rounded-lg bg-ink-800/70 px-1.5 py-0.5"><StudioIcon name="feather" size="h-3 w-3" class="text-brand-300"/><input type="range" min="0" max="60" step="1" :value="store.eraseFeather" @input="store.eraseFeather = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-6 text-right text-[9px] tabular-nums text-cream-100">{{ store.eraseFeather }}</span></div>
     <span :class="sep"></span>
@@ -92,7 +100,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ Vẽ tự do (paint brush) — tiến tới Krita/PS ══ -->
-  <div v-else-if="store.drawMode" class="flex flex-wrap items-center justify-center gap-1.5 rounded-lg bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-else-if="store.drawMode" :class="[bar, ring]">
     <label class="flex items-center gap-1.5 rounded-lg bg-ink-800/70 px-1.5 py-1"><StudioIcon name="brush" size="h-3 w-3" class="shrink-0 text-brand-300"/><input type="range" min="3" max="150" step="1" :value="store.drawBrushSize" @input="store.drawBrushSize = Number($event.target.value)" class="h-1 w-14 cursor-pointer accent-cream-300"><span class="w-7 shrink-0 text-right text-[8px] tabular-nums text-cream-100">{{ store.drawBrushSize }}px</span></label>
     <label class="flex items-center gap-1.5 rounded-lg bg-ink-800/70 px-1.5 py-1"><StudioIcon name="droplet" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-[9px] text-cream-300/60">Đậm</span><input type="range" min="0.05" max="1" step="0.05" :value="store.drawOpacity" @input="store.drawOpacity = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-7 shrink-0 text-right text-[8px] tabular-nums text-cream-100">{{ Math.round(store.drawOpacity * 100) }}%</span></label>
     <label class="flex items-center gap-1.5 rounded-lg bg-ink-800/70 px-1.5 py-1"><StudioIcon name="feather" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-[9px] text-cream-300/60">Mềm</span><input type="range" min="0" max="60" step="1" :value="store.drawSoftness" @input="store.drawSoftness = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-5 shrink-0 text-right text-[8px] tabular-nums text-cream-100">{{ store.drawSoftness }}</span></label>
@@ -108,7 +116,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ Crop ══ -->
-  <div v-else-if="store.reframeOpen || store.cropMode" class="flex flex-wrap items-center justify-center gap-1.5 rounded-lg bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-else-if="store.reframeOpen || store.cropMode" :class="[bar, ring]">
     <span class="flex items-center gap-1 text-cream-200"><StudioIcon name="crop" :size="I"/>Crop</span>
     <button v-for="r in reframeRatios" :key="r" type="button" @click="store.reframeRatio = r" class="rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors" :class="store.reframeRatio === r ? chipOn : chipOff">{{ r }}</button>
     <span class="h-4 w-px bg-ink-600"></span>
@@ -119,7 +127,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ Film Look ══ -->
-  <div v-else-if="store.filmOpen || store.looking" class="flex flex-wrap items-center justify-center gap-1.5 rounded-lg bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-else-if="store.filmOpen || store.looking" :class="[bar, ring]">
     <span class="flex items-center gap-1 text-cream-200"><StudioIcon name="palette" :size="I"/>Look</span>
     <button v-for="p in looks" :key="p[0]" type="button" @click="store.lookPreset = p[0]" class="rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors" :class="store.lookPreset === p[0] ? chipOn : chipOff">{{ p[1] }}</button>
     <span class="h-4 w-px bg-ink-600"></span>
@@ -129,7 +137,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ Layer Selection: hiện khi có layer ĐANG CHỌN (không cần bật selectTool) ══ -->
-  <div v-else-if="store.activeLayer && !store.selectTool" class="flex flex-wrap items-center justify-center gap-1.5 rounded-lg bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-else-if="store.activeLayer && !store.selectTool" :class="[bar, ring]">
     <!-- Nút checkbox chọn nhiều: toggle selectTool → cho phép thêm/bớt layer vào selection -->
     <button @click="store.selectTool = !store.selectTool" :class="[lbl, store.selectTool ? on : btn]" title="Bật/tắt chọn nhiều layer — bấm layer để thêm/bớt vào nhóm chọn (giống Shift+click)"><StudioIcon name="checkSquare" :size="I"/>Chọn nhiều</button>
     <!-- Căn lề (hiện khi >= 2 layer) -->
@@ -160,7 +168,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ Select Tool: marquee chọn hàng loạt + chọn tất cả / bỏ chọn + fit selection ══ -->
-  <div v-else-if="store.selectTool" class="flex flex-wrap items-center justify-center gap-1.5 rounded-lg bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-else-if="store.selectTool" :class="[bar, ring]">
     <span class="flex items-center gap-1 px-1 text-[10px] font-medium text-cream-200"><StudioIcon name="cursor" :size="I"/>Quét chọn</span>
     <button @click="store.selectAll()" :class="[lbl, btn]" title="Chọn tất cả layer (Ctrl+A)"><StudioIcon name="selectAll" :size="I"/>Tất cả</button>
     <button @click="store.deselectAll()" :class="[lbl, btn]" title="Bỏ chọn tất cả (Esc)"><StudioIcon name="x" :size="I"/>Bỏ chọn</button>
@@ -191,7 +199,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ Pan tool: context bar gọn với zoom + fit ══ -->
-  <div v-else-if="store.panMode" class="flex flex-wrap items-center justify-center gap-1.5 rounded-lg bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-else-if="store.panMode" :class="[bar, ring]">
     <span class="flex items-center gap-1 px-1 text-[10px] font-medium text-cream-200"><StudioIcon name="hand" :size="I"/>Di chuyển canvas</span>
     <button @click="store.zoomOut()" :class="iconBtn" title="Thu nhỏ"><StudioIcon name="zoomOut" :size="I"/></button>
     <button @click="store.zoomIn()" :class="iconBtn" title="Phóng to"><StudioIcon name="zoomIn" :size="I"/></button>
@@ -199,5 +207,5 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ No active tool: placeholder text ══ -->
-  <span v-else class="text-[11px] font-medium text-cream-300/50">Chọn công cụ từ thanh công cụ cạnh canvas (Esc = hủy · Enter = xong)</span>
+  <span v-else class="shrink-0 whitespace-nowrap text-[11px] font-medium text-cream-300/50">Chọn công cụ từ thanh công cụ cạnh canvas (Esc = hủy · Enter = xong)</span>
 </template>
