@@ -852,3 +852,89 @@ Full suite **810 pass**; 6 fail vẫn là 6 lỗi SẴN CÓ ở HEAD.
       chọn lại từng buổi. Nên gắn `look_id` vào project để mở lại đúng buổi chụp cũ.
 - [ ] Chưa hỗ trợ **nhiều người mẫu trong cùng khung** (lookbook đôi) và **đổi bối cảnh giữ nguyên ảnh gốc**
       (retouch lại phần nền) — đều cần model ảnh thật mới kiểm chứng được.
+
+---
+
+## Phiên 2026-09-22 (Đợt 11 — STUDIO thiết kế lại luồng: ảnh người mẫu + bối cảnh + prompt + CHIP từ «Cài đặt của tôi»)
+
+**Commit:** `202b6ac` (luồng mới) + `b7cfde1` (nhãn nhóm chip). **Đã deploy production** (không migration),
+rebuild `main-508WxgnN.js` / `my-settings-Dwa9SIL2.js`.
+
+### Luồng mới (theo yêu cầu)
+
+```
+ảnh 1 = NGƯỜI MẪU MẶC TRANG PHỤC (kết quả bước trước — GIỮ NGUYÊN, đây là sản phẩm)  [bắt buộc]
+ảnh 2 = BỐI CẢNH                                                                        [tùy chọn]
+ảnh 3 = THAM CHIẾU THÊM (chi tiết / phụ kiện / màu)                                    [tùy chọn]
++ ô nhập prompt  +  CHIP NHANH đọc từ PRESET trong «Cài đặt của tôi»
+```
+
+**Đã bỏ** theo yêu cầu: khối **Ánh sáng**, ô **Bộ sưu tập / chủ đề** — và cả bộ máy dựng sẵn trước đó
+(14 bối cảnh chữ · ống kính · dáng · danh sách ảnh), vì người dùng đã có nguồn chân lý riêng: **PRESET**.
+
+### Backend
+
+- `PhotoStudioService` viết lại:
+  - **`chipGroups()` / `chipIndex()`** ghép preset DÙNG CHUNG (bảng `presets`) với bản của CHÍNH tài khoản
+    (`user_catalogs` name `presets`: `custom` / `edits` / `hidden`) theo **đúng logic `useLocalCatalog.merge()`**
+    ở giao diện ⇒ Studio thấy đúng thứ người dùng thấy ở Cài đặt (mục tự thêm, mục bị ẩn, mục bị sửa);
+  - **`scene()`** dựng prompt theo thứ tự ưu tiên **GIỮ SẢN PHẨM > BỐI CẢNH > CHỈ DẪN người dùng**, chỉ nhắc
+    `SECOND`/`THIRD image` khi người dùng THỰC SỰ chọn ảnh đó;
+  - chip gửi lên chỉ là **ID**, đoạn chèn luôn tra từ Cài đặt ⇒ không tin nội dung client gửi;
+  - đếm đúng ảnh/credit; cảnh báo thiếu ảnh 1 · thiếu cả prompt lẫn chip · quá 12 chip · chip đã bị xoá/ẩn,
+    và **NÓI THẬT** khi chưa cấu hình model ảnh (chế độ demo).
+- Endpoint giữ nguyên đường: `POST /api/studio/shoot/catalog` (chip + 3 vai trò ô ảnh + tỉ lệ + `settings_url`)
+  và `POST /api/studio/shoot/plan` (prompt dựng sẵn).
+- **`/api/compose` + `/api/compose/preview` nhận TỪ 1 ẢNH** (trước bắt buộc 2): Studio chỉ có ảnh người mẫu khi
+  người dùng không chọn ảnh bối cảnh; prompt của Studio đi qua `final_prompt` nên phần "ghép nhiều ảnh" không dùng tới.
+  Không ảnh hưởng card khác (họ luôn gửi từ 2 ảnh).
+- **Nhãn nhóm**: bảng presets có **17 danh mục** nhưng cả `CHIP_CATEGORY_LABELS` (Studio) lẫn `CAT_LABELS`
+  (trang Cài đặt của tôi) chỉ khai 9 ⇒ bổ sung 8 nhãn còn thiếu (Màu sắc · Cổ áo · Tay áo · Độ vừa vặn ·
+  Họa tiết · Chi tiết · Dịp mặc · Mùa) ở CẢ HAI nơi — trước đó chip lọc hiện mã thô `color`, `neckline`…
+
+### Frontend — `StudioCard.vue` viết lại
+
+- 3 ô ảnh theo đúng vai trò, ghi rõ **bắt buộc / tùy chọn** ngay trên từng ô;
+- ô nhập prompt (đếm ký tự) + **CHIP NHANH nhóm theo danh mục preset**, chip "Đang dùng", nút **«Sửa chip»** mở
+  thẳng `/cai-dat/presets`;
+- số biến thể + tỉ lệ · **xem/sửa prompt gửi AI** (bản sửa tay được ưu tiên) · cảnh báo · ước tính credit · chạy 1 lần;
+- `store.js`: `sceneCatalog/scenePlan/sceneSetup/sceneEditedPrompt` + `loadSceneCatalog`, `setSceneSetup`,
+  `toggleSceneChip`, `clearSceneChips`, `planScene` (tất định), `scenePrompt`, `runScene` (qua `/api/compose`).
+
+### Đo THẬT trên production sau deploy
+
+```
+preset dùng chung = 198 · tổng chip = 198 · 17 nhóm:
+Chất liệu 21 · Màu sắc 16 · Phom dáng 12 · Cổ áo 10 · Tay áo 11 · Độ vừa vặn 8 · Họa tiết 12 · Phong cách 22 ·
+Chi tiết 13 · Dịp mặc 10 · Mùa 5 · Bối cảnh 18 · Góc máy 8 · Ống kính 7 · Kịch bản quay 8 · Dáng đứng 12 · Sửa ảnh 5
+
+scene(2 ảnh, 2 biến thể, 4:5) → images=2 credits=4 · used_chips=[Chất liệu/Lụa bóng, Chất liệu/Lụa sa tanh bóng]
+warnings=[Chưa cấu hình model tạo/sửa ảnh (nhóm "edit") — kết quả sẽ là ẢNH MẪU (chế độ demo)…]
+
+PROMPT: "Professional fashion photograph. The FIRST image is the model wearing the garment: keep her identity,
+face, hair, body proportions and pose, and keep the garment EXACTLY as it is … 100% fidelity — do NOT redesign …
+SCENE: place the model naturally into the setting shown in the SECOND image — match its perspective, camera height,
+scale, ground contact and lighting direction … DIRECTION: đặt cô ấy vào quán cà phê Sài Gòn …
+DETAILS: silk satin fabric with a subtle sheen · … QUALITY: photorealistic, sharp fabric texture …"
+```
+
+### Verify production
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `b7cfde1` |
+| Bundle | `main-508WxgnN.js` có "Chip nhanh" · "Đang dùng:" · "Xem/sửa prompt gửi AI" · "Sửa chip" · "Người mẫu mặc trang phục" |
+| Trang | `/` `/up` → **200** |
+
+**Test:** 15 test (9 unit `PhotoStudioServiceTest`: ghép catalog giống hệt Cài đặt — ẩn/sửa/tự thêm · bỏ preset thiếu dữ
+liệu · vai trò 3 ảnh theo số ảnh THỰC chọn · nối chip vào prompt · cảnh báo thiếu ảnh/hướng dẫn · đếm credit + demo · trần
+chip + tỉ lệ lạ; 6 feature `PhotoStudioTest`: 401 khách · catalog đọc từ Cài đặt của tôi · tôn trọng hidden/edits/custom ·
+plan KHÔNG gọi model + validate · module lock · **compose nhận 1 ảnh**). Full suite **812 pass**; 6 fail vẫn là lỗi SẴN CÓ.
+
+### Còn lại (đề xuất)
+
+- [ ] **Chưa có key model ảnh trên production** (nhóm `image`/`edit`/`video`/`swap` rỗng) ⇒ Studio vẫn chạy demo;
+      giao diện đã cảnh báo thay vì trả ảnh mẫu im lặng.
+- [ ] Nên thêm **chip "giữ nguyên"** mặc định (giữ tư thế/không đổi mặt) và **ô ghi chú chip** trong Cài đặt để
+      người dùng tự soạn cụm chỉ dẫn dài mà không phải gõ lại mỗi lần.
+- [ ] Chưa lưu **preset đang chọn theo bộ sưu tập** (mở lại buổi chụp cũ phải chọn lại chip).
