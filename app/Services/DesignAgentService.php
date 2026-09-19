@@ -352,45 +352,47 @@ class DesignAgentService
             .'Viết tiếng Việt, ngắn gọn, cụ thể, có thể hành động ngay: MỖI trường tối đa 25 từ, KHÔNG xuống dòng trong giá trị, KHÔNG thêm chữ nào ngoài JSON.';
 
         $started = microtime(true);
-        $answer = $this->gateway->text(self::AI_GROUP, [
-            ['role' => 'system', 'content' => $instruction],
-            ['role' => 'user', 'content' => "DỮ LIỆU:\n".json_encode([
-                'region' => $region,
-                'region_name' => $this->regionName($region),
-                'data_mode' => 'demo',
-                'trends' => array_map(fn (array $trend) => [
-                    'id' => $trend['id'],
-                    'title' => $trend['title'],
-                    'category' => $trend['category'],
-                    'lifecycle' => $trend['lifecycle'],
-                    'momentum' => $trend['momentum'],
-                    'confidence' => $trend['confidence'],
-                    'description' => $trend['description'],
-                    'recommended_action' => $trend['recommended_action'],
-                ], $trends),
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)],
-        ], ['response_format' => 'json_object', 'max_tokens' => 3000, 'timeout' => 60]);
+        $call = $this->callJson($instruction, [
+            'region' => $region,
+            'region_name' => $this->regionName($region),
+            'data_mode' => 'demo',
+            'trends' => array_map(fn (array $trend) => [
+                'id' => $trend['id'],
+                'title' => $trend['title'],
+                'category' => $trend['category'],
+                'lifecycle' => $trend['lifecycle'],
+                'momentum' => $trend['momentum'],
+                'confidence' => $trend['confidence'],
+                'description' => $trend['description'],
+                'recommended_action' => $trend['recommended_action'],
+            ], $trends),
+        ], 3000, 8000, 60);
         $latency = (int) round((microtime(true) - $started) * 1000);
         $attempted = $candidates[0]['provider'].':'.$candidates[0]['model'];
+        $answer = $call['answer'];
 
         if ($answer === null) {
             logger()->warning('TrendRadar: model không trả về nội dung, dùng engine tất định', ['group' => self::AI_GROUP, 'attempted' => $attempted]);
 
-            return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted])];
+            return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts']])];
         }
 
-        $directions = $this->normalizeDirections($this->decodeJson($answer['text']), $trends, $ruleDirections);
+        $directions = $this->normalizeDirections($call['json'], $trends, $ruleDirections);
         if ($directions === []) {
-            // Ghi lại ĐẦU ra thô (đã cắt) để lần sau biết chính xác vì sao không dùng được —
-            // đầu vào chỉ là catalog mẫu nên không có dữ liệu riêng của người dùng ở đây.
+            // Ghi lại ĐẦU ra thô (đã cắt) + lý do kết thúc để lần sau biết CHÍNH XÁC vì sao
+            // không dùng được — đầu vào chỉ là catalog mẫu nên không có dữ liệu riêng của user.
             logger()->warning('TrendRadar: model trả về định hướng không hợp lệ, dùng engine tất định', [
                 'attempted' => $attempted,
                 'provider' => $answer['provider'],
                 'model' => $answer['model'],
+                'finish_reason' => $answer['finish_reason'],
+                'reasoning_only' => $answer['reasoning_only'],
+                'attempts' => $call['attempts'],
+                'chars' => strlen($answer['text']),
                 'raw' => substr($answer['text'], 0, 800),
             ]);
 
-            return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted])];
+            return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts']])];
         }
 
         Cache::put($cacheKey, [
@@ -403,6 +405,7 @@ class DesignAgentService
             'provider' => $answer['provider'],
             'model' => $answer['model'],
             'latency_ms' => $latency,
+            'attempts' => $call['attempts'],
         ])];
     }
 
@@ -535,29 +538,31 @@ class DesignAgentService
             .'next_steps: đúng 3 việc cần làm tiếp.';
 
         $started = microtime(true);
-        $answer = $this->gateway->text(self::AI_GROUP, [
-            ['role' => 'system', 'content' => $instruction],
-            ['role' => 'user', 'content' => "DỮ LIỆU:\n".json_encode($context, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)],
-        ], ['response_format' => 'json_object', 'max_tokens' => 4000, 'timeout' => 75]);
+        $call = $this->callJson($instruction, $context, 4000, 8000, 75);
         $latency = (int) round((microtime(true) - $started) * 1000);
         $attempted = $candidates[0]['provider'].':'.$candidates[0]['model'];
+        $answer = $call['answer'];
 
         if ($answer === null) {
             logger()->warning('CollectionBot: model không trả về nội dung, dùng engine tất định', ['attempted' => $attempted]);
 
-            return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted]), 'data' => null];
+            return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts']]), 'data' => null];
         }
 
-        $data = $this->normalizeAiBrief($this->decodeJson($answer['text']));
+        $data = $this->normalizeAiBrief($call['json']);
         if ($data === null) {
             logger()->warning('CollectionBot: model trả về JSON không dùng được, dùng engine tất định', [
                 'attempted' => $attempted,
                 'provider' => $answer['provider'],
                 'model' => $answer['model'],
+                'finish_reason' => $answer['finish_reason'],
+                'reasoning_only' => $answer['reasoning_only'],
+                'attempts' => $call['attempts'],
+                'chars' => strlen($answer['text']),
                 'raw' => substr($answer['text'], 0, 800),
             ]);
 
-            return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted]), 'data' => null];
+            return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts']]), 'data' => null];
         }
 
         return [
@@ -565,9 +570,69 @@ class DesignAgentService
                 'provider' => $answer['provider'],
                 'model' => $answer['model'],
                 'latency_ms' => $latency,
+                'attempts' => $call['attempts'],
             ]),
             'data' => $data,
         ];
+    }
+
+    /**
+     * Gọi model rồi đọc JSON, có THANG THỬ LẠI.
+     *
+     * Vì sao cần: model "suy luận" (deepseek-flash, *-reasoner…) tính CẢ token suy luận vào
+     * max_tokens, nên với prompt dài, ngân sách có thể cạn TRƯỚC khi model viết xong JSON —
+     * 'content' bị cụt (finish_reason=length) hoặc rỗng hoàn toàn (chỉ còn reasoning). Đo thật
+     * trên production: lần đầu trả về đúng 6 ký tự '{"dire'. Vì vậy khi lần đầu không đọc được
+     * JSON, thử LẠI MỘT lần với ngân sách token lớn hơn hẳn trước khi chịu thua.
+     *
+     * @return array{json: ?array, answer: ?array, attempts: int}
+     */
+    private function callJson(string $instruction, array $payload, int $budget, int $retryBudget, int $timeout): array
+    {
+        $messages = [
+            ['role' => 'system', 'content' => $instruction],
+            ['role' => 'user', 'content' => "DỮ LIỆU:\n".json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)],
+        ];
+
+        $answer = $this->gateway->text(self::AI_GROUP, $messages, [
+            'response_format' => 'json_object',
+            'max_tokens' => $budget,
+            'timeout' => $timeout,
+        ]);
+
+        if ($answer === null) {
+            return ['json' => null, 'answer' => null, 'attempts' => 1];
+        }
+
+        $json = $this->decodeJson($answer['text']);
+        if ($json !== null) {
+            return ['json' => $json, 'answer' => $answer, 'attempts' => 1];
+        }
+
+        logger()->info('Agent Studio: lần gọi đầu chưa đọc được JSON, thử lại với ngân sách token lớn hơn', [
+            'provider' => $answer['provider'],
+            'model' => $answer['model'],
+            'finish_reason' => $answer['finish_reason'],
+            'reasoning_only' => $answer['reasoning_only'],
+            'chars' => strlen($answer['text']),
+        ]);
+
+        $retry = $this->gateway->text(self::AI_GROUP, $messages, [
+            'response_format' => 'json_object',
+            'max_tokens' => $retryBudget,
+            'timeout' => $timeout * 2,
+        ]);
+
+        if ($retry !== null) {
+            $retryJson = $this->decodeJson($retry['text']);
+            if ($retryJson !== null) {
+                return ['json' => $retryJson, 'answer' => $retry, 'attempts' => 2];
+            }
+
+            return ['json' => null, 'answer' => $retry, 'attempts' => 2];
+        }
+
+        return ['json' => null, 'answer' => $answer, 'attempts' => 2];
     }
 
     /** Chuẩn hoá phần chữ do model trả về; null = không có gì dùng được. */

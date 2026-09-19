@@ -213,6 +213,59 @@ class DesignAgentAiTest extends TestCase
         $this->assertSame('Định hướng AI 1', $response->json('directions.0.title'));
     }
 
+    /**
+     * Đo THẬT trên production: deepseek-flash là model suy luận (token suy luận tính vào
+     * max_tokens) nên lần gọi đầu có thể chỉ trả về đúng vài ký tự hoặc chỉ có reasoning.
+     * Agent phải THỬ LẠI với ngân sách token lớn hơn thay vì bỏ cuộc.
+     */
+    public function test_radar_retries_with_a_bigger_token_budget_when_the_answer_is_cut(): void
+    {
+        $this->configurePromptModel();
+        Http::fake([
+            'api.deepseek.com/*' => Http::sequence()
+                ->push(['choices' => [[
+                    'message' => ['content' => '{"dire'],
+                    'finish_reason' => 'length',
+                ]]], 200)
+                ->push(['choices' => [[
+                    'message' => ['content' => $this->directionsJson(6)],
+                    'finish_reason' => 'stop',
+                ]]], 200),
+        ]);
+
+        $response = $this->actingAs($this->customer())->postJson('/api/design-agent/radar')->assertOk();
+
+        $response->assertJsonPath('engine', 'ai-v1')->assertJsonPath('model.attempts', 2);
+        $this->assertSame('Định hướng AI 1', $response->json('directions.0.title'));
+
+        $budgets = Http::recorded()
+            ->map(fn ($pair) => (int) ($pair[0]->data()['max_tokens'] ?? 0))
+            ->values()
+            ->all();
+        $this->assertCount(2, $budgets, 'Phải gọi lại đúng một lần.');
+        $this->assertGreaterThan($budgets[0], $budgets[1], 'Lần thử lại phải xin ngân sách token LỚN HƠN.');
+    }
+
+    public function test_radar_retries_when_only_reasoning_came_back(): void
+    {
+        $this->configurePromptModel();
+        Http::fake([
+            'api.deepseek.com/*' => Http::sequence()
+                ->push(['choices' => [[
+                    'message' => ['content' => '', 'reasoning_content' => 'Ta cần trả JSON gồm các định hướng…'],
+                    'finish_reason' => 'length',
+                ]]], 200)
+                ->push(['choices' => [[
+                    'message' => ['content' => $this->directionsJson(5)],
+                    'finish_reason' => 'stop',
+                ]]], 200),
+        ]);
+
+        $response = $this->actingAs($this->customer())->postJson('/api/design-agent/radar')->assertOk();
+
+        $response->assertJsonPath('engine', 'ai-v1')->assertJsonPath('model.attempts', 2);
+    }
+
     // ── 3. Lỗi model ⇒ quay về tất định và nói rõ lý do ─────────────────────
 
     public function test_radar_falls_back_when_the_model_returns_broken_json(): void

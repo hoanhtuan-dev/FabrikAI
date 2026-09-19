@@ -122,20 +122,26 @@ class AiModelGateway
      *
      * @param  list<array{role:string, content:mixed}>  $messages
      * @param  array{response_format?:string, max_tokens?:int, timeout?:int, json?:bool}  $options
-     * @return array{text:string, provider:string, model:string}|null
+     * @return array{text:string, provider:string, model:string, finish_reason:?string, reasoning_only:bool}|null
      */
     public function text(string $group, array $messages, array $options = []): ?array
     {
         foreach ($this->candidates($group) as $candidate) {
             foreach ($candidate['keys'] as $key) {
                 try {
-                    $text = $this->callText($candidate, $key, $messages, $options);
+                    $result = $this->callText($candidate, $key, $messages, $options);
                 } catch (\Throwable $e) {
                     logger()->warning('AiModelGateway text lỗi ('.$candidate['provider'].':'.$candidate['model'].'): '.$e->getMessage());
                     continue;
                 }
-                if ($text !== null && trim($text) !== '') {
-                    return ['text' => trim($text), 'provider' => $candidate['provider'], 'model' => $candidate['model']];
+                if ($result !== null && trim($result['text']) !== '') {
+                    return [
+                        'text' => trim($result['text']),
+                        'provider' => $candidate['provider'],
+                        'model' => $candidate['model'],
+                        'finish_reason' => $result['finish_reason'],
+                        'reasoning_only' => $result['reasoning_only'],
+                    ];
                 }
             }
         }
@@ -221,7 +227,10 @@ class AiModelGateway
         return null;
     }
 
-    protected function callText(array $candidate, string $key, array $messages, array $options): ?string
+    /**
+     * @return array{text:string, finish_reason:?string, reasoning_only:bool}|null
+     */
+    protected function callText(array $candidate, string $key, array $messages, array $options): ?array
     {
         $timeout = (int) ($options['timeout'] ?? 90);
         $maxTokens = (int) ($options['max_tokens'] ?? 1024);
@@ -234,7 +243,7 @@ class AiModelGateway
             }
             $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
 
-            return $resp->successful() ? (string) data_get($resp->json(), 'choices.0.message.content') : null;
+            return $resp->successful() ? $this->textResult($resp->json()) : null;
         }
 
         if ($candidate['transport'] === 'gemini') {
@@ -249,7 +258,16 @@ class AiModelGateway
             $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout($timeout)
                 ->post($this->geminiBase($candidate).'/models/'.$candidate['model'].':generateContent', $body);
 
-            return $resp->successful() ? (string) data_get($resp->json(), 'candidates.0.content.parts.0.text') : null;
+            if (! $resp->successful()) {
+                return null;
+            }
+            $json = $resp->json();
+
+            return [
+                'text' => (string) data_get($json, 'candidates.0.content.parts.0.text'),
+                'finish_reason' => strtolower((string) data_get($json, 'candidates.0.finishReason')) ?: null,
+                'reasoning_only' => false,
+            ];
         }
 
         // openai-compatible (built-in base_url hoặc custom provider)
@@ -262,13 +280,29 @@ class AiModelGateway
         }
         $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
 
-        if (! $resp->successful()) {
-            return null;
-        }
+        return $resp->successful() ? $this->textResult($resp->json()) : null;
+    }
 
-        // Model reasoning có thể trả nội dung ở reasoning_content khi content rỗng.
-        return (string) (data_get($resp->json(), 'choices.0.message.content')
-            ?: data_get($resp->json(), 'choices.0.message.reasoning_content'));
+    /**
+     * Chuẩn hoá một phản hồi chat-completions.
+     *
+     * Vì sao cần finish_reason + reasoning_only: model "suy luận" (deepseek-flash, *-reasoner…)
+     * tính CẢ token suy luận vào max_tokens, nên khi ngân sách token cạn thì 'content' có thể
+     * RỖNG (chỉ còn reasoning) hoặc bị CẮT giữa chừng với finish_reason='length'. Người gọi cần
+     * biết điều đó để thử LẠI với ngân sách lớn hơn thay vì tưởng model trả lời sai.
+     *
+     * @return array{text:string, finish_reason:?string, reasoning_only:bool}
+     */
+    protected function textResult($json): array
+    {
+        $content = trim((string) data_get($json, 'choices.0.message.content'));
+        $reasoning = trim((string) data_get($json, 'choices.0.message.reasoning_content'));
+
+        return [
+            'text' => $content !== '' ? $content : $reasoning,
+            'finish_reason' => data_get($json, 'choices.0.finish_reason') ?: null,
+            'reasoning_only' => $content === '' && $reasoning !== '',
+        ];
     }
 
     protected function callVision(array $candidate, string $key, string $instruction, array $dataUris, array $options): ?string
