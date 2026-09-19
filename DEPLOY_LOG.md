@@ -219,3 +219,58 @@ Asset build từ worktree sạch (HEAD + chỉ thay đổi của phiên này) �
 - [ ] Thêm API key DeepSeek ở tab 🔑 (provider `deepseek`) thì nhóm DeepSeek mới thực sự gọi được; chưa có key thì candidate vẫn được liệt kê nhưng sẽ lỗi và rơi xuống nhóm sau.
 - [ ] Phiên Collections/Canvas: sửa 6 test đỏ rồi rebuild asset (xem mục phiên trước).
 
+
+---
+
+## Phiên 2026-09-22 (Đợt 3 — Card 'Gợi ý từ ảnh' đi theo Model Registry + luồng ưu tiên)
+
+**Commit:** `b82ff50`. **Đã deploy production** (không migration, không đổi frontend).
+
+### Nguyên nhân (điều tra theo yêu cầu)
+
+Card '💡 Gợi ý từ ảnh' chạy **pipeline riêng**, cứng `qwen|gemini` ở 3 chỗ và KHÔNG đọc Model Registry / nhóm công việc `vision` / luồng ưu tiên:
+
+| Chỗ | Trước |
+|---|---|
+| `helpers.php` `studio_suggest_provider()` | ép mọi giá trị khác về `qwen` |
+| `StyleSuggestService::suggest()` | chỉ dựng `$attempts` từ qwen + gemini (chuỗi `deepseek` xuất hiện **0 lần** trong cả `app/Services/`) |
+| `StudioController::updateSuggestSettings()` | validate `in:gemini,qwen` ⇒ không lưu được deepseek/custom |
+
+**Hệ quả thật trên production:** key `qwen` đã tắt, không có key gemini, chỉ còn key `deepseek` đang bật ⇒ **danh sách thử RỖNG** ⇒ card lặng lẽ rơi về phân tích màu GD (không có suy luận nào), dù registry đã có dòng `deepseek:deepseek-flash` trong nhóm `vision`.
+
+**Kiểm chứng thêm:** `deepseek-flash` ĐỌC ĐƯỢC ẢNH (test 1 lời gọi nhỏ: `POST api.deepseek.com/chat/completions` với `image_url` → HTTP 200, có `reasoning_content`) — giả định 'DeepSeek không có vision' là sai với API hiện tại (`GET /models` → `deepseek-flash`, `deepseek-v4-pro`).
+
+### Đã sửa
+
+| # | Thay đổi | File |
+|---|---|---|
+| 1 | `suggest_provider`: `''`/`auto` = AUTO theo registry (mặc định mới); slug cụ thể = ÉP provider đó | `helpers.php`, `config/studio.php` |
+| 2 | `registryVisionCandidates()`: candidate từ nhóm `vision` theo đúng thứ tự `studio_task_group_models()` (default nhóm → rank nhóm → ưu tiên provider → ưu tiên model); candidate không có key bị loại ngay | `StyleSuggestService` |
+| 3 | `suggestViaOpenAiVision()`: transport chung cho MỌI gateway OpenAI-compatible — DeepSeek (base trong catalog) + custom provider (base/protocol trong Settings); đọc cả `content` lẫn `reasoning_content` | `StyleSuggestService` |
+| 4 | Gộp implementation: `suggestViaQwenModel()` dùng chung cho đường legacy và đường registry; gemini nhận model cụ thể; đường cũ giữ nguyên làm lưới an toàn | `StyleSuggestService` |
+| 5 | Endpoint `/api/settings/suggest` nhận mọi slug (`auto`, `deepseek`, `ckey`…) | `StudioController` |
+
+### Verify trên production (chạy THẬT)
+
+```
+suggest_provider : ""  (AUTO theo registry)
+Candidate vision (thứ tự sẽ thử):
+  1. deepseek:deepseek-flash  transport=openai  base=https://api.deepseek.com  keys=1
+
+Gọi thật với ảnh mẫu public_html/samples/2aOboQq…jpg (84 KB) — 7.7 giây:
+  styles        : minimal elegant, soft feminine, resort evening
+  garment_type  : satin halter top + embroidered midi skirt set
+  color_palette : ivory cream, muted lilac purple, soft white, black hair
+  fabric        : liquid satin with sheen | silhouette: fitted halter top with flowy asymmetric midi skirt
+  detail_notes  : Two-piece ivory satin set: sleeveless halter top with a knotted twist at the neck …
+```
+
+Log: không có lỗi mới (4 dòng gần nhất đều từ 18–19/09). `/` `/dang-nhap` `/up` → 200.
+
+**Test:** 7 test mới `SuggestRegistryTest` (deepseek khi chỉ nó có key · đổi luồng ⇒ đổi thứ tự thử · custom provider openai · ép provider giữ hành vi cũ · helper AUTO · endpoint nhận slug lạ · fallback màu). Full suite 744 pass; 6 fail vẫn là lỗi SẴN CÓ ở HEAD thuộc phiên Collections/Canvas.
+
+### Còn lại (đề xuất)
+
+- [ ] `faceDescription()` và `poseDescription()` (mô tả khuôn mặt/tư thế cho Thay khuôn mặt + Thử đồ) **vẫn chỉ dùng Qwen** qua `studio_suggest_qwen_models()` — với key qwen đang tắt thì hai đường này trả `null` (try-on chạy thiếu mô tả). Nên cho chúng dùng chung `registryVisionCandidates()`.
+- [ ] Cân nhắc hiện `suggest_provider` (auto/qwen/gemini/deepseek/custom) trong tab Cài đặt — hiện chỉ đổi được qua API `/api/settings/suggest`.
+
