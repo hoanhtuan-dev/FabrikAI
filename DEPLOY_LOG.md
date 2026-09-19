@@ -564,3 +564,91 @@ vẫn đúng 6 lỗi SẴN CÓ ở HEAD (Collections/Canvas), không liên quan 
       ví dụ `deepseek:deepseek-chat`) hoặc tăng thời gian cache.
 - [ ] `DesignAgentService::radar()` gọi model cho CẢ khối catalog; nếu sau này có connector thật thì nên chunk theo nguồn.
 - [ ] 6 test đỏ sẵn có của phiên Collections/Canvas vẫn chưa sửa.
+
+---
+
+## Phiên 2026-09-22 (Đợt 7 — Agent Studio: tầng TIỀN + dữ liệu bán hàng thật của shop)
+
+**Commit:** `08ed60a` (tầng tiền + dữ liệu shop) + `6367796` (đối chiếu giá). **Đã deploy production**, có migration
+`2026_09_22_000003_create_shop_signals_table` (đã chạy: DONE 194ms) và rebuild asset `main-Bfw9_p_k.js`.
+
+### Vì sao làm đợt này
+
+Đặt mình vào người TRẢ TIỀN (chủ xưởng muốn ra bộ sưu tập để sản xuất → bán chạy → lợi nhuận): Agent Studio đợt 6
+dừng ở "định hướng + brief chữ + 24 ô màu", tức là **chưa trả lời được câu hỏi ra tiền**: cắt bao nhiêu cái, đặt
+bao nhiêu mét vải, giá vốn bao nhiêu, bán giá nào thì lãi, cần bao nhiêu vốn. Ba thiếu sót quyết định giá trị:
+
+| Thiếu | Hệ quả với chủ xưởng | Đợt này |
+|---|---|---|
+| Không có giá thành/lợi nhuận | "Dải giá Mid-range" không giúp quyết định gì | ✅ `CollectionPlanService` |
+| Không có lệnh sản xuất | "12 SKU" vô nghĩa nếu không biết cắt gì trước, bao nhiêu | ✅ lệnh cắt + 3 đợt |
+| Không có dữ liệu thật của shop | Mọi lời khuyên là phỏng đoán theo từ khoá | ✅ bảng `shop_signals` |
+
+### 1. Tầng TIỀN — `CollectionPlanService` (mới, TẤT ĐỊNH, không dùng AI cho con số)
+
+- **Lệnh cắt** theo NHÓM × SIZE; chia số lượng bằng **phần dư lớn nhất** nên tổng LUÔN khớp `số mã × số lượng/mã`
+  (làm tròn từng dòng riêng lẻ sinh lệch 2 cái — chủ xưởng đọc tổng không khớp là mất tin ngay).
+- **Giá vốn/cái** = vải (định mức theo nhóm × hệ số size × tiêu hao) + phụ liệu + giá công + bao bì + tỉ lệ lỗi.
+- **3 đợt 25/40/35** — cắt thử mỏng (đợt duy nhất còn sửa sai được) → dồn cho mã bán chạy → dứt điểm; mỗi đợt có
+  số cái, mét vải, vốn, lãi, số ngày và danh sách mã.
+- **Bảng size số đo (cm)** theo nhóm hàng + số cái cần cắt mỗi size (ghi rõ phải đối chiếu rập thật của xưởng).
+- **3 kịch bản giá** (sàn/mục tiêu/trần) kèm điểm hoà vốn; chặn giá trị vô lý (âm, % > 100).
+- `price_check` + ghi chú: đối chiếu giá bán gợi ý (giá vốn × lãi mong muốn) với dải giá thị trường →
+  `above_band` (bán cao hơn thị trường mới đủ lãi ⇒ phải giảm giá vải/định mức TRƯỚC khi cắt) hoặc `below_band`
+  (dư địa lãi, nhưng đừng bán rẻ hơn mức khách chấp nhận).
+
+### 2. Dữ liệu bán hàng THẬT — bảng `shop_signals` (mới)
+
+- 6 cột số tối giản (tên · nhóm · đã bán · tồn · đổi trả · giá bán) — người bán qua Facebook/Zalo/POS nhập tay hoặc
+  **dán thẳng từ Excel**; giới hạn 200 dòng/tài khoản, lưu theo `user_id` (cascade khi xoá tài khoản).
+- `internalBrandSignal()` nay dùng số THẬT: bán chạy, tồn, đổi trả, giá bình quân, sell-through, hàng chậm — thay cho
+  việc dò từ khoá trong prompt. `data_mode` = `local` khi có dữ liệu, `empty` khi chưa.
+- **Cơ cấu SKU ăn dữ liệu thật**: +1 SKU cho nhóm BÁN CHẠY NHẤT, −1 SKU cho nhóm TỒN NHIỀU mà bán chậm; `structure.basis`
+  = `shop_data`. **Dải giá NEO quanh giá bán bình quân thật (±20%)** thay vì bám từ khoá.
+- Dữ liệu shop chỉ gửi cho model ở đường brief (đường này KHÔNG dùng cache chung) — radar vẫn cache dùng chung an toàn.
+
+### 3. Endpoint + giao diện
+
+- `POST /api/design-agent/plan` (tất định, `Http::assertNothingSent` trong test) và `POST /api/design-agent/shop-signals`
+  (chỉ ghi dữ liệu của chính người dùng) — gắn vào module `collection_bot`.
+- Tab mới **"Sản xuất & lãi"**: form **13 đơn giá/định mức chỉnh được** (sửa là tính lại, gộp 500ms), KPI (tổng cái ·
+  vải cần đặt · vốn cần · lãi gộp), bảng lệnh cắt 16 dòng, 3 thẻ đợt, bảng size, 3 kịch bản giá, callout đối chiếu giá.
+- **Xuất file cho thợ cắt**: CSV lệnh cắt + CSV bảng size (BOM UTF-8 để Excel hiện đúng tiếng Việt) + sao chép lệnh cắt.
+- Khối **"Dữ liệu bán hàng của shop"**: dán từ Excel (Tab/phẩy/chấm phẩy, tự bỏ dòng tiêu đề), bảng nhập tay, lưu và
+  **tự tạo lại brief** theo số mới.
+
+### Đo THẬT trên production sau deploy (gọi service, không mock)
+
+```
+12 mã × 30 cái = 360 cái · 16 dòng cắt · vải 547,7m → đặt 580m (49,3tr)
+Giá vốn TB 230.023đ/cái · giá bán mục tiêu 875.000đ · lãi 474.850đ/cái (66,2%)
+Vốn cần 82.808.200đ · doanh thu 258.300.000đ · lãi gộp 175.491.800đ (67,9%) · 15 ngày
+Đợt 1: 91 cái / 150m / vốn 20,9tr / 4 ngày   Đợt 2: 144 cái / 240m / 33,1tr / 6 ngày   Đợt 3: 125 cái / 200m / 28,7tr / 5 ngày
+Bảng size áo S: Ngực 84 · Eo 68 · Mông 92 · Dài áo 60,5 · Vai 37 (tăng dần theo size)
+3 mức giá: sàn 550.000 → lãi 79,5tr (49%) · mục tiêu 875.000 → 175,5tr (67,9%) · trần 1.200.000 → 271,4tr (76,6%)
+```
+
+Chính phép đo này lộ ra một con số dễ gây tin sai (biên lãi 66%) ⇒ đó là lý do `price_check` ra đời ở commit sau:
+công thức đúng nhưng thị trường chưa chắc trả mức đó, nên hệ thống phải NÓI RA độ lệch thay vì để chủ xưởng tin.
+
+### Verify production
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `6367796` |
+| Migration | `2026_09_22_000003_create_shop_signals_table` → DONE · `shop_signals: OK` |
+| Route | `POST api/design-agent/plan` · `POST api/design-agent/shop-signals` có trong `route:list` |
+| Trang | `/` `/dang-nhap` `/up` → **200** |
+| Bundle | `main-Bfw9_p_k.js` chứa "Sản xuất & lãi" · "LỆNH CẮT" · "Dữ liệu bán hàng của shop" · "Lệnh cắt (CSV)" · "Bảng size (cm)" |
+
+**Test:** 17 test mới `CollectionPlanTest` (lệnh cắt khớp tổng · 3 đợt cộng đúng · đổi đơn giá ⇒ đổi kết quả ·
+chặn giá trị vô lý · endpoint không gọi AI · `above_band`/`below_band` · dữ liệu shop theo tài khoản và ẩn giữa
+các user · validate). Full suite **793 pass**; 6 fail vẫn đúng 6 lỗi SẴN CÓ ở HEAD (Collections/Canvas).
+
+### Còn lại để "đáng trả tiền" trọn vẹn
+
+- [ ] **Ảnh thật**: mood board vẫn 24 ô màu (`image_url: null`) và production CHƯA có key model ảnh (nhóm `image/edit/`
+      `video/swap` đều rỗng) ⇒ chuỗi giá trị vẫn đứt ở bước nhìn thấy sản phẩm. Cần nối model ảnh hoặc ảnh tham chiếu thật.
+- [ ] **Đối chiếu dự đoán với thực tế**: lưu kế hoạch tại thời điểm chốt rồi sau 2–4 tuần so với số bán thật để biết hướng
+      nào đúng/sai (hiện mới có chiều nhập dữ liệu vào).
+- [ ] Dữ liệu xu hướng vẫn là catalog mẫu (`evidence_mode: demo`) — chưa có connector thật, và điều đó vẫn phải nói thật.
