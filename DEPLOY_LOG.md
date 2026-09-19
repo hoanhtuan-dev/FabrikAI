@@ -713,3 +713,58 @@ Nhóm test thanh công cụ (CanvasControls · StudioGuiConfig · BatchGeneratio
 - `storage/logs/worker.log` **không tồn tại** ⇒ cron worker (DEPLOY.md §3) vẫn chưa được tạo; hệ thống đang chạy
   bằng lưới an toàn 90 giây. Vẫn đúng như đã ghi ở §8.3, **chưa xử lý trong đợt này**.
 - Đồng hồ máy chủ lệch (báo `Sat Sep 19 15:50 UTC`) — giờ địa phương lúc deploy: `2026-09-19 22:50 +07`.
+
+---
+
+## Phiên 2026-09-22 (Đợt 8 — Tách "Ghép trang phục" khỏi card "Ghép ảnh" thành CARD RIÊNG)
+
+**Commit:** `905ac49`. **Đã deploy production** (không migration), rebuild asset `main-DA-_QEtX.js`.
+
+### Vì sao tách
+
+Hai việc khác nhau về bản chất — để chung một card thì người dùng phải ĐỔI CHẾ ĐỘ rồi mới thấy đúng
+công cụ của mình, còn card "Ghép ảnh" bị đội thêm 6 khối điều khiển chỉ dùng cho chế độ kia:
+
+| | Ghép ảnh | Ghép trang phục |
+|---|---|---|
+| Việc | dựng BỐ CỤC | LAI TẠO BIẾN THỂ |
+| Slot | @image1 nền chính · @image2/3 ảnh ghép | @image1+@image2 trang phục nguồn · @image3 bối cảnh |
+| Tham số | không có | phong cách · trang trí · sáng tạo · preset theo tài khoản · biến thể theo trục |
+
+### Thay đổi
+
+- `ModuleRegistry`: thêm module **`outfit`** (panel, icon `shirt`, nhóm "Chỉnh ảnh") đặt NGAY SAU `compose` để
+  hai nút nằm cạnh nhau; dùng CHUNG đường `/compose` + `/outfit-settings` với card Ghép ảnh — cùng một
+  pipeline, hai cửa vào (đúng mẫu `refgen` dùng chung cho `variation` + `tryon`). `StudioGuiConfig` sinh mục
+  thanh công cụ từ bản khai này nên owner đổi được nhãn/icon/thứ tự/ẩn-hiện như mọi card khác.
+- `OutfitComposeCard.vue` (**mới**): 3 slot theo vai trò trang phục, prompt lai tạo + nút **"Prompt lai tạo mẫu"**
+  (khôi phục prompt gốc), Phong cách · Trang trí · Sáng tạo, Preset phong cách (lưu theo tài khoản), số biến thể
+  + trục Classic/Modern/Bold/Fluid, xem trước prompt, tiến độ "AI đang lai tạo trang phục…", so sánh Trước/Sau.
+  Nạp cài đặt tài khoản TRƯỚC rồi mới điền prompt mẫu (không ghi đè dữ liệu đã lưu).
+- `ComposeCard.vue`: gỡ toàn bộ chế độ `outfit` (tab chuyển chế độ, phong cách/trang trí/sáng tạo, preset, nạp/lưu
+  cài đặt) — chỉ còn dựng bố cục; thêm dòng hướng dẫn vai trò slot. **Nhẹ hơn ~120 dòng.**
+- `StudioApp.vue`: thêm `outfit` vào `ACTIVITY_CARDS` + mục dự phòng thanh công cụ.
+
+### Verify production
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `905ac49` |
+| Panel | `collections · concept · variation · tryon · inpaint · compose · outfit · upscale · director` |
+| Bundle | `main-DA-_QEtX.js`: có "Ghép trang phục" · "Prompt lai tạo mẫu" · "nền chính"; **không còn** "Ghép tự do" |
+| Trang | `/` `/up` → **200** |
+| Module | `outfit` (panel, `shirt`) cấp cho **mọi gói** (`plans: ['*']`) |
+
+**Lưu ý production:** `studio_gui_activity_bar` ĐÃ có bản owner lưu, nên id mới được NỐI VÀO CUỐI (đúng cơ chế
+`StudioGuiConfig::all()`). Đã sắp lại để "Ghép trang phục" đứng NGAY SAU "Ghép ảnh":
+`… inpaint | compose | outfit | upscale | stylist | prompt | director | collections | settings`.
+
+**Test:** `StudioGuiConfigTest` + `ModuleRegistryTest` đối chiếu PHP ⇄ Vue (id panel phải khớp `ACTIVITY_CARDS` và bản
+dự phòng) — cập nhật số panel 8 → 9 một cách có ý thức. Full suite **797 pass**; 6 fail vẫn là 6 lỗi SẴN CÓ ở HEAD.
+
+### Ghi chú kỹ thuật
+
+- Hai card dùng CHUNG state tiến trình (`composeStage` · `composeGenIds` · `composeError`) và chung đường `/api/compose`;
+  mỗi lúc chỉ một card được render (activity bar chọn 1 mục) nên tiến độ không bị lẫn giữa hai card.
+- `compose()` truyền `mode='compose'` với `creative_level/style/ornament` trung tính: backend chỉ dùng ba tham số đó
+  cho `mode='outfit'` nên hành vi ghép bố cục KHÔNG đổi.
