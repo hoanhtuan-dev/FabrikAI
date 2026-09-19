@@ -19,9 +19,15 @@ import ConfirmDialog from './ConfirmDialog.vue';
  *   · thêm khung xương + trạng thái rỗng phân biệt "chưa có dữ liệu" và "bộ lọc không khớp";
  *   · lọc theo danh mục bằng chip có số lượng, thay vì bắt cuộn qua mọi danh mục.
  */
+// Nhãn nhóm preset — PHẢI khớp CHIP_CATEGORY_LABELS ở App\Services\PhotoStudioService (chip nhanh
+// trong Studio dùng cùng nhãn) và phủ HẾT danh mục đang có trong bảng presets: trước đây thiếu
+// 8 danh mục (màu sắc, cổ áo, tay áo, độ vừa vặn, họa tiết, chi tiết, dịp mặc, mùa) nên chip lọc
+// hiện ra mã thô kiểu "color"/"neckline" thay vì tiếng Việt.
 const CAT_LABELS = {
-  fabric: 'Chất liệu', silhouette: 'Phom dáng', style: 'Phong cách', background: 'Bối cảnh',
-  pose: 'Dáng đứng', camera: 'Góc máy', lens: 'Ống kính', video_scene: 'Kịch bản quay', inpaint: 'Sửa ảnh (Inpaint)',
+  fabric: 'Chất liệu', color: 'Màu sắc', silhouette: 'Phom dáng', neckline: 'Cổ áo', sleeve: 'Tay áo',
+  fit: 'Độ vừa vặn', pattern: 'Họa tiết', detail: 'Chi tiết', style: 'Phong cách', occasion: 'Dịp mặc',
+  season: 'Mùa', background: 'Bối cảnh', pose: 'Dáng đứng', camera: 'Góc máy', lens: 'Ống kính',
+  video_scene: 'Kịch bản quay', inpaint: 'Sửa ảnh (Inpaint)',
 };
 
 const CSRF = () => {

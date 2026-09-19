@@ -44,8 +44,16 @@ class PhotoStudioService
     /** Nhãn nhóm chip — PHẢI khớp CAT_LABELS của mục "Preset" trong Cài đặt của tôi. */
     private const CHIP_CATEGORY_LABELS = [
         'fabric' => 'Chất liệu',
+        'color' => 'Màu sắc',
         'silhouette' => 'Phom dáng',
+        'neckline' => 'Cổ áo',
+        'sleeve' => 'Tay áo',
+        'fit' => 'Độ vừa vặn',
+        'pattern' => 'Họa tiết',
+        'detail' => 'Chi tiết',
         'style' => 'Phong cách',
+        'occasion' => 'Dịp mặc',
+        'season' => 'Mùa',
         'background' => 'Bối cảnh',
         'pose' => 'Dáng đứng',
         'camera' => 'Góc máy',
