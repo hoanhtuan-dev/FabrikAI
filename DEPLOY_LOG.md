@@ -171,3 +171,51 @@ php artisan queue:restart
 - Registry hiện **không còn dòng `fal:flux-1.1-schnell`** (admin đã xoá) ⇒ khi Qwen 429 thì KHÔNG còn fallback ảnh. Bấm **🔄 Đồng bộ catalog** ở tab 🔥 sẽ thêm lại (idempotent, không đè dòng đã sửa tay; muốn dùng thì bật lại dòng đó).
 - Có 2 custom provider: `ckey` (prio 5) và `deepseek-custom` (prio 5) — trùng ưu tiên nên thứ tự rơi về slug; đặt ưu tiên khác nhau nếu muốn route cụ thể thử trước.
 
+
+---
+
+## Phiên 2026-09-22 (Đợt 2 — DeepSeek vào luồng ưu tiên, trước Gemini)
+
+**Commit:** `7563701` + `bd9f92a`. **Đã deploy production:** `603ddb4` → `7563701` → `bd9f92a`.
+
+### Thay đổi
+
+| # | Thay đổi | File | Mô tả |
+|---|---|---|---|
+| 1 | Một nguồn cho danh sách nhóm | `helpers.php` | `studio_provider_families()` (qwen, custom, flux, **deepseek**, gemini, other) + `studio_provider_default_flow()` (bỏ `other` — nhóm HỨNG). Flow helper, validate ở Settings và `flow_counts` đều lấy từ đây. |
+| 2 | Luồng mặc định | `config/studio.php` | `qwen,custom,flux,deepseek,gemini`. |
+| 3 | Family riêng cho DeepSeek | `helpers.php` | Provider `deepseek` từ nhóm `other` → nhóm `deepseek`. |
+| 4 | 3 model DeepSeek | `helpers.php` | `deepseek-chat` + `deepseek-reasoner` (nhóm prompt), `deepseek-chat` (nhóm translate). Catalog 27 → 30 dòng. |
+| 5 | Sync có lọc | `StudioSyncModels` + `studio_sync_model_catalog($provider)` | `php artisan studio:sync-models --provider=deepseek` — nhập MỘT nhóm, **không hồi sinh** dòng catalog admin đã cố ý xoá (vd dòng `fal`). |
+| 6 | UI | `SettingsApp.vue` | Thẻ DeepSeek trong tab 🔥; `other` đổi thành nhóm hứng chung. |
+| 7 | Migration | `2026_09_22_000002_add_deepseek_to_provider_flow.php` | Chèn `deepseek` NGAY TRƯỚC `gemini` trong setting đã lưu, giữ nguyên thứ tự admin đặt; idempotent. |
+| 8 | Vá cache | cùng migration | Dùng `Setting::set()` + `flushCache()` thay vì `DB::table()->update()`. |
+
+### ⚠️ Bẫy thật đã gặp (ghi để phiên sau không mất thời gian)
+
+Migration bản đầu ghi thẳng `DB::table('settings')->update(...)` ⇒ **không kích hoạt model event** ⇒ cache `settings:all` giữ giá trị CŨ.
+Triệu chứng: DB đã có `custom,qwen,flux,deepseek,gemini`, migration báo DONE, nhưng `setting()` vẫn trả luồng cũ và `rank(deepseek)=990` (không được xếp hạng).
+
+→ **Quy tắc:** đổi setting trong migration/seeder phải đi qua `Setting::set()` (hoặc gọi `Setting::flushCache()` sau khi ghi); deploy có migration đụng settings thì chạy thêm `php artisan cache:clear`.
+→ Đã có test hồi quy `test_deepseek_migration_invalidates_settings_cache` (đỏ nếu quay lại cách ghi cũ).
+
+### Verify trên production (chạy thật)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `setting('studio_provider_priority')` | `custom,qwen,flux,deepseek,gemini` (admin giữ thứ tự custom-first) |
+| rank | qwen 10 · flux 20 · **deepseek 30** · gemini 40 |
+| candidate `prompt` | qwen3.8-flash → qwen3.8-max → **deepseek-chat → deepseek-reasoner** |
+| candidate `translate` | qwen3.8-flash → **deepseek-chat** |
+| candidate `vision` | không đổi (deepseek-chat không đọc ảnh) |
+| `/` `/dang-nhap` `/up` | 200 |
+| Dòng `fal` admin đã xoá | vẫn 0 — sync có lọc không hồi sinh |
+
+**Test:** 31/31 `ProviderPriorityFlowTest` xanh. Full suite 736 pass; 6 fail vẫn là lỗi SẴN CÓ ở HEAD thuộc phiên Collections/Canvas (không đổi).
+Asset build từ worktree sạch (HEAD + chỉ thay đổi của phiên này) — WIP của phiên song song vẫn nguyên, không bị đóng gói.
+
+### Cần làm tiếp
+
+- [ ] Thêm API key DeepSeek ở tab 🔑 (provider `deepseek`) thì nhóm DeepSeek mới thực sự gọi được; chưa có key thì candidate vẫn được liệt kê nhưng sẽ lỗi và rơi xuống nhóm sau.
+- [ ] Phiên Collections/Canvas: sửa 6 test đỏ rồi rebuild asset (xem mục phiên trước).
+
