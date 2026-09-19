@@ -131,10 +131,15 @@ return [
     |--------------------------------------------------------------------------
     | Tách hoàn toàn khỏi cấu hình Vision chung: tính năng "💡 Gợi ý từ ảnh" có
     | provider + model + hành vi riêng, không phụ thuộc setting nào khác.
+    |
+    | [2026-09-22] 'provider' mặc định = RỖNG = AUTO: đi theo MODEL REGISTRY nhóm 'vision'
+    | + luồng ưu tiên provider (qwen → custom → flux → deepseek → gemini). Trước đây cứng
+    | 'qwen | gemini' nên DeepSeek và custom provider không bao giờ được gọi. Đặt một slug
+    | cụ thể (qwen/gemini/deepseek/ckey…) để ÉP dùng provider đó trước.
     */
     'suggest' => [
         'enabled' => (bool) env('STUDIO_SUGGEST_ENABLED', true),
-        'provider' => env('STUDIO_SUGGEST_PROVIDER', 'qwen'), // qwen | gemini — Qwen ưu tiên
+        'provider' => env('STUDIO_SUGGEST_PROVIDER', ''), // '' / auto = theo registry + luồng ưu tiên
         'gemini_model' => env('STUDIO_SUGGEST_GEMINI_MODEL', 'gemini-2.5-flash'),
         'qwen_model' => env('STUDIO_SUGGEST_QWEN_MODEL', 'qwen3.8-flash'), // multimodal chính
         'qwen_models' => env('STUDIO_SUGGEST_QWEN_MODELS', ''), // danh sách ưu tiên, phân cách dấu phẩy

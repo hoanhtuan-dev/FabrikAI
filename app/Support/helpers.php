@@ -568,9 +568,14 @@ if (! function_exists('studio_suggest_enabled')) {
 if (! function_exists('studio_suggest_provider')) {
     function studio_suggest_provider(): string
     {
-        $p = strtolower((string) studio_suggest_config('provider', 'qwen'));
+        $p = strtolower(trim((string) studio_suggest_config('provider', '')));
 
-        return in_array($p, ['gemini', 'qwen'], true) ? $p : 'qwen';
+        // '' hoặc 'auto' = đi theo MODEL REGISTRY + luồng ưu tiên (candidate nhóm 'vision'):
+        // qwen → custom → flux → deepseek → gemini. Đây là mặc định: trước đây hàm này cứng
+        // ['gemini','qwen'] nên DeepSeek/custom provider KHÔNG BAO GIỜ được gọi.
+        // Giá trị cụ thể (qwen, gemini, deepseek, slug custom…) = ép dùng provider đó trước
+        // rồi mới tới provider còn lại (hành vi cũ, giữ để tương thích).
+        return $p === 'auto' ? '' : $p;
     }
 }
 
@@ -1049,7 +1054,9 @@ if (! function_exists('studio_provider_catalog')) {
             'veo' => ['name' => 'Google Veo — video', 'protocol' => 'gemini', 'family' => 'gemini', 'priority' => 9, 'hint' => 'GOOGLE_VEO_KEY'],
             'fal' => ['name' => 'Fal.ai — Flux (fallback ảnh)', 'protocol' => 'openai', 'family' => 'flux', 'priority' => 10, 'hint' => 'FAL_KEY (fal.ai/dashboard/keys) — queue.fal.run, auth "Key …"'],
             'replicate' => ['name' => 'Replicate — Flux (ảnh)', 'protocol' => 'openai', 'family' => 'flux', 'priority' => 5, 'hint' => 'REPLICATE_API_TOKEN (dùng qua custom provider để gọi trực tiếp)'],
-            'deepseek' => ['name' => 'DeepSeek — ngôn ngữ / suy luận', 'protocol' => 'openai', 'family' => 'deepseek', 'priority' => 5, 'hint' => 'DEEPSEEK_API_KEY · model deepseek-chat/reasoner · đứng trước Gemini trong luồng'],
+            // base_url khai báo được vì DeepSeek dùng transport OpenAI-compatible chung
+            // (chat/completions, ảnh qua image_url) — xem StyleSuggestService::suggestViaOpenAiVision().
+            'deepseek' => ['name' => 'DeepSeek — ngôn ngữ / suy luận (đa phương thức)', 'protocol' => 'openai', 'family' => 'deepseek', 'priority' => 5, 'base_url' => 'https://api.deepseek.com', 'hint' => 'DEEPSEEK_API_KEY · deepseek-flash (đọc được ảnh) / deepseek-v4-pro · đứng trước Gemini trong luồng'],
         ];
     }
 }
@@ -1194,7 +1201,9 @@ if (! function_exists('studio_provider_registry')) {
                 'slug' => $slug,
                 'name' => $meta['name'],
                 'protocol' => $meta['protocol'],
-                'base_url' => null,
+                // Built-in thường dùng transport viết tay (không cần base_url), nhưng provider
+                // OpenAI-compatible khai báo được base_url trong catalog (vd deepseek).
+                'base_url' => $meta['base_url'] ?? null,
                 'auth_style' => $meta['protocol'] === 'gemini' ? 'x-goog-api-key' : 'bearer',
                 'hint' => $meta['hint'] ?? null,
                 'family' => $meta['family'] ?? 'other',

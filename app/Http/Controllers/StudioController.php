@@ -4705,7 +4705,9 @@ RULES:
     {
         $data = $request->validate([
             'suggest_enabled' => ['nullable', 'string', 'in:1'],
-            'suggest_provider' => ['required', 'string', 'in:gemini,qwen'],
+            // '' / 'auto' = theo Model Registry + luồng ưu tiên; hoặc slug provider bất kỳ
+            // (qwen, gemini, deepseek, slug custom…) để ÉP dùng provider đó trước.
+            'suggest_provider' => ['nullable', 'string', 'max:60', 'regex:/^([a-z0-9][a-z0-9_-]*|auto)?$/'],
             'suggest_gemini_model' => ['nullable', 'string', 'max:255'],
             'suggest_qwen_model' => ['nullable', 'string', 'max:255'],
             'suggest_qwen_models' => ['nullable', 'string', 'max:1000'],
@@ -4720,7 +4722,9 @@ RULES:
         ]);
 
         set_setting('studio_suggest_enabled', ! empty($data['suggest_enabled']) ? '1' : '0');
-        set_setting('studio_suggest_provider', $data['suggest_provider']);
+        // 'auto' và rỗng đều nghĩa là AUTO (đi theo registry + luồng ưu tiên).
+        $suggestProvider = strtolower(trim((string) ($data['suggest_provider'] ?? '')));
+        set_setting('studio_suggest_provider', $suggestProvider === 'auto' ? '' : $suggestProvider);
         set_setting('studio_suggest_gemini_model', $data['suggest_gemini_model'] ?? '');
         set_setting('studio_suggest_qwen_model', $data['suggest_qwen_model'] ?? '');
         set_setting('studio_suggest_qwen_models', $data['suggest_qwen_models'] ?? '');

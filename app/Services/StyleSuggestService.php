@@ -29,8 +29,29 @@ class StyleSuggestService
         $skipLogo = (bool) ($opts['skip_logo'] ?? false);
         $skipBackground = (bool) ($opts['skip_background'] ?? false);
 
-        // Provider + model RIÊNG cho "Gợi ý từ ảnh" — không dùng chung cấu hình Vision.
+        // Provider cho "Gợi ý từ ảnh":
+        //   '' (mặc định) = AUTO — đi theo MODEL REGISTRY + LUỒNG ƯU TIÊN provider, lấy candidate
+        //                   từ nhóm công việc 'vision' (qwen → custom → flux → deepseek → gemini).
+        //                   Nhờ vậy DeepSeek / custom provider (CKEY…) dùng được cho suy luận ảnh,
+        //                   và đổi thứ tự luồng là đổi thứ tự thử — không cần sửa code.
+        //   'qwen'/'gemini' (hoặc slug khác) = ÉP provider đó trước, rồi provider còn lại sau
+        //                   (hành vi cũ, giữ để tương thích).
         $provider = studio_suggest_provider();
+
+        if ($provider === '') {
+            foreach ($this->registryVisionCandidates() as $cand) {
+                try {
+                    return $this->runCandidate($cand, $imagePath, $creativeLevel, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
+                } catch (\Throwable $e) {
+                    logger()->error($cand['provider'].':'.$cand['model'].' vision suggest failed: '.$e->getMessage());
+                }
+            }
+
+            // Registry trống hoặc chưa provider nào có key dùng được -> rơi về đường cũ
+            // (qwen rồi tới gemini) để không mất hành vi của bản trước.
+            $provider = 'qwen';
+        }
+
         $geminiKey = studio_api_key('gemini');
         $hasQwen = ! empty(studio_qwen_credentials('vision'));
 
@@ -63,6 +84,226 @@ class StyleSuggestService
         }
 
         throw new \RuntimeException('Chưa cấu hình API key vision cho "Gợi ý từ ảnh" và fallback màu đang tắt.');
+    }
+
+
+    /**
+     * Candidate vision lấy từ MODEL REGISTRY nhóm 'vision', xếp theo LUỒNG ƯU TIÊN provider
+     * (qwen → custom → flux → deepseek → gemini) — đúng thứ tự studio_task_group_models()
+     * trả về (default của nhóm trước, rồi rank nhóm → ưu tiên provider → ưu tiên model).
+     *
+     * Candidate không có key dùng được bị LOẠI NGAY (không gọi rồi mới lỗi), nên provider
+     * đang tắt key sẽ tự động bị bỏ qua và lời gọi rơi xuống provider kế tiếp trong luồng.
+     *
+     * @return list<array{provider:string, model:string, transport:string, base:string, keys:list<string>}>
+     */
+    protected function registryVisionCandidates(): array
+    {
+        if (! function_exists('studio_task_group_models')) {
+            return [];
+        }
+
+        $out = [];
+        foreach (studio_task_group_models('vision') as $row) {
+            $slug = (string) ($row['provider'] ?? '');
+            $model = (string) ($row['model'] ?? '');
+            if ($slug === '' || $model === '') {
+                continue;
+            }
+            $cand = $this->resolveCandidate($slug, $model);
+            if ($cand !== null) {
+                $out[] = $cand;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Một dòng registry -> transport cụ thể. Custom provider dùng chính protocol + base_url
+     * đã khai trong Settings; built-in dùng transport viết tay, base_url (nếu có) lấy từ catalog.
+     */
+    protected function resolveCandidate(string $slug, string $model): ?array
+    {
+        $custom = function_exists('studio_custom_provider') ? studio_custom_provider($slug) : null;
+
+        if ($custom) {
+            $keys = $this->keysFor($slug, $model, $custom['api_key_ref'] ?? null);
+            if (! $keys) {
+                return null;
+            }
+            // Đường vision hiện hỗ trợ gateway OpenAI-compatible (CKEY, DeepSeek gateway…);
+            // custom dashscope/gemini dùng transport riêng nên bỏ qua ở đây.
+            if ((string) ($custom['protocol'] ?? 'openai') !== 'openai') {
+                return null;
+            }
+
+            return [
+                'provider' => $slug,
+                'model' => $model,
+                'transport' => 'openai',
+                'base' => rtrim((string) $custom['base_url'], '/'),
+                'keys' => $keys,
+            ];
+        }
+
+        $catalog = function_exists('studio_provider_catalog') ? studio_provider_catalog() : [];
+        $meta = $catalog[$slug] ?? null;
+        $base = rtrim((string) ($meta['base_url'] ?? ''), '/');
+
+        if (in_array($slug, ['qwen', 'qwen_edit', 'dashscope', 'wan'], true)) {
+            $keys = studio_qwen_credentials('vision');
+
+            return $keys ? ['provider' => $slug, 'model' => $model, 'transport' => 'qwen', 'base' => '', 'keys' => array_values($keys)] : null;
+        }
+
+        if (in_array($slug, ['gemini', 'veo'], true)) {
+            $keys = $this->keysFor('gemini', $model);
+
+            return $keys ? ['provider' => $slug, 'model' => $model, 'transport' => 'gemini', 'base' => '', 'keys' => $keys] : null;
+        }
+
+        // Built-in OpenAI-compatible khai base_url trong catalog (vd deepseek).
+        if ($base !== '' && (string) ($meta['protocol'] ?? '') === 'openai') {
+            $keys = $this->keysFor($slug, $model);
+
+            return $keys ? ['provider' => $slug, 'model' => $model, 'transport' => 'openai', 'base' => $base, 'keys' => $keys] : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Mọi key dùng được cho một provider (key đã đăng ký theo scope 'vision' + key mặc định),
+     * đã giải mã và khử trùng lặp.
+     *
+     * @return list<string>
+     */
+    protected function keysFor(string $provider, string $model, ?string $extraRef = null): array
+    {
+        $keys = [];
+
+        foreach (array_unique(array_filter([$provider, $extraRef])) as $ref) {
+            if (function_exists('studio_api_keys_for')) {
+                foreach (studio_api_keys_for($ref, $model, 'vision') as $k) {
+                    $v = studio_api_key_value($k);
+                    if ($v) {
+                        $keys[] = $v;
+                    }
+                }
+            }
+            $v = function_exists('studio_api_key') ? studio_api_key($ref) : null;
+            if ($v) {
+                $keys[] = $v;
+            }
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /** Chạy một candidate qua transport tương ứng, thử lần lượt các key của provider đó. */
+    protected function runCandidate(array $cand, string $imagePath, int $creativeLevel, int $adherence, int $detailLevel, bool $skipHair, bool $skipLogo, bool $skipBackground): array
+    {
+        $last = null;
+
+        foreach ($cand['keys'] as $key) {
+            try {
+                return match ($cand['transport']) {
+                    'qwen' => $this->suggestViaQwenModel($cand['model'], $key, $imagePath, $creativeLevel, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground),
+                    'gemini' => $this->suggestViaVision($imagePath, $creativeLevel, $key, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground, $cand['model']),
+                    default => $this->suggestViaOpenAiVision($cand['base'], $cand['model'], $key, $imagePath, $creativeLevel, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground),
+                };
+            } catch (\Throwable $e) {
+                $last = $e->getMessage();
+            }
+        }
+
+        throw new \RuntimeException((string) ($last ?: 'không xác định'));
+    }
+
+    /**
+     * Vision qua gateway OpenAI-compatible: POST {base}/chat/completions với ảnh dạng
+     * image_url (data URI). Dùng cho DeepSeek (base https://api.deepseek.com) và MỌI custom
+     * provider protocol 'openai' (CKEY, OpenRouter, Together…).
+     *
+     * Model reasoning (deepseek-flash/v4-pro) có thể trả nội dung ở 'reasoning_content' khi
+     * 'content' rỗng — đọc cả hai trước khi kết luận là không phân tích được JSON.
+     */
+    protected function suggestViaOpenAiVision(string $base, string $model, string $key, string $imagePath, int $creativeLevel, int $adherence, int $detailLevel, bool $skipHair = false, bool $skipLogo = false, bool $skipBackground = false): array
+    {
+        [$b64, $mime] = $this->downscaleBase64($imagePath, (int) studio_suggest_config('downscale_max', 1024));
+        if ($b64 === '') {
+            $mime = function_exists('mime_content_type') ? (mime_content_type($imagePath) ?: 'image/jpeg') : 'image/jpeg';
+            $b64 = base64_encode((string) file_get_contents($imagePath));
+        }
+
+        $prompt = $this->analysisPrompt($adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
+
+        $resp = Http::withToken($key)->timeout(120)
+            ->post(rtrim($base, '/').'/chat/completions', [
+                'model' => $model,
+                // Model reasoning tính cả token suy luận vào completion nên để mức rộng.
+                'max_tokens' => (int) studio_suggest_config('max_tokens', 4000),
+                'messages' => [['role' => 'user', 'content' => [
+                    ['type' => 'text', 'text' => $prompt],
+                    ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
+                ]]],
+            ]);
+
+        if (! $resp->successful()) {
+            throw new \RuntimeException('Vision '.$model.' (HTTP '.$resp->status().'): '.substr((string) $resp->body(), 0, 180));
+        }
+
+        $text = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+        if ($text === '') {
+            $text = trim((string) data_get($resp->json(), 'choices.0.message.reasoning_content'));
+        }
+
+        $start = strpos($text, '{');
+        $end = strrpos($text, '}');
+        $json = ($start !== false && $end !== false) ? json_decode(substr($text, $start, $end - $start + 1), true) : null;
+
+        if (! is_array($json)) {
+            throw new \RuntimeException('Không phân tích được JSON từ vision '.$model.'.');
+        }
+
+        return $this->finalize($json, $creativeLevel, $adherence, $detailLevel);
+    }
+
+    /** Một model Qwen vision × một key (tách ra để registry-driven gọi được model cụ thể). */
+    protected function suggestViaQwenModel(string $model, string $key, string $imagePath, int $creativeLevel, int $adherence, int $detailLevel, bool $skipHair = false, bool $skipLogo = false, bool $skipBackground = false): array
+    {
+        [$b64, $mime] = $this->downscaleBase64($imagePath, (int) studio_suggest_config('downscale_max', 1024));
+        $prompt = $this->analysisPrompt($adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
+        $base = dashscope_base_url($key).'/compatible-mode/v1';
+
+        $resp = Http::withToken($key)->timeout(90)
+            ->post($base.'/chat/completions', [
+                'model' => $model,
+                'max_tokens' => (int) studio_suggest_config('max_tokens', 4000),
+                'messages' => [['role' => 'user', 'content' => [
+                    ['type' => 'text', 'text' => $prompt],
+                    ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
+                ]]],
+                'response_format' => ['type' => 'json_object'],
+            ]);
+
+        if (! $resp->successful()) {
+            throw new \RuntimeException('Qwen vision '.$model.' (HTTP '.$resp->status().'): '.substr((string) $resp->body(), 0, 180));
+        }
+
+        $text = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+        $json = json_decode($text, true);
+        if (! is_array($json)) {
+            $start = strpos($text, '{');
+            $end = strrpos($text, '}');
+            $json = ($start !== false && $end !== false) ? json_decode(substr($text, $start, $end - $start + 1), true) : null;
+        }
+        if (! is_array($json)) {
+            throw new \RuntimeException('Không phân tích được JSON từ Qwen vision ('.$model.').');
+        }
+
+        return $this->finalize($json, $creativeLevel, $adherence, $detailLevel);
     }
 
     /**
@@ -153,46 +394,20 @@ class StyleSuggestService
 
     protected function suggestViaQwenVision(string $imagePath, int $creativeLevel, int $adherence, int $detailLevel, bool $skipHair = false, bool $skipLogo = false, bool $skipBackground = false): array
     {
-        [$b64, $mime] = $this->downscaleBase64($imagePath, (int) studio_suggest_config('downscale_max', 1024));
-        $prompt = $this->analysisPrompt($adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
-
-        // Try several Qwen VISION models × keys. qwen3.8-flash/max (multimodal) thường thử trước; các tài khoản cũ chỉ expose qwen-vl-* nên giữ fallback ở cuối danh sách.
+        // Thu nhieu model Qwen VISION x nhieu key: qwen3.8-flash/max (da phuong thuc) truoc, cac
+        // tai khoan cu chi expose qwen-vl-* nen giu o cuoi danh sach. Mot model x mot key nam o
+        // suggestViaQwenModel() de duong registry-driven dung lai cung implementation.
         $last = null;
         foreach (studio_suggest_qwen_models() as $model) {
             foreach (studio_qwen_credentials('vision') as $key) {
-                $base = dashscope_base_url($key).'/compatible-mode/v1';
                 try {
-                    $resp = Http::withToken($key)->timeout(90)
-                        ->post($base.'/chat/completions', [
-                            'model' => $model,
-                            'messages' => [['role' => 'user', 'content' => [
-                                ['type' => 'text', 'text' => $prompt],
-                                ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
-                            ]]],
-                            'response_format' => ['type' => 'json_object'],
-                        ]);
-
-                    if ($resp->successful()) {
-                        $text = (string) data_get($resp->json(), 'choices.0.message.content');
-                        $json = json_decode(trim($text), true);
-                        if (is_array($json)) {
-                            return $this->finalize($json, $creativeLevel, $adherence, $detailLevel);
-                        }
-                        $last = 'Không phân tích được JSON từ Qwen vision ('.$model.').';
-                    } elseif (is_qwen_quota_error((string) $resp->body())) {
-                        $last = 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 180);
-                        continue; // Token Plan quota -> try next key
-                    } else {
-                        // Model-not-exist / unsupported -> try the NEXT vision model; other errors -> give up.
-                        $body = (string) $resp->body();
-                        $last = 'HTTP '.$resp->status().': '.substr($body, 0, 180);
-                        if (str_contains(strtolower($body), 'model_not_found') || str_contains(strtolower($body), 'model not exist') || $resp->status() === 404) {
-                            continue;
-                        }
-                        break 2;
-                    }
+                    return $this->suggestViaQwenModel($model, $key, $imagePath, $creativeLevel, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
                 } catch (\Throwable $e) {
                     $last = $e->getMessage();
+                    // Quota (Token Plan het han muc) -> thu key ke tiep; model khong ton tai -> thu model ke tiep.
+                    if (is_qwen_quota_error($last) || str_contains(strtolower($last), 'model_not_found') || str_contains(strtolower($last), 'model not exist') || str_contains($last, 'HTTP 404')) {
+                        continue;
+                    }
                     break 2;
                 }
             }
@@ -201,9 +416,10 @@ class StyleSuggestService
         throw new \RuntimeException('Qwen vision: '.($last ?: 'không xác định'));
     }
 
-    protected function suggestViaVision(string $imagePath, int $creativeLevel, string $key, int $adherence, int $detailLevel, bool $skipHair = false, bool $skipLogo = false, bool $skipBackground = false): array
+    protected function suggestViaVision(string $imagePath, int $creativeLevel, string $key, int $adherence, int $detailLevel, bool $skipHair = false, bool $skipLogo = false, bool $skipBackground = false, ?string $model = null): array
     {
-        $model = studio_suggest_gemini_model();
+        // Registry-driven truyen model cu the; duong cu khong truyen thi lay tu setting.
+        $model = $model ?: studio_suggest_gemini_model();
         [$b64, $mime] = $this->downscaleBase64($imagePath, (int) studio_suggest_config('downscale_max', 1024));
         if ($b64 === '') {
             $mime = function_exists('mime_content_type') ? (mime_content_type($imagePath) ?: 'image/jpeg') : 'image/jpeg';
