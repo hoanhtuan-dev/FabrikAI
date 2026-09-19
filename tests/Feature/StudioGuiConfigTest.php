@@ -182,7 +182,7 @@ class StudioGuiConfigTest extends TestCase
         // Nền tảng cũ (panel) vẫn nguyên vẹn + panel MỚI của Đợt 2 (Bộ sưu tập — không gian làm việc
         // theo nghề). Con số này là CHỦ ĐÍCH: thêm panel mới thì phải sửa test này một cách có ý thức
         // (và thêm card tương ứng vào ACTIVITY_CARDS — có test riêng đối chiếu hai bên).
-        $this->assertCount(8, StudioGuiConfig::panelIds(), 'Phải còn đủ 8 nhóm card (7 cũ + Bộ sưu tập).');
+        $this->assertCount(9, StudioGuiConfig::panelIds(), 'Phải còn đủ 9 nhóm card (8 cũ + Ghép trang phục tách ra ở 2026-09-22).');
         $this->assertContains('collections', StudioGuiConfig::panelIds(), 'Panel Bộ sưu tập phải nằm trong cấu hình.');
         $this->assertSame(['settings'], StudioGuiConfig::PINNED_IDS);
     }

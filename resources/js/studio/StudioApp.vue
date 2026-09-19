@@ -8,6 +8,8 @@ import DesignAgents from './components/DesignAgents.vue';
 import UpscaleCard from './components/UpscaleCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
 import ComposeCard from './components/ComposeCard.vue';
+// [Yêu cầu 2026-09-22] Card riêng cho "Ghép trang phục" — trước đây là một CHẾ ĐỘ trong ComposeCard.
+import OutfitComposeCard from './components/OutfitComposeCard.vue';
 // [Yêu cầu 2026-09-17] Card cũ "Ảnh mới từ ảnh mẫu" tách thành 2 card riêng.
 import VariationCard from './components/VariationCard.vue';
 import TryOnCard from './components/TryOnCard.vue';
@@ -72,6 +74,7 @@ const ACTIVITY_CARDS = {
   tryon: [TryOnCard],
   inpaint: [InpaintCard],
   compose: [ComposeCard],
+  outfit: [OutfitComposeCard],
   upscale: [UpscaleCard],
   director: [DirectorCard],
 };
@@ -100,6 +103,7 @@ const ACTIVITY_FALLBACK = [
   { id: 'tryon', kind: 'panel', icon: 'hanger', label: 'Mặc thử đồ' },
   { id: 'inpaint', kind: 'panel', icon: 'pencil', label: 'Sửa ảnh' },
   { id: 'compose', kind: 'panel', icon: 'layers', label: 'Ghép ảnh' },
+  { id: 'outfit', kind: 'panel', icon: 'shirt', label: 'Ghép trang phục' },
   { id: 'upscale', kind: 'panel', icon: 'maximize', label: 'Upscale' },
   { id: 'director', kind: 'panel', icon: 'film', label: 'Kịch bản quay' },
   { id: 'prompt', kind: 'action', icon: 'sparkles', label: 'Prompt Tạo Ảnh' },

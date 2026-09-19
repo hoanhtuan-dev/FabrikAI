@@ -100,6 +100,20 @@ class ModuleRegistry
             'plans' => ['*'],
         ],
         [
+            // [Yêu cầu 2026-09-22] TÁCH "Ghép trang phục" khỏi card "Ghép ảnh" thành card riêng.
+            // Hai việc khác nhau về bản chất: Ghép ảnh = dựng BỐ CỤC (nền chính + ảnh ghép, không có
+            // tham số thiết kế); Ghép trang phục = LAI TẠO BIẾN THỂ từ 2 trang phục nguồn, có phong
+            // cách · mức trang trí · mức sáng tạo · preset theo tài khoản · biến thể theo trục.
+            'id' => 'outfit', 'name' => 'Ghép trang phục', 'group' => 'Chỉnh ảnh',
+            'kind' => self::KIND_PANEL, 'gui' => true, 'icon' => 'shirt',
+            'summary' => 'Lai tạo biến thể trang phục mới từ 2 trang phục nguồn + bối cảnh (tùy chọn).',
+            // Dùng CHUNG đường /compose và cài đặt /outfit-settings với card Ghép ảnh: cùng một
+            // pipeline, hai cửa vào. Gói có MỘT trong hai module là gọi được (giống 'refgen' dùng
+            // chung cho 'variation' + 'tryon').
+            'endpoints' => ['compose', 'outfit-settings'], 'depends_on' => [],
+            'plans' => ['*'],
+        ],
+        [
             'id' => 'upscale', 'name' => 'Upscale', 'group' => 'Chỉnh ảnh',
             'kind' => self::KIND_PANEL, 'gui' => true, 'icon' => 'maximize',
             'summary' => 'Nâng độ nét và kích thước ảnh để in.',

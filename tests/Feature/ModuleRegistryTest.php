@@ -91,7 +91,7 @@ class ModuleRegistryTest extends TestCase
         $guiIds = ModuleRegistry::guiIds();
 
         $this->assertSame($guiIds, array_column($defaults, 'id'), 'Mục thanh công cụ phải sinh từ bản khai module, đúng thứ tự.');
-        $this->assertCount(8, StudioGuiConfig::panelIds(), 'Vẫn đủ 8 nhóm card.');
+        $this->assertCount(9, StudioGuiConfig::panelIds(), 'Vẫn đủ 9 nhóm card (Ghép ảnh và Ghép trang phục là 2 card riêng).');
         $this->assertSame('settings', end($guiIds) ?: null, 'Menu Cài đặt vẫn là mục ghim đáy.');
 
         foreach ($defaults as $row) {
