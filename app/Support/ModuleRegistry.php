@@ -92,11 +92,15 @@ class ModuleRegistry
             'plans' => ['*'],
         ],
         [
-            'id' => 'compose', 'name' => 'Ghép ảnh', 'group' => 'Chỉnh ảnh',
-            'kind' => self::KIND_PANEL, 'gui' => true, 'icon' => 'layers',
-            'summary' => 'Ghép nhiều ảnh thành một bố cục hoàn chỉnh.',
-            // `layers` là nút "Lưu Output" của bảng Lớp (LayersPanel) — cùng không gian canvas với Ghép ảnh.
-            'endpoints' => ['compose', 'layers'], 'depends_on' => [],
+            // [Yêu cầu 2026-09-22] Card này nay là STUDIO — phòng chụp thời trang chuyên nghiệp:
+            // bối cảnh chủ đề · sơ đồ đèn · ống kính · dáng · danh sách ảnh (shot list) · hậu kỳ.
+            // Id giữ nguyên 'compose' để không phá cấu hình thanh công cụ đã lưu của owner và các
+            // endpoint /compose sẵn có; chỉ ĐỔI TÊN hiển thị và mở rộng tính năng.
+            'id' => 'compose', 'name' => 'Studio', 'group' => 'Chỉnh ảnh',
+            'kind' => self::KIND_PANEL, 'gui' => true, 'icon' => 'camera',
+            'summary' => 'Phòng chụp: bối cảnh chủ đề bộ sưu tập · ánh sáng · dáng · danh sách ảnh · hậu kỳ.',
+            // `layers` là nút "Lưu Output" của bảng Lớp (LayersPanel) — cùng không gian canvas.
+            'endpoints' => ['compose', 'layers', 'studio/shoot'], 'depends_on' => [],
             'plans' => ['*'],
         ],
         [

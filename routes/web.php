@@ -156,6 +156,12 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::post('/reimagine', [StudioController::class, 'reimagine'])->name('reimagine');
     Route::post('/refgen', [StudioController::class, 'refgen'])->name('refgen');
     Route::post('/compose', [StudioController::class, 'compose'])->name('compose');
+    // ── STUDIO (phòng chụp): danh mục bối cảnh chủ đề + dựng danh sách ảnh của buổi chụp ──
+    // Cả hai đều TẤT ĐỊNH, không gọi model nên throttle rộng (người dùng chỉnh setup liên tục).
+    Route::post('/studio/shoot/catalog', [StudioController::class, 'shootCatalog'])
+        ->middleware('throttle:60,1')->name('studio.shoot.catalog');
+    Route::post('/studio/shoot/plan', [StudioController::class, 'shootPlan'])
+        ->middleware('throttle:60,1')->name('studio.shoot.plan');
     Route::post('/compose/preview', [StudioController::class, 'composePreview'])->name('compose.preview');
     Route::post('/generations/{generation}/region', [StudioController::class, 'regionEdit'])->name('region');
     Route::post('/process', [StudioController::class, 'processQueue'])->name('process');

@@ -7,8 +7,10 @@ import ConceptCard from './components/ConceptCard.vue';
 import DesignAgents from './components/DesignAgents.vue';
 import UpscaleCard from './components/UpscaleCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
-import ComposeCard from './components/ComposeCard.vue';
-// [Yêu cầu 2026-09-22] Card riêng cho "Ghép trang phục" — trước đây là một CHẾ ĐỘ trong ComposeCard.
+// [Yêu cầu 2026-09-22] Card "Ghép ảnh" nay là STUDIO — phòng chụp thời trang chuyên nghiệp
+// (bối cảnh chủ đề · ánh sáng · ống kính · dáng · danh sách ảnh · hậu kỳ). Id panel giữ nguyên 'compose'.
+import StudioCard from './components/StudioCard.vue';
+// Card riêng cho "Ghép trang phục" — trước đây là một CHẾ ĐỘ trong card Studio.
 import OutfitComposeCard from './components/OutfitComposeCard.vue';
 // [Yêu cầu 2026-09-17] Card cũ "Ảnh mới từ ảnh mẫu" tách thành 2 card riêng.
 import VariationCard from './components/VariationCard.vue';
@@ -73,7 +75,7 @@ const ACTIVITY_CARDS = {
   variation: [VariationCard],
   tryon: [TryOnCard],
   inpaint: [InpaintCard],
-  compose: [ComposeCard],
+  compose: [StudioCard],
   outfit: [OutfitComposeCard],
   upscale: [UpscaleCard],
   director: [DirectorCard],
@@ -102,7 +104,7 @@ const ACTIVITY_FALLBACK = [
   { id: 'variation', kind: 'panel', icon: 'variations', label: 'Tạo biến thể ảnh' },
   { id: 'tryon', kind: 'panel', icon: 'hanger', label: 'Mặc thử đồ' },
   { id: 'inpaint', kind: 'panel', icon: 'pencil', label: 'Sửa ảnh' },
-  { id: 'compose', kind: 'panel', icon: 'layers', label: 'Ghép ảnh' },
+  { id: 'compose', kind: 'panel', icon: 'camera', label: 'Studio' },
   { id: 'outfit', kind: 'panel', icon: 'shirt', label: 'Ghép trang phục' },
   { id: 'upscale', kind: 'panel', icon: 'maximize', label: 'Upscale' },
   { id: 'director', kind: 'panel', icon: 'film', label: 'Kịch bản quay' },

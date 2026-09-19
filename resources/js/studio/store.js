@@ -317,6 +317,27 @@ export const useStudioStore = defineStore('studio', {
     shopSignal: null,
     shopSaving: false,
     shopDataDirty: false,
+    // STUDIO — phòng chụp: catalog (bối cảnh/đèn/máy/dáng/loại ảnh/hậu kỳ) + setup + danh sách ảnh.
+    shootCatalog: null,
+    shootPlan: null,
+    shootLoading: false,
+    shootError: '',
+    shootPrompts: {},           // shot id → prompt người dùng đã chỉnh tay
+    shootSetup: {
+      backdrop: 'studio-white',
+      backdrop_note: '',
+      lighting: '',
+      camera: '50-28',
+      pose: 'stand-34',
+      style: 'ecommerce-clean',
+      shots: ['full-body', 'three-quarter', 'fabric-detail'],
+      ratio: '',
+      collection: '',
+      model_note: '',
+      garment_note: '',
+      extra: '',
+      variants: 1,
+    },
     trendRadar: null,
     trendRadarCache: {},      // region → payload đã tải (tránh gọi lại khi đổi tab/đổi vùng)
     trendRadarRequest: 0,     // chống race: chỉ nhận kết quả của lần gọi MỚI NHẤT
@@ -1084,6 +1105,109 @@ export const useStudioStore = defineStore('studio', {
         items.forEach((it) => { if (it.generation_id && it.status !== 'completed') this.pollGeneration(it.generation_id); });
         return items;
       } catch (e) { this.toast(e.message || 'Lỗi tạo ảnh từ ảnh mẫu.', 'error'); return null; }
+    },
+    // ── STUDIO: PHÒNG CHỤP (bối cảnh chủ đề · đèn · máy · dáng · danh sách ảnh) ────────────────
+    // Catalog lấy từ backend (nguồn duy nhất) rồi cache trong phiên: không hard-code trong giao diện.
+    async loadShootCatalog(force = false) {
+      if (this.shootCatalog && !force) return this.shootCatalog;
+      try {
+        this.shootCatalog = await this.api('/api/studio/shoot/catalog', {});
+        this.shootError = '';
+      } catch (e) {
+        this.shootError = e.message || 'Không tải được danh mục phòng chụp.';
+      }
+      return this.shootCatalog;
+    },
+    /** Đổi bất kỳ tham số nào của buổi chụp ⇒ danh sách ảnh cũ không còn đúng ⇒ bỏ đi để dựng lại. */
+    setShootSetup(patch = {}) {
+      this.shootSetup = { ...this.shootSetup, ...patch };
+      this.shootPlan = null;
+    },
+    toggleShootShot(id) {
+      const set = new Set(this.shootSetup.shots || []);
+      if (set.has(id)) set.delete(id); else set.add(id);
+      this.setShootSetup({ shots: Array.from(set) });
+    },
+    /** Dựng danh sách ảnh (shot list) — TẤT ĐỊNH ở backend, không gọi model, không tốn credit. */
+    async planShoot(imageCount = 2) {
+      this.shootLoading = true;
+      this.shootError = '';
+      try {
+        const data = await this.api('/api/studio/shoot/plan', {
+          ...this.shootSetup,
+          image_count: Math.max(0, Math.min(3, Number(imageCount) || 0)),
+        });
+        this.shootPlan = data || null;
+        this.shootPrompts = {};   // prompt chỉnh tay của buổi chụp trước không áp sang buổi mới
+        return data;
+      } catch (e) {
+        this.shootError = e.message || 'Không dựng được danh sách ảnh.';
+        this.shootPlan = null;
+        throw e;
+      } finally {
+        this.shootLoading = false;
+      }
+    },
+    setShootPrompt(shotId, text) {
+      this.shootPrompts = { ...this.shootPrompts, [String(shotId)]: String(text ?? '') };
+    },
+    shootPromptOf(shot) {
+      const custom = this.shootPrompts[String(shot && shot.id)];
+      return (custom !== undefined && custom !== null && String(custom).trim() !== '') ? String(custom) : String((shot && shot.prompt) || '');
+    },
+    /**
+     * CHẠY BUỔI CHỤP: mỗi tấm trong danh sách là MỘT generation riêng, đi đúng pipeline /api/compose
+     * sẵn có (nên credit, hàng đợi, Outputs, huỷ giữa chừng đều dùng lại hạ tầng cũ). Ảnh đầu là ẢNH
+     * TRANG PHỤC được giữ nguyên; các ảnh sau là tham chiếu (người mẫu/dáng/bối cảnh).
+     */
+    async runShoot(images) {
+      const shots = (this.shootPlan && this.shootPlan.shots) || [];
+      if (!Array.isArray(images) || images.length < 2) {
+        this.toast('Cần ít nhất 2 ảnh: 1 ảnh trang phục + 1 ảnh người mẫu/dáng.', 'error');
+        return null;
+      }
+      if (!shots.length) {
+        this.toast('Chưa có danh sách ảnh — bấm «Dựng danh sách ảnh» trước.', 'error');
+        return null;
+      }
+
+      this.composeStage = 'send';
+      this.composeError = '';
+      this.composeStartTs = Date.now();
+      this.composeGenIds = [];
+      const ids = [];
+      try {
+        for (const shot of shots) {
+          const prompt = this.shootPromptOf(shot).trim();
+          if (!prompt) continue;
+          const d = await this.api('/api/compose', {
+            images,
+            prompt,
+            final_prompt: prompt,          // prompt của phòng chụp đã hoàn chỉnh ⇒ gửi nguyên văn
+            variants: Math.max(1, Math.min(3, Number(shot.variants) || 1)),
+            mode: 'compose',
+            ...this.projectField(),
+          });
+          const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
+          items.forEach((it) => this.addGen({
+            id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider,
+            media_url: it.media_url, error: it.error, credits_cost: it.credits_cost ?? 1,
+            created_at: 'Studio · ' + (shot.name || shot.id),
+          }));
+          items.forEach((it) => { if (it.generation_id) ids.push(it.generation_id); });
+          this.composeGenIds = [...ids];
+          if (d.credits_left != null) this.creditsLeft = d.credits_left;
+        }
+        this.composeStage = 'processing';
+        if (ids.length) this.setBatch(ids);
+        ids.forEach((id) => this.pollGeneration(id));
+        return ids;
+      } catch (e) {
+        this.composeError = e.message || 'Buổi chụp lỗi giữa chừng.';
+        this.composeStage = 'error';
+        this.toast(this.composeError, 'error');
+        return ids.length ? ids : null;
+      }
     },
     // (Đã gỡ action xóa nền AI cùng nút của nó — xem ghi chú ở bảng Lớp.)
     // i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend).

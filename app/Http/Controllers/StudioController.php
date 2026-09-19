@@ -7,6 +7,7 @@ use App\Jobs\RenderVideoJob;
 use App\Models\Generation;
 use App\Models\Preset;
 use App\Services\GeminiService;
+use App\Services\PhotoStudioService;
 use App\Services\StyleSuggestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -951,6 +952,50 @@ class StudioController extends Controller
             'creative_level' => $s->creative_level,
             'presets' => $s->presets,
         ]);
+    }
+
+    /**
+     * STUDIO — PHÒNG CHỤP: danh mục bối cảnh chủ đề · sơ đồ đèn · ống kính · dáng · loại ảnh · hậu kỳ.
+     * Không tạo generation, không tốn credit — chỉ trả catalog cho giao diện.
+     */
+    public function shootCatalog(PhotoStudioService $studio): \Illuminate\Http\JsonResponse
+    {
+        return response()->json($studio->catalog());
+    }
+
+    /**
+     * Dựng DANH SÁCH ẢNH của một buổi chụp (mỗi tấm một prompt hoàn chỉnh + look signature dùng chung).
+     * KHÔNG gọi model, KHÔNG tạo generation ⇒ xem/sửa prompt thoải mái trước khi chạy.
+     */
+    public function shootPlan(Request $request, PhotoStudioService $studio): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'backdrop' => ['nullable', 'string', 'max:60'],
+            'backdrop_note' => ['nullable', 'string', 'max:400'],
+            'lighting' => ['nullable', 'string', 'max:60'],
+            'camera' => ['nullable', 'string', 'max:60'],
+            'pose' => ['nullable', 'string', 'max:60'],
+            'style' => ['nullable', 'string', 'max:60'],
+            'shots' => ['nullable', 'array', 'max:12'],
+            'shots.*' => ['string', 'max:60'],
+            'ratio' => ['nullable', 'string', 'in:1:1,4:5,3:4,9:16,4:3'],
+            'collection' => ['nullable', 'string', 'max:120'],
+            'model_note' => ['nullable', 'string', 'max:300'],
+            'garment_note' => ['nullable', 'string', 'max:300'],
+            'extra' => ['nullable', 'string', 'max:400'],
+            'variants' => ['nullable', 'integer', 'min:1', 'max:3'],
+            'image_count' => ['nullable', 'integer', 'min:0', 'max:3'],
+        ]);
+
+        // Nói THẬT nếu chưa có model tạo/sửa ảnh: khi đó buổi chụp chỉ trả ảnh mẫu (demo).
+        $imageReady = app(\App\Services\AiModelGateway::class)->has('edit');
+
+        return response()->json($studio->plan(
+            $data,
+            (int) ($data['image_count'] ?? 2),
+            $imageReady,
+            (int) studio_credit_cost('image'),
+        ));
     }
 
     /**
