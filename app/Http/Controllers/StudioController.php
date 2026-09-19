@@ -2078,6 +2078,136 @@ RULES:
     }
 
     /**
+     * Bản STREAM của suggest(): trả NDJSON, mỗi dòng một sự kiện tiến trình để card hiện
+     * tiến trình THẬT khi AI đang suy luận (provider nào, đang ở giai đoạn nào).
+     *
+     * Sự kiện: {"type":"phase","key":"prepare|vision|fallback|color","label":"…"} ·
+     *          {"type":"provider","provider":"deepseek","model":"deepseek-flash","transport":"openai","keys":1} ·
+     *          {"type":"result","data":{…}} · {"type":"error","message":"…"}
+     *
+     * POST /api/suggest (JSON) vẫn giữ nguyên cho client cũ và test.
+     */
+    public function suggestStream(Request $request)
+    {
+        $data = $request->validate([
+            'image' => ['nullable', 'image', 'max:8192'],
+            'reference_url' => ['nullable', 'string', 'max:2048'],
+            'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'adherence' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'detail_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'skip_hair' => ['nullable', 'integer', 'min:0', 'max:1'],
+            'skip_logo' => ['nullable', 'integer', 'min:0', 'max:1'],
+            'skip_background' => ['nullable', 'integer', 'min:0', 'max:1'],
+        ]);
+
+        $imagePath = null;
+
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+            $path = $request->file('image')->store('studio/ref', 'public');
+            $imagePath = storage_path('app/public/'.$path);
+        } elseif (! empty($data['reference_url'])) {
+            $imagePath = $this->resolveReferencePath($data['reference_url']);
+        }
+
+        // Lỗi TRƯỚC khi mở stream vẫn trả JSON 422 bình thường (client đọc res.ok).
+        if (! $imagePath || ! is_file($imagePath)) {
+            return response()->json(['message' => 'Không đọc được ảnh nguồn. Vui lòng tải ảnh hoặc chọn ảnh sản phẩm.'], 422);
+        }
+
+        if (! studio_suggest_enabled()) {
+            return response()->json(['message' => 'Tính năng "Gợi ý từ ảnh" đang bị tắt trong cài đặt Studio.'], 422);
+        }
+
+        $creativeLevel = (int) ($data['creative_level'] ?? studio_suggest_config('creative_level', 6));
+        $opts = [
+            'adherence' => $data['adherence'] ?? null,
+            'detail_level' => $data['detail_level'] ?? null,
+            'creative_level' => $creativeLevel,
+            'skip_hair' => (bool) ($data['skip_hair'] ?? false),
+            'skip_logo' => (bool) ($data['skip_logo'] ?? false),
+            'skip_background' => (bool) ($data['skip_background'] ?? false),
+        ];
+
+        // Trong test, Laravel bắt nội dung stream bằng output buffer của chính nó — đụng vào
+        // buffer ở đây sẽ làm test không đọc được NDJSON. Chỉ đẩy buffer khi chạy thật.
+        $live = ! app()->runningUnitTests();
+
+        return response()->stream(function () use ($imagePath, $creativeLevel, $opts, $live) {
+            // Vision có thể mất 30-90s với ảnh chi tiết — đừng để PHP cắt giữa chừng.
+            @set_time_limit(180);
+            if ($live) {
+                while (ob_get_level() > 0) {
+                    @ob_end_flush();
+                }
+            }
+
+            $write = function (array $event) use ($live): void {
+                echo json_encode($event, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+                if ($live) {
+                    if (ob_get_level() > 0) {
+                        @ob_flush();
+                    }
+                    @flush();
+                }
+            };
+
+            try {
+                $result = app(\App\Services\StyleSuggestService::class)
+                    ->suggest($imagePath, $creativeLevel, $opts, fn (array $e) => $write($e));
+
+                $write(['type' => 'result', 'data' => $result]);
+            } catch (\Throwable $e) {
+                $write(['type' => 'error', 'message' => $e->getMessage() ?: 'Không phân tích được ảnh.']);
+            }
+        }, 200, [
+            'Content-Type' => 'application/x-ndjson; charset=utf-8',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    /**
+     * 10 gợi ý từ ảnh MỚI NHẤT của người dùng (compact + đủ trường để khôi phục vào card).
+     * GET /api/suggest/recent?limit=10
+     */
+    public function suggestRecent(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $limit = max(1, min(20, (int) $request->query('limit', 10)));
+        $user = $request->user();
+
+        $items = $user->suggestResults()->latest()->limit($limit)->get()->map(fn ($r) => [
+            'id' => $r->id,
+            'reference_url' => $r->reference_url,
+            'reference_thumb' => $r->reference_thumb,
+            'garment_type' => $r->garment_type,
+            'styles' => $r->styles ?? [],
+            'background' => $r->background,
+            'pose' => $r->pose,
+            'fabric' => $r->fabric,
+            'silhouette' => $r->silhouette,
+            'camera' => $r->camera,
+            'embellishment' => $r->embellishment,
+            'detail_notes' => $r->detail_notes,
+            'color_palette' => $r->color_palette ?? [],
+            'keywords' => $r->keywords ?? [],
+            'image_prompt_en' => $r->image_prompt_en,
+            'prompt_vi' => $r->prompt_vi,
+            'video_prompt_en' => $r->video_prompt_en,
+            'creative_level' => (int) $r->creative_level,
+            'adherence' => (int) $r->adherence,
+            'detail_level' => (int) $r->detail_level,
+            'apply_count' => (int) $r->apply_count,
+            'created_at' => optional($r->created_at)->toIso8601String(),
+            'ago' => optional($r->created_at)->diffForHumans(),
+        ])->values();
+
+        return response()->json([
+            'items' => $items,
+            'total' => $user->suggestResults()->count(),
+        ]);
+    }
+
+    /**
      * Lưu kết quả phân tích từ "Gợi ý từ ảnh" vào Thư viện Prompt.
      */
     public function suggestLibrarySave(Request $request): \Illuminate\Http\JsonResponse

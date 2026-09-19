@@ -233,6 +233,10 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
 
     // ── Prompt helpers ──
     Route::post('/suggest', [StudioController::class, 'suggest'])->name('suggest');
+    // Bản STREAM (NDJSON) — card "Gợi ý từ ảnh" dùng để hiện tiến trình THẬT khi AI suy luận.
+    Route::post('/suggest/stream', [StudioController::class, 'suggestStream'])->name('suggest.stream');
+    // 10 gợi ý từ ảnh mới nhất của người dùng (danh sách "gần đây" trong card).
+    Route::get('/suggest/recent', [StudioController::class, 'suggestRecent'])->name('suggest.recent');
     Route::post('/translate', [StudioController::class, 'translate'])->name('translate');
     Route::get('/defaults', [StudioController::class, 'defaults'])->name('defaults');
     Route::get('/prompt-history', [StudioController::class, 'promptHistory'])->name('prompt-history');

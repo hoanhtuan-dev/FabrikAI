@@ -13,12 +13,27 @@ use Illuminate\Support\Facades\Http;
  */
 class StyleSuggestService
 {
-    public function suggest(string $imagePath, int $creativeLevel = 6, ?array $opts = null): array
+    /**
+     * @param callable|null $onProgress Nhận từng sự kiện tiến trình dạng array:
+     *        ['type' => 'phase', 'key' => 'prepare|vision', 'label' => '…']
+     *        ['type' => 'provider', 'provider' => 'deepseek', 'model' => 'deepseek-flash', 'transport' => 'openai', 'keys' => 1]
+     *        Dùng cho endpoint stream (NDJSON) để card hiện tiến trình THẬT khi AI đang suy luận.
+     */
+    public function suggest(string $imagePath, int $creativeLevel = 6, ?array $opts = null, ?callable $onProgress = null): array
     {
+        $emit = function (string $type, array $payload = []) use ($onProgress) {
+            if ($onProgress) {
+                $onProgress(array_merge(['type' => $type], $payload));
+            }
+        };
+        $started = microtime(true);
+
         // Tính năng bị tắt -> trả kết quả rỗng kèm cờ `disabled` để controller báo lỗi thân thiện.
         if (! studio_suggest_enabled()) {
             return ['disabled' => true, 'styles' => [], 'background' => '', 'image_prompt_en' => ''];
         }
+
+        $emit('phase', ['key' => 'prepare', 'label' => 'Đang chuẩn bị ảnh nguồn…']);
 
         // Độ bám ảnh gốc + mức chi tiết — kiểm soát riêng cho "Gợi ý từ ảnh".
         $adherence = $this->resolveAdherence($opts);
@@ -37,13 +52,24 @@ class StyleSuggestService
         //   'qwen'/'gemini' (hoặc slug khác) = ÉP provider đó trước, rồi provider còn lại sau
         //                   (hành vi cũ, giữ để tương thích).
         $provider = studio_suggest_provider();
+        $lastError = null;   // lỗi cuối cùng của provider — đưa vào thông báo cuối để UI nói rõ AI nào hỏng
 
         if ($provider === '') {
             foreach ($this->registryVisionCandidates() as $cand) {
+                $emit('provider', [
+                    'provider' => $cand['provider'],
+                    'model' => $cand['model'],
+                    'transport' => $cand['transport'],
+                    'keys' => count($cand['keys']),
+                ]);
+                $emit('phase', ['key' => 'vision', 'label' => 'AI đang đọc ảnh và suy luận… ('.$cand['provider'].' · '.$cand['model'].')']);
+
                 try {
-                    return $this->runCandidate($cand, $imagePath, $creativeLevel, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
+                    return $this->withMeta($this->runCandidate($cand, $imagePath, $creativeLevel, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground), $cand['provider'], $cand['model'], $started);
                 } catch (\Throwable $e) {
-                    logger()->error($cand['provider'].':'.$cand['model'].' vision suggest failed: '.$e->getMessage());
+                    $lastError = $e->getMessage();
+                    logger()->error($cand['provider'].':'.$cand['model'].' vision suggest failed: '.$lastError);
+                    $emit('phase', ['key' => 'fallback', 'label' => 'Provider này lỗi — đang thử provider kế tiếp…']);
                 }
             }
 
@@ -67,20 +93,30 @@ class StyleSuggestService
         }
 
         foreach ($attempts as $attempt) {
-            try {
-                if ($attempt === 'qwen') {
-                    return $this->suggestViaQwenVision($imagePath, $creativeLevel, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
-                }
+            $model = $attempt === 'qwen' ? (string) (studio_suggest_qwen_models()[0] ?? 'qwen') : studio_suggest_gemini_model();
+            $emit('provider', ['provider' => $attempt, 'model' => $model, 'transport' => $attempt, 'keys' => 1]);
+            $emit('phase', ['key' => 'vision', 'label' => 'AI đang đọc ảnh và suy luận… ('.$attempt.' · '.$model.')']);
 
-                return $this->suggestViaVision($imagePath, $creativeLevel, $geminiKey, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
+            try {
+                $out = $attempt === 'qwen'
+                    ? $this->suggestViaQwenVision($imagePath, $creativeLevel, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground)
+                    : $this->suggestViaVision($imagePath, $creativeLevel, $geminiKey, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
+
+                return $this->withMeta($out, $attempt, $model, $started);
             } catch (\Throwable $e) {
-                logger()->error($attempt.' vision suggest failed: '.$e->getMessage());
+                $lastError = $e->getMessage();
+                logger()->error($attempt.' vision suggest failed: '.$lastError);
             }
         }
 
         // Không có key + đã bật fallback màu -> phân tích màu GD để vẫn gợi ý offline.
         if (studio_suggest_fallback()) {
-            return $this->suggestViaColor($imagePath, $creativeLevel, $adherence, $detailLevel);
+            $emit('phase', ['key' => 'color', 'label' => 'Chưa có provider AI khả dụng — phân tích màu ngoại tuyến…']);
+            return $this->withMeta($this->suggestViaColor($imagePath, $creativeLevel, $adherence, $detailLevel), 'color', 'GD', $started);
+        }
+
+        if ($lastError) {
+            throw new \RuntimeException('Không provider AI nào phân tích được ảnh. Lỗi cuối: '.$lastError);
         }
 
         throw new \RuntimeException('Chưa cấu hình API key vision cho "Gợi ý từ ảnh" và fallback màu đang tắt.');
@@ -97,6 +133,21 @@ class StyleSuggestService
      *
      * @return list<array{provider:string, model:string, transport:string, base:string, keys:list<string>}>
      */
+    /**
+     * Gắn metadata về provider/model/thời gian vào kết quả — UI hiển thị được “AI nào đã suy luận và mất bao lâu”.
+     */
+    protected function withMeta(array $out, string $provider, string $model, float $started): array
+    {
+        $out['_meta'] = [
+            'provider' => $provider,
+            'model' => $model,
+            'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+            'finished_at' => now()->toIso8601String(),
+        ];
+
+        return $out;
+    }
+
     protected function registryVisionCandidates(): array
     {
         if (! function_exists('studio_task_group_models')) {

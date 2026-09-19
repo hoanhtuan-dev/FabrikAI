@@ -253,6 +253,20 @@ export const useStudioStore = defineStore('studio', {
     suggestSkipLogo: true,         // Bỏ qua logo, chữ, watermark (mặc định bật)
     suggestSkipBackground: true,   // Bỏ qua phân tích bối cảnh (mặc định bật)   // 1..10 mức chi tiết phân tích ảnh gốc (màu/đường may/hoạ tiết/độ dài/cổ/tay...)
     suggestSaving: false,       // đang lưu kết quả vào thư viện prompt
+    // ── Tiến trình "Gợi ý từ ảnh" (stream NDJSON) — card hiện AI NÀO đang suy luận + giai đoạn ──
+    suggestPhase: '',            // key giai đoạn: prepare | vision | fallback | color
+    suggestPhaseLabel: '',       // nhãn tiếng Việt của giai đoạn hiện tại
+    suggestProvider: '',         // provider đang suy luận (deepseek/qwen/gemini/slug custom…)
+    suggestModel: '',            // model id đang chạy
+    suggestStartedAt: 0,         // mốc bắt đầu (ms) — card tự đếm giây, không cần server
+    suggestLastMeta: null,       // { provider, model, elapsed_ms } của lần chạy xong gần nhất
+    suggestError: '',            // lỗi gần nhất để card hiện khối lỗi có ngữ cảnh
+    // ── Danh sách 10 gợi ý từ ảnh MỚI NHẤT (bảng suggest_results của chính người dùng) ──
+    suggestRecent: [],           // danh sách HIỂN THỊ = lịch sử client + kết quả đã lưu (server)
+    suggestRecentServer: [],     // kết quả ĐÃ LƯU trong bảng suggest_results
+    suggestLocalRecent: [],      // 10 phân tích gần nhất ở trình duyệt (chưa cần Lưu)
+    suggestRecentTotal: 0,
+    suggestRecentLoading: false,
     // ── Thư viện Prompt phân tích (💡 Gợi ý từ ảnh) — kế thừa pattern từ libraryItems ──
     suggestLibItems: [],
     suggestLibTotal: 0,
@@ -1862,10 +1876,13 @@ export const useStudioStore = defineStore('studio', {
       if (this.suggestSaving) return;
       this.suggestSaving = true;
       try {
+        // _meta (provider/model/thời gian) là thông tin phiên chạy — không lưu vào thư viện.
+        const { _meta, _restored_from, _reference_url, ...suggestFields } = this.suggestResult;
         const body = {
-          reference_url: this.upscaleSrc || '',
+          // Kết quả nạp lại từ 'gần đây' giữ ẢNH GỐC của nó; kết quả vừa phân tích thì dùng ảnh đang chọn.
+          reference_url: _reference_url || this.upscaleSrc || '',
           project_id: this.appliedProjectId() || null,
-          ...this.suggestResult,
+          ...suggestFields,
         };
         const res = await fetch('/api/suggest-library/save', {
           method: 'POST',
@@ -1875,6 +1892,7 @@ export const useStudioStore = defineStore('studio', {
         const d = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(d.message || 'Lỗi lưu.');
         this.toast('💾 Đã lưu prompt vào Thư viện Prompt.');
+        this.loadSuggestRecent();   // danh sách 'gần đây' trong card cập nhật ngay
       } catch (e) { this.toast(e.message || 'Lỗi lưu prompt.', 'error'); }
       finally { this.suggestSaving = false; }
     },
@@ -3727,6 +3745,7 @@ export const useStudioStore = defineStore('studio', {
         payload.skip_background = this.suggestSkipBackground ? 1 : 0;
         const d = await this.api('/api/suggest', payload);
         this.suggestResult = d;
+        this.pushSuggestLocal(d);
         const styles = (d.styles || []).join(', ');
         const extras = [styles, d.garment_type, d.background].filter(Boolean).join(' · ');
         this.toast(extras ? 'Đã gợi ý: ' + extras : 'Đã gợi ý.');
@@ -3734,6 +3753,215 @@ export const useStudioStore = defineStore('studio', {
       catch(e){ this.toast(e.message || 'Lỗi gợi ý.', 'error'); }
       finally { this.suggesting = false; }
     },
+    /** Payload chung cho cả đường JSON và đường stream của "Gợi ý từ ảnh". */
+    _suggestPayload(image) {
+      const payload = { reference_url: image, creative_level: this.creativeLevel };
+      // Gửi độ bám/chi tiết để backend ép bám ảnh gốc (0 = tự theo creative).
+      if (this.suggestAdherence) payload.adherence = this.suggestAdherence;
+      if (this.suggestDetailLevel) payload.detail_level = this.suggestDetailLevel;
+      // Cờ bỏ qua phân tích (mặc định false → AI phân tích bình thường).
+      payload.skip_hair = this.suggestSkipHair ? 1 : 0;
+      payload.skip_logo = this.suggestSkipLogo ? 1 : 0;
+      payload.skip_background = this.suggestSkipBackground ? 1 : 0;
+      return payload;
+    },
+
+    /**
+     * "Gợi ý từ ảnh" có TIẾN TRÌNH THẬT: đọc NDJSON từ /api/suggest/stream và cập nhật
+     * suggestPhase/suggestProvider ngay khi server gửi — người dùng thấy AI nào đang suy luận
+     * thay vì một nút "Đang phân tích…" bất động suốt 10-90 giây.
+     * Trình duyệt/proxy không hỗ trợ stream ⇒ tự rơi về đường JSON cũ (suggestStyle).
+     */
+    async suggestStyleStream(image) {
+      if (!this.suggestEnabled) { this.toast('Tính năng "Gợi ý từ ảnh" đang bị tắt trong cài đặt.', 'error'); return; }
+      if (!image) { this.toast('Chọn ảnh nguồn để gợi ý.', 'error'); return; }
+
+      this.suggesting = true;
+      this.suggestError = '';
+      this.suggestPhase = 'prepare';
+      this.suggestPhaseLabel = 'Đang chuẩn bị ảnh nguồn…';
+      this.suggestProvider = '';
+      this.suggestModel = '';
+      this.suggestLastMeta = null;
+      this.suggestStartedAt = Date.now();
+
+      const payload = this._suggestPayload(image);
+
+      try {
+        const res = await fetch('/api/suggest/stream', {
+          method: 'POST',
+          headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.status === 401 || res.redirected) { this.setAuthStatus(401); throw new Error('Phiên đăng nhập đã hết — tải lại trang.'); }
+
+        if (!res.ok || !res.body || !res.body.getReader) {
+          // Lỗi trước khi stream (422 ảnh không đọc được, tính năng tắt…) hoặc không có ReadableStream.
+          const d = await res.clone?.().json?.().catch(() => ({})) ?? {};
+          if (!res.ok && d && d.message) throw new Error(d.message);
+          return await this.suggestStyle(image); // đường JSON cũ
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        for (;;) {
+          const { value, done } = await reader.read();
+          buf += decoder.decode(value || new Uint8Array(), { stream: !done });
+          const lines = buf.split('\n');
+          buf = lines.pop();
+          for (const line of lines) this._handleSuggestEvent(line);
+          if (done) break;
+        }
+        if (buf.trim()) this._handleSuggestEvent(buf);
+
+        if (this.suggestError) return;
+
+        if (this.suggestResult) {
+          this.pushSuggestLocal(this.suggestResult);   // vào danh sách 'gần đây' ngay, không cần Lưu
+          const d = this.suggestResult;
+          const extras = [(d.styles || []).join(', '), d.garment_type, d.background].filter(Boolean).join(' · ');
+          this.toast(extras ? 'Đã gợi ý: ' + extras : 'Đã gợi ý.');
+        }
+      } catch (e) {
+        this.suggestError = e.message || 'Lỗi gợi ý.';
+        this.toast(this.suggestError, 'error');
+      } finally {
+        this.suggesting = false;
+      }
+    },
+
+    /** Một dòng NDJSON từ /api/suggest/stream → cập nhật state cho card. */
+    _handleSuggestEvent(line) {
+      const raw = String(line || '').trim();
+      if (!raw) return;
+      let ev;
+      try { ev = JSON.parse(raw); } catch { return; }
+
+      if (ev.type === 'phase') {
+        this.suggestPhase = ev.key || this.suggestPhase;
+        this.suggestPhaseLabel = ev.label || this.suggestPhaseLabel;
+      } else if (ev.type === 'provider') {
+        this.suggestProvider = ev.provider || '';
+        this.suggestModel = ev.model || '';
+      } else if (ev.type === 'result') {
+        this.suggestResult = ev.data || null;
+        this.suggestLastMeta = (ev.data && ev.data._meta) || null;
+        this.suggestPhase = 'done';
+        this.suggestPhaseLabel = 'Hoàn tất';
+      } else if (ev.type === 'error') {
+        this.suggestError = ev.message || 'Không phân tích được ảnh.';
+        this.toast(this.suggestError, 'error');
+      }
+    },
+
+    /** 10 gợi ý từ ảnh MỚI NHẤT của chính người dùng (cho danh sách "gần đây" trong card). */
+    async loadSuggestRecent() {
+      if (this.suggestRecentLoading) return;
+      this.suggestRecentLoading = true;
+      // Hiện ngay lịch sử của trình duyệt (nếu có) trước khi chờ server — danh sách không trống trơn lúc tải.
+      if (! (this.suggestLocalRecent || []).length) this._restoreSuggestLocal();
+      this.mergeSuggestRecent();
+      try {
+        const res = await fetch('/api/suggest/recent?limit=10', { headers: { Accept: 'application/json' } });
+        if (res.status === 401 || res.redirected) { this.setAuthStatus(401); return; }
+        const d = await res.json().catch(() => ({}));
+        this.suggestRecentServer = Array.isArray(d.items) ? d.items : [];
+        this.suggestRecentTotal = Number(d.total || 0);
+        this.mergeSuggestRecent();
+      } catch (e) {
+        // Danh sách gần đây là tiện ích — lỗi không được phá luồng chính.
+        this.suggestRecentServer = [];
+        this.mergeSuggestRecent();
+      } finally {
+        this.suggestRecentLoading = false;
+      }
+    },
+
+    /** Đẩy một kết quả vừa phân tích vào danh sách "gần đây" phía client (chưa cần Lưu). */
+    pushSuggestLocal(item) {
+      if (!item || !item.image_prompt_en) return;
+      const row = {
+        id: 'local-' + Date.now(),
+        _local: true,
+        reference_url: this.upscaleSrc || '',
+        garment_type: item.garment_type || '',
+        styles: item.styles || [],
+        background: item.background || '',
+        pose: item.pose || '',
+        fabric: item.fabric || '',
+        silhouette: item.silhouette || '',
+        camera: item.camera || '',
+        embellishment: item.embellishment || '',
+        detail_notes: item.detail_notes || '',
+        color_palette: item.color_palette || [],
+        keywords: item.keywords || [],
+        image_prompt_en: item.image_prompt_en || '',
+        prompt_vi: item.prompt_vi || '',
+        video_prompt_en: item.video_prompt_en || '',
+        creative_level: item.creative_level ?? this.creativeLevel,
+        adherence: item.adherence ?? 0,
+        detail_level: item.detail_level ?? 8,
+        apply_count: 0,
+        ago: 'vừa xong',
+        _meta: item._meta || null,
+      };
+      const rest = (this.suggestLocalRecent || []).filter((x) => x.image_prompt_en !== row.image_prompt_en);
+      this.suggestLocalRecent = [row, ...rest].slice(0, 10);
+      this._persistSuggestLocal();
+      this.mergeSuggestRecent();
+    },
+
+    _persistSuggestLocal() {
+      try { localStorage.setItem('fabrikai.suggestRecent', JSON.stringify(this.suggestLocalRecent || [])); } catch { /* chế độ riêng tư */ }
+    },
+
+    _restoreSuggestLocal() {
+      try {
+        const raw = localStorage.getItem('fabrikai.suggestRecent');
+        const arr = raw ? JSON.parse(raw) : [];
+        this.suggestLocalRecent = Array.isArray(arr) ? arr.slice(0, 10) : [];
+      } catch { this.suggestLocalRecent = []; }
+    },
+
+    /** Gộp kết quả ĐÃ LƯU (server) với lịch sử vừa phân tích (client) → 10 mục mới nhất. */
+    mergeSuggestRecent() {
+      const saved = this.suggestRecentServer || [];
+      const savedPrompts = new Set(saved.map((x) => x.image_prompt_en));
+      const local = (this.suggestLocalRecent || []).filter((x) => !savedPrompts.has(x.image_prompt_en));
+      this.suggestRecent = [...local, ...saved].slice(0, 10);
+    },
+
+    /** Khôi phục một gợi ý cũ vào card (đủ trường nên không cần gọi lại AI). */
+    applyRecentSuggest(item) {
+      if (!item) return;
+      this.suggestResult = {
+        styles: item.styles || [],
+        background: item.background || '',
+        pose: item.pose || '',
+        fabric: item.fabric || '',
+        silhouette: item.silhouette || '',
+        camera: item.camera || '',
+        garment_type: item.garment_type || '',
+        embellishment: item.embellishment || '',
+        detail_notes: item.detail_notes || '',
+        color_palette: item.color_palette || [],
+        keywords: item.keywords || [],
+        image_prompt_en: item.image_prompt_en || '',
+        prompt_vi: item.prompt_vi || '',
+        video_prompt_en: item.video_prompt_en || '',
+        creative_level: item.creative_level ?? this.creativeLevel,
+        adherence: item.adherence ?? 0,
+        detail_level: item.detail_level ?? 8,
+        _restored_from: item.id || null,
+        _reference_url: item.reference_url || '',   // ảnh GỐC của gợi ý này (khác ảnh đang chọn)
+      };
+      this.suggestLastMeta = null;
+      this.suggestError = '';
+      this.toast('Đã nạp lại gợi ý' + (item.garment_type ? ': ' + item.garment_type : '') + '.');
+    },
+
     statusLabel(s) { return { pending: 'Đang chờ', processing: 'Đang xử lý', completed: 'Hoàn tất', failed: 'Lỗi', cancelled: 'Đã hủy' }[s] || s || ''; },
     // Lazy worker poll: theo dõi một generation qua /api/generations/{id} (backend tự xử lý
     // job đang pending và tự "heal" job kẹt). Single-flight: không bao giờ gửi 2 request song song.
