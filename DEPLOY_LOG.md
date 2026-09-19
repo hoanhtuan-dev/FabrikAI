@@ -318,3 +318,67 @@ php artisan queue:restart
 - [ ] Kiểm thử endpoint design-agent bằng tài khoản thật để xác nhận module gating theo gói trên production.
 - [ ] Phiên Collections/Canvas: sửa 6 test đỏ rồi rebuild asset (xem mục phiên trước).
 
+
+---
+
+## Phiên 2026-09-22 (Đợt 4 — Thiết kế lại card 'Gợi ý từ ảnh' + tiến trình AI thật + 10 gợi ý mới nhất)
+
+**Commit:** `198065b`. **Đã deploy production** (không migration).
+
+### 1. Tiến trình THẬT khi AI suy luận
+
+| Việc | Chi tiết |
+|---|---|
+| Endpoint mới | `POST /api/suggest/stream` → NDJSON: `phase` → `provider` → `result` / `error` |
+| Service | `StyleSuggestService::suggest(..., ?callable $onProgress)` phát sự kiện ở đúng ranh giới thật (chuẩn bị ảnh → chọn provider → AI đọc ảnh → fallback → phân tích màu) |
+| JSON cũ | `POST /api/suggest` giữ nguyên, nay kèm `_meta {provider, model, elapsed_ms}` |
+| Lỗi | Thông báo cuối nêu rõ provider/model hỏng (`Lỗi cuối: Vision deepseek-flash (HTTP 500)…`) |
+
+**Đo THẬT trên production** (curl `-N`, mốc ms so với lúc gửi):
+
+```
++    74 ms  {"type":"phase","key":"prepare","label":"Đang chuẩn bị ảnh nguồn…"}
++    84 ms  {"type":"provider","provider":"deepseek","model":"deepseek-flash","transport":"openai","keys":1}
++    87 ms  {"type":"phase","key":"vision","label":"AI đang đọc ảnh và suy luận… (deepseek · deepseek-flash)"}
++  8807 ms  {"type":"result","data":{…}}
+TONG: 8810 ms
+```
+
+⇒ Sự kiện tiến trình về client sau **~80 ms**, kết quả sau **8.8 s**: card hiện đúng AI đang chạy + đồng hồ giây,
+thay vì nút 'Đang phân tích…' đứng im. Hostinger KHÔNG buffer (nhờ `ob_end_flush()` + header `X-Accel-Buffering: no`).
+
+### 2. Thiết kế lại card (SuggestCard.vue: 341 → 574 dòng)
+
+- **5 chế độ nhanh** một cú bấm: Bám gốc tối đa · Cân bằng · Sáng tạo · Sàn TMĐT · Lookbook (thay 3 slider + 3 checkbox phải tự chỉnh).
+- Khối **Tuỳ chỉnh nâng cao** thu gọn, có dòng tóm tắt trạng thái.
+- Khung kết quả có cấu trúc: chip dữ kiện (chất liệu · dáng · góc máy · tư thế · bối cảnh · hoạ tiết), bảng màu, **tab** (Prompt ảnh EN/VI · Prompt video · Chi tiết gốc · Từ khoá), nút Copy prompt, Lưu Thư viện, Tạo ảnh với prompt này.
+- Thanh tiến trình 4 chặng + chip AI + đồng hồ; khối lỗi có ngữ cảnh.
+- Accessibility: `role=status`, `aria-live`, `aria-expanded`, `aria-label` cho slider; mọi bề mặt hover đều có `motion-ui`/`motion-row` (**không thêm vi phạm** cho MotionFoundationTest).
+
+### 3. Danh sách 10 gợi ý từ ảnh mới nhất
+
+- `GET /api/suggest/recent?limit=10` — 10 kết quả mới nhất **của chính người dùng**, đủ trường để nạp lại vào card (không gọi lại AI), kèm `ago` + số lần đã dùng.
+- Card **gộp thêm lịch sử trên trình duyệt** (localStorage, 10 mục) nên danh sách có dữ liệu NGAY cả khi chưa bấm Lưu; mục chưa lưu có nút lưu nhanh, mục đã lưu hiện 'đã lưu'.
+- Nạp lại mục cũ giữ **ảnh gốc của chính nó** (không lấy nhầm ảnh đang chọn).
+
+### Verify production
+
+- Route mới có mặt: `api/suggest/stream`, `api/suggest/recent`.
+- `/` `/dang-nhap` `/up` → **200**.
+- Bundle đã chứa UI mới (`Chế độ nhanh`, `Gợi ý gần đây`) và code stream (`suggest/stream`, `pushSuggestLocal` ở chunk chia sẻ).
+- `/api/suggest/recent` trả đúng shape (hiện 0 mục vì Thư viện chưa có gì; lịch sử trình duyệt sẽ đổ vào sau lần phân tích đầu).
+
+**Test:** 5 test mới `SuggestStreamTest`; full suite **749 pass**; 6 fail vẫn là lỗi SẴN CÓ ở HEAD (Collections/Canvas).
+
+### ⚠️ Phối hợp phiên song song
+
+Phiên khác đang refactor `AiModelGateway` + 5 service (Gemini/ImageAI/Stylist/VideoAI/VirtualTryOn) và **cũng đang sửa `StudioController.php`**.
+Đã tách bằng cách chỉ stage **đúng hunk của phiên này** trong StudioController (`git apply --cached` với patch lọc theo `suggestStream`/`suggestRecent`),
+nên commit `198065b` KHÔNG chứa WIP của họ — 6 file WIP của họ vẫn nguyên trong cây làm việc.
+
+### Cần làm tiếp
+
+- [ ] `faceDescription()`/`poseDescription()` vẫn chỉ dùng Qwen (xem đợt 3).
+- [ ] Chưa có UI cho `suggest_provider` (auto/qwen/gemini/deepseek/custom) trong tab Cài đặt.
+- [ ] Phiên Collections/Canvas: sửa 6 test đỏ (CollectionsCard/CollectionsPage thiếu `.motion-ui` ở `hover:text-white`).
+
