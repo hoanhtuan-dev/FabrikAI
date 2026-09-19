@@ -12,7 +12,9 @@ class DesignAgentServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->agents = new DesignAgentService();
+        // null = chạy đúng nhánh TẤT ĐỊNH (không container, không model) — nhánh phải luôn
+        // cho ra contract y hệt để hai agent không bao giờ trả về rỗng khi chưa cấu hình model.
+        $this->agents = new DesignAgentService(null);
     }
 
     public function test_catalog_has_stable_data_backed_directions(): void

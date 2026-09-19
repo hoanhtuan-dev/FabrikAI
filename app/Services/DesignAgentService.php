@@ -4,18 +4,41 @@ namespace App\Services;
 
 use App\Models\Generation;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /**
  * Design Agents — contract và dữ liệu hợp nhất cho TrendRadar + CollectionBot.
  *
- * Các nguồn bên ngoài chưa có connector thật trong bản hiện tại, vì vậy response luôn
- * khai báo rõ source_mode=demo. Dữ liệu nội bộ chỉ đọc project/generation của chính
- * user đang đăng nhập; không có POS/ERP hay scraping thật cho đến khi connector được gắn.
+ * HAI TẦNG TÁCH BẠCH (bắt buộc):
+ *   · TẦNG SỐ LIỆU — catalog demo + dữ liệu nội bộ của CHÍNH user đang đăng nhập.
+ *     Luôn khai báo source_mode=demo / evidence_mode=demo: connector TMĐT, computer
+ *     vision, POS/ERP CHƯA chạy nên không có con số thị trường thật nào ở đây.
+ *   · TẦNG SUY LUẬN — model AI của NHÓM CÔNG VIỆC 'prompt' (Cài đặt → Nhóm công việc /
+ *     Model Registry / Luồng ưu tiên / Custom Provider) đọc tầng số liệu rồi viết định
+ *     hướng, brief, caption mood board, prompt. AI chỉ được trả về CHỮ: mọi con số trong
+ *     response vẫn do tầng số liệu quyết định nên AI không thể bịa số liệu thị trường.
+ *
+ * Không có model khả dụng (hoặc người dùng tắt AI) ⇒ quay về engine tất định và NÓI THẬT
+ * bằng khối `model` (mode=rule + lý do cụ thể), không im lặng giả vờ đã dùng AI.
  */
 class DesignAgentService
 {
     private const REGIONS = ['all', 'hcm', 'hanoi', 'danang'];
+
+    /** Nhóm công việc dùng cho MỌI suy luận của hai agent (Settings → Nhóm công việc). */
+    public const AI_GROUP = 'prompt';
+
+    /** Cache định hướng radar theo vùng + model đang cấu hình (tránh gọi lại mỗi lần mở). */
+    private const RADAR_CACHE_SECONDS = 600;
+
+    /**
+     * Tham số này BẮT BUỘC (kiểu nullable, không có default): container của Laravel KHÔNG tự
+     * inject tham số nullable-có-default — nó lấy giá trị default null — nên viết
+     * "?AiModelGateway $gateway = null" sẽ khiến service LUÔN chạy ở chế độ tất định dù Cài đặt
+     * đã có model. Truyền null tường minh khi cần test tất định thuần PHPUnit.
+     */
+    public function __construct(private readonly ?AiModelGateway $gateway) {}
 
     private const SOURCES = [
         [
@@ -45,14 +68,23 @@ class DesignAgentService
         ],
     ];
 
-    public function radar(?User $user, string $region = 'all'): array
+    public function radar(?User $user, string $region = 'all', bool $useAi = true): array
     {
         $region = $this->normalizeRegion($region);
         $trends = $this->trendCatalog($region);
         $internal = $this->internalBrandSignal($user);
+        $candidates = $this->aiCandidates();
+
+        // Định hướng TẤT ĐỊNH luôn được dựng trước: vừa là kết quả khi không có model,
+        // vừa là lưới an toàn nếu model trả về thiếu/không hợp lệ.
+        $ruleDirections = $this->ruleDirections($trends);
+        [$directions, $model] = $this->radarDirections($trends, $ruleDirections, $candidates, $region, $useAi);
 
         return [
             'agent' => 'TrendRadar',
+            'engine' => $model['mode'] === 'ai' ? 'ai-v1' : 'rule-based-v1',
+            'model' => $model,
+            'directions' => $directions,
             'source_mode' => 'demo',
             'generated_at' => now()->toISOString(),
             'region' => $region,
@@ -79,11 +111,14 @@ class DesignAgentService
                 'fabric_recognition' => 'Trường chất liệu đã có; pipeline nhận diện ảnh chưa bật.',
                 'price_band_analysis' => 'Dải giá đề xuất theo brief; chưa đọc giá bán thực tế.',
                 'trend_lifecycle' => 'Nhãn demo: emerging → peak → declining.',
+                'ai_reasoning' => $model['mode'] === 'ai'
+                    ? 'Định hướng do model “'.$model['provider'].':'.$model['model'].'” (nhóm prompt) viết trên đúng dữ liệu mẫu ở trên; số liệu không do AI tạo.'
+                    : 'Chưa có model khả dụng cho nhóm “prompt” nên định hướng do engine tất định dựng từ catalog mẫu.',
             ],
         ];
     }
 
-    public function collectionBrief(array $data, ?User $user): array
+    public function collectionBrief(array $data, ?User $user, bool $useAi = true): array
     {
         $prompt = trim((string) ($data['prompt'] ?? ''));
         $region = $this->normalizeRegion((string) ($data['region'] ?? 'all'));
@@ -109,16 +144,90 @@ class DesignAgentService
         $trendPhrase = $trendNames ? implode(', ', array_slice($trendNames, 0, 3)) : 'xu hướng đang lên';
         $collectionName = $this->collectionName($prompt, $region);
         $brief = trim((string) ($data['brief'] ?? ''));
-        $briefText = $brief !== '' ? $brief : sprintf(
-            '%s. Bộ sưu tập hướng tới %s, kết hợp %s và DNA shop (%s). Ưu tiên các sản phẩm dễ phối, có thể sản xuất theo size thực tế và bán ở phân khúc %s.',
-            $prompt,
-            $this->audienceFor($prompt),
-            $trendPhrase,
-            $brand['narrative'],
-            $priceBands['recommended_label'],
-        );
-        $promptVi = $this->promptVi($prompt, $selected, $palette);
-        $promptEn = $this->promptEn($prompt, $selected, $palette);
+
+        // TẦNG SUY LUẬN — model của nhóm 'prompt' viết narrative / brief / caption mood board /
+        // prompt trên ĐÚNG dữ liệu tất định ở trên. Con số (SKU, size, dải giá, cấu trúc) KHÔNG
+        // đi qua AI; AI trả về chữ nên không thể bịa số liệu thị trường.
+        $ai = $this->aiBrief([
+            'prompt' => $prompt,
+            'region' => $region,
+            'region_name' => $this->regionName($region),
+            'season' => $this->seasonTag($prompt),
+            'audience' => $this->audienceFor($prompt),
+            'brand_narrative' => $brand['narrative'],
+            'brand_top_categories' => $brand['top_categories'],
+            'brand_top_colors' => $brand['top_colors'],
+            'selected_trends' => array_map(fn (array $trend) => [
+                'id' => $trend['id'],
+                'title' => $trend['title'],
+                'category' => $trend['category'],
+                'lifecycle' => $trend['lifecycle'],
+                'description' => $trend['description'],
+                'recommended_action' => $trend['recommended_action'],
+                'evidence_mode' => 'demo',
+            ], $selected),
+            'palette' => $palette,
+            'categories' => $categoryMix,
+            'outfits' => $outfits,
+            'size_distribution' => $sizeDistribution,
+            'price_band' => $priceBands,
+        ], $this->aiCandidates(), $useAi);
+
+        $aiData = $ai['data'] ?? [];
+        $applied = [
+            'narrative' => false, 'brief' => false, 'moodboard_captions' => 0,
+            'category_rationale' => 0, 'outfit_goals' => 0, 'prompts' => false, 'next_steps' => false,
+        ];
+
+        if ($aiData) {
+            if (($aiData['narrative'] ?? '') !== '') {
+                $brand['narrative'] = $aiData['narrative'];
+                $applied['narrative'] = true;
+            }
+            foreach (($aiData['captions'] ?? []) as $index => $caption) {
+                if (isset($moodboard[$index])) {
+                    $moodboard[$index]['caption'] = $caption;
+                    $applied['moodboard_captions']++;
+                }
+            }
+            foreach ($categoryMix as $index => $row) {
+                $key = (string) $row['category'];
+                if (($aiData['category_rationale'][$key] ?? '') !== '') {
+                    $categoryMix[$index]['rationale'] = $aiData['category_rationale'][$key];
+                    $applied['category_rationale']++;
+                }
+            }
+            foreach ($outfits as $index => $row) {
+                $key = (string) $row['id'];
+                if (($aiData['outfit_goals'][$key] ?? '') !== '') {
+                    $outfits[$index]['goal'] = $aiData['outfit_goals'][$key];
+                    $applied['outfit_goals']++;
+                }
+            }
+        }
+
+        // Brief người dùng tự viết LUÔN thắng; sau đó mới tới brief của AI; cuối cùng là câu tất định.
+        $briefText = $brief !== ''
+            ? $brief
+            : (($aiData['brief'] ?? '') !== ''
+                ? $aiData['brief']
+                : sprintf(
+                    '%s. Bộ sưu tập hướng tới %s, kết hợp %s và DNA shop (%s). Ưu tiên các sản phẩm dễ phối, có thể sản xuất theo size thực tế và bán ở phân khúc %s.',
+                    $prompt,
+                    $this->audienceFor($prompt),
+                    $trendPhrase,
+                    $brand['narrative'],
+                    $priceBands['recommended_label'],
+                ));
+        $applied['brief'] = $brief === '' && ($aiData['brief'] ?? '') !== '';
+
+        $promptVi = ($aiData['prompt_vi'] ?? '') !== '' ? $aiData['prompt_vi'] : $this->promptVi($prompt, $selected, $palette);
+        $promptEn = ($aiData['prompt_en'] ?? '') !== '' ? $aiData['prompt_en'] : $this->promptEn($prompt, $selected, $palette);
+        $applied['prompts'] = ($aiData['prompt_vi'] ?? '') !== '' || ($aiData['prompt_en'] ?? '') !== '';
+
+        $nextSteps = array_values(array_filter((array) ($aiData['next_steps'] ?? []), 'strlen'));
+        $applied['next_steps'] = $nextSteps !== [];
+
         $canvas = $this->canvasSuggestions($prompt, $promptVi, $promptEn);
         $inputSignature = hash('sha256', json_encode([
             $prompt,
@@ -129,7 +238,9 @@ class DesignAgentService
 
         return [
             'agent' => 'CollectionBot',
-            'engine' => 'rule-based-v1',
+            'engine' => $ai['model']['mode'] === 'ai' ? 'ai-v1' : 'rule-based-v1',
+            'model' => $ai['model'],
+            'ai_applied' => $applied,
             'generated_at' => now()->toISOString(),
             'input' => [
                 'prompt' => $prompt,
@@ -165,12 +276,358 @@ class DesignAgentService
                     $region === 'all' ? 'TrendRadar' : $this->regionName($region),
                 ]), 0, 20)),
             ],
-            'next_steps' => [
+            'next_steps' => $nextSteps ?: [
                 'Duyệt mood board và bảng màu.',
                 'Điều chỉnh số lượng SKU theo tồn kho và năng lực sản xuất.',
                 'Áp dụng prompt vào Canvas hoặc tạo bộ sưu tập mới.',
             ],
         ];
+    }
+
+    // ───────────────────────── TẦNG SUY LUẬN (AI) ─────────────────────────
+
+    /**
+     * Candidate của nhóm công việc 'prompt' — đã tôn trọng Model Registry, luồng ưu tiên
+     * provider, custom provider và key đang bật. Rỗng = chưa cấu hình model nào dùng được.
+     *
+     * @return list<array{provider:string, model:string}>
+     */
+    private function aiCandidates(): array
+    {
+        return $this->gateway?->candidates(self::AI_GROUP) ?? [];
+    }
+
+    /**
+     * Khối "model" mà UI đọc để nói THẬT đang chạy bằng gì: mode=ai|rule, model nào, còn
+     * candidate nào, mất bao lâu, có lấy từ cache không, và LÝ DO khi phải quay về rule.
+     */
+    private function modelBlock(string $mode, array $candidates, array $extra = []): array
+    {
+        return array_merge([
+            'group' => self::AI_GROUP,
+            'mode' => $mode,
+            'provider' => null,
+            'model' => null,
+            'candidates' => count($candidates),
+            'available' => array_map(fn (array $c) => $c['provider'].':'.$c['model'], $candidates),
+            'latency_ms' => null,
+            'cached' => false,
+            'reason' => $mode === 'ai' ? null : ($candidates === [] ? 'no_model_key' : 'ai_disabled'),
+        ], $extra);
+    }
+
+    /**
+     * Định hướng của TrendRadar: 5-10 hướng. AI viết khi có model; nếu AI lỗi/thiếu hướng thì
+     * bù bằng hướng tất định để KHÔNG bao giờ trả về danh sách rỗng.
+     *
+     * @return array{0: list<array>, 1: array}
+     */
+    private function radarDirections(array $trends, array $ruleDirections, array $candidates, string $region, bool $useAi): array
+    {
+        if (! $useAi || $this->gateway === null || $candidates === []) {
+            return [$ruleDirections, $this->modelBlock('rule', $candidates)];
+        }
+
+        // LƯU Ý QUAN TRỌNG: chỉ gửi catalog của VÙNG (không gửi tín hiệu nội bộ của shop) nên
+        // cache dùng chung giữa các tài khoản là an toàn — dữ liệu nội bộ của người dùng không
+        // bao giờ rời khỏi tài khoản, kể cả khi hai người mở cùng một khu vực.
+        $fingerprint = md5(implode('|', array_map(fn (array $c) => $c['provider'].':'.$c['model'], $candidates)));
+        $cacheKey = 'design-agent:radar:v1:'.$region.':'.$fingerprint;
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached) && ! empty($cached['directions'])) {
+            return [$cached['directions'], $this->modelBlock('ai', $candidates, [
+                'provider' => $cached['provider'] ?? null,
+                'model' => $cached['model'] ?? null,
+                'latency_ms' => 0,
+                'cached' => true,
+            ])];
+        }
+
+        $instruction = 'Bạn là TrendRadar — chuyên gia phân tích xu hướng thời trang Việt Nam cho xưởng may và thương hiệu nhỏ. '
+            .'Bạn CHỈ được suy luận từ đúng khối DỮ LIỆU bên dưới (danh mục xu hướng mẫu + tín hiệu nội bộ của shop). '
+            .'TUYỆT ĐỐI KHÔNG bịa số liệu thị trường và KHÔNG được nói như thể đã đọc Shopee, TikTok, Instagram, SHEIN, TEMU, ASOS hay Runway — '
+            .'các connector đó CHƯA được kết nối, dữ liệu là mẫu. Không tự nghĩ ra mã xu hướng mới ngoài danh mục. '
+            .'Nhiệm vụ: viết 5-10 ĐỊNH HƯỚNG hành động cho khu vực "'.$region.'", mỗi định hướng bám vào 1-3 id xu hướng CÓ THẬT trong dữ liệu. '
+            .'Chỉ trả về JSON đúng dạng: {"directions":[{"title":"...","thesis":"...","why_now":"...","action":"...","risk":"...","price_band":"entry|mid|premium","confidence":0.8,"trend_ids":["id-co-that"]}]}. '
+            .'Viết tiếng Việt, ngắn gọn, cụ thể, có thể hành động ngay.';
+
+        $started = microtime(true);
+        $answer = $this->gateway->text(self::AI_GROUP, [
+            ['role' => 'system', 'content' => $instruction],
+            ['role' => 'user', 'content' => "DỮ LIỆU:\n".json_encode([
+                'region' => $region,
+                'region_name' => $this->regionName($region),
+                'data_mode' => 'demo',
+                'trends' => array_map(fn (array $trend) => [
+                    'id' => $trend['id'],
+                    'title' => $trend['title'],
+                    'category' => $trend['category'],
+                    'lifecycle' => $trend['lifecycle'],
+                    'momentum' => $trend['momentum'],
+                    'confidence' => $trend['confidence'],
+                    'description' => $trend['description'],
+                    'recommended_action' => $trend['recommended_action'],
+                ], $trends),
+            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)],
+        ], ['response_format' => 'json_object', 'max_tokens' => 2048, 'timeout' => 45]);
+        $latency = (int) round((microtime(true) - $started) * 1000);
+        $attempted = $candidates[0]['provider'].':'.$candidates[0]['model'];
+
+        if ($answer === null) {
+            logger()->warning('TrendRadar: model không trả về nội dung, dùng engine tất định', ['group' => self::AI_GROUP, 'attempted' => $attempted]);
+
+            return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted])];
+        }
+
+        $directions = $this->normalizeDirections($this->decodeJson($answer['text']), $trends, $ruleDirections);
+        if ($directions === []) {
+            logger()->warning('TrendRadar: model trả về định hướng không hợp lệ, dùng engine tất định', ['attempted' => $attempted]);
+
+            return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted])];
+        }
+
+        Cache::put($cacheKey, [
+            'directions' => $directions,
+            'provider' => $answer['provider'],
+            'model' => $answer['model'],
+        ], self::RADAR_CACHE_SECONDS);
+
+        return [$directions, $this->modelBlock('ai', $candidates, [
+            'provider' => $answer['provider'],
+            'model' => $answer['model'],
+            'latency_ms' => $latency,
+        ])];
+    }
+
+    /**
+     * Định hướng tất định từ catalog mẫu — nguồn duy nhất khi chưa có model, và là lưới an toàn
+     * khi model trả thiếu hướng. Mọi con số ở đây đến từ catalog (evidence_mode=demo).
+     *
+     * @return list<array>
+     */
+    private function ruleDirections(array $trends): array
+    {
+        $rows = [];
+        foreach (array_slice($trends, 0, 8) as $index => $trend) {
+            $rows[] = [
+                'id' => 'dir-rule-'.($index + 1),
+                'title' => (string) $trend['title'],
+                'thesis' => (string) $trend['description'],
+                'why_now' => 'Momentum mẫu '.$trend['momentum'].'/100 · '.number_format((int) $trend['evidence_count']).' tín hiệu mẫu (demo).',
+                'action' => (string) $trend['recommended_action'],
+                'risk' => $this->riskFor((string) $trend['lifecycle']),
+                'price_band' => null,
+                'confidence' => (float) $trend['confidence'],
+                'trend_ids' => [(string) $trend['id']],
+                'source' => 'rule',
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function riskFor(string $lifecycle): string
+    {
+        return match ($lifecycle) {
+            'declining' => 'Tăng trưởng đã chậm lại — chỉ nên dùng làm màu/vải nền, không dồn SKU.',
+            'peak' => 'Đang ở đỉnh nên cạnh tranh giá cao — cần khác biệt ở chất liệu và chi tiết.',
+            default => 'Chưa kiểm chứng ở quy mô lớn — nên sản xuất số lượng nhỏ rồi đo lại.',
+        };
+    }
+
+    /**
+     * Chuẩn hoá định hướng do model trả về: chỉ nhận CHỮ + id xu hướng có thật, cắt độ dài,
+     * và bù bằng hướng tất định nếu AI trả về ít hơn 5 hướng.
+     *
+     * @return list<array>
+     */
+    private function normalizeDirections(?array $json, array $trends, array $ruleDirections): array
+    {
+        if (! is_array($json)) {
+            return [];
+        }
+
+        $rows = $json['directions'] ?? $json;
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        $knownIds = array_column($trends, 'id');
+        $bands = ['entry', 'mid', 'premium'];
+        $out = [];
+        foreach ($rows as $index => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $title = Str::limit(trim((string) ($row['title'] ?? '')), 120, '');
+            if ($title === '') {
+                continue;
+            }
+            $confidence = is_numeric($row['confidence'] ?? null) ? (float) $row['confidence'] : null;
+            if ($confidence !== null) {
+                $confidence = max(0.0, min(1.0, $confidence > 1 ? $confidence / 100 : $confidence));
+            }
+            $out[] = [
+                'id' => 'dir-ai-'.($index + 1),
+                'title' => $title,
+                'thesis' => Str::limit(trim((string) ($row['thesis'] ?? '')), 400, ''),
+                'why_now' => Str::limit(trim((string) ($row['why_now'] ?? '')), 400, ''),
+                'action' => Str::limit(trim((string) ($row['action'] ?? '')), 400, ''),
+                'risk' => Str::limit(trim((string) ($row['risk'] ?? '')), 400, ''),
+                'price_band' => in_array((string) ($row['price_band'] ?? ''), $bands, true) ? (string) $row['price_band'] : null,
+                'confidence' => $confidence,
+                'trend_ids' => array_values(array_intersect(
+                    array_map('strval', (array) ($row['trend_ids'] ?? [])),
+                    $knownIds,
+                )),
+                'source' => 'ai',
+            ];
+            if (count($out) >= 10) {
+                break;
+            }
+        }
+
+        if (count($out) < 3) {
+            return [];   // model trả về quá ít hướng dùng được ⇒ coi như hỏng, quay về tất định
+        }
+
+        // Bù cho đủ 5 hướng tối thiểu bằng hướng tất định (khác tiêu đề), tối đa 10.
+        foreach ($ruleDirections as $fallback) {
+            if (count($out) >= 5) {
+                break;
+            }
+            if (collect($out)->contains(fn (array $item) => $item['title'] === $fallback['title'])) {
+                continue;
+            }
+            $out[] = $fallback;
+        }
+
+        return array_slice($out, 0, 10);
+    }
+
+    /**
+     * Gọi model nhóm 'prompt' để viết phần CHỮ của brief bộ sưu tập.
+     *
+     * @return array{model: array, data: ?array}
+     */
+    private function aiBrief(array $context, array $candidates, bool $useAi): array
+    {
+        if (! $useAi || $this->gateway === null || $candidates === []) {
+            return ['model' => $this->modelBlock('rule', $candidates), 'data' => null];
+        }
+
+        $instruction = 'Bạn là CollectionBot — trưởng phòng thiết kế bộ sưu tập thời trang Việt Nam. '
+            .'Bạn CHỈ được dùng đúng khối DỮ LIỆU bên dưới (DNA shop, xu hướng đã chọn, bảng màu, cơ cấu SKU, phối đồ, phân bổ size, dải giá). '
+            .'TUYỆT ĐỐI KHÔNG bịa số liệu bán hàng, không nhắc tới việc đã kết nối Shopee/TikTok/POS/ERP (chưa có connector thật). '
+            .'Không đổi bất kỳ con số nào — cơ cấu SKU, size và dải giá là do hệ thống quyết định. '
+            .'Chỉ trả về MỘT object JSON đúng dạng: {"narrative":"...","brief":"...","moodboard_captions":["... x24"],'
+            .'"category_rationale":{"TÊN NHÓM":"..."},"outfit_goals":{"look-1":"..."},"prompt_vi":"...","prompt_en":"...","next_steps":["...","...","..."]}. '
+            .'narrative: 1-2 câu DNA/định vị. brief: 3-5 câu tiếng Việt cho xưởng. moodboard_captions: ĐÚNG 24 caption ngắn tiếng Việt theo thứ tự ô. '
+            .'category_rationale: mỗi nhóm hàng 1 câu, dùng ĐÚNG tên nhóm trong dữ liệu. outfit_goals: mỗi look 1 câu, dùng ĐÚNG id look trong dữ liệu. '
+            .'prompt_vi: 1 đoạn mô tả ảnh tiếng Việt. prompt_en: 1 đoạn prompt ảnh tiếng Anh giàu chi tiết (chất liệu, dáng, ánh sáng, bố cục). '
+            .'next_steps: đúng 3 việc cần làm tiếp.';
+
+        $started = microtime(true);
+        $answer = $this->gateway->text(self::AI_GROUP, [
+            ['role' => 'system', 'content' => $instruction],
+            ['role' => 'user', 'content' => "DỮ LIỆU:\n".json_encode($context, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)],
+        ], ['response_format' => 'json_object', 'max_tokens' => 3000, 'timeout' => 60]);
+        $latency = (int) round((microtime(true) - $started) * 1000);
+        $attempted = $candidates[0]['provider'].':'.$candidates[0]['model'];
+
+        if ($answer === null) {
+            logger()->warning('CollectionBot: model không trả về nội dung, dùng engine tất định', ['attempted' => $attempted]);
+
+            return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted]), 'data' => null];
+        }
+
+        $data = $this->normalizeAiBrief($this->decodeJson($answer['text']));
+        if ($data === null) {
+            logger()->warning('CollectionBot: model trả về JSON không dùng được, dùng engine tất định', ['attempted' => $attempted]);
+
+            return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted]), 'data' => null];
+        }
+
+        return [
+            'model' => $this->modelBlock('ai', $candidates, [
+                'provider' => $answer['provider'],
+                'model' => $answer['model'],
+                'latency_ms' => $latency,
+            ]),
+            'data' => $data,
+        ];
+    }
+
+    /** Chuẩn hoá phần chữ do model trả về; null = không có gì dùng được. */
+    private function normalizeAiBrief(?array $json): ?array
+    {
+        if (! is_array($json)) {
+            return null;
+        }
+
+        $line = fn ($value, int $limit) => is_string($value) ? Str::limit(trim($value), $limit, '') : '';
+        $narrative = $line($json['narrative'] ?? '', 600);
+        $brief = $line($json['brief'] ?? '', 2000);
+        if ($narrative === '' && $brief === '') {
+            return null;
+        }
+
+        $captions = [];
+        foreach ((array) ($json['moodboard_captions'] ?? []) as $caption) {
+            $captions[] = $line($caption, 220);
+        }
+        $captions = array_slice(array_values(array_filter($captions, 'strlen')), 0, 24);
+
+        $map = function ($value, int $limit): array {
+            $out = [];
+            foreach ((array) $value as $key => $text) {
+                $key = Str::limit(trim((string) $key), 120, '');
+                $text = is_string($text) ? Str::limit(trim($text), $limit, '') : '';
+                if ($key !== '' && $text !== '') {
+                    $out[$key] = $text;
+                }
+            }
+
+            return $out;
+        };
+
+        $nextSteps = [];
+        foreach ((array) ($json['next_steps'] ?? []) as $step) {
+            $step = $line($step, 240);
+            if ($step !== '') {
+                $nextSteps[] = $step;
+            }
+        }
+
+        return [
+            'narrative' => $narrative,
+            'brief' => $brief,
+            'captions' => $captions,
+            'category_rationale' => $map($json['category_rationale'] ?? [], 240),
+            'outfit_goals' => $map($json['outfit_goals'] ?? [], 240),
+            'prompt_vi' => $line($json['prompt_vi'] ?? '', 1200),
+            'prompt_en' => $line($json['prompt_en'] ?? '', 1200),
+            'next_steps' => array_slice($nextSteps, 0, 5),
+        ];
+    }
+
+    /** Model đôi khi bọc JSON trong code fence hoặc thêm lời dẫn — trích object JSON đầu tiên. */
+    private function decodeJson(string $text): ?array
+    {
+        $text = trim($text);
+        $json = json_decode($text, true);
+        if (is_array($json)) {
+            return $json;
+        }
+
+        if (preg_match('/\{[\s\S]*\}/', $text, $m) === 1) {
+            $json = json_decode($m[0], true);
+            if (is_array($json)) {
+                return $json;
+            }
+        }
+
+        return null;
     }
 
     /** Danh sách ID ổn định để controller có thể validate trước khi gọi service. */

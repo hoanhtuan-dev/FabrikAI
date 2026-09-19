@@ -14,17 +14,20 @@ class DesignAgentController extends Controller
     {
         $data = $request->validate([
             'region' => ['nullable', 'string', 'in:all,hcm,hanoi,danang'],
+            // Người dùng được QUYỀN tắt suy luận AI (mặc định BẬT): tắt ⇒ engine tất định,
+            // nhanh và không tốn lượt gọi model.
+            'ai' => ['nullable', 'boolean'],
         ]);
 
         return response()->json($this->agents->radar(
-            $request->user(), (string) ($data['region'] ?? 'all')
+            $request->user(), (string) ($data['region'] ?? 'all'), (bool) ($data['ai'] ?? true)
         ));
     }
 
     public function collection(Request $request): \Illuminate\Http\JsonResponse
     {
         $payload = $request->only([
-            'prompt', 'region', 'trend_ids', 'brief', 'size_distribution',
+            'prompt', 'region', 'trend_ids', 'brief', 'size_distribution', 'ai',
         ]);
         $payload['prompt'] = trim((string) ($payload['prompt'] ?? ''));
         $payload['brief'] = trim((string) ($payload['brief'] ?? ''));
@@ -43,6 +46,7 @@ class DesignAgentController extends Controller
             'brief' => ['nullable', 'string', 'max:4000'],
             'size_distribution' => ['nullable', 'array', 'max:20'],
             'size_distribution.*' => ['nullable', 'integer', 'min:0', 'max:10000'],
+            'ai' => ['nullable', 'boolean'],
         ]);
 
         $validator->after(function ($validator) use ($payload) {
@@ -75,6 +79,8 @@ class DesignAgentController extends Controller
             ->mapWithKeys(fn ($count, $size) => [strtoupper(substr((string) $size, 0, 8)) => (int) $count])
             ->all();
 
-        return response()->json($this->agents->collectionBrief($data, $request->user()));
+        return response()->json($this->agents->collectionBrief(
+            $data, $request->user(), (bool) ($data['ai'] ?? true)
+        ));
     }
 }

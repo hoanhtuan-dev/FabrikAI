@@ -282,6 +282,9 @@ export const useStudioStore = defineStore('studio', {
     designAgentOpen: false,
     designAgentTab: 'trend',   // tương thích cũ: trend | collection
     designAgentStep: 'radar',   // wizard mới: radar → brief → canvas
+    // Bật/tắt SUY LUẬN AI cho Agent Studio (nhóm công việc 'prompt'). Tắt ⇒ engine tất định,
+    // nhanh và không tốn lượt gọi model — người dùng chủ động chọn.
+    designAgentAi: true,
     trendRadar: null,
     trendRadarCache: {},      // region → payload đã tải (tránh gọi lại khi đổi tab/đổi vùng)
     trendRadarRequest: 0,     // chống race: chỉ nhận kết quả của lần gọi MỚI NHẤT
@@ -2153,14 +2156,24 @@ export const useStudioStore = defineStore('studio', {
       this.designAgentStep = allowed.includes(step) ? step : 'radar';
       this.designAgentTab = this.designAgentStep === 'brief' ? 'collection' : 'trend';
     },
+    /** Bật/tắt suy luận AI của Agent Studio; đổi chế độ ⇒ bỏ cache radar (kết quả khác nhau). */
+    setDesignAgentAi(enabled) {
+      const next = !!enabled;
+      if (next === this.designAgentAi) return;
+      this.designAgentAi = next;
+      this.trendRadarCache = {};
+      if (this.designAgentAi) this.toast('Agent Studio sẽ dùng model AI của nhóm “prompt”.');
+      else this.toast('Agent Studio chuyển sang engine tất định (không gọi model).');
+    },
     /**
-     * Nạp TrendRadar cho một khu vực. Có cache theo vùng + chống race:
+     * Nạp TrendRadar cho một khu vực. Có cache theo vùng + chế độ AI + chống race:
      * đổi vùng liên tục thì kết quả cũ không được ghi đè kết quả mới.
      */
     async loadTrendRadar(region = 'all', { force = false } = {}) {
       const key = String(region || 'all');
-      if (!force && this.trendRadarCache[key]) {
-        this.trendRadar = this.trendRadarCache[key];
+      const cacheKey = key + '|' + (this.designAgentAi ? 'ai' : 'rule');
+      if (!force && this.trendRadarCache[cacheKey]) {
+        this.trendRadar = this.trendRadarCache[cacheKey];
         this.trendRadarError = '';
         return this.trendRadar;
       }
@@ -2170,10 +2183,10 @@ export const useStudioStore = defineStore('studio', {
       this.trendRadarLoading = true;
       this.trendRadarError = '';
       try {
-        const data = await this.api('/api/design-agent/radar', { region: key });
+        const data = await this.api('/api/design-agent/radar', { region: key, ai: this.designAgentAi });
         if (requestId !== this.trendRadarRequest) return null; // có request mới hơn đang chạy
         this.trendRadar = data || null;
-        if (data) this.trendRadarCache = { ...this.trendRadarCache, [key]: data };
+        if (data) this.trendRadarCache = { ...this.trendRadarCache, [cacheKey]: data };
         return data;
       } catch (error) {
         if (requestId === this.trendRadarRequest) {
@@ -2203,7 +2216,7 @@ export const useStudioStore = defineStore('studio', {
       this.collectionBriefLoading = true;
       this.collectionBriefError = '';
       try {
-        const data = await this.api('/api/design-agent/collection', payload || {});
+        const data = await this.api('/api/design-agent/collection', { ...(payload || {}), ai: this.designAgentAi });
         this.collectionBrief = data || null;
         this.collectionBriefInput = this.designBriefInput(payload);
         this.toast('CollectionBot đã xây dựng brief bộ sưu tập.');

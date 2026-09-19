@@ -138,6 +138,80 @@ const readiness = computed(() => ({
   canvas: collection.value && !briefStale.value ? 'ready' : 'locked',
 }));
 
+// ── NHẬN BIẾT MODEL: hai agent chạy bằng AI hay bằng engine tất định? ──────────
+// Backend trả khối `model` (mode/provider/model/candidates/latency/reason) để giao diện nói
+// THẬT đang dùng gì — trước đây Agent Studio chạy thuần rule-based và không hề cho biết điều đó.
+const MODEL_REASON_LABELS = {
+  no_model_key: 'Chưa có model/khoá nào dùng được cho nhóm “prompt” nên hai agent đang chạy engine tất định.',
+  model_error: 'Model không phản hồi — đã tự quay về engine tất định (kết quả vẫn đầy đủ).',
+  invalid_output: 'Model trả về dữ liệu không dùng được — đã tự quay về engine tất định.',
+  ai_disabled: 'Bạn đang tắt suy luận AI nên hai agent chạy engine tất định.',
+};
+const activeModel = computed(() => collection.value?.model || radar.value?.model || null);
+const modelReady = computed(() => activeModel.value?.mode === 'ai');
+const modelShort = computed(() => {
+  const m = activeModel.value;
+  if (!m) return 'AI: đang kiểm tra…';
+  if (m.mode === 'ai') return 'AI · ' + (m.provider || '') + (m.model ? ' · ' + m.model : '');
+  return 'Engine tất định';
+});
+const modelTitle = computed(() => {
+  const m = activeModel.value;
+  if (!m) return 'Chưa có thông tin model — mở bước Tín hiệu để đọc radar.';
+  if (m.mode === 'ai') {
+    return 'Suy luận do ' + m.provider + ':' + m.model + ' (nhóm công việc “' + (m.group || 'prompt') + '”)'
+      + (m.cached ? ' · lấy từ cache 10 phút' : (m.latency_ms != null ? ' · ' + m.latency_ms + ' ms' : ''));
+  }
+  return MODEL_REASON_LABELS[m.reason] || 'Đang chạy engine tất định.';
+});
+const modelCandidates = computed(() => activeModel.value?.available || []);
+const aiToggleTitle = computed(() => (store.designAgentAi
+  ? 'Đang BẬT: mỗi lần đọc radar/tạo brief sẽ gọi model của nhóm “prompt”.'
+  : 'Đang TẮT: chỉ dùng engine tất định, không gọi model.'));
+const directions = computed(() => radar.value?.directions || []);
+const appliedAi = computed(() => {
+  const a = collection.value?.ai_applied;
+  if (!a) return [];
+  const rows = [];
+  if (a.narrative) rows.push('DNA thương hiệu');
+  if (a.brief) rows.push('brief');
+  if (a.moodboard_captions) rows.push(a.moodboard_captions + ' caption mood board');
+  if (a.category_rationale) rows.push('lý do cơ cấu danh mục');
+  if (a.outfit_goals) rows.push('mục tiêu phối đồ');
+  if (a.prompts) rows.push('prompt ảnh');
+  if (a.next_steps) rows.push('bước tiếp theo');
+  return rows;
+});
+/** Brief hiện tại được dựng ở chế độ khác với công tắc AI hiện tại? */
+const briefModeMismatch = computed(() => {
+  const mode = collection.value?.model?.mode;
+  if (mode !== 'ai' && mode !== 'rule') return false;
+  return mode !== (store.designAgentAi ? 'ai' : 'rule');
+});
+function directionConfidence(value) {
+  return value == null ? null : Math.round(Number(value) * 100);
+}
+function directionPriceLabel(value) {
+  return { entry: 'Entry', mid: 'Mid-range', premium: 'Premium' }[value] || null;
+}
+function trendNameById(id) {
+  const found = trends.value.find((trend) => String(trend.id) === String(id));
+  return found ? trendTitle(found) : String(id);
+}
+/** Chọn nhanh các trend mà 3 định hướng mạnh nhất đang nhắc tới. */
+function focusDirections() {
+  const ids = new Set();
+  const ranked = directions.value.filter((row) => row.source === 'ai');
+  (ranked.length ? ranked : directions.value).slice(0, 3)
+    .forEach((row) => (row.trend_ids || []).forEach((id) => ids.add(String(id))));
+  if (!ids.size) return;
+  store.selectedTrendIds = Array.from(ids).slice(0, 6);
+}
+function toggleAi() {
+  store.setDesignAgentAi(!store.designAgentAi);
+  loadRadar(selectedRegion.value, { force: true });
+}
+
 function setStep(id) {
   store.setDesignAgentStep(id);
   if (id === 'radar' && !store.trendRadar) loadRadar(selectedRegion.value);
@@ -278,11 +352,41 @@ watch(() => store.designAgentOpen, (open) => {
             <p class="mt-0.5 truncate text-sm font-semibold text-cream-100">Từ tín hiệu xu hướng đến ảnh hoàn chỉnh</p>
           </div>
           <div class="flex flex-wrap items-center gap-2 text-[10px]">
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-semibold"
+              :class="modelReady ? 'bg-emerald-500/15 text-emerald-200' : 'bg-amber-500/15 text-amber-200'"
+              :title="modelTitle"
+            >
+              <span class="h-1.5 w-1.5 rounded-full" :class="modelReady ? 'bg-emerald-300' : 'bg-amber-300'"></span>
+              {{ modelShort }}
+            </span>
             <span class="rounded-full bg-amber-500/15 px-2 py-0.5 font-semibold text-amber-200">Nguồn: {{ sourceMode }}</span>
             <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-200">Nội bộ: local</span>
             <span v-if="selectedTrendCount" class="rounded-full bg-brand-500/15 px-2 py-0.5 font-semibold text-brand-100">{{ selectedTrendCount }} trend đã chọn</span>
+            <button
+              type="button"
+              class="motion-ui rounded-full border px-2 py-0.5 font-semibold transition"
+              :class="store.designAgentAi ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20' : 'border-ink-600 bg-ink-800 text-cream-300/70 hover:bg-ink-700'"
+              :aria-pressed="store.designAgentAi"
+              :title="aiToggleTitle"
+              @click="toggleAi"
+            >
+              Suy luận AI: {{ store.designAgentAi ? 'BẬT' : 'TẮT' }}
+            </button>
           </div>
         </div>
+
+        <!-- Vì sao đang chạy tất định? Nói thẳng lý do + nơi cấu hình, không để người dùng đoán. -->
+        <p
+          v-if="activeModel && !modelReady"
+          role="status"
+          class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-5 text-amber-100"
+        >
+          <StudioIcon name="info" size="h-3.5 w-3.5" class="shrink-0" />
+          <span>{{ modelTitle }}</span>
+          <span v-if="!store.designAgentAi" class="text-amber-200/80">Bật «Suy luận AI» ở trên để dùng model đã cấu hình.</span>
+          <span v-else-if="modelCandidates.length === 0" class="text-amber-200/80">Cấu hình tại Cài đặt → Nhóm công việc → “Suy luận prompt (Giám đốc sáng tạo / Thuật sỹ ảo)” và thêm khoá trong Quản lý API.</span>
+        </p>
         <nav class="mt-3 grid grid-cols-3 gap-1.5 lg:hidden" role="tablist" aria-label="Tiến trình thiết kế">
           <button
             v-for="(item, index) in STEPS"
@@ -368,12 +472,62 @@ watch(() => store.designAgentOpen, (open) => {
               </div>
             </div>
 
+            <p v-if="store.trendRadarLoading && store.designAgentAi" class="mb-3 flex items-center gap-2 text-[11px] text-brand-200" role="status" aria-live="polite">
+              <StudioIcon name="sparkles" size="h-3.5 w-3.5" class="animate-pulse" /> Đang gọi model của nhóm “prompt” để viết định hướng — có thể mất vài giây…
+            </p>
+
             <div v-if="store.trendRadarLoading && !radar" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-live="polite">
-              <span class="sr-only">Đang tải TrendRadar…</span>
+              <span class="sr-only">{{ store.designAgentAi ? 'Đang gọi model để suy luận xu hướng…' : 'Đang tải TrendRadar…' }}</span>
               <div v-for="i in 6" :key="i" class="h-40 animate-pulse rounded-xl border border-ink-700 bg-ink-800"></div>
             </div>
 
             <template v-else-if="radar">
+              <!-- ĐỊNH HƯỚNG: phần suy luận (AI hoặc tất định) — nói rõ nguồn của từng hướng. -->
+              <div v-if="directions.length" class="mb-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-cream-100">Định hướng từ TrendRadar ({{ directions.length }})</h3>
+                    <p class="mt-0.5 text-[11px] leading-5 text-cream-300/55">
+                      {{ modelReady
+                        ? 'Model viết trên đúng dữ liệu mẫu bên dưới — số liệu không do AI tạo.'
+                        : 'Engine tất định dựng từ catalog mẫu (chưa dùng model).' }}
+                    </p>
+                  </div>
+                  <button type="button" class="tool-btn" title="Chọn các trend mà 3 định hướng mạnh nhất đang nhắc tới" @click="focusDirections">
+                    <StudioIcon name="target" size="h-3 w-3" /> Chọn trend theo 3 hướng đầu
+                  </button>
+                </div>
+                <div class="mt-3 grid gap-2.5 lg:grid-cols-2">
+                  <article v-for="row in directions" :key="row.id" class="rounded-lg border border-ink-700 bg-ink-800 p-3.5">
+                    <div class="flex items-start justify-between gap-2">
+                      <h4 class="text-xs font-semibold leading-5 text-cream-100">{{ row.title }}</h4>
+                      <span
+                        class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+                        :class="row.source === 'ai' ? 'bg-emerald-500/15 text-emerald-200' : 'bg-ink-700 text-cream-300/60'"
+                      >{{ row.source === 'ai' ? 'AI' : 'tất định' }}</span>
+                    </div>
+                    <p v-if="row.thesis" class="mt-1.5 text-[11px] leading-5 text-cream-200">{{ row.thesis }}</p>
+                    <dl class="mt-2 space-y-1 text-[10px] leading-4">
+                      <div v-if="row.why_now" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-brand-200">Vì sao:</dt><dd class="text-cream-300/70">{{ row.why_now }}</dd></div>
+                      <div v-if="row.action" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-brand-200">Việc làm:</dt><dd class="text-cream-300/70">{{ row.action }}</dd></div>
+                      <div v-if="row.risk" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-amber-200">Rủi ro:</dt><dd class="text-cream-300/70">{{ row.risk }}</dd></div>
+                    </dl>
+                    <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
+                      <span v-if="directionPriceLabel(row.price_band)" class="rounded bg-ink-700 px-1.5 py-0.5 text-[9px] text-cream-200">{{ directionPriceLabel(row.price_band) }}</span>
+                      <span v-if="directionConfidence(row.confidence) !== null" class="rounded bg-ink-700 px-1.5 py-0.5 text-[9px] text-cream-200">Tin cậy {{ directionConfidence(row.confidence) }}%</span>
+                      <button
+                        v-for="id in row.trend_ids"
+                        :key="id"
+                        type="button"
+                        class="motion-ui rounded border px-1.5 py-0.5 text-[9px] transition"
+                        :class="selectedTrendIds.includes(String(id)) ? 'border-brand-500/60 bg-brand-500/15 text-brand-100 hover:bg-brand-500/25' : 'border-ink-600 text-cream-300/70 hover:bg-ink-700'"
+                        @click="toggleTrend(id)"
+                      >{{ trendNameById(id) }}</button>
+                    </div>
+                  </article>
+                </div>
+              </div>
+
               <div class="mb-3 flex flex-wrap items-center gap-2">
                 <div class="relative min-w-[12rem] flex-1">
                   <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-300/50" />
@@ -465,10 +619,13 @@ watch(() => store.designAgentOpen, (open) => {
 
                 <button type="button" class="btn-brand btn-sm mt-5 flex w-full items-center justify-center gap-2" :disabled="store.collectionBriefLoading" @click="createBrief">
                   <StudioIcon name="wand" size="h-3.5 w-3.5" :class="store.collectionBriefLoading ? 'animate-spin' : ''" />
-                  {{ store.collectionBriefLoading ? 'Đang xây dựng brief…' : (collection ? 'Tạo lại brief' : 'Tạo brief bộ sưu tập') }}
+                  {{ store.collectionBriefLoading
+                    ? (store.designAgentAi ? 'Đang gọi model xây brief…' : 'Đang xây dựng brief…')
+                    : (collection ? 'Tạo lại brief' : 'Tạo brief bộ sưu tập') }}
                 </button>
                 <div v-if="collectionError || store.collectionBriefError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs leading-5 text-red-200"><StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ collectionError || store.collectionBriefError }}</span></div>
                 <div v-if="briefStale" role="status" class="mt-3 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100"><StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Prompt/trend đã đổi. Bấm «Tạo lại brief» để cập nhật trước khi sang Canvas.</span></div>
+                <div v-else-if="briefModeMismatch" role="status" class="mt-3 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100"><StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Brief này được dựng ở chế độ {{ collection?.model?.mode === 'ai' ? 'AI' : 'tất định' }} — bấm «Tạo lại brief» nếu muốn theo đúng công tắc hiện tại.</span></div>
               </div>
 
               <div v-if="radar" class="card p-4">
@@ -492,6 +649,16 @@ watch(() => store.designAgentOpen, (open) => {
                     <div><p class="text-[10px] font-semibold uppercase tracking-wide text-brand-300">{{ collection.agent || 'CollectionBot' }} · {{ collection.engine || 'rule-based-v1' }}</p><h2 class="mt-1 text-lg font-semibold text-cream-100">Bộ sưu tập đề xuất</h2></div>
                     <span class="rounded-lg bg-ink-800 px-2.5 py-1 text-[10px] text-cream-300/60">Khu vực: {{ collection.input?.region || selectedRegion }}</span>
                   </div>
+                  <div class="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                    <span
+                      class="rounded-full px-2 py-0.5 font-semibold"
+                      :class="modelReady ? 'bg-emerald-500/15 text-emerald-200' : 'bg-amber-500/15 text-amber-200'"
+                      :title="modelTitle"
+                    >{{ modelReady ? 'AI: ' + (collection.model?.provider || '') + ' · ' + (collection.model?.model || '') : 'Engine tất định' }}</span>
+                    <span v-for="row in appliedAi" :key="row" class="rounded bg-brand-500/15 px-2 py-0.5 text-brand-100">AI viết: {{ row }}</span>
+                    <span v-if="modelReady && collection.model?.latency_ms != null" class="text-cream-300/50">{{ collection.model.latency_ms }} ms</span>
+                  </div>
+
                   <p class="mt-3 text-sm leading-6 text-cream-200">{{ collection.brief }}</p>
                   <div class="mt-4 grid gap-3 sm:grid-cols-3">
                     <div class="rounded-lg border border-ink-700 bg-ink-800 p-3"><p class="text-[10px] uppercase tracking-wide text-cream-300/50">Tổng SKU</p><p class="mt-1 text-lg font-semibold text-cream-100">{{ collection.structure?.total_skus || 0 }}</p></div>
