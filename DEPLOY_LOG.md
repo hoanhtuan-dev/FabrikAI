@@ -1581,7 +1581,7 @@ Phần tử **bỏ qua** khi đo (nền là gradient ảnh/khung canvas, không 
 
 ## Phiên 2026-09-23 (Đợt 21 — MÃ TRA CỨU LỖI cho lỗi phát sinh CHỈ Ở TRÌNH DUYỆT — món nợ cuối của §6.5)
 
-**Deploy:** `33b4054 → <commit>`. **Không migration mới.** Asset: `app-BqkNcUCi.css` (không đổi) · `main-*.js` + `pageBoot-*.js` (đổi).
+**Deploy:** `33b4054 → 914ec53`. **Không migration mới.** Asset: `app-BqkNcUCi.css` (không đổi, md5 `cd3927837b5f1723c7c569619a7d9fbd`) · JS đổi: `main-s335vP1M.js` + `pageBoot-DyatfnaX.js`.
 
 ### 0. Vấn đề thật (không phải "thiếu tính năng")
 
@@ -1653,10 +1653,10 @@ bất biến: *shell nào gọi `store.toast()` thì phải render `<Notificatio
 
 | Kiểm tra | Kết quả |
 |---|---|
-| HEAD | `<commit>` (trước pull: `33b4054`) |
+| HEAD | `914ec53` (trước pull: `33b4054`) |
 | Migration | **0 pending** |
 | Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` → exit=0 |
-| md5 asset | khớp bản build ở máy (CSS · main · pageBoot) |
+| md5 asset | khớp bản build ở máy: CSS `cd3927837b5f1723c7c569619a7d9fbd` · `main-s335vP1M.js` `02022ec99a30fa644815169503517ed6` · `pageBoot-DyatfnaX.js` `c829518f5814e41c97557cb75b622f5b` |
 | Route mới | `POST /api/client-errors` → **200** khi gửi mã hợp lệ; **422** với mã sai định dạng; **429** khi quá 30/phút |
 | Log production | `client_error[L-XXXX]` có mặt trong `storage/logs/laravel.log` sau khi gửi thử |
 | Trang | `/` · `/dang-nhap` · `/bang-gia` → 200; các trang sau đăng nhập → 302 · `production.ERROR` không tăng |
