@@ -47,6 +47,10 @@ class WebAccessCheck extends Command
             // TÍCH HỢP của nhà cung cấp ⇒ in ra "[không tìm kiếm]" ngay cạnh dòng nói máy chủ chạy được công
             // cụ — hai câu ngược nhau trên cùng một màn hình.
             $badge = match (true) {
+                // Đường /responses là endpoint RIÊNG của nhà cung cấp — không phải "tìm kiếm sẵn trong
+                // /chat/completions", nên nhãn phải khác; gộp lại là nói sai cơ chế ngay trên màn hình
+                // dùng để kiểm chứng.
+                WebAccessService::isHostedMode($row['plan'] ?? null) => '[CÔNG CỤ NCC]   ',
                 (bool) ($row['supported'] ?? false) => '[CÓ tìm kiếm sẵn]',
                 (bool) ($row['tool_ready'] ?? false) => '[CÔNG CỤ]       ',
                 (bool) ($row['tool'] ?? false) => '[chưa gán vai]  ',
