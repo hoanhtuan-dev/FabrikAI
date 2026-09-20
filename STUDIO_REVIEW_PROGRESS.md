@@ -520,6 +520,14 @@ JS/Vue studio **51 file (38 .vue) / 14.239 dòng** · `public_html` **21 MB** ·
 - **Thêm**: định hướng do AI viết nay mang **bằng chứng đo được** ("Dựa trên N tin thật · M nguồn" + link); giao diện có khối **"Chủ đề đang được nói tới trong tin"** + chip **"Có tin thật (N)"** + dòng đếm hướng thật/bộ có sẵn.
 - **Kiểm chứng**: đo 16→40 tin · 6→14 từ khoá + 10 chủ đề · hướng live 2/9 → **9/13** · **AI viết 8/8 định hướng, 6 dựa trên tin thật** (có ngày + tên báo) · gọi model thật **11,7s · engine=ai-v1 · deepseek-flash** · `MarketAnalysisFromSourcesTest` 9 test · **suite 954 test / 6.827 assert XANH** · deploy production `dfdef9f → 2e0ccd9`.
 
+**Vòng 21 (2026-09-24) — TỐI ƯU HIỆU NĂNG TẢI TRANG + TÁCH CODE THEO MIỀN (Đợt 33):**
+- **Yêu cầu**: "tối ưu hóa/nâng cấp Agent Studio + tối ưu hóa/tinh chỉnh/nâng cấp GUI/UX/UI". Chủ dự án chọn 2 trục: hiệu năng tải trang + tái cấu trúc code.
+- **Hiệu năng**: main entry **599 → 179 KB (−70%)** — 15 component nặng thành async (9 card activity bar + DesignAgents/ConceptCard/GalleryModal/ProjectWorkspace/SourcePickerPopup/LibraryApp), popup nạp ở lần mở đầu rồi giữ mount (không mất nháp); bỏ 3 setInterval(1s) thường trực bằng useJobTicker (chỉ chạy khi job chạy).
+- **Tách store.js 5.658 dòng → 13 module** (store/: helpers · state · getters + 10 module actions). Cắt NGUYÊN VĂN bằng script tự kiểm chứng (382 action, ghép lát == khối gốc). API công khai giữ nguyên — 37 file import không đổi.
+- **Tách DesignAgents.vue 1.742 dòng → shell (963) + 4 bước** (components/agents/AgentDnaStep.vue · AgentRadarStep.vue · AgentBriefStep.vue · AgentCanvasStep.vue): shell giữ script + provide() 139 binding, mỗi bước inject đúng bề mặt và dán nguyên văn template.
+- **Test khoá luật thích nghi**: thêm TestCase::studioStoreSource() + TestCase::designAgentsSource() (nối module/component con) để test quét source vẫn đọc đủ mọi mảnh; 2 test khoá import eager đổi sang dạng async (luật "card vẫn một nguồn" giữ nguyên).
+- **Kiểm chứng**: vite build OK · **suite 954 test / 6.844 assert XANH** · commit bbf837e + 082c6c9. Chưa deploy production.
+
 ### 3.6 Sửa lỗi / đồng bộ khác
 - `900f547` `studio_config()` bỏ qua empty string từ DB → fallback config default · `565c1a8` preview-enrich nhận body/hair từ tab Phom dáng · `6e16472` fix 500 image-thumb + popup GalleryModal/SourcePickerPopup không hiển thị trong StudioApp · `d6572a1` render ProjectWorkspace popup + gọn prompt `StylistService` · `d674560` fix **cross-world SW resource mismatch** cho modulepreload.
 - `e9ed8e5` khôi phục `settings.blade.php` bị cắt mất **184 dòng** · `c64ea21` fix CSS syntax + Vue missing closing tags · `1b804ed` + `e5175c6` bo góc **VSCode-style** toàn diện (card/input/btn/badge/chip + admin blade).

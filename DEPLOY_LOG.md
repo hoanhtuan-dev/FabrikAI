@@ -5,6 +5,44 @@
 
 ---
 
+## Phiên 2026-09-24 (Tối ưu hiệu năng tải trang + tách code theo miền — Đợt 33)
+
+### Mục tiêu (yêu cầu chủ dự án)
+"Tối ưu hóa/nâng cấp Agent Studio + tối ưu hóa/tinh chỉnh/nâng cấp GUI/UX/UI". Chủ dự án chọn 2 trục:
+**hiệu năng & tải trang** và **tái cấu trúc code** (store 5.658 dòng · component 1.742 dòng), cho phép đổi backend khi cần.
+
+### 1. Hiệu năng — main entry 599 KB → 179 KB (−70%)
+| # | Thay đổi | File | Đo được |
+|---|---|---|---|
+| 1 | 15 component nặng chuyển sang defineAsyncComponent | StudioApp.vue | main-*.js 599→179 KB; mỗi card/popup thành chunk riêng (4–95 KB) |
+| 2 | Card activity bar nạp khi panel được chọn | StudioApp.vue | 9 card: Collections/Suggest/Variation/TryOn/Inpaint/Studio/Outfit/Upscale/Director |
+| 3 | Popup nạp ở lần mở ĐẦU, rồi giữ mount (cờ everOpened) | StudioApp.vue | DesignAgents · ConceptCard — không mất nháp khi đóng/mở |
+| 4 | Fallback khi tải chunk = render function (Vue runtime-only) | StudioApp.vue | tránh lỗi option template không biên dịch |
+| 5 | Bỏ 3 setInterval(1s) thường trực | StudioCard/InpaintCard/OutfitComposeCard | useJobTicker chỉ chạy khi job chạy — hết re-render khi nhàn rỗi |
+
+### 2. Tách store.js 5.658 dòng → 13 module theo miền
+store.js giờ là lớp gộp mỏng (37 dòng). resources/js/studio/store/:
+helpers.js · state.js · getters.js + 10 module actions (account · generation · studioScene · canvasView · library · projects · agentStudio · layers · sources · selection).
+- Cắt NGUYÊN VĂN bằng script có tự kiểm chứng: 382 action, ghép lát == khối gốc, không trùng tên.
+- API công khai (useStudioStore, apiError, safeMessage, userFacingError) GIỮ NGUYÊN — 37 file import không đổi.
+- Test khoá luật quét source nay dùng TestCase::studioStoreSource() (nối các module).
+
+### 3. Tách DesignAgents.vue 1.742 dòng → shell + 4 bước
+- Shell DesignAgents.vue (963 dòng) giữ toàn bộ script + khung, provide() 139 binding.
+- components/agents/: AgentDnaStep (80) · AgentRadarStep (317) · AgentBriefStep (442) · AgentCanvasStep (86) — mỗi bước inject() đúng bề mặt nó dùng, template dán nguyên văn.
+- Test khoá luật quét giao diện dùng TestCase::designAgentsSource().
+
+### Kiểm chứng
+- vite build OK (main 179 KB · DesignAgents 100 KB riêng).
+- Full suite 954 test / 6.844 assert XANH.
+- Commit: bbf837e (hiệu năng + tách store) · 082c6c9 (tách DesignAgents).
+
+### Việc còn lại (không chặn)
+- Chưa deploy production (đang chạy bản cũ). Trước khi deploy: npm run build + xác minh 4 bước Agent Studio mở/đóng modal đúng (đặc biệt lần mở đầu tiên — chunk nạp lười).
+- store/actions layers.js (1.231) và selection.js (1.039) còn dài — có thể tách tiếp khi cần, không bắt buộc.
+
+---
+
 ## Phiên 2026-09-20 (Tối ưu UX/UI "Bộ sưu tập")
 
 ### Thay đổi chính
