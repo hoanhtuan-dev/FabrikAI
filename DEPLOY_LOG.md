@@ -2019,7 +2019,7 @@ Nếu người dùng khai `search_param=enable_search` cho một gateway **khôn
 
 ## Phiên 2026-09-23 (Đợt 28 — SỬA SAI SÓT: mục Cài đặt không tồn tại · "demo" khi đã có nguồn thật · dọn chữ kỹ thuật khỏi giao diện)
 
-**Deploy:** §T§<prev> → <commit>§T§. Không migration mới.
+**Deploy:** `61d3fa5 → 377bff5`. Không migration mới.
 
 ### 0. Người dùng bắt đúng ba lỗi — cả ba đều là lỗi của tôi
 
