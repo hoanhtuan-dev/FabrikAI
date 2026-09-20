@@ -80,6 +80,25 @@ class MarketSignalService
         ],
     ];
 
+    /**
+     * TỪ MỘT TIẾNG DỄ TRÙNG NGHĨA KHÁC — chỉ tính khi CÙNG BÀI có một từ khoá rõ nghĩa khác.
+     *
+     * Vì sao cần: khớp theo ranh giới từ đã chặn được "áo" trong "báo", nhưng không cứu được những từ mà
+     * bản thân chúng là một TỪ riêng ở nghĩa khác: "đầm" (đầm phá) · "dạ" (dạ dày) · "da" (da thịt) ·
+     * "kẻ" (kẻ gian) · "thô" (thô ráp) · "ren" (ren rỉ) · "len" (len lỏi) · "trơn" (trơn tru)…
+     * Quy tắc: bài phải có ít nhất MỘT từ khoá rõ nghĩa của ngành thì các từ mơ hồ này mới được tính —
+     * nhờ vậy tin kinh doanh chung không sinh ra "tín hiệu thời trang" giả.
+     *
+     * @var array<string, true>
+     */
+    public const AMBIGUOUS = [
+        'đầm' => true, 'dạ' => true, 'da' => true, 'kẻ' => true, 'thô' => true, 'ren' => true, 'len' => true,
+        'trơn' => true, 'sọc' => true, 'cúc' => true, 'túi' => true, 'bèo' => true, 'gấm' => true,
+        'nhung' => true, 'lụa' => true, 'vải' => true, 'váy' => true, 'yếm' => true, 'giày' => true,
+        'trắng' => true, 'đen' => true, 'xanh' => true, 'hồng' => true, 'vàng' => true, 'nâu' => true,
+        'đỏ' => true, 'tím' => true, 'xám' => true,
+    ];
+
     public const CATEGORY_LABELS = [
         'color' => 'Màu sắc',
         'silhouette' => 'Dáng',
@@ -292,32 +311,47 @@ class MarketSignalService
                 $sources[$sourceName] = true;
             }
 
+            // TỪ MỘT TIẾNG DỄ TRÙNG NGHĨA KHÁC chỉ được tính khi bài CÓ ngữ cảnh ngành (xem AMBIGUOUS):
+            // "đầm" trong "đầm phá", "dạ" trong "dạ dày", "da" trong "da thịt", "kẻ" trong "kẻ gian" —
+            // khớp theo ranh giới từ KHÔNG cứu được những ca này vì chúng vẫn là một TỪ riêng.
+            $clear = [];
+            $ambiguous = [];
             foreach (self::VOCABULARY as $category => $terms) {
                 foreach ($terms as $term) {
                     if (! $this->mentions($term, $text)) {
                         continue;
                     }
-                    $key = $category.'|'.$term;
-                    $found[$key] ??= [
-                        'term' => $term,
-                        'category' => $category,
-                        'mentions' => 0,
-                        'sources' => [],
-                        'samples' => [],
+                    if (isset(self::AMBIGUOUS[$term])) {
+                        $ambiguous[] = [$category, $term];
+                    } else {
+                        $clear[] = [$category, $term];
+                    }
+                }
+            }
+            // Có ít nhất một từ khoá RÕ NGHĨA ⇒ bài đang nói về ngành ⇒ nhận cả các từ mơ hồ ở trên.
+            $accepted = $clear === [] ? [] : array_merge($clear, $ambiguous);
+
+            foreach ($accepted as [$category, $term]) {
+                $key = $category.'|'.$term;
+                $found[$key] ??= [
+                    'term' => $term,
+                    'category' => $category,
+                    'mentions' => 0,
+                    'sources' => [],
+                    'samples' => [],
+                ];
+                $found[$key]['mentions']++;
+                if ($sourceName !== '') {
+                    $found[$key]['sources'][$sourceName] = true;
+                }
+                // Giữ tối đa 3 tin làm bằng chứng để người dùng tự kiểm chứng từng tín hiệu.
+                if (count($found[$key]['samples']) < 3) {
+                    $found[$key]['samples'][] = [
+                        'title' => Str::limit($title, 160, ''),
+                        'url' => (string) ($item['url'] ?? ''),
+                        'source' => $sourceName,
+                        'published_at' => $item['published_at'] ?? null,
                     ];
-                    $found[$key]['mentions']++;
-                    if ($sourceName !== '') {
-                        $found[$key]['sources'][$sourceName] = true;
-                    }
-                    // Giữ tối đa 3 tin làm bằng chứng để người dùng tự kiểm chứng từng tín hiệu.
-                    if (count($found[$key]['samples']) < 3) {
-                        $found[$key]['samples'][] = [
-                            'title' => Str::limit($title, 160, ''),
-                            'url' => (string) ($item['url'] ?? ''),
-                            'source' => $sourceName,
-                            'published_at' => $item['published_at'] ?? null,
-                        ];
-                    }
                 }
             }
 

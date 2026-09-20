@@ -19,6 +19,9 @@ import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 import StudioIcon from './StudioIcon.vue';
 import SourceLibraryPicker from './SourceLibraryPicker.vue';
+// Đọc bảng dán từ Excel nằm ở MODULE RIÊNG để kiểm được bằng máy (scripts/check-shop-paste.mjs) —
+// logic tiền nằm trong file .vue thì không test nào chạm tới, và đó đúng là cách lỗi cũ lọt qua.
+import { parseShopRows } from '../shopPaste.js';
 
 const store = useStudioStore();
 const prompt = ref('');
@@ -407,32 +410,6 @@ const shopOpen = ref(false);
 const shopSummary = computed(() => store.shopSignal || radar.value?.internal_brand_signal?.shop || null);
 const shopRowCount = computed(() => (store.shopRows || []).filter((row) => String(row.name || '').trim()).length);
 
-/** Dán từ Excel: chấp nhận Tab, dấu phẩy hoặc dấu chấm phẩy; bỏ dòng tiêu đề nếu có. */
-function parseShopRows(text) {
-  const lines = String(text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const rows = [];
-  const toInt = (value) => {
-    const n = Number(String(value ?? '').replace(/[^\d.-]/g, ''));
-    return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
-  };
-  for (const line of lines) {
-    const cells = line.split(/\t|;|,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((c) => c.trim().replace(/^"|"$/g, ''));
-    const name = String(cells[0] || '').trim();
-    if (!name) continue;
-    if (rows.length === 0 && /^(t[eê]n|name|s[aả]n ph[aẩ]m)\b/i.test(name)) continue;
-    rows.push({
-      name: name.slice(0, 160),
-      category: String(cells[1] || '').trim().slice(0, 80),
-      units_sold: toInt(cells[2]),
-      stock_on_hand: toInt(cells[3]),
-      returns: toInt(cells[4]),
-      price_vnd: toInt(cells[5]),
-      period_days: 30,
-      source: 'paste',
-    });
-  }
-  return rows;
-}
 function importShopPaste() {
   shopParseError.value = '';
   const rows = parseShopRows(shopPaste.value);
@@ -443,6 +420,12 @@ function importShopPaste() {
   store.shopRows = [...store.shopRows, ...rows].slice(0, 200);
   shopPaste.value = '';
   store.toast('Đã thêm ' + rows.length + ' dòng nháp — kiểm tra lại rồi bấm «Lưu dữ liệu shop».');
+  // Giá bán đọc sai (0đ hoặc dưới 1.000đ) làm dải giá và cả kế hoạch sản xuất ra số vô nghĩa — nói NGAY,
+  // thay vì để chủ xưởng phát hiện lúc bảng kịch bản bán trống.
+  const badPrice = rows.filter((row) => !row.price_vnd || row.price_vnd < 1000).length;
+  if (badPrice) {
+    shopParseError.value = badPrice + ' dòng có giá bán trống hoặc quá nhỏ (dưới 1.000đ). Kiểm tra lại cột Giá bán — nếu để 0 thì dải giá và kế hoạch sản xuất sẽ không dùng được.';
+  }
 }
 function addShopRow() {
   if (store.shopRows.length >= 200) { store.toast('Tối đa 200 dòng dữ liệu shop.', 'error'); return; }
@@ -487,7 +470,8 @@ function exportCutSheet() {
   ]));
   rows.push([]);
   rows.push(['TỔNG', '', planTotals.value.units, '', planTotals.value.fabric_order_m, planTotals.value.avg_unit_cost_vnd, '', planTotals.value.avg_profit_unit_vnd, planTotals.value.margin_pct]);
-  rows.push(['Vải cần đặt (m)', planTotals.value.fabric_order_m, 'Vốn cần', planTotals.value.capital_needed_vnd, 'Lãi dự kiến', planTotals.value.profit_vnd]);
+  rows.push(['Vải cần đặt (m)', planTotals.value.fabric_order_m, 'Vốn cần', planTotals.value.capital_needed_vnd, 'Lãi gộp (chưa trừ chi phí cố định)', planTotals.value.profit_vnd]);
+  if (planTotals.value.fixed_cost_vnd) rows.push(['Chi phí cố định', planTotals.value.fixed_cost_vnd, '', '', 'Lãi sau chi phí cố định', planTotals.value.profit_after_fixed_vnd]);
   planWaves.value.forEach((wave) => rows.push([wave.name, wave.share_pct + '%', wave.units, '', wave.fabric_order_m, wave.cost_vnd, wave.revenue_vnd, wave.profit_vnd, wave.days + ' ngày']));
   downloadCsv('lenh-cat-' + Date.now() + '.csv', rows);
 }
@@ -514,7 +498,7 @@ function copyCutSheet() {
   copyText([
     'LỆNH CẮT — ' + (collection.value?.project_payload?.name || ''),
     ...lines,
-    'Tổng: ' + planTotals.value.units + ' cái · vải cần đặt ' + planTotals.value.fabric_order_m + 'm · vốn ' + formatVnd(planTotals.value.capital_needed_vnd) + ' · lãi dự kiến ' + formatVnd(planTotals.value.profit_vnd),
+    'Tổng: ' + planTotals.value.units + ' cái · vải cần đặt ' + planTotals.value.fabric_order_m + 'm · vốn ' + formatVnd(planTotals.value.capital_needed_vnd) + ' · lãi gộp (chưa trừ chi phí cố định) ' + formatVnd(planTotals.value.profit_vnd),
   ].join('\n'), 'lệnh cắt');
 }
 
@@ -782,7 +766,7 @@ watch(() => store.designAgentOpen, (open) => {
           <section v-if="step === 'dna'" id="agent-step-dna" role="tabpanel" aria-label="DNA shop" :aria-busy="store.brandDnaLoading" class="grid gap-5 xl:grid-cols-[minmax(320px,420px)_1fr]">
             <div class="space-y-4">
               <div class="card p-4">
-                <h2 class="text-sm font-semibold text-cream-100">DNA shop của bạn</h2>
+                <h2 class="font-display text-base font-semibold text-brand-300">DNA shop của bạn</h2>
                 <p class="mt-1 text-body leading-5 text-cream-400">
                   Đây là phần <b class="text-cream-100">bạn tự khai</b> — agent dùng nó để viết brief, chọn nhóm hàng và loại bỏ những thứ bạn không làm.
                 </p>
@@ -800,7 +784,7 @@ watch(() => store.designAgentOpen, (open) => {
               </div>
 
               <div class="card p-4">
-                <h3 class="text-sm font-semibold text-cream-100">Nguồn dữ liệu agent đang có</h3>
+                <h3 class="font-display text-base font-semibold text-brand-300">Nguồn dữ liệu agent đang có</h3>
                 <ul class="mt-2 space-y-1.5 text-label leading-5 text-cream-300">
                   <li>· <b class="text-cream-100">DNA bạn khai</b> (màn hình này) — đáng tin nhất, sửa được bất cứ lúc nào.</li>
                   <li>· <b class="text-cream-100">Số bán của shop</b> (nhập ở bước Định hướng) — dữ liệu thật do bạn nhập.</li>
@@ -812,7 +796,7 @@ watch(() => store.designAgentOpen, (open) => {
 
             <div class="card p-4">
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <h3 class="text-sm font-semibold text-cream-100">Khai hồ sơ</h3>
+                <h3 class="font-display text-base font-semibold text-brand-300">Khai hồ sơ</h3>
                 <span v-if="dnaDirty" class="text-label text-warn">Có thay đổi chưa lưu</span>
               </div>
 
@@ -912,7 +896,7 @@ watch(() => store.designAgentOpen, (open) => {
               <div v-if="marketLive" class="mb-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <h3 class="text-sm font-semibold text-cream-100">Tín hiệu đo từ tin thật ({{ marketSignals.length }})</h3>
+                    <h3 class="font-display text-base font-semibold text-brand-300">Tín hiệu đo từ tin thật ({{ marketSignals.length }})</h3>
                     <p class="mt-0.5 text-body leading-5 text-cream-400">
                       {{ market.note }}<template v-if="marketAgeLabel"> · đo {{ marketAgeLabel }}</template>
                     </p>
@@ -955,7 +939,7 @@ watch(() => store.designAgentOpen, (open) => {
               <div v-if="directions.length" class="mb-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <h3 class="text-sm font-semibold text-cream-100">Định hướng từ TrendRadar ({{ directions.length }})</h3>
+                    <h3 class="font-display text-base font-semibold text-brand-300">Định hướng từ TrendRadar ({{ directions.length }})</h3>
                     <p class="mt-0.5 text-body leading-5 text-cream-400">
                       {{ radarMethodLine }}
                       <span v-if="radarReadAt" class="text-cream-400">· đọc lúc {{ radarReadAt }}.</span>
@@ -1138,7 +1122,7 @@ watch(() => store.designAgentOpen, (open) => {
           <section v-else-if="step === 'brief'" id="agent-step-brief" role="tabpanel" aria-label="Định hướng" :aria-busy="store.collectionBriefLoading" class="grid gap-5 xl:grid-cols-[minmax(320px,380px)_1fr]">
             <div class="space-y-4">
               <div class="card p-4">
-                <h2 class="text-sm font-semibold text-cream-100">Brief đầu vào</h2>
+                <h2 class="font-display text-base font-semibold text-brand-300">Brief đầu vào</h2>
                 <p class="mt-0.5 text-xs text-cream-400">Mô tả khách hàng, dịp mặc, chất liệu, màu sắc hoặc định vị giá.</p>
                 <label for="collection-prompt" class="label mt-4">Prompt tiếng Việt <span class="font-normal text-cream-400">(bắt buộc)</span></label>
                 <textarea id="collection-prompt" ref="promptInput" v-model="prompt" rows="5" maxlength="2000" aria-describedby="collection-prompt-help" class="input w-full resize-none !text-sm" placeholder="Ví dụ: Bộ sưu tập công sở mùa hè cho nữ văn phòng, ưu tiên linen thoáng và màu pastel dịu…" @keydown.ctrl.enter="createBrief"></textarea>
@@ -1230,6 +1214,11 @@ watch(() => store.designAgentOpen, (open) => {
                 <div v-if="shopOpen" class="mt-3 space-y-3">
                   <div v-if="shopSummary && shopSummary.row_count" class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-body leading-5 text-ok">
                     {{ shopSummary.narrative }}
+                    <!-- Kỳ báo cáo trộn nhau: cộng dồn số bán của các kỳ khác nhau rồi kể như MỘT con số là
+                         nói sai, nên phải nói ra và mời nhập lại theo cùng một kỳ. -->
+                    <p v-if="shopSummary.period_days_mixed" class="mt-1.5 text-warn">
+                      ↳ Dữ liệu đang trộn {{ (shopSummary.periods || []).length }} kỳ báo cáo khác nhau ({{ (shopSummary.periods || []).join(' · ') }} ngày) — nên nhập lại theo CÙNG một kỳ để so sánh cho đúng.
+                    </p>
                   </div>
                   <p v-else class="rounded-lg border border-ink-700 bg-ink-800 p-3 text-body leading-5 text-cream-400">
                     Chưa có dữ liệu. Nhập 2–3 dòng cũng đã giúp cơ cấu SKU bám đúng nhóm bán chạy của shop thay vì đoán theo từ khoá.
@@ -1343,7 +1332,7 @@ watch(() => store.designAgentOpen, (open) => {
                 <div v-if="briefTab === 'overview'" class="mt-4 grid gap-4 md:grid-cols-2">
                   <div class="card p-5">
                     <div class="flex flex-wrap items-center justify-between gap-2">
-                      <h3 class="text-sm font-semibold text-cream-100">Câu chuyện thương hiệu</h3>
+                      <h3 class="font-display text-base font-semibold text-brand-300">Câu chuyện thương hiệu</h3>
                       <!-- Nói RÕ brief này dựa trên DNA nào: bạn khai hay hệ thống suy ra. -->
                       <button type="button" class="rounded-full px-2 py-0.5 text-label font-semibold" :class="collection.brand_dna?.source === 'owner' ? 'bg-brand-500/20 text-brand-200' : 'bg-amber-500/15 text-warn'" @click="setStep('dna')">
                         {{ collection.brand_dna?.source_label || 'Chưa rõ nguồn DNA' }}
@@ -1352,14 +1341,14 @@ watch(() => store.designAgentOpen, (open) => {
                     <p class="mt-2 text-xs leading-5 text-cream-200">{{ collection.brand_narrative?.narrative || '—' }}</p>
                     <p v-if="collection.brand_dna?.fields?.avoid?.length" class="mt-2 text-label leading-5 text-cream-400">Không đề xuất: {{ collection.brand_dna.fields.avoid.join(', ') }}</p>
                   </div>
-                  <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Gợi ý cấu hình Canvas</h3><div v-if="canvasSettings" class="mt-2 flex flex-wrap gap-1.5 text-label"><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">Tỉ lệ {{ canvasSettings.ratio }}</span><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">{{ canvasSettings.variant_count }} biến thể</span><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">Negative prompt</span></div><p class="mt-2 text-body leading-5 text-cream-400">{{ canvasSettings?.note }}</p></div>
+                  <div class="card p-5"><h3 class="font-display text-base font-semibold text-brand-300">Gợi ý cấu hình Canvas</h3><div v-if="canvasSettings" class="mt-2 flex flex-wrap gap-1.5 text-label"><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">Tỉ lệ {{ canvasSettings.ratio }}</span><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">{{ canvasSettings.variant_count }} biến thể</span><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">Negative prompt</span></div><p class="mt-2 text-body leading-5 text-cream-400">{{ canvasSettings?.note }}</p></div>
                 </div>
 
                 <div v-else-if="briefTab === 'money'" class="mt-4 space-y-4">
                   <div class="card p-5">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                       <div class="min-w-0">
-                        <h3 class="text-sm font-semibold text-cream-100">Đơn giá &amp; định mức của xưởng bạn</h3>
+                        <h3 class="font-display text-base font-semibold text-brand-300">Đơn giá &amp; định mức của xưởng bạn</h3>
                         <p class="mt-0.5 text-body leading-5 text-cream-400">
                           Con số tiền do BẠN quyết định: sửa ô nào là kế hoạch tính lại ngay. Giá thành và lợi nhuận do hệ thống tính từ đúng những ô này — không dùng model AI cho con số.
                         </p>
@@ -1401,7 +1390,14 @@ watch(() => store.designAgentOpen, (open) => {
                       <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-label text-cream-400">Tổng sản xuất</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatNumber(planTotals.units) }} cái</p></div>
                       <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-label text-cream-400">Vải cần đặt</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatNumber(planTotals.fabric_order_m) }} m</p><p class="text-label text-cream-400">{{ formatVnd(planTotals.fabric_order_cost_vnd) }}</p></div>
                       <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-label text-cream-400">Vốn cần</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatVnd(planTotals.capital_needed_vnd) }}</p><p class="text-label text-cream-400">Giá vốn TB {{ formatVnd(planTotals.avg_unit_cost_vnd) }}/cái</p></div>
-                      <div class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5"><p class="text-label text-ok">Lãi gộp dự kiến</p><p class="mt-1 text-lg font-semibold tabular-nums text-ok">{{ formatVnd(planTotals.profit_vnd) }}</p><p class="text-label text-ok">{{ planTotals.margin_pct }}% · {{ formatVnd(planTotals.avg_profit_unit_vnd) }}/cái</p></div>
+                      <!-- HAI con số lợi nhuận phải nói rõ tên: phần tổng là TRƯỚC chi phí cố định, bảng kịch bản
+                           bán là SAU khi trừ. Trước đây hai chỗ trả hai số khác nhau mà không nhãn nào phân biệt. -->
+                      <div class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5">
+                        <p class="text-label text-ok">Lãi gộp (chưa trừ chi phí cố định)</p>
+                        <p class="mt-1 text-lg font-semibold tabular-nums text-ok">{{ formatVnd(planTotals.profit_vnd) }}</p>
+                        <p class="text-label text-ok">{{ planTotals.margin_pct }}% · {{ formatVnd(planTotals.avg_profit_unit_vnd) }}/cái</p>
+                        <p v-if="planTotals.fixed_cost_vnd" class="mt-1 text-label text-ok">Sau chi phí cố định {{ formatVnd(planTotals.fixed_cost_vnd) }}: <b>{{ formatVnd(planTotals.profit_after_fixed_vnd) }}</b> ({{ planTotals.margin_after_fixed_pct }}%)</p>
+                      </div>
                     </div>
 
                     <div
@@ -1422,7 +1418,7 @@ watch(() => store.designAgentOpen, (open) => {
                     <div class="card p-5">
                       <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <h3 class="text-sm font-semibold text-cream-100">Lệnh cắt — {{ planLines.length }} dòng</h3>
+                          <h3 class="font-display text-base font-semibold text-brand-300">Lệnh cắt — {{ planLines.length }} dòng</h3>
                           <p class="mt-0.5 text-body text-cream-400">
                             Số cái mỗi mã theo từng size, vải cần cho mỗi dòng và giá vốn/cái. Đây là bảng đưa thẳng cho thợ cắt.
                             <span v-if="planTotals.days_total" class="text-cream-400"> · khoảng {{ planTotals.days_total }} ngày nếu chạy {{ plan.assumptions.daily_capacity }} cái/ngày.</span>
@@ -1479,7 +1475,7 @@ watch(() => store.designAgentOpen, (open) => {
                         </div>
                         <p class="mt-2 text-xl font-semibold tabular-nums text-cream-100">{{ formatNumber(wave.units) }} cái</p>
                         <p class="text-body text-cream-400">Vải {{ wave.fabric_order_m }}m · vốn {{ formatVnd(wave.cost_vnd) }}<span v-if="wave.days"> · {{ wave.days }} ngày</span></p>
-                        <p class="mt-1 text-body text-ok">Lãi dự kiến {{ formatVnd(wave.profit_vnd) }}</p>
+                        <p class="mt-1 text-body text-ok">Lãi gộp (chưa trừ chi phí cố định) {{ formatVnd(wave.profit_vnd) }}</p>
                         <p class="mt-2 text-label leading-4 text-cream-400">{{ wave.note }}</p>
                         <details class="mt-2">
                           <summary class="cursor-pointer text-label font-semibold text-cream-400">Chi tiết {{ wave.lines.length }} dòng</summary>
@@ -1492,7 +1488,7 @@ watch(() => store.designAgentOpen, (open) => {
 
                     <div class="grid gap-4 lg:grid-cols-2">
                       <div class="card p-5">
-                        <h3 class="text-sm font-semibold text-cream-100">Bảng size (cm)</h3>
+                        <h3 class="font-display text-base font-semibold text-brand-300">Bảng size (cm)</h3>
                         <p class="mt-0.5 text-body leading-5 text-cream-400">Số đo tham chiếu dáng nữ VN — phải đối chiếu rập thật của xưởng và độ co của vải.</p>
                         <div v-for="chart in planSizeChart" :key="chart.category" class="mt-3 overflow-x-auto">
                           <p class="text-body font-semibold text-brand-200">{{ chart.category }}</p>
@@ -1510,7 +1506,7 @@ watch(() => store.designAgentOpen, (open) => {
                       </div>
 
                       <div class="card p-5">
-                        <h3 class="text-sm font-semibold text-cream-100">Ba mức giá — lãi tương ứng</h3>
+                        <h3 class="font-display text-base font-semibold text-brand-300">Ba mức giá — lãi tương ứng</h3>
                         <p class="mt-0.5 text-body leading-5 text-cream-400">Đã trừ chiết khấu kênh {{ plan.assumptions.channel_discount_pct }}% và cộng chi phí cố định.</p>
                         <div class="mt-3 space-y-2">
                           <div v-for="scenario in planScenarios" :key="scenario.price_vnd" class="rounded-lg border border-ink-700 bg-ink-800 p-3">
@@ -1518,7 +1514,7 @@ watch(() => store.designAgentOpen, (open) => {
                               <span class="text-xs font-semibold text-cream-100">{{ formatVnd(scenario.price_vnd) }}</span>
                               <span class="rounded px-2 py-0.5 text-label" :class="scenario.profit_vnd > 0 ? 'bg-emerald-500/15 text-ok' : 'bg-red-500/15 text-danger'">{{ scenario.label }}</span>
                             </div>
-                            <p class="mt-1 text-body text-cream-300">Lãi {{ formatVnd(scenario.profit_vnd) }} · biên {{ scenario.margin_pct }}%<span v-if="scenario.breakeven_units"> · hoà vốn ở {{ formatNumber(scenario.breakeven_units) }} cái</span></p>
+                            <p class="mt-1 text-body text-cream-300">Lãi (đã trừ chi phí cố định) {{ formatVnd(scenario.profit_vnd) }} · biên {{ scenario.margin_pct }}%<span v-if="scenario.breakeven_units"> · hoà vốn ở {{ formatNumber(scenario.breakeven_units) }} cái</span></p>
                           </div>
                         </div>
                         <ul class="mt-3 space-y-1 text-label leading-4 text-cream-400">
@@ -1536,7 +1532,7 @@ watch(() => store.designAgentOpen, (open) => {
                 </div>
 
                 <div v-else-if="briefTab === 'moodboard'" class="mt-4 card p-5">
-                  <div class="mb-3 flex items-center justify-between"><h3 class="text-sm font-semibold text-cream-100">Bảng mood</h3><span class="text-label text-cream-400">{{ moodboardItems.length }} ô</span></div>
+                  <div class="mb-3 flex items-center justify-between"><h3 class="font-display text-base font-semibold text-brand-300">Bảng mood</h3><span class="text-label text-cream-400">{{ moodboardItems.length }} ô</span></div>
                   <div class="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
                     <div v-for="(item, index) in moodboardItems" :key="item.id || index" class="group relative aspect-square overflow-hidden rounded-lg border border-ink-700" :style="{ backgroundColor: item.color || palette[index % Math.max(1, palette.length)]?.hex || '#b9c8c2' }" role="img" :aria-label="(item.label || 'Mood ' + (index + 1)) + ': ' + (item.caption || '')" :title="item.caption || item.label || 'Mood board'">
                       <span class="absolute inset-x-0 bottom-0 p-1.5 text-tiny font-semibold leading-3 text-white shadow-[0_-12px_16px_-8px_rgba(0,0,0,0.8)]">{{ item.label || 'Mood ' + (index + 1) }}</span>
@@ -1550,15 +1546,15 @@ watch(() => store.designAgentOpen, (open) => {
                 </div>
 
                 <div v-else-if="briefTab === 'structure'" class="mt-4 card p-5">
-                  <h3 class="text-sm font-semibold text-cream-100">Cấu trúc danh mục</h3><p class="mt-1 text-xs text-cream-400">{{ collection.structure?.rationale }}</p>
+                  <h3 class="font-display text-base font-semibold text-brand-300">Cấu trúc danh mục</h3><p class="mt-1 text-xs text-cream-400">{{ collection.structure?.rationale }}</p>
                   <div class="mt-3 space-y-2.5">
                     <div v-for="row in categoryRows" :key="row.category" class="rounded-lg bg-ink-800 p-3"><div class="flex items-center justify-between text-xs"><span class="font-semibold text-cream-100">{{ row.category }}</span><span class="text-brand-200">{{ row.count }} SKU · {{ row.share || 0 }}%</span></div><div class="mt-1.5 h-1 rounded bg-ink-700"><span class="block h-full rounded bg-brand-500" :style="{ width: Math.min(100, Number(row.share || 0)) + '%' }"></span></div><p class="mt-1.5 text-label leading-4 text-cream-400">{{ row.rationale }}</p></div>
                   </div>
                 </div>
 
                 <div v-else class="mt-4 grid gap-4 md:grid-cols-2">
-                  <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Phối outfit</h3><div class="mt-3 space-y-2.5"><div v-for="look in outfitRows" :key="look.id" class="rounded-lg border border-ink-700 bg-ink-800 p-3"><div class="flex items-center justify-between gap-2"><span class="text-xs font-semibold text-cream-100">{{ look.name }}</span><span class="text-label text-cream-400">{{ look.goal }}</span></div><p class="mt-1.5 text-body leading-4 text-cream-300">{{ (look.items || []).join(' · ') }}</p><div class="mt-2 flex gap-1"><span v-for="(color, index) in (look.palette || []).slice(0, 3)" :key="index" class="h-3 flex-1 rounded" :style="{ backgroundColor: color }"></span></div></div></div></div>
-                  <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Phân bổ size</h3><div class="mt-3 space-y-2.5"><div v-for="row in sizeRows" :key="row.size" class="flex items-center gap-3 text-xs"><span class="w-8 rounded bg-ink-800 py-1 text-center font-semibold text-cream-100">{{ row.size }}</span><span class="h-2 flex-1 rounded bg-ink-800"><span class="block h-full rounded bg-brand-500" :style="{ width: Math.min(100, Number(row.share || 0)) + '%' }"></span></span><span class="w-20 text-right text-cream-400">{{ row.count }} · {{ row.share || 0 }}%</span></div></div></div>
+                  <div class="card p-5"><h3 class="font-display text-base font-semibold text-brand-300">Phối outfit</h3><div class="mt-3 space-y-2.5"><div v-for="look in outfitRows" :key="look.id" class="rounded-lg border border-ink-700 bg-ink-800 p-3"><div class="flex items-center justify-between gap-2"><span class="text-xs font-semibold text-cream-100">{{ look.name }}</span><span class="text-label text-cream-400">{{ look.goal }}</span></div><p class="mt-1.5 text-body leading-4 text-cream-300">{{ (look.items || []).join(' · ') }}</p><div class="mt-2 flex gap-1"><span v-for="(color, index) in (look.palette || []).slice(0, 3)" :key="index" class="h-3 flex-1 rounded" :style="{ backgroundColor: color }"></span></div></div></div></div>
+                  <div class="card p-5"><h3 class="font-display text-base font-semibold text-brand-300">Phân bổ size</h3><div class="mt-3 space-y-2.5"><div v-for="row in sizeRows" :key="row.size" class="flex items-center gap-3 text-xs"><span class="w-8 rounded bg-ink-800 py-1 text-center font-semibold text-cream-100">{{ row.size }}</span><span class="h-2 flex-1 rounded bg-ink-800"><span class="block h-full rounded bg-brand-500" :style="{ width: Math.min(100, Number(row.share || 0)) + '%' }"></span></span><span class="w-20 text-right text-cream-400">{{ row.count }} · {{ row.share || 0 }}%</span></div></div></div>
                 </div>
               </template>
 
@@ -1594,7 +1590,7 @@ watch(() => store.designAgentOpen, (open) => {
                   </div>
 
                   <div class="card p-5">
-                    <h3 class="text-sm font-semibold text-cream-100">Cấu hình tạo ảnh</h3>
+                    <h3 class="font-display text-base font-semibold text-brand-300">Cấu hình tạo ảnh</h3>
                     <div class="mt-3 grid gap-4 sm:grid-cols-2">
                       <div>
                         <p class="text-label font-semibold uppercase tracking-wide text-cream-400">Tỉ lệ khung</p>
@@ -1619,7 +1615,7 @@ watch(() => store.designAgentOpen, (open) => {
 
                 <aside class="space-y-4">
                   <div class="card p-5">
-                    <h3 class="text-sm font-semibold text-cream-100">Sẵn sàng tạo ảnh</h3>
+                    <h3 class="font-display text-base font-semibold text-brand-300">Sẵn sàng tạo ảnh</h3>
                     <ul class="mt-3 space-y-2 text-xs">
                       <li class="flex items-center gap-2"><StudioIcon name="check" size="h-3.5 w-3.5" class="text-ok" /><span class="text-cream-200">Prompt {{ canvasLang === 'en' ? 'tiếng Anh' : 'tiếng Việt' }} đã sẵn sàng</span></li>
                       <li class="flex items-center gap-2"><StudioIcon name="check" size="h-3.5 w-3.5" class="text-ok" /><span class="text-cream-200">Tỉ lệ {{ canvas.ratio }} · {{ canvas.variantCount }} biến thể</span></li>
@@ -1645,7 +1641,7 @@ watch(() => store.designAgentOpen, (open) => {
                   </div>
 
                   <div class="card p-5">
-                    <h3 class="text-sm font-semibold text-cream-100">Bộ sưu tập</h3>
+                    <h3 class="font-display text-base font-semibold text-brand-300">Bộ sưu tập</h3>
                     <p class="mt-1.5 text-xs leading-5 text-cream-200">{{ collection.project_payload?.name }}</p>
                     <p class="mt-1 text-label text-cream-400">Tạo bộ sưu tập chỉ tạo vỏ dự án; ảnh vẫn do bạn chủ động tạo trong Canvas.</p>
                   </div>

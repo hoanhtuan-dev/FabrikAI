@@ -1932,7 +1932,7 @@ class DesignAgentService
         $stock = 0;
         $returns = 0;
         $revenue = 0;
-        $period = 30;
+        $periods = [];
         $lines = [];
         $byCategory = [];
 
@@ -1945,7 +1945,10 @@ class DesignAgentService
             $rowStock = max(0, (int) ($row['stock_on_hand'] ?? 0));
             $rowReturns = max(0, (int) ($row['returns'] ?? 0));
             $rowPrice = max(0, (int) ($row['price_vnd'] ?? 0));
-            $period = max(1, (int) ($row['period_days'] ?? 30));
+            // Kỳ báo cáo của từng dòng: dữ liệu có thể trộn nhiều kỳ (dán từ Excel nhiều tháng). Ghi lại
+            // TẤT CẢ để phần tổng nói đúng — cộng dồn số bán của các kỳ khác nhau rồi kể như một con số
+            // của một kỳ là nói sai.
+            $periods[max(1, (int) ($row['period_days'] ?? 30))] = true;
 
             $units += $rowUnits;
             $stock += $rowStock;
@@ -1974,13 +1977,24 @@ class DesignAgentService
 
         if ($lines === []) {
             return [
-                'row_count' => 0, 'period_days' => 30, 'units_sold' => 0, 'stock_on_hand' => 0,
+                'row_count' => 0, 'period_days' => 30, 'period_days_mixed' => false, 'periods' => [], 'units_sold' => 0, 'stock_on_hand' => 0,
                 'returns' => 0, 'return_rate_pct' => null, 'sell_through_pct' => null,
                 'avg_price_vnd' => null, 'revenue_vnd' => 0,
                 'best_sellers' => [], 'slow_movers' => [], 'category_demand' => [],
                 'narrative' => 'Chưa có dữ liệu bán hàng của shop — mọi con số bên dưới là GIẢ ĐỊNH, hãy nhập dữ liệu thật để lời khuyên sát hơn.',
             ];
         }
+
+        // Kỳ báo cáo: chỉ nói MỘT con số khi mọi dòng CÙNG một kỳ. Trộn kỳ thì nói ra — nếu không, người đọc
+        // tưởng "1.200 cái đã bán trong 30 ngày" trong khi thật ra là ba tháng khác nhau cộng lại.
+        $periodList = array_map('intval', array_keys($periods));
+        sort($periodList);
+        $mixed = count($periodList) > 1;
+        $periodPhrase = match (true) {
+            $periodList === [] => '',
+            $mixed => ' trong '.count($periodList).' kỳ báo cáo khác nhau ('.implode(' · ', array_map(fn (int $d) => $d.' ngày', $periodList)).')',
+            default => ' trong '.$periodList[0].' ngày',
+        };
 
         $best = $lines;
         usort($best, fn (array $a, array $b) => [$b['units_sold'], $b['name']] <=> [$a['units_sold'], $a['name']]);
@@ -2004,9 +2018,10 @@ class DesignAgentService
         $avgPrice = $units > 0 ? (int) round($revenue / $units) : null;
         $top = $best[0];
         $narrative = sprintf(
-            'Dữ liệu bán hàng THẬT của shop: %d dòng · %s cái đã bán · tồn %s · đổi trả %s%% · giá bán bình quân %s%s. Bán chạy nhất: %s (%s cái).',
+            'Dữ liệu bán hàng THẬT của shop: %d dòng · %s cái đã bán%s · tồn %s · đổi trả %s%% · giá bán bình quân %s%s. Bán chạy nhất: %s (%s cái).',
             count($lines),
             number_format($units),
+            $periodPhrase,
             number_format($stock),
             $units > 0 ? round($returns / $units * 100, 1) : 0,
             $avgPrice ? number_format($avgPrice) : '—',
@@ -2017,7 +2032,9 @@ class DesignAgentService
 
         return [
             'row_count' => count($lines),
-            'period_days' => $period,
+            'period_days' => $mixed ? null : ($periodList[0] ?? 30),
+            'period_days_mixed' => $mixed,
+            'periods' => $periodList,
             'units_sold' => $units,
             'stock_on_hand' => $stock,
             'returns' => $returns,

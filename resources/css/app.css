@@ -449,7 +449,9 @@
        trước đây .tool-btn dùng ink-700 còn nút viết tay dùng ink-600 nên hai nút cạnh nhau
        lệch màu viền. Hover đi lên ink-500 (nút rất phụ) hoặc brand-400 (nút thường). */
     .tool-btn { @apply inline-flex items-center gap-1.5 rounded-md border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-body font-semibold text-cream-200 transition hover:border-ink-500 hover:bg-ink-700 disabled:opacity-40; }
-    .tool-btn.is-active { @apply border-brand-500/70 bg-brand-600/20 text-brand-200 hover:bg-brand-600/30; }
+    /* "Đang chọn" = border-brand-500 — ĐÚNG token của §5.1. Trước đây dùng border-brand-500/70 nên trên
+       CÙNG một màn hình có hai kiểu viền cho cùng một trạng thái (thẻ hướng /100, nút /70). */
+    .tool-btn.is-active { @apply border-brand-500 bg-brand-600/20 text-brand-200 hover:bg-brand-600/30; }
     /* Nút icon vuông chuẩn (mọi chrome studio) */
     .icon-btn { @apply grid h-7 w-7 shrink-0 place-items-center rounded text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-30; }
     /* Header chuẩn của panel/card trong workspace */

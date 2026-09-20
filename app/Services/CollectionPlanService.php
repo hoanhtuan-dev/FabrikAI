@@ -37,6 +37,16 @@ class CollectionPlanService
         'fixed_cost' => 0,              // chi phí cố định của cả bộ (mẫu, rập, chụp ảnh…)
     ];
 
+    /**
+     * Khổ vải mà bảng định mức dưới đây được đo Ở ĐÓ. Người dùng đổi khổ trong Cài đặt ⇒ định mức quy đổi
+     * theo tỉ lệ nghịch (khổ rộng gấp rưỡi thì số mét cho cùng chi tiết giảm còn hai phần ba).
+     *
+     * Vì sao phải quy đổi: trước đây "Khổ vải" được NHẬP, được HIỂN THỊ, có gợi ý "dùng để tính định mức"…
+     * nhưng KHÔNG tham gia công thức nào — đổi 150cm → 180cm mà số mét vải và giá vốn đứng yên, tức là chủ
+     * xưởng ra quyết định mua vải trên con số sai.
+     */
+    private const REFERENCE_FABRIC_WIDTH_CM = 150;
+
     /** Định mức vải tham chiếu (mét/cái ở size M, khổ 1m50). */
     private const FABRIC_M = [
         'Áo / blouse' => 1.55,
@@ -135,7 +145,7 @@ class CollectionPlanService
             'cut_lines' => $lines,
             'totals' => $totals,
             'waves' => $this->waves($lines, $a),
-            'size_chart' => $this->sizeChart($categories, $sizes, $lines),
+            'size_chart' => $this->sizeChart($categories, $sizes, $lines, $a),
             'selling' => $this->sellingScenarios($lines, $a, $priceBand),
             'price_check' => $this->priceCheck($lines, $priceBand),
             'notes' => $this->notes($a, $lines, $this->priceCheck($lines, $priceBand)),
@@ -187,7 +197,9 @@ class CollectionPlanService
     {
         $factor = self::SIZE_FACTOR[$size] ?? 1.0;
         $baseM = self::FABRIC_M[$category] ?? 1.5;
-        $perUnit = round($baseM * $factor * (1 + $a['wastage_pct'] / 100), 2);
+        // Quy đổi theo KHỔ VẢI người dùng nhập: khổ rộng hơn ⇒ ít mét hơn cho cùng chi tiết.
+        $widthFactor = self::REFERENCE_FABRIC_WIDTH_CM / max(60, (float) $a['fabric_width_cm']);
+        $perUnit = round($baseM * $factor * $widthFactor * (1 + $a['wastage_pct'] / 100), 2);
         $fabricM = round($perUnit * $qty, 2);
 
         $defect = 1 + $a['defect_pct'] / 100;
@@ -232,7 +244,12 @@ class CollectionPlanService
         $fabricM = array_sum(array_column($lines, 'fabric_m_total'));
         $cost = array_sum(array_column($lines, 'cost_total_vnd'));
         $revenue = array_sum(array_column($lines, 'revenue_vnd'));
+        // MỘT định nghĩa, HAI con số nói rõ tên: lợi nhuận TRƯỚC chi phí cố định (theo từng cái) và SAU khi
+        // trừ chi phí cố định của cả bộ. Trước đây phần tổng trả số "trước" còn bảng kịch bản bán trả số
+        // "sau" mà không nhãn nào phân biệt ⇒ đọc hai chỗ ra hai con số lợi nhuận khác nhau.
         $profit = $revenue - $cost;
+        $fixedCost = (int) ($a['fixed_cost'] ?? 0);
+        $profitAfterFixed = $profit - $fixedCost;
         $order = (int) (ceil(($fabricM * (1 + $a['fabric_safety_pct'] / 100)) / 10) * 10);
         $avgUnitCost = $units > 0 ? (int) round($cost / $units) : 0;
         $avgProfit = $units > 0 ? (int) round($profit / $units) : 0;
@@ -245,8 +262,14 @@ class CollectionPlanService
             'fabric_order_cost_vnd' => (int) round($order * $a['fabric_price_per_m']),
             'cost_total_vnd' => (int) $cost,
             'revenue_vnd' => (int) $revenue,
+            // profit_vnd = lợi nhuận gộp TRƯỚC chi phí cố định (giữ tên cũ để không phá nơi đọc cũ), kèm
+            // ngay hai trường nói rõ còn bao nhiêu SAU khi trừ chi phí cố định của cả bộ.
             'profit_vnd' => (int) $profit,
+            'profit_basis' => 'before_fixed_cost',
+            'fixed_cost_vnd' => $fixedCost,
+            'profit_after_fixed_vnd' => (int) $profitAfterFixed,
             'margin_pct' => $revenue > 0 ? round($profit / $revenue * 100, 1) : null,
+            'margin_after_fixed_pct' => $revenue > 0 ? round($profitAfterFixed / $revenue * 100, 1) : null,
             'avg_unit_cost_vnd' => $avgUnitCost,
             'avg_profit_unit_vnd' => $avgProfit,
             'breakeven_units' => ($a['fixed_cost'] > 0 && $avgProfit > 0) ? (int) ceil($a['fixed_cost'] / $avgProfit) : 0,
@@ -296,7 +319,9 @@ class CollectionPlanService
                 'fabric_order_m' => (int) (ceil(($fabric * (1 + $a['fabric_safety_pct'] / 100)) / 10) * 10),
                 'cost_vnd' => $cost,
                 'revenue_vnd' => $revenue,
+                // Giống phần tổng: lợi nhuận gộp TRƯỚC chi phí cố định (kịch bản bán mới là số sau khi trừ).
                 'profit_vnd' => $revenue - $cost,
+                'profit_basis' => 'before_fixed_cost',
                 'days' => $a['daily_capacity'] > 0 ? (int) ceil($units / $a['daily_capacity']) : null,
             ];
         }
@@ -316,7 +341,7 @@ class CollectionPlanService
     }
 
     /** Bảng size số đo tham chiếu cho từng nhóm hàng có rập + số cái cần cắt mỗi size. */
-    private function sizeChart(array $categories, array $sizes, array $lines): array
+    private function sizeChart(array $categories, array $sizes, array $lines, array $a): array
     {
         $planned = [];
         foreach ($lines as $line) {
@@ -347,7 +372,9 @@ class CollectionPlanService
                 'category' => $name,
                 'unit' => 'cm',
                 'rows' => $rows,
-                'note' => 'Số đo THAM CHIẾU dáng nữ VN (khổ vải '.self::DEFAULTS['fabric_width_cm'].'cm). Phải đối chiếu với rập thật của xưởng và cộng độ co của vải trước khi cắt.',
+                // Khổ vải ở đây phải là khổ NGƯỜI DÙNG NHẬP (trước đây in khổ MẶC ĐỊNH ⇒ cùng một phản hồi
+                // mà hai câu nói hai khổ vải khác nhau).
+                'note' => 'Số đo THAM CHIẾU dáng nữ VN (định mức quy đổi theo khổ vải '.$a['fabric_width_cm'].'cm). Phải đối chiếu với rập thật của xưởng và cộng độ co của vải trước khi cắt.',
             ];
         }
 
@@ -358,7 +385,10 @@ class CollectionPlanService
     private function sellingScenarios(array $lines, array $a, array $priceBand): array
     {
         $units = array_sum(array_column($lines, 'qty'));
-        $cost = array_sum(array_column($lines, 'cost_total_vnd')) + (int) $a['fixed_cost'];
+        // Kịch bản bán trừ CẢ chi phí cố định (đây là số tiền thật còn lại sau cả bộ) — khác với lợi nhuận
+        // gộp ở phần tổng. Mỗi kịch bản tự khai basis để giao diện không phải đoán.
+        $variableCost = array_sum(array_column($lines, 'cost_total_vnd'));
+        $cost = $variableCost + (int) $a['fixed_cost'];
         if ($units === 0) {
             return [];
         }
@@ -376,6 +406,8 @@ class CollectionPlanService
                 'net_unit_vnd' => $net,
                 'revenue_vnd' => $revenue,
                 'profit_vnd' => $profit,
+                'profit_basis' => 'after_fixed_cost',
+                'fixed_cost_vnd' => (int) $a['fixed_cost'],
                 'margin_pct' => $revenue > 0 ? round($profit / $revenue * 100, 1) : null,
                 'breakeven_units' => $this->breakeven($cost, $net, $this->avgUnitCost($lines)),
                 'label' => $price === $min ? 'Giá sàn (dễ bán nhất)' : ($price === $max ? 'Giá trần (lãi tốt nhất)' : 'Giá mục tiêu'),
@@ -486,14 +518,16 @@ class CollectionPlanService
         $notes = [
             ($priceCheck['message'] ?? '') !== '' ? 'Đối chiếu giá: '.$priceCheck['message'] : null,
             'Mọi đơn giá/định mức ở đây là GIẢ ĐỊNH bạn nhập — sửa được ngay trên màn hình và kế hoạch tính lại tức thì.',
-            'Định mức vải là số tham chiếu theo khổ '.$a['fabric_width_cm'].'cm; vải sọc/họa tiết hoa văn cần cộng thêm 10–20%.',
+            'Định mức vải quy đổi theo khổ '.$a['fabric_width_cm'].'cm bạn nhập (khổ rộng hơn ⇒ ít mét hơn); vải sọc/họa tiết hoa văn cần cộng thêm 10–20%.',
+            // MỘT câu nói rõ hai con số lợi nhuận khác nhau ở đâu — nếu không, chủ xưởng đọc hai chỗ ra hai số.
+            'Lợi nhuận ở phần TỔNG là trước chi phí cố định; bảng kịch bản bán đã trừ chi phí cố định của cả bộ.',
             'Đợt 2 và đợt 3 nên chốt lại theo số bán THẬT của đợt 1, không nên cắt đủ ngay từ đầu.',
         ];
         if ($a['channel_discount_pct'] > 0) {
             $notes[] = 'Lãi đã trừ chiết khấu kênh bán '.$a['channel_discount_pct'].'%.';
         }
         if ($a['fixed_cost'] > 0) {
-            $notes[] = 'Đã tính '.number_format($a['fixed_cost']).'đ chi phí cố định vào vốn và điểm hoà vốn.';
+            $notes[] = 'Đã tính '.number_format($a['fixed_cost']).'đ chi phí cố định vào vốn, điểm hoà vốn và bảng kịch bản bán.';
         }
         if ($lines === []) {
             $notes[] = 'Chưa có dòng cắt nào — kiểm tra lại số lượng mỗi mã và bảng size.';

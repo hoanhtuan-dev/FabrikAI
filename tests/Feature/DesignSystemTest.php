@@ -229,6 +229,32 @@ class DesignSystemTest extends TestCase
             $css, 'Nút nghỉ của .tool-btn phải là border-ink-600 — lệch với nút viết tay là hai nút cạnh nhau khác viền.');
         $this->assertStringNotContainsString('rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1.5',
             $css, 'Đã quay lại viền nghỉ border-ink-700 cho .tool-btn.');
+
+        /* [Đợt 31 — 2026-09-23] TỪ VỰNG PHẢI ĐÓNG CẢ Ở LỚP CSS.
+           Lỗ thật: test chỉ quét file .vue, nên token viền khai trong app.css thoát khỏi từ vựng —
+           '.tool-btn.is-active' dùng border-brand-500/70 trong khi thẻ hướng dùng border-brand-500,
+           tức là CÙNG trạng thái "đang chọn" mà hai kiểu viền trên một màn hình. Nay quét cả app.css. */
+        // Ở lớp CSS có thêm hai token hợp lệ KHÔNG thuộc bảng "viền nút": khối CHỨA dùng border-ink-700
+        // (§5.1) và ô NHẬP dùng focus:border-brand-400. Cạnh viền thuần (border-l, border-r-0…) không có
+        // màu nên không tính.
+        $cssAllowed = $allowed + ['border-ink-700' => true, 'focus:border-brand-400' => true];
+        preg_match_all('/@apply[^;]*/', $css, $applies);
+        $cssViolations = [];
+        foreach ($applies[0] as $apply) {
+            preg_match_all('/(?:[a-z-]+:)*!?border(?:-(?!dashed|solid)[a-z0-9\/\[\]#._-]+)?/', $apply, $found);
+            foreach ($found[0] as $token) {
+                $token = str_replace('!', '', $token);
+                if ($token === 'border' || isset($cssAllowed[$token])) {
+                    continue;
+                }
+                if (preg_match('/^border-[ltrbxy](-\d+)?$/', $token)) {
+                    continue;   // cạnh viền không màu: không thuộc bảng token màu
+                }
+                $cssViolations[] = $token;
+            }
+        }
+        $this->assertSame([], array_values(array_unique($cssViolations)),
+            'Lớp CSS dùng token viền NGOÀI từ vựng §5.1 (đây là lỗ đã để lọt border-brand-500/70).');
     }
 
     /**
