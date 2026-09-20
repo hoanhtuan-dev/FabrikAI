@@ -1674,7 +1674,7 @@ bất biến: *shell nào gọi `store.toast()` thì phải render `<Notificatio
 
 ## Phiên 2026-09-23 (Đợt 22 — AGENT STUDIO: khả năng truy cập internet (đo thật) + DNA thương hiệu sửa được)
 
-**Deploy:** `601520e → <commit>`. **Migration mới:** `2026_09_23_000003_create_brand_dna_table`. **Route mới:** `GET/PUT/DELETE /api/brand-dna` · `GET /api/design-agent/web-access` · lệnh `php artisan studio:web-access`.
+**Deploy:** `601520e → 1f4b576`. **Migration mới:** `2026_09_23_000003_create_brand_dna_table`. **Route mới:** `GET/PUT/DELETE /api/brand-dna` · `GET /api/design-agent/web-access` · lệnh `php artisan studio:web-access`.
 
 ### 0. Câu hỏi người dùng và sự thật đo được
 
@@ -1733,7 +1733,7 @@ Trước đây: đếm project/generation + dò từ khoá trong `generations.pr
 
 | Kiểm tra | Kết quả |
 |---|---|
-| HEAD | `<commit>` (trước pull: `601520e`) |
+| HEAD | `1f4b576` (trước pull: `601520e`) |
 | Migration | `2026_09_23_000003_create_brand_dna_table` → **Ran** |
 | Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` → exit=0 |
 | md5 asset | khớp bản build ở máy |
