@@ -437,4 +437,55 @@ class BrandDnaTest extends TestCase
                 && str_contains($body, 'avoid');
         });
     }
+
+    /** Khối `model` của CẢ HAI agent phải nói được lần chạy đó có tìm kiếm web hay không. */
+    public function test_both_agents_expose_the_web_search_flag(): void
+    {
+        \App\Models\StudioProvider::create([
+            'slug' => 'gw-search', 'name' => 'Gateway có tìm kiếm', 'protocol' => 'openai',
+            'base_url' => 'https://search.example/v1', 'auth_style' => 'bearer',
+            'search_param' => 'enable_search', 'api_key_ref' => 'gw-search', 'priority' => 9, 'enabled' => true,
+        ]);
+        \App\Models\StudioApiKey::create([
+            'provider' => 'gw-search', 'label' => 'gw-search', 'value' => 'sk-x',
+            'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+        ]);
+        \App\Models\StudioModel::create([
+            'group' => 'prompt', 'name' => 'Model có tìm kiếm', 'provider' => 'gw-search',
+            'model_id' => 'co-search', 'api_key_ref' => 'gw-search', 'priority' => 9, 'enabled' => true,
+        ]);
+        set_setting('studio_task_prompt_model', 'gw-search:co-search');
+        Cache::flush();
+
+        // Phải trả ĐỦ 5 hướng trở lên: ít hơn thì normalizeDirections() coi là hỏng và quay về engine tất định
+        // (khi đó khối model là của chế độ rule — đúng thiết kế, nhưng không đo được cờ web_search của AI).
+        $directions = [];
+        for ($i = 1; $i <= 6; $i++) {
+            $directions[] = ['title' => 'Hướng AI '.$i, 'thesis' => 't', 'why_now' => 'w', 'action' => 'a', 'risk' => 'r', 'price_band' => 'mid'];
+        }
+
+        Http::fake([
+            'search.example/*' => Http::response(['choices' => [['message' => ['content' => json_encode(
+                ['directions' => $directions],
+                JSON_UNESCAPED_UNICODE,
+            )]]]], 200),
+        ]);
+
+        // TrendRadar: khoá nằm trong khối model.
+        $radar = app(DesignAgentService::class)->radar($this->customer(), 'hcm', true);
+        $this->assertTrue($radar['model']['web_search'], 'Radar phải nói lần chạy này CÓ tìm kiếm web.');
+
+        Http::fake([
+            'search.example/*' => Http::response(['choices' => [['message' => ['content' => json_encode([
+                'narrative' => 'DNA thương hiệu', 'brief' => 'Brief cho xưởng', 'prompt_vi' => 'vi', 'prompt_en' => 'en',
+                'moodboard_captions' => array_fill(0, 24, 'caption'), 'category_rationale' => [], 'outfit_goals' => [],
+                'next_steps' => ['a', 'b', 'c'],
+            ], JSON_UNESCAPED_UNICODE)]]]], 200),
+        ]);
+
+        // CollectionBot: TRƯỚC ĐÂY cờ này là khoá RỜI nên không bao giờ tới được client — nay nằm trong model.
+        $brief = app(DesignAgentService::class)->collectionBrief(['prompt' => 'đầm linen'], $this->customer(), true);
+        $this->assertArrayHasKey('web_search', $brief['model']);
+        $this->assertTrue($brief['model']['web_search']);
+    }
 }

@@ -431,7 +431,7 @@ class DesignAgentService
         if ($answer === null) {
             logger()->warning('TrendRadar: model không trả về nội dung, dùng engine tất định', ['group' => self::AI_GROUP, 'attempted' => $attempted]);
 
-            return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts']])];
+            return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch])];
         }
 
         $directions = $this->normalizeDirections($call['json'], $trends, $ruleDirections);
@@ -449,7 +449,7 @@ class DesignAgentService
                 'raw' => substr($answer['text'], 0, 800),
             ]);
 
-            return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts']])];
+            return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch])];
         }
 
         Cache::put($cacheKey, [
@@ -614,7 +614,7 @@ class DesignAgentService
         if ($answer === null) {
             logger()->warning('CollectionBot: model không trả về nội dung, dùng engine tất định', ['attempted' => $attempted]);
 
-            return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts']]), 'data' => null];
+            return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch]), 'data' => null];
         }
 
         $data = $this->normalizeAiBrief($call['json']);
@@ -630,7 +630,7 @@ class DesignAgentService
                 'raw' => substr($answer['text'], 0, 800),
             ]);
 
-            return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts']]), 'data' => null];
+            return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch]), 'data' => null];
         }
 
         return [
@@ -639,9 +639,11 @@ class DesignAgentService
                 'model' => $answer['model'],
                 'latency_ms' => $latency,
                 'attempts' => $call['attempts'],
+                // `web_search` nằm TRONG khối model (không phải khoá rời) — giao diện và văn bản hỗ trợ đều
+                // đọc `model.web_search`; để rời thì nó không bao giờ tới được client.
+                'web_search' => $webSearch,
             ]),
             'data' => $data,
-            'web_search' => $webSearch,
         ];
     }
 

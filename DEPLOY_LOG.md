@@ -1805,3 +1805,65 @@ Kết quả đo có thêm khối `task_groups`: 5 nhóm công việc (`prompt` �
 **Test:** full suite **884 test / 6.516 assert XANH** · `npm run build` exit 0.
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
+
+## Phiên 2026-09-23 (Đợt 24 — KIỂM CHỨNG "Tín hiệu thị trường · Định hướng" CHẠY THẬT bằng key DeepSeek trên production)
+
+**Câu hỏi:** *"Tín hiệu thị trường | định hướng chạy được chưa? đã có key và model deepseek."*
+
+**Trả lời: CHẠY ĐƯỢC — cả hai agent đều đã gọi model thật trên production.** Số đo bên dưới lấy từ một lần chạy thật trên máy chủ (xoá cache radar trước khi chạy để CHẮC CHẮN có lời gọi model).
+
+### 1. Cấu hình đọc từ Cài đặt (production)
+
+| Nhóm | Candidate dùng được |
+|---|---|
+| `prompt` (suy luận & viết nội dung — cả hai agent dùng nhóm này) | **3**: `deepseek:deepseek-flash` · `deepseek:deepseek-chat` · `deepseek:deepseek-reasoner` (mỗi model 1 key đang bật) |
+| `vision` (đọc ảnh) | **1**: `deepseek:deepseek-flash` |
+| `image` (tạo ảnh) | **0** — đã gán 3 model nhưng chưa có key ⇒ đúng như bạn nói: **chờ cài đặt key sau** |
+
+### 2. Tín hiệu thị trường (TrendRadar)
+
+| Chỉ số | Kết quả thật |
+|---|---|
+| engine | **`ai-v1`** |
+| model | `deepseek:deepseek-flash` (mode=**ai**) |
+| cache | `cached=false` (đã xoá cache trước khi chạy) |
+| độ trễ model | **33.597 ms** (tổng 33,6 s) |
+| số định hướng | **8** |
+| tìm kiếm web | `false` (DeepSeek không có tìm kiếm — đúng như thiết kế) |
+| AI có thật sự viết? | **CÓ** — so với bản tất định (`ai=false`): **khác nhau** ⇒ nội dung do model viết, không phải engine quy tắc |
+| ví dụ | *"Linen thoáng cho mùa nóng Đà Nẵng"* |
+
+### 3. Định hướng (CollectionBot)
+
+| Chỉ số | Kết quả thật |
+|---|---|
+| engine | **`ai-v1`** · `deepseek:deepseek-flash` |
+| độ trễ model | **27.876 ms** |
+| `ai_applied` | `{narrative:✓, brief:✓, moodboard_captions:24, category_rationale:4, outfit_goals:3, prompts:✓, next_steps:✓}` |
+| narrative | *"Vì shop chưa khai DNA chính chủ, hệ thống đang tạm dùng DNA mặc định và xem đây là phỏng đoán…"* |
+| brief | *"Xưởng nhận bộ 12 SKU: 5 áo/blouse, 3 quần, 2 váy, 2 phụ kiện. Chất liệu chủ lực là linen và cotton dệt thoáng…"* |
+| prompt ảnh (EN) | *"Editorial summer lookbook for a minimalist office linen dress collection: soft natural window light from the left…"* |
+| next_steps | 3 việc, có số cụ thể (6 mã màu · 24 ô moodboard · dải giá 550.000–1.200.000đ · tỉ lệ size 20/35/30/15) |
+
+> Chi tiết đáng chú ý: câu narrative **tự nói ra** rằng shop chưa khai DNA nên đang dùng bản phỏng đoán — đúng luật §18.1 (DNA do người dùng khai tách khỏi phần suy ra). Điền **bước 0 "DNA shop"** là hết phỏng đoán.
+
+### 4. Lỗi cũ đã hết
+
+Nhật ký production trước đây (2026-09-19/20) có các dòng **thất bại**:
+`TrendRadar: model trả về định hướng không hợp lệ {"finish_reason":"length","reasoning_only":true}` ·
+`CollectionBot: model trả về JSON không dùng được {"raw":"We need answer only JSON object…"}`
+— model suy luận tiêu hết ngân sách token trước khi viết JSON. Nay **không còn dòng nào**: lần chạy hôm nay không sinh cảnh báo nào, và thang thử-lại-với-ngân-sách-lớn-hơn đã xử lý đúng ca đó (bộ đếm `lần gọi đầu chưa đọc được JSON` = **0**).
+
+### 5. Sửa nhỏ kèm theo
+
+Cờ `web_search` của đường **brief** là khoá **RỜI** trong `aiBrief()` nên **không bao giờ tới được client** (radar thì đặt trong khối `model`). Đã dời vào khối `model` và bổ sung cho **cả nhánh quay-về-tất-định** (model_error · invalid_output) ⇒ giao diện luôn đọc được `model.web_search` ở cả hai agent. Test mới khoá điều này.
+
+### 6. Kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Test mới | `test_both_agents_expose_the_web_search_flag` — cả TrendRadar và CollectionBot đều trả `model.web_search` |
+| Full suite | **885 test / 6.532 assert XANH** |
+| Production | `engine=ai-v1` cho cả hai agent · không cảnh báo mới trong `storage/logs/laravel.log` · `production.ERROR` vẫn **9** |
+
+**Kết luận cho người dùng:** Tín hiệu thị trường và Định hướng **đã chạy thật bằng DeepSeek**. Hai điều cần biết: (1) mỗi lần chạy mất **~28–34 giây** (model `deepseek-flash`; radar có cache 10 phút theo vùng nên lần xem lại là tức thì); (2) chúng **không có nguồn internet** — muốn dẫn nguồn thật thì phải chọn một model/nhà cung cấp có tìm kiếm trong Cài đặt, hoặc khai tham số tìm kiếm cho Custom Provider (§18.2). Nhóm **tạo ảnh** vẫn chờ key.
