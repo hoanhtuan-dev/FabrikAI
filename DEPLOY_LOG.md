@@ -1485,3 +1485,96 @@ Khối chọn giao diện dùng **chính** các tiện ích mới (`bg-base-100/
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)**: app là SPA, tab đang mở giữ JS cũ nên deploy không tự cập nhật
 > (bài học đã ghi ở §14 luật 9). Không tải lại thì vẫn thấy giao diện cũ.
+
+## Phiên 2026-09-23 (Đợt 20 — MỘT bề mặt card + CỠ CHỮ toàn cục có cài đặt + dọn nốt 6 việc nợ §17.2)
+
+**Deploy:** `ecad512 → 1adb8c4 → 1e788bd` (commit sau là bản vá tương phản ở §5).
+**Migration mới:** `2026_09_23_000002_add_font_scale_to_users_table` — đã chạy trên production (`[17] Ran`).
+**Asset:** `app-D2xkPapV.css` → **`app-BqkNcUCi.css`** · `main-DWaw49h2.js` · `useTheme-BhVigILK.js`.
+
+### 1. "Mọi card từ nay chung một màu (theo màu theme)"
+
+| Trước | Sau |
+|---|---|
+| **9 card có gradient nhận diện riêng** (xanh · tím · cam · xanh dương…) | **0** — chỗ duy nhất còn `linear-gradient` là hiệu ứng **TẢI** (skeleton), không phải bề mặt card |
+| Card tự khai nền bằng `style="background: linear-gradient(…)"` | Không còn chỗ nào (`DesignSystemTest::test_every_card_uses_the_one_shared_surface` giữ luật này) |
+| Mỗi card một sắc thái riêng | **MỘT** bề mặt: lớp `.card` = `bg-ink-800` = `base-100` của theme (đổi theo Sáng/Tối) |
+
+Số đo trong Chrome thật (trang Studio): `soCard=2 · soNenKhacNhau=1 · soGradient=0`.
+
+### 2. "Tỷ lệ chữ hơi nhỏ → tăng nhẹ + thêm cài đặt cỡ chữ toàn cục"
+
+Thang chữ nay là **6 token theo VAI**, mỗi bậc **+1 px** so với bản trước: `--text-micro 9 · --text-tiny 10 · --text-label 11 · --text-body 12,5 · --text-body-lg 13 · --text-title 14` px — **tất cả nhân `var(--font-scale)`**; các bậc rem (`--text-xs…--text-3xl`) cũng nhân theo nên không còn chỗ nào đứng ngoài công tắc.
+
+Đo bằng Chrome thật (trang Studio, cùng một card):
+
+| Mức người dùng chọn | `--font-scale` | Tiêu đề card | Mô tả trong card | Nhãn nút |
+|---|---|---|---|---|
+| Nhỏ gọn — 90% | 0,9 | 14,4 px | 10,8 px | 9,9 px |
+| Vừa — 100% (**mặc định mới**, đã to hơn bản trước) | 1 | 16 px | 12 px | 11 px |
+| Lớn — 115% | 1,15 | 18,4 px | 13,8 px | 12,7 px |
+| Rất lớn — 130% | 1,3 | 20,8 px | 15,6 px | 14,3 px |
+
+- Lưu **theo tài khoản** (`users.font_scale`, whitelist máy chủ 90/100/115/130) qua `PUT /api/appearance` — **cùng một endpoint** với theme, không thêm đường dữ liệu thứ hai.
+- **Render sẵn ở server**: `<html style="--font-scale: 1.3">` ⇒ tải lại trang không nháy cỡ chữ (đo được: sau khi tải lại vẫn `--font-scale: 1.3`).
+- Đường vào: bánh răng → **"Giao diện (Sáng · Tối · Theo máy)"** → mục **Cỡ chữ** (4 mức, có chữ "Aa" xem trước), hoặc chip đổi nhanh ở thanh trạng thái.
+
+### 3. Sáu việc nợ trong §17.2 — nay đã làm (5/6) hoặc có lý do rõ
+
+| # | Việc | Đã làm gì | Bằng chứng |
+|---|---|---|---|
+| 1 | Card «Gợi ý từ ảnh» chưa cho chọn ảnh nguồn | Nút **"Chọn ảnh nguồn từ Thư viện"** ngay trong card + `<SourceLibraryPicker v-model="pickerOpen" mode="pick">`; chọn xong gán thẳng `store.upscaleSrc` | Chrome thật: bấm nút ⇒ mở hộp thoại `aria-label="Chọn từ thư viện"` |
+| 2 | Mã tra cứu lỗi cho tổng đài | `studio_error_code()` sinh mã `L-XXXX` (bảng chữ **không có** 0/O/1/I); `studio_fail()` ghi log `studio_fail[L-…]: ctx` và trả `error_code` trong payload; giao diện hiện **"(mã tra cứu: L-…)"** | `StudioDebtFixTest`: mã đúng dạng, có trong log, không lộ chi tiết kỹ thuật |
+| 3 | Preset tên file theo kênh bán | `export_channels()` (mặc định · Shopee · Lazada · TikTok Shop · catalogue · gửi xưởng) + ô chọn trong hộp xuất gói ở **cả** Bộ sưu tập lẫn thẻ; tên ảnh `anh/shopee-01-….jpg`; `manifest.json` thêm trường `channel`; máy chủ kiểm lại ⇒ **422** nếu kênh lạ | Chrome thật: hộp "Xuất gói cho xưởng" có ô **KÊNH BÁN (ĐẶT TÊN FILE TRONG GÓI)** 6 lựa chọn, chọn Shopee được; `ProjectExportTest` + test 422 |
+| 4 | Khách bấm "Duyệt" thì bộ sưu tập tự chuyển trạng thái | `ProjectShareController::submitFeedback()` đi qua `ProjectWorkflowService::canTransition/transition` với chủ dự án làm actor; bị từ chối thì **ghi lý do vào log** | `StudioDebtFixTest`: duyệt ⇒ `approved`; không đủ điều kiện ⇒ giữ nguyên + có log |
+| 5 | Cron `studio:grant-plan-credits` trên hPanel | **Không thể tạo từ SSH** (máy chủ không có lệnh `crontab`) — xem §4 dưới đây để bấm tay | `php artisan studio:grant-plan-credits --dry-run` → `[dry-run] Đã cấp: 0 người · bỏ qua: 1 · tổng credit: 0` |
+| 6 | Báo cáo chi phí theo nhóm | Trang mới **`/bao-cao-nhom`** (chỉ chủ nhóm): gộp theo chủ nhóm + từng ghế, cộng `generations.credits_cost` và đếm ảnh, mốc 7/30/90 ngày, xếp theo credit giảm dần; lối vào ở menu bánh răng | Chrome thật: tiêu đề "Chi phí theo nhóm" · 1 bảng · cột NHÓM (CHỦ NHÓM) · GHẾ · ẢNH · CREDIT · HOẠT ĐỘNG GẦN NHẤT · mốc 7/30/90 ngày |
+
+**`border-white/*` — đã xử lý đúng như yêu cầu:** 48 chỗ ⇒ **11 chỗ**, và **cả 11 chỗ còn lại đều là viền VẼ TRÊN ẢNH** (tay cầm crop ở `StudioApp.vue` và `CanvasMaskTools.vue`, vòng xoay trên nút màu ở `ConceptCard.vue`) — cố ý cố định theo §1.1 quy tắc 5. Mọi chỗ dùng cho **bề mặt giao diện** đã đổi sang token (`border-ink-600`); đo trong mã nguồn: `grep -ro "border-white" resources/js/studio | wc -l` → **11**, `resources/css` → **0**.
+
+### 4. Việc PHẢI bấm tay trên hPanel: cron cấp credit theo chu kỳ gói
+
+Máy chủ Hostinger **không có lệnh `crontab`** (đã kiểm: `command -v crontab` rỗng), cron chỉ tạo được trong **hPanel → Nâng cao → Cron Jobs**.
+
+| Trường trong hPanel | Giá trị |
+|---|---|
+| Lệnh | `php /home/u310846799/domains/fabrikai.shop/artisan studio:grant-plan-credits` |
+| Chu kỳ | **Hằng ngày, 00:10** (lệnh idempotent — chạy trùng vô hại) |
+
+Vì sao chưa gấp: đường **lazy** trong `PlanService` đã cấp credit khi người dùng vào app hoặc khi tạo ảnh (CAS + transaction), nên khách vẫn nhận đủ credit; cron chỉ để cấp cho người **không đăng nhập** trong kỳ.
+
+### 5. Bản vá tương phản tìm thêm được trong đợt này (commit `1e788bd`)
+
+Khi đo lại bằng Chrome thật, phép đo cũ **sai âm thầm**: Tailwind v4 phát màu dạng `oklab(0.489 -0.081 0.032 / 0.2)`, đọc chuỗi đó bằng biểu thức số rồi coi là RGB cho ra **"14 chỗ dưới AA" không tồn tại** — và **che mất 1 chỗ dưới AA có thật**.
+
+Cách đo đúng (đã dùng): nạp màu vào `ctx.fillStyle` → `getImageData` để lấy sRGB, rồi **hợp alpha theo cả cây tổ tiên**.
+
+| | Trước | Sau |
+|---|---|---|
+| Chỗ dưới AA (10 tổ hợp: 5 màn hình × 2 theme) | **1** — nhãn mô tả `text-cream-400` trên hàng đang chọn, **4,46:1** (cần 4,5:1). Nền tint `bg-brand-600/20` làm nền tối đi | **0** |
+| `--color-cream-400` (theme Sáng) | `#59646f` — 6,04:1 trên nền trắng nhưng **4,46:1** trên nền tint | **`#525c67`** — **4,97:1** trên nền tint · **6,81:1** trên nền trắng |
+
+Phần tử **bỏ qua** khi đo (nền là gradient ảnh/khung canvas, không phải bề mặt phẳng): **56** ở trang Studio, **24** ở Bộ sưu tập — nêu ra để không ai đọc "0 chỗ dưới AA" thành "đã đo hết mọi thứ".
+
+### 6. Verify production (đã chạy thật)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | **`1e788bd`** (trước pull: `ecad512`) |
+| Migration | `2026_09_23_000002_add_font_scale_to_users_table` → **Ran [17]**; lần chạy lại: `Nothing to migrate` |
+| Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` → **exit=0** |
+| **Bản phục vụ = bản build ở máy** | md5 **trùng cả 3**: CSS `cd3927837b5f1723c7c569619a7d9fbd` · JS `0e848778038938a2b47da38efa7827ea` · `useTheme` `e3dadeb2d5d1accef5474daf769125de` |
+| Asset trả về | `/build/assets/app-BqkNcUCi.css` · `main-DWaw49h2.js` · `useTheme-BhVigILK.js` → **200** |
+| Trang | `/` · `/dang-nhap` · `/bang-gia` → **200**; `/cai-dat/appearance` · `/bao-cao-nhom` · `/he-thong-thiet-ke` · `/bo-suu-tap` → **302** (khách chưa đăng nhập ⇒ route có thật); `/api/appearance` → **405** khi GET (chỉ nhận PUT) |
+| Cỡ chữ render sẵn | HTML máy chủ trả về có `style="--font-scale: 1"` trên `<html>` |
+| Log · hàng đợi | `production.ERROR` vẫn **9** (0 lỗi mới; mới nhất 2026-09-20) · `failed_jobs` = **0** |
+
+### 7. Bài học (đã thành luật §14)
+
+- **Luật 45:** đo màu bằng chuỗi là đo sai âm thầm — phải để **trình duyệt** giải màu (`fillStyle` + `getImageData`) và **hợp alpha theo cây tổ tiên**. Phép đo sai vừa báo lỗi không có thật, vừa **che** lỗi có thật.
+- **Luật 46:** bậc chữ **mờ nhất** phải đo cả trên **nền TINT** (hàng đang chọn/đang bật) — nền tint làm nền tối đi nên đó là nơi dễ dưới AA nhất.
+
+**Test:** full suite **854 test / 6.342 assert XANH** · `npm run build` exit 0.
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)**: app là SPA, tab đang mở giữ JS cũ nên deploy không tự cập nhật
+> (§14 luật 9). Không tải lại thì vẫn thấy giao diện và cỡ chữ cũ.

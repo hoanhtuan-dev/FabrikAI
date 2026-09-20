@@ -712,6 +712,16 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 44. **Mỗi card một màu = người dùng phải học lại từng card.** 9 gradient nhận diện riêng (xanh · tím ·
     cam · xanh dương…) trông "có cá tính" nhưng phá đúng mục tiêu của tài liệu này: học MỘT lần, dùng mọi
     card. Sắc thái riêng chỉ nên đến từ DỮ LIỆU (ảnh, màu trạng thái), không từ khung của card.
+45. **Đo màu bằng chuỗi là đo SAI âm thầm — phải để TRÌNH DUYỆT giải màu.** Tailwind v4 phát màu dạng
+    `oklab(0.489 -0.081 0.032 / 0.2)`; đọc chuỗi đó bằng biểu thức số rồi coi là RGB cho ra một bảng
+    "14 chỗ dưới AA" **hoàn toàn không tồn tại** — và che mất một chỗ dưới AA **có thật**. Cách đo đúng:
+    nạp màu vào `ctx.fillStyle` → `fillRect` → `getImageData` để lấy sRGB, rồi **hợp alpha (composite)
+    theo cả cây tổ tiên** chứ không lấy nền của phần tử gần nhất. (Bài học 4 nhắc lại: test đỏ chưa chắc
+    sản phẩm sai — nhưng số đo sai thì cũng chưa chắc sản phẩm đúng.)
+46. **Bậc chữ MỜ NHẤT phải đo cả trên NỀN TINT, không chỉ nền phẳng.** `cream-400` của theme Sáng đạt
+    6,04:1 trên nền trắng nhưng chỉ **4,46:1** khi nằm trên hàng đang chọn (`bg-brand-600/20`) — nền tint
+    làm nền tối đi. Trạng thái "đang chọn/đang bật" là nơi chữ mờ nhất hay xuất hiện nhất, nên nó phải
+    nằm trong bộ đo tương phản bắt buộc.
 
 ### E. Quy trình và kiểm thử
 
@@ -787,7 +797,7 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 
 ---
 
-## 16. Lịch sử triển khai — 21 vòng, mỗi vòng có số đo
+## 16. Lịch sử triển khai — 27 vòng, mỗi vòng có số đo
 
 > Bảng này là **bản ghi rút gọn** của các vòng đã làm. Bản đầy đủ (bối cảnh, bằng chứng từng bước, bài
 > học chi tiết) nằm trong lịch sử git của `docs/UX_PERSONA_STRATEGY.md` — tài liệu đó đã được hợp nhất
@@ -817,14 +827,12 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 | 20 | 2026-09-22 | **30 biến thể viền** cho ~8 nghĩa trên nút toàn Studio | Từ vựng ĐÓNG 16 token (§5) · `.tool-btn` và badge về cùng quy ước `/40` | 26 file · 134 chỗ thay thế · CSS gửi cho khách **−1,64 kB** (166,25 → 164,61) |
 | 21 | 2026-09-22 | Giao diện **nói với lập trình viên**: lộ nguyên văn lỗi nhà cung cấp, tên model, lệnh CLI | Ba tầng chặn (§6): PHP · cửa chặn ở biên `toast/notify` · state dùng `userFacingError()` (14 chỗ) · gỡ chip "DeepSeek · deepseek-chat" | `UserFacingMessagesTest` + `SuggestStreamTest` · 6 phép đột biến ĐỎ đúng chỗ |
 | 22 | 2026-09-23 | **Chữ dùng ĐỘ MỜ để tạo bậc ⇒ khó đọc**: 741 chỗ `text-cream-300/NN`, trong đó `/40` ≈ **2,9:1** (WCAG AA cần 4,5:1); app chỉ có MỘT giao diện (tối) và không cài đặt được | **4 bậc nội dung ĐẶC** + token trạng thái ngữ nghĩa · **theme Sáng/Tối** (hai dải token đảo vai, script chạy TRƯỚC khi vẽ, lưu theo tài khoản qua `users.theme` + `PUT /api/theme`) · mục **Giao diện** ở Cài đặt + nút đổi nhanh ở thanh trạng thái Studio | 50 file dọn màu (741 chỗ opacity + 345 chỗ sắc độ trạng thái) · mọi bậc chữ **6,7–18,3 : 1** · Chrome thật: 4 màn hình × 2 theme, **2.578 phần tử chữ/theme — 0 chỗ dưới AA** · CSS build **164,61 → 155,33 kB** (−9,3 kB) · 11 test mới (`ThemeSystemTest` 10 + 1 ở `CanvasControlsTest`) · icon 129 → **132** |
-
 | 23 | 2026-09-23 | **6 test đỏ tồn đọng** ở HEAD (Bộ sưu tập · Duyệt mẫu · a11y lớp phủ · chuyển động hover) + **5 món nợ** đã ghi trong DEPLOY_LOG | Sửa **SẢN PHẨM** ở chỗ là lỗi thật: 4 lớp phủ thiếu `role/aria-modal` · 2 bề mặt hover thiếu nhịp · state `reviewErrors` chết (nay hiện lỗi **từng ảnh kèm bước**) · trả lại nút **Xử lý ngay** (`processQueue`) đã mất khi card sidebar thu gọn · gom đường xuất gói về `store.exportProject()` (bỏ 2 bản fetch trùng 26 dòng) · 2 test cập nhật theo **bề mặt thật** | 6 → **0 test đỏ** · emoji **134 → 0** (23 file) · xoá ~115 dòng CSS chết + `.section-title` · `transition-all` 19 → **0** · nền nút 3 kiểu → **1 token** (51 thẻ) · thêm trang **`/he-thong-thiet-ke`** · 10 test mới/ cập nhật |
-
 | 24 | 2026-09-23 | **3 card còn MÀU NHẤN RIÊNG** (emerald: RefImageCard · ConceptCard · InpaintCard) + **12 nút chính bị khoá không nói vì sao** + 2 màn hình có **2 nút chính cùng lúc** | Thiết kế lại 3 card về đúng từ vựng: "đang chọn" = `border-brand-500 + bg-brand-600/20 + ring-brand-500/40` · "khối chứa" = `border-ink-700 + bg-ink-900` · "thành công" = token `ok` · nút chính của Inpaint về gradient thương hiệu · 12 nút khoá có dòng `↳` suy ra từ MỘT computed `blockReason` · hạ "Mở Agent Studio" xuống nút phụ · ẩn thanh CTA khi ở tab Hàng loạt | emerald trong 3 card **26 → 0** · **xoá hẳn danh sách miễn trừ emerald** trong `DesignSystemTest` · 2 test mới/bổ sung · `DesignSystemTest` **9/9 XANH** |
-
 | 25 | 2026-09-23 | Khiếu nại: **"chưa thấy thay đổi giao diện + không thấy cài đặt theme + không thấy ảnh hưởng gì từ theme daisyUI đã đưa"** | Lấy **đúng giá trị màu của theme tham chiếu** (nền xám nguội `#15191e/#191e24/#1d232a` · chữ `#ecf9ff` · trạng thái `#ff627d/#fcb700/#00d390/#00bafe`) + đưa **bộ tên token daisyUI** (`base-100/200/300 · base-content · primary · secondary · accent · neutral · info/success/warning/error + -content`) thành lớp ngữ nghĩa chính, giữ xanh lá làm `primary` · **mở đường vào**: thêm mục "Giao diện (Sáng · Tối · Theo máy)" vào menu Cài đặt trong Studio + đổi nút thanh trạng thái thành **chip có chữ** · khối chọn giao diện dùng chính `bg-base-100/base-200/base-300 text-base-content bg-primary` và nói rõ nguồn bảng màu | nền tối `#17150f → #191e24` · chữ `#f4f2ec → #ecf9ff` · menu bánh răng **4 → 5 mục** · chip trạng thái nay **có chữ "Sáng/Tối"** · Chrome thật: 5 màn hình × 2 theme **0 chỗ dưới AA** · 847 test XANH |
-
 | 26 | 2026-09-23 | Yêu cầu: **mọi card chung một màu** · **chữ hơi nhỏ, thêm cài đặt cỡ chữ** · làm nốt 6 việc còn nợ | Bỏ 9 gradient nhận diện riêng của card · thang cỡ chữ thành **6 token theo vai** (+1px mỗi bậc) + công tắc `--font-scale` (90/100/115/130%, lưu theo tài khoản, render sẵn ở server) · chọn ảnh nguồn NGAY trong card Gợi ý từ ảnh (`SourceLibraryPicker`) · **mã tra cứu lỗi L-XXXX** ở payload + log · **tên file theo kênh bán** (Shopee/Lazada/TikTok/catalogue/xưởng) · **tự chuyển trạng thái** khi khách bấm Duyệt (đi qua đúng whitelist) · trang **/bao-cao-nhom** (chi phí theo nhóm từ bảng generations) · 14 file bỏ viền trắng trên bề mặt | 941 `text-[Npx]` → **0** · 9 → **0** gradient nhận diện · `border-white/*` trên bề mặt **→ 0** · 4 test mới · full suite **XANH** |
+
+| 27 | 2026-09-23 | Đo lại tương phản bằng Chrome thật: phép đo cũ đọc màu `oklab()` như RGB ⇒ **báo 14 chỗ dưới AA không có thật** và **che mất 1 chỗ dưới AA có thật** | Đo lại bằng canvas (`fillStyle` → `getImageData`) + hợp alpha theo cả cây tổ tiên; `--color-cream-400` theme Sáng `#59646f` → **`#525c67`** | Trước: **1 chỗ 4,46:1** (nhãn mô tả trên hàng đang chọn `bg-brand-600/20`) · Sau: **0 chỗ dưới AA** trên **10 tổ hợp** (5 màn hình × 2 theme), 56 phần tử bỏ qua vì nền gradient |
 
 ### 16.1 Số đo trước → sau của cả hành trình
 
@@ -866,7 +874,23 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 > **12 nút chính bị khoá nay có dòng lý do** `↳` · hết cảnh **2 nút chính cùng lúc** (màn hình canvas trống · tab Hàng loạt).
 > Còn nợ duy nhất thuộc nhóm này: các nút bị khoá vì **ĐANG CHẠY** thì cố ý KHÔNG thêm dòng lý do (nhãn nút đã đổi thành "Đang gửi…").
 
-- [ ] `border-white/*` (48 chỗ) là viền vẽ TRÊN ẢNH (tay cầm crop · con trỏ cọ · ô màu trong suốt) — cố ý cố định theo §1.1 quy tắc 5. Nếu có chỗ mới dùng cho BỀ MẶT giao diện thì phải đổi sang `border-cream-50/*`.
+> **Đã dọn tiếp trong đợt 2026-09-23 (Đợt 20)** — xem §16 vòng 27: card dùng CHUNG một bề mặt ·
+> **cỡ chữ toàn cục có cài đặt** (90/100/115/130%) · chọn **ảnh nguồn ngay trong card «Gợi ý từ ảnh»** ·
+> **mã tra cứu lỗi `L-XXXX`** ghi ở cả giao diện và log · **tên file ảnh theo kênh bán** ·
+> **khách bấm "Duyệt" thì bộ sưu tập tự chuyển trạng thái** · **báo cáo chi phí theo nhóm** (`/bao-cao-nhom`) ·
+> **bề mặt giao diện dùng `border-white/*` đã đổi hết sang token** (48 → 11 chỗ, 11 chỗ còn lại đều vẽ TRÊN ẢNH).
+
+- [x] `border-white/*` — 11 chỗ còn lại là viền vẽ TRÊN ẢNH (tay cầm crop · con trỏ cọ · vòng xoay trên nút
+      màu) — cố ý cố định theo §1.1 quy tắc 5. Mọi chỗ dùng cho BỀ MẶT giao diện đã đổi sang `border-ink-600`.
+- [x] Card «Gợi ý từ ảnh» **đã cho chọn ảnh nguồn ngay trong card** (`SourceLibraryPicker`).
+- [x] **Mã tra cứu lỗi** `L-XXXX` **đã có** ở cả giao diện (`(mã tra cứu: L-…)`) và log (`studio_fail[L-…]`).
+- [x] Preset **tên file ảnh theo kênh bán** (`export_channels()` + ô chọn trong hộp xuất gói + `manifest.channel`).
+- [x] Khách bấm "Duyệt" trên trang chia sẻ ⇒ bộ sưu tập **tự chuyển trạng thái** (qua `ProjectWorkflowService`,
+      vẫn ghi lý do vào log khi bị từ chối).
+- [ ] Cron `studio:grant-plan-credits` trên hPanel — **máy chủ KHÔNG có lệnh `crontab`** nên phải bấm tay
+      trong hPanel (lệnh chính xác ghi ở DEPLOY_LOG Đợt 20 §4; đường lazy đã chạy nên chưa gấp).
+- [x] Báo cáo chi phí/tiến độ **theo nhóm** cho chủ doanh nghiệp (`/bao-cao-nhom`).
+- [ ] `error_code` cho lỗi phát sinh CHỈ ở trình duyệt (hiện chỉ lỗi từ máy chủ mới có mã tra cứu).
 - [ ] Card «Gợi ý từ ảnh» chưa cho **chọn ảnh nguồn ngay trong card** (`SourceLibraryPicker` đã có sẵn).
 - [ ] **Mã tra cứu lỗi** cho người dùng đọc cho tổng đài (`L-8F3K`) — ghi ở cả giao diện và log (§6.5).
 - [ ] Preset **tên file ảnh theo kênh bán** (sàn TMĐT/catalogue).
