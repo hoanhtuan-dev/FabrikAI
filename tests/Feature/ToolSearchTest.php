@@ -449,7 +449,131 @@ class ToolSearchTest extends TestCase
         $this->assertSame(1, $report['results']);
         $this->assertNull($report['error'], 'Đã có tin thật thì không được báo lỗi cho cả lượt chạy.');
     }
+
+    // ── (E) CÔNG CỤ TÌM KIẾM CỦA NHÀ CUNG CẤP QUA /responses (2026-09-21) ───
+
+    /** Khai một Custom Provider dùng endpoint /responses kèm công cụ web_search của nhà cung cấp. */
+    private function hostedProvider(string $slug, string $model, array $extra = []): void
+    {
+        $this->model(DesignAgentService::SEARCH_GROUP, $slug, $model, array_merge([
+            'search_mode' => 'responses_web_search',
+            'search_param' => 'web_search',
+        ], $extra));
+    }
+
+    /** Phản hồi /responses: `$searches` mục web_search_call + một message chứa JSON. */
+    private function responsesBody(string $text, int $searches = 1): array
+    {
+        $output = [['type' => 'reasoning', 'id' => 'rs_1']];
+        for ($i = 0; $i < $searches; $i++) {
+            $output[] = [
+                'type' => 'web_search_call', 'id' => 'call_'.$i, 'status' => 'completed',
+                'action' => [
+                    'type' => 'search',
+                    'queries' => ['xu hướng thu đông 2026 '.$i, 'ws_call_id=call_'.$i],
+                    'sources' => [['url' => 'https://bao.example/tin-'.$i]],
+                ],
+            ];
+        }
+        $output[] = ['type' => 'message', 'id' => 'msg_1', 'status' => 'completed', 'content' => [['type' => 'output_text', 'text' => $text]]];
+
+        return ['id' => 'resp_1', 'object' => 'response', 'status' => 'completed', 'output' => $output];
+    }
+
+    /**
+     * Đường /responses: gọi ĐÚNG endpoint, gửi ĐÚNG công cụ, và đếm số lượt tìm THẬT từ phản hồi.
+     * Đây là đường "dùng công cụ tìm kiếm của chính model" — /chat/completions từ chối nó (HTTP 422).
+     */
+    public function test_the_hosted_responses_mode_really_searches(): void
+    {
+        $this->hostedProvider('gw-hosted', 'v4-pro');
+        $this->searchSource();
+
+        $sent = [];
+        Http::fake([
+            'gw-hosted.example/*' => function ($request) use (&$sent) {
+                $sent[] = ['url' => $request->url(), 'body' => json_decode($request->body(), true)];
+
+                return Http::response($this->responsesBody($this->briefJson(), 2), 200);
+            },
+            'news.example/*' => Http::response($this->rss('Không dùng tới', 'https://bao.example/0'), 200),
+        ]);
+
+        $brief = app(DesignAgentService::class)->collectionBrief(['prompt' => 'đầm linen'], $this->customer(), true, true);
+
+        // (1) Đi ĐÚNG endpoint /responses, không phải /chat/completions.
+        $this->assertStringEndsWith('/responses', (string) $sent[0]['url']);
+        // (2) Khai ĐÚNG công cụ của nhà cung cấp + tách phần chỉ dẫn khỏi phần đầu vào.
+        $this->assertSame('web_search', data_get($sent[0]['body'], 'tools.0.type'));
+        $this->assertNotEmpty(data_get($sent[0]['body'], 'instructions'), 'Phần CHỈ DẪN phải đi qua instructions.');
+        $this->assertNotEmpty(data_get($sent[0]['body'], 'input'));
+        $this->assertSame('json_object', data_get($sent[0]['body'], 'text.format.type'), 'Radar/brief cần JSON nên phải khai format.');
+
+        // (3) Số ĐO lấy từ phản hồi: 2 lượt tìm thật, có từ khoá và nguồn.
+        $this->assertSame('ai-v1', $brief['engine']);
+        $this->assertTrue($brief['model']['web_search']);
+        $this->assertSame('hosted', $brief['model']['tool_search']['mode']);
+        $this->assertSame(2, $brief['model']['tool_search']['calls']);
+        $this->assertContains('xu hướng thu đông 2026 0', $brief['model']['tool_search']['queries']);
+        $this->assertContains('https://bao.example/tin-0', $brief['model']['tool_search']['sources']);
+        // Hậu tố nội bộ của gateway KHÔNG được lọt ra như một từ khoá.
+        foreach ($brief['model']['tool_search']['queries'] as $q) {
+            $this->assertStringNotContainsString('ws_call_id', (string) $q);
+        }
+    }
+
+    /**
+     * 🔴 CÁI BẪY: model NHẬN tham số công cụ rồi trả lời trơn tru mà KHÔNG tìm gì.
+     *
+     * Đo thật trên production: cùng `tools:[{type:web_search}]`, model nhỏ trả HTTP 200 và tự BỊA cả tin lẫn
+     * URL. Vì vậy "đã bật tìm kiếm" KHÔNG được suy ra từ việc ta đã gửi tham số — phải đếm web_search_call.
+     */
+    public function test_a_model_that_never_searches_is_not_reported_as_searching(): void
+    {
+        $this->hostedProvider('gw-hosted', 'model-nho');
+        $this->searchSource();
+
+        Http::fake([
+            'gw-hosted.example/*' => Http::response($this->responsesBody($this->briefJson(), 0), 200),
+            'news.example/*' => Http::response($this->rss('Không dùng tới', 'https://bao.example/0'), 200),
+        ]);
+
+        $brief = app(DesignAgentService::class)->collectionBrief(['prompt' => 'đầm linen'], $this->customer(), true, true);
+
+        $this->assertSame('ai-v1', $brief['engine'], 'Model vẫn trả lời được — chỉ là không có tìm kiếm.');
+        $this->assertFalse($brief['model']['web_search'], 'Không có web_search_call nào thì KHÔNG được nói là đã tìm.');
+        $this->assertSame('hosted', $brief['model']['tool_search']['mode']);
+        $this->assertSame(0, $brief['model']['tool_search']['calls']);
+    }
+
+    /** /responses không dùng được (endpoint thiếu/không cho công cụ) ⇒ quay về đường thường, KHÔNG vỡ lượt. */
+    public function test_the_hosted_mode_falls_back_when_the_endpoint_is_unavailable(): void
+    {
+        $this->hostedProvider('gw-hosted', 'v4-pro');
+        $this->searchSource();
+
+        $urls = [];
+        Http::fake([
+            'gw-hosted.example/*' => function ($request) use (&$urls) {
+                $urls[] = $request->url();
+                if (str_contains($request->url(), '/responses')) {
+                    return Http::response(['error' => ['message' => 'unknown url']], 404);
+                }
+
+                return Http::response($this->answerResponse($this->briefJson()), 200);
+            },
+            'news.example/*' => Http::response($this->rss('Không dùng tới', 'https://bao.example/0'), 200),
+        ]);
+
+        $brief = app(DesignAgentService::class)->collectionBrief(['prompt' => 'đầm linen'], $this->customer(), true, true);
+
+        $this->assertSame('ai-v1', $brief['engine'], 'Một endpoint tuỳ chọn không được làm hỏng cả lượt chạy.');
+        $this->assertFalse($brief['model']['web_search'], 'Rơi về đường thường thì lượt này KHÔNG có tìm kiếm.');
+        $this->assertSame(0, $brief['model']['tool_search']['calls']);
+        $this->assertTrue(collect($urls)->contains(fn ($u) => str_contains((string) $u, '/chat/completions')), 'Phải có lời gọi dự phòng /chat/completions.');
+    }
 }
+
 
 
 

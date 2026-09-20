@@ -130,7 +130,7 @@ class AiModelGateway
      * `tool_results` — giao diện đọc những số này chứ không đọc lời hứa.
      *
      * @param  array{response_format?:string, max_tokens?:int, timeout?:int, json?:bool, tools?:list<array<string,mixed>>, tool_handler?:callable, tool_rounds?:int}  $options
-     * @return array{text:string, provider:string, model:string, group:string, finish_reason:?string, reasoning_only:bool, tools_accepted:?bool, tool_calls:int, tool_queries:list<string>, tool_results:int}|null
+     * @return array{text:string, provider:string, model:string, group:string, finish_reason:?string, reasoning_only:bool, tools_accepted:?bool, tool_calls:int, tool_queries:list<string>, tool_results:int, hosted_calls:int, hosted_queries:list<string>, hosted_sources:list<string>}|null
      */
     public function text(string $group, array $messages, array $options = []): ?array
     {
@@ -197,6 +197,11 @@ class AiModelGateway
                         'tool_calls' => (int) ($result['tool_calls'] ?? 0),
                         'tool_queries' => array_values((array) ($result['tool_queries'] ?? [])),
                         'tool_results' => (int) ($result['tool_results'] ?? 0),
+                        // CÔNG CỤ CỦA NHÀ CUNG CẤP qua /responses: số lượt tìm THẬT (0 = nhận tham số mà
+                        // không tìm — model không hỗ trợ). Ba khoá này luôn có mặt để nơi gọi không phải đoán.
+                        'hosted_calls' => (int) ($result['hosted_calls'] ?? 0),
+                        'hosted_queries' => array_values((array) ($result['hosted_queries'] ?? [])),
+                        'hosted_sources' => array_values((array) ($result['hosted_sources'] ?? [])),
                     ];
                 }
 
@@ -317,6 +322,12 @@ class AiModelGateway
      */
     protected function callText(array $candidate, string $key, array $messages, array $options): ?array
     {
+        // ĐƯỜNG /responses + công cụ tìm kiếm CỦA NHÀ CUNG CẤP (2026-09-21): không phải tham số trong
+        // /chat/completions mà là một endpoint khác hẳn, nên phải rẽ nhánh TRƯỚC các nhánh còn lại.
+        if (! empty($options['search']) && WebAccessService::isHostedMode(WebAccessService::planFor($candidate))) {
+            return $this->callResponsesWithSearch($candidate, $key, $messages, $options);
+        }
+
         $tools = $this->toolDefinitions($options);
 
         // CÔNG CỤ (function calling): chỉ trên họ giao thức OpenAI-compatible — đó là nơi chuẩn "tools" là
@@ -492,6 +503,154 @@ class AiModelGateway
     }
 
     /**
+     * GỌI ENDPOINT /responses KÈM CÔNG CỤ TÌM KIẾM CỦA NHÀ CUNG CẤP.
+     *
+     * Vì sao có đường riêng: đo thật trên production (2026-09-21) — cùng một tham số
+     * `tools:[{"type":"web_search"}]`:
+     *   · `/chat/completions` → **HTTP 422** `unknown variant web_search, expected function`;
+     *   · `/responses` → **HTTP 200**, sinh ra mục `web_search_call` với truy vấn và trang đã mở THẬT.
+     * Nhưng đường này CHỈ chạy với model hỗ trợ: cùng tham số đó, model nhỏ hơn trả lời trơn tru mà KHÔNG
+     * có lời gọi tìm kiếm nào và tự BỊA tin + URL. Nên kết quả ở đây luôn kèm SỐ ĐO của việc đã xảy ra
+     * (`hosted_calls`), và nơi gọi chỉ được nói "đã tìm" khi con số đó > 0.
+     *
+     * Không ném lỗi khi endpoint không dùng được: rơi về đường /chat/completions thường (một tính năng
+     * tuỳ chọn không được phép làm hỏng cả lượt chạy) — chỉ là lượt đó không có tìm kiếm, và điều đó được
+     * báo đúng bằng `hosted_calls = 0`.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function callResponsesWithSearch(array $candidate, string $key, array $messages, array $options): ?array
+    {
+        $plan = WebAccessService::planFor($candidate) ?? [];
+        $timeout = (int) ($options['timeout'] ?? 90);
+        $maxTokens = (int) ($options['max_tokens'] ?? 1024);
+        $base = $this->chatBase($candidate, $key);
+
+        // /responses tách phần CHỈ DẪN (system) khỏi phần ĐẦU VÀO (user) — gộp lại thì mất ranh giới giữa
+        // "luật của hệ thống" và "dữ liệu người dùng", đúng ranh giới mà lớp chống prompt-injection dựa vào.
+        $instructions = [];
+        $input = [];
+        foreach ($messages as $message) {
+            $content = $message['content'] ?? '';
+            if (is_array($content)) {
+                $content = collect($content)->map(fn ($part) => is_array($part) ? ($part['text'] ?? '') : (string) $part)->implode('\n');
+            }
+            $content = trim((string) $content);
+            if ($content === '') {
+                continue;
+            }
+            if (($message['role'] ?? '') === 'system') {
+                $instructions[] = $content;
+            } else {
+                $input[] = $content;
+            }
+        }
+
+        $body = [
+            'model' => $candidate['model'],
+            'instructions' => implode("\n\n", $instructions),
+            'input' => implode("\n\n", $input),
+            'max_output_tokens' => $maxTokens,
+            'tools' => [['type' => (string) ($plan['param'] ?: 'web_search')]],
+        ];
+        if (($options['response_format'] ?? '') === 'json_object') {
+            $body['text'] = ['format' => ['type' => 'json_object']];
+        }
+        // Đo THẬT cần cả URL nguồn: thiếu `include` thì một số lượt không kèm danh sách nguồn đã mở.
+        $body['include'] = ['web_search_call.action.sources'];
+
+        try {
+            $response = Http::withToken($key)->timeout($timeout)->post($base.'/responses', $body);
+        } catch (\Throwable $e) {
+            logger()->warning('AiModelGateway /responses lỗi: '.$e->getMessage());
+
+            return $this->fallbackWithoutHostedSearch($candidate, $key, $messages, $options, $e);
+        }
+
+        if (! $response->successful()) {
+            // Endpoint không có / không cho phép công cụ ⇒ vẫn phải trả lời được, chỉ là không có tìm kiếm.
+            return $this->fallbackWithoutHostedSearch($candidate, $key, $messages, $options, null, $response->status());
+        }
+
+        return $this->responsesResult($response->json())
+            + ['tools_accepted' => true, 'tool_calls' => 0, 'tool_queries' => [], 'tool_results' => 0];
+    }
+
+    /** Rơi về /chat/completions khi /responses không dùng được — báo ĐÚNG là lượt này không tìm kiếm. */
+    protected function fallbackWithoutHostedSearch(array $candidate, string $key, array $messages, array $options, ?\Throwable $error = null, ?int $status = null): ?array
+    {
+        logger()->warning('AiModelGateway: /responses không dùng được, quay về /chat/completions', [
+            'provider' => $candidate['provider'], 'model' => $candidate['model'],
+            'status' => $status, 'error' => $error?->getMessage(),
+        ]);
+
+        unset($options['search']);
+        $plain = $this->callPlain($candidate, $key, $messages, $options);
+
+        return $plain === null ? null : $plain + [
+            'tools_accepted' => null, 'tool_calls' => 0, 'tool_queries' => [], 'tool_results' => 0,
+            'hosted_calls' => 0, 'hosted_queries' => [], 'hosted_sources' => [],
+        ];
+    }
+
+    /**
+     * Đọc phản hồi của /responses: chữ trả lời + SỐ ĐO công cụ tìm kiếm đã chạy thật.
+     *
+     * @param  mixed  $json
+     * @return array<string, mixed>
+     */
+    protected function responsesResult($json): array
+    {
+        $text = '';
+        $calls = 0;
+        $queries = [];
+        $sources = [];
+        $finish = null;
+
+        foreach ((array) data_get($json, 'output', []) as $item) {
+            $type = (string) ($item['type'] ?? '');
+
+            if ($type === 'web_search_call') {
+                $calls++;
+                foreach ((array) data_get($item, 'action.queries', []) as $query) {
+                    // Gateway gắn hậu tố nội bộ `ws_call_id=…` vào truy vấn — không phải từ khoá người dùng.
+                    $query = trim(preg_replace('/ws_call_id=\S+/', '', (string) $query) ?? '');
+                    if ($query !== '') {
+                        $queries[] = $query;
+                    }
+                }
+                $url = (string) data_get($item, 'action.url', '');
+                if ($url !== '') {
+                    $sources[] = preg_replace('/#ws_call_id=\S+/', '', $url) ?? $url;
+                }
+                foreach ((array) data_get($item, 'action.sources', []) as $row) {
+                    $u = (string) (is_array($row) ? ($row['url'] ?? '') : $row);
+                    if ($u !== '') {
+                        $sources[] = $u;
+                    }
+                }
+            }
+
+            if ($type === 'message') {
+                foreach ((array) ($item['content'] ?? []) as $part) {
+                    $text .= (string) ($part['text'] ?? '');
+                }
+                $finish = (string) ($item['status'] ?? '') ?: $finish;
+            }
+        }
+
+        return [
+            'text' => $text,
+            'finish_reason' => (string) data_get($json, 'status', '') ?: $finish,
+            'reasoning_only' => $text === '' && data_get($json, 'output.0.type') === 'reasoning',
+            // SỐ ĐO THẬT của công cụ: 0 = model nhận tham số nhưng KHÔNG hề tìm (đừng nói là đã tìm).
+            'hosted_calls' => $calls,
+            'hosted_queries' => array_values(array_unique($queries)),
+            'hosted_sources' => array_values(array_unique($sources)),
+        ];
+    }
+
+    /**
      * Đường gọi THƯỜNG (không công cụ) — thân cũ của callText, giữ nguyên hành vi.
      *
      * @return array{text:string, finish_reason:?string, reasoning_only:bool}|null
@@ -621,6 +780,13 @@ class AiModelGateway
 
         $plan = WebAccessService::planFor($candidate);
         if ($plan === null) {
+            return;
+        }
+
+        // Chế độ /responses KHÔNG phải một tham số trong body: nó là endpoint khác (xem
+        // callResponsesWithSearch). Rơi vào `default` ở đây sẽ gửi `{"web_search": true}` vào
+        // /chat/completions — một tham số bịa, đúng loại lỗi mà lớp này sinh ra để chặn.
+        if (WebAccessService::isHostedMode($plan)) {
             return;
         }
 

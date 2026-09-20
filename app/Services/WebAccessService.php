@@ -58,6 +58,13 @@ class WebAccessService
         'tools' => 'Gửi tools: [{"tham số": {}}] (Gemini: google_search)',
         'model_suffix' => 'Nối vào TÊN MODEL (OpenRouter kiểu ":online")',
         'plugins' => 'Gửi plugins: [{"id": "tham số"}]',
+        // [2026-09-21] ĐƯỜNG THỨ NĂM: gọi endpoint /responses kèm công cụ tìm kiếm CỦA NHÀ CUNG CẤP
+        // (DeepSeek: tools:[{"type":"web_search"}]). ĐO THẬT trên production:
+        //   · /chat/completions + tools:[{type:web_search}] → HTTP 422 "unknown variant web_search";
+        //   · /responses + cùng tham số → HTTP 200 và web_search_call THẬT — nhưng CHỈ với model hỗ trợ
+        //     (deepseek-v4-pro: 1–9 lượt tìm, URL thật · deepseek-flash: nhận tham số rồi BỊA tin + URL).
+        // Vì vậy đường này KHÔNG tin theo lời khai: chỉ tính là "đã tìm" khi response có web_search_call.
+        'responses_web_search' => 'Gọi endpoint /responses kèm tools: [{"type": "tham số"}] — model PHẢI hỗ trợ (DeepSeek: web_search, chỉ model mới)',
     ];
 
     public static function planFor(array $candidate): ?array
@@ -84,6 +91,17 @@ class WebAccessService
 
         // Giao thức thì CHẮC CHẮN: chính mã này dựng request theo cách đã biết của giao thức đó.
         return $dialect + ['source' => 'giao thức '.$candidate['transport'], 'verified' => true];
+    }
+
+    /**
+     * Kế hoạch này dùng ENDPOINT /responses kèm công cụ của nhà cung cấp — khác hẳn bốn kiểu còn lại
+     * (chúng chỉ gửi thêm tham số trong /chat/completions).
+     *
+     * @param  array<string, mixed>|null  $plan
+     */
+    public static function isHostedMode(?array $plan): bool
+    {
+        return ($plan['mode'] ?? '') === 'responses_web_search';
     }
 
     /** Giao thức này có tìm kiếm tích hợp không? (giữ cho nơi gọi cũ; mặc định KHÔNG) */

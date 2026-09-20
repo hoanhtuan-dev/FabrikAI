@@ -378,6 +378,18 @@ const toolSearchLine = computed(() => {
   const t = toolSearch.value;
   if (!t || t.mode === 'off') return '';
   if (t.mode === 'native') return 'Lượt này tìm kiếm nguồn ngoài do chính nhà cung cấp model thực hiện.';
+  // mode === 'hosted': công cụ tìm kiếm CỦA nhà cung cấp qua endpoint riêng. Đây là chỗ dễ nói dối nhất:
+  // model nhỏ NHẬN tham số rồi trả lời trơn tru mà không tìm gì (đo thật: có model còn bịa cả tin lẫn URL)
+  // ⇒ chỉ được nói "đã tìm" khi phản hồi có lời gọi tìm kiếm thật.
+  if (t.mode === 'hosted') {
+    if (Number(t.calls) > 0) {
+      const q = (t.queries || []).filter(Boolean);
+      const who = q.length ? ' theo từ khoá “' + q.join('”, “') + '”' : '';
+      const src = (t.sources || []).length ? ' · mở ' + t.sources.length + ' trang nguồn' : '';
+      return 'Model đã tự tìm trên internet ' + t.calls + ' lượt' + who + src;
+    }
+    return 'Model này nhận yêu cầu tìm kiếm nhưng KHÔNG thực hiện lượt tìm nào — lượt này không có nguồn ngoài từ model. Đổi sang model có hỗ trợ tìm kiếm nếu cần dẫn nguồn.';
+  }
   // mode === 'tool': công cụ do MÁY CHỦ chạy. Ba mức rất khác nhau, không được gộp thành một câu.
   if (t.accepted === false) {
     return 'Model bạn chọn KHÔNG nhận công cụ tìm kiếm nên lượt này không đọc được nguồn ngoài — đổi model cho vai «Tìm kiếm nguồn ngoài» trong Cài đặt nếu cần dẫn nguồn.';
