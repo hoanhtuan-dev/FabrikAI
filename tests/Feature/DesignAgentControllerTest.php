@@ -57,8 +57,12 @@ class DesignAgentControllerTest extends TestCase
             ->assertJsonPath('summary.images_analyzed_monthly', 0);
         $this->assertCount(8, $response->json('trends'));
         $this->assertSame('demo', $response->json('trends.0.evidence_mode'));
-        $this->assertSame('local', collect($response->json('sources'))->firstWhere('id', 'internal')['status']);
-        $this->assertSame('demo', collect($response->json('sources'))->firstWhere('id', 'ecommerce')['status']);
+        // BÁO CÁO NGUỒN nay nói ĐÚNG cái đang dùng: chưa khai nguồn nào ⇒ chỉ còn MỘT dòng nói rõ các kênh
+        // chưa kết nối (trước đây là 5 dòng tĩnh, 4 dòng ghi "Dữ liệu mẫu" gây hiểu sai khi đã nối nguồn thật).
+        $sources = collect($response->json('sources'));
+        $this->assertSame(1, $sources->count());
+        $this->assertSame('not_connected', $sources->firstWhere('id', 'not_connected')['status']);
+        $this->assertStringContainsString('Shopee', (string) $sources->firstWhere('id', 'not_connected')['channels']);
     }
 
     public function test_collection_returns_complete_brief_without_creating_project(): void

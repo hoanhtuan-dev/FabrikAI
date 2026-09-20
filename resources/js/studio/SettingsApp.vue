@@ -47,6 +47,20 @@ async function api(path, method = 'GET', body = null) {
   return d;
 }
 
+/**
+ * Gọi API QUẢN TRỊ (tiền tố khác: /api/admin) — vẫn dùng chung cookie CSRF + cách đọc lỗi như api().
+ * Tách ra vì `api()` gắn cứng tiền tố /api/settings-vue; trộn hai tiền tố vào một hàm là mở đường cho
+ * lỗi "gọi sai nhánh" rất khó thấy (đã xảy ra đúng một lần: route api/settings-vue/admin/web-sources).
+ */
+async function adminApi(path, method = 'GET', body = null) {
+  const opts = { method, headers: { 'X-XSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } };
+  if (body !== null) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch('/api/admin' + path, opts);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw apiError(d, null, r);
+  return d;
+}
+
 // ─────────────────────────── Điều hướng & nhãn ───────────────────────────
 const SECTIONS = [
   { id: 'overview',  group: 'Bắt đầu',      label: 'Tổng quan',        icon: 'activity' },
@@ -55,6 +69,7 @@ const SECTIONS = [
   { id: 'providers', group: 'Nhà cung cấp', label: 'Custom Providers', icon: 'globe' },
   { id: 'models',    group: 'Model',        label: 'Model Registry',   icon: 'server' },
   { id: 'tasks',     group: 'Model',        label: 'Nhóm công việc',   icon: 'target' },
+  { id: 'sources',   group: 'Vận hành',     label: 'Nguồn dữ liệu ngoài', icon: 'globe' },
   { id: 'general',   group: 'Vận hành',     label: 'Cấu hình chung',   icon: 'gear' },
 ];
 const SECTION_GROUPS = ['Bắt đầu', 'Nhà cung cấp', 'Model', 'Vận hành'];
@@ -130,7 +145,7 @@ async function loadSources() {
   ws.loading = true;
   ws.error = '';
   try {
-    const d = await api('/admin/web-sources');
+    const d = await adminApi('/web-sources');
     ws.rows = d.sources || [];
     ws.kinds = d.kinds || ['rss', 'json'];
   } catch (e) {
@@ -156,10 +171,10 @@ async function saveSource() {
     delete body.id;
     if (ws.editing) {
       delete body.slug;
-      await api('/admin/web-sources/' + ws.editing, 'PUT', body);
+      await adminApi('/web-sources/' + ws.editing, 'PUT', body);
       flash('Đã lưu nguồn « ' + ws.draft.name + ' ».');
     } else {
-      await api('/admin/web-sources', 'POST', body);
+      await adminApi('/web-sources', 'POST', body);
       flash('Đã thêm nguồn « ' + ws.draft.name + ' ».');
     }
     wsOpen.value = false;
@@ -173,7 +188,7 @@ async function saveSource() {
 
 async function removeSource(row) {
   try {
-    await api('/admin/web-sources/' + row.slug, 'DELETE');
+    await adminApi('/web-sources/' + row.slug, 'DELETE');
     flash('Đã xoá nguồn « ' + row.name + ' ».');
     await loadSources();
   } catch (e) {
@@ -184,7 +199,7 @@ async function removeSource(row) {
 async function testSource(row) {
   ws.testing = row.slug;
   try {
-    const d = await api('/admin/web-sources/' + row.slug + '/test', 'POST', {});
+    const d = await adminApi('/web-sources/' + row.slug + '/test', 'POST', {});
     flash(
       d.ok
         ? ('Nguồn « ' + row.name + ' »: HTTP ' + d.http + ' · ' + d.count + ' tin sau lọc.')
@@ -201,7 +216,7 @@ async function testSource(row) {
 
 async function seedSources() {
   try {
-    const d = await api('/admin/web-sources/seed', 'POST', {});
+    const d = await adminApi('/web-sources/seed', 'POST', {});
     flash(d.created ? ('Đã tạo ' + d.created + ' nguồn mặc định.') : 'Các nguồn mặc định đã có đủ.');
     await loadSources();
   } catch (e) {
@@ -1313,10 +1328,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                 <div class="min-w-0">
                   <h2 class="text-sm font-semibold text-cream-100">Nguồn dữ liệu ngoài cho agent</h2>
                   <p class="mt-1 text-body leading-5 text-cream-300">
-                    Máy chủ tự đi lấy tin từ danh sách dưới đây (RSS/JSON/API), lọc theo từ khoá + độ mới, rồi đưa vào lời nhắc của TrendRadar và CollectionBot <b class="text-cream-100">kèm URL và thời điểm</b> — model chỉ việc đọc và dẫn nguồn.
-                  </p>
-                  <p class="mt-1 text-body leading-5 text-cream-400">
-                    Đây là đường bù cho việc model không tự ra internet được: đo thật với DeepSeek, gửi tham số tìm kiếm vào thì API trả 200 nhưng bỏ qua.
+                    FabrikAI tự lấy tin từ những nguồn bạn khai ở đây rồi đưa cho AI đọc kèm <b class="text-cream-100">tên bài, đường dẫn và ngày đăng</b> — nhờ vậy phần phân tích xu hướng có nguồn thật để dẫn, không chỉ dựa vào dữ liệu mẫu.
                   </p>
                 </div>
                 <div class="flex gap-2">
@@ -1373,17 +1385,18 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
               </div>
             </div>
 
-            <div class="card p-5">
-              <h3 class="text-sm font-semibold text-cream-100">Nguồn JSON/API khai thế nào?</h3>
-              <p class="mt-1.5 text-body leading-5 text-cream-300">
-                Chọn kiểu <b class="text-cream-100">json</b> rồi khai đường dẫn tới mảng dữ liệu và tên từng trường — nguồn tự nói hình dạng của nó, nên thêm API mới không phải sửa mã:
+            <details class="card p-5">
+              <summary class="cursor-pointer text-sm font-semibold text-cream-100">Nguồn của tôi là API trả JSON thì khai thế nào?</summary>
+              <p class="mt-2 text-body leading-5 text-cream-300">
+                Chọn kiểu <b class="text-cream-100">json</b>, rồi chỉ cho FabrikAI biết dữ liệu nằm ở đâu trong phản hồi:
               </p>
               <ul class="mt-1.5 space-y-1 text-label leading-5 text-cream-400">
-                <li>· <code class="rounded bg-ink-800 px-1">items_path</code>: vị trí mảng, vd <code class="rounded bg-ink-800 px-1">data.items</code>.</li>
-                <li>· <code class="rounded bg-ink-800 px-1">title_field</code> · <code class="rounded bg-ink-800 px-1">link_field</code> · <code class="rounded bg-ink-800 px-1">date_field</code> · <code class="rounded bg-ink-800 px-1">summary_field</code>: tên trường trong mỗi mục (hỗ trợ đường dẫn lồng nhau).</li>
-                <li>· Chỉ nhận <b>http/https</b> — không đọc được file nội bộ (chống SSRF).</li>
+                <li>· <b class="text-cream-200">Danh sách bài</b> — vd <code class="rounded bg-ink-800 px-1">data.items</code>.</li>
+                <li>· <b class="text-cream-200">Tên bài · đường dẫn · ngày đăng · mô tả</b> — tên trường tương ứng trong mỗi bài.</li>
+                <li>· Chỉ nhận địa chỉ <b>http/https</b> công khai.</li>
               </ul>
-            </div>
+              <p class="mt-2 text-label leading-5 text-cream-400">Không khai được? Dán URL mẫu vào ô Ghi chú rồi nhắn quản trị viên FabrikAI — thêm kiểu nguồn mới là việc của chúng tôi.</p>
+            </details>
 
             <BaseModal v-model="wsOpen" wide :title="ws.editing ? ('Sửa nguồn — ' + ws.draft.name) : 'Thêm nguồn dữ liệu ngoài'">
               <div class="grid gap-3">

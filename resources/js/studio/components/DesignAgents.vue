@@ -98,12 +98,36 @@ function setDnaList(key, value) {
   store.brandDnaDraft = { ...dnaDraft.value, [key]: items };
 }
 const dnaDirty = computed(() => JSON.stringify(dnaDraft.value) !== JSON.stringify(dna.value?.dna || {}));
+// ── Nguồn dữ liệu: nhãn TIẾNG NGƯỜI DÙNG (không để chữ kỹ thuật trong template) ──────────────
+/** Đang có tin thật để AI đọc? (máy chủ tự lấy, không phải model tự tìm kiếm) */
+const liveSources = computed(() => !!(store.webSources && store.webSources.mode === 'live'));
+const newsItems = computed(() => (store.webSources?.items || []).slice(0, 6));
+const activeSourceCount = computed(() => ((store.webSources?.sources || []).filter((row) => row.ok)).length);
+const fetchedAtLabel = computed(() => {
+  const at = store.webSources?.fetched_at;
+  if (!at) return '';
+  try { return new Date(at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; }
+});
+const shortDate = (iso) => {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleDateString('vi-VN'); } catch (e) { return ''; }
+};
+const refreshLabel = computed(() => (store.webSourcesLoading ? 'Đang lấy…' : 'Cập nhật tin'));
+const sourceStatus = (row) => (row.ok ? 'Hoạt động' : 'Không lấy được');
+/** Một câu nói rõ AI đọc tin qua đường nào — không nêu tên tham số API hay mã HTTP. */
+const reasoningModelLine = computed(() => {
+  const search = store.webAccess?.model_search;
+  if (!search || !search.has_model) return 'Chưa cấu hình model cho phần suy luận.';
+  const name = search.active?.model || '';
+  return name ? 'Model đang dùng: ' + name + '.' : '';
+});
+
 /** Nhãn tuổi của bản brief lấy từ bộ đệm — để người dùng biết có nên bấm "Chạy lại bằng AI" không. */
 const cacheAgeLabel = computed(() => {
   const age = Number(collection.value?.model?.cache_age_s);
-  if (!Number.isFinite(age) || age < 0) return 'đã lưu';
-  if (age < 60) return age + ' giây trước';
-  return Math.round(age / 60) + ' phút trước';
+  if (!Number.isFinite(age) || age < 0) return 'trước đó';
+  if (age < 60) return 'cách đây ' + age + ' giây';
+  return 'cách đây ' + Math.round(age / 60) + ' phút';
 });
 /** Nhóm công việc CHƯA cấu hình model — đọc từ số đo (tức là từ Cài đặt), không phải danh sách cứng. */
 /** Nhóm công việc CHƯA chạy được — đọc từ số đo (tức từ Cài đặt), không phải danh sách cứng. */
@@ -150,7 +174,7 @@ const summaryItems = computed(() => {
   const summary = radar.value?.summary || {};
   const labels = {
     tracked_attributes: 'Thuộc tính theo dõi',
-    images_analyzed_monthly: 'Ảnh phân tích / tháng (CV chưa bật)',
+    images_analyzed_monthly: 'Ảnh phân tích mỗi tháng',
     active_trends: 'Xu hướng đang theo dõi',
     internal_products: 'Sản phẩm nội bộ',
     internal_generations: 'Lịch sử tạo ảnh',
@@ -464,8 +488,6 @@ function lifecycleClass(value) {
   if (value === 'peak') return 'text-brand-300';
   return 'text-cream-400';
 }
-function sourceMethod(source) { return source.status === 'local' ? 'Dữ liệu nội bộ' : 'Chưa kết nối thực tế'; }
-function sourceFrequency(source) { return source.status === 'local' ? 'Theo dữ liệu shop' : 'Bản demo'; }
 function formatNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? new Intl.NumberFormat('vi-VN').format(number) : '—';
@@ -697,8 +719,7 @@ watch(() => store.designAgentOpen, (open) => {
                 </p>
                 <p class="mt-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-label leading-5 text-cream-300">
                   <StudioIcon name="info" size="h-3.5 w-3.5" class="mr-1 inline-block align-[-2px]" />
-                  Trước đây DNA do hệ thống <b>đoán</b> (đếm dự án + dò từ khoá trong mô tả ảnh, không có gì thì dùng câu mặc định).
-                  Nay bạn khai được, và bản bạn khai luôn được ưu tiên.
+                  Điền càng cụ thể, brief càng sát shop của bạn. Bỏ trống cũng chạy được — khi đó AI dựa vào dự án và ảnh bạn đã làm.
                 </p>
                 <div v-if="dna" class="mt-3 flex flex-wrap items-center gap-2 text-label">
                   <span class="rounded-full px-2 py-0.5 font-semibold" :class="dna.is_set ? 'bg-brand-500/20 text-brand-200' : 'bg-amber-500/15 text-warn'">
@@ -895,123 +916,61 @@ watch(() => store.designAgentOpen, (open) => {
               <p v-else class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center text-xs text-cream-400">Không có xu hướng nào khớp bộ lọc hiện tại.</p>
 
               <details class="mt-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
-                <summary class="cursor-pointer text-xs font-semibold text-cream-200">Nguồn dữ liệu &amp; phương pháp ({{ sources.length }} nguồn)</summary>
-                <!-- KHẢ NĂNG TRUY CẬP INTERNET: số ĐO THẬT từ máy chủ, không phải câu văn tĩnh. -->
+                <summary class="cursor-pointer text-xs font-semibold text-cream-200">Nguồn dữ liệu cho phân tích</summary>
+                <!-- NGUỒN DỮ LIỆU: một câu trạng thái + tin thật đang dùng; chi tiết kỹ thuật gấp lại.
+                     Không đưa tên tham số API, mã HTTP hay tên nhà cung cấp ra bề mặt người dùng. -->
                 <div class="mt-3 rounded-xl border border-ink-700 bg-ink-900 p-3">
                   <div class="flex flex-wrap items-center justify-between gap-2">
-                    <p class="text-label font-semibold uppercase tracking-wide text-cream-300">Khả năng truy cập internet</p>
-                    <button type="button" class="tool-btn" :disabled="store.webAccessLoading" @click="store.loadWebAccess(true)">
-                      <StudioIcon name="refresh" size="h-3 w-3" /> {{ store.webAccessLoading ? 'Đang kiểm tra…' : 'Kiểm tra lại' }}
-                    </button>
-                  </div>
-                  <p v-if="!store.webAccess && store.webAccessLoading" class="mt-2 text-body text-cream-400">Đang đo…</p>
-                  <p v-else-if="store.webAccessError" role="alert" class="mt-2 text-body text-danger">{{ store.webAccessError }}</p>
-                  <template v-else-if="store.webAccess">
-                    <ul class="mt-2 space-y-1 text-body leading-5 text-cream-300">
-                      <li>
-                        <b :class="store.webAccess.outbound.ok ? 'text-ok' : 'text-warn'">{{ store.webAccess.outbound.ok ? 'Máy chủ CÓ internet' : 'Máy chủ KHÔNG ra được internet' }}</b>
-                        <span class="text-cream-400"> · đo {{ formatNumber(store.webAccess.outbound.results.length) }} đích · {{ (store.webAccess.outbound.results[0] || {}).ms || 0 }} ms · lúc {{ new Date(store.webAccess.outbound.checked_at).toLocaleTimeString('vi-VN') }}</span>
-                      </li>
-                      <li>
-                        <b :class="store.webAccess.model_search.supported ? 'text-ok' : 'text-warn'">
-                          {{ !store.webAccess.model_search.has_model
-                            ? 'Chưa có model dùng được cho nhóm suy luận'
-                            : (store.webAccess.model_search.supported
-                                ? (store.webAccess.model_search.verified
-                                    ? 'Model đang cấu hình CÓ tìm kiếm web (theo giao thức)'
-                                    : 'Model đang cấu hình CÓ tìm kiếm web — theo KHAI BÁO của bạn, chưa kiểm chứng')
-                                : 'Model đang cấu hình KHÔNG có tìm kiếm web') }}
-                        </b>
-                        <span v-if="store.webAccess.model_search.active" class="text-cream-400"> · {{ store.webAccess.model_search.active.model }}</span>
-                      </li>
-                    </ul>
-                    <p class="mt-2 text-body leading-5 text-cream-200">{{ store.webAccess.verdict_label }}</p>
-                    <p class="mt-1 text-label leading-5 text-cream-400">Nguồn ngoài vẫn là <b>dữ liệu mẫu</b> (chưa nối sàn TMĐT, chưa có scraping hay POS/ERP thật). Dữ liệu nội bộ là dự án/ảnh của chính tài khoản bạn.</p>
-
-                    <!-- CÁCH BẬT NGUỒN THẬT: nói đúng VIỆC CẦN LÀM, không đẩy người dùng về một nhà cung cấp nào. -->
-                    <details class="mt-2">
-                      <summary class="cursor-pointer text-label font-semibold text-cream-300">Muốn agent dẫn NGUỒN THẬT? Cách cấu hình</summary>
-                      <ol class="mt-1.5 space-y-1 text-label leading-5 text-cream-400">
-                        <li>1. Chọn một model/nhà cung cấp <b class="text-cream-200">có tìm kiếm web</b> trong Cài đặt → <b class="text-cream-200">Nhóm công việc</b> (nhóm «Suy luận &amp; viết nội dung»).</li>
-                        <li>2. Nếu gateway của bạn là loại <b class="text-cream-200">tự khai</b>: Cài đặt → <b class="text-cream-200">Custom Providers</b> → thêm gateway, rồi ở ô <b class="text-cream-200">“Tham số bật TÌM KIẾM WEB”</b> khai đúng cách gateway đó bật tìm kiếm:
-                          <span class="text-cream-300">cờ trong body (vd enable_search)</span> · <span class="text-cream-300">tools: [{google_search}]</span> · <span class="text-cream-300">nối vào tên model (vd :online)</span> · <span class="text-cream-300">plugins: [{id}]</span>.</li>
-                        <li>3. Quay lại đây bấm <b class="text-cream-200">Kiểm tra lại</b> — dòng “Model … CÓ tìm kiếm web” xuất hiện là xong; không cần sửa mã hay chờ deploy.</li>
-                      </ol>
-                      <p class="mt-1.5 text-label leading-5 text-cream-400">Model không có tìm kiếm thì vẫn chạy bình thường, chỉ là mọi câu trả lời dựa trên dữ liệu hệ thống gửi vào (dữ liệu mẫu + dữ liệu của bạn) — và agent sẽ không bao giờ nói như thể đã tự đọc sàn TMĐT.</p>
-                      <p class="mt-1.5 text-label leading-5 text-warn">Khai tham số KHÔNG làm gateway tự có tìm kiếm. Đo thật 23/09/2026: DeepSeek nhận <code class="rounded bg-ink-800 px-1">enable_search</code> với HTTP 200 nhưng <b>bỏ qua</b> — model vẫn trả lời “không có quyền truy cập thông tin thời gian thực”. Cách chắc chắn: dùng model/nhà cung cấp CÓ tìm kiếm (gateway định tuyến kiểu OpenRouter: khai <code class="rounded bg-ink-800 px-1">model_suffix</code> = <code class="rounded bg-ink-800 px-1">:online</code> hoặc <code class="rounded bg-ink-800 px-1">plugins</code> = <code class="rounded bg-ink-800 px-1">web</code>) — provider tự chạy tìm kiếm và trả về trích dẫn.</p>
-                    </details>
-                    <!-- Nhóm công việc CHƯA có model là trạng thái CẤU HÌNH, không phải lỗi: nói đúng
-                         để người dùng biết việc cần làm là vào Cài đặt, chứ không đi tìm lỗi ở agent. -->
-                    <ul v-if="blockedGroups.length" class="mt-2 space-y-0.5 text-label leading-5 text-warn">
-                      <li v-for="row in blockedGroups" :key="row.group">
-                        ↳ Nhóm {{ row.label }}: {{ groupStatus(row) }} (Cài đặt → Nhóm công việc / API key).
-                      </li>
-                    </ul>
-                    <details class="mt-2">
-                      <summary class="cursor-pointer text-label text-cream-400">Chi tiết phép đo</summary>
-                      <ul class="mt-1 space-y-0.5 text-label text-cream-400">
-                        <li v-for="row in store.webAccess.outbound.results" :key="row.url">· {{ row.url }} — {{ row.status ? 'HTTP ' + row.status : (row.error || 'không kết nối được') }} ({{ row.ms }} ms)</li>
-                        <li v-for="row in store.webAccess.model_search.candidates" :key="row.provider + row.model">· {{ row.provider }}:{{ row.model }} — {{ row.label }}</li>
-                        <li v-for="row in (store.webAccess.task_groups || [])" :key="row.group">
-                          · Nhóm {{ row.label }}: gán {{ row.candidates }} model · dùng được {{ row.usable }} · {{ groupStatus(row) }}
-                          <span v-if="row.usable_models.length" class="text-cream-400">({{ row.usable_models.join(', ') }})</span>
-                        </li>
-                      </ul>
-                    </details>
-                  </template>
-                </div>
-                <!-- NGUỒN THẬT ĐANG ĐƯỢC ĐƯA VÀO PROMPT (máy chủ tự lấy) — hiển thị nguyên trạng. -->
-                <div class="mt-3 rounded-xl border border-ink-700 bg-ink-900 p-3">
-                  <div class="flex flex-wrap items-center justify-between gap-2">
-                    <p class="text-label font-semibold uppercase tracking-wide text-cream-300">Nguồn thật đang dùng cho agent</p>
-                    <button type="button" class="tool-btn" :disabled="store.webSourcesLoading" @click="store.loadWebSources(true, selectedRegion)">
-                      <StudioIcon name="refresh" size="h-3 w-3" /> {{ store.webSourcesLoading ? 'Đang lấy…' : 'Làm mới nguồn' }}
-                    </button>
-                  </div>
-                  <p v-if="store.webSourcesError" role="alert" class="mt-2 text-body text-danger">{{ store.webSourcesError }}</p>
-                  <p v-else-if="!store.webSources" class="mt-2 text-body text-cream-400">Đang tải…</p>
-                  <template v-else>
-                    <p class="mt-2 text-body leading-5 text-cream-200">
-                      <b :class="store.webSources.mode === 'live' ? 'text-ok' : 'text-warn'">
-                        {{ store.webSources.mode === 'live' ? ('Đang dùng ' + store.webSources.items.length + ' tin THẬT') : 'Chưa có tin thật nào' }}
-                      </b>
-                      <span class="text-cream-400"> · lấy lúc {{ new Date(store.webSources.fetched_at).toLocaleTimeString('vi-VN') }} · tối đa {{ store.webSources.limits.limit }} tin vào prompt (cũ hơn {{ store.webSources.limits.max_age_days }} ngày bị bỏ)</span>
+                    <p class="text-body leading-5 text-cream-100">
+                      <template v-if="liveSources">
+                        Đang đọc <b class="text-ok">{{ newsItems.length }} tin thật</b> từ {{ activeSourceCount }} nguồn · cập nhật {{ fetchedAtLabel }}.
+                      </template>
+                      <template v-else>
+                        Chưa có tin thật nào — phần phân tích đang dựa trên dữ liệu của bạn và bộ xu hướng mẫu.
+                      </template>
                     </p>
-                    <div class="mt-2 overflow-x-auto">
-                      <table class="w-full min-w-[32rem] text-left text-label">
-                        <thead><tr class="border-b border-ink-700 text-cream-400"><th class="pb-1.5 pr-2 font-semibold">Nguồn</th><th class="pb-1.5 pr-2 font-semibold">Kiểu</th><th class="pb-1.5 pr-2 font-semibold">Kết quả</th><th class="pb-1.5 font-semibold">Tin</th></tr></thead>
+                    <button type="button" class="tool-btn" :disabled="store.webSourcesLoading" @click="store.loadWebSources(true, selectedRegion)">
+                      <StudioIcon name="refresh" size="h-3 w-3" /> {{ refreshLabel }}
+                    </button>
+                  </div>
+
+                  <p v-if="store.webSourcesError" role="alert" class="mt-2 text-body text-danger">{{ store.webSourcesError }}</p>
+
+                  <ul v-if="newsItems.length" class="mt-2 space-y-1 text-label leading-5 text-cream-300">
+                    <li v-for="item in newsItems" :key="item.url">
+                      · <a :href="item.url" target="_blank" rel="noopener" class="underline decoration-dotted hover:text-cream-100">{{ item.title }}</a>
+                      <span class="text-cream-400"> — {{ item.source_name }}<template v-if="item.published_at"> · {{ shortDate(item.published_at) }}</template></span>
+                    </li>
+                  </ul>
+
+                  <details v-if="liveSources" class="mt-2">
+                    <summary class="cursor-pointer text-label text-cream-400">Danh sách nguồn &amp; cách hoạt động</summary>
+                    <div class="mt-1.5 overflow-x-auto">
+                      <table class="w-full min-w-[26rem] text-left text-label">
+                        <thead><tr class="border-b border-ink-700 text-cream-400"><th class="pb-1.5 pr-2 font-semibold">Nguồn</th><th class="pb-1.5 pr-2 font-semibold">Trạng thái</th><th class="pb-1.5 font-semibold">Tin</th></tr></thead>
                         <tbody class="divide-y divide-ink-800">
                           <tr v-for="row in store.webSources.sources" :key="row.slug">
-                            <td class="py-1.5 pr-2"><a :href="row.url" target="_blank" rel="noopener" class="font-semibold text-cream-100 underline decoration-dotted">{{ row.name }}</a></td>
-                            <td class="py-1.5 pr-2 text-cream-400">{{ row.kind }}</td>
-                            <td class="py-1.5 pr-2"><span :class="row.ok ? 'text-ok' : 'text-warn'">{{ row.ok ? ('HTTP ' + row.http + ' · ' + row.ms + ' ms') : (row.error || 'không lấy được') }}</span></td>
+                            <td class="py-1.5 pr-2"><a :href="row.url" target="_blank" rel="noopener" class="text-cream-200 underline decoration-dotted">{{ row.name }}</a></td>
+                            <td class="py-1.5 pr-2"><span :class="row.ok ? 'text-ok' : 'text-warn'">{{ sourceStatus(row) }}</span></td>
                             <td class="py-1.5 tabular-nums text-cream-300">{{ row.count }}</td>
                           </tr>
                         </tbody>
                       </table>
                     </div>
-                    <ul v-if="store.webSources.items.length" class="mt-2 space-y-1 text-label leading-5 text-cream-300">
-                      <li v-for="item in store.webSources.items.slice(0, 6)" :key="item.url">
-                        · <a :href="item.url" target="_blank" rel="noopener" class="underline decoration-dotted">{{ item.title }}</a>
-                        <span class="text-cream-400"> — {{ item.source_name }}{{ item.published_at ? ' · ' + new Date(item.published_at).toLocaleDateString('vi-VN') : '' }}</span>
-                      </li>
-                    </ul>
-                  </template>
+                    <p class="mt-1.5 text-label leading-5 text-cream-400">
+                      FabrikAI tự lấy tin mỗi 30 phút, chỉ giữ tin trong {{ store.webSources.limits.max_age_days }} ngày và tối đa
+                      {{ store.webSources.limits.limit }} tin cho mỗi lần phân tích.
+                    </p>
+                    <p class="mt-1 text-label leading-5 text-cream-400">
+                      AI đọc tin qua máy chủ FabrikAI, không phải model tự tìm kiếm. {{ reasoningModelLine }}
+                    </p>
+                  </details>
                 </div>
 
-                <p class="mt-3 text-body leading-5 text-cream-400">Dữ liệu nội bộ là project/generation của chính tài khoản.hay POS/ERP thật trong bản này.</p>
-                <div class="mt-3 overflow-x-auto">
-                  <table class="w-full min-w-[30rem] text-left text-body">
-                    <thead><tr class="border-b border-ink-700 text-cream-400"><th class="pb-2 pr-2 font-semibold">Nguồn</th><th class="pb-2 pr-2 font-semibold">Trạng thái</th><th class="pb-2 font-semibold">Kênh / nhịp</th></tr></thead>
-                    <tbody class="divide-y divide-ink-800">
-                      <tr v-for="source in sources" :key="source.id">
-                        <td class="py-2.5 pr-2"><span class="block font-semibold text-cream-100">{{ source.name }}</span><span class="block text-cream-400">{{ source.channels }}</span></td>
-                        <td class="py-2.5 pr-2"><span class="inline-flex rounded-full px-2 py-0.5 font-semibold" :class="source.status === 'local' ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'">{{ source.status === 'local' ? 'local' : 'demo' }}</span></td>
-                        <td class="py-2.5 text-cream-400"><span class="block">{{ sourceMethod(source) }}</span><span class="block text-cream-400">{{ sourceFrequency(source) }}</span></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                <p class="mt-3 text-body leading-5 text-cream-400">
+                  Dữ liệu nội bộ là dự án và ảnh của chính tài khoản bạn.
+                  Kênh chưa kết nối: Shopee · TikTok Shop · Lazada · Instagram · sàn quốc tế · runway.
+                </p>
               </details>
             </template>
           </section>
@@ -1159,14 +1118,14 @@ watch(() => store.designAgentOpen, (open) => {
                     >{{ modelReady ? 'AI: ' + (collection.model?.provider || '') + ' · ' + (collection.model?.model || '') : 'Engine tất định' }}</span>
                     <span v-for="row in appliedAi" :key="row" class="rounded bg-brand-500/15 px-2 py-0.5 text-brand-200">AI viết: {{ row }}</span>
                     <!-- Nói THẬT bản này mới chạy model hay lấy từ bộ đệm (và cũ bao lâu). -->
-                    <span v-if="collection.model?.cached" class="rounded bg-ink-800 px-2 py-0.5 text-cream-400" title="Cùng đầu vào + cùng DNA + cùng model ⇒ máy chủ trả lại kết quả đã lưu">Từ bộ đệm · {{ cacheAgeLabel }}</span>
+                    <span v-if="collection.model?.cached" class="rounded bg-ink-800 px-2 py-0.5 text-cream-400" title="Cùng yêu cầu trước đó nên không cần tạo lại">Đã tạo {{ cacheAgeLabel }}</span>
                     <span v-else-if="modelReady && collection.model?.latency_ms != null" class="text-cream-400">Vừa chạy model · {{ collection.model.latency_ms }} ms</span>
                     <button
                       v-if="collection"
                       type="button"
                       class="tool-btn !py-0.5"
                       :disabled="store.collectionBriefLoading"
-                      title="Bỏ qua bộ đệm và gọi model lại (tốn token)"
+                      title="Tạo lại brief mới (tốn thêm một lượt gọi AI)"
                       @click="createBrief({ force: true })"
                     >
                       <StudioIcon name="refresh" size="h-3 w-3" /> Chạy lại bằng AI

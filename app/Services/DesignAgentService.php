@@ -118,7 +118,7 @@ class DesignAgentService
                 ['id' => 'hanoi', 'name' => 'Hà Nội'],
                 ['id' => 'danang', 'name' => 'Đà Nẵng'],
             ],
-            'sources' => self::SOURCES,
+            'sources' => $this->sourcesReport($evidence),
             'summary' => [
                 // Catalog mẫu hiện có 8 hướng; connector/CV/POS-ERP chưa chạy nên không phóng đại sản lượng.
                 'tracked_attributes' => 5,
@@ -409,6 +409,48 @@ class DesignAgentService
         $this->cacheBrief($cacheKey, $response);
 
         return $response;
+    }
+
+    /**
+     * BÁO CÁO NGUỒN cho giao diện — nói ĐÚNG cái đang dùng, không liệt kê trạng thái giả.
+     *
+     * Trước đây đường này trả về một danh sách TĨNH 5 dòng (4 dòng "Dữ liệu mẫu" + 1 dòng "Dữ liệu nội bộ")
+     * bất kể thực tế: khi đã nối nguồn thật, người dùng vẫn đọc thấy "nguồn ngoài là dữ liệu mẫu" — vừa sai
+     * vừa làm họ mất tin vào phần phân tích. Nay: nguồn THẬT đang chạy lên trước (kèm số tin), và các KÊNH
+     * chưa kết nối được gộp thành MỘT dòng nói thẳng là chưa có.
+     *
+     * @param  array<string, mixed>  $evidence
+     * @return list<array<string, mixed>>
+     */
+    private function sourcesReport(array $evidence): array
+    {
+        $rows = [];
+        foreach ($evidence['sources'] ?? [] as $source) {
+            $rows[] = [
+                'id' => $source['slug'],
+                'name' => $source['name'],
+                'channels' => parse_url((string) $source['url'], PHP_URL_HOST) ?: $source['url'],
+                'method' => strtoupper((string) $source['kind']).' · tự động lấy mỗi 30 phút',
+                'frequency' => 'Hằng ngày',
+                'status' => ($source['ok'] ?? false) ? 'live' : 'error',
+                'status_label' => ($source['ok'] ?? false) ? 'Đang dùng' : 'Không lấy được',
+                'count' => (int) ($source['count'] ?? 0),
+            ];
+        }
+
+        // Một dòng duy nhất cho các kênh CHƯA kết nối — người dùng cần biết giới hạn, không cần bảng giả.
+        $rows[] = [
+            'id' => 'not_connected',
+            'name' => 'Kênh chưa kết nối',
+            'channels' => 'Shopee · TikTok Shop · Lazada · Instagram · SHEIN · TEMU · sàn quốc tế · runway',
+            'method' => 'Cần hợp tác dữ liệu với từng sàn',
+            'frequency' => '—',
+            'status' => 'not_connected',
+            'status_label' => 'Chưa kết nối',
+            'count' => 0,
+        ];
+
+        return $rows;
     }
 
     /**

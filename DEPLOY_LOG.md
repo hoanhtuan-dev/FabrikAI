@@ -2014,3 +2014,52 @@ Nếu người dùng khai `search_param=enable_search` cho một gateway **khôn
 | Trang · asset | `/` 200 · `/settings` 401 · `/api/design-agent/sources` 401 (chưa đăng nhập) · md5 asset khớp bản build ở máy · `production.ERROR` vẫn **9** |
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
+
+---
+
+## Phiên 2026-09-23 (Đợt 28 — SỬA SAI SÓT: mục Cài đặt không tồn tại · "demo" khi đã có nguồn thật · dọn chữ kỹ thuật khỏi giao diện)
+
+**Deploy:** §T§<prev> → <commit>§T§. Không migration mới.
+
+### 0. Người dùng bắt đúng ba lỗi — cả ba đều là lỗi của tôi
+
+| Người dùng nói | Sự thật kiểm lại | Nguyên nhân |
+|---|---|---|
+| "Cài đặt → Nguồn dữ liệu ngoài — mày bịa hả?" | **ĐÚNG: mục đó KHÔNG có trong sidebar** dù tôi đã nói là có | Tôi thêm `<section v-show="section === 'sources'">` nhưng **thiếu dòng khai trong `SECTIONS`** ⇒ section không bao giờ hiện. Tệ hơn: tôi **không mở trình duyệt kiểm** mà vẫn báo là xong |
+| "có nguồn thật rồi vẫn dùng demo là sao?" | **ĐÚNG: panel vẫn ghi "nguồn ngoài đang ở chế độ demo"** và bảng nguồn vẫn là 5 dòng TĨNH (4 dòng "Dữ liệu mẫu") bất kể thực tế | Danh sách nguồn hiển thị lấy từ hằng số `SOURCES` trong mã, **không đọc trạng thái thật** của trình kết nối |
+| "bớt chú giải kỹ thuật, làm sạch GUI" | **ĐÚNG: tôi nhét chữ của lập trình viên lên giao diện** — `enable_search` · `HTTP 200` · `items_path` · `external_evidence` · "theo KHAI BÁO, chưa kiểm chứng" | Tôi viết như đang giải thích cho chính mình thay vì viết cho người dùng |
+
+### 1. Sửa lỗi 1: mục Cài đặt nay CÓ THẬT và có đường vào
+
+- Khai mục vào `SECTIONS` (nhóm **Vận hành**): "Nguồn dữ liệu ngoài".
+- Đường vào: Studio → bánh răng → **Cài đặt hệ thống (API key · model)** → sidebar **Nguồn dữ liệu ngoài**.
+- **Kiểm bằng Chrome thật** (bước tôi đã bỏ qua lần trước): sidebar hiện mục, bấm vào thấy bảng nguồn + trạng thái lấy tin.
+- Sửa luôn lỗi tiền tố API: hàm `api()` gắn cứng `/api/settings-vue` nên gọi `/admin/web-sources` thành 404 ⇒ thêm `adminApi()` riêng.
+
+### 2. Sửa lỗi 2: hết cảnh "có nguồn thật mà vẫn demo"
+
+- `DesignAgentService::sourcesReport()` (mới) dựng danh sách nguồn từ **trạng thái THẬT**: mỗi nguồn đang chạy là một dòng kèm số tin (`Đang dùng` / `Không lấy được`); các KÊNH chưa kết nối (Shopee · TikTok · Lazada · Instagram · sàn quốc tế · runway) gộp thành **MỘT dòng** "Chưa kết nối" — không còn bảng trạng thái giả.
+- Khối trong Agent Studio mở đầu bằng một câu: **"Đang đọc 6 tin thật từ 3 nguồn · cập nhật 18:28."**
+
+### 3. Sửa lỗi 3: dọn chữ kỹ thuật khỏi giao diện
+
+| Trước (chữ của lập trình viên) | Nay (câu cho người dùng) |
+|---|---|
+| "Model KHÔNG có tìm kiếm web — theo KHAI BÁO, chưa kiểm chứng" + "đo thật 23/09/2026… HTTP 200 nhưng bỏ qua" | "AI đọc tin qua máy chủ FabrikAI, không phải model tự tìm kiếm. Model đang dùng: …" |
+| Bảng nguồn kèm HTTP · ms · kind · `items_path` · SSRF | Bảng chỉ còn **Nguồn · Trạng thái · Tin**; chi tiết kỹ thuật gấp trong *Danh sách nguồn & cách hoạt động* |
+| "Từ bộ đệm · 2 giây trước" + "(tốn token)" | "**Đã tạo cách đây 2 phút**" + "Tạo lại brief mới (tốn thêm một lượt gọi AI)" |
+| DNA: "Trước đây DNA do hệ thống đoán (đếm dự án + dò từ khoá…)" | "Điền càng cụ thể, brief càng sát shop của bạn. Bỏ trống cũng chạy được — khi đó AI dựa vào dự án và ảnh bạn đã làm." |
+| "Ảnh phân tích / tháng (CV chưa bật)" | "Ảnh phân tích mỗi tháng" |
+| Hướng dẫn nguồn JSON dài 3 gạch đầu dòng kỹ thuật | Gấp trong *"Nguồn của tôi là API trả JSON thì khai thế nào?"* |
+
+Đo lại bằng Chrome thật: khối nguồn **không còn** `enable_search` · `SSRF` · `items_path` · `external_evidence` · `HTTP 200` · "KHAI BÁO" · "chưa kiểm chứng" (kết quả: **[]**).
+
+### 4. Kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Chrome thật — Cài đặt | sidebar có **Nguồn dữ liệu ngoài**; bấm vào thấy bảng nguồn, cột "Lấy tin gần nhất" có dữ liệu thật |
+| Chrome thật — Agent Studio | *Nguồn dữ liệu cho phân tích*: "Đang đọc 6 tin thật từ 3 nguồn · cập nhật 18:28" + 6 tin thật (tên bài · nguồn · ngày) |
+| Test | full suite **903 test / 6.606 assert XANH** (sửa 1 test cũ khoá bảng nguồn tĩnh) |
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).

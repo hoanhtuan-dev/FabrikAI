@@ -97,7 +97,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-Cj3g4izA.css",
+    "file": "assets/app-BbexqQsB.css",
     "name": "app",
     "names": [
       "app.css"
@@ -134,7 +134,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-CDuOcblo.js",
+    "file": "assets/main-C0my5R_-.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -161,7 +161,7 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-RMDubyQ3.js",
+    "file": "assets/settings-BBWu84dP.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
@@ -171,7 +171,7 @@
       "_BaseModal-BNIPzHmm.js"
     ],
     "css": [
-      "assets/settings-BZHR5d1u.css"
+      "assets/settings-CcV7bo0r.css"
     ]
   }
 }
