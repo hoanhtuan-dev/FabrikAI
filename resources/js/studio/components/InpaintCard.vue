@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed } from 'vue';
 import { useStudioStore } from '../store.js';
+import { useJobTicker } from '../composables/useJobTicker.js';
 import CompareSlider from './CompareSlider.vue';
 import StudioIcon from './StudioIcon.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
@@ -33,10 +34,9 @@ function chipIcon(p) { const l = (p.label || '').toLowerCase(); if (l.includes('
 // ── Ctrl/Cmd + Enter để gửi ──
 function onPromptKeydown(e) { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); if (canSubmit.value) submitInpaint(); } }
 
-const now = ref(Date.now());
-let timer = null;
-onMounted(() => { timer = setInterval(() => { now.value = Date.now(); }, 1000); });
-onBeforeUnmount(() => { if (timer) clearInterval(timer); });
+// Đồng hồ CHỈ chạy khi job chạy — trước đây interval 1s sống từ mount tới unmount, re-render cả khi nhàn rỗi.
+const running = computed(() => store.inpaintStage === 'send' || store.inpaintStage === 'processing');
+const { now } = useJobTicker(running);
 
 const elapsedSec = computed(() => store.inpaintStartTs ? Math.max(0, Math.floor((now.value - store.inpaintStartTs) / 1000)) : 0);
 const fmt = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
@@ -49,7 +49,6 @@ const blockReason = computed(() => {
   return '';
 });
 const canSubmit = computed(() => !blockReason.value && !store.inpainting);
-const running = computed(() => store.inpaintStage === 'send' || store.inpaintStage === 'processing');
 const maskActive = computed(() => store.inpaintMaskMode !== 'none');
 </script>
 <template>

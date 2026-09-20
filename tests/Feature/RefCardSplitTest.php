@@ -66,8 +66,10 @@ class RefCardSplitTest extends TestCase
         $this->assertStringContainsString("{ id: 'tryon', kind: 'panel', icon: 'hanger', label: 'Mặc thử đồ' }", $app,
             'Phải có mục "Mặc thử đồ" với icon móc treo.');
 
-        $this->assertStringContainsString("import VariationCard from './components/VariationCard.vue'", $app);
-        $this->assertStringContainsString("import TryOnCard from './components/TryOnCard.vue'", $app);
+        // Từ đợt tối ưu 2026-09-24 card nặng nạp LƯỜI (async component) — luật khoá là card
+        // vẫn được StudioApp tham chiếu đúng một nguồn, không bắt buộc import eager.
+        $this->assertStringContainsString("VariationCard = asyncCard(() => import('./components/VariationCard.vue'))", $app);
+        $this->assertStringContainsString("TryOnCard = asyncCard(() => import('./components/TryOnCard.vue'))", $app);
     }
 
     /**

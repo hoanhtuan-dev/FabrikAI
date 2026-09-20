@@ -136,7 +136,7 @@ class ProjectStatsTest extends TestCase
     {
         // Bất biến phía giao diện: danh sách mục LỖI của lượt hàng loạt được giữ lại để chạy lại
         // (trước đây chỉ hiện toast rồi mất, người dùng phải tự nhớ mục nào lỗi).
-        $store = (string) file_get_contents(resource_path('js/studio/store.js'));
+        $store = static::studioStoreSource();
         $this->assertStringContainsString('batchFailed', $store, 'Store phải giữ danh sách mục lỗi.');
         $this->assertStringContainsString('entry.ok = true', $store, 'Phải đánh dấu từng mục xong/lỗi khi gửi.');
         $this->assertStringContainsString('batchSend.items.push', $store, 'Phải ghi lại từng mục để hiện tiến trình thật.');

@@ -280,7 +280,7 @@ class ModulesAdminTest extends TestCase
         $this->assertStringContainsString('openUpgradeFor(', $app, 'Bấm vào mục bị khoá phải mời nâng cấp.');
         $this->assertStringContainsString('lockedModules', $app, 'Popup gói phải liệt kê tính năng còn thiếu.');
 
-        $store = (string) file_get_contents(resource_path('js/studio/store.js'));
+        $store = static::studioStoreSource();
         $this->assertStringContainsString('setModuleAccess(', $store, 'Store phải nhận quyền module từ máy chủ.');
         $this->assertStringContainsString("data.code === 'module_locked'", $store, '403 module_locked phải mở bảng nâng cấp.');
 

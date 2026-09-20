@@ -247,7 +247,7 @@ class StudioDockResizeTest extends TestCase
 
     public function test_dock_width_is_persisted_across_reload(): void
     {
-        $store = $this->src('js/studio/store.js');
+        $store = static::studioStoreSource();
 
         // Mặc định = đúng bề rộng cũ, để người dùng đang quen không thấy bố cục nhảy.
         $this->assertStringContainsString('leftDockWidth: 288', $store, 'Mặc định dock trái phải là 288px (w-72 cũ).');

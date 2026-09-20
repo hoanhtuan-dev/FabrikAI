@@ -213,7 +213,7 @@ class ShotReviewTest extends TestCase
     public function test_ui_actually_drives_the_shot_lifecycle(): void
     {
         // Bất biến chống "tính năng chết": backend có mà giao diện không gọi thì coi như không có.
-        $store = (string) file_get_contents(resource_path('js/studio/store.js'));
+        $store = static::studioStoreSource();
         $this->assertStringContainsString('async loadProjectShots(', $store, 'Store phải nạp được danh sách ảnh kèm trạng thái duyệt.');
         $this->assertStringContainsString("'/shots/review'", $store, 'Store phải gọi endpoint duyệt theo lô.');
         $this->assertStringContainsString('shotLabel(state)', $store, 'Nhãn trạng thái phải có một nguồn trong store.');

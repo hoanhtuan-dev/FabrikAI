@@ -66,7 +66,7 @@ class CanvasControlsTest extends TestCase
 
     public function test_delete_works_for_a_single_selected_object(): void
     {
-        $store = $this->src('js/studio/store.js');
+        $store = static::studioStoreSource();
         $app = $this->src('js/studio/StudioApp.vue');
 
         // Đối tượng đang chọn LUÔN gồm layer active ⇒ chọn 1 đối tượng vẫn là 1 đơn vị để xóa.
@@ -144,7 +144,7 @@ class CanvasControlsTest extends TestCase
     public function test_status_bar_no_longer_downloads_the_active_image(): void
     {
         $bar = $this->vue('CanvasStatusBar.vue');
-        $store = $this->src('js/studio/store.js');
+        $store = static::studioStoreSource();
 
         $this->assertStringNotContainsString('downloadActive', $bar, 'Nút "Tải ảnh đang chọn" phải được gỡ khỏi status bar.');
         $this->assertStringNotContainsString('Tải ảnh đang chọn', $bar, 'Không còn nhãn "Tải ảnh đang chọn".');
@@ -215,7 +215,7 @@ class CanvasControlsTest extends TestCase
     {
         // Gỡ nút thì phải gỡ CẢ DÂY CHUYỀN — để lại route/controller/action là mã chết vẫn gọi được.
         $layers = $this->vue('LayersPanel.vue');
-        $store = $this->src('js/studio/store.js');
+        $store = static::studioStoreSource();
 
         $this->assertStringNotContainsString('Xóa nền AI', $layers, 'Bảng Lớp vẫn còn nút "Xóa nền AI".');
         $this->assertStringNotContainsString('removeBgConfirmOpen', $layers, 'Còn state popup xác nhận xóa nền.');
@@ -262,7 +262,7 @@ class CanvasControlsTest extends TestCase
 
     public function test_save_output_is_lit_only_for_new_images(): void
     {
-        $store = $this->src('js/studio/store.js');
+        $store = static::studioStoreSource();
         $layers = $this->vue('LayersPanel.vue');
 
         // Nhận biết "đã có trong Output" theo ĐÚNG thứ tự danh tính của ảnh.
@@ -340,7 +340,7 @@ class CanvasControlsTest extends TestCase
 
     public function test_hiding_a_layer_keeps_it_selected(): void
     {
-        $store = $this->src('js/studio/store.js');
+        $store = static::studioStoreSource();
 
         preg_match('/toggleLayerVisible\(id\)\s*\{(.*?)\n    \},/s', $store, $m);
         $this->assertNotEmpty($m[1] ?? '', 'Không đọc được toggleLayerVisible().');
@@ -387,7 +387,7 @@ class CanvasControlsTest extends TestCase
 
     public function test_legacy_layers_get_their_size_backfilled(): void
     {
-        $store = $this->src('js/studio/store.js');
+        $store = static::studioStoreSource();
         $app = $this->src('js/studio/StudioApp.vue');
 
         // GỐC RỄ ĐÃ ĐO ĐƯỢC: layer lưu từ phiên bản trước khôi phục về với baseW/baseH = null ⇒
@@ -500,7 +500,7 @@ class CanvasControlsTest extends TestCase
     public function test_layers_dock_is_resizable_and_animates_when_toggled(): void
     {
         $app = $this->src('js/studio/StudioApp.vue');
-        $store = $this->src('js/studio/store.js');
+        $store = static::studioStoreSource();
         $composable = $this->src('js/studio/composables/useDockResize.js');
         $panel = $this->vue('LayersPanel.vue');
 

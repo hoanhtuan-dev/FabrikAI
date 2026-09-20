@@ -80,7 +80,7 @@ class BatchGenerationTest extends TestCase
 
     public function test_store_exposes_batch_generation_sharing_the_single_item_payload(): void
     {
-        $store = (string) file_get_contents(resource_path('js/studio/store.js'));
+        $store = static::studioStoreSource();
 
         $this->assertStringContainsString('async generateBatch(', $store, 'Store phải có action tạo hàng loạt.');
         $this->assertStringContainsString('imagePayload(prompt, variants = 1)', $store, 'Phải có bộ dựng payload dùng CHUNG.');

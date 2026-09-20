@@ -87,7 +87,7 @@ class JobTemplatesTest extends TestCase
         $this->assertSame($ids, array_values(array_unique($ids)), 'Id mẫu việc không được trùng.');
 
         // Nguồn dữ liệu nằm ở PHP; JS chỉ gọi API (không có bản sao prompt trong resources/js).
-        $store = (string) file_get_contents(resource_path('js/studio/store.js'));
+        $store = static::studioStoreSource();
         $this->assertStringContainsString("fetch('/api/job-templates'", $store, 'Store phải nạp mẫu việc qua API.');
         $card = (string) file_get_contents(resource_path('js/studio/components/ConceptCard.vue'));
         $this->assertStringContainsString('useTemplate(tpl)', $card, 'Tab Hàng loạt phải có nút áp mẫu việc.');
@@ -98,7 +98,7 @@ class JobTemplatesTest extends TestCase
     {
         // Bất biến hành vi phía giao diện: mẫu có \`export\` ⇒ store giữ lại để khối "Xuất gói cho xưởng"
         // điền sẵn bảng size/ghi chú (không bắt người dùng gõ lại).
-        $store = (string) file_get_contents(resource_path('js/studio/store.js'));
+        $store = static::studioStoreSource();
         $this->assertStringContainsString('pendingExport', $store, 'Store phải giữ mẫu xuất đang chờ.');
 
         /* [2026-09-23] Khối xuất gói nay có ở HAI bề mặt (card sidebar + trang /bo-suu-tap) và logic

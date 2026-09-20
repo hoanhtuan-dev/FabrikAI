@@ -186,7 +186,7 @@ class ClientErrorReportTest extends TestCase
     /** Mã tra cứu của MÁY CHỦ không được bị ném bỏ khi client dựng Error từ phản hồi. */
     public function test_the_studio_keeps_the_server_lookup_code(): void
     {
-        $store = $this->code($this->js('store.js'));
+        $store = static::studioStoreSource();
 
         $this->assertStringContainsString('function apiError(', $store);
         $this->assertStringContainsString('err.error_code = payload.error_code;', $store);
@@ -210,7 +210,7 @@ class ClientErrorReportTest extends TestCase
     /** Nơi gọi đã hiển thị lỗi rồi thì KHÔNG bắn thêm sự kiện — nếu không khách nhận hai thẻ cho một lỗi. */
     public function test_the_store_does_not_double_notify(): void
     {
-        $store = $this->code($this->js('store.js'));
+        $store = static::studioStoreSource();
 
         $this->assertStringContainsString('silent: true', $store,
             'userFacingError phải gọi reportClientError với silent: true — nơi gọi (failToast/toast) đã hiển thị lỗi.');
@@ -245,7 +245,7 @@ class ClientErrorReportTest extends TestCase
      */
     public function test_api_errors_carry_their_endpoint_into_the_log_context(): void
     {
-        $store = $this->code($this->js('store.js'));
+        $store = static::studioStoreSource();
 
         $this->assertStringContainsString('err.api_context =', $store, 'Loi tu API phai mang ngu canh endpoint.');
         $this->assertStringContainsString('(e && e.api_context)', $store, 'userFacingError phai dung ngu canh do khi bao loi.');

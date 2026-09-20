@@ -16,6 +16,7 @@
  */
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { useStudioStore } from '../store.js';
+import { useJobTicker } from '../composables/useJobTicker.js';
 import SourceLibraryPicker from './SourceLibraryPicker.vue';
 import CompareSlider from './CompareSlider.vue';
 import StudioIcon from './StudioIcon.vue';
@@ -87,11 +88,11 @@ function groupItems(group) {
 function hiddenCount(group) { return Math.max(0, (group.items || []).length - CHIPS_VISIBLE); }
 
 // Tiến trình dùng CHUNG state với pipeline compose (chỉ một card mở tại một thời điểm).
-const now = ref(Date.now());
-let timer = null;
+// Đồng hồ CHỈ chạy khi job chạy — trước đây interval 1s sống từ mount tới unmount, re-render cả khi nhàn rỗi.
+const running = computed(() => store.composeStage === 'send' || store.composeStage === 'processing');
+const { now } = useJobTicker(running);
 const elapsedSec = computed(() => store.composeStartTs ? Math.max(0, Math.floor((now.value - store.composeStartTs) / 1000)) : 0);
 const fmt = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-const running = computed(() => store.composeStage === 'send' || store.composeStage === 'processing');
 const doneCount = computed(() => store.composeGenIds.filter(id => store.generations.find(g => g.id === Number(id))?.status === 'completed').length);
 
 let planTimer = null;
@@ -101,12 +102,10 @@ function schedulePlan() {
 }
 
 onMounted(async () => {
-  timer = setInterval(() => { now.value = Date.now(); }, 1000);
   await store.loadSceneCatalog();
   schedulePlan();
 });
 onBeforeUnmount(() => {
-  if (timer) clearInterval(timer);
   if (planTimer) clearTimeout(planTimer);
 });
 

@@ -436,7 +436,7 @@ class StaticIntegrityTest extends TestCase
         //   (a) trước đây generateImage() dùng setInterval cộng ngẫu nhiên 4–12%, khoá 90% rồi API
         //       trả về là ép 100% + "Hoàn tất!" dù ảnh còn 'pending' ⇒ người dùng bị lừa.
         //   (b) generateImage() còn KHÔNG gọi pollGeneration() ⇒ thumbnail kẹt "Đang chờ" tới khi F5.
-        $store = (string) file_get_contents(resource_path('js/studio/store.js'));
+        $store = static::studioStoreSource();
 
         // Dùng 'setInterval(' (có ngoặc) để không khớp chính dòng chú thích giải thích lịch sử.
         $this->assertStringNotContainsString('setInterval(', $store,
@@ -464,7 +464,7 @@ class StaticIntegrityTest extends TestCase
         // Bất biến: trạng thái xác thực của store phải được TIÊU THỤ ở tầng view.
         // `needsLogin` cũ đã bị KHAI TỬ trong bản vá này (thay bằng `authState`), nên nó không
         // còn là trạng thái sống — chỉ còn trong chú thích giải thích lịch sử.
-        $store = (string) file_get_contents(resource_path('js/studio/store.js'));
+        $store = static::studioStoreSource();
         $views = '';
         foreach ($this->vueFiles() as $f) {
             $views .= (string) file_get_contents($f);

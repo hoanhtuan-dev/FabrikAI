@@ -12,7 +12,8 @@
  * Dùng CHUNG đường backend /api/compose (mode='outfit') và cài đặt /api/outfit-settings với card
  * Ghép ảnh — cùng một pipeline, hai cửa vào.
  */
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useJobTicker } from '../composables/useJobTicker.js';
 import { useStudioStore } from '../store.js';
 import { apiError } from '../store.js';
 import SourceLibraryPicker from './SourceLibraryPicker.vue';
@@ -48,11 +49,11 @@ const compareOpen = ref(false);
 const afterUrl = computed(() => store.generations.find(g => lastIds.value.includes(g.id) && g.status === 'completed')?.media_url || '');
 
 // Tiến trình (dùng chung state với card Ghép ảnh — chỉ một card mở tại một thời điểm)
-const now = ref(Date.now());
-let timer = null;
+// Đồng hồ CHỈ chạy khi job chạy — trước đây interval 1s sống từ mount tới unmount, re-render cả khi nhàn rỗi.
+const running = computed(() => store.composeStage === 'send' || store.composeStage === 'processing');
+const { now } = useJobTicker(running);
 const elapsedSec = computed(() => store.composeStartTs ? Math.max(0, Math.floor((now.value - store.composeStartTs) / 1000)) : 0);
 const fmt = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-const running = computed(() => store.composeStage === 'send' || store.composeStage === 'processing');
 const doneCount = computed(() => store.composeGenIds.filter(id => store.generations.find(g => g.id === Number(id))?.status === 'completed').length);
 
 const CSRF = () => {
@@ -91,13 +92,11 @@ function useSamplePrompt() {
 }
 
 onMounted(() => {
-  timer = setInterval(() => { now.value = Date.now(); }, 1000);
   // Nạp cài đặt của tài khoản TRƯỚC, rồi mới điền prompt mẫu (để không ghi đè prompt đã lưu).
   loadOutfitSettings().then(() => {
     if (!prompt.value.trim()) prompt.value = OUTFIT_PROMPT;
   });
 });
-onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 
 async function run() {
   if (selectedCount.value < 2 || busy.value) return;

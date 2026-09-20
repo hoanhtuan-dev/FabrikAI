@@ -110,7 +110,7 @@ class UserFacingMessagesTest extends TestCase
 
     public function test_the_frontend_has_a_boundary_that_blocks_technical_text(): void
     {
-        $store = $this->src('resources/js/studio/store.js');
+        $store = static::studioStoreSource();
 
         // (1) Có bộ lọc dùng chung + nó thật sự được dùng ở hai cửa hiển thị.
         $this->assertStringContainsString('export function safeMessage(', $store, 'Thiếu bộ lọc câu nói với người dùng.');

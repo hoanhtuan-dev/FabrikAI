@@ -250,7 +250,7 @@ class TeamSeatsTest extends TestCase
         $this->assertStringContainsString('store.inviteMember', $app, 'Studio phải mời được thành viên.');
         $this->assertStringContainsString('store.removeMember', $app, 'Studio phải bỏ được ghế.');
 
-        $store = (string) file_get_contents(resource_path('js/studio/store.js'));
+        $store = static::studioStoreSource();
         $this->assertStringContainsString("'/api/team'", $store, 'Store phải gọi API nhóm.');
         $this->assertStringContainsString('temp_password', $store, 'Mật khẩu tạm phải được hiển thị một lần cho chủ nhóm.');
 

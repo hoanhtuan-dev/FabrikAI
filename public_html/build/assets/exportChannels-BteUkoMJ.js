@@ -1,0 +1,1 @@
+var e=[{id:``,label:`Mặc định (không tiền tố)`},{id:`shopee`,label:`Shopee`},{id:`lazada`,label:`Lazada`},{id:`tiktok`,label:`TikTok Shop`},{id:`catalogue`,label:`Catalogue / lookbook`},{id:`xuong`,label:`Gửi xưởng (mẫu kỹ thuật)`}];export{e as t};

@@ -1,33 +1,48 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick, defineAsyncComponent, h } from 'vue';
 import { useStudioStore } from './store.js';
 import { toastClientErrors } from './clientErrors.js';
-import CollectionsCard from './components/CollectionsCard.vue';
-import SuggestCard from './components/SuggestCard.vue';
-import ConceptCard from './components/ConceptCard.vue';
-import DesignAgents from './components/DesignAgents.vue';
-import UpscaleCard from './components/UpscaleCard.vue';
-import InpaintCard from './components/InpaintCard.vue';
+import LoadingSpinner from './components/LoadingSpinner.vue';
+// [Tối ưu tải trang — 2026-09-24] Component nặng nạp LƯỜI (dynamic import) thay vì gộp hết vào
+// bundle khởi động: trước đây main.js kéo ~599KB JS (mọi card + mọi popup) dù ngườ�� dùng chưa chắc
+// mở chúng. Nay: card activity bar nạp khi panel được chọn; popup nạp ở lần mở ĐẦU TIÊN rồi giữ
+// mount (cờ everOpened ở dưới) để không mất nháp khi đóng/mở lại.
+// Card: spinner nhỏ trong panel lúc tải chunk. Popup: phủ mờ + spinner để cú bấm có phản hồi ngay.
+const asyncCard = (loader) => defineAsyncComponent({ loader, loadingComponent: LoadingSpinner, delay: 150 });
+// Phải dùng render function: bản Vue của Vite là runtime-only (không kèm compiler) nên option
+// `template:` trong component thường sẽ không biên dịch được ở trình duyệt.
+const ModalLoadingScrim = {
+  setup() {
+    return () => h('div', { class: 'fixed inset-0 z-[115] grid place-items-center bg-ink-950/60', role: 'status', 'aria-label': 'Đang tải' }, [h(LoadingSpinner, { text: 'Đang tải…' })]);
+  },
+};
+const asyncModal = (loader) => defineAsyncComponent({ loader, loadingComponent: ModalLoadingScrim, delay: 120 });
+const CollectionsCard = asyncCard(() => import('./components/CollectionsCard.vue'));
+const SuggestCard = asyncCard(() => import('./components/SuggestCard.vue'));
+const ConceptCard = asyncModal(() => import('./components/ConceptCard.vue'));
+const DesignAgents = asyncModal(() => import('./components/DesignAgents.vue'));
+const UpscaleCard = asyncCard(() => import('./components/UpscaleCard.vue'));
+const InpaintCard = asyncCard(() => import('./components/InpaintCard.vue'));
 // [Yêu cầu 2026-09-22] Card "Ghép ảnh" nay là STUDIO — phòng chụp thời trang chuyên nghiệp
 // (bối cảnh chủ đề · ánh sáng · ống kính · dáng · danh sách ảnh · hậu kỳ). Id panel giữ nguyên 'compose'.
-import StudioCard from './components/StudioCard.vue';
+const StudioCard = asyncCard(() => import('./components/StudioCard.vue'));
 // Card riêng cho "Ghép trang phục" — trước đây là một CHẾ ĐỘ trong card Studio.
-import OutfitComposeCard from './components/OutfitComposeCard.vue';
+const OutfitComposeCard = asyncCard(() => import('./components/OutfitComposeCard.vue'));
 // [Yêu cầu 2026-09-17] Card cũ "Ảnh mới từ ảnh mẫu" tách thành 2 card riêng.
-import VariationCard from './components/VariationCard.vue';
-import TryOnCard from './components/TryOnCard.vue';
+const VariationCard = asyncCard(() => import('./components/VariationCard.vue'));
+const TryOnCard = asyncCard(() => import('./components/TryOnCard.vue'));
 import RegionTools from './components/RegionTools.vue';
 import CanvasMaskTools from './components/CanvasMaskTools.vue';
 import ContextToolbar from './components/ContextToolbar.vue';
-import DirectorCard from './components/DirectorCard.vue';
+const DirectorCard = asyncCard(() => import('./components/DirectorCard.vue'));
 // [Đợt 0.5] GỠ import chết: SourcePanel/LibraryCard từng được thay bằng SourcePickerPopup/LibraryApp
 // nhưng import còn sót — "card" cũ không render ở đâu, chỉ để lại ấn tượng mobile đang dùng chúng.
-import SourcePickerPopup from './components/SourcePickerPopup.vue';
+const SourcePickerPopup = asyncModal(() => import('./components/SourcePickerPopup.vue'));
 import OutputModule from './components/OutputModule.vue';
-import LibraryApp from './LibraryApp.vue';
+const LibraryApp = asyncModal(() => import('./LibraryApp.vue'));
 // MultiSelectBar đã gộp vào ContextToolbar (layer selection bar).
-import GalleryModal from './components/GalleryModal.vue';
-import ProjectWorkspace from './components/ProjectWorkspace.vue';
+const GalleryModal = asyncModal(() => import('./components/GalleryModal.vue'));
+const ProjectWorkspace = asyncModal(() => import('./components/ProjectWorkspace.vue'));
 import StudioIcon from './components/StudioIcon.vue';
 import LayersPanel from './components/LayersPanel.vue';
 // [2026-09-20] Vách ngăn kéo + bộ điều khiển dock DÙNG CHUNG cho mọi dock co/giãn được.
@@ -45,6 +60,14 @@ const store = useStudioStore();
 // Lỗi nổ ra ngoài mọi khối try/catch (exception · promise bị từ chối) vẫn phải tới được người dùng
 // KÈM MÃ TRA CỨU — không thì nó chỉ nằm trong console của khách (docs/DESIGN_SYSTEM.md §6.5).
 toastClientErrors((text) => store.toast(text, 'error'));
+
+// Popup nặng nạp lưới NHƯNG sau lần mở đầu phải giữ mount — nếu gỡ khỏi DOM khi đóng thì bản nháp
+// nội bộ component (prompt đang gõ, tab đang xem) mất sạch, khác hẳn hành vi cũ.
+// Cờ everOpened: false -> chưa tải chunk; true -> đã tải và mount thường trực từ đó về sau.
+const designAgentsOpened = ref(!!store.designAgentOpen);
+const conceptPromptOpened = ref(!!store.promptOpen);
+watch(() => store.designAgentOpen, (open) => { if (open) designAgentsOpened.value = true; });
+watch(() => store.promptOpen, (open) => { if (open) conceptPromptOpened.value = true; });
 
 // [Q3 — 2026-09-19] GÓI THEO MÙA VỤ: mốc mua của gói xưởng là số VỤ (1 vụ = 3 tháng), không phải số
 // tháng. Form yêu cầu nâng cấp đọc mốc + nhãn từ CHÍNH gói đang chọn để không tự bịa đơn vị.
@@ -1671,8 +1694,8 @@ function onTouchEnd(e) {
         </div>
       </div>
     </div>
-    <ConceptCard popup />
+    <ConceptCard v-if="conceptPromptOpened" popup />
     <!-- Trợ lý thiết kế hợp nhất: TrendRadar + CollectionBot -->
-    <DesignAgents v-model="store.designAgentOpen" />
+    <DesignAgents v-if="designAgentsOpened" v-model="store.designAgentOpen" />
   </div>
 </template>

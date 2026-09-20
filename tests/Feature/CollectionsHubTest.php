@@ -81,14 +81,16 @@ class CollectionsHubTest extends TestCase
 
         $app = (string) file_get_contents(resource_path('js/studio/StudioApp.vue'));
         $this->assertStringContainsString('collections: [CollectionsCard]', $app, 'Thiếu card Bộ sưu tập trong bản đồ ACTIVITY_CARDS.');
-        $this->assertStringContainsString("import CollectionsCard from './components/CollectionsCard.vue'", $app);
+        // Từ đợt tối ưu 2026-09-24 card nặng nạp LƯỜI (async component) — luật khoá là
+        // CollectionsCard vẫn được StudioApp tham chiếu đúng một nguồn, không bắt buộc import eager.
+        $this->assertStringContainsString("CollectionsCard = asyncCard(() => import('./components/CollectionsCard.vue'))", $app);
         $this->assertStringContainsString('workspaceOpenRequest', $app, 'Phải có cầu nối mở workspace từ card (card không nhận được event).');
     }
 
     public function test_hub_card_only_uses_existing_store_actions(): void
     {
         $card = (string) file_get_contents(resource_path('js/studio/components/CollectionsCard.vue'));
-        $store = (string) file_get_contents(resource_path('js/studio/store.js'));
+        $store = static::studioStoreSource();
 
         /* [2026-09-23] Bất biến này nay kiểm DỮ LIỆU-DẪN-XUẤT thay vì một danh sách viết cứng.
            Lý do: card sidebar đã được thu gọn có chủ đích (việc chuyên sâu chuyển sang trang
