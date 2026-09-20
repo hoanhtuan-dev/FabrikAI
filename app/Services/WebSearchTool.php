@@ -30,8 +30,14 @@ class WebSearchTool
     /** Tên hàm gửi cho model — giữ ngắn, chỉ chữ thường và gạch dưới theo chuẩn function-calling. */
     public const NAME = 'web_search';
 
-    /** Trần lời gọi công cụ cho MỘT lượt chạy agent (mỗi lời gọi là một lần đi mạng). */
-    public const MAX_CALLS = 3;
+    /**
+     * Trần lời gọi công cụ cho MỘT lượt chạy agent (mỗi lời gọi là một lần đi mạng).
+     *
+     * 2026-09-21: nâng 3 → 5. Với trần 3, model chỉ tra được 3 chủ đề trong một danh mục hàng chục hướng,
+     * nên phần lớn hướng vẫn không có bằng chứng. Mỗi lời gọi có đệm 15 phút theo (nguồn · từ khoá) nên
+     * lượt chạy sau thường không tốn thêm lần đi mạng nào.
+     */
+    public const MAX_CALLS = 5;
 
     /** Trần ký tự của từ khoá model được hỏi. */
     private const MAX_QUERY_CHARS = 120;
