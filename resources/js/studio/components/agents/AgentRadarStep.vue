@@ -149,54 +149,59 @@ const formatVnd = inject('formatVnd');
                 </div>
               </details>
 
-              <!-- ĐỊNH HƯỚNG: phần suy luận (AI hoặc tất định) — nói rõ nguồn của từng hướng. -->
+              <!-- ĐỊNH HƯỚNG: thu gọn để người dùng TẬP TRUNG vào hướng thời trang + hiểu đang chọn gì,
+                   để làm gì. Chi tiết (việc làm · rủi ro · giá · độ tin cậy · nguồn) gấp vào <details>. -->
               <div v-if="directions.length" class="mb-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div class="min-w-0">
                     <h3 class="font-display text-base font-semibold text-brand-300">Định hướng từ TrendRadar ({{ directions.length }})</h3>
-                    <p class="mt-0.5 text-body leading-5 text-cream-400">
-                      {{ radarMethodLine }}
-                      <span v-if="radarReadAt" class="text-cream-400">· đọc lúc {{ radarReadAt }}.</span>
-                    </p>
+                    <p class="mt-0.5 text-body leading-5 text-cream-400">Chọn trend gắn với hướng bạn muốn — AI sẽ dựng brief bám theo các trend đã chọn.</p>
                   </div>
                   <button type="button" class="tool-btn" title="Chọn các trend mà 3 định hướng mạnh nhất đang nhắc tới" @click="focusDirections">
-                    <StudioIcon name="target" size="h-3 w-3" /> Chọn trend theo 3 hướng đầu
+                    <StudioIcon name="target" size="h-3 w-3" /> Chọn 3 hướng đầu
                   </button>
                 </div>
                 <div class="mt-3 grid gap-2.5 lg:grid-cols-2">
-                  <article v-for="row in directions" :key="row.id" class="rounded-lg border border-ink-700 bg-ink-800 p-3.5">
+                  <article v-for="row in directions" :key="row.id" class="rounded-lg border border-ink-700 bg-ink-800 p-3">
                     <div class="flex items-start justify-between gap-2">
-                      <h4 class="text-xs font-semibold leading-5 text-cream-100">{{ row.title }}</h4>
+                      <h4 class="text-sm font-semibold leading-5 text-cream-50">{{ row.title }}</h4>
                       <span
                         class="shrink-0 rounded px-1.5 py-0.5 text-tiny font-semibold uppercase tracking-wide"
                         :class="row.source === 'ai' ? 'bg-emerald-500/15 text-ok' : 'bg-ink-700 text-cream-400'"
                       >{{ row.source === 'ai' ? 'AI' : 'tất định' }}</span>
                     </div>
-                    <p v-if="row.thesis" class="mt-1.5 text-body leading-5 text-cream-200">{{ row.thesis }}</p>
-                    <dl class="mt-2 space-y-1 text-label leading-4">
-                      <div v-if="row.why_now" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-brand-200">Vì sao:</dt><dd class="text-cream-300">{{ row.why_now }}</dd></div>
-                      <div v-if="row.action" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-brand-200">Việc làm:</dt><dd class="text-cream-300">{{ row.action }}</dd></div>
-                      <div v-if="row.risk" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-warn">Rủi ro:</dt><dd class="text-cream-300">{{ row.risk }}</dd></div>
-                    </dl>
-                    <!-- Định hướng nói rõ nó dựa trên GÌ: tin thật (kèm số tin + link) hay bộ có sẵn. -->
-                    <p v-if="row.evidence_mode === 'live' && row.live" class="mt-2 text-label leading-4 text-ok">
-                      Dựa trên {{ row.live.mentions }} tin thật · {{ row.live.source_count }} nguồn
-                      <template v-if="(row.evidence || []).length">
-                        — <a v-for="item in row.evidence" :key="item.url" :href="item.url" target="_blank" rel="noopener" class="underline decoration-dotted hover:text-cream-100">{{ item.title }}</a>
-                      </template>
-                    </p>
-                    <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
-                      <span v-if="directionPriceLabel(row.price_band)" class="rounded bg-ink-700 px-1.5 py-0.5 text-tiny text-cream-200">{{ directionPriceLabel(row.price_band) }}</span>
-                      <span v-if="directionConfidence(row.confidence) !== null" class="rounded bg-ink-700 px-1.5 py-0.5 text-tiny text-cream-200">Tin cậy {{ directionConfidence(row.confidence) }}%</span>
+                    <!-- MỘT câu lý do: giúp hiểu "hướng này để làm gì, vì sao nên chọn" -->
+                    <p v-if="row.thesis || row.why_now" class="mt-1 text-body leading-5 text-cream-300">{{ row.thesis || row.why_now }}</p>
+                    <!-- Trend gắn với hướng — đây là thứ người dùng BẤM để chọn -->
+                    <div v-if="row.trend_ids && row.trend_ids.length" class="mt-2.5 flex flex-wrap items-center gap-1.5">
+                      <span class="text-tiny text-cream-400">Trend gắn:</span>
                       <button
                         v-for="id in row.trend_ids"
                         :key="id"
                         type="button"
-                        class="motion-ui rounded border px-1.5 py-0.5 text-tiny transition"
+                        class="motion-ui rounded border px-2 py-1 text-tiny font-semibold transition"
                         :class="selectedTrendIds.includes(String(id)) ? 'border-brand-500 bg-brand-500/15 text-brand-200 hover:bg-brand-500/25' : 'border-ink-600 text-cream-300 hover:bg-ink-700'"
                         @click="toggleTrend(id)"
                       >{{ trendNameById(id) }}</button>
                     </div>
+                    <!-- Chi tiết + nguồn gấp lại để không chiếm màn hình -->
+                    <details class="mt-2">
+                      <summary class="cursor-pointer text-tiny text-cream-400 underline decoration-dotted">Chi tiết &amp; nguồn</summary>
+                      <dl class="mt-1.5 space-y-1 text-label leading-4">
+                        <div v-if="row.action" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-brand-200">Việc làm:</dt><dd class="text-cream-300">{{ row.action }}</dd></div>
+                        <div v-if="row.risk" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-warn">Rủi ro:</dt><dd class="text-cream-300">{{ row.risk }}</dd></div>
+                      </dl>
+                      <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span v-if="directionPriceLabel(row.price_band)" class="rounded bg-ink-700 px-1.5 py-0.5 text-tiny text-cream-200">{{ directionPriceLabel(row.price_band) }}</span>
+                        <span v-if="directionConfidence(row.confidence) !== null" class="rounded bg-ink-700 px-1.5 py-0.5 text-tiny text-cream-200">Tin cậy {{ directionConfidence(row.confidence) }}%</span>
+                      </div>
+                      <p v-if="row.evidence_mode === 'live' && row.live" class="mt-1.5 text-label leading-4 text-ok">
+                        Dựa trên {{ row.live.mentions }} tin thật · {{ row.live.source_count }} nguồn
+                        <template v-if="(row.evidence || []).length">
+                          — <a v-for="item in row.evidence" :key="item.url" :href="item.url" target="_blank" rel="noopener" class="underline decoration-dotted hover:text-cream-100">{{ item.title }}</a>
+                        </template>
+                      </p>
+                    </details>
                   </article>
                 </div>
               </div>
