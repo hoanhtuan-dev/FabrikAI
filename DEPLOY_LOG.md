@@ -38,8 +38,16 @@ helpers.js · state.js · getters.js + 10 module actions (account · generation 
 - Commit: bbf837e (hiệu năng + tách store) · 082c6c9 (tách DesignAgents).
 
 ### Việc còn lại (không chặn)
-- **ĐÃ DEPLOY production 2026-09-24**: push `54de338 → 87b3fda` → SSH `git pull --ff-only` → HEAD `87b3fda` · `migrate` = Nothing to migrate · verify: `/` 200 · `main-De78Y48H.js` (179.070 byte) 200 · chunk `DesignAgents-CGv_NxyR.js` 200 · homepage trỏ đúng asset mới.
-- store/actions layers.js (1.231) và selection.js (1.039) còn dài — có thể tách tiếp khi cần, không bắt buộc.
+- **ĐÃ DEPLOY production 2026-09-24 (2 lần)**: lần 1 push `54de338 → 87b3fda` · lần 2 push `87b3fda → 9511da6` (tách tiếp + phím tắt) → SSH `git pull --ff-only` → HEAD `9511da6` · `migrate` = Nothing to migrate · verify: `/` 200 · `main-BoAXd400.js` 200 · chunk `DesignAgents-D6lw6kKB.js` 200 · homepage trỏ đúng asset mới.
+
+### 4. Nối tiếp (cùng phiên) — tách tiếp + phím tắt
+| # | Thay đổi | File | Ghi chú |
+|---|---|---|---|
+| 6 | Tách tiếp layers.js + selection.js | store/actions/ | layers → layerCore + brushes + layerTransform; selection → maskSelect + pathTool + maskBrush + regionOps (7 module con, cắt nguyên văn) |
+| 7 | Phím tắt điều hướng Agent Studio | DesignAgents.vue + AgentBriefStep.vue | Ctrl/Cmd+←/→ chuyển bước · 1–4 nhảy bước · Ctrl/Cmd+Enter tiếp tục (ngoài ô prompt); chặn khi đang gõ |
+| 8 | Hint phím tắt ở action bar | DesignAgents.vue | chuỗi gợi ý nhỏ + title trên nút Quay lại/Tiếp tục |
+
+> Ghi chú: skeleton loading (radar 6 ô · brief 6 ô) và empty state (trend/brief/kế hoạch) đã có sẵn từ các đợt trước — đợt này chỉ bổ sung phím tắt, không làm lại.
 
 ---
 
