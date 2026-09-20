@@ -675,6 +675,33 @@ function agentKeydown(event) {
 onMounted(() => window.addEventListener('keydown', agentKeydown));
 onBeforeUnmount(() => window.removeEventListener('keydown', agentKeydown));
 
+// ── LƯU NHÁP BỀN (2026-09-24) ─────────────────────────────────────────────────────────────
+// Prompt · bước đang mở · trend đã chọn · size preset KHÔNG mất khi tải lại trang / đóng modal.
+// Agent Studio là "trợ thủ" thì người dùng không được mất công sức vì lỡ F5 hay máy tự reload.
+const DRAFT_KEY = 'fabrikai.agentStudio.draft';
+function saveAgentDraft() {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      prompt: prompt.value,
+      step: store.designAgentStep || 'dna',
+      sizePreset: sizePreset.value,
+      selectedTrendIds: (store.selectedTrendIds || []).slice(),
+    }));
+  } catch (e) { /* chế độ riêng tư / đầy bộ nhớ — không làm hỏng luồng chính */ }
+}
+function restoreAgentDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    if (!d) return;
+    if (typeof d.prompt === 'string') prompt.value = d.prompt;
+    if (d.step && STEPS.some((s) => s.id === d.step)) store.setDesignAgentStep(d.step);
+    if (d.sizePreset && SIZE_PRESETS.some((s) => s.id === d.sizePreset)) sizePreset.value = d.sizePreset;
+    if (Array.isArray(d.selectedTrendIds)) store.selectedTrendIds = d.selectedTrendIds.map(String);
+  } catch (e) { /* bỏ qua bản nháp hỏng */ }
+}
+restoreAgentDraft();
+watch([prompt, () => store.designAgentStep, sizePreset, () => store.selectedTrendIds], saveAgentDraft);
+
 watch(prompt, () => { collectionError.value = ''; store.collectionBriefError = ''; });
 watch(collection, (value) => {
   const settings = value?.canvas || {};

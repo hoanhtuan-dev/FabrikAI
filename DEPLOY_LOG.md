@@ -57,6 +57,29 @@ helpers.js · state.js · getters.js + 10 module actions (account · generation 
 
 > Kết quả đợt 33 (tổng): hiệu năng main 599→179KB · tách store/DesignAgents/layers/selection · phím tắt · vai tìm kiếm + Model Registry · sửa TDZ + radar 504 · thiết kế lại UI mobile-first. Suite 959 test XANH, deploy HEAD b0ba214.
 
+### 5. CỨU MODEL VĂN BẢN (đo trên production 2026-09-24)
+
+**Chẩn đoán thật (test trực tiếp từng provider bằng key giải mã đúng):**
+
+| Provider | Model | Kết quả |
+|---|---|---|
+| deepseek | deepseek-chat | ✅ 200 · ~0.9s · JSON hợp lệ |
+| deepseek | deepseek-flash | ✅ 200 · ~1.1s · JSON hợp lệ |
+| ckey (api.xah.io) | sypham98/qwen3.8-fast | ⚠️ 200 nhưng **21 giây** cho câu hỏi tầm thường |
+| qwen | (cả 2 key Token Plan + PayGo) | ❌ **đang TẮT** (enabled=0) |
+
+**Đã sửa (chạy script trên production):**
+- Tắt 4 model `ckey:sypham98/qwen3.8-fast` (nhóm vision · prompt · translate · agent_search) — model này chậm 21s, gây 504. KHÔNG đụng model ảnh `ckey:phuocanh421994/Qwen_Image_3.0_Pro`.
+- Trỏ `studio_task_translate_model` → `deepseek:deepseek-chat` (trước đó trỏ ckey chậm).
+- Xoá cache model registry.
+
+**CÒN LẠI — chỉ chủ dự án làm được:**
+1. **Nạp/gia hạn Qwen key** (đang TẮT) — cần cho: tạo ảnh `qwen-image-3.0-pro` · đọc ảnh (vision) · model văn bản chính. Mở Cài đặt → API Keys → bật lại key Qwen (hoặc thêm key mới).
+2. **Kiểm tra api.xah.io (ckey)** — nếu model ảnh qua ckey cũng chậm/hỏng thì gia hạn hoặc bỏ provider này.
+3. **Bật cron + queue worker** trên hPanel (generation vẫn chạy inline chậm): `schedule:run` mỗi phút + `queue:work --stop-when-empty`.
+
+> Lưu ý: lỗi "401" tưởng key hỏng ở lần test đầu là do đọc sai trường `value` (đã mã hoá) — phải dùng `studio_api_key_value()`; key deepseek thực ra HỢP LỆ.
+
 > Ghi chú: skeleton loading (radar 6 ô · brief 6 ô) và empty state (trend/brief/kế hoạch) đã có sẵn từ các đợt trước — đợt này chỉ bổ sung phím tắt, không làm lại. Vai "Tìm kiếm nguồn ngoài" (nhóm công việc agent_search) ĐÃ tồn tại từ Đợt 30 (Ba vai riêng: suy luận · đọc ảnh · tìm kiếm); đợt này sửa lỗi nó không chạy được khi chỉ khai mình nó.
 
 ---
