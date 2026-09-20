@@ -180,8 +180,11 @@ class MarketAnalysisFromSourcesTest extends TestCase
         $view = static::designAgentsSource();
 
         $this->assertStringContainsString('Có tin thật ({{ liveTrendCount }})', $view);
-        $this->assertStringContainsString('Chủ đề đang được nói tới trong tin', $view);
-        $this->assertStringContainsString('hướng thuộc bộ có sẵn', $view);
+        // Nhãn được thu gọn trong đợt thiết kế lại 2026-09-24 — luật vẫn là: có khối chủ đề + tách rõ
+        // hướng ĐO TỪ TIN THẬT với hướng BỘ CÓ SẴN.
+        $this->assertStringContainsString('Chủ đề đang được nói tới', $view);
+        $this->assertStringContainsString('đo từ tin thật', $view);
+        $this->assertStringContainsString('bộ có sẵn', $view);
         $this->assertStringContainsString('marketTopics', $view);
     }
 }

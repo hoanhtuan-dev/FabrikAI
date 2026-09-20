@@ -107,67 +107,47 @@ const formatVnd = inject('formatVnd');
             </div>
 
             <template v-else-if="radar">
-              <!-- TÍN HIỆU ĐO TỪ TIN THẬT: số liệu có thật, đo bằng thuật toán, KHÔNG cần AI.
-                   Đặt TRƯỚC phần định hướng vì đây là thứ chủ shop dùng để tin phần phía sau. -->
-              <div v-if="marketLive" class="mb-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <h3 class="font-display text-base font-semibold text-brand-300">Tín hiệu đo từ tin thật ({{ marketSignals.length }})</h3>
-                    <p class="mt-0.5 text-body leading-5 text-cream-400">
-                      {{ market.note }}<template v-if="marketAgeLabel"> · đo {{ marketAgeLabel }}</template>
-                    </p>
+              <!-- TÍN HIỆU ĐO TỪ TIN THẬT: thu gọn + giải thích ngôn ngữ thường. Số liệu thật, đo bằng
+                   thuật toán KHÔNG cần AI — nhưng không nên chiếm hết màn hình: mặc định thu khi nhiều tín hiệu. -->
+              <details v-if="marketLive" class="mb-5 rounded-xl border border-ink-700 bg-ink-900/70" :open="marketSignals.length <= 4">
+                <summary class="cursor-pointer select-none px-4 py-3">
+                  <span class="flex flex-wrap items-center gap-2">
+                    <StudioIcon name="scan" size="h-4 w-4" class="text-ok" />
+                    <span class="font-display text-base font-semibold text-cream-50">Tín hiệu đo từ tin thật ({{ marketSignals.length }})</span>
+                    <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-label font-semibold text-ok">đo tự động · không cần AI</span>
+                  </span>
+                  <span class="mt-1 block text-label leading-4 text-cream-400">Máy chủ đọc tin từ các nguồn đã nối rồi đếm từ khoá đang được nhắc tới — số liệu THẬT kèm nguồn, không phải dự đoán của AI.{{ marketAgeLabel ? ' · đo ' + marketAgeLabel : '' }}</span>
+                </summary>
+                <div class="border-t border-ink-700 px-4 pb-3 pt-2.5">
+                  <div class="flex flex-wrap gap-1.5">
+                    <span v-for="signal in marketSignals" :key="signal.category + signal.term" class="inline-flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-900 px-2.5 py-1.5 text-label">
+                      <span class="font-semibold text-cream-100">{{ signal.term }}</span>
+                      <span class="text-cream-400">{{ signal.mentions }} tin · {{ signal.source_count }} nguồn</span>
+                      <span v-if="signal.change_pct === null || signal.change_pct === undefined" class="text-tiny text-cream-400">lần đo đầu</span>
+                      <span v-else class="rounded px-1 py-0.5 text-tiny font-semibold" :class="signal.change_pct >= 0 ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'">{{ signal.change_pct >= 0 ? '↗' : '↘' }} {{ Math.abs(signal.change_pct) }}%</span>
+                    </span>
                   </div>
-                  <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-label font-semibold text-ok">Đo tự động, không cần AI</span>
-                </div>
 
-                <ul class="mt-3 grid gap-2 sm:grid-cols-2">
-                  <li v-for="signal in marketSignals" :key="signal.category + signal.term" class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2">
-                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span class="text-body font-semibold text-cream-100">{{ signal.term }}</span>
-                      <span class="rounded bg-ink-800 px-1.5 py-0.5 text-tiny text-cream-300">{{ signal.category_label }}</span>
-                      <span class="text-label text-cream-300">{{ signal.mentions }} tin · {{ signal.source_count }} nguồn</span>
-                      <span
-                        v-if="signal.change_pct === null || signal.change_pct === undefined"
-                        class="rounded bg-ink-800 px-1.5 py-0.5 text-tiny text-cream-400"
-                      >lần đo đầu tiên</span>
-                      <span
-                        v-else
-                        class="rounded px-1.5 py-0.5 text-tiny font-semibold"
-                        :class="signal.change_pct >= 0 ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'"
-                      >{{ signal.change_pct >= 0 ? 'tăng' : 'giảm' }} {{ Math.abs(signal.change_pct) }}%</span>
-                    </div>
-                    <ul v-if="signalSamples(signal).length" class="mt-1.5 space-y-0.5 text-label leading-4 text-cream-300">
-                      <li v-for="sample in signalSamples(signal)" :key="sample.url">
-                        · <a :href="sample.url" target="_blank" rel="noopener" class="underline decoration-dotted hover:text-cream-100">{{ sample.title }}</a>
-                        <span v-if="sample.source" class="text-cream-400"> — {{ sample.source }}</span>
+                  <p v-if="marketTopics.length" class="mt-3 text-label leading-5 text-cream-300">
+                    <span class="font-semibold text-cream-200">Chủ đề đang được nói tới ({{ marketTopics.length }}):</span>
+                    <template v-for="(topic, i) in marketTopics.slice(0, 8)" :key="topic.term"><span class="text-cream-200">{{ topic.term }}</span><span v-if="i < Math.min(marketTopics.length, 8) - 1" class="text-cream-400"> · </span></template>
+                    <span v-if="marketTopics.length > 8" class="text-cream-400"> · …</span>
+                    <span class="text-cream-400"> — cụm từ lặp lại trong bài báo, không phải danh mục FabrikAI khai sẵn.</span>
+                  </p>
+
+                  <p v-if="marketPrices && marketPrices.count" class="mt-2 text-label text-cream-300">Giá ghi trong tin ({{ marketPrices.count }} lần): <b class="text-cream-100">{{ formatVnd(marketPrices.min_vnd) }} – {{ formatVnd(marketPrices.median_vnd) }} – {{ formatVnd(marketPrices.max_vnd) }}</b> <span class="text-cream-400">(thấp · trung vị · cao)</span></p>
+
+                  <details v-if="marketSignals.some((s) => signalSamples(s).length)" class="mt-2">
+                    <summary class="cursor-pointer text-label text-cream-400 underline decoration-dotted">Xem nguồn của từng tín hiệu</summary>
+                    <ul class="mt-1.5 space-y-1 text-label leading-4 text-cream-300">
+                      <li v-for="signal in marketSignals.filter((s) => signalSamples(s).length)" :key="'src-' + signal.term">
+                        <b class="text-cream-200">{{ signal.term }}</b>:
+                        <template v-for="(sample, j) in signalSamples(signal)" :key="sample.url"><a :href="sample.url" target="_blank" rel="noopener" class="underline decoration-dotted hover:text-cream-100">{{ sample.title }}</a><span v-if="j < signalSamples(signal).length - 1"> · </span></template>
                       </li>
                     </ul>
-                  </li>
-                </ul>
-
-                <!-- CHỦ ĐỀ ĐỌC TỪ CHÍNH TIN: cụm từ lặp lại trong tiêu đề/mô tả, KHÔNG phải danh mục khai
-                     sẵn — đây là phần trả lời "phân tích từ nguồn ngoài" mà không cần model nào. -->
-                <div v-if="marketTopics.length" class="mt-4 border-t border-ink-700 pt-3">
-                  <p class="text-body font-semibold text-cream-100">Chủ đề đang được nói tới trong tin ({{ marketTopics.length }})</p>
-                  <p class="mt-0.5 text-label leading-4 text-cream-400">Đọc trực tiếp từ tiêu đề và mô tả của các bài vừa lấy — không phải danh mục có sẵn của FabrikAI.</p>
-                  <ul class="mt-2 space-y-1.5">
-                    <li v-for="topic in marketTopics.slice(0, 6)" :key="'topic-' + topic.term" class="text-label leading-5 text-cream-200">
-                      <span class="font-semibold text-cream-100">{{ topic.term }}</span>
-                      <span class="text-cream-400"> · {{ topic.mentions }} tin · {{ topic.source_count }} nguồn</span>
-                      <ul v-if="signalSamples(topic).length" class="mt-0.5 space-y-0.5 text-cream-300">
-                        <li v-for="sample in signalSamples(topic)" :key="sample.url">
-                          · <a :href="sample.url" target="_blank" rel="noopener" class="underline decoration-dotted hover:text-cream-100">{{ sample.title }}</a>
-                        </li>
-                      </ul>
-                    </li>
-                  </ul>
+                  </details>
                 </div>
-
-                <p v-if="marketPrices && marketPrices.count" class="mt-3 text-body leading-5 text-cream-300">
-                  Giá ghi nhận trong tin ({{ marketPrices.count }} lần): {{ formatVnd(marketPrices.min_vnd) }} – {{ formatVnd(marketPrices.median_vnd) }} – {{ formatVnd(marketPrices.max_vnd) }}
-                  <span class="text-cream-400">(thấp · trung vị · cao — giá đọc được trong bài, không phải giá bán của bạn)</span>
-                </p>
-              </div>
+              </details>
 
               <!-- ĐỊNH HƯỚNG: phần suy luận (AI hoặc tất định) — nói rõ nguồn của từng hướng. -->
               <div v-if="directions.length" class="mb-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
@@ -245,11 +225,17 @@ const formatVnd = inject('formatVnd');
                 <button v-if="selectedTrendCount" type="button" class="tool-btn" @click="clearTrends"><StudioIcon name="trash" size="h-3 w-3" /> Bỏ chọn</button>
               </div>
 
-              <p class="mb-2 text-label leading-5 text-cream-400">
-                Đang hiện {{ visibleTrends.length }} / {{ trends.length }} hướng ·
-                <b class="text-ok">{{ liveTrendCount }} hướng có tin thật</b> ·
-                {{ trends.length - liveTrendCount }} hướng thuộc bộ có sẵn.
-              </p>
+              <div class="mb-2 flex flex-wrap items-center gap-2 text-label text-cream-400">
+                <span>Hiện {{ visibleTrends.length }}/{{ trends.length }} hướng</span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-ok"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>{{ liveTrendCount }} đo từ tin thật</span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-0.5 font-semibold text-warn"><span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>{{ trends.length - liveTrendCount }} bộ có sẵn</span>
+                <details class="ml-auto">
+                  <summary class="cursor-pointer text-tiny text-cream-400 underline decoration-dotted">Giải thích</summary>
+                  <p class="mt-1 max-w-md rounded-lg bg-ink-900 px-2.5 py-2 text-tiny leading-4 text-cream-300">
+                    <b class="text-cream-200">Đo từ tin thật</b> = hướng xuất hiện trong bài báo máy chủ vừa lấy (kèm nguồn). <b class="text-cream-200">Bộ có sẵn</b> = hướng mẫu của FabrikAI, chưa gắn với tin vừa lấy. Số liệu thật giúp bạn chọn đúng hướng đang được thị trường nhắc tới.
+                  </p>
+                </details>
+              </div>
 
               <div v-if="visibleTrends.length" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <button

@@ -298,13 +298,17 @@ const outfitRows = computed(() => collection.value?.outfit_matching || []);
 const sizeRows = computed(() => collection.value?.size_distribution || []);
 const priceBand = computed(() => collection.value?.price_bands || null);
 const canvasSettings = computed(() => collection.value?.canvas || null);
+const sizeDistribution = computed(() => (SIZE_PRESETS.find((item) => item.id === sizePreset.value) || SIZE_PRESETS[0]).values);
 const currentBriefInput = computed(() => ({
   prompt: prompt.value.trim(),
   region: selectedRegion.value,
   trend_ids: selectedTrendIds.value,
+  // [BUG ĐÃ SỬA] size_distribution PHẢI nằm trong input so sánh: thiếu nó thì brief vừa tạo LUÔN bị
+  // coi là "đã cũ" (bảng size được ghi vào brief khi tạo, nhưng chỗ kiểm tra lại không đưa vào so sánh)
+  // ⇒ người dùng chưa đổi gì vẫn thấy "Prompt/trend đã đổi. Bấm «Tạo lại brief»".
+  size_distribution: sizeDistribution.value,
 }));
 const briefStale = computed(() => store.collectionBriefStale(currentBriefInput.value));
-const sizeDistribution = computed(() => (SIZE_PRESETS.find((item) => item.id === sizePreset.value) || SIZE_PRESETS[0]).values);
 const canvasPrompt = computed(() => {
   if (!collection.value) return prompt.value.trim();
   return canvasLang.value === 'en'
