@@ -1867,3 +1867,57 @@ Cờ `web_search` của đường **brief** là khoá **RỜI** trong `aiBrief()
 | Production | `engine=ai-v1` cho cả hai agent · không cảnh báo mới trong `storage/logs/laravel.log` · `production.ERROR` vẫn **9** |
 
 **Kết luận cho người dùng:** Tín hiệu thị trường và Định hướng **đã chạy thật bằng DeepSeek**. Hai điều cần biết: (1) mỗi lần chạy mất **~28–34 giây** (model `deepseek-flash`; radar có cache 10 phút theo vùng nên lần xem lại là tức thì); (2) chúng **không có nguồn internet** — muốn dẫn nguồn thật thì phải chọn một model/nhà cung cấp có tìm kiếm trong Cài đặt, hoặc khai tham số tìm kiếm cho Custom Provider (§18.2). Nhóm **tạo ảnh** vẫn chờ key.
+
+## Phiên 2026-09-23 (Đợt 25 — BỘ ĐỆM BRIEF theo input_signature + BỐN KIỂU BẬT TÌM KIẾM khai trong Cài đặt)
+
+**Deploy:** `9e54228 → <commit>`. **Migration mới:** `2026_09_23_000005_add_search_mode_to_studio_providers`.
+
+### 1. Bộ đệm brief — bấm lại KHÔNG tốn thêm ~28 giây và token
+
+Đo ở Đợt 24: mỗi lần "Định hướng" là một lời gọi model thật — **27,9 s** (production). Bấm lại cùng đầu vào mà vẫn trả tiền là lãng phí.
+
+| Việc | Chi tiết |
+|---|---|
+| Khoá đệm | `input_signature` (prompt · vùng · trend đã chọn · phân bổ size) **+ tài khoản + DNA đang dùng + số bán của shop + model đang cấu hình + cách bật tìm kiếm + công tắc AI**, kèm `BRIEF_CACHE_VERSION` |
+| Thời gian sống | **1 giờ** (`BRIEF_CACHE_SECONDS`) |
+| Phản hồi khi trúng đệm | `model.cached=true` · `model.latency_ms=0` · `model.cache_age_s` · giữ `cached_at` |
+| Bỏ qua đệm | `force=1` trong `POST /api/design-agent/collection` (nút **Chạy lại bằng AI**) |
+| Giao diện | Badge **"Từ bộ đệm · 2 giây trước"** thay cho số ms; toast nói rõ *"Brief lấy từ bộ đệm (cùng đầu vào) — bấm Tạo lại nếu muốn chạy model mới"* |
+| An toàn | Đệm **riêng từng tài khoản** (số bán/DNA là dữ liệu riêng); đọc/ghi đệm đều **nuốt lỗi** — bộ đệm là tối ưu, không phải điều kiện để tính năng chạy |
+
+**Đo bằng Chrome thật (local):** lần 1 `cached=false` · lần 2 (cùng đầu vào, sau ~2 s) `cached=true, age=2, latency=0` · `force=1` ⇒ `cached=false`.
+
+Lỗi bắt được khi đo: `cache_age_s` ban đầu ra **1789897289** (~56 năm) vì ép `(int)` lên chuỗi ISO ⇒ ra năm 2026; đã sửa sang `strtotime()`.
+
+### 2. Bốn KIỂU bật tìm kiếm — khai trong Cài đặt, không sửa mã
+
+Trước đợt này chỉ có MỘT kiểu (gửi cờ trong body). Thực tế mỗi gateway một cách, nên `studio_providers` có thêm cột `search_mode`:
+
+| Kiểu | Request dựng ra | Ví dụ |
+|---|---|---|
+| `body_flag` | `{"<tham số>": true}` | DashScope/Qwen: `enable_search` |
+| `tools` | `tools: [{"<tham số>": {}}]` | Gemini: `google_search` |
+| `model_suffix` | **nối vào tên model** | OpenRouter kiểu `:online` |
+| `plugins` | `plugins: [{"id": "<tham số>"}]` | một số gateway OpenAI-compatible |
+
+- Cài đặt → **Custom Providers → Thêm provider** nay có **ô chọn Kiểu** + ô **Tham số** (đo bằng Chrome: 4 lựa chọn *Cờ trong body · tools: [{…}] · Nối vào tên model · plugins: [{id}]*).
+- `AiModelGateway::applySearch()` là **một chỗ duy nhất** dựng request cho cả ba nhánh giao thức (qwen · gemini · openai-compatible).
+- Provider tích hợp (Qwen/DashScope · Gemini) **không phải khai gì**: giao thức của chúng đã có sẵn cách bật.
+
+### 3. Hướng dẫn ngay trong giao diện
+
+Agent Studio → *Nguồn dữ liệu & phương pháp* → khối **"Muốn agent dẫn NGUỒN THẬT? Cách cấu hình"** (3 bước, không nêu tên nhà cung cấp nào):
+1. chọn model/nhà cung cấp **có tìm kiếm web** trong Cài đặt → Nhóm công việc;
+2. nếu là gateway tự khai: thêm Custom Provider rồi khai **Kiểu + Tham số** đúng cách gateway đó bật tìm kiếm;
+3. quay lại bấm **Kiểm tra lại** — thấy *"Model … CÓ tìm kiếm web"* là xong.
+Kèm câu chốt: model không có tìm kiếm thì **vẫn chạy bình thường**, chỉ là không dẫn nguồn thật — và agent sẽ không bao giờ nói như thể đã tự đọc sàn TMĐT.
+
+### 4. Kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Test mới (4) | bấm lại **không** gọi model (`Http::assertSentCount` giữ nguyên) · `force` gọi lại · **đổi DNA ⇒ mất đệm** · **đệm riêng từng tài khoản** · **bốn kiểu search dựng đúng request** |
+| Full suite | **889 test / 6.550 assert XANH** (`BrandDnaTest` nay 23 test) |
+| Chrome thật | bộ đệm: `false → true(age=2) → false(force)` · khối hướng dẫn hiện đúng 3 bước · ô chọn Kiểu có đủ 4 lựa chọn |
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).

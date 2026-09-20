@@ -488,4 +488,143 @@ class BrandDnaTest extends TestCase
         $this->assertArrayHasKey('web_search', $brief['model']);
         $this->assertTrue($brief['model']['web_search']);
     }
+
+    // ── (E) BỘ ĐỆM BRIEF THEO input_signature ──────────────────────────────
+
+    /**
+     * Bấm lại với CÙNG đầu vào ⇒ không gọi model lần nữa (đo trên production: mỗi lần là ~28 giây + token),
+     * và phản hồi phải NÓI THẬT là bản lấy từ bộ đệm.
+     */
+    public function test_identical_brief_uses_the_cache_instead_of_calling_the_model(): void
+    {
+        $this->configurePromptGateway('gw-cache', 'model-cache');
+        Cache::flush();
+        $this->fakeBrief();
+
+        $input = ['prompt' => 'bộ sưu tập đầm linen nữ công sở'];
+        $first = app(DesignAgentService::class)->collectionBrief($input, $this->customer(), true);
+        $this->assertFalse((bool) ($first['model']['cached'] ?? false), 'Lần đầu phải là bản chạy thật.');
+        Http::assertSentCount(1);
+
+        $second = app(DesignAgentService::class)->collectionBrief($input, $this->customer(), true);
+        $this->assertTrue((bool) ($second['model']['cached'] ?? false), 'Lần hai phải lấy từ bộ đệm.');
+        $this->assertSame(0, $second['model']['latency_ms']);
+        $this->assertSame(1, count(Http::recorded()), 'Bấm lại KHÔNG được gọi model lần nữa.');
+        $this->assertSame($first['brief'], $second['brief'], 'Nội dung phải y hệt bản đã đệm.');
+
+        // `force = true` (nút "Chạy lại bằng AI") phải bỏ qua bộ đệm.
+        app(DesignAgentService::class)->collectionBrief($input, $this->customer(), true, true);
+        Http::assertSentCount(2);
+    }
+
+    /** Đổi DNA ⇒ khoá đệm đổi ⇒ phải sinh lại (không trả bản viết theo DNA cũ). */
+    public function test_changing_the_dna_invalidates_the_brief_cache(): void
+    {
+        $this->configurePromptGateway('gw-cache2', 'model-cache');
+        Cache::flush();
+        $this->fakeBrief();
+        $user = $this->customer();
+        $input = ['prompt' => 'bộ sưu tập đầm linen'];
+
+        app(DesignAgentService::class)->collectionBrief($input, $user, true);
+        app(DesignAgentService::class)->collectionBrief($input, $user, true);
+        $this->assertSame(1, count(Http::recorded()), 'Chưa đổi gì thì phải dùng bộ đệm.');
+
+        app(BrandDnaService::class)->save($user, ['positioning' => 'Đầm linen nữ công sở']);
+        app(DesignAgentService::class)->collectionBrief($input, $user, true);
+        $this->assertSame(2, count(Http::recorded()), 'Đổi DNA thì bộ đệm cũ KHÔNG còn đúng.');
+    }
+
+    /** Bộ đệm là RIÊNG từng tài khoản — dữ liệu shop của người này không được trả cho người khác. */
+    public function test_the_brief_cache_is_per_account(): void
+    {
+        $this->configurePromptGateway('gw-cache3', 'model-cache');
+        Cache::flush();
+        $this->fakeBrief();
+        $input = ['prompt' => 'bộ sưu tập đầm linen'];
+
+        app(DesignAgentService::class)->collectionBrief($input, $this->customer(), true);
+        app(DesignAgentService::class)->collectionBrief($input, $this->owner(), true);
+
+        $this->assertSame(2, count(Http::recorded()), 'Khoá đệm phải gồm tài khoản.');
+    }
+
+    // ── (F) KIỂU BẬT TÌM KIẾM KHAI TRONG CÀI ĐẶT ────────────────────────────
+
+    /**
+     * Bốn KIỂU bật tìm kiếm đều phải dựng được request đúng — mỗi gateway một cách, người dùng khai
+     * trong Cài đặt (không sửa mã): cờ body · tools · NỐI TÊN MODEL · plugins.
+     */
+    public function test_search_modes_declared_in_settings_build_the_right_request(): void
+    {
+        $cases = [
+            ['body_flag', 'enable_search', fn (array $b) => ($b['enable_search'] ?? null) === true],
+            ['tools', 'google_search', fn (array $b) => ($b['tools'][0]['google_search'] ?? null) !== null],
+            ['model_suffix', ':online', fn (array $b) => str_ends_with((string) $b['model'], ':online')],
+            ['plugins', 'web', fn (array $b) => ($b['plugins'][0]['id'] ?? null) === 'web'],
+        ];
+
+        foreach ($cases as $i => [$mode, $param, $check]) {
+            $slug = 'gw-mode-'.$i;
+            \App\Models\StudioProvider::create([
+                'slug' => $slug, 'name' => 'Gateway '.$mode, 'protocol' => 'openai',
+                'base_url' => 'https://'.$slug.'.example/v1', 'auth_style' => 'bearer',
+                'search_param' => $param, 'search_mode' => $mode, 'api_key_ref' => $slug,
+                'priority' => 9, 'enabled' => true,
+            ]);
+            \App\Models\StudioApiKey::create([
+                'provider' => $slug, 'label' => $slug, 'value' => 'sk-'.$i,
+                'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+            ]);
+            \App\Models\StudioModel::create([
+                'group' => 'prompt', 'name' => 'Model '.$mode, 'provider' => $slug,
+                'model_id' => 'm-'.$i, 'api_key_ref' => $slug, 'priority' => 9, 'enabled' => true,
+            ]);
+            set_setting('studio_task_prompt_model', $slug.':m-'.$i);
+            Cache::flush();
+
+            Http::fake([$slug.'.example/*' => Http::response(['choices' => [['message' => ['content' => $this->validBriefJson()]]]], 200)]);
+            app(DesignAgentService::class)->collectionBrief(['prompt' => 'đầm linen '.$i], $this->customer(), true);
+
+            $sent = Http::recorded();
+            $this->assertNotEmpty($sent, 'Không có request cho kiểu '.$mode);
+            $body = (array) json_decode((string) $sent[0][0]->body(), true);
+            $this->assertTrue($check($body), 'Kiểu '.$mode.' dựng request sai: '.json_encode($body, JSON_UNESCAPED_UNICODE));
+        }
+    }
+
+    /** Cấu hình model + key dùng chung cho các test bộ đệm. */
+    private function configurePromptGateway(string $slug, string $modelId): void
+    {
+        \App\Models\StudioProvider::create([
+            'slug' => $slug, 'name' => 'Gateway '.$slug, 'protocol' => 'openai',
+            'base_url' => 'https://'.$slug.'.example/v1', 'auth_style' => 'bearer',
+            'api_key_ref' => $slug, 'priority' => 9, 'enabled' => true,
+        ]);
+        \App\Models\StudioApiKey::create([
+            'provider' => $slug, 'label' => $slug, 'value' => 'sk-'.$slug,
+            'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+        ]);
+        \App\Models\StudioModel::create([
+            'group' => 'prompt', 'name' => $modelId, 'provider' => $slug,
+            'model_id' => $modelId, 'api_key_ref' => $slug, 'priority' => 9, 'enabled' => true,
+        ]);
+        set_setting('studio_task_prompt_model', $slug.':'.$modelId);
+    }
+
+    /** JSON hợp lệ cho CollectionBot (đủ trường để normalizeAiBrief nhận). */
+    private function validBriefJson(): string
+    {
+        return json_encode([
+            'narrative' => 'DNA thương hiệu', 'brief' => 'Brief cho xưởng', 'prompt_vi' => 'vi', 'prompt_en' => 'en',
+            'moodboard_captions' => array_fill(0, 24, 'caption'), 'category_rationale' => [], 'outfit_goals' => [],
+            'next_steps' => ['a', 'b', 'c'],
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
+    /** Fake mọi gateway: trả JSON hợp lệ cho brief. */
+    private function fakeBrief(): void
+    {
+        Http::fake(['*' => Http::response(['choices' => [['message' => ['content' => $this->validBriefJson()]]]], 200)]);
+    }
 }

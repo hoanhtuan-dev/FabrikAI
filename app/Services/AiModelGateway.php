@@ -210,6 +210,7 @@ class AiModelGateway
             return [
                 'provider' => $provider, 'model' => $model, 'transport' => $transport, 'base' => $base, 'keys' => $keys,
                 'search_param' => trim((string) ($custom['search_param'] ?? '')) ?: null,
+                'search_mode' => trim((string) ($custom['search_mode'] ?? '')) ?: null,
             ];
         }
 
@@ -318,13 +319,22 @@ class AiModelGateway
             return;
         }
 
-        if ($plan['mode'] === 'tools') {
-            $body['tools'] = [[$plan['param'] => new \stdClass()]];
-
-            return;
+        switch ($plan['mode']) {
+            case 'tools':
+                $body['tools'] = [[$plan['param'] => new \stdClass()]];
+                break;
+            case 'model_suffix':
+                // Một số gateway bật tìm kiếm bằng CHÍNH TÊN MODEL (vd OpenRouter ':online').
+                if (! str_ends_with((string) $body['model'], (string) $plan['param'])) {
+                    $body['model'] = (string) $body['model'].$plan['param'];
+                }
+                break;
+            case 'plugins':
+                $body['plugins'] = [['id' => $plan['param']]];
+                break;
+            default:
+                $body[$plan['param']] = true;
         }
-
-        $body[$plan['param']] = true;
     }
 
     /**

@@ -46,8 +46,10 @@ class DesignAgentController extends Controller
     {
         $data = $this->validatedCollectionInput($request);
 
+        // `force=1` = bỏ qua BỘ ĐỆM và gọi model lại (nút "Tạo lại" trên giao diện). Mặc định dùng bộ đệm:
+        // cùng đầu vào + cùng DNA + cùng model ⇒ kết quả y hệt, không có lý do trả thêm ~28 giây và token.
         return response()->json($this->agents->collectionBrief(
-            $data, $request->user(), (bool) ($data['ai'] ?? true)
+            $data, $request->user(), (bool) ($data['ai'] ?? true), (bool) ($data['force'] ?? false)
         ));
     }
 
@@ -133,7 +135,7 @@ class DesignAgentController extends Controller
     private function validatedCollectionInput(Request $request): array
     {
         $payload = $request->only([
-            'prompt', 'region', 'trend_ids', 'brief', 'size_distribution', 'ai',
+            'prompt', 'region', 'trend_ids', 'brief', 'size_distribution', 'ai', 'force',
         ]);
         $payload['prompt'] = trim((string) ($payload['prompt'] ?? ''));
         $payload['brief'] = trim((string) ($payload['brief'] ?? ''));
@@ -153,6 +155,7 @@ class DesignAgentController extends Controller
             'size_distribution' => ['nullable', 'array', 'max:20'],
             'size_distribution.*' => ['nullable', 'integer', 'min:0', 'max:10000'],
             'ai' => ['nullable', 'boolean'],
+            'force' => ['nullable', 'boolean'],
         ]);
 
         $validator->after(function ($validator) use ($payload) {

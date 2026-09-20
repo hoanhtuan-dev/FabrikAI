@@ -286,7 +286,8 @@ class StudioSettingsController extends Controller
             'auth_style' => ['nullable', 'string', 'in:bearer,x-goog-api-key'],
             // Tham số bật TÌM KIẾM WEB của gateway (tuỳ chọn): nhà cung cấp tự khai biết gateway của mình
             // bật tìm kiếm bằng tham số nào; rỗng = không khai ⇒ hệ thống KHÔNG đoán là có.
-            'search_param' => ['nullable', 'string', 'max:40', 'regex:/^[A-Za-z_][A-Za-z0-9_.-]*$/'],
+            'search_param' => ['nullable', 'string', 'max:40', 'regex:/^[A-Za-z_:][A-Za-z0-9_.:-]*$/'],
+            'search_mode' => ['nullable', 'string', 'in:'.implode(',', array_keys(\App\Services\WebAccessService::SEARCH_MODES))],
             'api_key_ref' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9][A-Za-z0-9_-]*$/'],
             'priority' => ['nullable', 'integer', 'min:0', 'max:100'],
             'note' => ['nullable', 'string', 'max:255'],
@@ -309,6 +310,7 @@ class StudioSettingsController extends Controller
             'base_url' => rtrim((string) $data['base_url'], '/'),
             'auth_style' => $data['auth_style'] ?? 'bearer',
             'search_param' => ($data['search_param'] ?? null) ?: null,
+            'search_mode' => ($data['search_param'] ?? null) ? ($data['search_mode'] ?? 'body_flag') : null,
             'api_key_ref' => $data['api_key_ref'] ?: $data['slug'],
             'priority' => (int) ($data['priority'] ?? 5),
             'enabled' => true,
@@ -325,7 +327,8 @@ class StudioSettingsController extends Controller
             'protocol' => ['required', 'string', 'in:openai,dashscope,gemini'],
             'base_url' => ['required', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+/'],
             'auth_style' => ['nullable', 'string', 'in:bearer,x-goog-api-key'],
-            'search_param' => ['nullable', 'string', 'max:40', 'regex:/^[A-Za-z_][A-Za-z0-9_.-]*$/'],
+            'search_param' => ['nullable', 'string', 'max:40', 'regex:/^[A-Za-z_:][A-Za-z0-9_.:-]*$/'],
+            'search_mode' => ['nullable', 'string', 'in:'.implode(',', array_keys(\App\Services\WebAccessService::SEARCH_MODES))],
             'api_key_ref' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9][A-Za-z0-9_-]*$/'],
             'priority' => ['nullable', 'integer', 'min:0', 'max:100'],
             'enabled' => ['nullable', 'boolean'],
@@ -343,6 +346,7 @@ class StudioSettingsController extends Controller
             'base_url' => rtrim((string) $data['base_url'], '/'),
             'auth_style' => $data['auth_style'] ?? 'bearer',
             'search_param' => ($data['search_param'] ?? null) ?: null,
+            'search_mode' => ($data['search_param'] ?? null) ? ($data['search_mode'] ?? 'body_flag') : null,
             'api_key_ref' => $data['api_key_ref'] ?: $provider->slug,
             'priority' => (int) ($data['priority'] ?? $provider->priority ?? 5),
             'enabled' => (bool) ($data['enabled'] ?? true),
@@ -510,6 +514,7 @@ class StudioSettingsController extends Controller
             'auth_style' => $p->auth_style,
             // Rỗng = chưa khai khả năng tìm kiếm web (giao diện hiện "chưa khai", KHÔNG đoán là có).
             'search_param' => $p->search_param,
+            'search_mode' => $p->search_mode,
             'api_key_ref' => $p->api_key_ref,
             'priority' => (int) ($p->priority ?? 5),
             'enabled' => (bool) $p->enabled,

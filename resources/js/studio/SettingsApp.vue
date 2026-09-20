@@ -341,7 +341,14 @@ async function toggleKey(k) {
 }
 
 // ─────────────────────────── Hộp thoại: custom provider ───────────────────────────
-const blankProv = () => ({ name: '', protocol: 'openai', base_url: '', auth_style: 'bearer', search_param: '', api_key_ref: '', priority: 5, note: '', enabled: true, slug: '' });
+const blankProv = () => ({ name: '', protocol: 'openai', base_url: '', auth_style: 'bearer', search_param: '', search_mode: 'body_flag', api_key_ref: '', priority: 5, note: '', enabled: true, slug: '' });
+/** Kiểu bật tìm kiếm web — PHẢI khớp WebAccessService::SEARCH_MODES (một nguồn ở máy chủ). */
+const SEARCH_MODES = {
+  body_flag: 'Cờ trong body',
+  tools: 'tools: [{…}]',
+  model_suffix: 'Nối vào tên model',
+  plugins: 'plugins: [{id}]',
+};
 // slugKey = KHOÁ ĐỊNH TUYẾN của bản ghi (routeKey của model là slug, KHÔNG phải id số)
 // — trước đây form gửi id nên PUT/DELETE đều 404 (không sửa/xoá được provider).
 const provModal = reactive({ open: false, mode: 'create', id: null, slugKey: null, form: blankProv(), errors: {}, saving: false });
@@ -359,7 +366,7 @@ function openProvModal(row = null, preset = null) {
     errors: {},
     saving: false,
     form: row
-      ? { slug: row.slug, name: row.name, protocol: row.protocol, base_url: row.base_url, auth_style: row.auth_style, search_param: row.search_param || '', api_key_ref: row.api_key_ref, priority: row.priority ?? 5, note: row.note || '', enabled: !!row.enabled }
+      ? { slug: row.slug, name: row.name, protocol: row.protocol, base_url: row.base_url, auth_style: row.auth_style, search_param: row.search_param || '', search_mode: row.search_mode || 'body_flag', api_key_ref: row.api_key_ref, priority: row.priority ?? 5, note: row.note || '', enabled: !!row.enabled }
       : Object.assign(blankProv(), preset || {}),
   });
 }
@@ -382,6 +389,7 @@ async function submitProv() {
   const payload = {
     name: f.name.trim(), protocol: f.protocol, base_url: f.base_url.trim(), auth_style: f.auth_style,
     search_param: String(f.search_param || '').trim(),
+    search_mode: String(f.search_mode || 'body_flag'),
     api_key_ref: f.api_key_ref.trim(), priority: Number(f.priority) || 0, note: f.note, enabled: !!f.enabled,
   };
   if (provModal.mode === 'create') payload.slug = f.slug.trim();
@@ -413,6 +421,7 @@ function applyProviderTemplate(key) {
     base_url: tpl.base_url || '',
     auth_style: tpl.auth_style || 'bearer',
     search_param: tpl.search_param || '',
+    search_mode: tpl.search_mode || 'body_flag',
     api_key_ref: tpl.api_key_ref || '',
     note: tpl.note || '',
   });
@@ -1406,8 +1415,13 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
         </div>
         <div>
           <label class="label" for="p-search">Tham số bật TÌM KIẾM WEB <span class="font-normal normal-case text-cream-300">(tuỳ chọn — gateway của bạn bật tìm kiếm bằng tham số nào?)</span></label>
-          <input id="p-search" v-model="provModal.form.search_param" class="input !py-2 font-mono text-xs" placeholder="VD: enable_search · bỏ trống nếu không có">
-          <p class="mt-1 text-body text-cream-300">Điền thì FabrikAI gửi kèm tham số này khi agent cần tìm kiếm web; bỏ trống nghĩa là "không khai" — hệ thống KHÔNG đoán là có.</p>
+          <div class="flex flex-col gap-2 sm:flex-row">
+            <select v-model="provModal.form.search_mode" class="input !py-2 sm:max-w-[16rem]">
+              <option v-for="(label, value) in SEARCH_MODES" :key="value" :value="value">{{ label }}</option>
+            </select>
+            <input id="p-search" v-model="provModal.form.search_param" class="input !py-2 flex-1 font-mono text-xs" placeholder="VD: enable_search · :online · web · bỏ trống nếu không có">
+          </div>
+          <p class="mt-1 text-body text-cream-300">Khai thì agent bật tìm kiếm web bằng ĐÚNG cách của gateway bạn; bỏ trống nghĩa là "không khai" — hệ thống KHÔNG đoán là có.</p>
         </div>
         <div>
           <label class="label" for="p-prio">Ưu tiên trong nhóm Custom <span class="font-normal normal-case text-cream-300">(lớn hơn = thử trước)</span></label>

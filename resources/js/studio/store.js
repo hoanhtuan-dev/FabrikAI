@@ -2690,17 +2690,31 @@ export const useStudioStore = defineStore('studio', {
       if (!this.collectionBrief || !this.collectionBriefInput) return false;
       return JSON.stringify(this.designBriefInput(payload)) !== JSON.stringify(this.collectionBriefInput);
     },
-    async createCollectionBrief(payload) {
+    /**
+     * Tạo brief bộ sưu tập. `opts.force = true` khi người dùng bấm "Tạo lại" — bỏ qua bộ đệm máy chủ.
+     *
+     * Mặc định KHÔNG force: cùng đầu vào + cùng DNA + cùng model thì máy chủ trả lại kết quả đã đệm
+     * (lần chạy thật mất ~28 giây và tốn token — xem DesignAgentService::BRIEF_CACHE_VERSION).
+     */
+    async createCollectionBrief(payload, opts = {}) {
       this.collectionBriefLoading = true;
       this.collectionBriefError = '';
       try {
-        const data = await this.api('/api/design-agent/collection', { ...(payload || {}), ai: this.designAgentAi });
+        const data = await this.api('/api/design-agent/collection', {
+          ...(payload || {}),
+          ai: this.designAgentAi,
+          force: !!opts.force,
+        });
         this.collectionBrief = data || null;
         this.collectionBriefInput = this.designBriefInput(payload);
         this.plan = null;          // cấu trúc/SKU đổi ⇒ kế hoạch cũ không còn đúng
         this.planError = '';
         this.shopDataDirty = false;
-        this.toast('CollectionBot đã xây dựng brief bộ sưu tập.');
+        // Nói THẬT vì sao nhanh: bản lấy từ bộ đệm thì người dùng biết mà bấm "Tạo lại" nếu muốn bản mới.
+        const cached = !!(data && data.model && data.model.cached);
+        this.toast(cached
+          ? 'Brief lấy từ bộ đệm (cùng đầu vào) — bấm "Tạo lại" nếu muốn chạy model mới.'
+          : 'CollectionBot đã xây dựng brief bộ sưu tập.');
         return data;
       } catch (error) {
         this.collectionBriefError = userFacingError(error, 'Không tạo được brief bộ sưu tập.');

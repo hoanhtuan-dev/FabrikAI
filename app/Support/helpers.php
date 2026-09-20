@@ -1292,6 +1292,7 @@ if (! function_exists('studio_custom_provider')) {
             // Tham số bật tìm kiếm web của gateway này (rỗng = chưa khai). Quyết định "có tìm kiếm" đến
             // từ CÀI ĐẶT chứ không từ danh sách nhà cung cấp viết cứng trong mã — xem WebAccessService.
             'search_param' => trim((string) ($p->search_param ?? '')) ?: null,
+            'search_mode' => trim((string) ($p->search_mode ?? '')) ?: null,
             'api_key_ref' => $p->api_key_ref ?: $p->slug,
         ];
     }

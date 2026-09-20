@@ -18,7 +18,7 @@ class StudioProvider extends Model
         'slug', 'name', 'protocol', 'base_url', 'auth_style',
         // search_param: tên tham số bật tìm kiếm web của gateway này (rỗng = chưa khai). Xem
         // WebAccessService — quyết định "có tìm kiếm web" đến từ CÀI ĐẶT, không từ danh sách cứng.
-        'search_param',
+        'search_param', 'search_mode',
         'api_key_ref', 'priority', 'enabled', 'note',
     ];
 

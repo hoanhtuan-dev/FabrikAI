@@ -1042,10 +1042,31 @@ không nói vì sao thì khiến họ tưởng hệ thống hỏng. Giao diện 
 **Không viết cứng tên nhà cung cấp ở bất kỳ đâu quyết định hành vi**: mã nguồn chỉ biết *giao thức*;
 việc chọn provider/model là của Cài đặt. Câu kết luận cũng không nêu tên nhà cung cấp nào (test khoá).
 
+#### Cách BẬT nguồn thật (làm trong Cài đặt, KHÔNG sửa mã)
+
+| Gateway của bạn | Làm gì | Khai gì trong Cài đặt |
+|---|---|---|
+| DashScope/Qwen (provider tích hợp) | thêm key + gán model vào nhóm «Suy luận & viết nội dung» | không cần khai gì — giao thức `qwen` tự bật `enable_search` |
+| Gemini (provider tích hợp) | như trên | không cần khai gì — giao thức `gemini` tự bật `google_search` |
+| Gateway OpenAI-compatible TỰ KHAI | Cài đặt → Custom Providers → thêm gateway (base URL + protocol) | bật tìm kiếm bằng cách khai **Kiểu** + **Tham số**: `body_flag` (`enable_search`) · `tools` (`google_search`) · `model_suffix` (`:online`) · `plugins` (`web`) |
+
+Sau khi khai, bấm **Kiểm tra lại** trong Agent Studio: dòng *"Model … CÓ tìm kiếm web"* xuất hiện là xong. Bốn kiểu trên là **bốn cách dựng request** đã có sẵn trong mã; thêm một gateway mới nói cùng một trong bốn kiểu đó thì **không phải sửa mã**.
+
+### 18.4 Bộ đệm brief theo `input_signature` — bấm lại không tốn thêm ~28 giây
+
+Đo trên production: một lần "Định hướng" là **~28 giây** và có tính token. Cùng đầu vào mà phải trả tiền lần nữa là lãng phí, nên kết quả brief được đệm **1 giờ** với khoá gồm MỌI thứ làm đổi kết quả:
+
+`input_signature` (prompt · vùng · trend đã chọn · phân bổ size) **+ tài khoản + bản DNA đang dùng + số bán của shop + model đang cấu hình + cách bật tìm kiếm + công tắc AI**, kèm `BRIEF_CACHE_VERSION` để đổi cấu trúc phản hồi là bản cũ không lẫn vào.
+
+- Giao diện **nói thật**: badge *"Từ bộ đệm · X giây/phút trước"* thay cho số ms, và có nút **Chạy lại bằng AI** (gửi `force=1`) khi người dùng muốn bản mới.
+- Bộ đệm **nuốt lỗi** cả khi đọc lẫn khi ghi: đây là tối ưu tốc độ, không phải điều kiện để tính năng chạy (đường chạy tất định thuần PHPUnit không có container ⇒ `Cache` không tồn tại).
+- Đường **radar** giữ cache riêng của nó (10 phút theo vùng + model + cách bật tìm kiếm).
+
 Kiểm tra nhanh trên máy chủ: `php artisan studio:web-access --force`.
 
 ### 18.3 Bộ test giữ hai luật này
 
-`tests/Feature/BrandDnaTest.php` (16 test): hồ sơ tách theo tài khoản · validate + chuẩn hoá · xoá DNA
+`tests/Feature/BrandDnaTest.php` (23 test): hồ sơ tách theo tài khoản · validate + chuẩn hoá · xoá DNA
 không xoá dự án · DNA thắng phần suy ra và **có mặt trong payload gửi model** · đo internet có/không có
-mạng · model không tìm kiếm phải nói thẳng là không · cache + `force` đo lại.
+mạng · model không tìm kiếm phải nói thẳng là không · cache + `force` đo lại · **bộ đệm brief** (bấm lại
+không gọi model · đổi DNA là mất đệm · đệm riêng từng tài khoản) · **bốn kiểu bật tìm kiếm** dựng đúng request.

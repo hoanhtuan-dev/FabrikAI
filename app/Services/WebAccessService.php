@@ -52,12 +52,22 @@ class WebAccessService
      * @param  array{provider?:string, model?:string, transport?:string, search_param?:?string}  $candidate
      * @return array{mode:string, param:string, source:string}|null
      */
+    /** Các KIỂU bật tìm kiếm mà hệ thống biết cách dựng request (nhãn hiển thị ở Cài đặt). */
+    public const SEARCH_MODES = [
+        'body_flag' => 'Gửi cờ trong body — {"tham số": true} (DashScope/Qwen: enable_search)',
+        'tools' => 'Gửi tools: [{"tham số": {}}] (Gemini: google_search)',
+        'model_suffix' => 'Nối vào TÊN MODEL (OpenRouter kiểu ":online")',
+        'plugins' => 'Gửi plugins: [{"id": "tham số"}]',
+    ];
+
     public static function planFor(array $candidate): ?array
     {
         $declared = trim((string) ($candidate['search_param'] ?? ''));
         if ($declared !== '') {
+            $mode = (string) ($candidate['search_mode'] ?? 'body_flag');
+
             return [
-                'mode' => 'body_flag',
+                'mode' => isset(self::SEARCH_MODES[$mode]) ? $mode : 'body_flag',
                 'param' => $declared,
                 'source' => 'khai trong Cài đặt (Custom Provider)',
             ];
@@ -91,7 +101,7 @@ class WebAccessService
                 'plan' => $plan,
                 'label' => $plan === null
                     ? 'Không có tìm kiếm web (giao thức không khai tham số tìm kiếm)'
-                    : 'Bật tìm kiếm bằng `'.$plan['param'].'` — '.$plan['source'],
+                    : 'Bật tìm kiếm ('.($plan['mode'] ?? 'body_flag').') bằng `'.$plan['param'].'` — '.$plan['source'],
             ];
         }
 

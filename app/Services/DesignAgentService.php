@@ -127,7 +127,27 @@ class DesignAgentService
         ];
     }
 
-    public function collectionBrief(array $data, ?User $user, bool $useAi = true): array
+    /**
+     * BỘ ĐỆM BRIEF THEO `input_signature` (2026-09-23).
+     *
+     * Vì sao cần: mỗi lần "Định hướng" là một lời gọi model thật — đo trên production: **~28 giây** và
+     * tốn token. Người dùng bấm lại (hoặc mở lại màn hình, hoặc đổi tab rồi quay về) mà đầu vào y nguyên
+     * thì KHÔNG có lý do gì phải trả tiền lần nữa.
+     *
+     * Khoá đệm gồm MỌI thứ làm thay đổi kết quả — thiếu một thứ là trả về bản của cấu hình khác:
+     *   · `input_signature` (prompt · vùng · trend đã chọn · phân bổ size) do chính hàm này tính;
+     *   · tài khoản (dữ liệu shop là riêng từng người);
+     *   · bản DNA đang dùng + số bán của shop (đổi DNA/số bán ⇒ phải sinh lại);
+     *   · model đang cấu hình + cách bật tìm kiếm;
+     *   · công tắc AI (chạy tất định và chạy AI khác nhau).
+     *
+     * Đổi CẤU TRÚC phản hồi thì tăng phiên bản trong khoá (BRIEF_CACHE_VERSION) để bản cũ không lẫn vào.
+     */
+    private const BRIEF_CACHE_VERSION = 'v1';
+
+    private const BRIEF_CACHE_SECONDS = 3600;
+
+    public function collectionBrief(array $data, ?User $user, bool $useAi = true, bool $force = false): array
     {
         $prompt = trim((string) ($data['prompt'] ?? ''));
         $region = $this->normalizeRegion((string) ($data['region'] ?? 'all'));
@@ -153,6 +173,31 @@ class DesignAgentService
         $trendPhrase = $trendNames ? implode(', ', array_slice($trendNames, 0, 3)) : 'xu hướng đang lên';
         $collectionName = $this->collectionName($prompt, $region);
         $brief = trim((string) ($data['brief'] ?? ''));
+
+        // ── BỘ ĐỆM: cùng đầu vào + cùng cấu hình ⇒ trả lại kết quả cũ, KHÔNG gọi model lần nữa ──
+        $candidates = $this->aiCandidates();
+        $inputSignature = hash('sha256', json_encode([
+            $prompt,
+            $region,
+            $requestedIds,
+            array_map(fn ($row) => $row['size'].':'.$row['count'], $sizeDistribution),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $cacheKey = $this->briefCacheKey($inputSignature, $user, $brand, $candidates, $useAi);
+        if (! $force) {
+            $hit = $this->readBriefCache($cacheKey);
+            if (is_array($hit)) {
+                // Nói THẬT là bản này lấy từ bộ đệm (và lấy lúc nào) để người dùng biết vì sao nhanh.
+                $hit['model']['cached'] = true;
+                $hit['model']['latency_ms'] = 0;
+                // `cached_at` là chuỗi ISO — ép (int) thẳng sẽ ra NĂM (2026) và tuổi bộ đệm thành ~56 năm.
+                $cachedAtTs = strtotime((string) ($hit['cached_at'] ?? '')) ?: time();
+                $hit['model']['cache_age_s'] = max(0, time() - $cachedAtTs);
+                $hit['cached_at'] = $hit['cached_at'] ?? now()->toISOString();
+                $hit['engine'] = ($hit['model']['mode'] ?? 'rule') === 'ai' ? 'ai-v1' : 'rule-based-v1';
+
+                return $hit;
+            }
+        }
 
         // TẦNG SUY LUẬN — model của nhóm 'prompt' viết narrative / brief / caption mood board /
         // prompt trên ĐÚNG dữ liệu tất định ở trên. Con số (SKU, size, dải giá, cấu trúc) KHÔNG
@@ -201,7 +246,7 @@ class DesignAgentService
             'outfits' => $outfits,
             'size_distribution' => $sizeDistribution,
             'price_band' => $priceBands,
-        ], $this->aiCandidates(), $useAi);
+        ], $candidates, $useAi);
 
         $aiData = $ai['data'] ?? [];
         $applied = [
@@ -259,14 +304,8 @@ class DesignAgentService
         $applied['next_steps'] = $nextSteps !== [];
 
         $canvas = $this->canvasSuggestions($prompt, $promptVi, $promptEn);
-        $inputSignature = hash('sha256', json_encode([
-            $prompt,
-            $region,
-            $requestedIds,
-            array_map(fn ($row) => $row['size'].':'.$row['count'], $sizeDistribution),
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
-        return [
+        $response = [
             'agent' => 'CollectionBot',
             'engine' => $ai['model']['mode'] === 'ai' ? 'ai-v1' : 'rule-based-v1',
             'model' => $ai['model'],
@@ -325,6 +364,69 @@ class DesignAgentService
                 'Áp dụng prompt vào Canvas hoặc tạo bộ sưu tập mới.',
             ],
         ];
+
+        // LƯU BỘ ĐỆM: kèm mốc thời gian để lần sau nói được "bản này cũ bao lâu rồi".
+        $this->cacheBrief($cacheKey, $response);
+
+        return $response;
+    }
+
+    /**
+     * Khoá đệm cho MỘT lần brief — xem BRIEF_CACHE_VERSION ở trên để biết vì sao gồm đúng những thứ này.
+     *
+     * @param  list<array<string,mixed>>  $candidates
+     */
+    private function briefCacheKey(string $inputSignature, ?User $user, array $brand, array $candidates, bool $useAi): string
+    {
+        $dna = (array) ($brand['dna'] ?? []);
+        $shop = array_intersect_key(
+            (array) ($brand['shop'] ?? []),
+            array_flip(['row_count', 'units_sold', 'stock_on_hand', 'return_rate_pct', 'avg_price_vnd']),
+        );
+        $model = implode('|', array_map(fn (array $c) => $c['provider'].':'.$c['model'], $candidates));
+        $search = WebAccessService::planFor($candidates[0] ?? []);
+
+        return 'design-agent:brief:'.self::BRIEF_CACHE_VERSION.':'.hash('sha256', json_encode([
+            $inputSignature,
+            'user:'.($user?->id ?? 0),
+            'dna:'.json_encode($dna, JSON_UNESCAPED_UNICODE),
+            'shop:'.json_encode($shop, JSON_UNESCAPED_UNICODE),
+            'model:'.$model,
+            'search:'.($search === null ? 'none' : $search['mode'].':'.$search['param']),
+            'ai:'.($useAi ? '1' : '0'),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    /**
+     * Đọc bộ đệm — NUỐT LỖI có chủ ý: bộ đệm là tối ưu, không phải điều kiện để tính năng chạy.
+     * (Đường chạy tất định thuần PHPUnit không có container ⇒ `Cache` không tồn tại; nếu để lỗi nổi lên
+     * thì "tối ưu tốc độ" lại làm hỏng chính hàm nó muốn tăng tốc.)
+     */
+    private function readBriefCache(string $key): ?array
+    {
+        try {
+            $hit = Cache::get($key);
+
+            return is_array($hit) ? $hit : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /** Ghi bộ đệm (kèm `cached_at`) — nuốt lỗi: bộ đệm hỏng KHÔNG được làm hỏng phản hồi. */
+    private function cacheBrief(string $key, array $response): void
+    {
+        try {
+            Cache::put($key, $response + ['cached_at' => now()->toISOString()], self::BRIEF_CACHE_SECONDS);
+        } catch (\Throwable $e) {
+            // Ghi log cũng phải bọc: ở môi trường KHÔNG có container (test đơn vị thuần PHPUnit) thì cả
+            // `logger()` lẫn `Cache` đều không tồn tại — bộ đệm không được phép làm hỏng phản hồi.
+            try {
+                logger()->warning('CollectionBot: không ghi được bộ đệm', ['error' => $e->getMessage()]);
+            } catch (\Throwable) {
+                // không có gì để làm — bộ đệm chỉ là tối ưu tốc độ
+            }
+        }
     }
 
     // ───────────────────────── TẦNG SUY LUẬN (AI) ─────────────────────────

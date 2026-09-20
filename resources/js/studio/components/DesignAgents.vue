@@ -98,6 +98,13 @@ function setDnaList(key, value) {
   store.brandDnaDraft = { ...dnaDraft.value, [key]: items };
 }
 const dnaDirty = computed(() => JSON.stringify(dnaDraft.value) !== JSON.stringify(dna.value?.dna || {}));
+/** Nhãn tuổi của bản brief lấy từ bộ đệm — để người dùng biết có nên bấm "Chạy lại bằng AI" không. */
+const cacheAgeLabel = computed(() => {
+  const age = Number(collection.value?.model?.cache_age_s);
+  if (!Number.isFinite(age) || age < 0) return 'đã lưu';
+  if (age < 60) return age + ' giây trước';
+  return Math.round(age / 60) + ' phút trước';
+});
 /** Nhóm công việc CHƯA cấu hình model — đọc từ số đo (tức là từ Cài đặt), không phải danh sách cứng. */
 /** Nhóm công việc CHƯA chạy được — đọc từ số đo (tức từ Cài đặt), không phải danh sách cứng. */
 const blockedGroups = computed(() => (store.webAccess?.task_groups || []).filter((row) => !row.configured || row.needs_key));
@@ -470,7 +477,8 @@ function formatVnd(value) {
     : '—';
 }
 
-async function createBrief() {
+/** @param {{force?: boolean}} opts  force = bỏ qua bộ đệm (nút "Tạo lại") */
+async function createBrief(opts = {}) {
   collectionError.value = '';
   const value = prompt.value.trim();
   if (value.length < 3) {
@@ -483,7 +491,7 @@ async function createBrief() {
       region: selectedRegion.value,
       trend_ids: selectedTrendIds.value,
       size_distribution: sizeDistribution.value,
-    });
+    }, { force: !!opts.force });
     return true;
   } catch (error) {
     collectionError.value = store.collectionBriefError || error.message || 'Không tạo được brief bộ sưu tập.';
@@ -914,6 +922,18 @@ watch(() => store.designAgentOpen, (open) => {
                     </ul>
                     <p class="mt-2 text-body leading-5 text-cream-200">{{ store.webAccess.verdict_label }}</p>
                     <p class="mt-1 text-label leading-5 text-cream-400">Nguồn ngoài vẫn là <b>dữ liệu mẫu</b> (chưa nối sàn TMĐT, chưa có scraping hay POS/ERP thật). Dữ liệu nội bộ là dự án/ảnh của chính tài khoản bạn.</p>
+
+                    <!-- CÁCH BẬT NGUỒN THẬT: nói đúng VIỆC CẦN LÀM, không đẩy người dùng về một nhà cung cấp nào. -->
+                    <details class="mt-2">
+                      <summary class="cursor-pointer text-label font-semibold text-cream-300">Muốn agent dẫn NGUỒN THẬT? Cách cấu hình</summary>
+                      <ol class="mt-1.5 space-y-1 text-label leading-5 text-cream-400">
+                        <li>1. Chọn một model/nhà cung cấp <b class="text-cream-200">có tìm kiếm web</b> trong Cài đặt → <b class="text-cream-200">Nhóm công việc</b> (nhóm «Suy luận &amp; viết nội dung»).</li>
+                        <li>2. Nếu gateway của bạn là loại <b class="text-cream-200">tự khai</b>: Cài đặt → <b class="text-cream-200">Custom Providers</b> → thêm gateway, rồi ở ô <b class="text-cream-200">“Tham số bật TÌM KIẾM WEB”</b> khai đúng cách gateway đó bật tìm kiếm:
+                          <span class="text-cream-300">cờ trong body (vd enable_search)</span> · <span class="text-cream-300">tools: [{google_search}]</span> · <span class="text-cream-300">nối vào tên model (vd :online)</span> · <span class="text-cream-300">plugins: [{id}]</span>.</li>
+                        <li>3. Quay lại đây bấm <b class="text-cream-200">Kiểm tra lại</b> — dòng “Model … CÓ tìm kiếm web” xuất hiện là xong; không cần sửa mã hay chờ deploy.</li>
+                      </ol>
+                      <p class="mt-1.5 text-label leading-5 text-cream-400">Model không có tìm kiếm thì vẫn chạy bình thường, chỉ là mọi câu trả lời dựa trên dữ liệu hệ thống gửi vào (dữ liệu mẫu + dữ liệu của bạn) — và agent sẽ không bao giờ nói như thể đã tự đọc sàn TMĐT.</p>
+                    </details>
                     <!-- Nhóm công việc CHƯA có model là trạng thái CẤU HÌNH, không phải lỗi: nói đúng
                          để người dùng biết việc cần làm là vào Cài đặt, chứ không đi tìm lỗi ở agent. -->
                     <ul v-if="blockedGroups.length" class="mt-2 space-y-0.5 text-label leading-5 text-warn">
@@ -976,7 +996,7 @@ watch(() => store.designAgentOpen, (open) => {
                   </div>
                 </div>
 
-                <button type="button" class="btn-brand btn-sm mt-5 flex w-full items-center justify-center gap-2" :disabled="store.collectionBriefLoading" @click="createBrief">
+                <button type="button" class="btn-brand btn-sm mt-5 flex w-full items-center justify-center gap-2" :disabled="store.collectionBriefLoading" @click="createBrief()">
                   <StudioIcon name="wand" size="h-3.5 w-3.5" :class="store.collectionBriefLoading ? 'animate-spin' : ''" />
                   {{ store.collectionBriefLoading
                     ? (store.designAgentAi ? 'AI đang xây brief…' : 'Đang xây dựng brief…')
@@ -1093,7 +1113,19 @@ watch(() => store.designAgentOpen, (open) => {
                       :title="modelTitle"
                     >{{ modelReady ? 'AI: ' + (collection.model?.provider || '') + ' · ' + (collection.model?.model || '') : 'Engine tất định' }}</span>
                     <span v-for="row in appliedAi" :key="row" class="rounded bg-brand-500/15 px-2 py-0.5 text-brand-200">AI viết: {{ row }}</span>
-                    <span v-if="modelReady && collection.model?.latency_ms != null" class="text-cream-400">{{ collection.model.latency_ms }} ms</span>
+                    <!-- Nói THẬT bản này mới chạy model hay lấy từ bộ đệm (và cũ bao lâu). -->
+                    <span v-if="collection.model?.cached" class="rounded bg-ink-800 px-2 py-0.5 text-cream-400" title="Cùng đầu vào + cùng DNA + cùng model ⇒ máy chủ trả lại kết quả đã lưu">Từ bộ đệm · {{ cacheAgeLabel }}</span>
+                    <span v-else-if="modelReady && collection.model?.latency_ms != null" class="text-cream-400">Vừa chạy model · {{ collection.model.latency_ms }} ms</span>
+                    <button
+                      v-if="collection"
+                      type="button"
+                      class="tool-btn !py-0.5"
+                      :disabled="store.collectionBriefLoading"
+                      title="Bỏ qua bộ đệm và gọi model lại (tốn token)"
+                      @click="createBrief({ force: true })"
+                    >
+                      <StudioIcon name="refresh" size="h-3 w-3" /> Chạy lại bằng AI
+                    </button>
                   </div>
 
                   <p class="mt-3 text-sm leading-6 text-cream-200">{{ collection.brief }}</p>
