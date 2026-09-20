@@ -2009,5 +2009,8 @@ Nếu người dùng khai `search_param=enable_search` cho một gateway **khôn
 | Test mới (13) | đọc RSS + bỏ HTML · ánh xạ JSON theo khai báo · lọc từ khoá/độ mới/trần · **một nguồn chết không làm hỏng lượt** · vùng khác thì bỏ qua CÓ LÝ DO · đệm + `force` · **tin thật ĐI VÀO payload gửi model (tiêu đề + URL)** · `live`/`demo` đúng · chỉ admin cấu hình · CRUD + Lấy thử · chặn `file://` · seed không ghi đè |
 | Full suite | **903 test / 6.605 assert XANH** |
 | Production | `php artisan studio:web-sources --seed` → 3 nguồn · `mode=live` · 14 tin (Google News 8 · Tuổi Trẻ 6 · VnExpress 2 sau lọc) |
+| **Ưu tiên provider trên production** | `studio_provider_priority` = `qwen,custom,flux,deepseek,gemini` ⇒ thứ tự candidate: **qwen3.8-flash · qwen3.8-max · deepseek-flash · deepseek-chat · deepseek-reasoner** (Qwen trước, DeepSeek dự phòng; chưa có key Qwen nên DeepSeek đang chạy) |
+| **Chạy thật 2 agent sau khi nối nguồn** | RADAR: `engine=ai-v1` · `deepseek-flash` · **`source_mode=live`** · 14 tin ngoài trong prompt · 8 định hướng · **12,9 s** (trước khi có nguồn: 33,6 s) · BRIEF: `ai-v1` · 14 tin · `ai_applied` đầy đủ · **15,4 s** (trước: 27,9 s) · không cảnh báo mới trong log |
+| Trang · asset | `/` 200 · `/settings` 401 · `/api/design-agent/sources` 401 (chưa đăng nhập) · md5 asset khớp bản build ở máy · `production.ERROR` vẫn **9** |
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
