@@ -616,7 +616,43 @@ class ToolSearchTest extends TestCase
         $this->assertSame('ai', $pastel['live']['origin'] ?? null, 'Phải phân biệt được tin do AI tra với tin của feed định kỳ.');
         $this->assertStringContainsString('AI tự tra', (string) $pastel['regional_note']);
     }
+
+    /**
+     * BẢN ĐỆM PHẢI GIỮ CẢ NHÃN "AI TÌM THẤY".
+     *
+     * [LỖI THẬT — đo trên production 2026-09-21] Bản đầu chỉ đệm directions, không đệm danh mục hướng: lượt
+     * ĐẦU hiện "3 hướng AI tìm thấy · 2 bộ có sẵn", mở lại màn hình (đọc đệm) lại hiện "4 bộ có sẵn" — cùng
+     * một lượt chạy mà hai màn hình khác nhau. Test này chạy HAI lần liên tiếp và bắt buộc kết quả giống nhau.
+     */
+    public function test_the_cache_keeps_the_ai_evidence_labels(): void
+    {
+        $this->hostedProvider('gw-hosted', 'v4-pro');
+        $this->searchSource();
+
+        Http::fake([
+            'gw-hosted.example/*' => Http::response($this->responsesBody($this->directionsJson(), 1, ['xu hướng pastel 2026']), 200),
+            'news.example/*' => function ($request) {
+                return str_contains(urldecode($request->url()), 'pastel')
+                    ? Http::response($this->rss('Màu pastel lên ngôi mùa thu 2026', 'https://bao.example/pastel'), 200)
+                    : Http::response($this->rss('Tin chung về ngành may mặc', 'https://bao.example/chung'), 200);
+            },
+        ]);
+
+        $first = app(DesignAgentService::class)->radar($this->customer(), 'all', true);
+        $second = app(DesignAgentService::class)->radar($this->customer(), 'all', true);
+
+        $label = function (array $radar): string {
+            $row = collect($radar['trends'])->firstWhere('id', 'soft-pastel');
+
+            return (string) ($row['live']['origin'] ?? 'khong-co');
+        };
+
+        $this->assertSame('ai', $label($first));
+        $this->assertTrue($second['model']['cached'], 'Lần hai phải đọc từ đệm (đúng thứ cần kiểm).');
+        $this->assertSame('ai', $label($second), 'Đọc từ đệm KHÔNG được làm mất nhãn bằng chứng do AI tìm.');
+    }
 }
+
 
 
 

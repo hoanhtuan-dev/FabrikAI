@@ -1493,12 +1493,19 @@ class DesignAgentService
         // lời khác đi, nên không được dùng lại bản cache cũ.
         // Khoá cache gồm CẢ dấu vân tay của tin ngoài: có tin mới ⇒ câu trả lời phải được sinh lại.
         // v4 = thêm khối model.tool_search + đổi cách ghi khoá "cách tìm kiếm" — bản v3 thiếu khoá mới.
-        $cacheKey = 'design-agent:radar:v4:'.$region.':'.$fingerprint.':'.$this->searchModeKey($search)
+        // v5 = đệm giữ CẢ danh mục hướng ĐÃ GẮN BẰNG CHỨNG (kể cả tin do AI tự tra). Đo thật 2026-09-21:
+        // bản v4 chỉ đệm directions, nên lượt ĐẦU hiện "3 hướng AI tìm thấy · 2 bộ có sẵn" còn lượt mở lại
+        // (đọc đệm) hiện lại "4 bộ có sẵn" — cùng một lượt chạy mà hai màn hình khác nhau.
+        $cacheKey = 'design-agent:radar:v5:'.$region.':'.$fingerprint.':'.$this->searchModeKey($search)
             .':'.(string) ($evidence['fingerprint'] ?? 'none');
         // Đọc/ghi bộ đệm phải BỌC LỖI như đường brief: bộ đệm hỏng (bảng cache thiếu/đầy) không được
         // biến một lần đọc xu hướng thành lỗi 500.
         $cached = $this->readBriefCache($cacheKey);
         if (is_array($cached) && ! empty($cached['directions'])) {
+            // Danh mục hướng cũng phải đọc từ đệm: nhãn "AI tìm thấy" được gắn SAU khi model chạy, nên bản
+            // đệm thiếu nó là lần mở sau nói ngược lại lần chạy thật.
+            $cachedTrends = is_array($cached['trends'] ?? null) && $cached['trends'] !== [] ? $cached['trends'] : $trends;
+
             return [$cached['directions'], $this->modelBlock('ai', $candidates, [
                 'provider' => $cached['provider'] ?? null,
                 'model' => $cached['model'] ?? null,
@@ -1508,7 +1515,7 @@ class DesignAgentService
                 // Số đo của lượt ĐÃ CHẠY được giữ nguyên trong đệm — bản đệm không được biến một lượt CÓ
                 // tìm kiếm thành một lượt "không tìm gì".
                 'tool_search' => is_array($cached['tool_search'] ?? null) ? $cached['tool_search'] : null,
-            ]), $trends];
+            ]), $cachedTrends];
         }
 
         $instruction = 'Bạn là TrendRadar — chuyên gia phân tích xu hướng thời trang Việt Nam cho xưởng may và thương hiệu nhỏ. '
@@ -1669,6 +1676,9 @@ class DesignAgentService
         try {
             Cache::put($cacheKey, [
                 'directions' => $directions,
+                // Danh mục hướng ĐÃ enrich (có thể vừa được gắn bằng chứng từ tin AI tự tra) — xem chú thích
+                // ở khoá đệm v5.
+                'trends' => $trends,
                 'web_search' => $webSearch,
                 'tool_search' => $toolSearch,
                 'provider' => $answer['provider'],
