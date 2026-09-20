@@ -643,7 +643,7 @@ export const useStudioStore = defineStore('studio', {
       // và deleteGen.
       if (!res.ok || res.redirected || !ct.includes('application/json')) {
         // redirected ⇒ Laravel đá về /dang-nhap và trả HTML ⇒ coi như HẾT PHIÊN, không phải 403.
-        if (res.redirected || (res.url && res.url.includes('/dang-nhap'))) this.setAuthStatus(401);
+        if (expired) this.setAuthStatus(401);
         else this.setAuthStatus(res.status);
         // [Q1 — 2026-09-19] Hết credit (402 code=out_of_credits) ⇒ MỞ THẲNG bảng nâng cấp kèm danh mục
         // gói, thay vì để khách đọc một câu lỗi rồi không biết bấm vào đâu. Xử lý ở MỘT chỗ này nên
@@ -665,7 +665,10 @@ export const useStudioStore = defineStore('studio', {
         // biết phải làm gì, còn hỗ trợ thì không biết lỗi ở đâu:
         //   · phiên đăng nhập đã hết (máy chủ đá về trang đăng nhập) ⇒ chỉ cần tải lại trang;
         //   · máy chủ trả về thứ không dùng được (lỗi/không phải JSON) ⇒ tải lại, nếu vẫn lỗi thì đọc mã tra cứu.
-        const expired = res.redirected || (res.url && res.url.includes('/dang-nhap'));
+        // 419 = Laravel từ chối vì token phiên/CSRF đã cũ (tab mở lâu, hoặc máy ngủ rồi thức).
+        // Đây CHÍNH LÀ "hết phiên" chứ không phải lỗi dữ liệu — trước đây rơi vào nhánh chung nên khách
+        // nhận một câu mơ hồ (đúng ca khách báo mã L-P7CR).
+        const expired = res.redirected || res.status === 419 || (res.url && res.url.includes('/dang-nhap'));
         const err = new Error(data.message || (expired
           ? 'Phiên làm việc đã hết. Hãy tải lại trang để đăng nhập lại.'
           : 'Không tải được dữ liệu. Hãy tải lại trang và thử lại.'));

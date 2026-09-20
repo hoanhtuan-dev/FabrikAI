@@ -2110,4 +2110,15 @@ Tra trong `storage/logs/laravel.log` của production:
 | Full suite | **904 test / 6.612 assert XANH** |
 | Production | log có dòng `client_error[L-P7CR]` — mã tra cứu hoạt động đúng thiết kế (khách đọc mã, hỗ trợ tra ra dòng log) |
 
+
+### 2b. Bổ sung sau khi lần theo nguyên nhân `L-P7CR`
+
+Dòng log không có lỗi máy chủ nào cùng thời điểm, mà lời gọi là `Proxy.api` (POST trong Studio) ⇒ thủ phạm
+thường gặp là **phiên/token đã cũ** (tab mở lâu, máy ngủ rồi thức) — Laravel trả **419** kèm trang HTML,
+và bản cũ rơi vào nhánh chung nên khách chỉ nhận một câu mơ hồ. Nay:
+
+- **419 được xếp đúng loại "hết phiên"** (cùng với bị đá về `/dang-nhap`) ⇒ câu hiển thị là
+  *"Phiên làm việc đã hết. Hãy tải lại trang để đăng nhập lại."* và trạng thái xác thực chuyển sang
+  `expired` ⇒ hiện thẻ **AuthNotice** mời đăng nhập lại (thay vì im lặng).
+- Ngữ cảnh log ghi rõ `api <đường dẫn> → hết phiên`, nên lần sau mã tra cứu là tra được ngay.
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
