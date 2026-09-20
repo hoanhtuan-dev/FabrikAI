@@ -38,7 +38,7 @@ helpers.js · state.js · getters.js + 10 module actions (account · generation 
 - Commit: bbf837e (hiệu năng + tách store) · 082c6c9 (tách DesignAgents).
 
 ### Việc còn lại (không chặn)
-- Chưa deploy production (đang chạy bản cũ). Trước khi deploy: npm run build + xác minh 4 bước Agent Studio mở/đóng modal đúng (đặc biệt lần mở đầu tiên — chunk nạp lười).
+- **ĐÃ DEPLOY production 2026-09-24**: push `54de338 → 87b3fda` → SSH `git pull --ff-only` → HEAD `87b3fda` · `migrate` = Nothing to migrate · verify: `/` 200 · `main-De78Y48H.js` (179.070 byte) 200 · chunk `DesignAgents-CGv_NxyR.js` 200 · homepage trỏ đúng asset mới.
 - store/actions layers.js (1.231) và selection.js (1.039) còn dài — có thể tách tiếp khi cần, không bắt buộc.
 
 ---

@@ -12,9 +12,14 @@ import { canvasViewActions } from './store/actions/canvasView.js';
 import { libraryActions } from './store/actions/library.js';
 import { projectsActions } from './store/actions/projects.js';
 import { agentStudioActions } from './store/actions/agentStudio.js';
-import { layersActions } from './store/actions/layers.js';
+import { layerCoreActions } from './store/actions/layerCore.js';
+import { brushesActions } from './store/actions/brushes.js';
+import { layerTransformActions } from './store/actions/layerTransform.js';
 import { sourcesActions } from './store/actions/sources.js';
-import { selectionActions } from './store/actions/selection.js';
+import { maskSelectActions } from './store/actions/maskSelect.js';
+import { pathToolActions } from './store/actions/pathTool.js';
+import { maskBrushActions } from './store/actions/maskBrush.js';
+import { regionOpsActions } from './store/actions/regionOps.js';
 
 export const useStudioStore = defineStore('studio', {
   state: studioState,
@@ -27,9 +32,14 @@ export const useStudioStore = defineStore('studio', {
     ...libraryActions,
     ...projectsActions,
     ...agentStudioActions,
-    ...layersActions,
+    ...layerCoreActions,
+    ...brushesActions,
+    ...layerTransformActions,
     ...sourcesActions,
-    ...selectionActions,
+    ...maskSelectActions,
+    ...pathToolActions,
+    ...maskBrushActions,
+    ...regionOpsActions,
   },
 });
 
