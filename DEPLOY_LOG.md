@@ -50,6 +50,9 @@ helpers.js · state.js · getters.js + 10 module actions (account · generation 
 | 10 | Test khoá vai tìm kiếm | AgentRolesTest.php | 7 → 10 test (brief dùng model tìm kiếm + gửi enable_search · trống thì không bật · radar chạy độc lập) |
 | 11 | Thêm 3 vai Agent Studio vào Model Registry | SettingsApp.vue + StudioSettingsController.php + helpers.php | dropdown "Vai trò" và validation backend đều thiếu agent_reason/agent_vision/agent_search; thêm studio_model_group_slugs() làm một nguồn + sửa 4 chỗ đọc api_key_ref nullable |
 | 12 | Test Model Registry nhận vai Agent Studio | AgentRolesTest.php | 11 test / 48 assert (POST group=agent_search → 201 + UI scan ROLE_ORDER) · suite 958 XANH |
+| 13 | Sửa TDZ "Cannot access 't' before initialization" | store/actions/account.js | api() dùng `expired` trước khi khai báo ⇒ mọi HTTP lỗi ném ReferenceError thay vì câu lỗi thật |
+| 14 | Sửa radar 504 (gọi nhầm model tìm kiếm) | DesignAgentService.php | radarDirections gọi nhóm agent_search khi có model mà KHÔNG cần model tìm kiếm được ⇒ gọi nhầm ckey (api.xah.io chết) ⇒ treo 90s ⇒ 504; nay chỉ dùng nhóm tìm kiếm khi webSearch=true (khớp aiBrief) |
+| 15 | Test radar bỏ qua model tìm kiếm không tìm kiếm được | AgentRolesTest.php | 12 test / 51 assert · suite 959 XANH |
 
 > Ghi chú: skeleton loading (radar 6 ô · brief 6 ô) và empty state (trend/brief/kế hoạch) đã có sẵn từ các đợt trước — đợt này chỉ bổ sung phím tắt, không làm lại. Vai "Tìm kiếm nguồn ngoài" (nhóm công việc agent_search) ĐÃ tồn tại từ Đợt 30 (Ba vai riêng: suy luận · đọc ảnh · tìm kiếm); đợt này sửa lỗi nó không chạy được khi chỉ khai mình nó.
 
