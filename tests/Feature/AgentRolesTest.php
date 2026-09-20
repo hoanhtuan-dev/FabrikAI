@@ -115,6 +115,74 @@ class AgentRolesTest extends TestCase
         $this->assertSame('ai-v1', $brief['engine']);
     }
 
+    // ── (A2) VAI TÌM KIẾM INTERNET (đảm bảo nhóm search thật sự chạy, không chỉ "có tên") ──
+
+    /**
+     * Khai nhóm TÌM KIẾM với provider tự khai search_param ⇒ lượt chạy dùng ĐÚNG model của nhóm đó
+     * VÀ gửi cờ bật tìm kiếm web vào body (không chỉ là cờ nội bộ nói suông).
+     */
+    public function test_the_search_role_is_used_and_enables_web_search(): void
+    {
+        // Custom Provider khai cách bật tìm kiếm (search_param) — planFor đọc tham số này trước giao thức.
+        $this->model(DesignAgentService::SEARCH_GROUP, 'gw-search', 'search-1', [
+            'search_param' => 'enable_search',
+            'search_mode' => 'body_flag',
+        ]);
+        Http::fake(['gw-search.example/*' => Http::response(['choices' => [['message' => ['content' => $this->briefJson()]]]], 200)]);
+
+        $brief = app(DesignAgentService::class)->collectionBrief(['prompt' => 'đầm linen'], $this->customer(), true, true);
+
+        $this->assertSame('gw-search', $brief['model']['provider'], 'Vai tìm kiếm đã khai thì lượt chạy phải dùng model của nó.');
+        $this->assertSame('search-1', $brief['model']['model']);
+        $this->assertTrue($brief['model']['web_search'], 'Model có khả năng tìm kiếm thì cờ web_search phải bật.');
+
+        // Cờ bật tìm kiếm THẬT SỰ nằm trong request gửi đi (enable_search), không phải chỉ là cờ báo cáo.
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'gw-search.example')
+            && str_contains((string) $request->body(), 'enable_search'));
+    }
+
+    /**
+     * Nhóm tìm kiếm BỎ TRỐNG ⇒ rơi về nhóm suy luận và KHÔNG bật tìm kiếm web (nói đúng, không hứa suông).
+     */
+    public function test_an_empty_search_role_falls_back_without_web_search(): void
+    {
+        $this->model(DesignAgentService::REASON_GROUP, 'gw-reason', 'reason-1');
+        Http::fake(['gw-reason.example/*' => Http::response(['choices' => [['message' => ['content' => $this->briefJson()]]]], 200)]);
+
+        $brief = app(DesignAgentService::class)->collectionBrief(['prompt' => 'đầm linen'], $this->customer(), true, true);
+
+        $this->assertSame('gw-reason', $brief['model']['provider'], 'Nhóm tìm kiếm bỏ trống thì dùng nhóm suy luận.');
+        $this->assertFalse($brief['model']['web_search'], 'Không có model tìm kiếm thì cờ web_search phải TẮT.');
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'gw-reason.example')
+            && ! str_contains((string) $request->body(), 'enable_search'));
+    }
+
+    /**
+     * Đường RADAR cũng phải chạy được BẰNG MỘT MÌNH nhóm tìm kiếm (không cần nhóm suy luận) —
+     * khoá luôn cả hai đường vì trước đây cả hai đều kiểm nhóm suy luận TRƯỚC nhóm tìm kiếm.
+     */
+    public function test_the_search_role_runs_radar_standalone(): void
+    {
+        $this->model(DesignAgentService::SEARCH_GROUP, 'gw-search', 'search-1', [
+            'search_param' => 'enable_search',
+            'search_mode' => 'body_flag',
+        ]);
+        Http::fake(['gw-search.example/*' => Http::response(['choices' => [['message' => ['content' => json_encode([
+            'directions' => array_fill(0, 6, ['title' => 'Hướng', 'thesis' => 't', 'why_now' => 'w', 'action' => 'a', 'risk' => 'r', 'price_band' => 'mid']),
+        ], JSON_UNESCAPED_UNICODE)]]]], 200)]);
+
+        $radar = app(DesignAgentService::class)->radar($this->customer(), 'all', true);
+
+        $this->assertSame('ai-v1', $radar['engine'], 'Radar phải chạy AI bằng nhóm tìm kiếm khi nhóm suy luận trống.');
+        $this->assertSame('gw-search', $radar['model']['provider']);
+        $this->assertSame('search-1', $radar['model']['model']);
+        $this->assertTrue($radar['model']['web_search'], 'Radar chạy bằng model tìm kiếm thì cờ web_search phải bật.');
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'gw-search.example')
+            && str_contains((string) $request->body(), 'enable_search'));
+    }
+
     // ── (B) VAI ĐỌC ẢNH ────────────────────────────────────────────────────
 
     /**

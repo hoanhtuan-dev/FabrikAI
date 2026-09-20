@@ -1121,7 +1121,10 @@ class DesignAgentService
      */
     private function radarDirections(array $trends, array $ruleDirections, array $candidates, string $region, bool $useAi, array $evidence = [], array $callCandidates = []): array
     {
-        if (! $useAi || $this->gateway === null || $candidates === []) {
+        // VAI TÌM KIẾM chạy ĐỘC LẬP được: chỉ cần MỘT trong hai nhóm (suy luận/tìm kiếm) có model là đủ.
+        // Trước đây kiểm `$candidates === []` (nhóm suy luận) TRƯỚC khi xét nhóm tìm kiếm ⇒ người dùng chỉ
+        // khai nhóm "Tìm kiếm nguồn ngoài" mà không khai nhóm suy luận thì agent im lặng rơi về engine tất định.
+        if (! $useAi || $this->gateway === null || ($candidates === [] && $callCandidates === [])) {
             return [$ruleDirections, $this->modelBlock('rule', $candidates)];
         }
 
@@ -1211,7 +1214,7 @@ class DesignAgentService
         if ($answer === null) {
             logger()->warning('TrendRadar: model không trả về nội dung, dùng engine tất định', ['group' => self::AI_GROUP, 'attempted' => $attempted]);
 
-            return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch])];
+            return [$ruleDirections, $this->modelBlock('rule', $runner, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch])];
         }
 
         $directions = $this->normalizeDirections($call['json'], $trends, $ruleDirections);
@@ -1234,7 +1237,7 @@ class DesignAgentService
                 'raw' => substr($answer['text'], 0, 800),
             ]);
 
-            return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch])];
+            return [$ruleDirections, $this->modelBlock('rule', $runner, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch])];
         }
 
         try {
@@ -1248,7 +1251,7 @@ class DesignAgentService
             // Bộ đệm là tối ưu tốc độ, không phải điều kiện để trả kết quả.
         }
 
-        return [$directions, $this->modelBlock('ai', $candidates, [
+        return [$directions, $this->modelBlock('ai', $runner, [
             'provider' => $answer['provider'],
             'model' => $answer['model'],
             'latency_ms' => $latency,
@@ -1445,7 +1448,14 @@ class DesignAgentService
      */
     private function aiBrief(array $context, array $candidates, bool $useAi, array $evidence = []): array
     {
-        if (! $useAi || $this->gateway === null || $candidates === []) {
+        if (! $useAi || $this->gateway === null) {
+            return ['model' => $this->modelBlock('rule', $candidates), 'data' => null];
+        }
+        // VAI TÌM KIẾM chạy ĐỘC LẬP được (giống đường radar): chỉ cần MỘT trong hai nhóm có model là đủ.
+        // Trước đây kiểm `$candidates === []` TRƯỚC khi xét nhóm tìm kiếm ⇒ người dùng chỉ khai nhóm
+        // "Tìm kiếm nguồn ngoài" thì brief im lặng rơi về engine tất định dù model tìm kiếm sẵn sàng.
+        $searchGroup = $this->searchCandidates();
+        if ($candidates === [] && $searchGroup === []) {
             return ['model' => $this->modelBlock('rule', $candidates), 'data' => null];
         }
 
@@ -1469,7 +1479,7 @@ class DesignAgentService
 
         // TÌM KIẾM: nhóm "Agent Studio — Tìm kiếm nguồn ngoài" quyết định (giống đường radar). Có model ở
         // nhóm đó và model ấy biết bật tìm kiếm ⇒ gọi chính model đó; không ⇒ dùng nhóm suy luận.
-        $searchGroup = $this->searchCandidates();
+        // ($searchGroup đã tính ở đầu hàm để quyết định "có AI chạy được không".)
         $searchPlan = WebAccessService::planFor($searchGroup[0] ?? []);
         $webSearch = $searchPlan !== null;
         $runner = $webSearch ? $searchGroup : $candidates;
@@ -1483,7 +1493,7 @@ class DesignAgentService
         if ($answer === null) {
             logger()->warning('CollectionBot: model không trả về nội dung, dùng engine tất định', ['attempted' => $attempted]);
 
-            return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch]), 'data' => null];
+            return ['model' => $this->modelBlock('rule', $runner, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch]), 'data' => null];
         }
 
         $data = $this->normalizeAiBrief($call['json']);
@@ -1499,11 +1509,11 @@ class DesignAgentService
                 'raw' => substr($answer['text'], 0, 800),
             ]);
 
-            return ['model' => $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch]), 'data' => null];
+            return ['model' => $this->modelBlock('rule', $runner, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch]), 'data' => null];
         }
 
         return [
-            'model' => $this->modelBlock('ai', $candidates, [
+            'model' => $this->modelBlock('ai', $runner, [
                 'provider' => $answer['provider'],
                 'model' => $answer['model'],
                 'latency_ms' => $latency,
