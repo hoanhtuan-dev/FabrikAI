@@ -22,6 +22,10 @@ export const accountActions = {
       // và deleteGen.
       if (!res.ok || res.redirected || !ct.includes('application/json')) {
         // redirected ⇒ Laravel đá về /dang-nhap và trả HTML ⇒ coi như HẾT PHIÊN, không phải 403.
+        // [BUG ĐÃ SỬA] "expired" từng được DÙNG ở đây rồi mới KHAI BÁO ở dưới (const expired = ... ở cuối
+        // khối) ⇒ mỗi lần có HTTP lỗi (vd 504) là ném "Cannot access 'expired' before initialization"
+        // thay vì câu lỗi thật. Nay khai báo TRƯỚC khi dùng.
+        const expired = res.redirected || res.status === 419 || (res.url && res.url.includes('/dang-nhap'));
         if (expired) this.setAuthStatus(401);
         else this.setAuthStatus(res.status);
         // [Q1 — 2026-09-19] Hết credit (402 code=out_of_credits) ⇒ MỞ THẲNG bảng nâng cấp kèm danh mục
@@ -47,7 +51,6 @@ export const accountActions = {
         // 419 = Laravel từ chối vì token phiên/CSRF đã cũ (tab mở lâu, hoặc máy ngủ rồi thức).
         // Đây CHÍNH LÀ "hết phiên" chứ không phải lỗi dữ liệu — trước đây rơi vào nhánh chung nên khách
         // nhận một câu mơ hồ (đúng ca khách báo mã L-P7CR).
-        const expired = res.redirected || res.status === 419 || (res.url && res.url.includes('/dang-nhap'));
         const err = new Error(data.message || (expired
           ? 'Phiên làm việc đã hết. Hãy tải lại trang để đăng nhập lại.'
           : 'Không tải được dữ liệu. Hãy tải lại trang và thử lại.'));

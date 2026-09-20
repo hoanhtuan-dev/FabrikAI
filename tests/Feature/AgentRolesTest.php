@@ -214,6 +214,30 @@ class AgentRolesTest extends TestCase
             && str_contains((string) $request->body(), 'enable_search'));
     }
 
+    /**
+     * Radar KHÔNG được gọi nhóm tìm kiếm khi model đó KHÔNG tìm kiếm được (không khai search_param,
+     * giao thức không có dialect) — trước đây "nhóm tìm kiếm cứ có model là gọi" nên một model CHẾT
+     * nằm trong agent_search (vd custom provider timeout) làm radar treo 90s và proxy trả 504.
+     */
+    public function test_radar_ignores_a_search_group_model_that_cannot_search(): void
+    {
+        // Nhóm tìm kiếm CÓ model nhưng provider KHÔNG khai search_param ⇒ planFor = null.
+        $this->model(DesignAgentService::SEARCH_GROUP, 'gw-search', 'search-1');
+        // Nhóm suy luận có model bình thường.
+        $this->model(DesignAgentService::REASON_GROUP, 'gw-reason', 'reason-1');
+        Http::fake(['gw-reason.example/*' => Http::response(['choices' => [['message' => ['content' => json_encode([
+            'directions' => array_fill(0, 6, ['title' => 'Hướng', 'thesis' => 't', 'why_now' => 'w', 'action' => 'a', 'risk' => 'r', 'price_band' => 'mid']),
+        ], JSON_UNESCAPED_UNICODE)]]]], 200)]);
+
+        $radar = app(DesignAgentService::class)->radar($this->customer(), 'all', true);
+
+        $this->assertSame('gw-reason', $radar['model']['provider'], 'Radar phải dùng nhóm suy luận khi model tìm kiếm không tìm kiếm được.');
+        $this->assertFalse($radar['model']['web_search']);
+
+        // KHÔNG được gọi model tìm kiếm (gw-search) — nó không tìm kiếm được, gọi là lãng phí + treo.
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'gw-search.example'));
+    }
+
     // ── (B) VAI ĐỌC ẢNH ────────────────────────────────────────────────────
 
     /**

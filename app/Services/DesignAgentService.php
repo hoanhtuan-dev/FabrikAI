@@ -973,15 +973,14 @@ class DesignAgentService
             (array) ($brand['shop'] ?? []),
             array_flip(['row_count', 'units_sold', 'stock_on_hand', 'return_rate_pct', 'avg_price_vnd']),
         );
-        // Nhóm TÌM KIẾM đứng trước nhóm suy luận (giống đường chạy thật ở aiBrief): khoá đệm tính theo
-        // nhóm suy luận trong khi lượt chạy do nhóm tìm kiếm quyết định thì đổi cấu hình tìm kiếm xong vẫn
-        // nhận bản đệm cũ (không có nguồn thật) tới một giờ.
-        $runner = $this->searchCandidates();
-        if ($runner === []) {
-            $runner = $candidates;
-        }
+        // Nhóm TÌM KIẾM đứng trước nhóm suy luận CHỈ KHI model đó THẬT SỰ bật được tìm kiếm — phải khớp
+        // đúng đường chạy thật ở aiBrief (runner = webSearch ? searchGroup : candidates). Trước đây "có model
+        // trong nhóm tìm kiếm là dùng" nên khoá đệm tính theo model tìm kiếm (dù không tìm kiếm được) trong
+        // khi lượt chạy lại dùng nhóm suy luận ⇒ đổi cấu hình tìm kiếm làm mất bộ đệm vô cớ.
+        $searchGroup = $this->searchCandidates();
+        $search = WebAccessService::planFor($searchGroup[0] ?? []);
+        $runner = ($search !== null) ? $searchGroup : $candidates;
         $model = implode('|', array_map(fn (array $c) => $c['provider'].':'.$c['model'], $runner));
-        $search = WebAccessService::planFor($runner[0] ?? []);
 
         return 'design-agent:brief:'.self::BRIEF_CACHE_VERSION.':'.hash('sha256', json_encode([
             $inputSignature,
@@ -1137,7 +1136,9 @@ class DesignAgentService
         $searchPlan = WebAccessService::planFor($callCandidates[0] ?? []);
         $webSearch = $searchPlan !== null;
 
-        $fingerprint = md5(implode('|', array_map(fn (array $c) => $c['provider'].':'.$c['model'], $callCandidates !== [] ? $callCandidates : $candidates)));
+        // [BUG ĐÃ SỬA] Vân tay cache phải khớp model THẬT SỰ được gọi: chỉ dùng nhóm tìm kiếm khi
+        // webSearch bật, không phải "nhóm tìm kiếm cứ có model là dùng" (sai khi model đó không tìm kiếm được).
+        $fingerprint = md5(implode('|', array_map(fn (array $c) => $c['provider'].':'.$c['model'], $webSearch ? $callCandidates : $candidates)));
         // Cờ tìm kiếm nằm TRONG khoá cache: nội dung trả lời khác nhau (có/không nguồn thật) nên dùng
         // chung cache sẽ trả về câu trả lời của chế độ khác.
         // Khoá cache gồm CẢ cách bật tìm kiếm: đổi tham số trong Cài đặt (hoặc bật/tắt) là nội dung trả
@@ -1175,7 +1176,11 @@ class DesignAgentService
             .'Trả JSON NGAY, không viết phần suy luận/giải thích dài dòng.';
 
         $started = microtime(true);
-        $runner = $callCandidates !== [] ? $callCandidates : $candidates;
+        // [BUG ĐÃ SỬA — nguyên nhân 504 radar] Chỉ gọi nhóm TÌM KIẾM khi model đó THẬT SỰ bật được tìm kiếm
+        // (webSearch). Trước đây "$callCandidates !== []" nên nhóm agent_search CÓ model (dù model đó KHÔNG
+        // tìm kiếm được, vd custom provider thường) là radar bỏ nhóm suy luận mà gọi nhầm model đó —
+        // model chết/timeout (api.xah.io) thì radar treo 90s và proxy trả 504.
+        $runner = $webSearch ? $callCandidates : $candidates;
         $call = $this->callJson($instruction, [
             'region' => $region,
             'region_name' => $this->regionName($region),
