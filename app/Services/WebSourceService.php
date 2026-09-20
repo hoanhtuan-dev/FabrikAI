@@ -93,7 +93,9 @@ class WebSourceService
             }
             // Nguồn TÌM KIẾM chỉ có nghĩa khi có từ khoá điền vào (`{query}`); gọi thẳng URL đó ở đường đọc
             // tin cố định là đi hỏi internet đúng chuỗi "{query}" rồi nhận về rác. Bỏ qua và NÓI RA lý do.
-            if (str_contains((string) $source->url, self::SEARCH_PLACEHOLDER)) {
+            // Kiểu `search` bị bỏ qua ở đây LUÔN (kể cả khi admin quên `{query}` trong URL) — nó là làn
+            // TÌM KIẾM, không phải feed.
+            if ($source->kind === 'search' || str_contains((string) $source->url, self::SEARCH_PLACEHOLDER)) {
                 $statuses[] = $this->status($source, false, null, 0, 0, 'bỏ qua: nguồn tìm kiếm theo từ khoá', [
                     'state' => 'skipped',
                     'state_label' => 'Bỏ qua (chỉ dùng khi model gọi công cụ tìm kiếm)',
@@ -309,6 +311,29 @@ class WebSourceService
     }
 
     /**
+     * LẤY THỬ MỘT NGUỒN TÌM KIẾM bằng một từ khoá mẫu — cho nút "Lấy thử" ở Cài đặt.
+     *
+     * Vì sao cần đường riêng: nguồn tìm kiếm có `{query}` trong URL nên gọi thẳng URL đó là đi hỏi internet
+     * đúng chuỗi "{query}". Người khai nguồn cần thấy NGAY là cấu hình đúng hay sai, kèm HTTP và số tin —
+     * cấu hình mù là cấu hình sẽ hỏng lúc chạy thật.
+     *
+     * KHÔNG dùng đệm: đây là phép THỬ, phải là kết quả của lúc bấm.
+     *
+     * @return array<string, mixed>
+     */
+    public function fetchWithQuery(WebSource $source, string $query): array
+    {
+        $target = $this->withQuery($source, $query);
+        $started = microtime(true);
+
+        try {
+            return $this->interpretSearch($target, $this->request($target), $started, self::SEARCH_LIMIT);
+        } catch (\Throwable $e) {
+            return $this->failure($source, $e, $started);
+        }
+    }
+
+    /**
      * Một truy vấn trên MỘT nguồn, CÓ ĐỆM riêng theo (nguồn · từ khoá).
      *
      * Vì sao không dùng `fetch()`: đệm của `fetch()` khoá theo nguồn nên hai truy vấn khác nhau sẽ nuốt
@@ -402,7 +427,8 @@ class WebSourceService
         } elseif ($oversized) {
             $result['error'] = 'nội dung quá lớn';
         } else {
-            $parsed = $source->kind === 'json' ? $this->parseJson($body, $source) : $this->parseRss($body);
+            // Cùng lý do như interpret(): 'search' cũng là API JSON.
+            $parsed = $source->kind === 'rss' ? $this->parseRss($body) : $this->parseJson($body, $source);
             $result['parsed'] = count($parsed);
             $result['ok'] = true;
 
@@ -584,7 +610,7 @@ class WebSourceService
             ->timeout(self::TIMEOUT)
             ->withHeaders(['User-Agent' => 'FabrikAI/1.0 (+https://fabrikai.shop)'])
             ->withOptions($this->options())
-            ->get($source->url);
+            ->get($this->withSearchKey($source));
     }
 
     /** Yêu cầu đơn (đường fetch một nguồn). */
@@ -596,7 +622,45 @@ class WebSourceService
             ->timeout(self::TIMEOUT)
             ->withHeaders(['User-Agent' => 'FabrikAI/1.0 (+https://fabrikai.shop)'])
             ->withOptions($this->options())
-            ->get($source->url);
+            ->get($this->withSearchKey($source));
+    }
+
+    /**
+     * URL gọi thật của một nguồn — GẮN KHOÁ API cho nguồn TÌM KIẾM, và chỉ ở đây.
+     *
+     * Vì sao khoá KHÔNG nằm trong `web_sources.url`: cột đó hiện nguyên văn trên màn Cài đặt, đi vào
+     * payload API, vào bảng trạng thái nguồn và vào log — dán khoá vào đó là phơi khoá ở 4 chỗ. Khoá đọc
+     * từ bảng API key (đã mã hoá) theo provider = slug của nguồn, rồi chỉ xuất hiện trong URL của ĐÚNG
+     * lời gọi HTTP này.
+     */
+    private function withSearchKey(WebSource $source): string
+    {
+        $url = (string) $source->url;
+
+        if (($source->kind ?? '') !== 'search') {
+            return $url;
+        }
+
+        $refs = array_values(array_unique(array_filter([
+            trim((string) $source->slug),
+            'google_cse',
+        ], 'strlen')));
+
+        $key = null;
+        foreach ($refs as $ref) {
+            $key = function_exists('studio_api_key') ? studio_api_key($ref) : null;
+            if ($key) {
+                break;
+            }
+        }
+
+        if (! $key) {
+            // Không có khoá ⇒ gọi thẳng URL (API sẽ trả 401/403) và trạng thái nguồn nói rõ "Không lấy được".
+            // KHÔNG tự chế khoá, KHÔNG im lặng coi như thành công.
+            return $url;
+        }
+
+        return $url.(str_contains($url, '?') ? '&' : '?').'key='.rawurlencode((string) $key);
     }
 
     /**
@@ -671,7 +735,9 @@ class WebSourceService
         } elseif ($oversized) {
             $result['error'] = 'nội dung quá lớn';
         } else {
-            $parsed = $source->kind === 'json' ? $this->parseJson($body, $source) : $this->parseRss($body);
+            // CHỈ 'rss' mới đi đường RSS: 'json' VÀ 'search' đều là API trả JSON. Viết `=== 'json'` thì nguồn
+            // tìm kiếm rơi vào bộ đọc RSS và luôn ra 0 tin dù API trả 200 — lỗi im lặng đúng kiểu khó thấy.
+            $parsed = $source->kind === 'rss' ? $this->parseRss($body) : $this->parseJson($body, $source);
             $result['parsed'] = count($parsed);
             $result['ok'] = true;
             // GIỮ BẢN ĐỌC ĐƯỢC (rộng) trong đệm: việc cắt theo trần là rẻ, việc đi mạng là đắt. Nhờ vậy lần

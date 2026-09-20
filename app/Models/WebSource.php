@@ -14,7 +14,19 @@ class WebSource extends Model
 {
     protected $table = 'web_sources';
 
-    public const KINDS = ['rss', 'json'];
+    /**
+     * Ba KIỂU nguồn:
+     *   · rss    — feed tin (RSS/Atom);
+     *   · json   — API trả JSON, khai ánh xạ trường qua items_path/*_field;
+     *   · search — API TÌM KIẾM theo TỪ KHOÁ (2026-09-21): URL có chỗ điền `{query}`, và khoá API
+     *              KHÔNG nằm trong URL — nó đọc từ bảng API key (provider = slug của nguồn) lúc gọi.
+     *
+     * Vì sao cần kiểu thứ ba: đo thật — Google News RSS (kiểu rss) CHỈ có tin tức, nên câu hỏi tra cứu
+     * thường ("cách giặt vải linen") và câu hỏi thương mại ("xưởng may gia công ở Tân Bình") đều trả về
+     * **0 kết quả**. Muốn tra được WEB CHUNG thì phải gọi một API tìm kiếm thật (vd Google Custom Search
+     * JSON API), và API đó cần khoá.
+     */
+    public const KINDS = ['rss', 'json', 'search'];
 
     protected $fillable = [
         'slug', 'name', 'url', 'kind', 'enabled', 'priority', 'keywords', 'region', 'max_items',

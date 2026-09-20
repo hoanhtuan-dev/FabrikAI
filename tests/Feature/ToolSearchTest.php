@@ -651,7 +651,67 @@ class ToolSearchTest extends TestCase
         $this->assertTrue($second['model']['cached'], 'Lần hai phải đọc từ đệm (đúng thứ cần kiểm).');
         $this->assertSame('ai', $label($second), 'Đọc từ đệm KHÔNG được làm mất nhãn bằng chứng do AI tìm.');
     }
+
+    // ── (F) LÀN WEB CHUNG BẰNG API TÌM KIẾM (2026-09-21) ───────────────────
+
+    /**
+     * Nguồn kiểu `search` PHẢI gắn khoá API vào lời gọi HTTP, và khoá KHÔNG được nằm trong URL nguồn.
+     *
+     * Đo thật: Google News RSS (kiểu rss) chỉ có tin tức — câu hỏi tra cứu thường ("cách giặt vải linen")
+     * và câu hỏi thương mại đều trả 0 kết quả. Muốn tra web chung thì phải gọi API tìm kiếm thật, và API
+     * đó cần khoá. Khoá để trong `web_sources.url` là phơi khoá ở màn Cài đặt + payload + log.
+     */
+    public function test_a_search_source_gets_the_api_key_at_call_time_only(): void
+    {
+        StudioApiKey::create([
+            'provider' => 'google-web', 'label' => 'Google CSE', 'value' => 'key-cse-123',
+            'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+        ]);
+        WebSource::create([
+            'slug' => 'google-web', 'name' => 'Google — tìm kiếm web chung', 'kind' => 'search', 'enabled' => true,
+            'url' => 'https://www.googleapis.com/customsearch/v1?cx=CX123&num=10&q={query}',
+            'priority' => 1, 'max_items' => 10,
+            'items_path' => 'items', 'title_field' => 'title', 'link_field' => 'link', 'summary_field' => 'snippet',
+        ]);
+
+        Http::fake(['www.googleapis.com/*' => Http::response(json_encode(['items' => [
+            ['title' => 'Cách giặt vải linen', 'link' => 'https://gusa.vn/a', 'snippet' => 'Hướng dẫn giặt linen không nhão'],
+        ]]), 200)]);
+
+        $found = app(WebSourceService::class)->search('cách giặt vải linen', 'all');
+
+        $this->assertSame(1, $found['count'], 'Nguồn tìm kiếm phải trả được kết quả web chung.');
+        $this->assertSame('https://gusa.vn/a', $found['items'][0]['url']);
+        $this->assertSame('Hướng dẫn giặt linen không nhão', $found['items'][0]['summary']);
+
+        // KHOÁ có trong lời gọi HTTP…
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'key=key-cse-123')
+            && str_contains(urldecode($request->url()), 'q=cách giặt vải linen'));
+        // …nhưng KHÔNG có trong URL lưu ở Cài đặt (chỗ hiện nguyên văn cho mọi người đọc).
+        $row = WebSource::query()->where('slug', 'google-web')->first();
+        $this->assertStringNotContainsString('key-cse-123', (string) $row->url);
+    }
+
+    /** Nguồn tìm kiếm KHÔNG được đọc ở đường lấy tin cố định — nó là làn TÌM KIẾM, không phải feed. */
+    public function test_a_search_source_is_never_read_as_a_fixed_feed(): void
+    {
+        WebSource::create([
+            'slug' => 'google-web', 'name' => 'Google — web chung', 'kind' => 'search', 'enabled' => true,
+            // Cố tình KHÔNG có {query}: dù admin quên, nó vẫn không được coi là feed.
+            'url' => 'https://www.googleapis.com/customsearch/v1?cx=CX123&q=thoi+trang',
+            'priority' => 1, 'max_items' => 10,
+        ]);
+        Http::fake();
+
+        $evidence = app(WebSourceService::class)->evidence('all');
+        $row = collect($evidence['sources'])->firstWhere('slug', 'google-web');
+
+        $this->assertSame('skipped', $row['state']);
+        $this->assertStringContainsString('tìm kiếm', (string) $row['state_label']);
+        Http::assertNothingSent();
+    }
 }
+
 
 
 

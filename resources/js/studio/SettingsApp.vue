@@ -404,6 +404,21 @@ function validKey(v) {
 // ─────────────────────────── Hộp thoại: API key ───────────────────────────
 const blankKey = (provider = '') => ({ provider, label: '', value: '', kind: '', priority: 5, note: '', enabled: true });
 const keyModal = reactive({ open: false, mode: 'create', id: null, form: blankKey(), errors: {}, saving: false });
+/**
+ * Provider KHÔNG có trong danh sách (vd khoá cho một nguồn tìm kiếm) — chọn "Khác" thì hiện ô tự nhập.
+ *
+ * Vì sao phải xoá giá trị '__other' ngay khi chọn: để nguyên thì nó lọt vào cột provider trong database
+ * và trở thành một "nhà cung cấp" tên là __other — rác dữ liệu mà không ai truy ra.
+ */
+const keyProviderOther = ref(false);
+function onKeyProviderChange() {
+  if (keyModal.form.provider === '__other') {
+    keyProviderOther.value = true;
+    keyModal.form.provider = '';
+  } else {
+    keyProviderOther.value = false;
+  }
+}
 function openKeyModal(row = null, presetProvider = '') {
   Object.assign(keyModal, {
     open: true,
@@ -1440,7 +1455,15 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     <input type="checkbox" v-model="ws.draft.enabled" class="h-4 w-4 accent-brand-600"> Bật nguồn này
                   </label>
                 </div>
-                <template v-if="ws.draft.kind === 'json'">
+                <!-- Nguồn TÌM KIẾM: cần chỗ điền từ khoá + KHOÁ API. -->
+                <div v-if="ws.draft.kind === 'search'" class="rounded-lg border border-ink-700 bg-ink-900 p-3 text-label leading-5 text-cream-300">
+                  <p><b class="text-cream-100">Nguồn tìm kiếm web chung</b> — dùng khi cần tra những thứ KHÔNG phải tin tức (cách làm, chất liệu, nhà cung cấp…).</p>
+                  <p class="mt-1">1. URL phải có chỗ điền từ khoá, ví dụ Google Custom Search:
+                    <code class="break-all text-cream-200">https://www.googleapis.com/customsearch/v1?cx=MÃ_ENGINE&amp;num=10&amp;hl=vi&amp;q={query}</code></p>
+                  <p class="mt-1">2. Khoá API <b class="text-cream-100">KHÔNG</b> dán vào URL (URL hiện nguyên văn trên màn này và trong log). Thêm khoá ở <b class="text-cream-100">Cài đặt → API key</b> với provider = <b class="text-cream-200">slug của nguồn này</b> (hoặc <code class="text-cream-200">google_cse</code>) — key được mã hoá khi lưu và chỉ gắn vào lời gọi HTTP lúc chạy.</p>
+                  <p class="mt-1">3. Ánh xạ trường bên dưới khai kết quả trả về: Google CSE trả <code class="text-cream-200">items</code> với <code class="text-cream-200">title</code> · <code class="text-cream-200">link</code> · <code class="text-cream-200">snippet</code>.</p>
+                </div>
+                <template v-if="ws.draft.kind === 'json' || ws.draft.kind === 'search'">
                   <div class="grid gap-3 sm:grid-cols-2">
                     <label class="block"><span class="label">items_path</span><input v-model="ws.draft.items_path" class="input !py-2 font-mono text-xs" placeholder="data.items"></label>
                     <label class="block"><span class="label">title_field</span><input v-model="ws.draft.title_field" class="input !py-2 font-mono text-xs" placeholder="title"></label>
@@ -1572,10 +1595,26 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
         <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label class="label" for="k-provider">Provider</label>
-            <select id="k-provider" v-model="keyModal.form.provider" class="input !py-2" :class="keyModal.errors.provider ? '!border-red-500/70' : ''">
+            <select
+              id="k-provider"
+              v-model="keyModal.form.provider"
+              class="input !py-2"
+              :class="keyModal.errors.provider ? '!border-red-500/70' : ''"
+              @change="onKeyProviderChange"
+            >
               <option value="">— Chọn provider —</option>
               <option v-for="p in sortedProviders" :key="p.slug" :value="p.slug">{{ p.name }} ({{ p.slug }})</option>
+              <!-- Provider KHÔNG phải nhà cung cấp model: vd khoá cho một NGUỒN TÌM KIẾM (Google Custom
+                   Search) — slug lúc đó là slug của nguồn. Không có mục này thì loại khoá đó không thêm
+                   được từ giao diện, và người dùng phải sửa tay trong database. -->
+              <option value="__other">Khác — tự nhập tên (vd: nguồn tìm kiếm)</option>
             </select>
+            <input
+              v-if="keyProviderOther"
+              v-model="keyModal.form.provider"
+              class="input mt-2 !py-2 font-mono text-xs"
+              placeholder="vd: google-web"
+            >
             <p v-if="keyModal.errors.provider" class="mt-1 text-body text-danger">{{ keyModal.errors.provider }}</p>
           </div>
           <div>

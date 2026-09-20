@@ -70,7 +70,15 @@ class AdminWebSourceController extends Controller
      */
     public function test(WebSource $source, WebSourceService $service): JsonResponse
     {
-        $fetched = $service->fetch($source, true);
+        // Nguồn TÌM KIẾM phải thử bằng một TỪ KHOÁ MẪU: URL của nó có chỗ điền `{query}`, gọi thẳng là đi
+        // hỏi internet đúng chuỗi "{query}" rồi báo lỗi — trong khi cấu hình có thể đang hoàn toàn đúng.
+        $query = null;
+        if ($source->kind === 'search' || WebSourceService::isSearchable($source)) {
+            $query = (string) config('studio.web_source_test_query', 'thời trang');
+            $fetched = $service->fetchWithQuery($source, $query);
+        } else {
+            $fetched = $service->fetch($source, true);
+        }
 
         return response()->json([
             'source' => $this->map($source),
@@ -80,6 +88,8 @@ class AdminWebSourceController extends Controller
             'error' => $fetched['error'],
             'count' => count($fetched['items']),
             'items' => array_slice($fetched['items'], 0, 5),
+            // Nói RÕ đã thử bằng từ khoá nào — nếu không, người khai không biết con số này ứng với câu hỏi gì.
+            'query' => $query,
         ]);
     }
 
