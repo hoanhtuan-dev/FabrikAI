@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\CollectionPlanService;
 use App\Services\DesignAgentService;
+use App\Services\MarketSignalService;
 use App\Services\WebAccessService;
 use App\Services\WebSourceService;
 use Illuminate\Http\Request;
@@ -50,18 +51,22 @@ class DesignAgentController extends Controller
      * hiển thị ĐÚNG thứ đang dùng (nguồn nào chết, nguồn nào bị lọc hết tin) — không phải câu văn tĩnh.
      * `?force=1` = lấy lại ngay (nút "Làm mới nguồn").
      */
-    public function sources(Request $request, WebSourceService $sources): \Illuminate\Http\JsonResponse
+    public function sources(Request $request, WebSourceService $sources, MarketSignalService $market): \Illuminate\Http\JsonResponse
     {
         $data = $request->validate([
             'force' => ['nullable', 'boolean'],
             'region' => ['nullable', 'string', 'in:all,hcm,hanoi,danang'],
         ]);
+        $region = (string) ($data['region'] ?? 'all');
+        $force = (bool) ($data['force'] ?? false);
 
-        return response()->json($sources->evidence(
-            (string) ($data['region'] ?? 'all'),
-            WebSourceService::EVIDENCE_LIMIT,
-            (bool) ($data['force'] ?? false),
-        ));
+        $evidence = $sources->evidence($region, WebSourceService::EVIDENCE_LIMIT, $force);
+
+        // TÍN HIỆU THỊ TRƯỜNG đi kèm chính lời gọi này: người dùng bấm "Cập nhật tin" thì cả phần ĐO từ tin
+        // cũng phải mới, nếu không màn hình hiện tin mới mà số liệu vẫn của lần đo cũ.
+        $evidence['market'] = $market->capture($region, $force);
+
+        return response()->json($evidence);
     }
 
     public function collection(Request $request): \Illuminate\Http\JsonResponse

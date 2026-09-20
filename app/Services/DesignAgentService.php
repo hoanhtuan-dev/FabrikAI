@@ -5,8 +5,12 @@ namespace App\Services;
 use App\Models\Generation;
 use App\Models\ShopSignal;
 use App\Models\User;
+use App\Support\VietnameseText;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+// BẮT BUỘC có dòng này: thiếu nó thì "Http::" trong namespace App\Services trỏ vào App\Services\Http
+// (không tồn tại) và nhánh ĐỌC ẢNH MẪU QUA URL chết âm thầm — catch nuốt lỗi nên không ai thấy.
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 /**
@@ -63,46 +67,26 @@ class DesignAgentService
         // thời điểm. Bắt buộc-kiểu-nullable vì lý do y như hai tham số trên (default null ⇒ container
         // luôn truyền null ⇒ nguồn ngoài không bao giờ tới được prompt).
         private readonly ?WebSourceService $sources,
+        // TÍN HIỆU THỊ TRƯỜNG đo từ nguồn ngoài (thuật toán, không AI). Bắt buộc-kiểu-nullable vì lý do y
+        // như ba tham số trên: có default null thì container luôn truyền null và agent mất hẳn tầng dữ liệu.
+        private readonly ?MarketSignalService $market,
     ) {}
-
-    private const SOURCES = [
-        [
-            'id' => 'ecommerce', 'name' => 'Sàn TMĐT', 'channels' => 'Shopee, TikTok Shop, Lazada',
-            'method' => 'Connector TMĐT (chưa bật)', 'frequency' => 'Real-time',
-            'status' => 'demo', 'status_label' => 'Dữ liệu mẫu',
-        ],
-        [
-            'id' => 'social', 'name' => 'Mạng xã hội', 'channels' => 'Instagram, TikTok, Pinterest',
-            'method' => 'Computer vision (chưa bật)', 'frequency' => 'Hàng giờ',
-            'status' => 'demo', 'status_label' => 'Dữ liệu mẫu',
-        ],
-        [
-            'id' => 'international', 'name' => 'Sàn quốc tế', 'channels' => 'SHEIN, TEMU, ASOS',
-            'method' => 'Crawler (chưa bật)', 'frequency' => 'Hàng ngày',
-            'status' => 'demo', 'status_label' => 'Dữ liệu mẫu',
-        ],
-        [
-            'id' => 'runway', 'name' => 'Runway & Fashion Week', 'channels' => 'Các tuần lễ thời trang',
-            'method' => 'Phân tích hình ảnh (chưa bật)', 'frequency' => 'Theo mùa',
-            'status' => 'demo', 'status_label' => 'Dữ liệu mẫu',
-        ],
-        [
-            'id' => 'internal', 'name' => 'Dữ liệu nội bộ', 'channels' => 'Project & generation của tài khoản',
-            'method' => 'Đọc dữ liệu nội bộ đã có', 'frequency' => 'Real-time',
-            'status' => 'local', 'status_label' => 'Dữ liệu nội bộ',
-        ],
-    ];
 
     public function radar(?User $user, string $region = 'all', bool $useAi = true): array
     {
         $region = $this->normalizeRegion($region);
-        $trends = $this->trendCatalog($region);
         $internal = $this->internalBrandSignal($user);
         $candidates = $this->aiCandidates();
 
         // NGUỒN NGOÀI: máy chủ tự đi lấy tin thật (RSS/JSON) cho vùng này. Không có nguồn nào / nguồn chết
         // ⇒ `mode=empty` và mọi câu nói về dữ liệu thị trường vẫn phải là "dữ liệu mẫu".
         $evidence = $this->externalEvidence($region);
+
+        // TÍN HIỆU THỊ TRƯỜNG: đo các tin VỪA LẤY bằng thuật toán (không AI) rồi gắn vào danh mục xu hướng.
+        // Đây là phần trả lời đúng câu hỏi "model không có tìm kiếm web thì lấy đâu ra dữ liệu": từ khoá nào
+        // đang được nhắc tới, bao nhiêu tin, tăng hay giảm — đo được cả khi KHÔNG có model nào chạy.
+        $market = $this->marketReport($region);
+        $trends = $this->withMarketSignals($this->trendCatalog($region), $market);
 
         // VAI TÌM KIẾM: nhóm riêng (nếu khai) quyết định model nào chạy lượt này; bỏ trống thì dùng nhóm
         // suy luận như trước.
@@ -136,11 +120,15 @@ class DesignAgentService
                 ['id' => 'danang', 'name' => 'Đà Nẵng'],
             ],
             'sources' => $this->sourcesReport($evidence),
+            // TÍN HIỆU ĐO TỪ TIN THẬT: giao diện đọc khối này để hiện số liệu CÓ THẬT thay vì số mẫu.
+            'market' => $market,
             'summary' => [
                 // Catalog mẫu hiện có 8 hướng; connector/CV/POS-ERP chưa chạy nên không phóng đại sản lượng.
                 'tracked_attributes' => 5,
                 'images_analyzed_monthly' => 0,
                 'active_trends' => count($trends),
+                'market_signals' => (int) ($market['signals_total'] ?? 0),
+                'live_sources' => count(array_filter((array) ($evidence['sources'] ?? []), fn (array $row) => ($row['ok'] ?? false))),
                 'internal_products' => $internal['product_count'],
                 'internal_generations' => $internal['generation_count'],
             ],
@@ -150,12 +138,18 @@ class DesignAgentService
                 'color_clustering' => 'Trường màu đã có; connector và CV chưa chạy để gom ảnh thật.',
                 'silhouette_detection' => 'Trường dáng đã có; pipeline nhận diện ảnh chưa bật.',
                 'fabric_recognition' => 'Trường chất liệu đã có; pipeline nhận diện ảnh chưa bật.',
-                'price_band_analysis' => 'Dải giá đề xuất theo brief; chưa đọc giá bán thực tế.',
-                'trend_lifecycle' => 'Nhãn demo: emerging → peak → declining.',
+                'price_band_analysis' => ($market['prices']['count'] ?? 0) > 0
+                    ? 'Giá trong tin thị trường được đọc tự động (không dùng AI) và hiển thị ở khối tín hiệu.'
+                    : 'Dải giá đề xuất theo brief; chưa đọc được giá nào trong tin thị trường.',
+                'trend_lifecycle' => ($market['mode'] ?? 'empty') === 'live'
+                    ? 'Vòng đời của hướng CÓ TIN THẬT được suy từ mức tăng/giảm giữa các lần đo; hướng còn lại vẫn là nhãn của bộ có sẵn.'
+                    : 'Nhãn của bộ xu hướng có sẵn: emerging → peak → declining.',
                 // Câu này HIỂN THỊ cho người dùng ⇒ không nêu provider/model/nhóm công việc.
                 'ai_reasoning' => $model['mode'] === 'ai'
-                    ? 'Phần định hướng do AI viết trên đúng dữ liệu mẫu ở trên; các số liệu thì không do AI tạo.'
-                    : 'Phần định hướng được dựng tự động từ bộ dữ liệu mẫu (AI chưa tham gia bước này).',
+                    ? 'Phần định hướng do AI viết trên đúng dữ liệu ở trên (tin thật + số liệu của bạn); các số liệu thì không do AI tạo.'
+                    : 'Phần định hướng được dựng tự động từ dữ liệu ở trên' . (($market['mode'] ?? 'empty') === 'live'
+                        ? ' (tin thật máy chủ vừa lấy, đo bằng thuật toán — không cần AI).'
+                        : ' (bộ có sẵn, vì chưa có tin thật nào; AI chưa tham gia bước này).'),
             ],
         ];
     }
@@ -185,7 +179,11 @@ class DesignAgentService
         $prompt = trim((string) ($data['prompt'] ?? ''));
         $region = $this->normalizeRegion((string) ($data['region'] ?? 'all'));
         $requestedIds = array_values(array_filter(array_map('strval', (array) ($data['trend_ids'] ?? [])), 'strlen'));
-        $allTrends = $this->trendCatalog($region);
+        // TÍN HIỆU THỊ TRƯỜNG đo từ tin thật: dựng TRƯỚC khi chọn trend vì hướng nào có tin thì mang số
+        // thật (và hướng chỉ có trong tin trở thành mục chọn được) — brief nhờ vậy bám dữ liệu thật kể cả
+        // khi không có model nào chạy.
+        $market = $this->marketReport($region);
+        $allTrends = $this->withMarketSignals($this->trendCatalog($region), $market);
         $selected = collect($allTrends)
             ->filter(fn (array $trend) => in_array((string) $trend['id'], $requestedIds, true))
             ->values()
@@ -195,9 +193,9 @@ class DesignAgentService
         }
 
         $brand = $this->internalBrandSignal($user);
-        // VAI ĐỌC ẢNH: ảnh mẫu người dùng chọn ở bước Định hướng (tối đa 3) → một đoạn mô tả phong cách.
-        // Không chọn ảnh, hoặc chưa cấu hình model đọc ảnh ⇒ bỏ qua; brief vẫn chạy như thường.
-        $referenceStyle = $this->referenceStyle((array) ($data['reference_images'] ?? []));
+        // VAI ĐỌC ẢNH được gọi SAU khi kiểm bộ đệm (bên dưới): gọi trước thì mỗi lần bấm lại vẫn tốn một
+        // lượt model đọc ảnh rồi vứt kết quả đi khi bản đệm được dùng.
+        $referenceImages = array_values(array_filter(array_map('strval', (array) ($data['reference_images'] ?? [])), 'strlen'));
         $palette = $this->paletteFor($prompt, $selected);
         $categoryMix = $this->categoryMix($prompt, $brand);
         $moodboard = $this->moodboard($prompt, $selected, $palette);
@@ -214,16 +212,24 @@ class DesignAgentService
         $candidates = $this->aiCandidates();
         // Nguồn ngoài cho đường brief: không giới hạn vùng (brief là toàn quốc theo prompt người dùng).
         $evidence = $this->externalEvidence($region);
+        // Khoá đệm phải gồm MỌI thứ làm đổi kết quả. Thiếu hai thứ này thì bản đệm của đầu vào KHÁC bị trả về:
+        //   · ẢNH MẪU (ảnh đổi ⇒ mô tả phong cách và phần chữ do AI viết phải đổi);
+        //   · BRIEF DO NGƯỜI DÙNG TỰ VIẾT (nó thắng mọi bản do AI viết).
         $inputSignature = hash('sha256', json_encode([
             $prompt,
             $region,
             $requestedIds,
             array_map(fn ($row) => $row['size'].':'.$row['count'], $sizeDistribution),
+            'brief:'.$brief,
+            'reference:'.implode('|', $referenceImages),
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         $cacheKey = $this->briefCacheKey($inputSignature, $user, $brand, $candidates, $useAi, (string) ($evidence['fingerprint'] ?? ''));
         if (! $force) {
             $hit = $this->readBriefCache($cacheKey);
             if (is_array($hit)) {
+                // Khối tín hiệu thị trường được làm mới theo số ĐANG có: tin mới mà phần chữ còn dùng bản
+                // đệm thì con số vẫn phải đúng thời điểm, không hiển thị số cũ như số hiện tại.
+                $hit['market'] = $market;
                 // Nói THẬT là bản này lấy từ bộ đệm (và lấy lúc nào) để người dùng biết vì sao nhanh.
                 $hit['model']['cached'] = true;
                 $hit['model']['latency_ms'] = 0;
@@ -236,6 +242,10 @@ class DesignAgentService
                 return $hit;
             }
         }
+
+        // Chỉ tới đây mới cần đọc ảnh mẫu (đã chắc chắn KHÔNG dùng bản đệm) ⇒ không tốn lượt gọi model vô ích.
+        // Tắt AI thì KHÔNG gọi model đọc ảnh: người dùng tắt công tắc AI là để không tốn lượt gọi nào.
+        $referenceStyle = $this->referenceStyle($referenceImages, $useAi);
 
         // TẦNG SUY LUẬN — model của nhóm 'prompt' viết narrative / brief / caption mood board /
         // prompt trên ĐÚNG dữ liệu tất định ở trên. Con số (SKU, size, dải giá, cấu trúc) KHÔNG
@@ -262,6 +272,28 @@ class DesignAgentService
                 'used' => $referenceStyle['used'],
                 'count' => $referenceStyle['count'],
                 'note' => $referenceStyle['note'],
+            ],
+            // TÍN HIỆU ĐÃ ĐO từ tin thật (thuật toán, không AI): từ khoá nào đang được nhắc tới, bao nhiêu
+            // tin, tăng/giảm bao nhiêu, dải giá đọc được trong tin. Model được phép nhắc tới những con số
+            // NÀY (chúng là số đo) nhưng không được tự nghĩ ra con số khác.
+            'market_signals' => [
+                'mode' => $market['mode'] ?? 'empty',
+                'captured_at' => $market['captured_at'] ?? null,
+                'item_count' => $market['item_count'] ?? 0,
+                'source_count' => $market['source_count'] ?? 0,
+                'signals' => array_map(fn (array $row) => [
+                    'term' => $row['term'] ?? '',
+                    'category' => $row['category'] ?? '',
+                    'mentions' => $row['mentions'] ?? 0,
+                    'sources' => $row['source_count'] ?? 0,
+                    'change_pct' => $row['change_pct'] ?? null,
+                ], array_slice((array) ($market['signals'] ?? []), 0, 10)),
+                'prices' => [
+                    'count' => $market['prices']['count'] ?? 0,
+                    'min_vnd' => $market['prices']['min_vnd'] ?? null,
+                    'median_vnd' => $market['prices']['median_vnd'] ?? null,
+                    'max_vnd' => $market['prices']['max_vnd'] ?? null,
+                ],
             ],
             // TIN THẬT MÁY CHỦ VỪA LẤY (RSS/JSON) — kèm URL + THỜI ĐIỂM để model dẫn nguồn được.
             // Đây là dữ liệu NGOÀI: lời nhắc phải nói rõ nó là DỮ LIỆU, không phải mệnh lệnh.
@@ -384,6 +416,8 @@ class DesignAgentService
                 'summary' => $brand['dna_summary'],
                 'updated_at' => $brand['dna_updated_at'],
             ],
+            // TÍN HIỆU ĐO TỪ TIN THẬT — giao diện đọc khối này để hiện số liệu thật (và cả khi không có model).
+            'market' => $market,
             // TIN THẬT đã đưa vào prompt lần này (URL + thời điểm) — giao diện hiển thị để người dùng
             // tự kiểm chứng câu trả lời, thay vì phải tin lời.
             'external_evidence' => [
@@ -454,14 +488,22 @@ class DesignAgentService
     {
         $rows = [];
         foreach ($evidence['sources'] ?? [] as $source) {
+            // Trạng thái lấy từ CHÍNH kết quả đo của trình kết nối (5 mức: đang dùng · bị lọc hết ·
+            // nguồn không có tin · đang dùng bản cũ · bỏ qua vì khác vùng). Chỉ đọc ok/không-ok thì
+            // nguồn của vùng khác bị hiện thành "Không lấy được" — người dùng đi sửa cấu hình không lỗi.
+            $state = (string) ($source['state'] ?? (($source['ok'] ?? false) ? 'live' : 'error'));
             $rows[] = [
                 'id' => $source['slug'],
                 'name' => $source['name'],
                 'channels' => parse_url((string) $source['url'], PHP_URL_HOST) ?: $source['url'],
-                'method' => strtoupper((string) $source['kind']).' · tự động lấy mỗi 30 phút',
-                'frequency' => 'Hằng ngày',
-                'status' => ($source['ok'] ?? false) ? 'live' : 'error',
-                'status_label' => ($source['ok'] ?? false) ? 'Đang dùng' : 'Không lấy được',
+                'method' => $source['kind'] === 'json'
+                    ? 'Nguồn dữ liệu JSON theo cấu hình'
+                    : 'Tin RSS/Atom',
+                // Chu kỳ THẬT: máy chủ lấy lại tin theo lịch 30 phút (routes/console.php) và mỗi lần
+                // người dùng bấm "Cập nhật tin". Không hứa "hằng ngày" như bản cũ.
+                'frequency' => 'Mỗi 30 phút',
+                'status' => $state,
+                'status_label' => (string) ($source['state_label'] ?? (($source['ok'] ?? false) ? 'Đang dùng' : 'Không lấy được')),
                 'count' => (int) ($source['count'] ?? 0),
             ];
         }
@@ -509,6 +551,269 @@ class DesignAgentService
     }
 
     /**
+     * TÍN HIỆU THỊ TRƯỜNG cho lượt radar — đo từ tin thật, KHÔNG cần model có tìm kiếm web (2026-09-23).
+     *
+     * Vì sao đặt ở đây: model đang chạy không tự ra internet được, nên nếu chỉ đưa TIN vào prompt thì hết
+     * model là hết phân tích và mọi con số vẫn là số mẫu. Lớp MarketSignalService đo bằng thuật toán, còn
+     * hàm này chỉ lo một việc: bảo đảm số liệu đủ mới rồi trả về ĐÚNG dạng mà giao diện và prompt cần.
+     *
+     * Không có trình kết nối (test thuần PHPUnit) ⇒ trả shape RỖNG đủ khoá, không rẽ nhánh ở nơi gọi.
+     *
+     * @return array<string, mixed>
+     */
+    private function marketReport(string $region): array
+    {
+        if ($this->market === null) {
+            return [
+                'mode' => 'empty', 'signals' => [], 'signals_total' => 0, 'prices' => ['count' => 0],
+                'captured_at' => null, 'item_count' => 0, 'source_count' => 0, 'snapshots' => 0,
+                'window_days' => 0, 'history_days' => 0, 'note' => 'Chưa bật đo tín hiệu thị trường.', 'label' => 'Tín hiệu thị trường',
+            ];
+        }
+
+        try {
+            return $this->market->ensureFresh($region);
+        } catch (\Throwable $e) {
+            try {
+                logger()->warning('Agent Studio: không đo được tín hiệu thị trường', ['error' => $e->getMessage()]);
+            } catch (\Throwable) {
+            }
+
+            return $this->market->emptyReport($region);
+        }
+    }
+
+    /**
+     * GẮN TÍN HIỆU THẬT VÀO DANH MỤC XU HƯỚNG + thêm hướng CHỈ có trong tin.
+     *
+     * Đây là chỗ biến "tin thật" thành "dữ liệu": hướng nào có tin nhắc tới thì mang số ĐO (bao nhiêu tin,
+     * mấy nguồn, tăng/giảm bao nhiêu %) và được đánh dấu là có bằng chứng thật; hướng không có tin vẫn giữ
+     * nguyên số của bộ có sẵn nhưng PHẢI mang nhãn "bộ có sẵn" — không trộn hai loại số với nhau.
+     *
+     * Từ khoá trong tin mà danh mục chưa có thì thành hướng MỚI (id 'live-…'): nhờ vậy khi không có model,
+     * engine tất định vẫn có việc THẬT để nói thay vì đọc lại 8 hướng mẫu.
+     *
+     * @param  list<array<string, mixed>>  $trends
+     * @param  array<string, mixed>  $market
+     * @return list<array<string, mixed>>
+     */
+    private function withMarketSignals(array $trends, array $market): array
+    {
+        $signals = (array) ($market['signals'] ?? []);
+        if (($market['mode'] ?? 'empty') !== 'live' || $signals === []) {
+            return $trends;
+        }
+
+        $used = [];
+        $out = [];
+        foreach ($trends as $trend) {
+            $text = trim(($trend['title'] ?? '').' '.($trend['description'] ?? '').' '.($trend['recommended_action'] ?? ''));
+            $hits = [];
+            foreach ($signals as $index => $signal) {
+                if (VietnameseText::mentions((string) ($signal['term'] ?? ''), $text)) {
+                    $hits[] = $signal;
+                    $used[$index] = true;
+                }
+            }
+
+            $out[] = $hits === [] ? $trend + ['momentum_source' => 'catalog', 'live' => null] : $this->enrichTrend($trend, $hits, $market);
+        }
+
+        // Hướng MỚI chỉ có trong tin: yêu cầu tối thiểu 2 tin nhắc tới, tối đa 6 hướng để không phình màn hình.
+        $extra = [];
+        foreach ($signals as $index => $signal) {
+            if (isset($used[$index]) || (int) ($signal['mentions'] ?? 0) < 2) {
+                continue;
+            }
+            $extra[] = $this->liveTrend($signal, $market);
+            if (count($extra) >= 6) {
+                break;
+            }
+        }
+
+        $merged = array_merge($out, $extra);
+        // THỨ TỰ: hướng CÓ TIN THẬT lên trước, trong mỗi nhóm thì xếp theo "đà tăng".
+        //
+        // Vì sao không chỉ xếp theo đà tăng: đà tăng của bộ có sẵn là SỐ MẪU (74–91) nên nó luôn cao hơn
+        // con số ĐO được từ tin thật — xếp thuần theo số thì hướng thật luôn nằm dưới hướng mẫu, và engine
+        // tất định (không có model) sẽ mãi đọc lại 8 hướng mẫu. Người bán cần thấy cái đang có bằng chứng.
+        usort($merged, fn (array $a, array $b) => [
+            ($a['evidence_mode'] ?? 'demo') === 'live' ? 0 : 1,
+            -1 * (int) ($a['momentum'] ?? 0),
+        ] <=> [
+            ($b['evidence_mode'] ?? 'demo') === 'live' ? 0 : 1,
+            -1 * (int) ($b['momentum'] ?? 0),
+        ]);
+
+        return array_values($merged);
+    }
+
+    /**
+     * Hướng có sẵn + bằng chứng thật: số đo THAY số mẫu, và nói rõ nguồn nào nhắc tới nó.
+     *
+     * @param  array<string, mixed>  $trend
+     * @param  list<array<string, mixed>>  $hits
+     * @param  array<string, mixed>  $market
+     * @return array<string, mixed>
+     */
+    private function enrichTrend(array $trend, array $hits, array $market): array
+    {
+        $mentions = array_sum(array_map(fn (array $row) => (int) ($row['mentions'] ?? 0), $hits));
+        $sources = max(array_map(fn (array $row) => (int) ($row['source_count'] ?? 0), $hits));
+        $change = $this->weightedChange($hits);
+        $articles = [];
+        foreach ($hits as $row) {
+            foreach ((array) ($row['samples'] ?? []) as $sample) {
+                if (count($articles) < 3 && ! in_array($sample, $articles, true)) {
+                    $articles[] = $sample;
+                }
+            }
+        }
+
+        // array_merge (KHÔNG dùng phép hợp mảng): phép hợp giữ giá trị CŨ khi khoá trùng, nên số đo sẽ
+        // không bao giờ thay được số mẫu — đúng lỗi mà test bắt được.
+        return array_merge($trend, [
+            'momentum' => $this->momentumFromSignal($mentions, $change),
+            'confidence' => $this->confidenceFromSignal($mentions, $sources),
+            'evidence_count' => $mentions,
+            'evidence_mode' => 'live',
+            'momentum_source' => 'signal',
+            'regional_note' => 'Số liệu đo từ tin thật của nguồn ngoài (không dùng AI).',
+            'live' => [
+                'mentions' => $mentions,
+                'source_count' => $sources,
+                'change_pct' => $change,
+                'terms' => array_values(array_map(fn (array $row) => (string) $row['term'], $hits)),
+                'articles' => array_slice($articles, 0, 3),
+                'captured_at' => $market['captured_at'] ?? null,
+            ],
+        ]);
+    }
+
+    /**
+     * Hướng MỚI suy từ tin: mọi thứ trừ cái tên đều do thuật toán quyết (số đo, vòng đời, việc nên làm).
+     *
+     * @param  array<string, mixed>  $signal
+     * @param  array<string, mixed>  $market
+     * @return array<string, mixed>
+     */
+    private function liveTrend(array $signal, array $market): array
+    {
+        $term = (string) ($signal['term'] ?? '');
+        $category = (string) ($signal['category'] ?? 'style');
+        $mentions = (int) ($signal['mentions'] ?? 0);
+        $sources = (int) ($signal['source_count'] ?? 0);
+        $change = $signal['change_pct'] ?? null;
+        $samples = array_slice((array) ($signal['samples'] ?? []), 0, 3);
+        $first = $samples[0] ?? [];
+
+        return [
+            'id' => 'live-'.(Str::slug($term) ?: 'tin'),
+            'title' => mb_strtoupper(mb_substr($term, 0, 1)).mb_substr($term, 1),
+            'category' => $category,
+            'lifecycle' => $this->lifecycleFromChange(is_numeric($change) ? (int) $change : null),
+            'momentum' => $this->momentumFromSignal($mentions, is_numeric($change) ? (int) $change : null),
+            'confidence' => $this->confidenceFromSignal($mentions, $sources),
+            'evidence_count' => $mentions,
+            'color' => $this->categoryColor($category),
+            'region' => $market['region'] ?? 'all',
+            'description' => sprintf(
+                'Nhắc tới trong %d tin của %d nguồn%s%s',
+                $mentions,
+                $sources,
+                ($first['title'] ?? '') !== '' ? ' — ví dụ: «'.Str::limit((string) $first['title'], 120, '').'»' : '',
+                $samples !== [] && ($samples[0]['source'] ?? '') !== '' ? ' ('.($samples[0]['source']).')' : '',
+            ),
+            'recommended_action' => $this->actionForCategory($category),
+            'regional_note' => 'Hướng này chỉ có trong tin thật, không nằm trong bộ xu hướng có sẵn.',
+            'evidence_mode' => 'live',
+            'momentum_source' => 'signal',
+            'live' => [
+                'mentions' => $mentions,
+                'source_count' => $sources,
+                'change_pct' => is_numeric($change) ? (int) $change : null,
+                'terms' => [$term],
+                'articles' => $samples,
+                'captured_at' => $market['captured_at'] ?? null,
+            ],
+        ];
+    }
+
+    /**
+     * ĐÀ TĂNG từ số đo — ĐÂY LÀ HEURISTIC, không phải tần suất thị trường thật, nên giao diện phải gọi nó
+     * bằng tên khác với "đà tăng" của bộ mẫu: số tin nhắc tới (có trọng số theo mức tăng/giảm giữa các lần đo).
+     */
+    private function momentumFromSignal(int $mentions, ?int $change): int
+    {
+        $base = 45 + $mentions * 5;
+        $adjust = $change === null ? 0 : max(-20, min(20, (int) round($change / 5)));
+
+        return max(5, min(98, $base + $adjust));
+    }
+
+    /** Độ tin cậy suy từ SỐ NGUỒN (nhiều nguồn cùng nhắc = chắc hơn) và số tin. */
+    private function confidenceFromSignal(int $mentions, int $sources): float
+    {
+        return round(max(0.4, min(0.95, 0.45 + min(0.3, $mentions * 0.03) + min(0.2, $sources * 0.05))), 2);
+    }
+
+    /** Vòng đời suy từ mức tăng/giảm giữa hai lần đo; chưa đủ dữ liệu để so thì coi là mới nổi. */
+    private function lifecycleFromChange(?int $change): string
+    {
+        if ($change === null) {
+            return 'emerging';
+        }
+
+        return match (true) {
+            $change >= 15 => 'emerging',
+            $change <= -15 => 'declining',
+            default => 'peak',
+        };
+    }
+
+    /** Mức tăng/giảm của một hướng = bình quân gia quyền theo số tin của các từ khoá cấu thành nó. */
+    private function weightedChange(array $hits): ?int
+    {
+        $weight = 0;
+        $sum = 0.0;
+        foreach ($hits as $row) {
+            $change = $row['change_pct'] ?? null;
+            $mentions = max(1, (int) ($row['mentions'] ?? 0));
+            if (! is_numeric($change)) {
+                continue;
+            }
+            $weight += $mentions;
+            $sum += ((int) $change) * $mentions;
+        }
+
+        return $weight === 0 ? null : (int) round($sum / $weight);
+    }
+
+    /** Màu nhận diện của hướng mới theo nhóm — dùng đúng bảng màu đang có ở catalog mẫu. */
+    private function categoryColor(string $category): string
+    {
+        return [
+            'color' => '#d9c7f2',
+            'silhouette' => '#b9c8c2',
+            'fabric' => '#e5d7bd',
+            'detail' => '#c8d1d5',
+            'style' => '#a98f77',
+        ][$category] ?? '#b9c8c2';
+    }
+
+    /** Việc nên làm theo nhóm hàng — câu tất định, không phải AI viết, nên luôn có kể cả khi không có model. */
+    private function actionForCategory(string $category): string
+    {
+        return match ($category) {
+            'color' => 'Thử một nhóm 2-3 mã màu rồi đo lại sức bán trước khi mở rộng.',
+            'silhouette' => 'Làm 1-2 mã chủ lực theo dáng này, giữ phom dễ mặc cho nhiều dáng người.',
+            'fabric' => 'Đặt vải một đợt nhỏ, kiểm tra độ rũ và giá vải trước khi cam kết số lượng.',
+            'detail' => 'Dùng làm điểm nhấn trên mẫu đang bán thay vì làm bộ mới.',
+            default => 'Chọn một nhóm khách cụ thể cho phong cách này rồi thử 1-2 mẫu.',
+        };
+    }
+
+    /**
      * VAI ĐỌC ẢNH (nhóm "Agent Studio — Đọc ảnh mẫu"): đọc 1-3 ảnh mẫu của chính người dùng và trả về
      * MỘT đoạn mô tả ngắn để brief bám đúng phong cách thật của shop (chất liệu, tông màu, bố cục, ánh sáng).
      *
@@ -521,13 +826,19 @@ class DesignAgentService
      * @param  list<string>  $urls  tối đa 3
      * @return array{used:bool, count:int, note:string, model:?string, group:?string, reason:?string}
      */
-    private function referenceStyle(array $urls): array
+    private function referenceStyle(array $urls, bool $useAi = true): array
     {
         $urls = array_values(array_filter(array_map('strval', $urls), fn (string $u) => trim($u) !== ''));
         $urls = array_slice($urls, 0, 3);
 
         if ($urls === []) {
             return ['used' => false, 'count' => 0, 'note' => '', 'model' => null, 'group' => null, 'reason' => 'no_images'];
+        }
+
+        // TẮT AI nghĩa là KHÔNG gọi model nào — kể cả model đọc ảnh. Bỏ qua điều này thì công tắc AI chỉ
+        // tắt được một nửa số lượt gọi và người dùng vẫn bị trừ tiền vì một việc họ đã tắt.
+        if (! $useAi) {
+            return ['used' => false, 'count' => count($urls), 'note' => '', 'model' => null, 'group' => null, 'reason' => 'ai_disabled'];
         }
 
         $candidates = $this->visionCandidates();
@@ -644,14 +955,28 @@ class DesignAgentService
             (array) ($brand['shop'] ?? []),
             array_flip(['row_count', 'units_sold', 'stock_on_hand', 'return_rate_pct', 'avg_price_vnd']),
         );
-        $model = implode('|', array_map(fn (array $c) => $c['provider'].':'.$c['model'], $candidates));
-        $search = WebAccessService::planFor($candidates[0] ?? []);
+        // Nhóm TÌM KIẾM đứng trước nhóm suy luận (giống đường chạy thật ở aiBrief): khoá đệm tính theo
+        // nhóm suy luận trong khi lượt chạy do nhóm tìm kiếm quyết định thì đổi cấu hình tìm kiếm xong vẫn
+        // nhận bản đệm cũ (không có nguồn thật) tới một giờ.
+        $runner = $this->searchCandidates();
+        if ($runner === []) {
+            $runner = $candidates;
+        }
+        $model = implode('|', array_map(fn (array $c) => $c['provider'].':'.$c['model'], $runner));
+        $search = WebAccessService::planFor($runner[0] ?? []);
 
         return 'design-agent:brief:'.self::BRIEF_CACHE_VERSION.':'.hash('sha256', json_encode([
             $inputSignature,
             'user:'.($user?->id ?? 0),
             'dna:'.json_encode($dna, JSON_UNESCAPED_UNICODE),
             'shop:'.json_encode($shop, JSON_UNESCAPED_UNICODE),
+            // NỘI DUNG shop, không chỉ 5 số tổng: đổi sản phẩm/nhóm hàng mà tổng bán và tồn không đổi là
+            // chuyện thường, khi đó brief cũ vẫn ghi tên nhóm hàng CŨ nếu khoá chỉ có số tổng.
+            'shop_rows:'.hash('sha256', json_encode([
+                $brand['shop']['best_sellers'] ?? [],
+                $brand['shop']['slow_movers'] ?? [],
+                $brand['shop']['category_demand'] ?? [],
+            ], JSON_UNESCAPED_UNICODE)),
             'model:'.$model,
             'search:'.($search === null ? 'none' : $search['mode'].':'.$search['param']),
             'ai:'.($useAi ? '1' : '0'),
@@ -756,7 +1081,9 @@ class DesignAgentService
     private function modelBlock(string $mode, array $candidates, array $extra = []): array
     {
         return array_merge([
-            'group' => self::AI_GROUP,
+            // Nhóm THẬT ĐÃ DÙNG (candidatesIn gắn vào từng candidate). Trước đây hằng số 'prompt' được
+            // trả về vô điều kiện ⇒ người dùng cấu hình nhóm riêng cho Agent Studio vẫn đọc thấy nhóm khác.
+            'group' => (string) ($candidates[0]['group'] ?? self::AI_GROUP),
             'mode' => $mode,
             'provider' => null,
             'model' => null,
@@ -797,7 +1124,9 @@ class DesignAgentService
         // Khoá cache gồm CẢ dấu vân tay của tin ngoài: có tin mới ⇒ câu trả lời phải được sinh lại.
         $cacheKey = 'design-agent:radar:v3:'.$region.':'.$fingerprint.':'.($webSearch ? 'search:'.$searchPlan['param'] : 'plain')
             .':'.(string) ($evidence['fingerprint'] ?? 'none');
-        $cached = Cache::get($cacheKey);
+        // Đọc/ghi bộ đệm phải BỌC LỖI như đường brief: bộ đệm hỏng (bảng cache thiếu/đầy) không được
+        // biến một lần đọc xu hướng thành lỗi 500.
+        $cached = $this->readBriefCache($cacheKey);
         if (is_array($cached) && ! empty($cached['directions'])) {
             return [$cached['directions'], $this->modelBlock('ai', $candidates, [
                 'provider' => $cached['provider'] ?? null,
@@ -850,7 +1179,10 @@ class DesignAgentService
             ], $trends),
         ], 3000, 8000, 60, $webSearch ? ['search' => true] : [], $runner);
         $latency = (int) round((microtime(true) - $started) * 1000);
-        $attempted = $candidates[0]['provider'].':'.$candidates[0]['model'];
+        // Model ĐÃ THỰC SỰ ĐƯỢC GỌI là model đầu của $runner (nhóm tìm kiếm có thể khác nhóm suy luận) —
+        // lấy từ $candidates là báo sai model mỗi khi lỗi.
+        $first = $runner[0] ?? $candidates[0];
+        $attempted = $first['provider'].':'.$first['model'];
         $answer = $call['answer'];
 
         if ($answer === null) {
@@ -877,12 +1209,16 @@ class DesignAgentService
             return [$ruleDirections, $this->modelBlock('rule', $candidates, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch])];
         }
 
-        Cache::put($cacheKey, [
-            'directions' => $directions,
-            'web_search' => $webSearch,
-            'provider' => $answer['provider'],
-            'model' => $answer['model'],
-        ], self::RADAR_CACHE_SECONDS);
+        try {
+            Cache::put($cacheKey, [
+                'directions' => $directions,
+                'web_search' => $webSearch,
+                'provider' => $answer['provider'],
+                'model' => $answer['model'],
+            ], self::RADAR_CACHE_SECONDS);
+        } catch (\Throwable) {
+            // Bộ đệm là tối ưu tốc độ, không phải điều kiện để trả kết quả.
+        }
 
         return [$directions, $this->modelBlock('ai', $candidates, [
             'provider' => $answer['provider'],
@@ -904,17 +1240,34 @@ class DesignAgentService
     {
         $rows = [];
         foreach (array_slice($trends, 0, 8) as $index => $trend) {
+            $live = is_array($trend['live'] ?? null) ? $trend['live'] : null;
+            $change = $live['change_pct'] ?? null;
+
             $rows[] = [
                 'id' => 'dir-rule-'.($index + 1),
                 'title' => (string) $trend['title'],
                 'thesis' => (string) $trend['description'],
-                'why_now' => 'Momentum mẫu '.$trend['momentum'].'/100 · '.number_format((int) $trend['evidence_count']).' tín hiệu mẫu (demo).',
+                // CÂU "VÌ SAO BÂY GIỜ" phải khác nhau giữa hai loại dữ liệu: hướng có tin thật thì nói số
+                // ĐO ĐƯỢC (bao nhiêu tin, mấy nguồn, tăng/giảm bao nhiêu), hướng còn lại nói thẳng là số mẫu.
+                'why_now' => $live !== null
+                    ? sprintf(
+                        'Nhắc tới trong %d tin của %d nguồn%s.',
+                        (int) $live['mentions'],
+                        (int) $live['source_count'],
+                        is_numeric($change)
+                            ? ' · '.(($change >= 0) ? 'tăng ' : 'giảm ').abs((int) $change).'% so với lần đo trước'
+                            : ' · lần đo đầu tiên nên chưa so sánh được',
+                    )
+                    : 'Đà tăng '.$trend['momentum'].'/100 · '.number_format((int) $trend['evidence_count']).' tín hiệu của bộ có sẵn (chưa gắn với tin thị trường).',
                 'action' => (string) $trend['recommended_action'],
                 'risk' => $this->riskFor((string) $trend['lifecycle']),
                 'price_band' => null,
                 'confidence' => (float) $trend['confidence'],
                 'trend_ids' => [(string) $trend['id']],
                 'source' => 'rule',
+                // Tin làm căn cứ (bấm ra bài gốc) — chỉ có khi hướng này thật sự có tin nhắc tới.
+                'evidence' => $live !== null ? array_slice((array) ($live['articles'] ?? []), 0, 2) : [],
+                'evidence_mode' => $live !== null ? 'live' : 'demo',
             ];
         }
 
@@ -1345,9 +1698,26 @@ class DesignAgentService
     }
 
     /** Danh sách ID ổn định để controller có thể validate trước khi gọi service. */
+    /**
+     * Mọi id hợp lệ cho validate: hướng của bộ có sẵn + hướng SINH TỪ TIN THẬT (id 'live-…').
+     *
+     * Thiếu vế thứ hai thì người dùng chọn đúng hướng đang hiện trên màn hình (hướng đo từ tin) và bị
+     * máy chủ trả 422 "xu hướng không tồn tại" — lỗi chỉ xuất hiện sau khi đã nối nguồn thật.
+     */
     public function trendIds(): array
     {
-        return array_column($this->trendCatalog('all'), 'id');
+        $ids = array_column($this->trendCatalog('all'), 'id');
+
+        try {
+            $market = $this->market?->report('all') ?? ['mode' => 'empty', 'signals' => []];
+            if (($market['mode'] ?? 'empty') === 'live') {
+                $ids = array_merge($ids, array_column($this->withMarketSignals([], $market), 'id'));
+            }
+        } catch (\Throwable) {
+            // Không đọc được tín hiệu ⇒ vẫn phải validate được bằng bộ có sẵn.
+        }
+
+        return array_values(array_unique($ids));
     }
 
     /** Catalog mẫu cho UI và validation; thay bằng connector thật mà không đổi schema. */
@@ -1415,13 +1785,19 @@ class DesignAgentService
         }
 
         $projects = $user->projects()->count();
-        // Chỉ lấy một mẫu có kiểm soát; không đọc toàn bộ lịch sử prompt của user.
+        // ĐẾM bằng truy vấn tổng hợp, không đếm trên mẫu: trước đây đếm trên 120 dòng mới nhất rồi hiển thị
+        // như TỔNG ⇒ shop có 500 ảnh vẫn thấy "120". Chỉ lấy mẫu chữ (120 prompt) để suy DNA.
+        $totals = $user->generations()
+            ->whereNotNull('prompt')
+            ->selectRaw('COUNT(*) AS total, SUM(CASE WHEN shot_state = ? THEN 1 ELSE 0 END) AS approved', [Generation::SHOT_APPROVED])
+            ->first();
         $generations = $user->generations()
             ->whereNotNull('prompt')
             ->orderByDesc('id')
             ->limit(120)
             ->get(['prompt', 'shot_state']);
-        $approved = $generations->where('shot_state', Generation::SHOT_APPROVED)->count();
+        $generationCount = (int) ($totals->total ?? $generations->count());
+        $approved = (int) ($totals->approved ?? 0);
         $text = mb_strtolower($generations->pluck('prompt')->implode(' '));
         $colorCandidates = ['pastel', 'beige', 'ivory', 'white', 'đen', 'trắng', 'xanh', 'hồng', 'vàng'];
         $categoryCandidates = ['áo', 'blouse', 'váy', 'quần', 'phụ kiện', 'linen', 'cotton', 'lụa'];
@@ -1453,14 +1829,16 @@ class DesignAgentService
 
         return [
             'product_count' => $projects,
-            'generation_count' => $generations->count(),
+            'generation_count' => $generationCount,
             'approved_count' => $approved,
             'narrative' => $narrative,
             'top_categories' => $topCategories,
             'top_colors' => $topColors,
             // Dữ liệu THẬT của shop: đây là phần khiến Agent Studio khác một chatbot.
             'data_mode' => $shop['row_count'] > 0 ? 'local' : 'empty',
-            'shop_rows' => array_slice($rows, 0, 100),
+            // Trả ĐÚNG trần mà đường ghi chấp nhận (200). Cắt còn 100 trong khi đường ghi XOÁ HẾT rồi ghi
+            // lại đúng những gì giao diện đang có ⇒ lần bấm Lưu sau xoá vĩnh viễn các dòng thứ 101-200.
+            'shop_rows' => array_slice($rows, 0, 200),
             'shop' => $shop,
             // DNA: phần CHỦ SHOP KHAI (dna) tách hẳn khỏi phần SUY RA (dna_source ≠ owner).
             'dna' => $dna['data'] ?? BrandDnaService::empty(),

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Một NGUỒN dữ liệu ngoài (RSS/JSON/API) mà máy chủ sẽ tự đi lấy rồi đưa vào lời nhắc của agent.
  *
- * Xem WebSourceService để biết cách lấy/lọc/đệm, và docs/DESIGN_SYSTEM.md §18.5.
+ * Xem WebSourceService để biết cách lấy/lọc/đệm, và docs/DESIGN_SYSTEM.md §19.
  * Đây là cấu hình TOÀN CỤC (quản trị viên khai), không phải dữ liệu của từng người dùng.
  */
 class WebSource extends Model

@@ -208,11 +208,30 @@ class WebAccessService
             // NHÓM CÔNG VIỆC nào chưa có model — đọc từ CHÍNH Cài đặt, không phải danh sách cứng.
             // Người dùng cần thấy "nhóm tạo ảnh chưa có model" như một trạng thái CẤU HÌNH, không phải lỗi.
             'task_groups' => $this->taskGroups(),
-            // Nguồn ngoài vẫn là dữ liệu MẪU cho tới khi có connector thật (chưa có scraping/POS/ERP).
-            'sources_mode' => 'demo',
+            // Nguồn ngoài: ĐỌC TRẠNG THÁI THẬT, không phải hằng số. Trước đây luôn trả 'demo' kể cả khi đã
+            // nối nguồn RSS thật ⇒ màn hình "khả năng truy cập internet" nói ngược với thực tế.
+            'sources_mode' => $this->sourcesMode(),
             'verdict' => $verdict,
             'verdict_label' => $verdictLabel,
         ];
+    }
+
+    /**
+     * Trạng thái THẬT của nguồn dữ liệu ngoài: 'live' khi đã đo được tín hiệu từ tin thật, ngược lại 'demo'.
+     *
+     * Trả 'demo' khi chưa nối nguồn nào — nghĩa là "chưa có dữ liệu thị trường thật", đúng như giao diện
+     * cần nói để người dùng không tin nhầm vào số liệu mẫu.
+     */
+    private function sourcesMode(): string
+    {
+        try {
+            $report = app(MarketSignalService::class)->report('all');
+
+            return ($report['mode'] ?? 'empty') === 'live' ? 'live' : 'demo';
+        } catch (\Throwable) {
+            // Chưa migrate / lỗi DB ⇒ coi như chưa có dữ liệu thật, KHÔNG được hứa là đang có.
+            return 'demo';
+        }
     }
 
     /**

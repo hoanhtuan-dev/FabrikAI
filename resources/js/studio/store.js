@@ -2714,7 +2714,9 @@ export const useStudioStore = defineStore('studio', {
       } catch (error) {
         if (requestId === this.trendRadarRequest) {
           this.trendRadarError = userFacingError(error, 'Không tải được TrendRadar.');
-          this.trendRadar = null;
+          // KHÔNG xoá kết quả đang xem: một lần mạng lỗi không được biến màn hình đang có dữ liệu thành
+          // trắng — người dùng mất luôn thứ họ đang đọc và không hiểu vì sao. Chỉ báo lỗi ở trên.
+          if (!this.trendRadar) this.trendRadar = null;
           this.toast(this.trendRadarError, 'error');
         }
         throw error;
@@ -2731,6 +2733,11 @@ export const useStudioStore = defineStore('studio', {
         trend_ids: [...new Set((payload.trend_ids || []).map(String))].sort(),
         // Đổi ảnh mẫu ⇒ brief cũ không còn đúng ⇒ phải tạo lại (nếu không sẽ hiện "brief đã sẵn sàng" sai).
         reference_images: [...(this.briefReferenceImages || [])].map(String).sort(),
+        // Đổi BẢNG SIZE cũng làm brief cũ sai: cơ cấu SKU và phân bổ size tính từ đây, và khoá bộ đệm của
+        // MÁY CHỦ có phần này. Thiếu ở client thì đổi preset xong giao diện vẫn nói "brief khớp".
+        size_distribution: Object.entries(payload.size_distribution || {})
+          .map(([size, count]) => size + ':' + count)
+          .sort(),
       };
     },
     /** Brief hiện tại đã cũ so với prompt/trend người dùng đang chọn? */

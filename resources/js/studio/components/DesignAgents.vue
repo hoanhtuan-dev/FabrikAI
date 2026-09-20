@@ -1,6 +1,6 @@
 <script setup>
 /**
- * Agent Studio — thiết kế lại toàn diện flow TrendRadar → CollectionBot → Canvas.
+ * Agent Studio — luồng ba bước: đọc tín hiệu → định hướng → thực thi (Canvas).
  *
  * Ba bước rõ ràng:
  *   1. Tín hiệu  — đọc radar, lọc, chọn trend.
@@ -24,6 +24,8 @@ const store = useStudioStore();
 const prompt = ref('');
 const promptInput = ref(null);
 const collectionError = ref('');
+// Đang tạo vỏ dự án từ brief — khoá nút để bấm nhanh hai lần không sinh hai dự án.
+const creatingCollection = ref(false);
 const trendQuery = ref('');
 const trendCategory = ref('all');
 const lifecycleFilter = ref('all');
@@ -131,15 +133,50 @@ const shortDate = (iso) => {
   try { return new Date(iso).toLocaleDateString('vi-VN'); } catch (e) { return ''; }
 };
 const refreshLabel = computed(() => (store.webSourcesLoading ? 'Đang lấy…' : 'Cập nhật tin'));
-const sourceStatus = (row) => (row.ok ? 'Hoạt động' : 'Không lấy được');
-/** Một câu nói rõ AI đọc tin qua đường nào — không nêu tên tham số API hay mã HTTP. */
-const reasoningModelLine = computed(() => {
-  const search = store.webAccess?.model_search;
-  if (!search || !search.has_model) return 'Chưa cấu hình model cho phần suy luận.';
-  const name = search.active?.model || '';
-  return name ? 'Model đang dùng: ' + name + '.' : '';
-});
 
+// ── TÍN HIỆU THỊ TRƯỜNG ĐO TỪ TIN THẬT (2026-09-23) ─────────────────────────────
+// Đây là phần trả lời "model không có tìm kiếm web thì lấy đâu ra dữ liệu": máy chủ lấy tin, rồi ĐO bằng
+// thuật toán (từ khoá · số tin · tăng/giảm · dải giá) — không cần model nào chạy.
+const market = computed(() => radar.value?.market || store.webSources?.market || collection.value?.market || null);
+const marketLive = computed(() => (market.value?.mode || 'empty') === 'live');
+const marketSignals = computed(() => market.value?.signals || []);
+const marketPrices = computed(() => market.value?.prices || null);
+const marketAgeLabel = computed(() => {
+  const minutes = Number(market.value?.age_minutes);
+  if (!Number.isFinite(minutes)) return '';
+  if (minutes < 60) return minutes + ' phút trước';
+  if (minutes < 60 * 24) return Math.round(minutes / 60) + ' giờ trước';
+  return Math.round(minutes / (60 * 24)) + ' ngày trước';
+});
+/** Tin làm căn cứ cho MỘT tín hiệu (tối đa 2, để tự kiểm chứng con số). */
+const signalSamples = (signal) => (Array.isArray(signal?.samples) ? signal.samples.slice(0, 2) : []);
+/** Câu mô tả con số của một hướng: hướng có tin nói bằng SỐ ĐO, hướng còn lại nói rõ là bộ có sẵn. */
+const trendSignalLabel = (trend) => {
+  if (trend?.evidence_mode !== 'live') {
+    return 'Đà tăng ' + (trend?.momentum ?? 0) + '/100 · ' + formatNumber(trend?.evidence_count) + ' bằng chứng của bộ có sẵn';
+  }
+  const live = trend.live || {};
+  const parts = [(live.mentions || 0) + ' tin thật nhắc tới', (live.source_count || 0) + ' nguồn'];
+  if (live.change_pct === null || live.change_pct === undefined) parts.push('lần đo đầu tiên');
+  else parts.push((live.change_pct >= 0 ? 'tăng ' : 'giảm ') + Math.abs(live.change_pct) + '% so với lần đo trước');
+  return parts.join(' · ');
+};
+/** Radar đọc lúc nào + phần chữ do đâu — ĐỌC TỪ server (methodology), không chép tay lại một câu gần giống. */
+const radarMethodLine = computed(() => String(radar.value?.methodology?.ai_reasoning || ''));
+const radarReadAt = computed(() => {
+  const at = radar.value?.generated_at;
+  if (!at) return '';
+  try { return new Date(at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; }
+});
+/**
+ * Trạng thái một nguồn, nói ĐÚNG việc đang xảy ra — năm mức chứ không phải hai.
+ * Chỉ đọc ok/không-ok thì nguồn bị bỏ qua vì khác vùng hiện lên thành "Không lấy được" (bịa lỗi).
+ */
+const sourceStatus = (row) => row?.state_label || (row?.ok ? 'Đang dùng' : 'Không lấy được');
+const sourceStatusTone = (row) => (row?.ok ? 'text-ok' : (row?.state === 'skipped' ? 'text-cream-400' : 'text-warn'));
+/** Khả năng truy cập internet: câu kết luận ĐO ĐƯỢC + các nhóm công việc chưa chạy được. */
+const internetVerdict = computed(() => String(store.webAccess?.verdict_label || ''));
+const groupsNeedingSetup = computed(() => (store.webAccess?.task_groups || []).filter((row) => !row.configured || row.needs_key));
 /** Nhãn tuổi của bản brief lấy từ bộ đệm — để người dùng biết có nên bấm "Chạy lại bằng AI" không. */
 const cacheAgeLabel = computed(() => {
   const age = Number(collection.value?.model?.cache_age_s);
@@ -147,15 +184,6 @@ const cacheAgeLabel = computed(() => {
   if (age < 60) return 'cách đây ' + age + ' giây';
   return 'cách đây ' + Math.round(age / 60) + ' phút';
 });
-/** Nhóm công việc CHƯA cấu hình model — đọc từ số đo (tức là từ Cài đặt), không phải danh sách cứng. */
-/** Nhóm công việc CHƯA chạy được — đọc từ số đo (tức từ Cài đặt), không phải danh sách cứng. */
-const blockedGroups = computed(() => (store.webAccess?.task_groups || []).filter((row) => !row.configured || row.needs_key));
-/** Câu nói ĐÚNG việc cần làm: chưa gán model khác với đã gán nhưng thiếu key. */
-function groupStatus(row) {
-  if (!row.configured) return 'chưa gán model';
-  if (row.needs_key) return 'đã gán model nhưng CHƯA có key dùng được — chờ cài đặt key';
-  return 'đang chạy';
-}
 /**
  * Vì sao nút "Lưu DNA" đang bị khoá — MỘT nguồn cho cả điều kiện khoá lẫn câu giải thích
  * (docs/DESIGN_SYSTEM.md §4 quy tắc 4): hai chỗ viết riêng thì sớm muộn lệch nhau.
@@ -188,16 +216,27 @@ const selectedRegion = computed({
 const trends = computed(() => radar.value?.trends || []);
 const sources = computed(() => radar.value?.sources || []);
 const sourceMode = computed(() => radar.value?.source_mode || 'demo');
+/**
+ * Bốn ô số liệu đầu màn hình. Thứ tự CÓ CHỦ Ý: số ĐO ĐƯỢC từ tin thật lên trước, số của bộ có sẵn và số
+ * của chính tài khoản xuống sau — trước đây ô đầu là "Thuộc tính theo dõi: 5" (một hằng số cứng) và ô
+ * "Ảnh phân tích mỗi tháng: 0", tức là hai ô vô nghĩa chiếm chỗ của số thật.
+ */
 const summaryItems = computed(() => {
   const summary = radar.value?.summary || {};
+  const order = ['live_sources', 'market_signals', 'active_trends', 'internal_products', 'internal_generations', 'tracked_attributes', 'images_analyzed_monthly'];
   const labels = {
+    live_sources: 'Nguồn tin đang dùng',
+    market_signals: 'Từ khoá từ tin thật',
+    active_trends: 'Hướng đang theo dõi',
+    internal_products: 'Sản phẩm của bạn',
+    internal_generations: 'Ảnh bạn đã tạo',
     tracked_attributes: 'Thuộc tính theo dõi',
     images_analyzed_monthly: 'Ảnh phân tích mỗi tháng',
-    active_trends: 'Xu hướng đang theo dõi',
-    internal_products: 'Sản phẩm nội bộ',
-    internal_generations: 'Lịch sử tạo ảnh',
   };
-  return Object.entries(summary).map(([key, value]) => ({ key, label: labels[key] || key, value }));
+  const live = new Set(['live_sources', 'market_signals']);
+  return order
+    .filter((key) => key in summary)
+    .map((key) => ({ key, label: labels[key] || key, value: summary[key], fromNews: live.has(key) }));
 });
 const selectedTrendIds = computed(() => (store.selectedTrendIds || []).map(String));
 const selectedTrendCount = computed(() => selectedTrendIds.value.length);
@@ -589,7 +628,13 @@ async function createCollection() {
     collectionError.value = 'Chưa có dữ liệu bộ sưu tập để tạo.';
     return;
   }
-  await store.createCollectionFromBrief(payload);
+  if (creatingCollection.value) return;   // chống bấm hai lần ⇒ hai dự án trùng
+  creatingCollection.value = true;
+  try {
+    await store.createCollectionFromBrief(payload);
+  } finally {
+    creatingCollection.value = false;
+  }
 }
 async function copyText(value, label) {
   const text = String(value || '').trim();
@@ -624,7 +669,7 @@ watch(() => store.designAgentOpen, (open) => {
     v-model="store.designAgentOpen"
     full
     height="min(94vh, 960px)"
-    title="Agent Studio — TrendRadar → CollectionBot → Canvas"
+    title="Agent Studio — từ tín hiệu xu hướng tới ảnh hoàn chỉnh"
   >
     <div class="flex h-full min-h-0 flex-col">
       <!-- Thanh tiến trình + trạng thái -->
@@ -643,8 +688,13 @@ watch(() => store.designAgentOpen, (open) => {
               <span class="h-1.5 w-1.5 rounded-full" :class="modelReady ? 'bg-emerald-300' : 'bg-amber-300'"></span>
               {{ modelShort }}
             </span>
-            <span class="rounded-full bg-amber-500/15 px-2 py-0.5 font-semibold text-warn">Nguồn: {{ sourceMode }}</span>
-            <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-ok">Nội bộ: local</span>
+            <!-- Nguồn dữ liệu nói bằng CÂU NGƯỜI ĐỌC ĐƯỢC: "live/demo/local" là từ của lập trình viên. -->
+            <span
+              class="rounded-full px-2 py-0.5 font-semibold"
+              :class="liveSources ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'"
+              :title="liveSources ? 'Máy chủ đang đọc tin thật từ các nguồn đã nối' : 'Chưa nối được nguồn tin nào — phần xu hướng dùng bộ có sẵn'"
+            >{{ liveSources ? 'Tin thị trường thật' : 'Bộ xu hướng có sẵn' }}</span>
+            <span v-if="marketSignals.length" class="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-ok">{{ marketSignals.length }} tín hiệu đo được</span>
             <span v-if="selectedTrendCount" class="rounded-full bg-brand-500/15 px-2 py-0.5 font-semibold text-brand-200">{{ selectedTrendCount }} trend đã chọn</span>
             <button
               type="button"
@@ -670,19 +720,20 @@ watch(() => store.designAgentOpen, (open) => {
           <span v-if="!store.designAgentAi" class="text-warn">Bật «Suy luận AI» ở trên để phần phân tích do AI thực hiện.</span>
           <span v-else-if="modelCandidates.length === 0" class="text-warn">Cấu hình tại Cài đặt → Nhóm công việc → “Suy luận prompt (Giám đốc sáng tạo / Thuật sỹ ảo)” và thêm khoá trong Quản lý API.</span>
         </p>
-        <nav class="mt-3 grid grid-cols-3 gap-1.5 lg:hidden" role="tablist" aria-label="Tiến trình thiết kế">
+        <!-- 4 bước ⇒ lưới 2 cột (lưới 3 cột để hàng dưới lẻ một nút, nhìn như lỗi).
+             Không dùng role=tab ở đây: mỗi lúc chỉ MỘT bước tồn tại trong DOM, nên aria-controls sẽ trỏ
+             vào phần tử không có thật — trình đọc màn hình đọc ra tham chiếu gãy. -->
+        <nav class="mt-3 grid grid-cols-2 gap-1.5 lg:hidden" aria-label="Tiến trình thiết kế">
           <button
             v-for="(item, index) in STEPS"
             :key="item.id"
             type="button"
-            role="tab"
             class="seg-btn !flex-col !items-start !gap-0.5 !px-2 !py-2 text-left"
             :class="{ 'is-active': step === item.id }"
-            :aria-selected="step === item.id"
-            :aria-controls="'agent-step-' + item.id"
+            :aria-current="step === item.id ? 'step' : undefined"
             @click="setStep(item.id)"
           >
-            <span class="text-tiny opacity-70">Bước {{ index + 1 }}</span>
+            <span class="text-tiny text-cream-400">Bước {{ index + 1 }}</span>
             <span class="text-body font-semibold">{{ item.label }}</span>
           </button>
         </nav>
@@ -797,10 +848,14 @@ watch(() => store.designAgentOpen, (open) => {
                     <StudioIcon name="save" size="h-3.5 w-3.5" /> {{ store.brandDnaSaving ? 'Đang lưu…' : 'Lưu DNA' }}
                   </button>
                   <span v-if="dnaBlockReason" class="text-label text-cream-400">↳ {{ dnaBlockReason }}</span>
-                  <button type="button" class="btn-ghost btn-sm" :disabled="!dnaDirty" @click="store.discardBrandDnaDraft()">Bỏ thay đổi</button>
+                  <!-- Nút khoá vì lý do người dùng GỠ ĐƯỢC thì phải nói lý do ngay dưới nút (§4 luật 4). -->
+                  <button type="button" class="btn-ghost btn-sm" :disabled="store.brandDnaSaving || !dnaDirty" @click="store.discardBrandDnaDraft()">Bỏ thay đổi</button>
+                  <span v-if="!dnaDirty && !store.brandDnaSaving" class="text-label text-cream-400">↳ Không có thay đổi nào để bỏ.</span>
                   <button type="button" class="btn-ghost btn-sm" :disabled="store.brandDnaSaving || dnaEmpty" @click="store.resetBrandDna()">Xoá hồ sơ</button>
+                  <span v-if="dnaEmpty && !store.brandDnaSaving" class="text-label text-cream-400">↳ Chưa có hồ sơ nào để xoá.</span>
                 </div>
-                <p v-if="!dnaBlockReason && dna?.is_set" class="text-label text-cream-400">Bản đang lưu trùng với bản bạn đang thấy.</p>
+                <!-- Câu này chỉ đúng khi KHÔNG đang lưu: lúc đang lưu thì bản nháp còn khác bản đã lưu. -->
+                <p v-if="!dnaBlockReason && !store.brandDnaSaving && dna?.is_set" class="text-label text-cream-400">Bản đang lưu trùng với bản bạn đang thấy.</p>
               </div>
             </div>
           </section>
@@ -812,7 +867,8 @@ watch(() => store.designAgentOpen, (open) => {
                 <p class="mt-0.5 text-xs text-cream-400">Chọn 2–4 hướng phù hợp nhất với DNA shop. Chưa chọn cũng chạy được với nhóm mặc định.</p>
               </div>
               <div class="flex flex-wrap items-center gap-2">
-                <select v-model="selectedRegion" :disabled="store.trendRadarLoading" class="input !w-auto !bg-ink-800 !py-2 !text-xs !text-cream-100">
+                <label for="agent-region" class="sr-only">Khu vực đọc tín hiệu</label>
+                <select id="agent-region" v-model="selectedRegion" :disabled="store.trendRadarLoading" class="input !w-auto !bg-ink-800 !py-2 !text-xs !text-cream-100">
                   <option v-for="region in regions" :key="region.id" :value="region.id">{{ region.name }}</option>
                 </select>
                 <button type="button" class="tool-btn" :disabled="store.trendRadarLoading" @click="loadRadar(selectedRegion, { force: true })">
@@ -825,15 +881,24 @@ watch(() => store.designAgentOpen, (open) => {
               <StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ store.trendRadarError }}</span>
             </div>
 
-            <div v-if="radar" class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div v-for="item in summaryItems.slice(0, 4)" :key="item.key" class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5">
-                <p class="text-label leading-4 text-cream-400">{{ item.label }}</p>
-                <p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatNumber(item.value) }}</p>
+            <div v-if="radar" class="mb-4">
+              <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                <div v-for="item in summaryItems" :key="item.key" class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5">
+                  <p class="text-label leading-4 text-cream-400">{{ item.label }}</p>
+                  <p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatNumber(item.value) }}</p>
+                  <p class="text-tiny leading-3 text-cream-400">{{ item.fromNews ? 'từ tin thật' : 'từ dữ liệu của bạn' }}</p>
+                </div>
               </div>
+              <!-- Nguồn của con số phải nằm NGAY DƯỚI số, không gấp trong khối khác (§18.2). -->
+              <p class="mt-1.5 text-label leading-5 text-cream-400">
+                {{ marketLive
+                  ? 'Số đầu tiên là số ĐO từ tin thật; các hướng còn lại ghi rõ hướng nào có tin thật, hướng nào thuộc bộ có sẵn.'
+                  : 'Chưa có tin thật nào: các hướng đang hiển thị thuộc BỘ XU HƯỚNG CÓ SẴN của FabrikAI, không phải số liệu thị trường.' }}
+              </p>
             </div>
 
             <p v-if="store.trendRadarLoading && store.designAgentAi" class="mb-3 flex items-center gap-2 text-body text-brand-200" role="status" aria-live="polite">
-              <StudioIcon name="sparkles" size="h-3.5 w-3.5" class="animate-pulse" /> Đang gọi model của nhóm “prompt” để viết định hướng — có thể mất vài giây…
+              <StudioIcon name="sparkles" size="h-3.5 w-3.5" class="animate-pulse" /> AI đang viết định hướng từ dữ liệu bên dưới — có thể mất vài giây…
             </p>
 
             <div v-if="store.trendRadarLoading && !radar" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-live="polite">
@@ -842,15 +907,58 @@ watch(() => store.designAgentOpen, (open) => {
             </div>
 
             <template v-else-if="radar">
+              <!-- TÍN HIỆU ĐO TỪ TIN THẬT: số liệu có thật, đo bằng thuật toán, KHÔNG cần AI.
+                   Đặt TRƯỚC phần định hướng vì đây là thứ chủ shop dùng để tin phần phía sau. -->
+              <div v-if="marketLive" class="mb-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-cream-100">Tín hiệu đo từ tin thật ({{ marketSignals.length }})</h3>
+                    <p class="mt-0.5 text-body leading-5 text-cream-400">
+                      {{ market.note }}<template v-if="marketAgeLabel"> · đo {{ marketAgeLabel }}</template>
+                    </p>
+                  </div>
+                  <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-label font-semibold text-ok">Đo tự động, không cần AI</span>
+                </div>
+
+                <ul class="mt-3 grid gap-2 sm:grid-cols-2">
+                  <li v-for="signal in marketSignals" :key="signal.category + signal.term" class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2">
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span class="text-body font-semibold text-cream-100">{{ signal.term }}</span>
+                      <span class="rounded bg-ink-800 px-1.5 py-0.5 text-tiny text-cream-300">{{ signal.category_label }}</span>
+                      <span class="text-label text-cream-300">{{ signal.mentions }} tin · {{ signal.source_count }} nguồn</span>
+                      <span
+                        v-if="signal.change_pct === null || signal.change_pct === undefined"
+                        class="rounded bg-ink-800 px-1.5 py-0.5 text-tiny text-cream-400"
+                      >lần đo đầu tiên</span>
+                      <span
+                        v-else
+                        class="rounded px-1.5 py-0.5 text-tiny font-semibold"
+                        :class="signal.change_pct >= 0 ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'"
+                      >{{ signal.change_pct >= 0 ? 'tăng' : 'giảm' }} {{ Math.abs(signal.change_pct) }}%</span>
+                    </div>
+                    <ul v-if="signalSamples(signal).length" class="mt-1.5 space-y-0.5 text-label leading-4 text-cream-300">
+                      <li v-for="sample in signalSamples(signal)" :key="sample.url">
+                        · <a :href="sample.url" target="_blank" rel="noopener" class="underline decoration-dotted hover:text-cream-100">{{ sample.title }}</a>
+                        <span v-if="sample.source" class="text-cream-400"> — {{ sample.source }}</span>
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
+
+                <p v-if="marketPrices && marketPrices.count" class="mt-3 text-body leading-5 text-cream-300">
+                  Giá ghi nhận trong tin ({{ marketPrices.count }} lần): {{ formatVnd(marketPrices.min_vnd) }} – {{ formatVnd(marketPrices.median_vnd) }} – {{ formatVnd(marketPrices.max_vnd) }}
+                  <span class="text-cream-400">(thấp · trung vị · cao — giá đọc được trong bài, không phải giá bán của bạn)</span>
+                </p>
+              </div>
+
               <!-- ĐỊNH HƯỚNG: phần suy luận (AI hoặc tất định) — nói rõ nguồn của từng hướng. -->
               <div v-if="directions.length" class="mb-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div class="min-w-0">
                     <h3 class="text-sm font-semibold text-cream-100">Định hướng từ TrendRadar ({{ directions.length }})</h3>
                     <p class="mt-0.5 text-body leading-5 text-cream-400">
-                      {{ modelReady
-                        ? 'Phần định hướng do AI viết trên đúng dữ liệu mẫu bên dưới — số liệu không do AI tạo.'
-                        : 'Phần định hướng được dựng tự động từ dữ liệu mẫu (AI chưa tham gia bước này).' }}
+                      {{ radarMethodLine }}
+                      <span v-if="radarReadAt" class="text-cream-400">· đọc lúc {{ radarReadAt }}.</span>
                     </p>
                   </div>
                   <button type="button" class="tool-btn" title="Chọn các trend mà 3 định hướng mạnh nhất đang nhắc tới" @click="focusDirections">
@@ -917,7 +1025,8 @@ watch(() => store.designAgentOpen, (open) => {
                       <span class="flex flex-wrap items-center gap-1.5 text-label font-semibold uppercase tracking-wide text-cream-400">
                         {{ categoryLabel(trend.category) }}
                         <span class="rounded bg-ink-800 px-1.5 py-0.5 normal-case tracking-normal" :class="lifecycleClass(trend.lifecycle)">{{ lifecycleLabel(trend.lifecycle) }}</span>
-                        <span v-if="trend.evidence_mode === 'demo'" class="rounded bg-amber-500/15 px-1.5 py-0.5 normal-case tracking-normal text-warn" title="Hướng này lấy từ bộ xu hướng có sẵn của FabrikAI, chưa gắn với tin thị trường vừa lấy">bộ có sẵn</span>
+                        <span v-if="trend.evidence_mode === 'live'" class="rounded bg-emerald-500/15 px-1.5 py-0.5 normal-case tracking-normal text-ok" title="Hướng này có tin thật nhắc tới — số liệu bên dưới là số ĐO từ các tin đó">có tin thật</span>
+                        <span v-else class="rounded bg-amber-500/15 px-1.5 py-0.5 normal-case tracking-normal text-warn" title="Hướng này lấy từ bộ xu hướng có sẵn của FabrikAI, chưa gắn với tin thị trường vừa lấy">bộ có sẵn</span>
                       </span>
                       <span class="mt-1.5 block text-sm font-semibold text-cream-100">{{ trendTitle(trend) }}</span>
                       <span class="mt-1 block text-body leading-4 text-cream-400">{{ trend.description }}</span>
@@ -926,12 +1035,14 @@ watch(() => store.designAgentOpen, (open) => {
                       <StudioIcon :name="selectedTrendIds.includes(String(trend.id)) ? 'check' : 'square'" size="h-3 w-3" />
                     </span>
                   </span>
-                  <span class="mt-3 block text-label text-cream-400">Đà tăng {{ trend.momentum ?? 0 }} · tin cậy {{ Math.round((trend.confidence || 0) * 100) }}% · {{ formatNumber(trend.evidence_count) }} bằng chứng (mẫu)</span>
+                  <span class="mt-3 block text-label text-cream-400">{{ trendSignalLabel(trend) }}</span>
                   <span class="mt-1.5 block h-1 overflow-hidden rounded bg-ink-700"><span class="block h-full bg-gradient-to-r from-brand-500 to-amber-300" :style="{ width: Math.min(100, Number(trend.momentum || 0)) + '%' }"></span></span>
                   <span class="mt-2 block text-body leading-4 text-cream-400">{{ trend.recommended_action }}</span>
                 </button>
               </div>
-              <p v-else class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center text-xs text-cream-400">Không có xu hướng nào khớp bộ lọc hiện tại.</p>
+              <p v-else class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center text-xs text-cream-400">
+                {{ trends.length ? 'Không có xu hướng nào khớp bộ lọc hiện tại — bỏ bộ lọc để xem tất cả.' : 'Chưa đọc được xu hướng nào. Bấm «Tải lại»; nếu vẫn trống, kiểm tra nguồn tin ở khối «Nguồn dữ liệu cho phân tích».' }}
+              </p>
 
               <details class="mt-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
                 <summary class="cursor-pointer text-xs font-semibold text-cream-200">Nguồn dữ liệu cho phân tích</summary>
@@ -965,11 +1076,17 @@ watch(() => store.designAgentOpen, (open) => {
                     <summary class="cursor-pointer text-label text-cream-400">Danh sách nguồn &amp; cách hoạt động</summary>
                     <div class="mt-1.5 overflow-x-auto">
                       <table class="w-full min-w-[26rem] text-left text-label">
-                        <thead><tr class="border-b border-ink-700 text-cream-400"><th class="pb-1.5 pr-2 font-semibold">Nguồn</th><th class="pb-1.5 pr-2 font-semibold">Trạng thái</th><th class="pb-1.5 font-semibold">Tin</th></tr></thead>
+                        <thead><tr class="border-b border-ink-700 text-cream-400"><th scope="col" class="pb-1.5 pr-2 font-semibold">Nguồn</th><th scope="col" class="pb-1.5 pr-2 font-semibold">Trạng thái</th><th scope="col" class="pb-1.5 font-semibold">Tin dùng được</th></tr></thead>
                         <tbody class="divide-y divide-ink-800">
                           <tr v-for="row in store.webSources.sources" :key="row.slug">
                             <td class="py-1.5 pr-2"><a :href="row.url" target="_blank" rel="noopener" class="text-cream-200 underline decoration-dotted">{{ row.name }}</a></td>
-                            <td class="py-1.5 pr-2"><span :class="row.ok ? 'text-ok' : 'text-warn'">{{ sourceStatus(row) }}</span></td>
+                            <!-- Trạng thái nói ĐÚNG việc đang xảy ra: đang dùng · bị lọc hết · nguồn không có tin ·
+                                 đang dùng bản lấy trước · bỏ qua vì khác vùng. Không gộp thành "Không lấy được". -->
+                            <td class="py-1.5 pr-2">
+                              <span :class="sourceStatusTone(row)">{{ sourceStatus(row) }}</span>
+                              <span v-if="row.parsed && row.count === 0" class="block text-cream-400">{{ row.parsed }} tin đọc được nhưng không tin nào qua bộ lọc</span>
+                              <span v-else-if="row.parsed" class="block text-cream-400">{{ row.parsed }} tin đọc được</span>
+                            </td>
                             <td class="py-1.5 tabular-nums text-cream-300">{{ row.count }}</td>
                           </tr>
                         </tbody>
@@ -980,7 +1097,7 @@ watch(() => store.designAgentOpen, (open) => {
                       {{ store.webSources.limits.limit }} tin cho mỗi lần phân tích.
                     </p>
                     <p class="mt-1 text-label leading-5 text-cream-400">
-                      AI đọc tin qua máy chủ FabrikAI, không phải model tự tìm kiếm. {{ reasoningModelLine }}
+                      AI đọc tin qua máy chủ FabrikAI, không phải model tự tìm kiếm.
                     </p>
                   </details>
                 </div>
@@ -989,6 +1106,30 @@ watch(() => store.designAgentOpen, (open) => {
                   Dữ liệu nội bộ là dự án và ảnh của chính tài khoản bạn.
                   Kênh chưa kết nối: Shopee · TikTok Shop · Lazada · Instagram · sàn quốc tế · runway.
                 </p>
+
+                    <!-- KHẢ NĂNG TRUY CẬP INTERNET — số ĐO, không phải câu văn (docs/DESIGN_SYSTEM.md §18.2).
+                         Trước đây khối này được nạp mỗi lần mở màn hình nhưng KHÔNG hiện ở đâu cả. -->
+                    <div class="mt-3 rounded-lg border border-ink-700 bg-ink-900 p-3">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="text-body font-semibold text-cream-100">Khả năng đọc tin từ internet</p>
+                        <button
+                          type="button"
+                          class="tool-btn"
+                          :disabled="store.webAccessLoading"
+                          title="Đo lại ngay: máy chủ có ra được internet hay không"
+                          @click="store.loadWebAccess(true)"
+                        >
+                          <StudioIcon name="refresh" size="h-3 w-3" :class="store.webAccessLoading ? 'animate-spin' : ''" />
+                          {{ store.webAccessLoading ? 'Đang kiểm tra…' : 'Kiểm tra lại' }}
+                        </button>
+                      </div>
+                      <p v-if="store.webAccessError" role="alert" class="mt-2 text-body text-danger">{{ store.webAccessError }}</p>
+                      <p v-else-if="internetVerdict" class="mt-1.5 text-body leading-5 text-cream-300">{{ internetVerdict }}</p>
+                      <p v-else class="mt-1.5 text-body leading-5 text-cream-400">Chưa đo được — bấm «Kiểm tra lại».</p>
+                      <ul v-if="groupsNeedingSetup.length" class="mt-2 space-y-0.5 text-label leading-5 text-cream-300">
+                        <li v-for="row in groupsNeedingSetup" :key="row.group">· {{ row.label }}: {{ row.configured ? 'chưa có khoá dùng được' : 'chưa gán model' }}</li>
+                      </ul>
+                    </div>
               </details>
             </template>
           </section>
@@ -999,7 +1140,7 @@ watch(() => store.designAgentOpen, (open) => {
               <div class="card p-4">
                 <h2 class="text-sm font-semibold text-cream-100">Brief đầu vào</h2>
                 <p class="mt-0.5 text-xs text-cream-400">Mô tả khách hàng, dịp mặc, chất liệu, màu sắc hoặc định vị giá.</p>
-                <label for="collection-prompt" class="label mt-4">Prompt tiếng Việt</label>
+                <label for="collection-prompt" class="label mt-4">Prompt tiếng Việt <span class="font-normal text-cream-400">(bắt buộc)</span></label>
                 <textarea id="collection-prompt" ref="promptInput" v-model="prompt" rows="5" maxlength="2000" aria-describedby="collection-prompt-help" class="input w-full resize-none !text-sm" placeholder="Ví dụ: Bộ sưu tập công sở mùa hè cho nữ văn phòng, ưu tiên linen thoáng và màu pastel dịu…" @keydown.ctrl.enter="createBrief"></textarea>
                 <div class="mt-1.5 flex items-start justify-between gap-3"><p id="collection-prompt-help" class="text-label leading-4 text-cream-400">Ctrl+Enter để tạo brief.</p><span class="shrink-0 text-label tabular-nums text-cream-400">{{ prompt.length }}/2000</span></div>
 
@@ -1010,11 +1151,13 @@ watch(() => store.designAgentOpen, (open) => {
                     <button type="button" class="tool-btn" :disabled="refImages.length >= 3" @click="refPickerOpen = true">
                       <StudioIcon name="library" size="h-3 w-3" /> Chọn ảnh mẫu
                     </button>
+                    <span v-if="refImages.length >= 3" class="text-label text-cream-400">↳ Đã đủ 3 ảnh mẫu — bỏ một ảnh nếu muốn đổi.</span>
                   </div>
                   <div v-if="refImages.length" class="mt-2 flex flex-wrap gap-2">
                     <div v-for="url in refImages" :key="url" class="relative">
                       <img :src="url" alt="Ảnh mẫu" class="h-14 w-14 rounded-lg border border-ink-600 object-cover">
-                      <button type="button" class="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-ink-800 text-cream-300" aria-label="Bỏ ảnh mẫu" @click="removeReference(url)">
+                      <!-- 24x24 là ngưỡng chạm tối thiểu của WCAG 2.2 (SC 2.5.8); h-5/w-5 = 20px là quá nhỏ. -->
+                      <button type="button" class="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full border border-ink-600 bg-ink-800 text-cream-300" aria-label="Bỏ ảnh mẫu" @click="removeReference(url)">
                         <StudioIcon name="x" size="h-3 w-3" />
                       </button>
                     </div>
@@ -1030,17 +1173,26 @@ watch(() => store.designAgentOpen, (open) => {
                   <div v-if="selectedTrendObjects.length" class="flex flex-wrap gap-2">
                     <span v-for="trend in selectedTrendObjects" :key="trend.id" class="flex items-center gap-1.5 rounded-lg border border-brand-500/40 bg-brand-500/10 px-2 py-1 text-body text-brand-200"><span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: trend.color }"></span>{{ trendTitle(trend) }}</span>
                   </div>
-                  <p v-else class="text-xs leading-5 text-cream-400">Chưa chọn trend — CollectionBot dùng nhóm mặc định.</p>
+                  <p v-else class="text-xs leading-5 text-cream-400">Chưa chọn hướng nào — hệ thống sẽ dùng nhóm mặc định.</p>
                 </div>
 
                 <div class="mt-4">
                   <span class="text-body font-semibold uppercase tracking-wide text-cream-400">Bảng size dự kiến</span>
-                  <div class="seg mt-2">
-                    <button v-for="preset in SIZE_PRESETS" :key="preset.id" type="button" class="seg-btn" :class="{ 'is-active': sizePreset === preset.id }" @click="sizePreset = preset.id">{{ preset.label }}</button>
+                  <!-- Nhóm chọn-một: màu KHÔNG được là tín hiệu duy nhất ⇒ có aria-pressed cho trình đọc màn hình. -->
+                  <div class="seg mt-2" role="group" aria-label="Bảng size dự kiến">
+                    <button v-for="preset in SIZE_PRESETS" :key="preset.id" type="button" class="seg-btn" :class="{ 'is-active': sizePreset === preset.id }" :aria-pressed="sizePreset === preset.id" @click="sizePreset = preset.id">{{ preset.label }}</button>
                   </div>
                 </div>
 
-                <button type="button" class="btn-brand btn-sm mt-5 flex w-full items-center justify-center gap-2" :disabled="store.collectionBriefLoading" @click="createBrief()">
+                <!-- MỘT hành động chính cho mỗi màn: đã có brief thì nút "Tạo lại" lùi về thứ yếu
+                     (nút chính lúc đó là «Chốt brief & sang Canvas» ở thanh dưới). -->
+                <button
+                  type="button"
+                  class="btn-sm mt-5 flex w-full items-center justify-center gap-2"
+                  :class="collection ? 'tool-btn !py-2.5' : 'btn-brand'"
+                  :disabled="store.collectionBriefLoading"
+                  @click="createBrief()"
+                >
                   <StudioIcon name="wand" size="h-3.5 w-3.5" :class="store.collectionBriefLoading ? 'animate-spin' : ''" />
                   {{ store.collectionBriefLoading
                     ? (store.designAgentAi ? 'AI đang xây brief…' : 'Đang xây dựng brief…')
@@ -1103,11 +1255,11 @@ watch(() => store.designAgentOpen, (open) => {
                       <thead class="sticky top-0 bg-ink-800 text-cream-400">
                         <tr>
                           <th class="p-1.5 font-semibold">Tên</th>
-                          <th class="p-1.5 font-semibold">Nhóm</th>
-                          <th class="p-1.5 font-semibold">Bán</th>
-                          <th class="p-1.5 font-semibold">Tồn</th>
-                          <th class="p-1.5 font-semibold">Đổi</th>
-                          <th class="p-1.5 font-semibold">Giá</th>
+                          <th scope="col" class="p-1.5 font-semibold">Nhóm</th>
+                          <th scope="col" class="p-1.5 font-semibold">Bán</th>
+                          <th scope="col" class="p-1.5 font-semibold">Tồn</th>
+                          <th scope="col" class="p-1.5 font-semibold">Đổi</th>
+                          <th scope="col" class="p-1.5 font-semibold">Giá</th>
                           <th class="p-1.5"></th>
                         </tr>
                       </thead>
@@ -1115,12 +1267,15 @@ watch(() => store.designAgentOpen, (open) => {
                         <tr v-for="(row, index) in store.shopRows" :key="index">
                           <td class="p-1"><input v-model="row.name" class="input !py-1 !text-label" placeholder="Tên sản phẩm"></td>
                           <td class="p-1"><input v-model="row.category" class="input !w-20 !py-1 !text-label" placeholder="Áo"></td>
-                          <td class="p-1"><input v-model.number="row.units_sold" type="number" min="0" class="input !w-16 !py-1 !text-label tabular-nums"></td>
-                          <td class="p-1"><input v-model.number="row.stock_on_hand" type="number" min="0" class="input !w-16 !py-1 !text-label tabular-nums"></td>
-                          <td class="p-1"><input v-model.number="row.returns" type="number" min="0" class="input !w-14 !py-1 !text-label tabular-nums"></td>
-                          <td class="p-1"><input v-model.number="row.price_vnd" type="number" min="0" class="input !w-24 !py-1 !text-label tabular-nums"></td>
+                          <!-- Ô số không có nhãn thì trình đọc màn hình chỉ đọc "edit text" — phải có aria-label
+                               nêu ĐÚNG ô nào của dòng nào. -->
+                          <td class="p-1"><input v-model.number="row.units_sold" type="number" min="0" :aria-label="'Số bán của ' + (row.name || 'dòng ' + (index + 1))" class="input !w-16 !py-1 !text-label tabular-nums"></td>
+                          <td class="p-1"><input v-model.number="row.stock_on_hand" type="number" min="0" :aria-label="'Tồn kho của ' + (row.name || 'dòng ' + (index + 1))" class="input !w-16 !py-1 !text-label tabular-nums"></td>
+                          <td class="p-1"><input v-model.number="row.returns" type="number" min="0" :aria-label="'Số đổi trả của ' + (row.name || 'dòng ' + (index + 1))" class="input !w-14 !py-1 !text-label tabular-nums"></td>
+                          <td class="p-1"><input v-model.number="row.price_vnd" type="number" min="0" :aria-label="'Giá bán của ' + (row.name || 'dòng ' + (index + 1))" class="input !w-24 !py-1 !text-label tabular-nums"></td>
                           <td class="p-1">
-                            <button type="button" class="tool-btn !px-1.5 !py-1" title="Xoá dòng" @click="removeShopRow(index)"><StudioIcon name="trash" size="h-3 w-3" /></button>
+                            <!-- Nút chỉ có icon PHẢI có aria-label (§8 luật 1) và vùng chạm ≥ 24px (WCAG 2.2). -->
+                            <button type="button" class="tool-btn !px-2 !py-1.5" :aria-label="'Xoá ' + (row.name || 'dòng ' + (index + 1))" title="Xoá dòng" @click="removeShopRow(index)"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
                           </td>
                         </tr>
                       </tbody>
@@ -1147,7 +1302,8 @@ watch(() => store.designAgentOpen, (open) => {
               <template v-else-if="collection">
                 <div class="card p-5">
                   <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div><p class="text-label font-semibold uppercase tracking-wide text-brand-300">{{ collection.agent || 'CollectionBot' }} · {{ collection.engine || 'rule-based-v1' }}</p><h2 class="mt-1 text-lg font-semibold text-cream-100">Bộ sưu tập đề xuất</h2></div>
+                    <!-- KHÔNG in tên nội bộ của agent hay tên model ra màn hình khách (§6). -->
+                    <div><p class="text-label font-semibold uppercase tracking-wide text-brand-300">Bộ sưu tập đề xuất</p><h2 class="mt-1 text-lg font-semibold text-cream-100">Phương án cho bộ sưu tập của bạn</h2></div>
                     <span class="rounded-lg bg-ink-800 px-2.5 py-1 text-label text-cream-400">Khu vực: {{ collection.input?.region || selectedRegion }}</span>
                   </div>
                   <div class="mt-2 flex flex-wrap items-center gap-1.5 text-label">
@@ -1155,11 +1311,11 @@ watch(() => store.designAgentOpen, (open) => {
                       class="rounded-full px-2 py-0.5 font-semibold"
                       :class="modelReady ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'"
                       :title="modelTitle"
-                    >{{ modelReady ? 'AI: ' + (collection.model?.provider || '') + ' · ' + (collection.model?.model || '') : 'Engine tất định' }}</span>
+                    >{{ modelShort }}</span>
                     <span v-for="row in appliedAi" :key="row" class="rounded bg-brand-500/15 px-2 py-0.5 text-brand-200">AI viết: {{ row }}</span>
                     <!-- Nói THẬT bản này mới chạy model hay lấy từ bộ đệm (và cũ bao lâu). -->
                     <span v-if="collection.model?.cached" class="rounded bg-ink-800 px-2 py-0.5 text-cream-400" title="Cùng yêu cầu trước đó nên không cần tạo lại">Đã tạo {{ cacheAgeLabel }}</span>
-                    <span v-else-if="modelReady && collection.model?.latency_ms != null" class="text-cream-400">Vừa chạy model · {{ collection.model.latency_ms }} ms</span>
+                    <span v-else-if="modelReady" class="text-cream-400">Vừa phân tích xong</span>
                     <button
                       v-if="collection"
                       type="button"
@@ -1257,7 +1413,7 @@ watch(() => store.designAgentOpen, (open) => {
                       <StudioIcon :name="plan.price_check.status === 'above_band' ? 'alertTriangle' : 'info'" size="h-4 w-4" class="shrink-0" />
                       <span>
                         {{ plan.price_check.message }}
-                        <span class="mt-0.5 block opacity-70">
+                        <span class="mt-0.5 block text-cream-400">
                           Giá bán gợi ý theo giá vốn: {{ formatVnd(plan.price_check.suggested_price_vnd) }} · dải giá brief: {{ formatVnd(plan.price_check.band_min_vnd) }} – {{ formatVnd(plan.price_check.band_max_vnd) }}
                         </span>
                       </span>
@@ -1442,14 +1598,14 @@ watch(() => store.designAgentOpen, (open) => {
                     <div class="mt-3 grid gap-4 sm:grid-cols-2">
                       <div>
                         <p class="text-label font-semibold uppercase tracking-wide text-cream-400">Tỉ lệ khung</p>
-                        <div class="seg mt-2">
-                          <button v-for="ratio in RATIO_OPTIONS" :key="ratio" type="button" class="seg-btn" :class="{ 'is-active': canvas.ratio === ratio }" @click="canvas.ratio = ratio">{{ ratio }}</button>
+                        <div class="seg mt-2" role="group" aria-label="Tỉ lệ khung ảnh">
+                          <button v-for="ratio in RATIO_OPTIONS" :key="ratio" type="button" class="seg-btn" :class="{ 'is-active': canvas.ratio === ratio }" :aria-pressed="canvas.ratio === ratio" @click="canvas.ratio = ratio">{{ ratio }}</button>
                         </div>
                       </div>
                       <div>
                         <p class="text-label font-semibold uppercase tracking-wide text-cream-400">Số biến thể</p>
-                        <div class="seg mt-2">
-                          <button v-for="n in [1, 2, 3, 4]" :key="n" type="button" class="seg-btn" :class="{ 'is-active': Number(canvas.variantCount) === n }" @click="canvas.variantCount = n">{{ n }}</button>
+                        <div class="seg mt-2" role="group" aria-label="Số biến thể ảnh">
+                          <button v-for="n in [1, 2, 3, 4]" :key="n" type="button" class="seg-btn" :class="{ 'is-active': Number(canvas.variantCount) === n }" :aria-pressed="Number(canvas.variantCount) === n" @click="canvas.variantCount = n">{{ n }}</button>
                         </div>
                       </div>
                     </div>
@@ -1473,11 +1629,14 @@ watch(() => store.designAgentOpen, (open) => {
                       <div class="flex items-center justify-between text-xs"><span class="text-cream-400">Chi phí ước tính</span><span class="font-semibold text-cream-100">~{{ estimatedCredits }} credit</span></div>
                       <div class="mt-1 flex items-center justify-between text-body"><span class="text-cream-400">Credit còn lại</span><span class="text-cream-200">{{ formatNumber(store.creditsLeft) }}</span></div>
                     </div>
-                    <button type="button" class="btn-brand btn-sm mt-4 flex w-full items-center justify-center gap-2" @click="applyCanvas">
+                    <!-- Nút này TRÙNG hành động với nút chính ở thanh dưới ⇒ hạ xuống thứ yếu,
+                         vì hai nút chính cùng lúc làm người dùng đứng hình (docs/DESIGN_SYSTEM.md §4 luật 3). -->
+                    <button type="button" class="tool-btn mt-4 w-full justify-center !py-2.5" @click="applyCanvas">
                       <StudioIcon name="zap" size="h-3.5 w-3.5" /> Áp dụng &amp; mở Tạo ảnh
                     </button>
-                    <button type="button" class="tool-btn mt-2 w-full justify-center !py-2.5" @click="createCollection">
-                      <StudioIcon name="briefcase" size="h-3.5 w-3.5" /> Tạo bộ sưu tập từ brief
+                    <!-- Cờ đang-chạy: không có nó thì bấm hai lần tạo HAI dự án trùng nhau. -->
+                    <button type="button" class="tool-btn mt-2 w-full justify-center !py-2.5" :disabled="creatingCollection" @click="createCollection">
+                      <StudioIcon name="briefcase" size="h-3.5 w-3.5" /> {{ creatingCollection ? 'Đang tạo…' : 'Tạo bộ sưu tập từ brief' }}
                     </button>
                     <button type="button" class="tool-btn mt-2 w-full justify-center !py-2.5" @click="setStep('brief')">
                       <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Chỉnh lại brief
@@ -1509,7 +1668,8 @@ watch(() => store.designAgentOpen, (open) => {
             <span v-else>~{{ estimatedCredits }} credit cho {{ canvas.variantCount }} biến thể</span>
           </div>
           <div class="flex items-center gap-2">
-            <button v-if="step !== 'radar'" type="button" class="tool-btn !px-3 !py-2" @click="back"><StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Quay lại</button>
+            <!-- Bước DNA là bước ĐẦU nên không có bước trước: nút "Quay lại" ở đây từng bấm không có gì xảy ra. -->
+            <button v-if="stepIndex > 0" type="button" class="tool-btn !px-3 !py-2" @click="back"><StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Quay lại</button>
             <button v-if="step !== 'canvas'" type="button" class="btn-brand btn-sm flex items-center gap-2" :disabled="(step === 'brief' && store.collectionBriefLoading)" @click="advance">
               {{ step === 'dna' ? 'Đọc tín hiệu thị trường' : (step === 'radar' ? (selectedTrendCount ? 'Phân tích thành brief' : 'Tiếp tục với mặc định') : 'Chốt brief & sang Canvas') }}
               <StudioIcon name="arrowRight" size="h-3.5 w-3.5" />
