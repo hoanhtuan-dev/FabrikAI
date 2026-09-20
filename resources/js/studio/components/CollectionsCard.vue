@@ -225,7 +225,7 @@ async function startExport() {
     await store.exportProject(applied.value.id, exportForm.value);
     store.toast('Đã tải gói ZIP về máy.', 'success');
   } catch (e) {
-    store.toast(e.message || 'Lỗi khi tải gói xuất.', 'error');
+    store.failToast(e, 'Lỗi khi tải gói xuất.');
   }
 }
 // ── Phím tắt trong khối duyệt (chỉ khi card đang mở khối duyệt) ──────────────

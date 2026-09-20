@@ -14,6 +14,7 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
+import { apiError } from '../store.js';
 import SourceLibraryPicker from './SourceLibraryPicker.vue';
 import CompareSlider from './CompareSlider.vue';
 import StudioIcon from './StudioIcon.vue';
@@ -125,12 +126,12 @@ async function loadPreview() {
       body: JSON.stringify({ images: urls, prompt: prompt.value, mode: 'outfit', creative_level: creativeLevel.value, style: style.value, ornament_level: ornamentLevel.value, variants: variants.value }),
     });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(d.message || 'Không tải được bản xem trước prompt.');
+    if (!res.ok) throw apiError(d, 'Không tải được bản xem trước prompt.');
     previewPrompt.value = d.prompt || '';
     previewAxes.value = Array.isArray(d.axes) ? d.axes : [];
     previewDirty.value = false;
   } catch (e) {
-    store.toast(e.message || 'Lỗi tải bản xem trước prompt.', 'error');
+    store.failToast(e, 'Lỗi tải bản xem trước prompt.');
   } finally {
     previewLoading.value = false;
   }
@@ -162,10 +163,10 @@ async function persistOutfitSettings() {
       }),
     });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(d.message || 'Không lưu được cài đặt.');
+    if (!res.ok) throw apiError(d, 'Không lưu được cài đặt.');
     return true;
   } catch (e) {
-    store.toast(e.message || 'Lỗi lưu cài đặt.', 'error');
+    store.failToast(e, 'Lỗi lưu cài đặt.');
     return false;
   }
 }

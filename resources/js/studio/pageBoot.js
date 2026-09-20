@@ -8,7 +8,14 @@
  *     (đăng ký từ thời `/studio`, scope `/`) phục vụ asset cũ; và nếu blade thiếu element gốc thì
  *     `mount('#x-root')` ném lỗi khó đọc thay vì nói rõ nguyên nhân.
  * Gom về một chỗ để không thể lệch lại.
+ *
+ * [2026-09-23] Cùng lý do đó, file này nay BẬT LUÔN bộ bắt lỗi trình duyệt (clientErrors.js) ngay khi
+ * module được nạp: mọi entry SPA đều import file này để mount, nên không entry nào lọt lưới — đúng
+ * lớp bug "vá một chỗ rồi quên các chỗ tương đương" mà đầu file này đã ghi.
  */
+import { installClientErrorReporters } from './clientErrors.js';
+
+installClientErrorReporters();
 
 /**
  * Gỡ mọi service worker còn đăng ký + xoá cache của chúng.

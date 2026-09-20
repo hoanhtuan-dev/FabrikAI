@@ -1,17 +1,21 @@
 {
-  "_BaseModal-BUQwEqWH.js": {
-    "file": "assets/BaseModal-BUQwEqWH.js",
+  "_BaseModal-YyZwU310.js": {
+    "file": "assets/BaseModal-YyZwU310.js",
     "name": "BaseModal",
     "imports": [
-      "_pageBoot-JJzG-QoH.js"
+      "_pageBoot-DyatfnaX.js"
     ]
   },
-  "__plugin-vue_export-helper-D14J8epx.js": {
-    "file": "assets/_plugin-vue_export-helper-D14J8epx.js",
-    "name": "_plugin-vue_export-helper",
+  "_NotificationCenter-CltalS4r.js": {
+    "file": "assets/NotificationCenter-CltalS4r.js",
+    "name": "NotificationCenter",
     "imports": [
-      "_pageBoot-JJzG-QoH.js"
+      "_pageBoot-DyatfnaX.js"
     ]
+  },
+  "__plugin-vue_export-helper-BDNMzG2s.js": {
+    "file": "assets/_plugin-vue_export-helper-BDNMzG2s.js",
+    "name": "_plugin-vue_export-helper"
   },
   "_fonts-BRD9E1vz.css": {
     "file": "assets/fonts-BRD9E1vz.css",
@@ -81,23 +85,15 @@
     "file": "assets/inter-700-normal-Yt3aPRUw.woff2",
     "src": "_inter-700-normal-Yt3aPRUw.woff2"
   },
-  "_pageBoot-JJzG-QoH.js": {
-    "file": "assets/pageBoot-JJzG-QoH.js",
+  "_pageBoot-DyatfnaX.js": {
+    "file": "assets/pageBoot-DyatfnaX.js",
     "name": "pageBoot"
   },
-  "_useStudioThumb-DcSone9p.js": {
-    "file": "assets/useStudioThumb-DcSone9p.js",
-    "name": "useStudioThumb",
-    "imports": [
-      "_pageBoot-JJzG-QoH.js",
-      "__plugin-vue_export-helper-D14J8epx.js"
-    ]
-  },
-  "_useTheme-BhVigILK.js": {
-    "file": "assets/useTheme-BhVigILK.js",
+  "_useTheme-ZGuZUZ_c.js": {
+    "file": "assets/useTheme-ZGuZUZ_c.js",
     "name": "useTheme",
     "imports": [
-      "_pageBoot-JJzG-QoH.js"
+      "_pageBoot-DyatfnaX.js"
     ]
   },
   "resources/css/app.css": {
@@ -110,72 +106,72 @@
     "isEntry": true
   },
   "resources/js/studio/admin.js": {
-    "file": "assets/admin-BPDj_EWL.js",
+    "file": "assets/admin-D4Y2apVN.js",
     "name": "admin",
     "src": "resources/js/studio/admin.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-JJzG-QoH.js",
-      "__plugin-vue_export-helper-D14J8epx.js",
-      "_BaseModal-BUQwEqWH.js"
+      "_pageBoot-DyatfnaX.js",
+      "__plugin-vue_export-helper-BDNMzG2s.js",
+      "_BaseModal-YyZwU310.js"
     ],
     "css": [
-      "assets/admin-gxWTUGGH.css"
+      "assets/admin-DhJRnj7q.css"
     ]
   },
   "resources/js/studio/collections.js": {
-    "file": "assets/collections-CnOUHK84.js",
+    "file": "assets/collections-eZHUmuhQ.js",
     "name": "collections",
     "src": "resources/js/studio/collections.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-JJzG-QoH.js",
-      "__plugin-vue_export-helper-D14J8epx.js",
-      "_useStudioThumb-DcSone9p.js"
+      "_pageBoot-DyatfnaX.js",
+      "_NotificationCenter-CltalS4r.js",
+      "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/collections-BQr6yDD5.css"
+      "assets/collections-BPagBBZv.css"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-DWaw49h2.js",
+    "file": "assets/main-s335vP1M.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-JJzG-QoH.js",
-      "__plugin-vue_export-helper-D14J8epx.js",
-      "_useStudioThumb-DcSone9p.js",
-      "_BaseModal-BUQwEqWH.js",
-      "_useTheme-BhVigILK.js"
+      "_pageBoot-DyatfnaX.js",
+      "_NotificationCenter-CltalS4r.js",
+      "__plugin-vue_export-helper-BDNMzG2s.js",
+      "_BaseModal-YyZwU310.js",
+      "_useTheme-ZGuZUZ_c.js"
     ],
     "css": [
-      "assets/main-DSc9FaCF.css"
+      "assets/main-D0SUe_NN.css"
     ]
   },
   "resources/js/studio/my-settings.js": {
-    "file": "assets/my-settings-UkDa0Ut3.js",
+    "file": "assets/my-settings-D_fIG1Af.js",
     "name": "my-settings",
     "src": "resources/js/studio/my-settings.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-JJzG-QoH.js",
-      "_BaseModal-BUQwEqWH.js",
-      "_useTheme-BhVigILK.js"
+      "_pageBoot-DyatfnaX.js",
+      "_BaseModal-YyZwU310.js",
+      "_useTheme-ZGuZUZ_c.js"
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-_wthNp16.js",
+    "file": "assets/settings-PW6Iyafs.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-JJzG-QoH.js",
-      "__plugin-vue_export-helper-D14J8epx.js",
-      "_BaseModal-BUQwEqWH.js"
+      "_pageBoot-DyatfnaX.js",
+      "__plugin-vue_export-helper-BDNMzG2s.js",
+      "_BaseModal-YyZwU310.js"
     ],
     "css": [
-      "assets/settings-Cq-UI7_2.css"
+      "assets/settings-CAN3dm2B.css"
     ]
   }
 }

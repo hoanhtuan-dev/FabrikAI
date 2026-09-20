@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from './store.js';
+import { toastClientErrors } from './clientErrors.js';
+import NotificationCenter from './components/NotificationCenter.vue';
 import { thumbUrl, onThumbError } from './composables/useStudioThumb.js';
 import GalleryModal from './components/GalleryModal.vue';
 import PromptLibraryTab from './components/PromptLibraryTab.vue';
@@ -8,6 +10,8 @@ import StudioIcon from './components/StudioIcon.vue';
 import { gridClass } from './libraryLayout.js';
 
 const store = useStudioStore();
+// Lỗi trình duyệt hiện kèm mã tra cứu (xem clientErrors.js).
+toastClientErrors((text) => store.toast(text, 'error'));
 
 // embedded: được nhúng trong StudioApp (SPA /studio) thay vì trang riêng /api/library.
 // Khi embedded: wrapper compact (lấp đầy khung studio), không render GalleryModal riêng (StudioApp lo),
@@ -690,5 +694,8 @@ onMounted(async () => {
     </div>
 
     <GalleryModal v-if="store.viewer && !props.embedded" />
+
+    <!-- store.toast() cũng được gọi ở thư viện ⇒ phải có chỗ hiện, nếu không mã tra cứu vô hình. -->
+    <NotificationCenter />
   </div>
 </template>

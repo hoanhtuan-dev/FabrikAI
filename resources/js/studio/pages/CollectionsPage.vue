@@ -18,11 +18,15 @@
  */
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useStudioStore } from '../store.js';
+import { toastClientErrors } from '../clientErrors.js';
+import NotificationCenter from '../components/NotificationCenter.vue';
 import { EXPORT_CHANNELS } from '../exportChannels.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import StudioIcon from '../components/StudioIcon.vue';
 
 const store = useStudioStore();
+// Lỗi trình duyệt hiện kèm mã tra cứu (xem clientErrors.js).
+toastClientErrors((text) => store.toast(text, 'error'));
 
 // ══════════ UI STATE ══════════
 const createOpen = ref(false);
@@ -319,7 +323,7 @@ async function startExport() {
     await store.exportProject(applied.value.id, exportForm.value);
     store.toast('Đã tải gói ZIP về máy.', 'success');
   } catch (e) {
-    store.toast(e.message || 'Lỗi khi tải gói xuất.', 'error');
+    store.failToast(e, 'Lỗi khi tải gói xuất.');
   }
 }
 // ══════════ PHÍM TẮT (chỉ khi khối duyệt mở) ══════════
@@ -847,6 +851,9 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+
+    <!-- store.toast() đã được gọi ở khắp trang này nhưng KHÔNG có chỗ render ⇒ thông báo (kèm mã tra cứu) vô hình. -->
+    <NotificationCenter />
   </div>
 </template>
 

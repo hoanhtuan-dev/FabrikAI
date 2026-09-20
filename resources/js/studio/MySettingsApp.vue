@@ -7,6 +7,7 @@ import FacesSection from './components/settings/FacesSection.vue';
 import StylistSection from './components/settings/StylistSection.vue';
 import AppearanceSection from './components/settings/AppearanceSection.vue';
 import { notify } from './composables/useSettingsToast.js';
+import { toastClientErrors } from './clientErrors.js';
 import { setCatalogErrorHandler } from './composables/useLocalCatalog.js';
 
 /**
@@ -39,6 +40,8 @@ const SECTIONS = [
 // trong useLocalCatalog.js. Nối vào khay thông báo để người dùng BIẾT khi tùy chỉnh không lưu được,
 // thay vì tưởng đã lưu rồi mất dữ liệu.
 setCatalogErrorHandler(notify.err);
+// Lỗi trình duyệt hiện kèm mã tra cứu (xem clientErrors.js).
+toastClientErrors(notify.err);
 
 const section = ref('presets');
 const navOpen = ref(false);   // sidebar dạng ngăn kéo trên màn hình hẹp

@@ -41,6 +41,14 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by((string) $request->ip());
         });
 
+        // [Đợt 21 — 2026-09-23] BÁO LỖI TỪ TRÌNH DUYỆT: endpoint phải MỞ cho cả khách chưa đăng nhập
+        // (lỗi có thể nổ ngay ở trang đăng nhập), nên khoá theo IP là lớp chặn duy nhất. 30 lần/phút
+        // rộng hơn nhu cầu thật rất nhiều (một lần tải trang chỉ gửi tối đa 12 báo cáo) mà vẫn chặn
+        // được việc dùng endpoint để bơm log.
+        RateLimiter::for('client-errors', function (Request $request) {
+            return Limit::perMinute(30)->by('client-errors:'.(string) $request->ip());
+        });
+
         // [Q2 — 2026-09-19] Yêu cầu nâng cấp gói: chống spam gửi yêu cầu (khách bấm nhiều lần / bot).
         // Khoá theo user (đã đăng nhập) — 5 yêu cầu/giờ là quá đủ cho nhu cầu thật.
         RateLimiter::for('upgrade-request', function (Request $request) {

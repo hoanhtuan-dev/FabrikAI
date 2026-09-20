@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue';
 import { useStudioStore } from './store.js';
+import { toastClientErrors } from './clientErrors.js';
 import CollectionsCard from './components/CollectionsCard.vue';
 import SuggestCard from './components/SuggestCard.vue';
 import ConceptCard from './components/ConceptCard.vue';
@@ -41,6 +42,9 @@ import NotificationCenter from './components/NotificationCenter.vue';
 // Delete/nút thùng rác không thấy gì xảy ra, cờ treo lại còn chặn cả phím tắt layer).
 import ConfirmDialog from './components/ConfirmDialog.vue';
 const store = useStudioStore();
+// Lỗi nổ ra ngoài mọi khối try/catch (exception · promise bị từ chối) vẫn phải tới được người dùng
+// KÈM MÃ TRA CỨU — không thì nó chỉ nằm trong console của khách (docs/DESIGN_SYSTEM.md §6.5).
+toastClientErrors((text) => store.toast(text, 'error'));
 
 // [Q3 — 2026-09-19] GÓI THEO MÙA VỤ: mốc mua của gói xưởng là số VỤ (1 vụ = 3 tháng), không phải số
 // tháng. Form yêu cầu nâng cấp đọc mốc + nhãn từ CHÍNH gói đang chọn để không tự bịa đơn vị.

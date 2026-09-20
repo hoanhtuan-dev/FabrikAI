@@ -1578,3 +1578,96 @@ Phần tử **bỏ qua** khi đo (nền là gradient ảnh/khung canvas, không 
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)**: app là SPA, tab đang mở giữ JS cũ nên deploy không tự cập nhật
 > (§14 luật 9). Không tải lại thì vẫn thấy giao diện và cỡ chữ cũ.
+
+## Phiên 2026-09-23 (Đợt 21 — MÃ TRA CỨU LỖI cho lỗi phát sinh CHỈ Ở TRÌNH DUYỆT — món nợ cuối của §6.5)
+
+**Deploy:** `33b4054 → <commit>`. **Không migration mới.** Asset: `app-BqkNcUCi.css` (không đổi) · `main-*.js` + `pageBoot-*.js` (đổi).
+
+### 0. Vấn đề thật (không phải "thiếu tính năng")
+
+Mã tra cứu `L-XXXX` đã có từ Đợt 20, nhưng **chỉ ở lỗi do MÁY CHỦ sinh**. Lỗi người dùng thật hay gặp lại
+sinh ngay **trong trình duyệt**: mất mạng · fetch hỏng · canvas không xuất được blob · hết dung lượng
+localStorage · exception không ai bắt. Nhóm đó **không đi qua controller nào**, nên:
+
+| | Trước | Hệ quả |
+|---|---|---|
+| Câu lỗi hiện ra | "Failed to fetch" (nguyên văn tiếng Anh của trình duyệt) hoặc "Lỗi khi tải gói xuất." | Khách không biết làm gì tiếp, và **không có mã nào để đọc cho tổng đài** |
+| Dấu vết trong `storage/logs/laravel.log` | **Không có dòng nào** | Hỗ trợ không có gì để tra dù khách mô tả đúng lúc nào |
+
+Đo được trong lúc làm: **54 chỗ** gọi `toast(e.message, 'error')` (tro toast lỗi mà không có mã) và **20 chỗ**
+ném lỗi từ phản hồi máy chủ bằng `throw new Error(d.message)` — cách viết này **NÉM BỎ** `error_code` mà
+`studio_fail()` vừa gửi, nên phần lớn lỗi máy chủ cũng hiện ra mà không có mã.
+
+### 1. Hai nguồn sinh lỗi ⇒ hai đường gắn mã
+
+| Nguồn | Ai sinh mã | Ghi ở đâu | Tra bằng |
+|---|---|---|---|
+| Máy chủ | `studio_error_code()` (đã có) | `studio_fail[L-XXXX]` | `grep 'studio_fail\[L-'` |
+| **Trình duyệt (MỚI)** | `newClientCode()` — `resources/js/studio/clientErrors.js` | `client_error[L-XXXX]` qua `POST /api/client-errors` | `grep 'client_error\[L-'` |
+
+Bảng chữ dùng chung, cố ý bỏ `0 O 1 I`: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`. Regex phía máy chủ siết ĐÚNG
+bảng chữ đó (`L-[A-HJ-NP-Z2-9]{4}`) — mã chứa O/I bị từ chối vì hệ thống không bao giờ sinh ra chúng.
+
+### 2. Sáu việc đã làm ở phía trình duyệt
+
+1. **`clientErrors.js`** (mới): sinh mã · gộp trùng theo chữ ký lỗi (một lỗi = một mã = một dòng log) ·
+   trần 12 lần gửi mỗi lần tải trang · **hàng đợi `localStorage`** gửi bù khi mất mạng · bắt
+   `window.onerror` + `unhandledrejection`.
+2. **`pageBoot.js`** bật bộ bắt lỗi ngay khi module được nạp ⇒ **cả 6 entry SPA** đều có (đúng lý do file này
+   tồn tại: "vá một chỗ rồi quên các chỗ tương đương").
+3. **`userFacingError(e, fallback, opts)`** chọn ĐÚNG nguồn mã: ưu tiên `error_code` của máy chủ, chỉ khi
+   lỗi thuần trình duyệt mới tự sinh mã + gửi chi tiết về máy chủ. Thêm `prefix` cho các câu "Không X: <lý do>".
+4. **`failToast(e, fallback)`** (action mới của store) — **54 chỗ** `toast(e.message, 'error')` nay đi qua đây.
+5. **`apiError(payload, fallback, res)`** — **20 chỗ** dựng Error từ phản hồi máy chủ nay **GIỮ `error_code`**
+   (trước đây rơi mất ngay tại dòng `throw`).
+6. **Câu lỗi mạng/DOM của trình duyệt vào danh sách chặn kỹ thuật** (`failed to fetch` · `network error` ·
+   `quotaexceeded` · `securityerror` …) ⇒ khách không còn đọc tiếng Anh nguyên văn; bản gốc đi vào log kèm mã.
+
+### 3. Lỗi phát hiện thêm khi đo (đã sửa): thông báo gọi mà KHÔNG có chỗ hiện
+
+`CollectionsPage.vue` (Bộ sưu tập) và `LibraryApp.vue` (Thư viện) gọi `store.toast(...)` ở **13 chỗ** nhưng
+**không render `<NotificationCenter />`** ⇒ mọi thông báo — kể cả mã tra cứu — **vô hình**. Đây đúng luật 19
+("đặt cờ rồi quên render"). Nay hai shell đã render trung tâm thông báo, và `ClientErrorReportTest` khoá
+bất biến: *shell nào gọi `store.toast()` thì phải render `<NotificationCenter />`*.
+
+### 4. Endpoint nhận báo cáo — ba ràng buộc an toàn
+
+| Ràng buộc | Chi tiết |
+|---|---|
+| Không tin nội dung client gửi | `code` phải đúng định dạng; `message ≤ 500` · `context ≤ 120` · `page ≤ 300` · `userMessage ≤ 200` |
+| Không bơm được log | `throttle:client-errors` 30/phút theo IP + `Cache::add` gộp trùng theo mã trong **10 phút** |
+| Không làm hỏng thêm trải nghiệm | Luôn trả `200 {ok, code, logged}` — không bao giờ echo chi tiết kỹ thuật; **mở cho cả khách chưa đăng nhập** (lỗi có thể nổ ngay ở trang đăng nhập) |
+
+### 5. Đo bằng Chrome thật (chạy tại máy, đăng nhập owner)
+
+| Tình huống | Kết quả đo được |
+|---|---|
+| Lỗi đồng bộ ngoài mọi `try/catch` (`window.onerror`) | Toast: **"Có lỗi xảy ra ngay trong trình duyệt. Hãy tải lại trang (Ctrl+Shift+R) và thử lại. (mã tra cứu: L-SUW5)"** · log: `client_error[L-SUW5]: window.onerror` |
+| Một SPA khác ném lỗi | Toast kèm **L-7G6R** · log `client_error[L-7G6R]: window.onerror` |
+| Promise bị từ chối không ai bắt | Toast kèm **L-7G6R** (gộp trùng đúng: cùng chữ ký ⇒ cùng mã, không gửi lại) |
+| **Mất mạng thật** (chặn `*/export*`, bấm "Tải gói ZIP") | Thẻ lỗi: **"Lỗi khi tải gói xuất. (mã tra cứu: L-3HDW)"** — KHÔNG còn "Failed to fetch"; log: `client_error[L-3HDW]: userFacingError` với `"message":"TypeError: Failed to fetch | at Proxy.exportProject (…pageBoot…js)"` và `"user_message":"Lỗi khi tải gói xuất."` |
+| Hàng đợi khi mất mạng | Chặn `*/api/client-errors*` ⇒ mã vào `localStorage`; mở lại + tải trang ⇒ hàng đợi về **0** (đã gửi bù) |
+| Không còn thẻ trùng | Trước khi sửa: cùng một lỗi hiện **2 thẻ** (nơi gọi + bộ báo lỗi cùng hiện). Sau khi thêm `silent: true`: **1 thẻ** |
+
+### 6. Verify production (đã chạy thật)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `<commit>` (trước pull: `33b4054`) |
+| Migration | **0 pending** |
+| Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` → exit=0 |
+| md5 asset | khớp bản build ở máy (CSS · main · pageBoot) |
+| Route mới | `POST /api/client-errors` → **200** khi gửi mã hợp lệ; **422** với mã sai định dạng; **429** khi quá 30/phút |
+| Log production | `client_error[L-XXXX]` có mặt trong `storage/logs/laravel.log` sau khi gửi thử |
+| Trang | `/` · `/dang-nhap` · `/bang-gia` → 200; các trang sau đăng nhập → 302 · `production.ERROR` không tăng |
+| Hàng đợi | `failed_jobs` = 0 |
+
+### 7. Bài học (đã thành luật §14)
+
+- **Luật 47:** mã tra cứu phải có ở **cả hai phía sinh lỗi** — thiếu một phía là mất một nửa dấu vết.
+- **Luật 48:** **không được ném bỏ dữ liệu chẩn đoán trên đường về** (`throw new Error(d.message)` làm rơi
+  `error_code`); phải đo ở ĐẦU CUỐI của chuỗi (câu người dùng đọc), không phải ở chỗ mình vừa viết.
+
+**Test:** full suite **866 test / 6.412 assert XANH** (thêm **12 test** ở `ClientErrorReportTest`) · `npm run build` exit 0.
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).

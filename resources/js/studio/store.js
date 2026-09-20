@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
+import { reportClientError } from './clientErrors.js';
 
 const CSRF = () => {
   // Standalone SPA: Laravel đặt cookie XSRF-TOKEN (đã mã hoá) sau request GET đầu tiên (/api/boot).
@@ -18,6 +19,21 @@ function bootProjectStatuses() {
   return (readBoot() && readBoot().project_statuses) || null;
 }
 
+
+/**
+ * Lỗi dựng từ MỘT PHẢN HỒI MÁY CHỦ — GIỮ LẠI mã tra cứu.
+ *
+ * Vì sao có hàm này: các chỗ cũ viết `throw new Error(d.message || '…')` nên `d.error_code` (mã tra cứu
+ * mà studio_fail vừa gửi) bị NÉM BỎ ngay tại đó — kết quả là phần lớn lỗi máy chủ hiện ra giao diện
+ * KHÔNG có mã, dù log phía máy chủ có mã. Dùng hàm này ở mọi chỗ biến phản hồi lỗi thành Error.
+ */
+export function apiError(payload, fallback, res) {
+  const msg = (payload && payload.message) || fallback || ('HTTP ' + ((res && res.status) || '?'));
+  const err = new Error(msg);
+  if (payload && payload.error_code) err.error_code = payload.error_code;
+  if (res && res.status) err.status = res.status;
+  return err;
+}
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    CHẶN RÒ RỈ CHI TIẾT KỸ THUẬT RA GIAO DIỆN — luật đầy đủ ở docs/DESIGN_SYSTEM.md §6.
@@ -42,6 +58,11 @@ const TECH_LEAK = new RegExp([
   '\\/api\\/|\\/home\\/|\\/var\\/www|\\.php\\b',
   'API key|api_key|quota|rate limit|timeout|ECONN|ETIMEDOUT',
   '\\bundefined\\b|\\bnull\\b|\\bNaN\\b',
+  // [Đợt 21 — 2026-09-23] Câu lỗi MẠNG/DOM do chính trình duyệt sinh cũng là chi tiết kỹ thuật: trước đây
+  // người dùng đọc nguyên "Failed to fetch" (tiếng Anh, không nói phải làm gì). Nay câu đó bị thay bằng
+  // câu hướng dẫn, còn bản gốc đi vào log kèm mã tra cứu (clientErrors.js).
+  'failed to fetch|network ?error|network request failed|load failed|aborterror|the operation was aborted',
+  'quotaexceeded|securityerror|invalidstateerror|notallowederror|indexsizeerror|encodingerror',
 ].join('|'), 'i');
 
 /** Ghi chi tiết kỹ thuật ra console (chỉ lập trình viên thấy) kèm ngữ cảnh. */
@@ -64,17 +85,33 @@ export function safeMessage(text, fallback = '') {
   return raw;
 }
 
-/** Bắt lỗi ở mọi action: trả câu hướng người dùng, KHÔNG bao giờ trả `e.message` thô. */
-export function userFacingError(e, fallback) {
+/** Câu đã mang mã tra cứu rồi (một lớp trước đã gắn) — không gắn thêm mã thứ hai. */
+const LOOKUP_SUFFIX = /\(mã tra cứu: L-[A-Z0-9]{4}\)/;
+
+/**
+ * Bắt lỗi ở mọi action: trả câu hướng người dùng, KHÔNG bao giờ trả `e.message` thô.
+ *
+ * Mã tra cứu (§6.5): có HAI nguồn và hàm này chọn đúng nguồn.
+ *   · Lỗi MÁY CHỦ ⇒ dùng `error_code` server gửi kèm (studio_fail → mã đã có trong laravel.log).
+ *   · Lỗi sinh NGAY TRONG TRÌNH DUYỆT (mất mạng · fetch hỏng · canvas/Blob · exception không ai bắt)
+ *     ⇒ KHÔNG có mã nào từ server, nên ta tự sinh mã rồi gửi chi tiết về /api/client-errors để máy chủ
+ *     ghi log (clientErrors.js). Trước 2026-09-23 nhóm lỗi này hiện ra mà không có mã nào để tra.
+ *
+ * @param {*} e            lỗi bắt được
+ * @param {string} fallback câu thay thế khi câu gốc là chi tiết kỹ thuật
+ * @param {{prefix?: string, context?: string}} opts  tiền tố ngữ cảnh ('Không thu hồi được') + ngữ cảnh log
+ */
+export function userFacingError(e, fallback, opts) {
+  const options = opts || {};
   const raw = (e && (e.message || e.error || e.statusText)) || '';
   const clean = safeMessage(raw, '');
-  // Mã tra cứu do server trả về (studio_fail → error_code): gắn vào câu hiển thị để khách đọc cho
-  // tổng đài, và hỗ trợ grep được trong storage/logs/laravel.log. Vẫn KHÔNG lộ chi tiết kỹ thuật.
-  const code = (e && (e.error_code || (e.response && e.response.error_code))) || '';
-  const withCode = (text) => (code && text ? text + ' (mã tra cứu: ' + code + ')' : text);
-  if (clean) return withCode(clean);
-  if (raw) logTechnical('error-blocked', raw);
-  return withCode(fallback);
+  const prefix = options.prefix ? String(options.prefix) + ': ' : '';
+  const body = clean ? prefix + clean : (fallback || '');
+  if (!clean && raw) logTechnical('error-blocked', raw);
+  if (LOOKUP_SUFFIX.test(body)) return body;
+  const serverCode = (e && (e.error_code || (e.response && e.response.error_code))) || '';
+  const code = serverCode || reportClientError(e || new Error(body || 'unknown'), options.context || 'userFacingError', { userMessage: body, silent: true });
+  return code && body ? body + ' (mã tra cứu: ' + code + ')' : body;
 }
 
 /**
@@ -715,7 +752,7 @@ export const useStudioStore = defineStore('studio', {
         this.toast(d.message || ('Đã thêm ' + (d.member?.name || '') + ' vào nhóm.'), 'success');
         return d;
       } catch (e) {
-        this.toast(e.message || 'Không thêm được thành viên.', 'error');
+        this.failToast(e, 'Không thêm được thành viên.');
         return null;
       } finally { this.teamBusy = false; }
     },
@@ -730,7 +767,7 @@ export const useStudioStore = defineStore('studio', {
         this.toast(d.message || 'Đã bỏ thành viên khỏi nhóm.', 'info');
         return d;
       } catch (e) {
-        this.toast(e.message || 'Không bỏ được thành viên.', 'error');
+        this.failToast(e, 'Không bỏ được thành viên.');
         return null;
       } finally { this.teamBusy = false; }
     },
@@ -756,7 +793,7 @@ export const useStudioStore = defineStore('studio', {
         this.toast(d.message || ('Đã gửi yêu cầu ' + (d.request?.code || '')), d.reused ? 'info' : 'success');
         return d;
       } catch (e) {
-        this.toast(e.message || 'Không gửi được yêu cầu nâng cấp.', 'error');
+        this.failToast(e, 'Không gửi được yêu cầu nâng cấp.');
         return null;
       } finally {
         this.upgradeBusy = false;
@@ -781,12 +818,12 @@ export const useStudioStore = defineStore('studio', {
             this.openUpgrade(plan || { id: planId });
             return;
           }
-          throw new Error(d.message || ('HTTP ' + res.status));
+          throw apiError(d, null, res);
         }
         await this.loadPlanStatus(true);
         this.toast('Đã chuyển sang gói ' + ((d.plan && d.plan.name) || ''), 'info');
       } catch (e) {
-        this.toast('Không đổi được gói: ' + e.message, 'error');
+        this.failToast(e, 'Không đổi được gói.', { prefix: 'Không đổi được gói' });
       }
       this.planBusy = false;
     },
@@ -821,6 +858,17 @@ export const useStudioStore = defineStore('studio', {
       const allowed = this.modulesStatus.filter((m) => m.allowed).length;
       return { allowed, total };
     },
+    /**
+     * Hiển thị lỗi BẮT ĐƯỢC từ một exception: câu người dùng hiểu + MÃ TRA CỨU.
+     *
+     * Vì sao cần: trước đây các khối catch gọi thẳng `this.toast(e.message, 'error')` nên câu hiện ra
+     * KHÔNG có mã tra cứu — khách đọc cho tổng đài thì hỗ trợ không tra được gì. Mọi chỗ hiển thị lỗi từ
+     * exception phải đi qua đây (test ClientErrorReportTest khoá bất biến này).
+     */
+    failToast(e, fallback, opts = {}) {
+      this.toast(userFacingError(e, fallback, opts), 'error', opts);
+    },
+
     toast(msg, type = 'info', opts = {}) {
       // ── CỬA CHẶN CUỐI CÙNG (docs/DESIGN_SYSTEM.md §6) ────────────────────────────────────
       // Mọi thông báo đều đi qua đây, nên đây là chỗ DUY NHẤT bảo đảm không có câu nào lọt ra
@@ -990,7 +1038,7 @@ export const useStudioStore = defineStore('studio', {
       const res = await fetch('/api/projects/' + id + '/export' + (q.toString() ? '?' + q.toString() : ''), { headers: { Accept: 'application/zip' } });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Không tạo được gói xuất (' + res.status + ').');
+        throw apiError(err, 'Không tạo được gói xuất (' + res.status + ').');
       }
       const blob = await res.blob();
       const cd = res.headers.get('Content-Disposition') || '';
@@ -1144,7 +1192,7 @@ export const useStudioStore = defineStore('studio', {
         this.generatedCount = items.length;
         this.syncBatchProgress();
         items.forEach((it) => { if (it.generation_id) this.pollGeneration(it.generation_id); });
-      } catch (e) { this.toast(e.message || 'Lỗi tạo ảnh.', 'error'); }
+      } catch (e) { this.failToast(e, 'Lỗi tạo ảnh.'); }
       finally {
         this.generating = false;
       }
@@ -1166,7 +1214,7 @@ export const useStudioStore = defineStore('studio', {
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
         if (process) this.processQueue();
         return items;
-      } catch (e) { this.toast(e.message || 'Lỗi tạo lại ảnh.', 'error'); return null; }
+      } catch (e) { this.failToast(e, 'Lỗi tạo lại ảnh.'); return null; }
     },
     // i2i — Tạo ẢNH MỚI từ ảnh tham chiếu (card "Tạo ảnh mới từ ảnh mẫu", mode='refgen').
     // KHÁC reimagine/edit: dùng model SINH ẢNH (mặc định qwen-image-3.0-pro) + ảnh tham chiếu
@@ -1210,7 +1258,7 @@ export const useStudioStore = defineStore('studio', {
         // processQueue chỉ refresh /api/latest nên kết quả pending sẽ kẹt ở Output mà không lên canvas.
         items.forEach((it) => { if (it.generation_id && it.status !== 'completed') this.pollGeneration(it.generation_id); });
         return items;
-      } catch (e) { this.toast(e.message || 'Lỗi tạo ảnh từ ảnh mẫu.', 'error'); return null; }
+      } catch (e) { this.failToast(e, 'Lỗi tạo ảnh từ ảnh mẫu.'); return null; }
     },
     // ── STUDIO: dựng khung hình từ ẢNH NGƯỜI MẪU + BỐI CẢNH + PROMPT + CHIP NHANH ───────────
     // Chip nhanh đọc từ PRESET trong "Cài đặt của tôi" (backend ghép bản dùng chung ⊕ bản riêng của
@@ -1441,7 +1489,7 @@ export const useStudioStore = defineStore('studio', {
           project_id: this.appliedProjectId(),
         });
         this.addGen({ id: d.generation_id, type: 'video', status: d.status || 'processing', model: d.model || this.videoModel, provider: d.provider || 'video', media_url: d.media_url || null, error: null, credits_cost: d.credits_cost || 10, created_at: 'Vừa gửi' });
-      } catch (e) { this.toast(e.message || 'Lỗi render video.', 'error'); }
+      } catch (e) { this.failToast(e, 'Lỗi render video.'); }
       finally { this.videoBusy = false; }
     },
     // Đọc preset "Kịch bản quay" (video_scene) đang chọn từ danh sách nạp ở Cài đặt → Prompt Templates.
@@ -1681,7 +1729,7 @@ export const useStudioStore = defineStore('studio', {
         const d = await this.api('/api/reframe', { image: this.upscaleSrc, ratio: this.reframeRatio, ...this.projectField() });
         this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'reframe', provider: 'reframe', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa cắt' });
         this.toast('Đã cắt giữa ' + this.reframeRatio + '.');
-      } catch (e) { this.toast(e.message || 'Lỗi cắt.', 'error'); }
+      } catch (e) { this.failToast(e, 'Lỗi cắt.'); }
       finally { this.reframing = false; }
     },
     async applyFilmLook() {
@@ -1691,7 +1739,7 @@ export const useStudioStore = defineStore('studio', {
         const d = await this.api('/api/look', { image: this.upscaleSrc, look: this.lookPreset, level: Number(this.lookLevel) || 5, ...this.projectField() });
         this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'look', provider: 'look', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa áp dụng' });
         this.toast('Đã áp dụng Look ' + this.lookPreset + '.');
-      } catch (e) { this.toast(e.message || 'Lỗi áp dụng Look.', 'error'); }
+      } catch (e) { this.failToast(e, 'Lỗi áp dụng Look.'); }
       finally { this.looking = false; }
     },
     upscaleCfg() { return { scale: this.upscaleScale, refine: this.upscaleRefine, vibrance: this.vibrance }; },
@@ -1789,12 +1837,12 @@ export const useStudioStore = defineStore('studio', {
         const d = ct.includes('application/json') ? await r.json().catch(() => ({})) : {};
         // Redirect về trang login (chưa đăng nhập/hết phiên) trả HTML 200 — phải coi là THẤT BẠI
         // để không báo "Đã xóa" trong khi server thực tế chưa xóa.
-        if (!r.ok || r.redirected || !ct.includes('application/json')) throw new Error(d.message || 'Không xóa được — hãy tải lại trang và thử lại.');
+        if (!r.ok || r.redirected || !ct.includes('application/json')) throw apiError(d, 'Không xóa được — hãy tải lại trang và thử lại.');
         this._removeGenLocal(g);
         this.toast('Đã xóa.');
         return true;
       }
-      catch (e) { this.toast(e.message || 'Lỗi xóa.', 'error'); return false; }
+      catch (e) { this.failToast(e, 'Lỗi xóa.'); return false; }
     },
     // Gỡ generation khỏi store + layer canvas liên quan (dùng chung cho xóa server & xóa cục bộ).
     _removeGenLocal(g) {
@@ -1823,7 +1871,7 @@ export const useStudioStore = defineStore('studio', {
       const res = await fetch(url, opts);
       const d = await res.json().catch(() => ({}));
       if (!res.ok || res.redirected || !(res.headers.get('content-type') || '').includes('application/json')) {
-        throw new Error(d.message || 'Có lỗi xảy ra.');
+        throw apiError(d, 'Có lỗi xảy ra.');
       }
       return d;
     },
@@ -1848,7 +1896,7 @@ export const useStudioStore = defineStore('studio', {
         this.libraryStats = { ...(this.libraryStats || {}), ...(d.stats || {}) };
         this.libraryHasMore = !!d.has_more;
         this.libraryFilters.page = d.current_page || (this.libraryFilters.page + 1);
-      } catch (e) { this.toast(e.message || 'Không tải được thư viện.', 'error'); }
+      } catch (e) { this.failToast(e, 'Không tải được thư viện.'); }
       finally { this.libraryLoading = false; }
     },
     async loadMoreLibrary() {
@@ -1877,7 +1925,7 @@ export const useStudioStore = defineStore('studio', {
           orphan_bytes: d.orphans?.bytes ?? 0,
         };
         return d;
-      } catch (e) { this.toast(e.message || 'Không quét được thư viện.', 'error'); return null; }
+      } catch (e) { this.failToast(e, 'Không quét được thư viện.'); return null; }
       finally { this.libraryScanning = false; }
     },
     toggleLibrarySelect(id) {
@@ -1921,7 +1969,7 @@ export const useStudioStore = defineStore('studio', {
         this.toast('Đã xóa ' + (d.deleted || 0) + ' mục · giải phóng ' + this.formatBytes(d.freed_bytes || 0) + '.');
         await this.loadLibrary(true);
         return true;
-      } catch (e) { this.toast(e.message || 'Lỗi xóa hàng loạt.', 'error'); return false; }
+      } catch (e) { this.failToast(e, 'Lỗi xóa hàng loạt.'); return false; }
       finally { this.libraryCleaning = false; }
     },
     async libraryCleanup(scope) {
@@ -1934,7 +1982,7 @@ export const useStudioStore = defineStore('studio', {
         await this.loadLibrary(true);
         await this.refreshLibraryScan();
         return true;
-      } catch (e) { this.toast(e.message || 'Lỗi dọn dẹp.', 'error'); return false; }
+      } catch (e) { this.failToast(e, 'Lỗi dọn dẹp.'); return false; }
       finally { this.libraryCleaning = false; }
     },
     formatBytes(bytes) {
@@ -1952,7 +2000,7 @@ export const useStudioStore = defineStore('studio', {
         const d = await this._libraryFetch('/api/uploads');
         this.uploadItems = Array.isArray(d.items) ? d.items : [];
         this.uploadStats = d.stats || null;
-      } catch (e) { this.toast(e.message || 'Không tải được danh sách file.', 'error'); }
+      } catch (e) { this.failToast(e, 'Không tải được danh sách file.'); }
       finally { this.uploadLoading = false; }
     },
     /**
@@ -1973,7 +2021,7 @@ export const useStudioStore = defineStore('studio', {
         if (it) it.project_id = (d && d.project_id != null) ? d.project_id : null;
         this.toast(action === 'detach' ? 'Đã bỏ ảnh khỏi bộ sưu tập.' : 'Đã gắn ảnh vào bộ sưu tập.');
         return true;
-      } catch (e) { this.toast(e.message || 'Không gắn được ảnh vào bộ sưu tập.', 'error'); return false; }
+      } catch (e) { this.failToast(e, 'Không gắn được ảnh vào bộ sưu tập.'); return false; }
     },
     toggleUploadSelect(rel) {
       const i = this.uploadSelection.indexOf(rel);
@@ -1995,7 +2043,7 @@ export const useStudioStore = defineStore('studio', {
         this.toast('Đã xóa ' + (d.deleted || 0) + ' file · giải phóng ' + this.formatBytes(d.freed_bytes || 0) + '.');
         await this.loadUploads();
         return true;
-      } catch (e) { this.toast(e.message || 'Lỗi xóa file.', 'error'); return false; }
+      } catch (e) { this.failToast(e, 'Lỗi xóa file.'); return false; }
       finally { this.uploadCleaning = false; }
     },
     async deleteUpload(rel) {
@@ -2008,7 +2056,7 @@ export const useStudioStore = defineStore('studio', {
         this.toast('Đã xóa ' + (d.deleted || 0) + ' file · giải phóng ' + this.formatBytes(d.freed_bytes || 0) + '.');
         await this.loadUploads();
         return true;
-      } catch (e) { this.toast(e.message || 'Lỗi xóa file.', 'error'); return false; }
+      } catch (e) { this.failToast(e, 'Lỗi xóa file.'); return false; }
       finally { this.uploadCleaning = false; }
     },
     async uploadCleanup() {
@@ -2020,7 +2068,7 @@ export const useStudioStore = defineStore('studio', {
         this.toast('Đã dọn xong · giải phóng ' + this.formatBytes(d.freed_bytes || 0) + '.');
         await this.loadUploads();
         return true;
-      } catch (e) { this.toast(e.message || 'Lỗi dọn dẹp.', 'error'); return false; }
+      } catch (e) { this.failToast(e, 'Lỗi dọn dẹp.'); return false; }
       finally { this.uploadCleaning = false; }
     },
     // ── Thư viện Prompt phân tích ( Gợi ý từ ảnh) — kế thừa pattern từ libraryItems ──
@@ -2044,7 +2092,7 @@ export const useStudioStore = defineStore('studio', {
         this.suggestLibStats = data.stats || null;
         this.suggestLibHasMore = data.has_more || false;
         this.suggestLibFilters.page = data.current_page || 1;
-      } catch (e) { this.toast(e.message || 'Lỗi tải thư viện prompt.', 'error'); }
+      } catch (e) { this.failToast(e, 'Lỗi tải thư viện prompt.'); }
       finally { this.suggestLibLoading = false; }
     },
     setSuggestLibFilter(key, value) {
@@ -2089,12 +2137,12 @@ export const useStudioStore = defineStore('studio', {
           body: JSON.stringify({ ids }),
         });
         const d = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(d.message || 'Lỗi xóa.');
+        if (!res.ok) throw apiError(d, 'Lỗi xóa.');
         this.suggestLibSelection = [];
         this.toast('Đã xóa ' + (d.deleted || 0) + ' prompt.');
         await this.loadSuggestLib(true);
         return true;
-      } catch (e) { this.toast(e.message || 'Lỗi xóa prompt.', 'error'); return false; }
+      } catch (e) { this.failToast(e, 'Lỗi xóa prompt.'); return false; }
     },
     // ── CRUD prompt trong Thư viện Prompt (thêm / sửa / xóa đơn lẻ) ──
     async savePrompt(payload) {
@@ -2103,7 +2151,7 @@ export const useStudioStore = defineStore('studio', {
         this.toast('Đã thêm prompt vào Thư viện Prompt.');
         await this.loadSuggestLib(true);
         return d;
-      } catch (e) { this.toast(e.message || 'Lỗi thêm prompt.', 'error'); return null; }
+      } catch (e) { this.failToast(e, 'Lỗi thêm prompt.'); return null; }
     },
     async updatePrompt(id, payload) {
       try {
@@ -2113,11 +2161,11 @@ export const useStudioStore = defineStore('studio', {
           body: JSON.stringify(payload),
         });
         const d = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(d.message || 'Lỗi cập nhật.');
+        if (!res.ok) throw apiError(d, 'Lỗi cập nhật.');
         this.toast('Đã cập nhật prompt.');
         await this.loadSuggestLib(true);
         return d;
-      } catch (e) { this.toast(e.message || 'Lỗi cập nhật prompt.', 'error'); return null; }
+      } catch (e) { this.failToast(e, 'Lỗi cập nhật prompt.'); return null; }
     },
     async deletePrompt(id) {
       try {
@@ -2126,12 +2174,12 @@ export const useStudioStore = defineStore('studio', {
           headers: { 'X-XSRF-TOKEN': CSRF(), Accept: 'application/json' },
         });
         const d = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(d.message || 'Lỗi xóa.');
+        if (!res.ok) throw apiError(d, 'Lỗi xóa.');
         this.suggestLibSelection = this.suggestLibSelection.filter(x => x !== id);
         this.toast('Đã xóa prompt.');
         await this.loadSuggestLib(true);
         return true;
-      } catch (e) { this.toast(e.message || 'Lỗi xóa prompt.', 'error'); return false; }
+      } catch (e) { this.failToast(e, 'Lỗi xóa prompt.'); return false; }
     },
     async saveSuggestResult() {
       if (!this.suggestResult || !this.suggestResult.image_prompt_en) {
@@ -2155,10 +2203,10 @@ export const useStudioStore = defineStore('studio', {
           body: JSON.stringify(body),
         });
         const d = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(d.message || 'Lỗi lưu.');
+        if (!res.ok) throw apiError(d, 'Lỗi lưu.');
         this.toast('Đã lưu prompt vào Thư viện Prompt.');
         this.loadSuggestRecent();   // danh sách 'gần đây' trong card cập nhật ngay
-      } catch (e) { this.toast(e.message || 'Lỗi lưu prompt.', 'error'); }
+      } catch (e) { this.failToast(e, 'Lỗi lưu prompt.'); }
       finally { this.suggestSaving = false; }
     },
     async applySuggestPrompt(item) {
@@ -2218,7 +2266,7 @@ export const useStudioStore = defineStore('studio', {
         this.projectLoaded = true;
         return this.projects;
       } catch (e) {
-        this.toast(e.message || 'Không tải được dự án.', 'error');
+        this.failToast(e, 'Không tải được dự án.');
         return this.projects;
       } finally {
         this.projectLoading = false;
@@ -2231,14 +2279,14 @@ export const useStudioStore = defineStore('studio', {
       this.activeProjectReviewOnly = !!opts.reviewOnly;
       try {
         const res = await fetch('/api/projects/' + id, { headers: { Accept: 'application/json' } });
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Không tải được dự án.');
+        if (!res.ok) throw apiError(await res.json().catch(() => ({})), 'Không tải được dự án.');
         const d = await res.json();
         this.activeProject = d;
         this.activeProjectGenerations = d.generations || [];
         // Mở dự án của mình = đang làm việc trên nó → tự ÁP DỤNG cho phiên tạo ảnh/video.
         if (!this.activeProjectReviewOnly) this.appliedProject = d;
         return d;
-      } catch (e) { this.toast(e.message || 'Lỗi tải dự án.', 'error'); return null; }
+      } catch (e) { this.failToast(e, 'Lỗi tải dự án.'); return null; }
     },
     // ── Chia sẻ bộ sưu tập cho khách duyệt (Đợt 4) ────────────────────────────────────────
     // Card trong sidebar KHÔNG tự gọi API (bất biến: một đường dữ liệu đi qua store) — ba action dưới
@@ -2249,7 +2297,7 @@ export const useStudioStore = defineStore('studio', {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return await r.json();
       } catch (e) {
-        this.toast('Không tải được trạng thái chia sẻ: ' + e.message, 'error');
+        this.failToast(e, 'Không tải được trạng thái chia sẻ.', { prefix: 'Không tải được trạng thái chia sẻ' });
         return null;
       }
     },
@@ -2259,7 +2307,7 @@ export const useStudioStore = defineStore('studio', {
         await navigator.clipboard?.writeText(d.url).then(() => this.toast('Đã tạo link chia sẻ và copy vào bộ nhớ tạm.')).catch(() => this.toast('Đã tạo link chia sẻ — bấm «Copy link» để lấy.'));
         return d;
       } catch (e) {
-        this.toast('Không tạo được link: ' + e.message, 'error');
+        this.failToast(e, 'Không tạo được link.', { prefix: 'Không tạo được link' });
         return null;
       }
     },
@@ -2269,7 +2317,7 @@ export const useStudioStore = defineStore('studio', {
         this.toast('Đã thu hồi link — khách mở lại sẽ không xem được nữa.');
         return true;
       } catch (e) {
-        this.toast('Không thu hồi được: ' + e.message, 'error');
+        this.failToast(e, 'Không thu hồi được.', { prefix: 'Không thu hồi được' });
         return false;
       }
     },
@@ -2346,7 +2394,7 @@ export const useStudioStore = defineStore('studio', {
         }
         return d;
       } catch (e) {
-        this.toast('Không duyệt được: ' + e.message, 'error');
+        this.failToast(e, 'Không duyệt được.', { prefix: 'Không duyệt được' });
         return null;
       }
     },
@@ -2602,7 +2650,7 @@ export const useStudioStore = defineStore('studio', {
         this.projects.unshift(d);
         this.toast('Đã tạo dự án "' + d.name + '".');
         return d;
-      } catch (e) { this.toast(e.message || 'Lỗi tạo dự án.', 'error'); return null; }
+      } catch (e) { this.failToast(e, 'Lỗi tạo dự án.'); return null; }
     },
     async updateProject(id, payload) {
       try {
@@ -2612,7 +2660,7 @@ export const useStudioStore = defineStore('studio', {
         if (this.activeProject && this.activeProject.id === id) this.activeProject = d;
         this.toast('Đã cập nhật dự án.');
         return d;
-      } catch (e) { this.toast(e.message || 'Lỗi cập nhật.', 'error'); return null; }
+      } catch (e) { this.failToast(e, 'Lỗi cập nhật.'); return null; }
     },
     async deleteProject(id) {
       try {
@@ -2622,7 +2670,7 @@ export const useStudioStore = defineStore('studio', {
         if (this.appliedProject && this.appliedProject.id === id) this.appliedProject = null;
         this.toast('Đã xóa dự án (output được giữ lại).');
         return true;
-      } catch (e) { this.toast(e.message || 'Lỗi xóa dự án.', 'error'); return false; }
+      } catch (e) { this.failToast(e, 'Lỗi xóa dự án.'); return false; }
     },
     async transitionProject(id, to, note = '') {
       try {
@@ -2632,7 +2680,7 @@ export const useStudioStore = defineStore('studio', {
         if (this.activeProject && this.activeProject.id === id) this.activeProject = d;
         this.toast('Dự án → ' + (d.status_label || d.status) + '.');
         return d;
-      } catch (e) { this.toast(e.message || 'Không thể chuyển trạng thái.', 'error'); return null; }
+      } catch (e) { this.failToast(e, 'Không thể chuyển trạng thái.'); return null; }
     },
     // Gắn/gỡ 1 HOẶC NHIỀU generation khỏi dự án + ĐỒNG BỘ mọi state liên quan (library, outputs
     // Studio, workspace đang mở, bộ đếm) — một nơi duy nhất để UI gọi.
@@ -2682,7 +2730,7 @@ export const useStudioStore = defineStore('studio', {
           }
         }
         return { ok: true, changed, failed };
-      } catch (e) { this.toast(e.message || 'Lỗi gắn ảnh.', 'error'); return { ok: false, changed: 0, failed: ids.length }; }
+      } catch (e) { this.failToast(e, 'Lỗi gắn ảnh.'); return { ok: false, changed: 0, failed: ids.length }; }
     },
     // id dự án đang được ÁP DỤNG cho phiên tạo ảnh/video (Dự án hiện tại).
     // Tách khỏi activeProject: áp dụng tồn tại độc lập, không mất khi đóng workspace.
@@ -2876,9 +2924,9 @@ export const useStudioStore = defineStore('studio', {
           if (pid) fd.append('project_id', String(pid));
           const res = await fetch('/api/layers/save', { method: 'POST', headers: { 'X-XSRF-TOKEN': CSRF(), Accept: 'application/json' }, body: fd });
           d = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(d.message || 'Không lưu được.');
+          if (!res.ok) throw apiError(d, 'Không lưu được.');
         }
-        if (!d || !d.generation_id) throw new Error((d && d.message) || 'Không lưu được.');
+        if (!d || !d.generation_id) throw apiError(d, 'Không lưu được.');
         // Bản ghi THẬT (id trong CSDL) ⇒ ảnh vào được Thư viện và còn nguyên sau khi tải lại trang.
         // Dùng unshift trực tiếp thay vì addGen: addGen đẩy thêm một layer canvas nữa, mà layer đang lưu
         // đã có sẵn trên canvas rồi (sẽ thành hai layer trùng nhau).
@@ -2893,7 +2941,7 @@ export const useStudioStore = defineStore('studio', {
         // nên nếu không đánh dấu thì người dùng vẫn thấy nút sáng và bấm lại sẽ tạo bản trùng).
         l.savedOutputId = d.generation_id;
         this.toast('Đã lưu layer vào Output và Thư viện.');
-      } catch (e) { this.toast(e.message || 'Không lưu được.', 'error'); }
+      } catch (e) { this.failToast(e, 'Không lưu được.'); }
     },
     // Đo kích thước thật của ảnh rồi xếp theo flow: hàng ngang (có gap), tự xuống hàng khi quá rộng.
     _positionByImageSize(id, image) {
@@ -3813,7 +3861,7 @@ export const useStudioStore = defineStore('studio', {
         a.click();
         a.remove();
         this.toast('Đã xuất ảnh gộp.');
-      } catch (e) { this.toast(e.message || 'Không gộp được.', 'error'); }
+      } catch (e) { this.failToast(e, 'Không gộp được.'); }
     },
     // Gộp layer thành 1 layer mới (upload lên server để lưu lâu dài).
     async flattenToLayer() {
@@ -3824,12 +3872,12 @@ export const useStudioStore = defineStore('studio', {
         fd.append('image', new File([blob], 'composite.png', { type: 'image/png' }));
         const res = await fetch('/api/upload-ref', { method: 'POST', headers: { 'X-XSRF-TOKEN': CSRF(), Accept: 'application/json' }, body: fd });
         const d = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(d.message || 'Không gộp được.');
+        if (!res.ok) throw apiError(d, 'Không gộp được.');
         const id = 'flat-' + Date.now();
         this.pushCanvasLayer(id, 'source', 'Gộp layer', d.url);
         this.setActiveLayer(id);
         this.toast('Đã gộp layer thành ảnh mới.');
-      } catch (e) { this.toast(e.message || 'Không gộp được.', 'error'); }
+      } catch (e) { this.failToast(e, 'Không gộp được.'); }
     },
     // Tên hiển thị của một generation (dùng tên tuỳ chỉnh nếu có, ngược lại "Ảnh #id").
     genName(g) { return (g && g.meta && g.meta.name) ? g.meta.name : (g ? 'Ảnh #' + g.id : 'Ảnh'); },
@@ -4068,7 +4116,7 @@ export const useStudioStore = defineStore('studio', {
         if (!text) { this.toast('Máy dịch không trả nội dung — thử lại.', 'error'); return; }
         this.suggestResult.prompt_vi = text;
         this.toast('Đã dịch sang tiếng Việt.');
-      } catch (e) { this.toast(e.message || 'Lỗi dịch.', 'error'); }
+      } catch (e) { this.failToast(e, 'Lỗi dịch.'); }
     },
     async suggestStyle(image) {
       if (!this.suggestEnabled) { this.toast('Tính năng "Gợi ý từ ảnh" đang bị tắt trong cài đặt.', 'error'); return; }
@@ -4090,7 +4138,7 @@ export const useStudioStore = defineStore('studio', {
         const extras = [styles, d.garment_type, d.background].filter(Boolean).join(' · ');
         this.toast(extras ? 'Đã gợi ý: ' + extras : 'Đã gợi ý.');
       }
-      catch(e){ this.toast(e.message || 'Lỗi gợi ý.', 'error'); }
+      catch(e){ this.failToast(e, 'Lỗi gợi ý.'); }
       finally { this.suggesting = false; }
     },
     /** Payload chung cho cả đường JSON và đường stream của "Gợi ý từ ảnh". */
@@ -4139,7 +4187,7 @@ export const useStudioStore = defineStore('studio', {
         if (!res.ok || !res.body || !res.body.getReader) {
           // Lỗi trước khi stream (422 ảnh không đọc được, tính năng tắt…) hoặc không có ReadableStream.
           const d = await res.clone?.().json?.().catch(() => ({})) ?? {};
-          if (!res.ok && d && d.message) throw new Error(d.message);
+          if (!res.ok && d && d.message) throw apiError(d, 'Lỗi hệ thống, vui lòng thử lại.');
           return await this.suggestStyle(image); // đường JSON cũ
         }
 
@@ -4377,7 +4425,7 @@ export const useStudioStore = defineStore('studio', {
         }
         // Endpoint source-agnostic: nhận ẢNH BẤT KỲ (không phụ thuộc generation cha của Outputs).
         const d = await this.api('/api/inpaint', body);
-        if (!d.generation_id) { throw new Error(d.message || 'Không tạo được yêu cầu sửa ảnh.'); }
+        if (!d.generation_id) { throw apiError(d, 'Không tạo được yêu cầu sửa ảnh.'); }
         this.inpaintGenId = d.generation_id;
         this.inpaintStage = 'processing';
         this.addGen({ id: d.generation_id, type: 'image', status: d.status || 'pending', model: d.model || 'inpaint', provider: d.provider || 'qwen', media_url: d.media_url, error: d.error, credits_cost: d.credits_cost ?? 1, created_at: 'Vừa gửi' });
@@ -4392,7 +4440,7 @@ export const useStudioStore = defineStore('studio', {
     async cancelInpaint() {
       if (!this.inpaintGenId || !this.inpaintStage) return;
       try { await this.api('/api/generations/' + this.inpaintGenId + '/cancel', {}); this.inpaintStage = 'cancelled'; this.toast('Đã hủy sửa ảnh.'); }
-      catch (e) { this.toast(e.message || 'Lỗi hủy.', 'error'); }
+      catch (e) { this.failToast(e, 'Lỗi hủy.'); }
     },
     clearInpaintStatus() { this._inpaintStopDrag && this._inpaintStopDrag(); this.inpaintStage = ''; this.inpaintError = ''; this.inpaintGenId = null; this.inpaintStartTs = 0; this.inpaintMaskMode = 'none'; this.inpaintMaskDone = false; this._inpaintMaskKind = ''; this.inpaintBrushData = ''; this.inpaintErase = false; this._inpaintMaskCanvas = null; this._inpaintMaskCtx = null; this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }; },
     // ── Inpaint Mask: chọn vùng trên ảnh preview (integrated into InpaintCard) ──
@@ -5315,7 +5363,7 @@ export const useStudioStore = defineStore('studio', {
         this.saveLayerLayout();
         this.toast(action === 'delete' ? 'Đã xóa nội dung vùng chọn.' : 'Đã tô màu vùng chọn.');
       } catch (e) {
-        this.toast(e.message || 'Không áp dụng được.', 'error');
+        this.failToast(e, 'Không áp dụng được.');
       }
     },
     deleteSelectedRegion() { this._applySelectionToLayer('delete'); },
@@ -5350,7 +5398,7 @@ export const useStudioStore = defineStore('studio', {
         this.setActiveLayer(id);
         this.toast('Đã nhân đôi vùng chọn tại vị trí.');
       } catch (e) {
-        this.toast(e.message || 'Không nhân đôi được.', 'error');
+        this.failToast(e, 'Không nhân đôi được.');
       }
     },
     // Nâng (float/cut) vùng chọn: cắt nội dung khỏi layer gốc → đưa lên layer mới chồng khít để kéo đi.
@@ -5391,7 +5439,7 @@ export const useStudioStore = defineStore('studio', {
         this.setActiveLayer(id);
         this.toast('Đã nâng vùng chọn thành layer mới — kéo để di chuyển.');
       } catch (e) {
-        this.toast(e.message || 'Không nâng được.', 'error');
+        this.failToast(e, 'Không nâng được.');
       }
     },
     // ── Undo / Redo (lịch sử layer) ──

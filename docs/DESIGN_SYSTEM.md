@@ -390,12 +390,41 @@ thông báo lỗi **không được** chứa tên model/provider.
 > **Quy tắc rút ra:** người dùng chỉ cần biết *chuyện gì* và *làm gì tiếp*. Mọi thứ giải thích
 > *tại sao hỏng ở tầng nào* là để trong log — nơi lập trình viên đọc, không phải nơi khách hàng đọc.
 
-### 6.5 Còn nợ (đề xuất)
+### 6.5 MÃ TRA CỨU LỖI — khách đọc 6 ký tự, hỗ trợ tra ra đúng dòng log
+
+**Đã làm xong 2026-09-23** (trước đó là món nợ cuối của mục này). Câu hỏi gốc: *"lỗi lúc mấy giờ, tài khoản
+nào?"* — hỗ trợ phải hỏi khách rồi tự dò log. Nay mọi câu lỗi người dùng nhìn thấy đều kết thúc bằng
+`(mã tra cứu: L-XXXX)`, và **cùng mã đó có trong `storage/logs/laravel.log`**.
+
+Có **HAI nguồn sinh lỗi**, nên phải có **hai đường gắn mã** — thiếu một đường là mất một nửa dấu vết:
+
+| Nguồn lỗi | Ai sinh mã | Ghi ở đâu | Tra bằng gì |
+|---|---|---|---|
+| **Máy chủ** (exception trong controller/service) | `studio_error_code()` — `app/Support/helpers.php` | `studio_fail[L-XXXX]: <ngữ cảnh>` (Log::warning) | `grep 'studio_fail\[L-' storage/logs/laravel.log` |
+| **Trình duyệt** (mất mạng · fetch hỏng · canvas/Blob · exception không ai bắt) | `newClientCode()` — `resources/js/studio/clientErrors.js` | `client_error[L-XXXX]: <ngữ cảnh>` qua `POST /api/client-errors` | `grep 'client_error\[L-' storage/logs/laravel.log` |
+
+**Bảng chữ dùng chung** (bỏ `0 O 1 I` vì khách đọc qua điện thoại): `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` —
+khai ở cả hai phía và `ClientErrorReportTest` khoá bất biến *hai bảng chữ phải giống nhau*.
+
+Bốn quy tắc của đường thứ hai (lỗi trình duyệt):
+
+1. **Chỉ sinh mã khi máy chủ không có mã.** `userFacingError(e, fallback)` ưu tiên `error_code` của máy chủ;
+   chỉ khi lỗi phát sinh thuần trong trình duyệt mới tự sinh mã + gửi chi tiết về `/api/client-errors`.
+2. **Mã tra cứu của máy chủ không được bị ném bỏ trên đường về.** Mọi chỗ dựng `Error` từ phản hồi dùng
+   `apiError(payload, fallback, res)` (export từ `store.js`) để **giữ `error_code`** — trước đây
+   `throw new Error(d.message)` làm rơi mất mã mà máy chủ vừa gửi.
+3. **Một lỗi = một mã = một dòng log.** Lỗi lặp lại trong cùng lần tải trang chỉ hiện **một lần** và gửi
+   **một lần** (trần 12 lần gửi/trang). Mất mạng thì bản ghi vào hàng đợi `localStorage` và gửi bù sau.
+4. **Endpoint mở cho cả khách chưa đăng nhập** (lỗi có thể nổ ngay ở trang đăng nhập) nhưng bị chặn theo
+   IP (30/phút) và gộp trùng theo mã (10 phút) ⇒ không thể dùng để bơm log.
+
+**Lỗi vẫn KHÔNG lộ chi tiết kỹ thuật**: mã là 6 ký tự vô nghĩa với người dùng; câu hiển thị vẫn qua cửa
+chặn §6.3, còn `message` kỹ thuật chỉ đi vào log.
+
+### 6.6 Còn nợ (đề xuất)
 
 - Vài câu lỗi còn dài dòng kiểu hệ thống ("Lỗi hệ thống, vui lòng thử lại.") — nên nói rõ người dùng
   làm gì tiếp.
-- **Chưa có mã tra cứu lỗi** cho người dùng đọc cho tổng đài ⇒ hỗ trợ phải hỏi giờ + tài khoản mới
-  tra được log. Nên sinh mã ngắn (vd `L-8F3K`) ghi ở **cả** giao diện **và** log.
 
 ---
 
@@ -723,6 +752,16 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
     làm nền tối đi. Trạng thái "đang chọn/đang bật" là nơi chữ mờ nhất hay xuất hiện nhất, nên nó phải
     nằm trong bộ đo tương phản bắt buộc.
 
+47. **Mã tra cứu phải có ở CẢ HAI phía sinh lỗi — thiếu một phía là mất một nửa dấu vết.** Mã `L-XXXX` ban
+    đầu chỉ có ở lỗi MÁY CHỦ. Nhưng lỗi người dùng thật hay gặp lại sinh ngay trong TRÌNH DUYỆT (mất mạng,
+    canvas không xuất được blob, exception không ai bắt) — nhóm đó không đi qua controller nào nên không
+    có dòng log nào để tra, dù khách vẫn đọc được một câu lỗi. Khi thiết kế cơ chế chẩn đoán, hãy hỏi:
+    *lỗi này sinh ra ở MẤY nơi, và mỗi nơi đã có đường ghi dấu vết chưa?*
+48. **Không được NÉM BỎ dữ liệu chẩn đoán trên đường về.** Server gửi kèm `error_code`, nhưng client viết
+    `throw new Error(d.message)` là mất mã ngay tại đó — log có, mã tra cứu trên màn hình không. Đây là
+    dạng lỗi "hai đầu đều đúng, chỗ nối làm rơi": trước khi tin một cơ chế đã hoạt động, phải đo ở ĐẦU
+    CUỐI của chuỗi (câu người dùng đọc), không phải ở chỗ mình vừa viết.
+
 ### E. Quy trình và kiểm thử
 
 33. **Mỗi route mới phải khai vào `ModuleRegistry`** — nếu không, công tắc gói không chặn được nó, và
@@ -797,7 +836,7 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 
 ---
 
-## 16. Lịch sử triển khai — 27 vòng, mỗi vòng có số đo
+## 16. Lịch sử triển khai — 28 vòng, mỗi vòng có số đo
 
 > Bảng này là **bản ghi rút gọn** của các vòng đã làm. Bản đầy đủ (bối cảnh, bằng chứng từng bước, bài
 > học chi tiết) nằm trong lịch sử git của `docs/UX_PERSONA_STRATEGY.md` — tài liệu đó đã được hợp nhất
@@ -833,6 +872,8 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 | 26 | 2026-09-23 | Yêu cầu: **mọi card chung một màu** · **chữ hơi nhỏ, thêm cài đặt cỡ chữ** · làm nốt 6 việc còn nợ | Bỏ 9 gradient nhận diện riêng của card · thang cỡ chữ thành **6 token theo vai** (+1px mỗi bậc) + công tắc `--font-scale` (90/100/115/130%, lưu theo tài khoản, render sẵn ở server) · chọn ảnh nguồn NGAY trong card Gợi ý từ ảnh (`SourceLibraryPicker`) · **mã tra cứu lỗi L-XXXX** ở payload + log · **tên file theo kênh bán** (Shopee/Lazada/TikTok/catalogue/xưởng) · **tự chuyển trạng thái** khi khách bấm Duyệt (đi qua đúng whitelist) · trang **/bao-cao-nhom** (chi phí theo nhóm từ bảng generations) · 14 file bỏ viền trắng trên bề mặt | 941 `text-[Npx]` → **0** · 9 → **0** gradient nhận diện · `border-white/*` trên bề mặt **→ 0** · 4 test mới · full suite **XANH** |
 
 | 27 | 2026-09-23 | Đo lại tương phản bằng Chrome thật: phép đo cũ đọc màu `oklab()` như RGB ⇒ **báo 14 chỗ dưới AA không có thật** và **che mất 1 chỗ dưới AA có thật** | Đo lại bằng canvas (`fillStyle` → `getImageData`) + hợp alpha theo cả cây tổ tiên; `--color-cream-400` theme Sáng `#59646f` → **`#525c67`** | Trước: **1 chỗ 4,46:1** (nhãn mô tả trên hàng đang chọn `bg-brand-600/20`) · Sau: **0 chỗ dưới AA** trên **10 tổ hợp** (5 màn hình × 2 theme), 56 phần tử bỏ qua vì nền gradient |
+
+| 28 | 2026-09-23 | **Mã tra cứu lỗi chỉ có ở phía máy chủ**: lỗi sinh trong trình duyệt (mất mạng · fetch hỏng · canvas/Blob · exception không ai bắt) hiện ra giao diện mà KHÔNG có mã và KHÔNG có dòng log nào — hỗ trợ không tra được gì | Client sinh mã cùng bảng chữ với PHP + gửi chi tiết về `POST /api/client-errors` (mở cho khách, throttle 30/phút, gộp trùng theo mã) · `userFacingError` chọn đúng nguồn mã · **54 chỗ `toast(e.message)` → `failToast(e, …)`** · **`apiError()` giữ `error_code` của máy chủ** (trước đây bị ném bỏ) · bắt cả `window.onerror` + `unhandledrejection` | 54 chỗ toast lỗi + 20 chỗ ném lỗi nay đi qua đường có mã · hàng đợi `localStorage` gửi bù khi mất mạng · 10 test mới (`ClientErrorReportTest`) |
 
 ### 16.1 Số đo trước → sau của cả hành trình
 
@@ -890,7 +931,8 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 - [ ] Cron `studio:grant-plan-credits` trên hPanel — **máy chủ KHÔNG có lệnh `crontab`** nên phải bấm tay
       trong hPanel (lệnh chính xác ghi ở DEPLOY_LOG Đợt 20 §4; đường lazy đã chạy nên chưa gấp).
 - [x] Báo cáo chi phí/tiến độ **theo nhóm** cho chủ doanh nghiệp (`/bao-cao-nhom`).
-- [ ] `error_code` cho lỗi phát sinh CHỈ ở trình duyệt (hiện chỉ lỗi từ máy chủ mới có mã tra cứu).
+- [x] `error_code` cho lỗi phát sinh CHỈ ở trình duyệt — client sinh mã cùng định dạng, gửi về
+      `POST /api/client-errors` để máy chủ ghi `client_error[L-XXXX]`; xem §6.5.
 - [ ] Card «Gợi ý từ ảnh» chưa cho **chọn ảnh nguồn ngay trong card** (`SourceLibraryPicker` đã có sẵn).
 - [ ] **Mã tra cứu lỗi** cho người dùng đọc cho tổng đài (`L-8F3K`) — ghi ở cả giao diện và log (§6.5).
 - [ ] Preset **tên file ảnh theo kênh bán** (sàn TMĐT/catalogue).
@@ -908,5 +950,6 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 | `tests/Feature/UserFacingMessagesTest.php` | §6 (không rò rỉ chi tiết kỹ thuật ở nhãn tiến trình, luồng stream, cửa chặn ở biên, state lỗi) |
 | `tests/Feature/SuggestStreamTest.php` | §6 (cấm nêu tên model/provider trong nhãn tiến trình & lỗi) |
 | `tests/Feature/ToolbarAreaTest.php` | §7 (vùng toolbar cao cố định + cuộn trục X) |
+| `tests/Feature/ClientErrorReportTest.php` | §6.5 (mã tra cứu của lỗi trình duyệt: log · định dạng mã · gộp trùng · throttle · bảng chữ JS = PHP · không chỗ nào còn đẩy `e.message` thô vào toast lỗi hay ném bỏ `error_code` của máy chủ) |
 | `tests/Feature/ModuleRegistryTest.php` | §14 luật 33 (mọi route studio phải thuộc một module của gói) |
 | `tests/Feature/UserCatalogTest.php` | §15.1 (4 URL cài đặt cũ vẫn trả 200) |

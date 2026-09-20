@@ -26,7 +26,7 @@ function pickType(t) { type.value = t.id; step.value = 'survey'; answers.value =
 async function loadCluster() {
   loading.value = true;
   try { const d = await store.api('/api/stylist/cluster', { type: type.value }); questions.value = d.questions || []; questions.value.forEach(q => { if (!answers.value[q.key]) answers.value[q.key] = []; }); }
-  catch(e){ store.toast(e.message || 'Lỗi tải câu hỏi.', 'error'); }
+  catch(e){ store.failToast(e, 'Lỗi tải câu hỏi.'); }
   finally { loading.value = false; }
 }
 function toggleOpt(key, opt) { const a = answers.value[key]; const i = a.indexOf(opt); if (i>=0) a.splice(i,1); else a.push(opt); }
@@ -35,7 +35,7 @@ function buildAnswers() { const flat = {}; Object.keys(answers.value).forEach(k 
 async function submitPrompt() {
   loading.value = true;
   try { const d = await store.api('/api/stylist/prompt', { type: type.value, answers: buildAnswers() }); promptEn.value = d.prompt_en; promptVi.value = d.prompt_vi; promptLang.value = 'en'; step.value = 'result'; store.imagePromptEn = d.prompt_en; }
-  catch(e){ store.toast(e.message || 'Lỗi tạo prompt.', 'error'); }
+  catch(e){ store.failToast(e, 'Lỗi tạo prompt.'); }
   finally { loading.value = false; }
 }
 async function refine() {
@@ -66,7 +66,7 @@ async function refine() {
       }, 500);
     }
   }
-  catch(e){ store.toast(e.message || 'Lỗi tinh chỉnh.', 'error'); }
+  catch(e){ store.failToast(e, 'Lỗi tinh chỉnh.'); }
   finally { loading.value = false; }
 }
 function backToSurvey() { step.value = 'survey'; }

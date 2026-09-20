@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useLocalCatalog, isAdminUser } from '../../composables/useLocalCatalog.js';
 import { notify } from '../../composables/useSettingsToast.js';
+import { apiError } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
 import SettingsSkeleton from './SettingsSkeleton.vue';
 import SettingsEmpty from './SettingsEmpty.vue';
@@ -76,7 +77,7 @@ onMounted(async () => {
 async function postJson(url, body) {
   const r = await fetch(url, { method: 'POST', headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.message || 'Lỗi lưu.');
+  if (!r.ok) throw apiError(d, 'Lỗi lưu.');
   return d;
 }
 async function del(url) {

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useLocalCatalog, isAdminUser } from '../../composables/useLocalCatalog.js';
 import { notify } from '../../composables/useSettingsToast.js';
+import { apiError } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
 import SettingsSkeleton from './SettingsSkeleton.vue';
 import SettingsEmpty from './SettingsEmpty.vue';
@@ -68,7 +69,7 @@ async function api(path, method = 'GET', body = null) {
   if (body !== null) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
   const r = await fetch('/api/presets' + (path || ''), opts);
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.message || ('HTTP ' + r.status));
+  if (!r.ok) throw apiError(d, null, r);
   return d;
 }
 

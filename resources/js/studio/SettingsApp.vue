@@ -27,6 +27,8 @@
  *   7. Điều hướng theo URL (?tab=keys) — F5 và link chia sẻ giữ đúng mục đang xem.
  */
 import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { userFacingError, apiError } from './store.js';
+import { toastClientErrors } from './clientErrors.js';
 import StudioIcon from './components/StudioIcon.vue';
 import BaseModal from './components/BaseModal.vue';
 
@@ -41,7 +43,7 @@ async function api(path, method = 'GET', body = null) {
   if (body !== null) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
   const r = await fetch(BASE + path, opts);
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.message || ('HTTP ' + r.status));
+  if (!r.ok) throw apiError(d, null, r);
   return d;
 }
 
@@ -128,6 +130,8 @@ const sortedProviders = computed(() => [...providers.value].sort((a, b) => (a.ra
 const customProviders = computed(() => providers.value.filter((p) => p.custom));
 
 function flash(msg, ok = true) { toast.value = { msg, ok }; setTimeout(() => { toast.value = null; }, ok ? 2800 : 5200); }
+// Lỗi trình duyệt hiện kèm mã tra cứu; câu hiển thị vẫn qua cửa chặn §6.
+toastClientErrors((text) => flash(text, false));
 function goTo(id) { section.value = id; }
 
 async function load(quiet = false) {
@@ -137,14 +141,14 @@ async function load(quiet = false) {
     data.value = await api('/data');
     syncCfg();
     syncTasks();
-  } catch (e) { error.value = e.message; }
+  } catch (e) { error.value = userFacingError(e, 'Không tải được dữ liệu.'); }
   finally { loading.value = false; }
 }
 
 /** Chạy một thao tác ghi rồi nạp lại snapshot; lỗi hiện qua toast. */
 async function run(fn, okMsg) {
   try { await fn(); if (okMsg) flash(okMsg); await load(true); return true; }
-  catch (e) { flash(e.message, false); return false; }
+  catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); return false; }
 }
 
 // ─────────────────────────── Tổng quan: số liệu & việc cần xử lý ───────
@@ -503,7 +507,7 @@ async function syncModels() {
     const d = await api('/sync-catalog', 'POST', {});
     await load(true);
     flash('Đã đồng bộ catalog: ' + (d.created == null ? 0 : d.created) + ' model mới, ' + (d.updated == null ? 0 : d.updated) + ' cập nhật.');
-  } catch (e) { flash(e.message, false); }
+  } catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); }
   syncSaving.value = false;
 }
 

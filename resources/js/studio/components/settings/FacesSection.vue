@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { isAdminUser } from '../../composables/useLocalCatalog.js';
 import { notify } from '../../composables/useSettingsToast.js';
+import { apiError } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
 import SettingsSkeleton from './SettingsSkeleton.vue';
 import SettingsEmpty from './SettingsEmpty.vue';
@@ -104,7 +105,7 @@ async function add() {
       body: fd,
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.message || ('HTTP ' + r.status));
+    if (!r.ok) throw apiError(d, null, r);
     form.value = { name: '' };
     file.value = null;
     if (fileInput.value) fileInput.value.value = '';

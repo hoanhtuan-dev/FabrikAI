@@ -29,7 +29,7 @@ async function runUpscale() {
     });
     afterUrl.value = d.media_url || '';
     store.toast('Đã nâng cấp ảnh (' + store.upscaleScale + 'x).');
-  } catch (e) { store.toast(e.message || 'Lỗi nâng cấp ảnh.', 'error'); }
+  } catch (e) { store.failToast(e, 'Lỗi nâng cấp ảnh.'); }
   finally { store.upscaling = false; }
 }
 

@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectShareController;
 use App\Http\Controllers\ReportController;
@@ -112,6 +113,17 @@ Route::middleware(['auth', 'admin', 'nostore'])->get('/bao-cao-nhom', [ReportCon
 // ══════════════════════════════════════════════════════════════════════════════
 Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
     Route::put('/appearance', [ThemeController::class, 'update'])->name('appearance.update');
+});
+
+// ── BÁO LỖI TỪ TRÌNH DUYỆT (Đợt 21 — 2026-09-23) ────────────────────────────────
+// Mã tra cứu L-XXXX của lỗi phía client phải tra được trong log y như mã của lỗi máy chủ (§6.5).
+// CỐ Ý không đòi đăng nhập: lỗi có thể nổ ngay ở trang đăng nhập, và người gặp sự cố không phải lúc nào
+// cũng còn phiên hợp lệ — chặn ở đây là mất đúng dấu vết cần nhất. Bù lại: throttle 30/phút theo IP +
+// gộp trùng theo mã trong 10 phút (ClientErrorController).
+// Cũng KHÔNG thuộc module nào trong ModuleRegistry (đã khai 'client-errors' vào INFRA_PREFIXES): đây là
+// đường chẩn đoán hạ tầng, không phải tính năng bán theo gói — công tắc gói không được tắt nó.
+Route::prefix('api')->name('api.')->middleware('throttle:client-errors')->group(function () {
+    Route::post('/client-errors', [ClientErrorController::class, 'store'])->name('client-errors.store');
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

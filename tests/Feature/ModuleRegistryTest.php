@@ -41,10 +41,14 @@ class ModuleRegistryTest extends TestCase
      * 'appearance' (2026-09-23): tùy chọn HIỂN THỊ của chính người dùng (giao diện Sáng/Tối + cỡ chữ). Không phải
      * tính năng bán theo gói ⇒ cố ý KHÔNG khai vào ModuleRegistry, nếu không thì một gói
      * thiếu module sẽ làm người dùng không đổi được giao diện của chính mình.
+     *
+     * 'client-errors' (2026-09-23): đường CHẨN ĐOÁN — trình duyệt gửi lỗi phía client về để mã tra cứu
+     * L-XXXX có mặt trong log. Không phải tính năng bán theo gói, và phải chạy được kể cả khi mọi module
+     * đều bị tắt (nếu không thì lúc hệ thống hỏng nhất lại mất đúng dấu vết cần nhất).
      */
     protected const INFRA_PREFIXES = [
         'admin', 'boot', 'defaults', 'gui', 'plan/status', 'billing', 'settings', 'settings-vue',
-        'image', 'image-thumb', 'process', 'appearance',
+        'image', 'image-thumb', 'process', 'appearance', 'client-errors',
     ];
 
     protected function setUp(): void

@@ -18,6 +18,8 @@
  * đúng phân quyền 2 tầng (admin cho dashboard/plans/ledger/gui, super_admin cho users).
  */
 import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { userFacingError, apiError } from './store.js';
+import { toastClientErrors } from './clientErrors.js';
 import StudioIcon from './components/StudioIcon.vue';
 import BaseModal from './components/BaseModal.vue';
 
@@ -33,7 +35,7 @@ async function api(path, method = 'GET', body = null) {
   if (body !== null) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
   const r = await fetch(BASE + path, opts);
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.message || ('HTTP ' + r.status));
+  if (!r.ok) throw apiError(d, null, r);
   return d;
 }
 
@@ -177,6 +179,8 @@ const canNext = (d) => d.page < (d.last_page || 1);
 const countText = (shown, total, unit) => (shown === total ? total + ' ' + unit : 'Hiện ' + shown + '/' + total + ' ' + unit);
 
 function flash(msg, ok = true) { toast.value = { msg, ok }; setTimeout(() => { if (toast.value && toast.value.msg === msg) toast.value = null; }, ok ? 3000 : 5200); }
+// Lỗi trình duyệt hiện kèm mã tra cứu; câu hiển thị vẫn qua cửa chặn §6.
+toastClientErrors((text) => flash(text, false));
 function goTo(id) {
   section.value = id;
   ensureLoaded(id);
@@ -188,20 +192,20 @@ function goTo(id) {
  */
 async function run(fn, okMsg) {
   try { await fn(); if (okMsg) flash(okMsg); return true; }
-  catch (e) { flash(e.message, false); return false; }
+  catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); return false; }
 }
 
 // ─────────────────────────── Nạp dữ liệu ───────────────────────────
 async function loadDashboard() {
   loading.dashboard = true;
   try { dashboard.value = await api('/dashboard'); }
-  catch (e) { flash(e.message, false); }
+  catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); }
   finally { loading.dashboard = false; }
 }
 async function loadPlans() {
   loading.plans = true;
   try { plansData.value = (await api('/plans')).plans || []; }
-  catch (e) { flash(e.message, false); }
+  catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); }
   finally { loading.plans = false; }
 }
 async function loadUsers() {
@@ -215,7 +219,7 @@ async function loadUsers() {
     q.set('per_page', f.userPerPage);
     q.set('page', usersData.value.page || 1);
     usersData.value = await api('/users?' + q.toString());
-  } catch (e) { flash(e.message, false); }
+  } catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); }
   finally { loading.users = false; }
 }
 async function loadLedger() {
@@ -228,7 +232,7 @@ async function loadLedger() {
     q.set('per_page', l.perPage);
     q.set('page', ledgerData.value.page || 1);
     ledgerData.value = await api('/transactions?' + q.toString());
-  } catch (e) { flash(e.message, false); }
+  } catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); }
   finally { loading.ledger = false; }
 }
 async function loadGui() {
@@ -238,7 +242,7 @@ async function loadGui() {
     guiItems.value = (d.activityBar || []).map((x) => Object.assign({}, x));
     guiIcons.value = d.icons || [];
     guiSnapshot.value = JSON.stringify(guiItems.value);
-  } catch (e) { flash(e.message, false); }
+  } catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); }
   finally { loading.gui = false; }
 }
 // ─────────────────────────── Yêu cầu nâng cấp (Q2) ───────────────────────────
@@ -256,7 +260,7 @@ async function loadUpgrades() {
       bank_name: bank.name || '', bank_account: bank.account || '', bank_holder: bank.holder || '', bank_branch: bank.branch || '',
       support_phone: sup.phone || '', support_email: sup.email || '', support_zalo: sup.zalo || '', support_hours: sup.hours || '',
     });
-  } catch (e) { flash(e.message, false); }
+  } catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); }
   finally { loading.upgrades = false; }
 }
 async function setUpgradeStatus(row, status) {
@@ -289,7 +293,7 @@ async function loadModules() {
     (d.plans || []).forEach((p) => { draft[p.slug] = (p.modules || []).slice(); });
     planModules.value = draft;
     moduleDirty.value = false;
-  } catch (e) { flash(e.message, false); }
+  } catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); }
   finally { loading.modules = false; }
 }
 function toggleGlobal(id) {
@@ -636,7 +640,7 @@ const askResetGui = () => askConfirm(
       guiItems.value = (d.activityBar || []).map((x) => Object.assign({}, x));
       guiSnapshot.value = JSON.stringify(guiItems.value);
       flash('Đã khôi phục mặc định.');
-    } catch (e) { flash(e.message, false); }
+    } catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); }
   },
 );
 
@@ -656,7 +660,7 @@ async function saveGui() {
     guiItems.value = (d.activityBar || []).map((x) => Object.assign({}, x));
     guiSnapshot.value = JSON.stringify(guiItems.value);
     flash('Đã lưu cấu hình giao diện.');
-  } catch (e) { flash(e.message, false); }
+  } catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); }
   guiSaving.value = false;
 }
 
