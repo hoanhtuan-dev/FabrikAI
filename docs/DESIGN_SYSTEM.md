@@ -1187,7 +1187,25 @@ ngày thì `prune` xoá. Nhờ vậy bảng không phình mà vẫn có lịch s
    bản lấy trước · Bỏ qua (nguồn của vùng khác)*. Gộp lại thành "Không lấy được" là báo lỗi cho một nguồn
    hoàn toàn bình thường.
 
-### 20.6 Bộ test giữ luật này
+### 20.6 BA LUẬT RÚT RA TỪ CÂU HỎI "CÓ NGUỒN NGOÀI SAO VẪN DÙNG BỘ CÓ SẴN?" (Đợt 32)
+
+1. **Trần của PROMPT không phải trần của việc ĐO.** Prompt chỉ cần 5–8 tin/nguồn cho gọn ngữ cảnh, nhưng đo
+   trên 8 tin thì không từ khoá nào lặp lại ⇒ không có hướng nào sinh từ tin. Đệm giữ **bản đọc được** (60
+   tin/nguồn), mỗi việc tự cắt theo trần của mình, và **cắt lại từ đệm chứ không gọi lại mạng**.
+2. **Đo bằng từ vựng khai sẵn là chưa đủ** — phải đọc cả **chủ đề trong chính tin** (cụm 2–4 tiếng, bỏ từ
+   dừng, ≥2 tin, dọn cụm con, bỏ tên toà soạn). Từ vựng chỉ bắt được thứ người viết mã NGHĨ TỚI.
+3. **Model "suy luận" tính cả token đang nghĩ vào ngân sách trả lời.** Ngân sách nhỏ ⇒ nó bị cắt trước khi
+   viết JSON (`finish_reason=length`, `reasoning_only=true`) ⇒ agent rơi về engine tất định và người dùng
+   kết luận "AI không phân tích". Ba việc phải đi cùng nhau: **ngân sách đủ lớn**, **tắt suy luận dài khi cần
+   JSON** (an toàn: provider không hiểu cờ thì gọi lại không cờ), và **đường lui giữa các nhóm model** trong
+   Cài đặt — vì một nhóm vai trò có thể chỉ có MỘT model.
+
+### 20.7 Bộ test giữ luật này
+
+`tests/Feature/MarketAnalysisFromSourcesTest.php` (9 test — khoá ba luật ở §20.6): đo trên bản rộng mà
+KHÔNG gọi lại mạng · chủ đề đọc từ tin (cụm 4 tiếng không bị chẻ đôi) · tên toà soạn không thành chủ đề ·
+cụm chứa từ dừng bị loại · hướng sinh từ tin không trùng thẻ + đứng trước bộ có sẵn · nhóm chủ đề có nhãn và
+việc-nên-làm riêng · ngân sách/cờ tắt suy luận/đường lui của model · giao diện có chip lọc và khối chủ đề.
 
 `tests/Feature/MarketSignalTest.php` (22 test): đo từ khoá/nhóm hàng/bằng chứng · ranh giới từ · khớp không
 dấu cho cụm từ · giá 3 kiểu viết + loại số không phải giá + trung vị · không ghi trùng ảnh chụp · `prune` ·

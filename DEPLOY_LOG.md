@@ -2366,6 +2366,83 @@ Thêm xong thì: tin tự làm mới mỗi 30 phút (giao diện tự đổi san
 **Không thêm cron thì hệ thống vẫn dùng được** (tín hiệu vẫn được đo khi mở màn hình; generation vẫn xử lý
 inline) — chỉ là chậm hơn và giao diện nói đúng rằng chưa có lịch chạy nền.
 
+---
+
+## Phiên 2026-09-23 (Đợt 32 — "CÓ NGUỒN NGOÀI SAO VẪN DÙNG BỘ CÓ SẴN?": ba nguyên nhân thật, đã sửa cả ba)
+
+**Deploy:** `dfdef9f → 2475a2c → 2e0ccd9` (không migration mới).
+
+### 0. Câu hỏi của chủ dự án, và câu trả lời ĐO ĐƯỢC
+
+> *"tại sao có nguồn dữ liệu ngoài mà vẫn dùng bộ có sẵn thay vì phân tích?"*
+
+Đo trên production trước khi sửa — cả ba nguyên nhân đều có thật, không phải suy đoán:
+
+| # | Bằng chứng đo được | Nghĩa là |
+|---|---|---|
+| 1 | 3 nguồn trả về **210 tin** (100 + 50 + 60) nhưng máy đo chỉ nhận **16 tin** (trần `max_items` 8/6/5 dùng CHUNG cho cả prompt lẫn việc đo) | Đo trên 16 tin thì gần như không từ khoá nào lặp lại ≥2 tin ⇒ **1 hướng** sinh từ tin, 7/9 thẻ là bộ có sẵn |
+| 2 | Máy đo chỉ biết **từ vựng 5 nhóm tôi khai** | Tin nói "tuần lễ thời trang", "mùa thu", "new york" mà tôi chưa khai thì **không thành dữ liệu** |
+| 3 | Log: **10 lần** *"TrendRadar: model không trả về nội dung"* + **3 lần** *"JSON không dùng được"*; chi tiết một dòng: `finish_reason: "length"`, `reasoning_only: true`, `chars: 9677` | Model **suy luận** tính cả token "nghĩ" vào `max_tokens` (ngân sách 3.000) ⇒ viết ~9.700 ký tự suy luận rồi bị CẮT trước khi viết JSON ⇒ mọi lượt radar rơi về engine tất định (đọc bộ có sẵn). Nhóm vai trò chỉ có **1 model** nên không có đường lui |
+
+### 1. Sửa nguyên nhân 1 — ĐO trên bản RỘNG, tách khỏi trần của prompt
+
+- `WebSourceService` nay giữ **bản ĐỌC ĐƯỢC** trong đệm (60 tin/nguồn) và cắt theo **trần của từng việc**:
+  prompt vẫn 5–8 tin/nguồn, việc ĐO xin bản rộng (`MEASURE_PER_SOURCE = 30`), **cắt lại từ đệm nên không
+  gọi lại mạng**.
+- Kết quả đo trên production: **16 → 40 tin**.
+
+### 2. Sửa nguyên nhân 2 — đọc CHỦ ĐỀ từ chính tin, không chỉ từ vựng khai sẵn
+
+- Trích **cụm 2–4 tiếng** từ tiêu đề + mô tả: bỏ từ dừng, bỏ số, phải xuất hiện ở **≥2 tin**, dọn **cụm con
+  và cụm chồng nhau** (giữ cụm dài nhất), bỏ **tên miền chung** ("thời trang", "tin tức", "việt nam").
+- **Bỏ tên toà soạn ở tầng ĐỌC TIN** (`stripPublisher`): Google News nhét "Bài viết - Kenh14.vn" vào **cả
+  tiêu đề lẫn mô tả**, nên "kenh14 vn" từng thành một "chủ đề thị trường". Nhận diện bằng DỮ LIỆU: đuôi sau
+  dấu gạch mà **lặp lại ở ≥2 tin** trong cùng lượt thì là tên nguồn đăng.
+- Kết quả: **14 từ khoá ngành + 10 chủ đề trong tin**; hướng sinh từ tin **2 → 9**.
+- Lỗi thật bắt được khi làm: cụm "tuần lễ thời trang" là **4 tiếng** mà bản đầu chỉ trích 2–3 tiếng ⇒ nó bị
+  chẻ thành "tuần lễ thời" + "lễ thời trang" (hai thẻ chồng nhau, đọc như lỗi) — đã mở tới 4 tiếng + dọn cụm con.
+
+### 3. Sửa nguyên nhân 3 — model suy luận phải viết được JSON, và phải có đường lui
+
+| Việc | Chi tiết |
+|---|---|
+| Ngân sách token | 3.000/8.000 → **6.000/16.000**, timeout 60/75 → **90s** (ngân sách phải đủ cho CẢ phần "nghĩ" lẫn JSON) |
+| Tắt suy luận dài | `AiModelGateway::applyThinkingOff()` gửi `enable_thinking: false` cho model họ Qwen3 trên DashScope; **provider không hiểu cờ thì tự gọi lại KHÔNG có cờ** (một tham số tuỳ chọn không được phép làm hỏng lời gọi) |
+| Câu lệnh | Thêm *"Trả JSON NGAY, không viết phần suy luận/giải thích dài dòng"* |
+| ĐƯỜNG LUI giữa các nhóm | `fallback_groups`: nhóm chính hết model dùng được thì thử tiếp các nhóm khác trong Cài đặt (tìm kiếm → suy luận → nền). Trước đây nhóm chỉ có 1 model ⇒ model đó hỏng là mất luôn phần AI |
+| Chẩn đoán | `lastAttempts()` ghi rõ **từng model đã thử · finish_reason · reasoning_only · số ký tự** ⇒ lần sau không phải đoán "vì sao model không trả lời" |
+
+### 4. Định hướng do AI viết phải nói được nó dựa trên GÌ
+
+`attachTrendEvidence()`: suy bằng chứng từ chính các `trend_ids` mà định hướng nhắc tới — hướng nào bám vào
+hướng **có tin thật** thì mang nhãn *"Dựa trên N tin thật · M nguồn"* + link bài viết; còn lại gắn **bộ có sẵn**.
+Trước đây nhãn này chỉ có ở đường tất định nên màn hình hiện *"8 định hướng do AI viết · 0 dựa trên tin thật"*.
+
+### 5. Giao diện
+
+- Khối **"Chủ đề đang được nói tới trong tin"** (kèm link từng bài) — phần đọc trực tiếp từ nguồn.
+- Chip lọc **"Có tin thật (N)"** + dòng đếm *"Đang hiện X/Y hướng · N hướng có tin thật · M hướng thuộc bộ có sẵn"*.
+- Thẻ định hướng có dòng bằng chứng (số tin · số nguồn · link).
+
+### 6. Kiểm chứng
+
+| Kiểm tra | Trước | Sau |
+|---|---|---|
+| Tin đưa vào máy đo | 16 | **40** |
+| Dữ liệu đo được | 6 từ khoá | **14 từ khoá + 10 chủ đề** |
+| Hướng có tin thật | 2 / 9 | **9 / 13** |
+| Định hướng do AI viết | **0** (model bị cắt, rơi về tất định) | **8 / 8** |
+| Định hướng dựa trên tin thật | 0 | **6 / 8** (có ngày + tên báo) |
+| Gọi model thật | lỗi liên tục (13 dòng log) | **11,7 s · `engine=ai-v1` · deepseek-flash** |
+| Test | 945 | **954 test / 6.827 assert XANH** (`MarketAnalysisFromSourcesTest` 9 test khoá cả ba nguyên nhân) |
+
+Trích định hướng thật lấy từ production sau khi sửa:
+*"Váy midi công sở phối pastel dịu — Tuần lễ thời trang New York mùa thu được báo VN đưa tin ngày…"* ·
+*"Quần ống rộng cạp cao làm hero SKU — Street style mùa thu từ New York được Tuổi Trẻ tổng hợp ngày…"*.
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
+
+
 
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
