@@ -2299,17 +2299,74 @@ Ba subagent đọc song song toàn bộ tầng dữ liệu + giao diện + trìn
 4. Chạy một lần `php artisan studio:market-signals --force` rồi đối chiếu số tin với bản local.
 5. Nhắc người dùng **Ctrl+Shift+R**.
 
-### 8. Nợ đã biết (ghi lại để không tưởng là đã xong)
+### 8. TRẢ NỢ (cùng ngày, commit `c76dfbd`) — 7 món nợ ghi ở bản trước, nay ĐÓNG cả 7
 
-| Việc | Vì sao chưa làm |
+| Món nợ | Đã làm gì | Test giữ |
+|---|---|---|
+| **"Khổ vải" không vào công thức** (đổi 150→180cm mà số mét vải đứng yên) | Định mức quy đổi theo khổ **người dùng nhập**: `REFERENCE_FABRIC_WIDTH_CM / khổ` ⇒ khổ rộng hơn thì ít mét hơn. Câu ghi chú bảng size in **đúng khổ đã nhập** (trước đây in khổ mặc định nên một phản hồi nói hai khổ khác nhau) | `DebtFixesTest::test_fabric_width_changes_the_fabric_consumption_and_cost` + `..._note_uses_the_users_fabric_width` |
+| **Dán từ Excel sai 1000 lần** (`"520.000"` → 520 · `"1.200.000"` → **0**) | Bộ đọc số hiểu định dạng vi-VN tách ra `resources/js/studio/shopPaste.js` (module riêng để KIỂM ĐƯỢC), kèm **cảnh báo tại chỗ** khi giá bằng 0/dưới 1.000đ | `scripts/check-shop-paste.mjs` (18 phép kiểm, chạy trong suite) + `DebtFixesTest::test_excel_paste_parser_passes_its_node_checks` |
+| **Hai con số lợi nhuận không nhãn** | MỘT định nghĩa + HAI con số có tên: phần tổng trả `profit_vnd` + `profit_basis=before_fixed_cost` + `profit_after_fixed_vnd` + `margin_after_fixed_pct`; mỗi kịch bản bán tự khai `after_fixed_cost`; giao diện/file lệnh cắt/câu tóm tắt đều ghi rõ "chưa trừ / đã trừ chi phí cố định" | `DebtFixesTest::test_profit_has_two_named_numbers` |
+| **Dữ liệu shop trộn nhiều kỳ** | Trả `period_days=null` + `period_days_mixed=true` + danh sách `periods`; câu kể chuyện nói *"trong N kỳ báo cáo khác nhau (30 · 90 ngày)"*; giao diện cảnh báo mời nhập lại cùng một kỳ | `DebtFixesTest::test_shop_periods_are_not_mixed_silently` |
+| **Từ khoá một tiếng trùng nghĩa khác** (`đầm phá`, `dạ dày`, `da thịt`) | Thêm `MarketSignalService::AMBIGUOUS`: từ mơ hồ chỉ được tính khi **cùng bài có một từ khoá rõ nghĩa** — tin kinh doanh chung không sinh "tín hiệu thời trang" giả | `DebtFixesTest` không phủ; xem nợ còn lại bên dưới |
+| **19 tiêu đề card lệch §1.3** | Đổi hết sang `font-display text-base font-semibold text-brand-300` | `DesignSystemTest` (quét .vue) |
+| **`.tool-btn.is-active` lệch từ vựng §5.1** | Đổi `border-brand-500/70` → `border-brand-500`, và **đóng lỗ test**: `DesignSystemTest` nay quét cả `app.css` nên token viền trong CSS không thoát khỏi từ vựng nữa | `DesignSystemTest::test_button_borders_use_one_token_per_meaning` (nhánh CSS mới) |
+
+**Còn lại (biết và chấp nhận, không giấu):**
+- Từ mơ hồ vẫn có thể lọt khi bài CÓ ngữ cảnh ngành (`"Báo cáo dệt may: dạ dày…"`) — muốn chắc phải dùng cụm ≥2 tiếng; hiện chưa có bằng chứng thực tế gây hại.
+- Chu kỳ lấy tin đọc từ lịch cố định 30 phút, chưa cấu hình được theo từng nguồn.
+- `DesignSystemTest` quét CSS theo token viền; token màu chữ trong CSS vẫn chưa được quét.
+
+### 9. DEPLOY + KIỂM CHỨNG TRÊN PRODUCTION (2026-09-20, cùng ngày)
+
+**Deploy:** `92344b6 → c76dfbd → 0ee9a54` (ba commit: tính năng · trả nợ · đo-lường-thay-vì-hứa).
+
+| Bước | Kết quả |
 |---|---|
-| "Khổ vải" được nhập/hiển thị nhưng **không tham gia công thức** định mức vải; câu ghi chú bảng size còn in khổ MẶC ĐỊNH | Sửa công thức tiền ⇒ phải chốt cách quy đổi với chủ dự án |
-| Dán từ Excel: `"520.000"` → **520**, `"1.200.000"` → **0** ở phần parse phía giao diện | Cần chuẩn hoá theo locale; chưa có test nào chạm đường dán |
-| Hai con số LỢI NHUẬN trong cùng một kế hoạch (một cái gồm `fixed_cost`, một cái không) | Cần chốt định nghĩa + nhãn `profit_before/after_fixed` |
-| `period_days` của dữ liệu shop trộn nhiều kỳ nhưng chỉ giữ giá trị dòng cuối | Hiện chưa nơi nào đọc |
-| Từ khoá một tiếng trùng nghĩa khác (`đầm` trong `đầm phá`) | Giới hạn của khớp theo từ; muốn chắc phải dùng cụm ≥2 tiếng |
-| 19 tiêu đề card trong Agent Studio chưa theo §1.3 (`font-display` + `text-brand-300` + icon) | Việc thẩm mỹ, chạm nhiều dòng |
-| `.tool-btn.is-active` dùng `border-brand-500/70` (lệch từ vựng §5.1) | Cần sửa cả `app.css` và mở rộng `DesignSystemTest` quét CSS |
+| Sao lưu DB trước khi deploy | ✅ `~/fabrikai-db-backup-before-signals-20260920-124812.sql` · **37 bảng / 285 KB** (mysqldump qua socket — LƯU Ý: `parse_ini_file(".env")` KHÔNG dùng được vì .env có giá trị chứa dấu `=`; `config('database.connections.mysql.socket')` trả rỗng ⇒ phải đọc `DB_SOCKET` thẳng từ .env) |
+| `git pull --ff-only` | ✅ `92344b6 → c76dfbd` rồi `→ 0ee9a54` |
+| `composer dump-autoload` | ⚠️ Host vẫn chặn `proc_open`; nhưng **4 class mới đều `class_exists` = true** (kiểm bằng PHP) — PSR-4 tự nạp, không cần dump |
+| `php artisan migrate --force` | ✅ `2026_09_23_000007_create_market_signals_table` (DONE) → 22 migration |
+| Cache | ✅ `config:cache` · `route:cache` · `view:cache` |
+| `php artisan schedule:list` | ✅ thấy `studio:market-signals` (`*/30`) · `studio-scheduler-heartbeat` (`*/5`) · `--prune` (03:30) |
+| **Đo tín hiệu thật từ máy chủ** | ✅ `Google News 8 tin · Tuổi Trẻ 6 · VnExpress 2` ⇒ 16 tin · 6-8 từ khoá · **có tăng/giảm** (*tuần lễ thời trang: 4 tin · 2 nguồn · +33%*) |
+| Bảng `market_signals` | ✅ 2 lần đo, bản mới nhất `region=all items=16 sources=3` |
+| **Radar thật trên production** | ✅ `source_mode=live` · `market=live` · 6 tín hiệu · hướng **có tin thật lên đầu** (*Tuần lễ thời trang* — hướng sinh từ tin; *Váy midi công sở*) · định hướng tất định dẫn số đo: *"Nhắc tới trong 4 tin của 2 nguồn · tăng 33% so với lần đo trước"* |
+| **Khổ vải trên production** | ✅ 150cm ⇒ **58,8 m / 8.019.000đ** vs 180cm ⇒ **48,9 m / 7.177.500đ** (trước đây hai bên giống nhau) |
+| HTTP | ✅ `/up` 200 · `/` 200 · `/bang-gia` 200 · `/dang-nhap` 200 · `/api/design-agent/sources` **401** (chưa đăng nhập) |
+| Log | 10 dòng ERROR/CRITICAL (trước deploy 10) — **không phát sinh lỗi mới**; cảnh báo cũ *"Không có queue worker xử lý generation #25 sau 90s"* chính là triệu chứng của mục 10 bên dưới |
+| Test | **945 test / 6.791 assert XANH** (trước đợt: 911/6.668) |
+
+### 10. PHÁT HIỆN KHI DEPLOY: HOST KHÔNG CHẠY CRON NÀO — và cách sửa cho ĐÚNG
+
+Kiểm trên production sau khi lên mã mới:
+
+| Bằng chứng | Nghĩa là |
+|---|---|
+| `schedule:list` có job, nhưng **0 khoá mutex `schedule`** trong bảng `cache` | `schedule:run` **chưa từng chạy** ⇒ lịch 30 phút (và cả `clean-storage` hằng ngày) không hoạt động |
+| **Không có** `storage/logs/worker.log` | cron `queue:work` (DEPLOY.md §3) **không tồn tại** |
+| **7 job `RenderImageJob` nằm chờ** (1 từ 18/09, 6 từ 20/09 15:38) | Queue không có ai xử lý; app phải chạy inline sau 90 giây (chậm + dễ cạn pool PHP-FPM) |
+| `auto_refresh.alive = false` (đo trên máy chủ) | Câu "tự động mỗi 30 phút" là câu SAI trên host này |
+
+**Đã sửa trong mã (commit `0ee9a54`) — "đo lường thay vì hứa":**
+- Lịch chạy nền tự ghi **NHỊP TIM** mỗi 5 phút (TTL 30 phút) ⇒ `studio_scheduler_alive()`.
+- `WebSourceService` trả thêm khối `auto_refresh {alive, label}`; cột **Chu kỳ** trong báo cáo nguồn đọc cùng số đo đó.
+- Giao diện **bỏ câu viết cứng**, hiện label đo được và **tô vàng** khi chưa bật lịch: *"Máy chủ chưa bật lịch chạy nền — tin được làm mới khi bạn mở màn hình hoặc bấm «Cập nhật tin»"*.
+- `SchedulerHonestyTest` (5 test) khoá luật: **không có nhịp ⇒ không được hứa tự động**.
+- Dọn tồn đọng: chạy `queue:work --stop-when-empty --max-time=55 --tries=1` một lần ⇒ **7/7 job xử lý xong trong 0,9 ms mỗi job** (CAS chặn làm lại việc đã xong), `jobs=0 failed=0`.
+
+**VIỆC CHỈ CHỦ DỰ ÁN LÀM ĐƯỢC (hPanel → Advanced → Cron Jobs) — 2 dòng, mỗi phút một lần:**
+
+```
+cd /home/u310846799/domains/fabrikai.shop && /usr/bin/php artisan schedule:run >> storage/logs/scheduler.log 2>&1
+cd /home/u310846799/domains/fabrikai.shop && /usr/bin/php artisan queue:work --stop-when-empty --max-time=55 --tries=1 --timeout=900 >> storage/logs/worker.log 2>&1
+```
+
+Thêm xong thì: tin tự làm mới mỗi 30 phút (giao diện tự đổi sang câu "Máy chủ tự làm mới tin mỗi 30 phút"),
+ảnh/video render bằng worker nền thay vì chạy inline, và `clean-storage` hằng ngày chạy lại.
+**Không thêm cron thì hệ thống vẫn dùng được** (tín hiệu vẫn được đo khi mở màn hình; generation vẫn xử lý
+inline) — chỉ là chậm hơn và giao diện nói đúng rằng chưa có lịch chạy nền.
+
+
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
 
