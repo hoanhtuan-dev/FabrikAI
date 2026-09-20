@@ -40,7 +40,7 @@ const hasProgress = computed(() => props.progress != null);
     <!-- Progress bar -->
     <div v-if="hasProgress" class="w-full max-w-xs overflow-hidden rounded-full bg-cream-50/10">
       <div :class="[sizeClasses.bar]"
-           class="animate-pulse rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-brand-500 transition-all duration-slow"
+           class="animate-pulse rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-brand-500 motion-ui motion-ui--size duration-slow"
            :style="{ width: Math.min(100, Math.max(0, progress)) + '%' }"></div>
     </div>
   </div>

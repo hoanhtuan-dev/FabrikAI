@@ -12,7 +12,7 @@ import ConfirmDialog from './ConfirmDialog.vue';
  *
  * Giữ NGUYÊN toàn bộ logic (api /api/presets, catalog 3 phần custom-edits-hidden, chế độ admin sửa bản
  * dùng chung). Chỉ làm lại phần trình bày theo các lỗi UX đã chỉ ra:
- *   · bỏ emoji trong tiêu đề (🗂️) — dùng đúng hệ icon của app (icons.json qua StudioIcon);
+ *   · bỏ emoji trong tiêu đề () — dùng đúng hệ icon của app (icons.json qua StudioIcon);
  *   · thay toast tự chế bằng khay thông báo dùng chung;
  *   · thay window.confirm() bằng ConfirmDialog (BaseModal có Esc + bẫy tiêu điểm);
  *   · thêm TÌM KIẾM — trước đây 9 danh mục × nhiều mục, muốn tìm một preset phải cuộn bằng mắt;
@@ -210,13 +210,13 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
     <!-- ── Chip lọc theo danh mục ────────────────────────────────────────── -->
     <div v-if="!loading && !error" class="mb-4 flex flex-wrap gap-1.5">
       <button @click="catFilter = 'all'"
-              :class="catFilter === 'all' ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800/60 text-cream-300 hover:border-ink-500'"
+              :class="catFilter === 'all' ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-300 hover:border-ink-500'"
               class="rounded-full border px-2.5 py-1 text-[11px] font-medium transition">
         Tất cả <span class="text-cream-400">{{ merged.length }}</span>
       </button>
       <button v-for="cat in allCategories" :key="cat" @click="catFilter = cat"
               :title="STUDIO_CATEGORIES.includes(cat) ? 'Danh mục này là CHIP NHANH trong card Studio' : ''"
-              :class="catFilter === cat ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800/60 text-cream-300 hover:border-ink-500'"
+              :class="catFilter === cat ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-300 hover:border-ink-500'"
               class="rounded-full border px-2.5 py-1 text-[11px] font-medium transition">
         {{ CAT_LABELS[cat] || cat }} <span class="text-cream-400">{{ countFor(cat) }}</span>
         <span v-if="STUDIO_CATEGORIES.includes(cat)" class="ml-1 rounded bg-brand-600/25 px-1 py-0.5 text-[9px] font-bold text-brand-200">Studio</span>

@@ -74,16 +74,16 @@ function download(g) {
           <span class="pointer-events-none absolute left-1/2 top-1 z-10 hidden -translate-x-1/2 items-center gap-1 rounded-full bg-scrim/70 px-1.5 py-0.5 text-[9px] font-semibold text-scrim-content transition group-hover:flex"><StudioIcon name="download" size="h-2.5 w-2.5" class="text-brand-300"/>Kéo thả</span>
           <!-- [Trục 3] Thanh hành động: hiện khi rê chuột HOẶC khi có nút được focus (bàn phím dùng được). -->
           <div class="pointer-events-none absolute inset-x-0 bottom-0 z-20 grid grid-cols-2 gap-0.5 bg-black/80 p-0.5 opacity-0 backdrop-blur-sm transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-ink-800/90 text-[9px] font-semibold text-cream-100 transition hover:bg-brand-600 hover:text-white" title="Thêm vào canvas (thành layer để ghép/sửa)" :aria-label="'Thêm ' + store.genName(g) + ' vào canvas'" @click.stop="toCanvas(g)">
+            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-scrim/85 text-[9px] font-semibold text-scrim-content transition hover:bg-brand-600 hover:text-white" title="Thêm vào canvas (thành layer để ghép/sửa)" :aria-label="'Thêm ' + store.genName(g) + ' vào canvas'" @click.stop="toCanvas(g)">
               <StudioIcon name="plus" size="h-3 w-3" /> Canvas
             </button>
-            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-ink-800/90 text-[9px] font-semibold text-cream-100 transition hover:bg-brand-600 hover:text-white" title="Tải ảnh gốc về máy" :aria-label="'Tải ' + store.genName(g)" @click.stop="download(g)">
+            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-scrim/85 text-[9px] font-semibold text-scrim-content transition hover:bg-brand-600 hover:text-white" title="Tải ảnh gốc về máy" :aria-label="'Tải ' + store.genName(g)" @click.stop="download(g)">
               <StudioIcon name="download" size="h-3 w-3" /> Tải
             </button>
-            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-ink-800/90 text-[9px] font-semibold text-cream-100 transition hover:bg-brand-600 hover:text-white" title="Tạo biến thể từ ảnh này (mở công cụ Biến thể)" :aria-label="'Tạo biến thể từ ' + store.genName(g)" @click.stop="useIn(g, 'variation')">
+            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-scrim/85 text-[9px] font-semibold text-scrim-content transition hover:bg-brand-600 hover:text-white" title="Tạo biến thể từ ảnh này (mở công cụ Biến thể)" :aria-label="'Tạo biến thể từ ' + store.genName(g)" @click.stop="useIn(g, 'variation')">
               <StudioIcon name="variations" size="h-3 w-3" /> Biến thể
             </button>
-            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-ink-800/90 text-[9px] font-semibold text-cream-100 transition hover:bg-brand-600 hover:text-white" title="Sửa ảnh này (mở công cụ Sửa ảnh)" :aria-label="'Sửa ' + store.genName(g)" @click.stop="useIn(g, 'inpaint')">
+            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-scrim/85 text-[9px] font-semibold text-scrim-content transition hover:bg-brand-600 hover:text-white" title="Sửa ảnh này (mở công cụ Sửa ảnh)" :aria-label="'Sửa ' + store.genName(g)" @click.stop="useIn(g, 'inpaint')">
               <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
             </button>
           </div>

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Support\ModuleRegistry;
+use App\Support\ThemePalette;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route as RouteFacade;
@@ -30,62 +31,45 @@ class ThemeSystemTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * [2026-09-23] Việc ĐỌC token và TÍNH tương phản nay nằm ở App\Support\ThemePalette — CÙNG lớp
+     * mà trang xem token cho người thiết kế dùng (/he-thong-thiet-ke). Trước đây test tự parse app.css
+     * theo cách riêng, nên nếu làm thêm một trang đọc token thì đã có HAI chỗ tính và chúng lệch nhau
+     * lúc nào không biết.
+     */
     private function css(): string
     {
         return (string) file_get_contents(resource_path('css/app.css'));
     }
 
-    /** Bảng token của theme TỐI — khai trong khối @theme. */
+    /** @return array<string,string> token của theme TỐI (khối @theme) */
     private function darkTokens(): array
     {
-        preg_match('/@theme\s*\{(.*?)\n\}/s', $this->css(), $m);
-        $this->assertNotEmpty($m[1] ?? '', 'Không đọc được khối @theme trong app.css.');
+        ThemePalette::flush();
+        $tokens = ThemePalette::tokens('dark');
+        $this->assertNotEmpty($tokens, 'Không đọc được khối @theme trong app.css.');
 
-        return $this->tokens($m[1]);
+        return $tokens;
     }
 
-    /** Bảng token của theme SÁNG — khối [data-theme='light'] (ngoài layer nên thắng @theme). */
+    /** @return array<string,string> token của theme SÁNG (khối [data-theme=\'light\']) */
     private function lightTokens(): array
     {
-        preg_match("/\[data-theme='light'\]\s*\{(.*?)\n\}/s", $this->css(), $m);
-        $this->assertNotEmpty($m[1] ?? '', "Thiếu khối [data-theme='light'] trong app.css.");
+        ThemePalette::flush();
+        $tokens = ThemePalette::tokens('light');
+        $this->assertNotEmpty($tokens, "Thiếu khối [data-theme='light'] trong app.css.");
 
-        return $this->tokens($m[1]);
+        return $tokens;
     }
 
-    /** @return array<string,string> tên token => mã màu hex */
-    private function tokens(string $block): array
-    {
-        preg_match_all('/--color-([a-z0-9-]+):\s*(#[0-9a-fA-F]{6})\s*;/', $block, $m, PREG_SET_ORDER);
-        $out = [];
-        foreach ($m as $row) {
-            $out[$row[1]] = $row[2];
-        }
-
-        return $out;
-    }
-
-    // ── Công thức WCAG 2.1: độ chói tương đối + tỉ lệ tương phản ──────────────────────────
     private function luminance(string $hex): float
     {
-        $hex = ltrim($hex, '#');
-        $channels = [];
-        foreach ([0, 2, 4] as $i) {
-            $c = hexdec(substr($hex, $i, 2)) / 255;
-            $channels[] = $c <= 0.03928 ? $c / 12.92 : (($c + 0.055) / 1.055) ** 2.4;
-        }
-
-        return 0.2126 * $channels[0] + 0.7152 * $channels[1] + 0.0722 * $channels[2];
+        return ThemePalette::luminance($hex);
     }
 
     private function contrast(string $a, string $b): float
     {
-        $la = $this->luminance($a);
-        $lb = $this->luminance($b);
-        $hi = max($la, $lb);
-        $lo = min($la, $lb);
-
-        return ($hi + 0.05) / ($lo + 0.05);
+        return ThemePalette::contrast($a, $b);
     }
 
     public function test_both_themes_declare_the_same_token_ramps(): void
@@ -362,6 +346,31 @@ class ThemeSystemTest extends TestCase
         foreach (['sun', 'moon', 'monitor'] as $icon) {
             $this->assertArrayHasKey($icon, $icons, 'Thiếu icon '.$icon.' cho mục Giao diện.');
         }
+    }
+
+    public function test_the_designer_token_page_shows_the_same_numbers_as_the_test(): void
+    {
+        $this->seed();
+        $admin = User::where('email', 'admin@fabrikai.shop')->firstOrFail();
+        $customer = User::where('email', 'user@fabrikai.shop')->firstOrFail();
+
+        // Trang nội bộ của người làm sản phẩm: khách KHÔNG vào được (đây không phải trang cho khách dùng).
+        $this->actingAs($customer)->get('/he-thong-thiet-ke')->assertForbidden();
+
+        $this->actingAs($admin)->get('/he-thong-thiet-ke')
+            ->assertOk()
+            ->assertSee('Bảng token hai theme', false)
+            ->assertSee('Theme Tối', false)
+            ->assertSee('Theme Sáng', false)
+            // Đúng những bậc token đang có, và con số lấy từ CÙNG lớp ThemePalette mà test này dùng.
+            ->assertSee('cream-400', false)
+            ->assertSee('--color-scrim', false)
+            ->assertSee(number_format(ThemePalette::contrast(ThemePalette::resolved('dark')['cream-400'], ThemePalette::resolved('dark')['ink-800']), 2, ',', '.'), false);
+
+        // Bất biến quan trọng nhất: trang KHÔNG có nguồn dữ liệu riêng — nó phải gọi ThemePalette.
+        $controller = (string) file_get_contents(app_path('Http/Controllers/ThemeController.php'));
+        $this->assertStringContainsString('ThemePalette::matrix(', $controller,
+            'Trang token phải đọc số liệu từ App\Support\ThemePalette, không tự tính lại.');
     }
 
     /** @return list<string> */

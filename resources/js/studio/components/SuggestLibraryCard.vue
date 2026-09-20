@@ -83,7 +83,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
       </div>
       <div v-else-if="!store.suggestLibItems.length" class="py-16 text-center">
         <p class="text-xs text-cream-400">Chưa có prompt nào được lưu.</p>
-        <p class="mt-1 text-[10px] text-cream-400">Dùng card "💡 Gợi ý từ ảnh" → nhấn "💾 Lưu vào Thư viện Prompt".</p>
+        <p class="mt-1 text-[10px] text-cream-400">Dùng card "Gợi ý từ ảnh" → nhấn "Lưu vào Thư viện Prompt".</p>
       </div>
       <div v-else class="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <div
@@ -181,8 +181,8 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
             <!-- Tags -->
             <div class="flex flex-wrap gap-1.5">
               <span v-for="s in (item.styles || [])" :key="s" class="rounded-full bg-brand-600/20 px-2 py-0.5 text-[10px] text-brand-200">{{ s }}</span>
-              <span v-if="item.garment_type" class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200">👕 {{ item.garment_type }}</span>
-              <span v-if="item.embellishment" class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200">✨ {{ item.embellishment }}</span>
+              <span v-if="item.garment_type" class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200"><StudioIcon name="shirt" size="h-3 w-3" /> {{ item.garment_type }}</span>
+              <span v-if="item.embellishment" class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200"><StudioIcon name="sparkles" size="h-3 w-3" /> {{ item.embellishment }}</span>
             </div>
 
             <!-- Chi tiết phân tích -->

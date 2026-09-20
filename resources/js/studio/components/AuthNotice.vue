@@ -48,7 +48,7 @@ const copy = {
     <div class="w-full max-w-md rounded-2xl border border-ink-700 bg-ink-900 p-6 text-center shadow-2xl">
       <div class="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-brand-600/15 text-brand-300">
         <span v-if="copy[store.authState].icon === 'login'" class="text-2xl" role="img" aria-hidden="true">→</span>
-        <span v-else class="text-2xl" role="img" aria-hidden="true">🔒</span>
+        <StudioIcon v-else name="lock" size="h-6 w-6" class="text-cream-300" aria-hidden="true" />
       </div>
       <h1 id="auth-notice-title" class="font-display text-lg font-semibold text-cream-100">{{ copy[store.authState].title }}</h1>
       <p class="mt-2 text-sm leading-relaxed text-cream-300">{{ copy[store.authState].body }}</p>

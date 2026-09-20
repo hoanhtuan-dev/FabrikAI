@@ -1,6 +1,6 @@
 <script setup>
 /**
- * ⚙️ CÀI ĐẶT STUDIO — bản thiết kế lại UX/UI (2026-09-18).
+ *  CÀI ĐẶT STUDIO — bản thiết kế lại UX/UI (2026-09-18).
  *
  * VẤN ĐỀ CỦA BẢN CŨ (một trang, 6 tab, 789 dòng):
  *   · Không có TỔNG QUAN: mở trang là gặp ngay danh sách key — không biết hệ thống đang thiếu gì
@@ -958,7 +958,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                   <select v-model="tplPick" aria-label="Chọn mẫu khai báo provider" class="input !w-auto !py-2 text-xs">
-                    <option value="">📋 Mẫu khai báo…</option>
+                    <option value="">Mẫu khai báo…</option>
                     <option v-for="(tpl, key) in providerTemplates" :key="key" :value="key">{{ tpl.label }}</option>
                   </select>
                   <button class="tool-btn" :disabled="!tplPick" :class="!tplPick ? 'opacity-50' : ''" @click="applyProviderTemplate(tplPick)">
@@ -1401,7 +1401,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
         <div>
           <label class="label" for="p-prio">Ưu tiên trong nhóm Custom <span class="font-normal normal-case text-cream-300">(lớn hơn = thử trước)</span></label>
           <input id="p-prio" type="number" min="0" max="100" v-model.number="provModal.form.priority" class="input !py-2 sm:max-w-[10rem]">
-          <p class="mt-1 text-[11px] text-cream-300">Tab 🔥 quyết định THỨ TỰ NHÓM; số này phân định các route nằm CÙNG nhóm — ví dụ nhiều custom provider: route điểm cao được gọi trước, lỗi thì mới rơi xuống route dưới.</p>
+          <p class="mt-1 text-[11px] text-cream-300">Tab Nhóm công việc quyết định THỨ TỰ NHÓM; số này phân định các route nằm CÙNG nhóm — ví dụ nhiều custom provider: route điểm cao được gọi trước, lỗi thì mới rơi xuống route dưới.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
           <label class="flex items-center gap-2 text-xs text-cream-200">

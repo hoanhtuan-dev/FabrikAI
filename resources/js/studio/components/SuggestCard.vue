@@ -320,7 +320,7 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
             <span>· mức bám: {{ adherenceLabel }}</span>
           </p>
         </div>
-        <button class="motion-ui grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cream-50/10 text-cream-200 transition hover:bg-red-600 hover:text-white"
+        <button class="motion-ui grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink-800 text-cream-200 transition hover:bg-red-600 hover:text-white"
                 title="Xoá gợi ý này" aria-label="Xoá gợi ý này"
                 @click="store.suggestResult = null; store.suggestError = ''; lang = 'en'">
           <StudioIcon name="x" size="h-3.5 w-3.5" />

@@ -209,7 +209,7 @@ function saveSettings() {
               :class="selected[i-1] ? 'border-brand-500 bg-ink-900' : 'border-dashed border-ink-600 hover:border-brand-400 bg-ink-900/40'">
         <template v-if="selected[i-1]">
           <img :src="selected[i-1].url" class="h-full w-full object-cover" @error="onSlotImgError(i-1)">
-          <span v-if="slotImgError[i-1]" class="absolute inset-0 grid place-items-center bg-ink-900 text-2xl" title="Ảnh không tải được — bấm × để bỏ">🖼️</span>
+          <span v-if="slotImgError[i-1]" class="absolute inset-0 grid place-items-center bg-ink-900 text-2xl" title="Ảnh không tải được — bấm × để bỏ"><StudioIcon name="image" size="h-6 w-6" /></span>
           <span class="absolute left-1 top-1 rounded-full bg-brand-500 px-1.5 text-[9px] font-bold text-white">{{ i }}</span>
           <span class="absolute inset-x-0 bottom-0 bg-scrim/65 px-1 py-0.5 text-center text-[9px] font-semibold text-scrim-content">{{ SLOT_ROLES[i-1] }}</span>
           <span @click.stop="removeSlot(i-1)" title="Bỏ ảnh khỏi slot" class="motion-ui absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-red-600/90 text-[11px] text-white hover:bg-red-500"><StudioIcon name="x" size="h-3.5 w-3.5" /></span>
@@ -255,7 +255,7 @@ function saveSettings() {
     <div class="mt-3">
       <div class="flex items-center justify-between">
         <label class="label mb-0">Preset phong cách</label>
-        <button @click="saveSettings" class="btn-ghost btn-sm shrink-0 whitespace-nowrap" title="Lưu phong cách + trang trí + sáng tạo hiện tại vào tài khoản">💾 Lưu cài đặt</button>
+        <button @click="saveSettings" class="btn-ghost btn-sm shrink-0 whitespace-nowrap" title="Lưu phong cách + trang trí + sáng tạo hiện tại vào tài khoản"><StudioIcon name="save" size="h-3.5 w-3.5" /> Lưu cài đặt</button>
       </div>
       <div class="mt-1 flex flex-wrap gap-1.5">
         <button v-for="p in stylePresets" :key="p.name" @click="applyPreset(p)" class="group inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2.5 py-1 text-[10px] font-medium text-cream-200 transition hover:border-brand-400">
@@ -281,7 +281,7 @@ function saveSettings() {
 
     <!-- Xem trước / chỉnh tay prompt -->
     <button @click="togglePreview" type="button" class="btn-outline mt-3 w-full whitespace-nowrap">
-      {{ previewOpen ? 'Ẩn xem trước prompt' : '👁 Xem trước prompt' }}
+      {{ previewOpen ? 'Ẩn xem trước prompt' : 'Xem trước prompt' }}
     </button>
     <div v-if="previewOpen" class="mt-2 rounded-lg border border-brand-500/30 bg-brand-900/20 p-3">
       <div class="mb-1.5 flex items-center justify-between gap-2">
@@ -317,7 +317,7 @@ function saveSettings() {
     <!-- Thành công -->
     <div v-if="store.composeStage === 'done'" class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-ok">
       Đã lai tạo xong — kết quả đã được chọn trong Outputs.
-      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-cream-50/10 px-2 py-0.5 hover:bg-cream-50/20">Đóng</button>
+      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-ink-800 px-2 py-0.5 hover:bg-ink-700">Đóng</button>
     </div>
 
     <!-- Lỗi -->
@@ -333,11 +333,11 @@ function saveSettings() {
     <!-- Đã hủy -->
     <div v-if="store.composeStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-cream-50/5 p-3 text-xs text-cream-200">
       Đã hủy yêu cầu ghép trang phục.
-      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-cream-50/10 px-2 py-0.5 hover:bg-cream-50/20">Đóng</button>
+      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-ink-800 px-2 py-0.5 hover:bg-ink-700">Đóng</button>
     </div>
 
     <!-- So sánh Trước/Sau -->
-    <button v-if="baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-1.5 w-full whitespace-nowrap">🔍 So sánh Trước/Sau</button>
+    <button v-if="baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-1.5 w-full whitespace-nowrap"><StudioIcon name="zoomIn" size="h-3.5 w-3.5" /> So sánh Trước/Sau</button>
 
     <SourceLibraryPicker
       v-model="open"

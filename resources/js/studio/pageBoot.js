@@ -17,7 +17,7 @@
  * `sw-studio.js` (scope `/studio`) hoặc `sw.js` (scope `/`), và service worker cũ sẽ phục vụ
  * JavaScript/CSS đã lâu không còn tồn tại → SPA trắng trang mà không có lỗi rõ ràng.
  *
- * ⚠️ KHÔNG xoá hàm này dù PWA đã bị gỡ hẳn ở phía máy chủ (T5, 2026-09-17: đã xoá `public_html/sw.js`
+ *  KHÔNG xoá hàm này dù PWA đã bị gỡ hẳn ở phía máy chủ (T5, 2026-09-17: đã xoá `public_html/sw.js`
  * + `manifest.json`). Gỡ file trên máy chủ **không** tự gỡ service worker đã cài trong trình duyệt
  * của người dùng cũ — SW cũ vẫn nằm đó và vẫn phục vụ asset cũ cho tới khi có JavaScript gỡ nó.
  *

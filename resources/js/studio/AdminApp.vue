@@ -7,7 +7,7 @@
  *     LẠC CHỖ trong template (nằm giữa các hộp thoại) nên rất khó lần ra khi đọc code.
  *   · Hộp thoại tự viết tay (\`fixed inset-0\` + role) nhưng KHÔNG giữ focus: bấm Tab vài lần là
  *     bàn phím đi xuyên ra sau lớp phủ. Bản này dùng chung BaseModal (đã có focus trap + Esc).
- *   · Mọi nút dùng emoji (✏️ 💰 🔑 🗑 ➕ 💾) — không có nhãn chữ, không screen-reader đọc được.
+ *   · Mọi nút dùng emoji () — không có nhãn chữ, không screen-reader đọc được.
  *   · Người có vai trò Quản trị (không phải Owner) vẫn thấy tab Người dùng, bấm vào chỉ nhận
  *     lỗi 403 khô khan. Nay phân quyền được HIỂN THỊ rõ (ẩn mục + nói vì sao).
  *   · Dữ liệu server trả về nhưng bị bỏ: type_label, admin (ai điều chỉnh), users_count của gói,
@@ -1482,7 +1482,7 @@ onMounted(async () => {
                                 class="rounded border px-1.5 py-0.5 text-[10px] transition"
                                 :class="(planModules[p.slug] || []).includes(m.id)
                                   ? 'border-emerald-500/40 bg-emerald-500/15 text-ok'
-                                  : 'border-ink-600 bg-ink-800/60 text-cream-300 hover:border-ink-500'"
+                                  : 'border-ink-600 bg-ink-800 text-cream-300 hover:border-ink-500'"
                                 :title="m.summary"
                                 @click="toggleGrant(p.slug, m.id)">
                           <StudioIcon :name="(planModules[p.slug] || []).includes(m.id) ? 'check' : 'x'" size="h-3 w-3" class="mr-0.5 inline" />{{ m.name }}
@@ -1768,7 +1768,7 @@ onMounted(async () => {
                           class="rounded border px-1.5 py-0.5 text-[10px] transition"
                           :class="(planModal.form.modules || []).includes(m.id)
                             ? 'border-emerald-500/40 bg-emerald-500/15 text-ok'
-                            : 'border-ink-600 bg-ink-800/60 text-cream-300 hover:border-ink-500'"
+                            : 'border-ink-600 bg-ink-800 text-cream-300 hover:border-ink-500'"
                           :title="m.summary + (m.depends_on.length ? ' · cần: ' + m.depends_on.join(', ') : '')"
                           @click="togglePlanFormModule(m.id)">
                     <StudioIcon :name="(planModal.form.modules || []).includes(m.id) ? 'check' : 'x'" size="h-3 w-3" class="mr-0.5 inline" />{{ m.name }}

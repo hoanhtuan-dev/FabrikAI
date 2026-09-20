@@ -292,7 +292,7 @@ function confirmAdd() {
               <input type="range" min="2" max="8" step="1" v-model.number="gridCols" class="h-1.5 w-24 cursor-pointer accent-brand-500" aria-label="Kích thước ô ảnh">
             </div>
             <!-- [MỚI] Chọn tất cả ảnh ĐANG HIỆN (sau khi lọc) — 1 cú bấm thay vì tích từng ảnh -->
-            <button @click="selectAllVisible" :disabled="!visibleCount" class="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-ink-600 bg-ink-800/60 px-3 text-xs font-medium text-cream-200 transition-colors hover:border-brand-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-40" :title="allVisibleSelected ? 'Bỏ chọn toàn bộ ảnh đang hiện' : 'Chọn toàn bộ ' + visibleCount + ' ảnh đang hiện'">
+            <button @click="selectAllVisible" :disabled="!visibleCount" class="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-ink-600 bg-ink-800 px-3 text-xs font-medium text-cream-200 transition-colors hover:border-brand-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-40" :title="allVisibleSelected ? 'Bỏ chọn toàn bộ ảnh đang hiện' : 'Chọn toàn bộ ' + visibleCount + ' ảnh đang hiện'">
               <StudioIcon :name="allVisibleSelected ? 'selectSubtract' : 'selectAll'" size="h-3.5 w-3.5"/>
               {{ allVisibleSelected ? 'Bỏ chọn' : 'Chọn tất cả' }}
             </button>

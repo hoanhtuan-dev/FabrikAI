@@ -86,7 +86,7 @@ const progress = computed(() => {
         <span class="shrink-0 text-[11px] font-semibold tabular-nums text-brand-300">{{ progress.pct }}%</span>
       </div>
       <div class="h-1 w-full bg-ink-800">
-        <div class="h-full bg-gradient-to-r from-brand-500 to-brand-300 transition-all duration-slow ease-emphasized" :style="{ width: progress.pct + '%' }"></div>
+        <div class="h-full bg-gradient-to-r from-brand-500 to-brand-300 motion-ui motion-ui--size duration-slow ease-emphasized" :style="{ width: progress.pct + '%' }"></div>
       </div>
     </div>
 
@@ -113,12 +113,12 @@ const progress = computed(() => {
         <button
           v-if="n.action"
           type="button"
-          class="shrink-0 rounded-md border border-ink-600 px-2 py-0.5 text-[10px] font-semibold transition hover:bg-cream-50/10"
+          class="shrink-0 rounded-md border border-ink-600 px-2 py-0.5 text-[10px] font-semibold transition hover:bg-ink-800"
           @click="n.action.run(); store.dismissNotification(n.id)"
         >{{ n.action.label }}</button>
         <button
           type="button"
-          class="shrink-0 rounded-md p-0.5 opacity-60 transition hover:bg-cream-50/10 hover:opacity-100"
+          class="shrink-0 rounded-md p-0.5 opacity-60 transition hover:bg-ink-800 hover:opacity-100"
           title="Đóng thông báo"
           aria-label="Đóng thông báo"
           @click="store.dismissNotification(n.id)"

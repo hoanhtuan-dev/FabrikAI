@@ -228,4 +228,93 @@ class DesignSystemTest extends TestCase
         $this->assertStringNotContainsString('rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1.5',
             $css, 'Đã quay lại viền nghỉ border-ink-700 cho .tool-btn.');
     }
+
+    /**
+     * KHÔNG EMOJI TRONG CHROME — khoá lại sau khi dọn hết nợ (2026-09-23).
+     *
+     * Đo trước khi dọn: 134 lần xuất hiện trên 23 file (ConceptCard 43 · store.js 18 · AdminApp 7 …).
+     * Ba lý do thật của luật này (docs/DESIGN_SYSTEM.md §9): mỗi hệ điều hành vẽ một kiểu nên bố cục
+     * lệch nhau; emoji không theo bảng màu nên phá tông của card; trình đọc màn hình đọc tên emoji
+     * thành tiếng, chen vào giữa nhãn.
+     *
+     * KÝ HIỆU CHỮ được phép (không phải emoji hình, và tài liệu §8 dùng chúng làm tín hiệu phi màu):
+     * ✓ (đã lưu) · ✕ (đóng) · ✗ · ★. Emoji trong NỘI DUNG do người dùng/AI sinh ra cũng ngoài phạm vi
+     * test này (test chỉ quét mã giao diện).
+     */
+    public function test_no_pictographic_emoji_in_studio_chrome(): void
+    {
+        // Nháy ĐÔI: PHP chỉ hiểu \u{…} trong chuỗi nháy đôi (chuỗi nháy đơn là văn bản thô).
+        $allowed = ["\u{2713}", "\u{2715}", "\u{2717}", "\u{2605}", "\u{2606}"];
+        $pattern = '/[\x{1F300}-\x{1FAFF}\x{2B00}-\x{2BFF}\x{FE0F}]|[\x{2600}-\x{27BF}]/u';
+
+        $violations = [];
+        foreach (\Illuminate\Support\Facades\File::allFiles(resource_path('js/studio')) as $file) {
+            if (! in_array($file->getExtension(), ['vue', 'js'], true)) continue;
+            $body = (string) file_get_contents($file->getPathname());
+            if (preg_match_all($pattern, $body, $m)) {
+                foreach (array_unique($m[0]) as $hit) {
+                    if (in_array($hit, $allowed, true)) continue;
+                    $violations[] = $file->getFilename().': '.$hit;
+                }
+            }
+        }
+        foreach (\Illuminate\Support\Facades\File::allFiles(resource_path('views')) as $file) {
+            $body = (string) file_get_contents($file->getPathname());
+            if (preg_match_all($pattern, $body, $m)) {
+                foreach (array_unique($m[0]) as $hit) {
+                    if (in_array($hit, $allowed, true)) continue;
+                    $violations[] = 'views/'.$file->getFilename().': '.$hit;
+                }
+            }
+        }
+
+        $this->assertSame([], array_values(array_unique($violations)),
+            "Có emoji trong chrome của studio. Xem docs/DESIGN_SYSTEM.md §9 — dùng <StudioIcon> (icons.json) "
+            .'thay cho emoji; emoji chỉ còn chấp nhận trong nội dung do người dùng/AI sinh ra.');
+    }
+
+    /**
+     * NỀN CỦA NÚT — một trạng thái, MỘT token.
+     *
+     * Đo trước khi đồng bộ (2026-09-23): nút nghỉ có BA kiểu nền khác nhau — bg-ink-800 (đa số),
+     * "kính mờ" bg-white/5 (sau đợt theme đổi thành bg-cream-50/5) và bg-ink-900/90 — nên hai nút
+     * cạnh nhau lệch nền mà không ai cố ý. Đây đúng là vết lặp của lỗi VIỀN (§5.2) đã sửa trước đó.
+     *
+     * Từ vựng: nút nghỉ = bg-ink-800 · hover = bg-ink-700 · nền màu/nhấn = token ngữ nghĩa
+     * (bg-brand-600 · bg-brand-500 · bg-danger/10 …). Nút đặt TRÊN ẢNH dùng token cố định
+     * bg-scrim/NN + text-scrim-content (§1.1 quy tắc 5) — đó là môi trường ảnh, không phải bề mặt.
+     */
+    public function test_button_backgrounds_use_one_token_per_state(): void
+    {
+        // Nền "kính mờ"/alpha lạ: KHÔNG bao giờ dùng cho trạng thái nghỉ của nút.
+        $forbidden = [
+            'bg-ink-900/90', 'bg-ink-900/95', 'bg-ink-900/85', 'bg-ink-900/80', 'bg-ink-900/70',
+            'bg-ink-800/90', 'bg-ink-800/80', 'bg-ink-800/70', 'bg-ink-800/60',
+            'bg-cream-50/5', 'bg-cream-50/10', 'bg-cream-50/15', 'bg-cream-50/20',
+            'bg-white/5', 'bg-white/10', 'bg-white/20',
+        ];
+
+        $violations = [];
+        foreach (\Illuminate\Support\Facades\File::allFiles(resource_path('js/studio')) as $file) {
+            if ($file->getExtension() !== 'vue') continue;
+            $html = (string) file_get_contents($file->getPathname());
+            preg_match_all('/<(button|a|label)\b[^>]*>/s', $html, $tags);
+            foreach ($tags[0] as $tag) {
+                foreach ($forbidden as $bad) {
+                    if (str_contains($tag, $bad)) {
+                        $violations[] = $file->getFilename().': '.$bad;
+                    }
+                }
+            }
+        }
+
+        $this->assertSame([], array_values(array_unique($violations)),
+            "Nút dùng nền 'kính mờ'/alpha cho trạng thái NGHỈ ⇒ hai nút cạnh nhau lệch nền. "
+            .'Xem docs/DESIGN_SYSTEM.md §5.3 — nút nghỉ = bg-ink-800 · hover = bg-ink-700 · nút trên ẢNH = bg-scrim/NN.');
+
+        // Nút dùng CHUNG cũng phải theo đúng nền đó (không lệch với nút viết tay).
+        $css = $this->src('resources/css/app.css');
+        $this->assertStringContainsString('.tool-btn { @apply inline-flex items-center gap-1.5 rounded-md border border-ink-600 bg-ink-800',
+            $css, '.tool-btn phải dùng nền nghỉ bg-ink-800 — lệch với nút viết tay là hai nút cạnh nhau khác nền.');
+    }
 }

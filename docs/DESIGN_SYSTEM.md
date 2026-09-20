@@ -90,6 +90,7 @@
 | Lưu | `users.theme` (migration `2026_09_23_000001`) qua `PUT /api/theme` — whitelist cứng `light|dark|system`; localStorage `fabrikai.theme` là **cache** để vào trang là đúng ngay |
 | Hàm PHP | `theme_pref()` (mặc định `dark` khi chưa chọn) · `theme_resolved()` (`system` ⇒ trả `dark`, script sửa lại trước khi vẽ) |
 | Hàm JS | `window.FabrikAITheme` · bọc Vue: `composables/useTheme.js` |
+| **Xem bảng token + tỉ lệ tương phản** | **`/he-thong-thiet-ke`** (cấp OWNER, server-render) — đọc thẳng `resources/css/app.css` qua `App\Support\ThemePalette`, CÙNG lớp mà `ThemeSystemTest` dùng nên trang và test không thể lệch số |
 
 **Đo lại bằng Chrome thật (2026-09-23)** — bốn màn hình (bảng giá · Studio · Cài đặt của tôi ·
 Bộ sưu tập) × hai theme, **2.578 phần tử chữ mỗi theme**: **0 chỗ** dưới ngưỡng WCAG AA. Phép đo
@@ -258,10 +259,24 @@ Ba quyết định đáng nhớ:
 bằng máy, không phải thứ chỉ lộ ra khi có người ngồi nhìn. Muốn thêm token: sửa bảng này + danh sách
 trong test **trong cùng một commit** — đó là chủ ý, không phải tai nạn.
 
-### 5.3 Nền của nút — nợ đã biết
+### 5.3 Nền của nút — một trạng thái, MỘT token (đồng bộ 2026-09-23)
 
-Nền nút vẫn còn trộn `bg-ink-800` / `bg-white/5` / `bg-ink-900/90`. Cùng cách đo như viền, có thể
-đồng bộ tiếp ở đợt sau; khi làm thì áp đúng luật "một nghĩa, một token" ở mục này.
+> Đo trước khi đồng bộ: nút nghỉ có **ba** kiểu nền — `bg-ink-800` (đa số), "kính mờ" `bg-white/5`
+> và `bg-ink-900/90`. Hai nút cạnh nhau lệch nền mà không ai cố ý; đây đúng vết lặp của lỗi **viền**
+> đã sửa ở §5.2.
+
+| Trạng thái | Token | Ghi chú |
+|---|---|---|
+| Nút nghỉ | `bg-ink-800` | **mọi** nút/chip/ô bấm được |
+| Hover | `hover:bg-ink-700` | |
+| Đang chọn / nhấn mạnh | `bg-brand-600` (+ `text-white`) · tint `bg-brand-600/20` | |
+| Ngữ nghĩa | `bg-danger/10` · `bg-warn/15` · `bg-ok/15` · `bg-info/15` | tint theo màu trạng thái |
+| **Nút đặt TRÊN ẢNH** | `bg-scrim/85` + `text-scrim-content` | môi trường ảnh ⇒ CỐ ĐỊNH (§1.1 quy tắc 5) |
+| Khối CHỨA (không bấm được) | `bg-ink-900` · `bg-ink-900/95` | panel/thanh dính — KHÔNG dùng cho nút |
+
+Khoá bằng `DesignSystemTest::test_button_backgrounds_use_one_token_per_state`: nút dùng lại nền
+"kính mờ" (`bg-cream-50/5`, `bg-ink-900/90`, `bg-white/5`…) là **test ĐỎ** — muốn thêm ngoại lệ thì
+sửa bảng này **và** danh sách trong test trong cùng một commit.
 
 ---
 
@@ -383,9 +398,12 @@ thông báo lỗi **không được** chứa tên model/provider.
   bố cục lệch nhau; (b) emoji không theo bảng màu nên phá vỡ tông của card; (c) trình đọc màn hình
   đọc tên emoji thành tiếng, chen vào giữa nhãn.
   Emoji chỉ còn chấp nhận trong **nội dung do người dùng/AI sinh ra**.
-- **Nợ hiện có (đo 2026-09-22): 23/65 file còn emoji · 134 lần xuất hiện** — nhiều nhất là
-  `ConceptCard.vue` (43), `store.js` (18, phần lớn là chuỗi toast), `AdminApp.vue` (7).
-  Không cần dọn một đợt riêng: **sửa tới file nào thì dọn file đó**, và không thêm emoji mới.
+- **ĐÃ DỌN SẠCH (2026-09-23): 23/65 file · 134 lần xuất hiện → 0.** Nhiều nhất trước đó là
+  `ConceptCard.vue` (43, gồm cả một trường `emoji` trong bảng dữ liệu kiểu tóc — đã bỏ hẳn trường đó),
+  `store.js` (18, phần lớn là chuỗi toast), `AdminApp.vue` (7). Cách xử lý: chỗ là **icon** thì đổi sang
+  `StudioIcon` (bot · image · save · eye · zoomIn · user · shirt · sparkles · wand · lock), chỗ chỉ là **trang trí** thì bỏ.
+  **KÝ HIỆU CHỮ được giữ** (không phải emoji hình, và §8 dùng chúng làm tín hiệu phi màu): ✓ · ✕ · ✗ · ★.
+  Khoá bằng `DesignSystemTest::test_no_pictographic_emoji_in_studio_chrome` — thêm emoji mới vào chrome là **test ĐỎ**.
 
 ---
 
@@ -731,6 +749,8 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 | 21 | 2026-09-22 | Giao diện **nói với lập trình viên**: lộ nguyên văn lỗi nhà cung cấp, tên model, lệnh CLI | Ba tầng chặn (§6): PHP · cửa chặn ở biên `toast/notify` · state dùng `userFacingError()` (14 chỗ) · gỡ chip "DeepSeek · deepseek-chat" | `UserFacingMessagesTest` + `SuggestStreamTest` · 6 phép đột biến ĐỎ đúng chỗ |
 | 22 | 2026-09-23 | **Chữ dùng ĐỘ MỜ để tạo bậc ⇒ khó đọc**: 741 chỗ `text-cream-300/NN`, trong đó `/40` ≈ **2,9:1** (WCAG AA cần 4,5:1); app chỉ có MỘT giao diện (tối) và không cài đặt được | **4 bậc nội dung ĐẶC** + token trạng thái ngữ nghĩa · **theme Sáng/Tối** (hai dải token đảo vai, script chạy TRƯỚC khi vẽ, lưu theo tài khoản qua `users.theme` + `PUT /api/theme`) · mục **Giao diện** ở Cài đặt + nút đổi nhanh ở thanh trạng thái Studio | 50 file dọn màu (741 chỗ opacity + 345 chỗ sắc độ trạng thái) · mọi bậc chữ **6,7–18,3 : 1** · Chrome thật: 4 màn hình × 2 theme, **2.578 phần tử chữ/theme — 0 chỗ dưới AA** · CSS build **164,61 → 155,33 kB** (−9,3 kB) · 11 test mới (`ThemeSystemTest` 10 + 1 ở `CanvasControlsTest`) · icon 129 → **132** |
 
+| 23 | 2026-09-23 | **6 test đỏ tồn đọng** ở HEAD (Bộ sưu tập · Duyệt mẫu · a11y lớp phủ · chuyển động hover) + **5 món nợ** đã ghi trong DEPLOY_LOG | Sửa **SẢN PHẨM** ở chỗ là lỗi thật: 4 lớp phủ thiếu `role/aria-modal` · 2 bề mặt hover thiếu nhịp · state `reviewErrors` chết (nay hiện lỗi **từng ảnh kèm bước**) · trả lại nút **Xử lý ngay** (`processQueue`) đã mất khi card sidebar thu gọn · gom đường xuất gói về `store.exportProject()` (bỏ 2 bản fetch trùng 26 dòng) · 2 test cập nhật theo **bề mặt thật** | 6 → **0 test đỏ** · emoji **134 → 0** (23 file) · xoá ~115 dòng CSS chết + `.section-title` · `transition-all` 19 → **0** · nền nút 3 kiểu → **1 token** (51 thẻ) · thêm trang **`/he-thong-thiet-ke`** · 10 test mới/ cập nhật |
+
 ### 16.1 Số đo trước → sau của cả hành trình
 
 | Chỉ số | Trước | Sau |
@@ -765,14 +785,13 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 
 ### 17.2 Việc còn nợ (không chặn khách)
 
-- [ ] **Mã chết của "Storefront Vue SPA"**: các lớp `.sf-shell · .sf-btn* · .glass · .card-surface · .sf-input` trong `app.css` không còn file nào dùng và vẫn viết theo lối "nền sáng" — nên xoá hẳn thay vì để mục nát (chúng KHÔNG theo theme).
+> **Đã dọn trong đợt 2026-09-23** (xem §16 vòng 23): mã chết "Storefront Vue SPA" · **nợ emoji (134 → 0)** ·
+> **nền nút** (ba kiểu → một token) · **trang xem token** (`/he-thong-thiet-ke`) · file thăm dò lạ trên production ·
+> và 6 test đỏ sẵn có ở HEAD.
+
 - [ ] `border-white/*` (48 chỗ) là viền vẽ TRÊN ẢNH (tay cầm crop · con trỏ cọ · ô màu trong suốt) — cố ý cố định theo §1.1 quy tắc 5. Nếu có chỗ mới dùng cho BỀ MẶT giao diện thì phải đổi sang `border-cream-50/*`.
-- [ ] Chưa có trang "xem token" cho người thiết kế (liệt kê mọi bậc màu + tỉ lệ tương phản của cả hai theme) — hiện số liệu chỉ nằm trong test.
-- [ ] **Emoji toàn studio**: 23/65 file · 134 lần xuất hiện. Sửa tới file nào dọn file đó (§9).
 - [ ] Nhiều card khác vẫn còn **2 nút chính** hoặc **nút khoá không nêu lý do** — rà theo checklist §10.
 - [ ] Card «Gợi ý từ ảnh» chưa cho **chọn ảnh nguồn ngay trong card** (`SourceLibraryPicker` đã có sẵn).
-- [ ] Ba card còn **màu nhấn riêng** (emerald) — muốn về một mối thì phải thiết kế lại 3 card đó.
-- [ ] **Nền nút** còn trộn `bg-ink-800` / `bg-white/5` / `bg-ink-900/90` — đồng bộ tiếp theo §5.
 - [ ] **Mã tra cứu lỗi** cho người dùng đọc cho tổng đài (`L-8F3K`) — ghi ở cả giao diện và log (§6.5).
 - [ ] Preset **tên file ảnh theo kênh bán** (sàn TMĐT/catalogue).
 - [ ] Tự động chuyển trạng thái bộ sưu tập khi khách bấm "Duyệt" — hiện **CỐ Ý** chỉ ghi phản hồi

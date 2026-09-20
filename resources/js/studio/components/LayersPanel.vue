@@ -4,12 +4,12 @@
 import { ref, computed } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
-// Popup xác nhận DÙNG CHUNG (kế thừa hình dáng popup "⚠️ Dọn toàn bộ canvas?") — xem ConfirmDialog.vue.
+// Popup xác nhận DÙNG CHUNG (kế thừa hình dáng popup " Dọn toàn bộ canvas?") — xem ConfirmDialog.vue.
 import ConfirmDialog from './ConfirmDialog.vue';
 
 const store = useStudioStore();
 
-// Menu "Thêm layer" (Trong suốt / 6 swatch nền) — logic y hệt blankMenuOpen cũ (StudioApp :406-415).
+// Menu "Thêm layer" (Trong suốt / 6 swatch nền) — logic y hệt blankMenuOpen cũ (StudioApp:406-415).
 const blankMenuOpen = ref(false);
 const blankRatio = ref(store.imageRatio);
 const blankColor = ref('#4f9dff'); // màu tùy chỉnh cho layer màu mới
@@ -76,7 +76,7 @@ function onRowDrop(e, l) {
   clearDrag();
 }
 
-// Palette: click swatch = gán màu tô + copy clipboard + toast (y hệt copyColor StudioApp :25-28).
+// Palette: click swatch = gán màu tô + copy clipboard + toast (y hệt copyColor StudioApp:25-28).
 async function copyColor(c) {
   store.inpaintFillColor = c; // đồng bộ màu cho công cụ tô màu
   // N12: phải await (xem GalleryModal.copyPrompt) — nếu không, toast báo thành công giả.
@@ -305,7 +305,7 @@ async function copyColor(c) {
     <!-- Popup xác nhận dọn canvas — chính là popup mà hành động XÓA ĐỐI TƯỢNG ĐANG CHỌN kế thừa -->
     <ConfirmDialog
       :open="store.confirmClearCanvasOpen"
-      title="⚠️ Dọn toàn bộ canvas?"
+      title="Dọn toàn bộ canvas?"
       confirm-label="Dọn canvas"
       @confirm="store.cleanCanvas()"
       @cancel="store.confirmClearCanvasOpen = false"

@@ -37,7 +37,7 @@ import AuthNotice from './components/AuthNotice.vue';
 import CanvasEmptyState from './components/CanvasEmptyState.vue';
 import NotificationCenter from './components/NotificationCenter.vue';
 // [2026-09-20] Popup xác nhận DÙNG CHUNG — hành động xóa đối tượng đang chọn KẾ THỪA đúng popup
-// của "⚠️ Dọn toàn bộ canvas?" (trước đây cờ confirmDeleteOpen không có popup nào render ⇒ bấm
+// của " Dọn toàn bộ canvas?" (trước đây cờ confirmDeleteOpen không có popup nào render ⇒ bấm
 // Delete/nút thùng rác không thấy gì xảy ra, cờ treo lại còn chặn cả phím tắt layer).
 import ConfirmDialog from './components/ConfirmDialog.vue';
 const store = useStudioStore();
@@ -542,7 +542,7 @@ const layerHandles = computed(() => {
   return out.sort((a, b) => (a.active === b.active ? 0 : (a.active ? 1 : -1)));
 });
 
-// Nền canvas — dùng CHUNG class .canvas-bg-* trong app.css với ô màu ở CanvasStatusBar. Trước đây chỗ
+// Nền canvas — dùng CHUNG class.canvas-bg-* trong app.css với ô màu ở CanvasStatusBar. Trước đây chỗ
 // này trỏ tới một class bàn cờ không hề được định nghĩa (nền "lưới" thành trong suốt) và ô màu ở status
 // bar tự vẽ màu riêng nên lệch với màu thật. Một nguồn ⇒ không thể lệch nữa.
 // Tên công cụ đang khiến canvas ở chế độ "chỉnh 1 layer" — hiện trong nhãn chế độ (xem template).
@@ -704,8 +704,8 @@ function layerStyle(l, i) {
   return {
     transform: store.layerTransformStyle(l),
     transformOrigin: 'center',
-    // Độ mờ RIÊNG của layer nằm ở thẻ .layer-body bên trong (inline, KHÔNG transition) — thẻ ngoài
-    // .layer-el giữ hệ số ẩn/hiện và chuyển động opacity. Tách hai tầng như vậy để: (a) bật/tắt layer
+    // Độ mờ RIÊNG của layer nằm ở thẻ.layer-body bên trong (inline, KHÔNG transition) — thẻ ngoài
+    //.layer-el giữ hệ số ẩn/hiện và chuyển động opacity. Tách hai tầng như vậy để: (a) bật/tắt layer
     // mờ được CẢ thẻ (ảnh + viền chọn + nhãn nhóm), (b) kéo thanh trượt Độ mờ vẫn TỨC THÌ.
     mixBlendMode: (l.blend && l.blend !== 'normal') ? l.blend : 'normal',
     zIndex: i + 1,
@@ -1224,7 +1224,7 @@ function onTouchEnd(e) {
          vẫn phải hoạt động. -->
     <ConfirmDialog
       :open="store.confirmDeleteOpen"
-      :title="'⚠️ Xóa ' + store.selectionUnitLabels.length + ' đối tượng?'"
+      :title="'Xóa ' + store.selectionUnitLabels.length + ' đối tượng?'"
       confirm-label="Xóa"
       @confirm="store.confirmDeleteSelection()"
       @cancel="store.confirmDeleteOpen = false"
@@ -1276,7 +1276,7 @@ function onTouchEnd(e) {
           </button>
         </template>
 
-        <!-- ⚙️ CÀI ĐẶT — GÓC TRÁI DƯỚI CÙNG ------------------------------------------------->
+        <!--  CÀI ĐẶT — GÓC TRÁI DƯỚI CÙNG ------------------------------------------------->
         <!-- Ghim đáy; nhãn/icon/ẩn-hiện lấy từ CẤU HÌNH (không đổi được vị trí). -->
         <div v-if="settingsEntry" class="relative mt-auto">
           <div v-if="settingsOpen" class="fixed inset-0 z-40" @click="settingsOpen = false"></div>
@@ -1392,7 +1392,7 @@ function onTouchEnd(e) {
             <div v-else class="absolute inset-0">
               <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
                 <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="layer-el absolute left-0 top-0" :class="l.visible === false ? 'layer-el--hidden' : ''" :data-layer-id="l.id" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)" @pointerenter="hoveredLayerId = l.id" @pointerleave="hoveredLayerId = hoveredLayerId === l.id ? '' : hoveredLayerId">
-                  <!-- .layer-body: ĐỘ MỜ RIÊNG của layer (inline, không chuyển động) — nhờ tách hai
+                  <!--.layer-body: ĐỘ MỜ RIÊNG của layer (inline, không chuyển động) — nhờ tách hai
                        tầng mà thanh trượt Độ mờ vẫn tức thì trong khi bật/tắt layer vẫn mờ mượt. -->
                   <div class="layer-body" :style="{ opacity: l.opacity != null ? l.opacity : 1 }">
                   <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :title="l.groupId ? 'Thuộc nhóm — Alt+click để chỉnh sửa riêng layer này' : l.name" :class="[l.id === store.activeLayerId ? 'outline outline-2 -outline-offset-2 outline-sky-400' : (store.isSelected(l.id) ? 'outline outline-2 -outline-offset-2 outline-sky-400/70' : ''), l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']" draggable="false" />
@@ -1475,13 +1475,13 @@ function onTouchEnd(e) {
             <button v-for="l in store.layersFrontFirst" :key="l.id" @click="store.selectLayer(l)" class="h-7 w-7 shrink-0 overflow-hidden rounded-md transition" :class="store.activeLayerId === l.id ? 'ring-2 ring-brand-400' : 'opacity-60 hover:opacity-100'" :title="l.name">
               <img :src="l.image" class="h-7 w-7 object-cover" />
             </button>
-            <button @click="store.deleteLayer(store.activeLayer)" :disabled="!store.activeLayer" class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-ink-900/85 text-danger shadow hover:bg-red-600 hover:text-white disabled:opacity-30" title="Xóa layer khỏi canvas" aria-label="Xóa layer khỏi canvas"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+            <button @click="store.deleteLayer(store.activeLayer)" :disabled="!store.activeLayer" class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-ink-800 text-danger shadow hover:bg-red-600 hover:text-white disabled:opacity-30" title="Xóa layer khỏi canvas" aria-label="Xóa layer khỏi canvas"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
           </div>
           <!-- variant slider (bottom, only when multiple variants) -->
           <div v-if="store.showBatch && store.activeBatch.length > 1" class="batch-slider absolute bottom-14 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
             <div class="flex items-center gap-1.5">
               <span class="text-[10px] text-cream-400">{{ store.activeBatch.length }} biến thể</span>
-              <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2 transition-all duration-base" :class="store.previewId === v.id ? 'border-brand-500 scale-105' : 'border-ink-600 hover:border-brand-400'">
+              <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2 motion-ui motion-ui--size duration-base" :class="store.previewId === v.id ? 'border-brand-500 scale-105' : 'border-ink-600 hover:border-brand-400'">
                 <template v-if="v.status === 'completed' && v.media_url">
                   <img :src="v.media_url" class="batch-thumb h-full w-full bg-ink-900 object-cover" loading="lazy">
                 </template>
@@ -1584,13 +1584,13 @@ function onTouchEnd(e) {
           <template v-for="a in activityBar" :key="'m-' + a.id">
             <button v-if="a.kind === 'panel'" @click="a.locked ? openUpgradeFor(a.id) : selectActivity(a.id)"
                     class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors"
-                    :class="a.locked ? 'bg-ink-800/60 text-cream-400' : (activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300')"
+                    :class="a.locked ? 'bg-ink-800 text-cream-400' : (activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300')"
                     :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label">
                 <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-4 w-4" /> {{ a.label }}
             </button>
             <button v-else-if="a.kind === 'action'" @click="a.locked ? openUpgradeFor(a.id) : runToolbarAction(a.id); menuOpen = a.locked ? menuOpen : false"
                     class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors"
-                    :class="a.locked ? 'bg-ink-800/60 text-cream-400' : (isToolbarActionActive(a.id) ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300')"
+                    :class="a.locked ? 'bg-ink-800 text-cream-400' : (isToolbarActionActive(a.id) ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300')"
                     :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label">
                 <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-4 w-4" /> {{ a.label }}
             </button>

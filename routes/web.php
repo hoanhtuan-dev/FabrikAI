@@ -92,6 +92,11 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->group(function () {
 // Nay: khách ⇒ về /dang-nhap · customer ⇒ 403 · admin ⇒ 200.
 Route::middleware(['auth', 'admin', 'nostore'])->get('/admin', [AdminController::class, 'adminPage'])->name('admin.page');
 
+// [2026-09-23] TRANG XEM TOKEN cho người thiết kế: bảng bậc màu + tỉ lệ tương phản của CẢ HAI theme,
+// tính từ resources/css/app.css. Cấp OWNER: đây là công cụ nội bộ của người làm sản phẩm, không phải
+// trang cho khách (khách đã có "Cài đặt của tôi → Giao diện" để chọn Sáng/Tối).
+Route::middleware(['auth', 'admin', 'nostore'])->get('/he-thong-thiet-ke', [ThemeController::class, 'tokensPage'])->name('design-tokens.page');
+
 // ══════════════════════════════════════════════════════════════════════════════
 // TÙY CHỌN GIAO DIỆN — theme Sáng/Tối (2026-09-23)
 //

@@ -4,7 +4,7 @@ const props = defineProps({
   modelValue: { type: Boolean, default: false },
   before: { type: String, default: '' },
   after: { type: String, default: '' },
-  title: { type: String, default: '🔍 So sánh Trước / Sau' },
+  title: { type: String, default: 'So sánh Trước / Sau' },
 });
 const emit = defineEmits(['update:modelValue']);
 const pos = ref(50);

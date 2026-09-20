@@ -185,7 +185,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
               :class="selected[0] ? 'border-brand-500 bg-ink-900' : 'border-dashed border-ink-600 hover:border-brand-400 bg-ink-900/50'">
         <template v-if="selected[0]">
           <img :src="selected[0].url" class="h-full w-full object-cover" @error="onSlotImgError(0)">
-          <span v-if="slotImgError[0]" class="absolute inset-0 grid place-items-center bg-ink-900 text-3xl">🖼️</span>
+          <span v-if="slotImgError[0]" class="absolute inset-0 grid place-items-center bg-ink-900"><StudioIcon name="image" size="h-8 w-8" /></span>
           <span class="absolute inset-x-0 bottom-0 bg-scrim/70 px-2 py-1 text-[10px] font-semibold text-scrim-content">Giữ nguyên ảnh này · bấm để đổi</span>
           <span @click.stop="removeSlot(0)" title="Bỏ ảnh" class="motion-ui absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-red-600/90 text-white hover:bg-red-500"><StudioIcon name="x" size="h-3.5 w-3.5" /></span>
         </template>
@@ -209,7 +209,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
                 :class="selected[i] ? 'border-brand-500 bg-ink-900' : 'border-dashed border-ink-600 hover:border-brand-400 bg-ink-900/50'">
           <template v-if="selected[i]">
             <img :src="selected[i].url" class="h-full w-full object-cover" @error="onSlotImgError(i)">
-            <span v-if="slotImgError[i]" class="absolute inset-0 grid place-items-center bg-ink-900 text-2xl">🖼️</span>
+            <span v-if="slotImgError[i]" class="absolute inset-0 grid place-items-center bg-ink-900"><StudioIcon name="image" size="h-6 w-6" /></span>
             <span class="absolute inset-x-0 bottom-0 bg-scrim/70 px-1 py-0.5 text-center text-[9px] font-semibold text-scrim-content">{{ slotTitle(i) }}</span>
             <span @click.stop="removeSlot(i)" title="Bỏ ảnh" class="motion-ui absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[10px] text-white hover:bg-red-500"><StudioIcon name="x" size="h-3 w-3" /></span>
           </template>
@@ -356,7 +356,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
 
     <div v-if="store.composeStage === 'done'" class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-[11px] leading-5 text-ok">
       Xong — ảnh đã vào <strong>Outputs</strong> (góc phải) và bảng Lớp.
-      <button @click="store.clearComposeStatus()" class="ml-1 rounded-full bg-cream-50/10 px-2 py-0.5 hover:bg-cream-50/20">Đóng</button>
+      <button @click="store.clearComposeStatus()" class="ml-1 rounded-full bg-ink-800 px-2 py-0.5 hover:bg-ink-800">Đóng</button>
     </div>
 
     <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-lg border border-red-500/40 bg-red-900/25 p-3 text-[11px] leading-5 text-danger">
@@ -370,10 +370,10 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
 
     <div v-if="store.composeStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-cream-50/5 p-3 text-[11px] text-cream-200">
       Đã hủy.
-      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-cream-50/10 px-2 py-0.5 hover:bg-cream-50/20">Đóng</button>
+      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-ink-800 px-2 py-0.5 hover:bg-ink-800">Đóng</button>
     </div>
 
-    <button v-if="baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-2 w-full whitespace-nowrap">🔍 So sánh Trước/Sau</button>
+    <button v-if="baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-2 w-full whitespace-nowrap"><StudioIcon name="zoomIn" size="h-3.5 w-3.5" /> So sánh Trước/Sau</button>
 
     <SourceLibraryPicker
       v-model="open"

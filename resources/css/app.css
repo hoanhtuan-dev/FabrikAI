@@ -326,9 +326,6 @@
     .chip { @apply inline-flex items-center gap-2 rounded-2xl border border-ink-600 bg-ink-900 px-4 py-2 text-sm font-medium text-cream-200 transition-colors hover:border-brand-400 hover:text-brand-200;
     }
 
-    .section-title {
-        @apply font-display text-2xl font-semibold text-cream-50 sm:text-3xl;
-    }
 
     .kicker {
         @apply text-xs font-semibold uppercase tracking-[0.2em] text-brand-300;
@@ -747,7 +744,7 @@
 ::-webkit-scrollbar-thumb:active { background: var(--color-brand-500); }
 * { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
 
-@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
 }
 
 @layer utilities {
@@ -762,117 +759,9 @@
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .studio-shell .scrollbar-hide, .studio-shell { scroll-behavior: smooth; }
 
-/* ==========================================================================
-   Storefront Vue SPA design system
-   Minimalist · glassmorphic · gradient · everything-is-a-card. Compiled
-   with Tailwind's cascade layers so these composed classes stay overridable
-   by plain utilities used in the .vue components.
-   ========================================================================== */
-@layer components {
-.sf-shell {
-    @apply min-h-screen bg-cream-50 text-ink-900 antialiased;
-    background-image:
-        radial-gradient(1100px 560px at 12% -6%, rgba(69, 128, 98, 0.16), transparent 60%),
-        radial-gradient(900px 480px at 100% -4%, rgba(178, 106, 59, 0.10), transparent 55%);
-    background-attachment: fixed;
-}
-
-.sf-container {
-    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
-}
-
-/* --- Glassmorphism surfaces --- */
-.glass {
-    @apply border border-white/60 bg-white/70 backdrop-blur-xl;
-    box-shadow:
-        0 1px 0 rgba(255, 255, 255, 0.6) inset,
-        0 8px 30px -12px rgba(11, 18, 16, 0.18);
-}
-
-.glass-strong {
-    @apply border border-white/70 bg-white/85 backdrop-blur-2xl;
-    box-shadow:
-        0 1px 0 rgba(255, 255, 255, 0.7) inset,
-        0 20px 60px -24px rgba(11, 18, 16, 0.30);
-}
-
-.card-surface {
-    @apply rounded-[1.75rem] border border-cream-200 bg-white/70 backdrop-blur-xl;
-    box-shadow:
-        0 1px 0 rgba(255, 255, 255, 0.6) inset,
-        0 10px 40px -18px rgba(11, 18, 16, 0.22);
-}
-
-.card-surface-hover {
-    @apply transition-all hover:-translate-y-1;
-    transition-duration: var(--motion-dur-base);
-}
-.card-surface-hover:hover {
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 26px 60px -22px rgba(11, 18, 16, 0.34);
-}
-
-.sf-gradient-text {
-    @apply bg-gradient-to-r from-brand-700 via-brand-500 to-clay-500 bg-clip-text text-transparent;
-}
-
-/* --- Buttons --- */
-.sf-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
-}
-.sf-btn-primary {
-    @apply bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-lg shadow-brand-900/20 hover:from-brand-700 hover:to-brand-600 active:scale-[.98];
-}
-.sf-btn-dark {
-    @apply bg-ink-900 text-cream-50 shadow-lg shadow-ink-900/20 hover:bg-ink-800 active:scale-[.98];
-}
-.sf-btn-ghost {
-    @apply text-ink-700 hover:bg-white/70 active:scale-[.98];
-}
-.sf-btn-soft {
-    @apply border border-cream-200 bg-white/70 text-ink-900 backdrop-blur hover:bg-white active:scale-[.98];
-}
-
-/* --- Typography helpers --- */
-.section-kicker {
-    @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-600;
-}
-.section-title {
-    @apply font-display text-2xl font-semibold text-ink-900 sm:text-3xl;
-}
-.sf-badge { @apply inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide;
-}
-
-.sf-input {
-    @apply w-full rounded-2xl border border-cream-200 bg-white/70 px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-500/70 backdrop-blur focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15;
-}
-
-.sf-scroll-x {
-    @apply flex gap-4 overflow-x-auto pb-2;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-}
-.sf-scroll-x > * { scroll-snap-align: start; }
-
-/* Mobile safe-area bottom inset */
-.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0.75rem); }
-
-/* Hide scrollbar on snap carousels */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-/* Scroll-reveal (fade-up) — applied via the v-reveal directive */
-.reveal-anim {
-    opacity: 0;
-    transform: translateY(20px);
-    /* Nhịp dài có chủ đích của hiệu ứng cuộn — vẫn là TOKEN, không viết số tại chỗ. */
-    transition: opacity var(--motion-dur-reveal) var(--motion-ease-emphasized),
-                transform var(--motion-dur-reveal) var(--motion-ease-emphasized);
-}
-.reveal-anim.is-revealed {
-    opacity: 1;
-    transform: none;
-}
-@media (prefers-reduced-motion: reduce) {
-    .reveal-anim { opacity: 1; transform: none; transition: none; }
-}
-} /* end @layer components (storefront) */
+/* [2026-09-23] ĐÃ XOÁ khối "Storefront Vue SPA design system" (~115 dòng: .sf-* · .glass ·
+   .card-surface · .section-title/kicker · .sf-input · .pb-safe · .reveal-anim).
+   Vì sao: (a) ĐO ĐƯỢC 0 file trong resources/js + resources/views còn dùng bất kỳ lớp nào trong đó;
+   (b) toàn bộ khối viết theo lối "nền sáng" (bg-white/70, text-ink-900, border-cream-200) nên KHÔNG
+   theo theme Sáng/Tối — để lại chỉ tạo nguồn màu thứ hai cho người sau chép nhầm.
+   Bản cũ nằm trong lịch sử git; storefront thật dùng layouts/app.blade.php. */

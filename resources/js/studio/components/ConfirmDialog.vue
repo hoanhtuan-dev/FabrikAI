@@ -7,7 +7,7 @@
  * cờ confirmDeleteOpen mà KHÔNG có popup nào render ⇒ bấm Delete (hoặc nút thùng rác) không thấy gì xảy
  * ra, cờ thì treo lại và còn CHẶN luôn phím tắt layer. Nay mọi xác nhận đi qua đúng một component này.
  *
- * Hình dáng KẾ THỪA popup "⚠️ Dọn toàn bộ canvas?" đang dùng: nền đen mờ, khung max-w-xs, viền đỏ khi
+ * Hình dáng KẾ THỪA popup " Dọn toàn bộ canvas?" đang dùng: nền đen mờ, khung max-w-xs, viền đỏ khi
  * là hành động nguy hiểm, hai nút [hành động | Hủy].
  *
  * Trợ năng: role=dialog + aria-modal; Esc và bấm nền = hủy; focus vào nút hành động khi mở và TRẢ focus

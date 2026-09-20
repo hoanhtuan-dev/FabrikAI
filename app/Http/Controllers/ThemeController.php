@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ThemePalette;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -43,5 +45,34 @@ class ThemeController extends Controller
         $user->save();
 
         return response()->json(['theme' => $user->theme]);
+    }
+
+    /**
+     * TRANG XEM TOKEN cho người thiết kế (2026-09-23) — cấp OWNER.
+     *
+     * Vì sao cần: nợ đã ghi trong DEPLOY_LOG — "số liệu tương phản chỉ nằm trong test". Người thiết kế
+     * muốn biết bậc chữ nào đang đạt AA phải mở mã test ra đọc. Nay có một trang đọc thẳng token từ
+     * resources/css/app.css qua App\Support\ThemePalette — CÙNG lớp mà ThemeSystemTest dùng, nên
+     * trang và test không thể nói hai con số khác nhau.
+     *
+     * Vì sao server-render: đây là trang ĐỌC số liệu của chính mã nguồn, không có tương tác nào; thêm
+     * một app JS nữa chỉ để vẽ bảng là thêm một chỗ có thể lệch.
+     */
+    public function tokensPage(): View
+    {
+        return view('studio.design-tokens', [
+            'themes' => [
+                'Tối' => ThemePalette::matrix('dark'),
+                'Sáng' => ThemePalette::matrix('light'),
+            ],
+            'accents' => [
+                'Tối' => ThemePalette::accents('dark'),
+                'Sáng' => ThemePalette::accents('light'),
+            ],
+            'surfaces' => ThemePalette::SURFACES,
+            'fixed' => ThemePalette::FIXED,
+            'fixedValues' => ThemePalette::resolved('dark'),
+            'aa' => ThemePalette::AA,
+        ]);
     }
 }

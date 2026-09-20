@@ -1,16 +1,16 @@
 {
-  "_BaseModal-No-9AhrO.js": {
-    "file": "assets/BaseModal-No-9AhrO.js",
+  "_BaseModal-BUQwEqWH.js": {
+    "file": "assets/BaseModal-BUQwEqWH.js",
     "name": "BaseModal",
     "imports": [
-      "_pageBoot-CeilSBG0.js"
+      "_pageBoot-JJzG-QoH.js"
     ]
   },
-  "__plugin-vue_export-helper-BlTFfaA4.js": {
-    "file": "assets/_plugin-vue_export-helper-BlTFfaA4.js",
+  "__plugin-vue_export-helper-D14J8epx.js": {
+    "file": "assets/_plugin-vue_export-helper-D14J8epx.js",
     "name": "_plugin-vue_export-helper",
     "imports": [
-      "_pageBoot-CeilSBG0.js"
+      "_pageBoot-JJzG-QoH.js"
     ]
   },
   "_fonts-BRD9E1vz.css": {
@@ -81,27 +81,27 @@
     "file": "assets/inter-700-normal-Yt3aPRUw.woff2",
     "src": "_inter-700-normal-Yt3aPRUw.woff2"
   },
-  "_pageBoot-CeilSBG0.js": {
-    "file": "assets/pageBoot-CeilSBG0.js",
+  "_pageBoot-JJzG-QoH.js": {
+    "file": "assets/pageBoot-JJzG-QoH.js",
     "name": "pageBoot"
   },
-  "_useStudioThumb-CD1sZm3n.js": {
-    "file": "assets/useStudioThumb-CD1sZm3n.js",
+  "_useStudioThumb-CEUyBvt1.js": {
+    "file": "assets/useStudioThumb-CEUyBvt1.js",
     "name": "useStudioThumb",
     "imports": [
-      "_pageBoot-CeilSBG0.js",
-      "__plugin-vue_export-helper-BlTFfaA4.js"
+      "_pageBoot-JJzG-QoH.js",
+      "__plugin-vue_export-helper-D14J8epx.js"
     ]
   },
-  "_useTheme-Cxj9Wnhy.js": {
-    "file": "assets/useTheme-Cxj9Wnhy.js",
+  "_useTheme-mNUCLvJz.js": {
+    "file": "assets/useTheme-mNUCLvJz.js",
     "name": "useTheme",
     "imports": [
-      "_pageBoot-CeilSBG0.js"
+      "_pageBoot-JJzG-QoH.js"
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-DG3z1aZB.css",
+    "file": "assets/app-CDTA1bwx.css",
     "name": "app",
     "names": [
       "app.css"
@@ -110,72 +110,72 @@
     "isEntry": true
   },
   "resources/js/studio/admin.js": {
-    "file": "assets/admin-DwIuWK8h.js",
+    "file": "assets/admin-BTrx1MyJ.js",
     "name": "admin",
     "src": "resources/js/studio/admin.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-CeilSBG0.js",
-      "__plugin-vue_export-helper-BlTFfaA4.js",
-      "_BaseModal-No-9AhrO.js"
+      "_pageBoot-JJzG-QoH.js",
+      "__plugin-vue_export-helper-D14J8epx.js",
+      "_BaseModal-BUQwEqWH.js"
     ],
     "css": [
-      "assets/admin-C9ZUxGsb.css"
+      "assets/admin-C0RGt4er.css"
     ]
   },
   "resources/js/studio/collections.js": {
-    "file": "assets/collections-DdZ63TPY.js",
+    "file": "assets/collections-CSHRueJD.js",
     "name": "collections",
     "src": "resources/js/studio/collections.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-CeilSBG0.js",
-      "__plugin-vue_export-helper-BlTFfaA4.js",
-      "_useStudioThumb-CD1sZm3n.js"
+      "_pageBoot-JJzG-QoH.js",
+      "__plugin-vue_export-helper-D14J8epx.js",
+      "_useStudioThumb-CEUyBvt1.js"
     ],
     "css": [
-      "assets/collections-DbDpcDcu.css"
+      "assets/collections-BH-Nh1Bq.css"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-CAXQY34O.js",
+    "file": "assets/main-t0yeM8hV.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-CeilSBG0.js",
-      "__plugin-vue_export-helper-BlTFfaA4.js",
-      "_useStudioThumb-CD1sZm3n.js",
-      "_BaseModal-No-9AhrO.js",
-      "_useTheme-Cxj9Wnhy.js"
+      "_pageBoot-JJzG-QoH.js",
+      "__plugin-vue_export-helper-D14J8epx.js",
+      "_useStudioThumb-CEUyBvt1.js",
+      "_BaseModal-BUQwEqWH.js",
+      "_useTheme-mNUCLvJz.js"
     ],
     "css": [
-      "assets/main-D6l1vlfc.css"
+      "assets/main-DCyNV2Hz.css"
     ]
   },
   "resources/js/studio/my-settings.js": {
-    "file": "assets/my-settings-B5PPpN2d.js",
+    "file": "assets/my-settings-z446McuU.js",
     "name": "my-settings",
     "src": "resources/js/studio/my-settings.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-CeilSBG0.js",
-      "_BaseModal-No-9AhrO.js",
-      "_useTheme-Cxj9Wnhy.js"
+      "_pageBoot-JJzG-QoH.js",
+      "_BaseModal-BUQwEqWH.js",
+      "_useTheme-mNUCLvJz.js"
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-DzhGI70s.js",
+    "file": "assets/settings-CHy0LYPS.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
     "imports": [
-      "_pageBoot-CeilSBG0.js",
-      "__plugin-vue_export-helper-BlTFfaA4.js",
-      "_BaseModal-No-9AhrO.js"
+      "_pageBoot-JJzG-QoH.js",
+      "__plugin-vue_export-helper-D14J8epx.js",
+      "_BaseModal-BUQwEqWH.js"
     ],
     "css": [
-      "assets/settings-DIxFmtae.css"
+      "assets/settings-CxdE_pkQ.css"
     ]
   }
 }

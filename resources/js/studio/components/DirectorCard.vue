@@ -11,10 +11,10 @@ const store = useStudioStore();
       <span class="rounded-full bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">video</span>
     </h2>
 
-    <!-- Model video — danh sách từ Cài đặt → 🎯 Nhóm công việc (video) -->
+    <!-- Model video — danh sách từ Cài đặt →  Nhóm công việc (video) -->
     <div v-if="store.taskGroupModels('video').length > 1" class="mt-4 flex items-center gap-2">
-      <span class="shrink-0 text-[10px] font-medium text-cream-400">🤖</span>
-      <select v-model="store.videoModelSel" class="input !py-2 !text-xs" title="Model render video — danh sách từ Cài đặt → 🎯 Nhóm công việc (video)">
+      <StudioIcon name="bot" size="h-3.5 w-3.5" class="shrink-0 text-cream-400" />
+      <select v-model="store.videoModelSel" class="input !py-2 !text-xs" title="Model render video — danh sách từ Cài đặt → Nhóm công việc (video)">
         <option value="">Mặc định ({{ store.taskGroupModels('video')[0]?.label || 'auto' }})</option>
         <option v-for="m in store.taskGroupModels('video')" :key="m.provider + m.model" :value="m.provider + ':' + m.model">{{ m.label }}</option>
       </select>
@@ -43,7 +43,7 @@ const store = useStudioStore();
     </div>
     <div v-if="store.videoScenes.length" class="mt-1 grid grid-cols-2 gap-1.5">
       <button v-for="sc in store.videoScenes" :key="sc.id" @click="store.videoScene = String(store.videoScene) === String(sc.id) ? '' : sc.id" :title="sc.prompt"
-              class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
+              class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold motion-ui motion-ui--size"
               :class="String(store.videoScene) === String(sc.id) ? 'border-brand-500 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400 hover:bg-ink-700'">
         <span class="grid h-5 w-5 shrink-0 place-items-center rounded-lg bg-ink-700/70 text-brand-300"><StudioIcon name="film" size="h-3 w-3" /></span>
         <span class="truncate">{{ sc.label }}</span>

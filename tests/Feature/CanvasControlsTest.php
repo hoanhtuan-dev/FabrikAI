@@ -55,7 +55,10 @@ class CanvasControlsTest extends TestCase
             'Nút xác nhận phải gọi đúng hành động xóa đối tượng đang chọn.');
 
         $layers = $this->vue('LayersPanel.vue');
-        $this->assertStringContainsString('⚠️ Dọn toàn bộ canvas?', $layers,
+        /* [2026-09-23] Câu hỏi nay KHÔNG còn emoji: đợt dọn nợ emoji (§9 của docs/DESIGN_SYSTEM.md) bỏ
+           emoji khỏi chrome — popup nguy hiểm đã có viền đỏ + nhãn nút rõ, không cần emoji để báo nguy.
+           Bất biến của test KHÔNG đổi: hành động xoá phải kế thừa ĐÚNG popup dùng chung, giữ nguyên câu hỏi. */
+        $this->assertStringContainsString('Dọn toàn bộ canvas?', $layers,
             'Popup dọn canvas phải giữ nguyên câu hỏi gốc (đây là popup được kế thừa).');
         $this->assertStringContainsString('<ConfirmDialog', $layers,
             'Popup dọn canvas phải chuyển sang component dùng chung thay vì markup chép tay.');

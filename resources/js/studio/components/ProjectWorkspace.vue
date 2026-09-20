@@ -36,7 +36,7 @@ const statusOrder = ['draft', 'in_progress', 'review', 'approved', 'archived'];
 
 const grouped = computed(() => {
   // §5.2: object thường -> status '__proto__'/'constructor' là truthy nên map[key] trỏ vào
-  // prototype và .push() ném lỗi, vỡ cả board. Object.create(null) bỏ hẳn prototype.
+  // prototype và.push() ném lỗi, vỡ cả board. Object.create(null) bỏ hẳn prototype.
   const map = Object.create(null);
   for (const s of statusOrder) map[s] = [];
   for (const p of store.projects) {
@@ -49,12 +49,12 @@ const grouped = computed(() => {
 // Empty state riêng theo scope (hàng đợi duyệt / lưu trữ) — scope own giữ khung kanban.
 const boardEmptyMessage = computed(() => {
   if (store.projects.length) return '';
-  if (store.projectScope === 'pending') return 'Không có bộ sưu tập chờ duyệt 🎉';
+  if (store.projectScope === 'pending') return 'Không có bộ sưu tập chờ duyệt';
   if (store.projectsArchived) return 'Không có bộ sưu tập lưu trữ.';
   return '';
 });
 const listEmptyMessage = computed(() => {
-  if (store.projectScope === 'pending') return 'Không có bộ sưu tập chờ duyệt 🎉';
+  if (store.projectScope === 'pending') return 'Không có bộ sưu tập chờ duyệt';
   if (store.projectsArchived) return 'Không có bộ sưu tập lưu trữ.';
   return 'Chưa có bộ sưu tập. Bấm "＋ Bộ sưu tập mới" để bắt đầu.';
 });
@@ -407,7 +407,7 @@ watch(() => open.value, (v) => {
                     <div v-for="g in store.activeProjectGenerations" :key="g.id" class="group relative aspect-square overflow-hidden rounded-lg bg-ink-800" :class="g.media_url ? 'cursor-pointer' : ''" @click="g.media_url ? store.openViewer(g, store.activeProjectGenerations) : null">
                       <img v-if="g.media_url" :src="thumbUrl(g.media_url, 320)" :alt="'#' + g.id" class="h-full w-full object-cover" loading="lazy" @error="onThumbError($event, g.media_url)">
                       <!-- hover: nút gỡ khỏi dự án -->
-                      <button v-if="!store.activeProjectReviewOnly && g.media_url" @click.stop="detachGen(g)" :disabled="detachId === g.id" class="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-ink-900/80 text-cream-300 opacity-0 transition hover:bg-red-800 hover:text-white group-hover:opacity-100 disabled:opacity-60" title="Gỡ khỏi dự án"><StudioIcon name="unlink" size="h-3.5 w-3.5" /></button>
+                      <button v-if="!store.activeProjectReviewOnly && g.media_url" @click.stop="detachGen(g)" :disabled="detachId === g.id" class="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-ink-800 text-cream-300 opacity-0 transition hover:bg-red-800 hover:text-white group-hover:opacity-100 disabled:opacity-60" title="Gỡ khỏi dự án"><StudioIcon name="unlink" size="h-3.5 w-3.5" /></button>
                       <div class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-1.5 pb-1 pt-4 text-[9px] text-cream-100">
                         <span class="block truncate">{{ g.status }}</span>
                       </div>

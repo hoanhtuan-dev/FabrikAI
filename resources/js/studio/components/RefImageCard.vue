@@ -139,7 +139,7 @@ async function runRefgen() {
   busy.value = true;
   // Ảnh tham chiếu có thể là data:URL (canvas flattened) → backend downscaleSource xử lý.
   // Model: selector trên card (imageModelSel — dùng chung nhóm image với Tạo Ảnh 2D);
-  // '' = default nhóm image từ Cài đặt → 🎯 Nhóm công việc.
+  // '' = default nhóm image từ Cài đặt →  Nhóm công việc.
   // Thử đồ: gửi tryon=true + body directive từ store + khuôn mặt mẫu (ảnh, mô tả do vision đọc).
   const tryon = isTryon.value;
   const body = tryon ? { height: store.bodyHeight, build: store.bodyBuild, waist: store.bodyWaist, shoulders: store.bodyShoulders, hips: store.bodyHips } : null;
@@ -197,7 +197,7 @@ async function runRefgen() {
       </button>
       <div v-if="bgOpenRefgen" class="mt-2 grid grid-cols-2 gap-1.5">
         <button v-for="p in presets" :key="p.id" @click="applyPreset(p)"
-                class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
+                class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold motion-ui motion-ui--size"
                 :class="activePreset === p.id ? 'border-brand-500 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400 hover:bg-ink-700'">
           <span class="h-4 w-4 shrink-0 rounded-full border border-white/25 shadow-inner ring-1 ring-black/30" :style="{ background: p.color }" :title="'Mã màu ' + p.color"></span>
           <span class="truncate">{{ p.label }}</span>
@@ -211,7 +211,7 @@ async function runRefgen() {
       </div>
       <div class="mt-1 grid grid-cols-2 gap-1.5">
         <button v-for="a in anglePresets" :key="a.id" @click="applyAngle(a)"
-                class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
+                class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold motion-ui motion-ui--size"
                 :class="activeAngle === a.id ? 'border-brand-500 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400 hover:bg-ink-700'">
           <!-- M18: render primitives có cấu trúc thay vì v-html. a.svg trước đây là chuỗi markup
                thô (hôm nay là hằng số trong file, nhưng thành XSS sink ngay khi dữ liệu này đến từ
@@ -231,10 +231,10 @@ async function runRefgen() {
       <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: giữ chủ thể, đổi sang nền studio tối, góc máy chếch…"></textarea>
       <p class="mt-1 text-right text-[10px] text-cream-400">{{ prompt.length }}/1000</p>
 
-      <!-- Model sinh ảnh — nhóm image (Cài đặt → 🎯 Nhóm công việc) -->
+      <!-- Model sinh ảnh — nhóm image (Cài đặt →  Nhóm công việc) -->
       <div v-if="store.taskGroupModels('image').length > 1" class="mt-3 flex items-center gap-2">
-        <span class="shrink-0 text-[10px] font-medium text-cream-400">🤖</span>
-        <select v-model="store.imageModelSel" class="input !py-2 !text-xs" title="Model sinh ảnh — danh sách từ Cài đặt → 🎯 Nhóm công việc (image)">
+        <StudioIcon name="bot" size="h-3.5 w-3.5" class="shrink-0 text-cream-400" />
+        <select v-model="store.imageModelSel" class="input !py-2 !text-xs" title="Model sinh ảnh — danh sách từ Cài đặt → Nhóm công việc (image)">
           <option value="">Mặc định ({{ store.taskGroupModels('image')[0]?.label || 'auto' }})</option>
           <option v-for="m in store.taskGroupModels('image')" :key="m.provider + m.model" :value="m.provider + ':' + m.model">{{ m.label }}</option>
         </select>
@@ -290,7 +290,7 @@ async function runRefgen() {
                   :class="String(faceModelId) === String(f.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-600 bg-ink-800 hover:border-emerald-400'"
                   class="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
             <img v-if="f.thumb || f.image" :src="f.thumb || f.image" loading="lazy" class="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
-            <span v-else class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-ink-700 text-[12px]">👩</span>
+            <span v-else class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-ink-700"><StudioIcon name="user" size="h-4 w-4" /></span>
             <span class="truncate">{{ f.name }}</span>
           </button>
           <span v-if="!faces.length" class="col-span-2 text-[10px] text-cream-400">Chưa có khuôn mặt mẫu — để trống để AI tự chọn.</span>
@@ -328,7 +328,7 @@ async function runRefgen() {
                   :class="String(poseId) === String(p.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-600 bg-ink-800 hover:border-emerald-400'"
                   class="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
             <img v-if="p.thumb || p.image" :src="p.thumb || p.image" loading="lazy" class="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
-            <span v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-700 text-sm">🧍</span>
+            <span v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-700"><StudioIcon name="user" size="h-4 w-4" /></span>
             <span class="truncate">{{ p.name }}</span>
           </button>
           <span v-if="!poses.length" class="col-span-2 text-[10px] text-cream-400">Chưa có pose mẫu — để trống để AI tự chọn.</span>
@@ -339,7 +339,7 @@ async function runRefgen() {
       <div v-if="openPanel === 'bg'" class="mt-2 rounded-lg border border-emerald-400/20 bg-emerald-900/10 p-2.5">
         <div class="grid grid-cols-2 gap-1.5">
           <button v-for="p in presets" :key="p.id" @click="applyPreset(p)"
-                  class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
+                  class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold motion-ui motion-ui--size"
                   :class="activePreset === p.id ? 'border-emerald-400 bg-emerald-600/25 text-cream-50' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-emerald-400'">
             <span class="h-4 w-4 shrink-0 rounded-full border border-white/25 shadow-inner ring-1 ring-black/30" :style="{ background: p.color }"></span>
             <span class="truncate">{{ p.label }}</span>

@@ -67,7 +67,7 @@ function startConfirm() { confirming.value = true; clearTimeout(confirmTimer); c
 function resetConfirm() { confirming.value = false; clearTimeout(confirmTimer); }
 const deleting = ref(false);
 async function doDelete() {
-  // §5.2: trước đây không có cờ đang-xóa và nút không :disabled -> bấm nhanh 2 lần gửi 2 lệnh DELETE.
+  // §5.2: trước đây không có cờ đang-xóa và nút không:disabled -> bấm nhanh 2 lần gửi 2 lệnh DELETE.
   if (deleting.value) return;
   const g = current.value; if (!g) return;
   deleting.value = true;
@@ -307,7 +307,7 @@ onBeforeUnmount(() => {
 <template>
   <div ref="rootEl" tabindex="-1" role="dialog" aria-modal="true" aria-label="Xem ảnh" class="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-2 outline-none backdrop-blur-sm sm:p-5" @click.self="close">
     <!-- Đóng -->
-    <button @click="close" class="absolute right-4 top-4 z-30 grid h-10 w-10 place-items-center rounded-full bg-ink-900/90 text-cream-200 transition hover:bg-ink-700 hover:text-white" title="Đóng (Esc)" aria-label="Đóng">
+    <button @click="close" class="absolute right-4 top-4 z-30 grid h-10 w-10 place-items-center rounded-full bg-ink-800 text-cream-200 transition hover:bg-ink-700 hover:text-white" title="Đóng (Esc)" aria-label="Đóng">
       <StudioIcon name="x" size="h-5 w-5" />
     </button>
     <!-- Chuyển ảnh -->
@@ -344,7 +344,7 @@ onBeforeUnmount(() => {
         <!-- Thu gọn / mở thông tin ảnh -->
         <button @click="infoOpen = !infoOpen"
                 class="absolute right-3 top-14 z-20 grid h-7 w-7 place-items-center rounded-full border transition"
-                :class="infoOpen ? 'border-ink-600 bg-ink-900/90 text-cream-200 hover:bg-ink-700 hover:text-white' : 'border-brand-500 bg-brand-600/25 text-brand-200 hover:bg-brand-600/40'"
+                :class="infoOpen ? 'border-ink-600 bg-ink-800 text-cream-200 hover:bg-ink-700 hover:text-white' : 'border-brand-500 bg-brand-600/25 text-brand-200 hover:bg-brand-600/40'"
                 :title="infoOpen ? 'Thu gọn thông tin ảnh' : 'Mở thông tin ảnh'"
                 :aria-label="infoOpen ? 'Thu gọn thông tin ảnh' : 'Mở thông tin ảnh'">
           <StudioIcon name="columns" size="h-3.5 w-3.5"/>
@@ -402,7 +402,7 @@ onBeforeUnmount(() => {
 
         <!-- Seed (gieo quẻ) — hiện khi ảnh đã tạo có lưu seed -->
         <div v-if="seedValue" class="flex items-center justify-between rounded-md border border-brand-500/30 bg-brand-600/10 px-2.5 py-1.5">
-          <span class="text-[9px] font-semibold uppercase tracking-wide text-brand-300/80">🎲 Seed</span>
+          <span class="text-[9px] font-semibold uppercase tracking-wide text-brand-300/80">Seed</span>
           <span class="text-xs font-semibold text-brand-100">{{ seedValue }}</span>
         </div>
 
