@@ -391,6 +391,40 @@ class ToolSearchTest extends TestCase
         $this->assertSame(1, $payload['too_old'], 'Phải ghi lại là tin đó bị loại vì quá cũ.');
         $this->assertStringContainsString('quá cũ', (string) $payload['note']);
     }
+
+    /**
+     * CÔNG CỤ PHẢI ĐƯỢC NÓI RA kể cả khi máy chủ ĐÃ có tin thật.
+     *
+     * [LỖI THẬT — đo trên production 2026-09-21] Bản đầu viết các mức dữ liệu dưới dạng HOẶC: hễ có
+     * external_evidence (tin thật) là prompt KHÔNG nhắc tới công cụ. Đo được trên production: radar chạy
+     * deepseek-flash, `tool_search.accepted=true` nhưng `calls=0` — công cụ nằm trong request mà model
+     * không biết mình được phép hỏi thêm. Tin lấy theo feed cố định và việc hỏi đúng chủ đề đang cần là
+     * hai thứ BỔ SUNG cho nhau, không thay thế nhau.
+     */
+    public function test_the_tool_is_announced_even_when_live_news_is_present(): void
+    {
+        $this->model(DesignAgentService::SEARCH_GROUP, 'gw-search', 'search-1');
+        $this->searchSource();
+
+        $sent = [];
+        Http::fake([
+            'gw-search.example/*' => function ($request) use (&$sent) {
+                $sent[] = json_decode($request->body(), true);
+
+                return Http::response($this->answerResponse($this->briefJson()), 200);
+            },
+            // Nguồn trả tin THẬT ⇒ evidence.mode=live ⇒ nhánh "đã có tin" được dùng trong prompt.
+            'news.example/*' => Http::response($this->rss('Tin thật hôm nay về linen', 'https://bao.example/1'), 200),
+        ]);
+
+        $brief = app(DesignAgentService::class)->collectionBrief(['prompt' => 'đầm linen'], $this->customer(), true, true);
+
+        $system = (string) data_get($sent[0] ?? [], 'messages.0.content', '');
+        $this->assertStringContainsString('web_search', $system, 'Có tin thật rồi vẫn phải NÓI cho model biết nó được gọi công cụ.');
+        $this->assertSame('web_search', data_get($sent[0] ?? [], 'tools.0.function.name'), 'Công cụ phải nằm trong request.');
+        $this->assertTrue($brief['model']['tool_search']['enabled']);
+    }
 }
+
 
 

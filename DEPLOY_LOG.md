@@ -60,6 +60,28 @@ biết gọi hàm**, kể cả model không có tìm kiếm tích hợp.
 - Tài liệu: `docs/DESIGN_SYSTEM.md` §18.2 thêm tầng thứ ba + verdict mới + quy tắc "nguồn TÌM ĐƯỢC".
 - Commit: `092c73f` (chưa deploy production — chờ chủ dự án gán model cho vai tìm kiếm rồi kiểm chứng).
 
+### 5bis. ĐO TRÊN PRODUCTION sau khi deploy — và MỘT LỖI THẬT do chính phép đo bắt được
+Deploy `f3ce5a3` (push → SSH `git pull --ff-only` → `migrate` = *Nothing to migrate* → `config/route/view:cache`).
+Vai «Tìm kiếm nguồn ngoài» trên production **đã có sẵn model** `deepseek:deepseek-flash` ⇒ công cụ bật ngay.
+
+| Phép đo trên máy chủ | Kết quả |
+|---|---|
+| HTTP | `/` `/up` `/bang-gia` `/dang-nhap` **200** · `/api/design-agent/web-access` **401** |
+| Asset | `main-Dq_Tr-BV.js` **200** · `DesignAgents-OFNqpDxr.js` **200**; chunk đã chứa `toolSearchLine` |
+| `studio:web-access --force` | kết luận MỚI: *"Máy chủ có internet và model bạn gán cho vai «Tìm kiếm nguồn ngoài» sẽ GỌI CÔNG CỤ tìm kiếm do máy chủ chạy…"* |
+| Máy chủ tìm thật (không gọi model) | từ khoá *"xu hướng thời trang thu đông"* → **6 tin · đọc 100 · 83 tin quá cũ · 505 ms**, có tên báo + ngày |
+| **Radar thật (AI)** | `engine=ai-v1` · `deepseek:deepseek-flash` · 17,9 s · **8 định hướng do AI viết** · `web_search=true` · `tool_search.mode=tool · accepted=true` · **`calls=0`** |
+| Log production | **không phát sinh dòng lỗi mới** (dòng cuối vẫn là 18:50 UTC trước lúc deploy) |
+
+**🔴 LỖI THẬT phép đo bắt được:** công cụ *được gửi* mà model *không biết* mình được phép hỏi thêm.
+Nguyên nhân: prompt viết các mức dữ liệu dưới dạng **HOẶC** — hễ đã có `external_evidence` (tin thật lấy sẵn)
+là nhánh mô tả công cụ **không được dùng tới**. Trên production nguồn RSS luôn có tin ⇒ mọi lượt radar/brief
+đều rơi vào nhánh đó ⇒ tính năng "bật" nhưng không bao giờ chạy.
+
+**Đã sửa (cùng ngày)**: các mức dữ liệu nay **CỘNG THÊM, không loại trừ nhau** — tin lấy theo feed cố định
+và việc hỏi đúng chủ đề đang cần là hai thứ bổ sung; nhánh "TUYỆT ĐỐI KHÔNG bịa…" chỉ còn áp dụng khi
+KHÔNG có nguồn ngoài nào. Kèm test khoá: `test_the_tool_is_announced_even_when_live_news_is_present`.
+
 ### 6. Việc chủ dự án cần làm để BẬT (không sửa mã)
 1. Cài đặt → **Nhóm công việc** → «Agent Studio — Tìm kiếm nguồn ngoài» → gán một model (production: `deepseek:deepseek-chat` hoặc `deepseek:deepseek-flash` — cả hai gọi hàm được).
 2. Agent Studio → bước **Tín hiệu** → nút **Kiểm tra lại**: dòng kết luận phải là *"…sẽ GỌI CÔNG CỤ tìm kiếm do máy chủ chạy"*.
