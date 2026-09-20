@@ -2249,6 +2249,21 @@ if (! function_exists('studio_task_groups')) {
     }
 }
 
+if (! function_exists('studio_model_group_slugs')) {
+    /**
+     * MỌI slug nhóm công việc mà Model Registry nhận khi thêm/sửa model.
+     *
+     * = toàn bộ nhóm trong studio_task_groups() (gồm 3 vai Agent Studio) + hai vai trò CŨ
+     * (inference/text) mà model đang dùng vẫn còn — giữ để tương thích, không xoá trộn.
+     * MỘT nguồn duy nhất cho cả validation lẫn giao diện: trước đây StudioSettingsController
+     * chép tay danh sách và THIẾU cả 3 nhóm Agent Studio ⇒ không thêm được model tìm kiếm từ UI.
+     */
+    function studio_model_group_slugs(): array
+    {
+        return array_values(array_unique(array_merge(array_keys(studio_task_groups()), ['inference', 'text'])));
+    }
+}
+
 if (! function_exists('studio_task_group_models')) {
     /**
      * Danh sách model của một nhóm công việc, theo thứ tự ưu tiên:

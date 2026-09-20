@@ -398,7 +398,7 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-BLYqavPU.js",
+    "file": "assets/settings-BVq44655.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
@@ -408,7 +408,7 @@
       "_BaseModal-Cml2Wluy.js"
     ],
     "css": [
-      "assets/settings-CcV7bo0r.css"
+      "assets/settings-DMlZqOtI.css"
     ]
   }
 }

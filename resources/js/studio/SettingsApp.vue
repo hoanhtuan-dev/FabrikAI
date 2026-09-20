@@ -84,10 +84,15 @@ const ROLE_META = {
   vision:    { label: 'Đọc ảnh (vision)',  icon: 'eye',      desc: 'Nhận diện khuôn mặt / dáng' },
   prompt:    { label: 'Suy luận prompt',   icon: 'sparkles', desc: 'Trợ lý thiết kế · giám đốc sáng tạo' },
   translate: { label: 'Dịch prompt',       icon: 'globe',    desc: 'Việt ⇄ Anh' },
+  // BA VAI RIÊNG CỦA AGENT STUDIO (Đợt 30) — phải nằm trong Model Registry để chủ shop thêm model
+  // cho từng vai. Nhãn KHỚP với studio_task_groups() phía server (một nghĩa, hai nơi).
+  agent_reason: { label: 'Agent Studio — Suy luận & viết nội dung', icon: 'bot',      desc: 'Viết brief · caption · prompt · định hướng' },
+  agent_vision: { label: 'Agent Studio — Đọc ảnh mẫu',              icon: 'eye',      desc: 'Nhìn 1–3 ảnh mẫu để bám phong cách shop' },
+  agent_search: { label: 'Agent Studio — Tìm kiếm nguồn ngoài',     icon: 'globe',    desc: 'Model/nhà cung cấp CÓ tìm kiếm web, dẫn nguồn' },
   inference: { label: 'Suy luận (cũ)',     icon: 'bot',      desc: 'Vai trò cũ — giữ để tương thích', legacy: true },
   text:      { label: 'Ngôn ngữ (cũ)',     icon: 'bot',      desc: 'Vai trò cũ — giữ để tương thích', legacy: true },
 };
-const ROLE_ORDER = ['image', 'edit', 'video', 'swap', 'vision', 'prompt', 'translate', 'inference', 'text'];
+const ROLE_ORDER = ['image', 'edit', 'video', 'swap', 'vision', 'prompt', 'translate', 'agent_reason', 'agent_vision', 'agent_search', 'inference', 'text'];
 const roleLabel = (g) => (ROLE_META[g] && ROLE_META[g].label) || g;
 const roleIcon = (g) => (ROLE_META[g] && ROLE_META[g].icon) || 'server';
 const isLegacyRole = (g) => !!(ROLE_META[g] && ROLE_META[g].legacy);

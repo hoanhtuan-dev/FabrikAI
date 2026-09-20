@@ -311,7 +311,7 @@ class StudioSettingsController extends Controller
             'auth_style' => $data['auth_style'] ?? 'bearer',
             'search_param' => ($data['search_param'] ?? null) ?: null,
             'search_mode' => ($data['search_param'] ?? null) ? ($data['search_mode'] ?? 'body_flag') : null,
-            'api_key_ref' => $data['api_key_ref'] ?: $data['slug'],
+            'api_key_ref' => ($data['api_key_ref'] ?? '') ?: $data['slug'],
             'priority' => (int) ($data['priority'] ?? 5),
             'enabled' => true,
             'note' => $data['note'] ?? null,
@@ -347,7 +347,7 @@ class StudioSettingsController extends Controller
             'auth_style' => $data['auth_style'] ?? 'bearer',
             'search_param' => ($data['search_param'] ?? null) ?: null,
             'search_mode' => ($data['search_param'] ?? null) ? ($data['search_mode'] ?? 'body_flag') : null,
-            'api_key_ref' => $data['api_key_ref'] ?: $provider->slug,
+            'api_key_ref' => ($data['api_key_ref'] ?? '') ?: $provider->slug,
             'priority' => (int) ($data['priority'] ?? $provider->priority ?? 5),
             'enabled' => (bool) ($data['enabled'] ?? true),
             'note' => $data['note'] ?? null,
@@ -367,7 +367,9 @@ class StudioSettingsController extends Controller
     public function storeModel(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'group' => ['required', 'string', 'in:image,edit,video,swap,vision,prompt,translate,inference,text'],
+            // Nhóm hợp lệ lấy từ MỘT nguồn (studio_model_group_slugs): gồm cả 3 vai Agent Studio
+            // (agent_reason · agent_vision · agent_search). Trước đây chép tay và THIẾU 3 nhóm này.
+            'group' => ['required', 'string', Rule::in(studio_model_group_slugs())],
             'name' => ['required', 'string', 'max:120'],
             'provider' => ['required', 'string', 'max:60'],
             'model_id' => ['required', 'string', 'max:255'],
@@ -385,7 +387,7 @@ class StudioSettingsController extends Controller
             'name' => $data['name'],
             'provider' => $data['provider'],
             'model_id' => $data['model_id'],
-            'api_key_ref' => $data['api_key_ref'] ?: $data['provider'],
+            'api_key_ref' => ($data['api_key_ref'] ?? '') ?: $data['provider'],
             'priority' => (int) ($data['priority'] ?? 5),
             'enabled' => $data['enabled'] ?? true,
             'note' => $data['note'] ?? null,
@@ -397,7 +399,9 @@ class StudioSettingsController extends Controller
     public function updateModel(Request $request, StudioModel $model): JsonResponse
     {
         $data = $request->validate([
-            'group' => ['required', 'string', 'in:image,edit,video,swap,vision,prompt,translate,inference,text'],
+            // Nhóm hợp lệ lấy từ MỘT nguồn (studio_model_group_slugs): gồm cả 3 vai Agent Studio
+            // (agent_reason · agent_vision · agent_search). Trước đây chép tay và THIẾU 3 nhóm này.
+            'group' => ['required', 'string', Rule::in(studio_model_group_slugs())],
             'name' => ['required', 'string', 'max:120'],
             'provider' => ['required', 'string', 'max:60'],
             'model_id' => ['required', 'string', 'max:255'],
@@ -415,7 +419,7 @@ class StudioSettingsController extends Controller
             'name' => $data['name'],
             'provider' => $data['provider'],
             'model_id' => $data['model_id'],
-            'api_key_ref' => $data['api_key_ref'] ?: $data['provider'],
+            'api_key_ref' => ($data['api_key_ref'] ?? '') ?: $data['provider'],
             'priority' => (int) ($data['priority'] ?? 0),
             'enabled' => (bool) ($data['enabled'] ?? true),
             'note' => $data['note'] ?? null,
