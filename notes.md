@@ -2,6 +2,7 @@
 
 - [ ] Tạo các trang nội dung -> người dùng public ảnh|video -> SEO nội dung -> xếp hạng và bầu chọn.
 - [ ] Tràn featured, hướng dẫn, tính năng.
+- [ ] Lấy cảm hứng từ compyU
 
 ---
 
