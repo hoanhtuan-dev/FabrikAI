@@ -198,7 +198,7 @@ function saveSettings() {
   <div class="card p-4" style="background: linear-gradient(160deg, rgba(255,170,120,.13), rgba(74,122,144,.06));">
     <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="shirt" /> Ghép trang phục</h2>
 
-    <p class="mt-2 rounded-md border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
+    <p class="mt-2 rounded-md border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-200">
       @image1 + @image2 = trang phục nguồn · @image3 = bối cảnh (tùy chọn) — lai tạo biến thể mới
     </p>
 
@@ -211,14 +211,14 @@ function saveSettings() {
           <img :src="selected[i-1].url" class="h-full w-full object-cover" @error="onSlotImgError(i-1)">
           <span v-if="slotImgError[i-1]" class="absolute inset-0 grid place-items-center bg-ink-900 text-2xl" title="Ảnh không tải được — bấm × để bỏ">🖼️</span>
           <span class="absolute left-1 top-1 rounded-full bg-brand-500 px-1.5 text-[9px] font-bold text-white">{{ i }}</span>
-          <span class="absolute inset-x-0 bottom-0 bg-black/65 px-1 py-0.5 text-center text-[9px] font-semibold text-cream-100">{{ SLOT_ROLES[i-1] }}</span>
+          <span class="absolute inset-x-0 bottom-0 bg-scrim/65 px-1 py-0.5 text-center text-[9px] font-semibold text-scrim-content">{{ SLOT_ROLES[i-1] }}</span>
           <span @click.stop="removeSlot(i-1)" title="Bỏ ảnh khỏi slot" class="motion-ui absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-red-600/90 text-[11px] text-white hover:bg-red-500"><StudioIcon name="x" size="h-3.5 w-3.5" /></span>
           <span v-if="i > 1" @click.stop="makeBase(i-1)" class="absolute bottom-6 right-1 grid h-5 w-5 place-items-center rounded-full bg-ink-800/90 text-[9px] text-white" title="Đưa lên làm @image1">⤴</span>
         </template>
         <template v-else>
-          <span class="grid h-6 w-6 place-items-center text-ink-600"><StudioIcon name="shirt" size="h-5 w-5" v-if="i === 1" /><span v-else>＋</span></span>
-          <span class="px-1 text-center text-[9px] font-medium text-cream-300/60">{{ SLOT_ROLES[i-1] }}</span>
-          <span class="px-1 text-center text-[9px] text-cream-300/40">@image{{ i }}</span>
+          <span class="grid h-6 w-6 place-items-center text-cream-400"><StudioIcon name="shirt" size="h-5 w-5" v-if="i === 1" /><span v-else>＋</span></span>
+          <span class="px-1 text-center text-[9px] font-medium text-cream-400">{{ SLOT_ROLES[i-1] }}</span>
+          <span class="px-1 text-center text-[9px] text-cream-400">@image{{ i }}</span>
         </template>
       </button>
     </div>
@@ -236,20 +236,20 @@ function saveSettings() {
     <div class="mt-3">
       <label class="label">Phong cách</label>
       <input v-model="style" type="text" maxlength="200" class="input !text-xs" placeholder="VD: tối giản hiện đại, công sở thanh lịch, streetwear, boho, cổ điển…">
-      <p class="mt-1 text-[10px] text-cream-300/50">Phong cách là hướng sáng tạo CHỦ ĐẠO — kết quả sẽ bám theo phong cách này.</p>
+      <p class="mt-1 text-[10px] text-cream-400">Phong cách là hướng sáng tạo CHỦ ĐẠO — kết quả sẽ bám theo phong cách này.</p>
     </div>
-    <div class="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+    <div class="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-cream-50/5 px-3 py-2.5 text-xs">
       <span class="shrink-0 font-medium text-cream-200">Trang trí</span>
       <input type="range" min="0" max="10" v-model.number="ornamentLevel" class="h-2 w-full cursor-pointer accent-brand-500">
-      <span class="shrink-0 font-semibold text-cream-50">{{ ornamentLevel }}</span><span class="shrink-0 text-cream-300/60">/10</span>
+      <span class="shrink-0 font-semibold text-cream-50">{{ ornamentLevel }}</span><span class="shrink-0 text-cream-400">/10</span>
     </div>
-    <p class="mt-1 text-[10px] leading-relaxed text-cream-300/50">0 = tối giản, không họa tiết/đính đá · 10 = cầu kỳ, đính đá &amp; họa tiết đậm.</p>
-    <div class="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+    <p class="mt-1 text-[10px] leading-relaxed text-cream-400">0 = tối giản, không họa tiết/đính đá · 10 = cầu kỳ, đính đá &amp; họa tiết đậm.</p>
+    <div class="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-cream-50/5 px-3 py-2.5 text-xs">
       <span class="shrink-0 font-medium text-cream-200">Sáng tạo</span>
       <input type="range" min="1" max="10" v-model.number="creativeLevel" class="h-2 w-full cursor-pointer accent-brand-500">
-      <span class="shrink-0 font-semibold text-cream-50">{{ creativeLevel }}</span><span class="shrink-0 text-cream-300/60">/10</span>
+      <span class="shrink-0 font-semibold text-cream-50">{{ creativeLevel }}</span><span class="shrink-0 text-cream-400">/10</span>
     </div>
-    <p class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Thấp = bám sát 2 trang phục gốc · Cao = tự do lai tạo, editorial.</p>
+    <p class="mt-1 text-[10px] leading-relaxed text-cream-400">Thấp = bám sát 2 trang phục gốc · Cao = tự do lai tạo, editorial.</p>
 
     <!-- Preset phong cách + lưu cài đặt (database) -->
     <div class="mt-3">
@@ -262,7 +262,7 @@ function saveSettings() {
           {{ p.name }}
           <span @click.stop="deletePreset(p)" class="motion-ui grid h-4 w-4 place-items-center rounded-full text-cream-400 hover:bg-red-600 hover:text-white" title="Xóa preset">×</span>
         </button>
-        <span v-if="!stylePresets.length" class="text-[10px] text-cream-300/50">Chưa có preset — lưu phong cách + trang trí + sáng tạo hiện tại để tái dùng cho cả bộ sưu tập.</span>
+        <span v-if="!stylePresets.length" class="text-[10px] text-cream-400">Chưa có preset — lưu phong cách + trang trí + sáng tạo hiện tại để tái dùng cho cả bộ sưu tập.</span>
       </div>
       <div class="mt-1.5 flex gap-1.5">
         <input v-model="presetName" type="text" maxlength="60" class="input !py-1.5 !text-xs" placeholder="Tên preset (VD: Bộ sưu tập Xuân)">
@@ -277,7 +277,7 @@ function saveSettings() {
               :class="variants === n ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="h-7 w-7 rounded-full font-semibold transition-colors">{{ n }}</button>
     </div>
-    <p v-if="variants > 1" class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Biến thể đi theo trục khác nhau để không trùng lặp: Classic · Modern · Bold · Fluid.</p>
+    <p v-if="variants > 1" class="mt-1 text-[10px] leading-relaxed text-cream-400">Biến thể đi theo trục khác nhau để không trùng lặp: Classic · Modern · Bold · Fluid.</p>
 
     <!-- Xem trước / chỉnh tay prompt -->
     <button @click="togglePreview" type="button" class="btn-outline mt-3 w-full whitespace-nowrap">
@@ -289,13 +289,13 @@ function saveSettings() {
         <button @click="loadPreview" :disabled="previewLoading" class="btn-ghost btn-sm shrink-0">{{ previewLoading ? 'Đang tải…' : 'Làm mới' }}</button>
       </div>
       <textarea v-model="previewPrompt" @input="onPreviewEdit" rows="6" class="input w-full !text-[11px] leading-relaxed" placeholder="Bấm Làm mới để lấy prompt hiện tại…"></textarea>
-      <p class="mt-1 text-[10px] leading-relaxed" :class="previewDirty ? 'text-amber-300' : 'text-cream-300/50'">
+      <p class="mt-1 text-[10px] leading-relaxed" :class="previewDirty ? 'text-warn' : 'text-cream-400'">
         <span v-if="previewDirty">✓ Sẽ gửi bản prompt đã chỉnh này.</span>
         <span v-else>Chưa chỉnh sửa — hệ thống tự dựng prompt từ các tùy chọn. Đổi tùy chọn/ảnh xong bấm "Làm mới".</span>
       </p>
       <p v-if="previewAxes.length > 1" class="mt-1 text-[10px] leading-relaxed text-brand-200/80">
         Biến thể theo trục ({{ variants }} biến thể): mỗi biến thể thêm 1 chỉ thị phom dáng/tâm trạng riêng.<br>
-        <span class="text-cream-300/60">1·Classic · 2·Modern · 3·Bold · 4·Fluid — nếu bạn chỉnh tay prompt trên, trục sẽ tắt.</span>
+        <span class="text-cream-400">1·Classic · 2·Modern · 3·Bold · 4·Fluid — nếu bạn chỉnh tay prompt trên, trục sẽ tắt.</span>
       </p>
     </div>
 
@@ -310,18 +310,18 @@ function saveSettings() {
         :subtext="fmt(elapsedSec) + ' · ' + doneCount + '/' + store.composeGenIds.length + ' biến thể'"
         :progress="doneCount / Math.max(1, store.composeGenIds.length) * 100" />
       <div class="mt-2 flex justify-end">
-        <button @click="store.cancelCompose()" class="rounded-full bg-red-600/25 px-2.5 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">Hủy</button>
+        <button @click="store.cancelCompose()" class="rounded-full bg-red-600/25 px-2.5 py-1 text-[10px] font-semibold text-danger hover:bg-red-600">Hủy</button>
       </div>
     </div>
 
     <!-- Thành công -->
-    <div v-if="store.composeStage === 'done'" class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
+    <div v-if="store.composeStage === 'done'" class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-ok">
       Đã lai tạo xong — kết quả đã được chọn trong Outputs.
-      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
+      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-cream-50/10 px-2 py-0.5 hover:bg-cream-50/20">Đóng</button>
     </div>
 
     <!-- Lỗi -->
-    <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-lg border border-red-500/40 bg-red-900/25 p-3 text-xs text-red-200">
+    <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-lg border border-red-500/40 bg-red-900/25 p-3 text-xs text-danger">
       <p class="font-semibold">Ghép trang phục thất bại</p>
       <p class="mt-1 whitespace-pre-line leading-relaxed">{{ store.composeError }}</p>
       <div class="mt-2 flex gap-2">
@@ -331,9 +331,9 @@ function saveSettings() {
     </div>
 
     <!-- Đã hủy -->
-    <div v-if="store.composeStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 p-3 text-xs text-cream-200">
+    <div v-if="store.composeStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-cream-50/5 p-3 text-xs text-cream-200">
       Đã hủy yêu cầu ghép trang phục.
-      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
+      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-cream-50/10 px-2 py-0.5 hover:bg-cream-50/20">Đóng</button>
     </div>
 
     <!-- So sánh Trước/Sau -->

@@ -66,7 +66,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
       :class="danger ? 'border-red-500/40' : 'border-ink-700'"
     >
       <p class="text-sm font-semibold text-cream-100">{{ title }}</p>
-      <p class="mt-1 text-xs leading-relaxed text-cream-300/70"><slot /></p>
+      <p class="mt-1 text-xs leading-relaxed text-cream-300"><slot /></p>
       <div class="mt-3 flex gap-2">
         <button
           ref="confirmBtn"

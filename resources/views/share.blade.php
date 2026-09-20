@@ -6,7 +6,7 @@
     <meta name="description" content="Xem và duyệt bộ sưu tập {{ $project->name }} — FabrikAI.">
 @endsection
 @section('content')
-<div class="studio-dark min-h-screen">
+<div class="studio-shell min-h-screen">
     <header class="border-b border-ink-700 bg-ink-900/95">
         <div class="container-x flex flex-wrap items-center gap-3 py-3">
             <span class="flex items-center gap-2">
@@ -33,7 +33,7 @@
                 {{ $imagesTotal }} ảnh{{ $referenceImages ? ' · '.count($referenceImages).' ảnh gốc' : '' }}
             </span>
             @if($imagesTruncated)
-                <span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 font-semibold text-amber-200">
+                <span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 font-semibold text-warn">
                     Trang này hiển thị {{ $images->count() }}/{{ $imagesTotal }} ảnh mới nhất
                 </span>
             @endif
@@ -99,13 +99,13 @@
             <h2 class="font-display text-xl font-semibold text-cream-50">Phản hồi của bạn</h2>
 
             @if($sent)
-                <div class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+                <div class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-ok">
                     Đã gửi phản hồi — cảm ơn bạn. Người phụ trách bộ sưu tập sẽ nhận được ngay trong FabrikAI.
                 </div>
             @endif
 
             @if($errors->any())
-                <div class="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{{ $errors->first() }}</div>
+                <div class="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-danger">{{ $errors->first() }}</div>
             @endif
 
             <form method="POST" action="{{ url('/chia-se/'.$token.'/phan-hoi') }}" class="card mt-3 p-4">
@@ -139,7 +139,7 @@
                             <li class="card p-3">
                                 <div class="flex flex-wrap items-center gap-2 text-[11px]">
                                     <span class="font-semibold text-cream-100">{{ $fb->author_name }}</span>
-                                    <span class="rounded-full px-2 py-0.5 font-semibold {{ $fb->decision === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300' }}">{{ $fb->decisionLabel() }}</span>
+                                    <span class="rounded-full px-2 py-0.5 font-semibold {{ $fb->decision === 'approved' ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn' }}">{{ $fb->decisionLabel() }}</span>
                                     <span class="text-cream-300">{{ $fb->created_at?->format('d/m/Y H:i') }}</span>
                                 </div>
                                 @if($fb->message)

@@ -2512,3 +2512,51 @@ function studio_qwen_text_models(): array
 }
 
 
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   THEME (giao diện Sáng/Tối) — 2026-09-23 · docs/DESIGN_SYSTEM.md §1.1
+   Một chỗ khai, mọi shell dùng: blade render sẵn data-theme cho thẻ <html> để KHÔNG nháy
+   màu khi tải trang, và partial resources/views/partials/theme.blade.php sửa lại ngay
+   trước lần vẽ đầu tiên khi người dùng chọn "theo hệ điều hành".
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+if (! function_exists('theme_options')) {
+    /**
+     * Ba lựa chọn hợp lệ — NGUỒN DUY NHẤT cho cả PHP (whitelist ở ThemeController) lẫn blade.
+     */
+    function theme_options(): array
+    {
+        return ['light', 'dark', 'system'];
+    }
+}
+
+if (! function_exists('theme_pref')) {
+    /**
+     * Tùy chọn theme của người ĐANG đăng nhập: light | dark | system.
+     *
+     * Chưa từng chọn (users.theme = NULL) ⇒ 'dark' — đúng giao diện sản phẩm đang dùng, nên
+     * người dùng hiện hữu không bị đổi giao diện sau khi tính năng này lên.
+     * Khách chưa đăng nhập ⇒ 'dark' (script trong partial vẫn đổi được theo máy của họ).
+     */
+    function theme_pref(): string
+    {
+        $pref = auth()->user()?->theme;
+
+        return in_array($pref, theme_options(), true) ? $pref : 'dark';
+    }
+}
+
+if (! function_exists('theme_resolved')) {
+    /**
+     * Theme CỤ THỂ để render vào data-theme của thẻ <html>.
+     *
+     * 'system' không giải được ở phía server (máy chủ không biết ý hệ điều hành của khách),
+     * nên trả 'dark' và để script trong partial sửa lại TRƯỚC khi vẽ. Đây là lý do duy nhất
+     * khiến giá trị render sẵn có thể khác lựa chọn của người dùng.
+     */
+    function theme_resolved(): string
+    {
+        return theme_pref() === 'light' ? 'light' : 'dark';
+    }
+}
+

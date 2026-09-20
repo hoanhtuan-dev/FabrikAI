@@ -97,18 +97,18 @@ const shortcuts = [
           </span>
           <div class="min-w-0">
             <h2 class="text-lg font-semibold text-cream-50">Canvas trống</h2>
-            <p class="mt-0.5 text-xs text-cream-300/55">Tạo ảnh từ mô tả, hoặc để Agent Studio dựng hướng đi trước.</p>
+            <p class="mt-0.5 text-xs text-cream-400">Tạo ảnh từ mô tả, hoặc để Agent Studio dựng hướng đi trước.</p>
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-2 text-[11px]">
           <span class="inline-flex items-center gap-1.5 rounded-full bg-ink-800 px-2.5 py-1 text-cream-200" :title="'Credit còn lại'">
             <StudioIcon name="coins" size="h-3.5 w-3.5" class="text-brand-300" /> {{ store.creditsLeft }}
           </span>
-          <span v-if="store.planName" class="rounded-full bg-ink-800 px-2.5 py-1 text-cream-300/70">{{ store.planName }}</span>
-          <span v-if="projectName" class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/15 px-2.5 py-1 text-brand-100" :title="'Bộ sưu tập đang áp dụng'">
+          <span v-if="store.planName" class="rounded-full bg-ink-800 px-2.5 py-1 text-cream-300">{{ store.planName }}</span>
+          <span v-if="projectName" class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/15 px-2.5 py-1 text-brand-200" :title="'Bộ sưu tập đang áp dụng'">
             <StudioIcon name="folderOpen" size="h-3.5 w-3.5" /> {{ projectName }}
           </span>
-          <span class="rounded-full bg-ink-800 px-2.5 py-1 text-cream-300/70">{{ layerCount }} lớp</span>
+          <span class="rounded-full bg-ink-800 px-2.5 py-1 text-cream-300">{{ layerCount }} lớp</span>
         </div>
       </header>
 
@@ -119,7 +119,7 @@ const shortcuts = [
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 class="text-sm font-semibold text-cream-100">Tạo ảnh từ mô tả</h3>
-                <p class="mt-0.5 text-[11px] text-cream-300/50">Mô tả trang phục, phong cách, bối cảnh và ánh sáng.</p>
+                <p class="mt-0.5 text-[11px] text-cream-400">Mô tả trang phục, phong cách, bối cảnh và ánh sáng.</p>
               </div>
               <button type="button" class="tool-btn" @click="store.promptOpen = true" title="Mở bảng Prompt Tạo Ảnh đầy đủ">
                 <StudioIcon name="sliders" size="h-3.5 w-3.5" /> Bảng đầy đủ
@@ -137,7 +137,7 @@ const shortcuts = [
                 @keydown="onPromptKeydown"
               ></textarea>
               <div class="absolute bottom-3 right-3 flex items-center gap-2">
-                <span class="text-[10px] font-semibold text-cream-300/45" title="Số credit ước tính">~{{ creditEstimate }} credit</span>
+                <span class="text-[10px] font-semibold text-cream-400" title="Số credit ước tính">~{{ creditEstimate }} credit</span>
                 <button type="button" class="btn-brand btn-sm flex items-center gap-1.5" :disabled="!canGenerate" @click="generate" title="Tạo ảnh (Enter)">
                   <StudioIcon name="zap" size="h-3.5 w-3.5" /> Tạo ảnh
                 </button>
@@ -146,14 +146,14 @@ const shortcuts = [
 
             <div class="mt-3 flex flex-wrap items-center gap-2">
               <div class="flex items-center gap-1 rounded-lg bg-ink-800 p-1" role="group" aria-label="Số biến thể">
-                <span class="px-1 text-[10px] text-cream-300/50">Biến thể</span>
-                <button v-for="n in [1, 2, 4]" :key="n" type="button" class="h-6 min-w-6 rounded-md px-1.5 text-[11px] font-semibold transition" :class="Number(variantCount) === n ? 'bg-brand-600 text-white' : 'text-cream-300/60 hover:text-cream-100'" @click="variantCount = n">{{ n }}</button>
+                <span class="px-1 text-[10px] text-cream-400">Biến thể</span>
+                <button v-for="n in [1, 2, 4]" :key="n" type="button" class="h-6 min-w-6 rounded-md px-1.5 text-[11px] font-semibold transition" :class="Number(variantCount) === n ? 'bg-brand-600 text-white' : 'text-cream-400 hover:text-cream-100'" @click="variantCount = n">{{ n }}</button>
               </div>
               <div class="flex items-center gap-1 rounded-lg bg-ink-800 p-1" role="group" aria-label="Tỉ lệ khung hình">
-                <span class="px-1 text-[10px] text-cream-300/50">Tỉ lệ</span>
-                <button v-for="r in ratioOptions" :key="r" type="button" class="h-6 rounded-md px-2 text-[11px] font-semibold transition" :class="store.imageRatio === r ? 'bg-brand-600 text-white' : 'text-cream-300/60 hover:text-cream-100'" @click="store.imageRatio = r">{{ r }}</button>
+                <span class="px-1 text-[10px] text-cream-400">Tỉ lệ</span>
+                <button v-for="r in ratioOptions" :key="r" type="button" class="h-6 rounded-md px-2 text-[11px] font-semibold transition" :class="store.imageRatio === r ? 'bg-brand-600 text-white' : 'text-cream-400 hover:text-cream-100'" @click="store.imageRatio = r">{{ r }}</button>
               </div>
-              <span class="ml-auto text-[10px] text-cream-300/40">Enter để tạo nhanh · Shift+Enter xuống dòng</span>
+              <span class="ml-auto text-[10px] text-cream-400">Enter để tạo nhanh · Shift+Enter xuống dòng</span>
             </div>
           </section>
 
@@ -161,7 +161,7 @@ const shortcuts = [
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 class="text-sm font-semibold text-cream-100">Hoặc bắt đầu có định hướng</h3>
-                <p class="mt-0.5 text-[11px] text-cream-300/50">Agent Studio dẫn từ tín hiệu thị trường đến prompt tạo ảnh.</p>
+                <p class="mt-0.5 text-[11px] text-cream-400">Agent Studio dẫn từ tín hiệu thị trường đến prompt tạo ảnh.</p>
               </div>
               <button type="button" class="btn-brand btn-sm flex items-center gap-2" @click="openAgent('radar')">
                 <StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Mở Agent Studio
@@ -174,7 +174,7 @@ const shortcuts = [
                   <StudioIcon :name="stepItem.icon" size="h-3.5 w-3.5" class="text-brand-300" />
                   <span class="text-xs font-semibold text-cream-100">{{ stepItem.title }}</span>
                 </div>
-                <p class="mt-2 text-[11px] leading-4 text-cream-300/60">{{ stepItem.text }}</p>
+                <p class="mt-2 text-[11px] leading-4 text-cream-400">{{ stepItem.text }}</p>
               </div>
             </div>
           </section>
@@ -183,15 +183,15 @@ const shortcuts = [
         <!-- Cột phụ: hành động nhanh + phím tắt -->
         <aside class="space-y-4">
           <section class="motion-rise-in rounded-2xl border border-ink-700 bg-ink-900/80 p-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-cream-300/60">Đi nhanh</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-cream-400">Đi nhanh</h3>
             <div class="mt-3 space-y-2">
               <button v-for="action in quickActions" :key="action.id" type="button" class="tool-btn w-full justify-start !px-3 !py-2.5 text-left" :title="action.hint" @click="action.run()">
                 <StudioIcon :name="action.icon" size="h-4 w-4" class="shrink-0 text-brand-300" />
-                <span class="min-w-0"><span class="block text-xs font-semibold text-cream-100">{{ action.label }}</span><span class="block truncate text-[10px] text-cream-300/50">{{ action.hint }}</span></span>
+                <span class="min-w-0"><span class="block text-xs font-semibold text-cream-100">{{ action.label }}</span><span class="block truncate text-[10px] text-cream-400">{{ action.hint }}</span></span>
               </button>
               <button type="button" class="tool-btn w-full justify-start !px-3 !py-2.5 text-left" title="Xem gói và nâng cấp" @click="store.planOpen = true">
                 <StudioIcon name="coins" size="h-4 w-4" class="shrink-0 text-brand-300" />
-                <span class="min-w-0"><span class="block text-xs font-semibold text-cream-100">Gói &amp; credit</span><span class="block truncate text-[10px] text-cream-300/50">Hạn mức, chi phí, nâng cấp</span></span>
+                <span class="min-w-0"><span class="block text-xs font-semibold text-cream-100">Gói &amp; credit</span><span class="block truncate text-[10px] text-cream-400">Hạn mức, chi phí, nâng cấp</span></span>
               </button>
             </div>
           </section>
@@ -199,7 +199,7 @@ const shortcuts = [
           <details class="motion-rise-in rounded-2xl border border-ink-700 bg-ink-900/80 p-4">
             <summary class="cursor-pointer text-xs font-semibold text-cream-200">Phím tắt canvas</summary>
             <ul class="mt-3 space-y-1.5">
-              <li v-for="item in shortcuts" :key="item.key" class="flex items-center justify-between gap-3 text-[11px] text-cream-300/65">
+              <li v-for="item in shortcuts" :key="item.key" class="flex items-center justify-between gap-3 text-[11px] text-cream-400">
                 <span>{{ item.label }}</span>
                 <kbd class="rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[10px] text-cream-200">{{ item.key }}</kbd>
               </li>

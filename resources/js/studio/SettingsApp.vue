@@ -90,11 +90,11 @@ const flowMeta = (token) => FLOW_META[token] || { label: token, short: token, ic
 const BADGE = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold';
 const BADGE_TONE = {
   neutral: 'bg-ink-700 text-cream-300',
-  ok: 'bg-emerald-500/15 text-emerald-300',
-  warn: 'bg-amber-500/15 text-amber-300',
-  danger: 'bg-red-500/15 text-red-300',
+  ok: 'bg-emerald-500/15 text-ok',
+  warn: 'bg-amber-500/15 text-warn',
+  danger: 'bg-red-500/15 text-danger',
   brand: 'bg-brand-600/25 text-brand-100',
-  info: 'bg-sky-500/15 text-sky-300',
+  info: 'bg-sky-500/15 text-info',
   custom: 'bg-indigo-500/15 text-indigo-300',
 };
 
@@ -216,10 +216,10 @@ const attention = computed(() => {
 // Bốn tông chú ý — CÙNG quy ước với viền nút: một nghĩa = ĐÚNG MỘT cặp màu + alpha (/40).
 // Xem docs/DESIGN_SYSTEM.md §5 "Viền".
 const attentionTone = (tone) => ({
-  danger: 'text-red-300 bg-red-500/10 border-red-500/40',
-  warn: 'text-amber-300 bg-amber-500/10 border-amber-500/40',
-  info: 'text-sky-300 bg-sky-500/10 border-sky-500/40',
-  ok: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/40',
+  danger: 'text-danger bg-red-500/10 border-red-500/40',
+  warn: 'text-warn bg-amber-500/10 border-amber-500/40',
+  info: 'text-info bg-sky-500/10 border-sky-500/40',
+  ok: 'text-ok bg-emerald-500/10 border-emerald-500/40',
 }[tone] || 'text-cream-300 bg-ink-700 border-ink-700');
 
 // ─────────────────────────── Lọc & nhóm danh sách ───────────────────────────
@@ -594,12 +594,12 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
 </script>
 
 <template>
-  <div class="studio-dark min-h-screen w-full">
+  <div class="studio-shell min-h-screen w-full">
     <!-- Thông báo: aria-live để trình đọc màn hình đọc được kết quả thao tác -->
     <div class="pointer-events-none fixed bottom-5 right-5 z-[80] flex w-[min(92vw,26rem)] flex-col gap-2">
       <transition name="fade">
         <div v-if="toast" role="status" aria-live="polite"
-             :class="toast.ok ? 'border-emerald-500/40 bg-emerald-950/95 text-emerald-100' : 'border-red-500/50 bg-red-950/95 text-red-100'"
+             :class="toast.ok ? 'border-emerald-500/40 bg-emerald-950/95 text-ok' : 'border-red-500/50 bg-red-950/95 text-danger'"
              class="pointer-events-auto flex items-start gap-2 rounded-lg border px-3.5 py-2.5 text-xs font-semibold shadow-2xl backdrop-blur">
           <StudioIcon :name="toast.ok ? 'check' : 'alertTriangle'" size="h-4 w-4 shrink-0" class="mt-px" />
           <span>{{ toast.msg }}</span>
@@ -619,7 +619,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
             <StudioIcon name="gear" size="h-4 w-4" class="text-brand-300" />
             Cài đặt Studio
           </h1>
-          <p class="mt-0.5 hidden truncate text-[11px] text-cream-300/85 sm:block">
+          <p class="mt-0.5 hidden truncate text-[11px] text-cream-300 sm:block">
             Nhà cung cấp · API key · model — cấu hình ở đây áp dụng cho mọi tài khoản FabrikAI.
           </p>
         </div>
@@ -648,9 +648,9 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           <div v-for="i in 4" :key="i" class="card h-24 animate-pulse"></div>
         </div>
       </div>
-      <div v-else-if="error" class="card border-red-500/40 p-6 text-sm text-red-200">
+      <div v-else-if="error" class="card border-red-500/40 p-6 text-sm text-danger">
         <p class="flex items-center gap-2 font-semibold"><StudioIcon name="alertTriangle" size="h-4 w-4" /> Không nạp được cấu hình</p>
-        <p class="mt-1 text-xs text-red-200/80">{{ error }}</p>
+        <p class="mt-1 text-xs text-danger">{{ error }}</p>
         <button class="btn-outline btn-sm mt-3" @click="load()">Thử lại</button>
       </div>
 
@@ -658,21 +658,21 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
         <!-- ═════════ Danh mục (desktop) ═════════ -->
         <nav class="hidden lg:sticky lg:top-[4.75rem] lg:block lg:self-start" aria-label="Mục cài đặt">
           <div v-for="group in SECTION_GROUPS" :key="group" class="mb-4">
-            <p class="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-cream-300/75">{{ group }}</p>
+            <p class="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-cream-300">{{ group }}</p>
             <ul class="space-y-0.5">
               <li v-for="s in sectionsIn(group)" :key="s.id">
                 <button :data-nav="s.id" @click="goTo(s.id)" @keydown="navKey($event, SECTIONS.indexOf(s))"
                         :aria-current="section === s.id ? 'true' : undefined"
                         :class="section === s.id ? 'bg-brand-600/20 text-cream-50 ring-1 ring-inset ring-brand-500/40' : 'text-cream-200 hover:bg-ink-800'"
                         class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors">
-                  <StudioIcon :name="s.icon" size="h-4 w-4" :class="section === s.id ? 'text-brand-300' : 'text-cream-300/80'" />
+                  <StudioIcon :name="s.icon" size="h-4 w-4" :class="section === s.id ? 'text-brand-300' : 'text-cream-300'" />
                   <span class="min-w-0 flex-1 truncate">{{ s.label }}</span>
                   <span v-if="navBadge(s.id)" :class="[BADGE, section === s.id ? BADGE_TONE.brand : BADGE_TONE.neutral]" class="!px-1.5">{{ navBadge(s.id) }}</span>
                 </button>
               </li>
             </ul>
           </div>
-          <p class="px-3 text-[10px] leading-relaxed text-cream-300/75">
+          <p class="px-3 text-[10px] leading-relaxed text-cream-300">
             Cài đặt ở đây là TOÀN CỤC. Tuỳ chọn riêng của bạn nằm ở
             <a href="/presets" class="link">Prompt Templates</a> và
             <a href="/model-settings" class="link">Khuôn mặt &amp; Dáng</a>.
@@ -708,18 +708,18 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                       ]" :key="card.id" @click="goTo(card.id)"
                       class="card p-4 text-left transition-colors hover:border-brand-400">
                 <div class="flex items-start justify-between gap-2">
-                  <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/80">{{ card.label }}</p>
+                  <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300">{{ card.label }}</p>
                   <StudioIcon :name="card.icon" size="h-4 w-4" class="text-brand-300/70" />
                 </div>
                 <p class="mt-1.5 font-display text-2xl font-semibold text-cream-50">{{ card.value }}</p>
-                <p class="mt-0.5 text-[11px] text-cream-300/85">{{ card.note }}</p>
+                <p class="mt-0.5 text-[11px] text-cream-300">{{ card.note }}</p>
               </button>
             </div>
 
             <div class="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
               <div class="card p-4">
                 <h2 class="flex items-center gap-2 text-sm font-semibold text-cream-50">
-                  <StudioIcon name="alertTriangle" size="h-4 w-4" class="text-amber-300" />
+                  <StudioIcon name="alertTriangle" size="h-4 w-4" class="text-warn" />
                   Việc cần xử lý
                 </h2>
                 <ul class="mt-3 space-y-2">
@@ -753,10 +753,10 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                         {{ flowMeta(t).short }}
                         <span class="opacity-70">{{ flowCounts[t] || 0 }} model</span>
                       </span>
-                      <StudioIcon v-if="i < flowTokens.length - 1" name="arrowRight" size="h-3 w-3" class="text-cream-300/75" />
+                      <StudioIcon v-if="i < flowTokens.length - 1" name="arrowRight" size="h-3 w-3" class="text-cream-300" />
                     </template>
                   </div>
-                  <p class="mt-2.5 text-[11px] leading-relaxed text-cream-300/85">
+                  <p class="mt-2.5 text-[11px] leading-relaxed text-cream-300">
                     Khi tạo ảnh/video/suy luận, hệ thống thử theo thứ tự trên cho tới khi có kết quả.
                     Model gán riêng cho từng nhóm công việc thắng chuỗi này.
                   </p>
@@ -769,19 +769,19 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                   </h2>
                   <div class="mt-3 grid grid-cols-2 gap-2.5">
                     <div v-for="u in usageCards" :key="u.key" class="rounded-lg border border-ink-700 bg-ink-900/60 p-2.5">
-                      <p class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300/75">
+                      <p class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300">
                         <StudioIcon :name="u.icon" size="h-3 w-3" /> {{ u.label }}
                       </p>
                       <p class="mt-1 text-lg font-semibold text-cream-50">{{ u.value }}</p>
                     </div>
                   </div>
-                  <p v-if="usage.quota_resets_at" class="mt-2 text-[11px] text-cream-300/80">Hạn mức đặt lại: {{ usage.quota_resets_at }}</p>
+                  <p v-if="usage.quota_resets_at" class="mt-2 text-[11px] text-cream-300">Hạn mức đặt lại: {{ usage.quota_resets_at }}</p>
                 </div>
               </div>
             </div>
 
             <div class="card flex flex-wrap items-center gap-2 p-4">
-              <p class="mr-auto text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Thao tác nhanh</p>
+              <p class="mr-auto text-[11px] font-semibold uppercase tracking-wide text-cream-300">Thao tác nhanh</p>
               <button class="btn-brand btn-sm" @click="openKeyModal()"><StudioIcon name="plus" size="h-3.5 w-3.5" /> Thêm API key</button>
               <button class="btn-outline btn-sm" @click="openProvModal()"><StudioIcon name="globe" size="h-3.5 w-3.5" /> Thêm provider</button>
               <button class="btn-outline btn-sm" @click="openModelModal()"><StudioIcon name="server" size="h-3.5 w-3.5" /> Thêm model</button>
@@ -799,7 +799,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                   <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
                     <StudioIcon name="sliders" size="h-4 w-4" class="text-brand-300" /> Luồng ưu tiên provider
                   </h2>
-                  <p class="mt-1 max-w-2xl text-xs text-cream-300/85">
+                  <p class="mt-1 max-w-2xl text-xs text-cream-300">
                     Thứ tự thử provider cho MỌI nhóm công việc. Nhóm trên được thử trước; trong cùng một nhóm thì xét Ưu tiên model giảm dần.
                   </p>
                 </div>
@@ -816,7 +816,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     {{ flowMeta(t).short }}
                     <span class="opacity-70">{{ flowCounts[t] || 0 }} model</span>
                   </span>
-                  <StudioIcon v-if="i < flowTokens.length - 1" name="arrowRight" size="h-3.5 w-3.5" class="text-cream-300/75" />
+                  <StudioIcon v-if="i < flowTokens.length - 1" name="arrowRight" size="h-3.5 w-3.5" class="text-cream-300" />
                 </template>
               </div>
 
@@ -826,10 +826,10 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-600/20 text-xs font-bold text-brand-200">#{{ i + 1 }}</span>
                     <div class="min-w-0 flex-1">
                       <p class="flex items-center gap-1.5 text-sm font-semibold text-cream-50">
-                        <StudioIcon :name="flowMeta(t).icon" size="h-3.5 w-3.5" class="text-cream-300/85" />
+                        <StudioIcon :name="flowMeta(t).icon" size="h-3.5 w-3.5" class="text-cream-300" />
                         {{ flowMeta(t).label }}
                       </p>
-                      <p class="mt-0.5 text-[11px] text-cream-300/80">{{ flowMeta(t).desc }}</p>
+                      <p class="mt-0.5 text-[11px] text-cream-300">{{ flowMeta(t).desc }}</p>
                     </div>
                     <span :class="[BADGE, familyConfigured(t) ? BADGE_TONE.ok : BADGE_TONE.warn]">{{ familyConfigured(t) ? 'đã có key' : 'chưa có key' }}</span>
                     <span class="flex items-center gap-1">
@@ -843,7 +843,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                       {{ p.name }}
                       <span v-if="p.key_count" class="opacity-70">×{{ p.key_count }}</span>
                     </span>
-                    <span v-if="!familyProviders(t).length" class="text-[11px] text-cream-300/75">Chưa có provider nào trong nhóm này.</span>
+                    <span v-if="!familyProviders(t).length" class="text-[11px] text-cream-300">Chưa có provider nào trong nhóm này.</span>
                     <template v-if="t === 'custom'">
                       <button class="tool-btn" @click="goTo('providers')">Khai báo route (có mẫu sẵn) <StudioIcon name="arrowRight" size="h-3.5 w-3.5" /></button>
                     </template>
@@ -851,15 +851,15 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                 </li>
               </ol>
 
-              <p class="mt-3 flex items-start gap-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5 text-[11px] text-cream-300/85">
-                <StudioIcon name="info" size="h-3.5 w-3.5 shrink-0 mt-px text-sky-300" />
+              <p class="mt-3 flex items-start gap-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5 text-[11px] text-cream-300">
+                <StudioIcon name="info" size="h-3.5 w-3.5 shrink-0 mt-px text-info" />
                 <span>Nút "Đồng bộ catalog" nhập danh sách model QwenCloud tích hợp trong mã nguồn vào Model Registry (idempotent — không đụng model bạn đã sửa tay). Khi QwenCloud ra model mới: cập nhật catalog trong <code class="rounded bg-ink-800 px-1">helpers.php</code> rồi bấm lại.</span>
               </p>
             </div>
 
             <details class="card p-4">
               <summary class="cursor-pointer text-sm font-semibold text-cream-100">Trợ giúp · Custom provider &amp; gateway OpenAI-compatible</summary>
-              <div class="mt-2 space-y-1.5 text-[11px] text-cream-300/80">
+              <div class="mt-2 space-y-1.5 text-[11px] text-cream-300">
                 <p>· Mọi gateway <b class="text-cream-100">OpenAI-compatible</b> đều dùng được ngay: khai báo Base URL (kết thúc bằng <code class="rounded bg-ink-800 px-1">/v1</code>), chọn protocol <b class="text-cream-100">openai</b> + auth <b class="text-cream-100">Bearer</b>. Chat/vision/prompt đi qua <code class="rounded bg-ink-800 px-1">POST /chat/completions</code>.</p>
                 <p>· Ảnh: nếu gateway phục vụ OpenAI Images API thì FabrikAI gọi <code class="rounded bg-ink-800 px-1">POST /images/generations</code> (trả <code class="rounded bg-ink-800 px-1">data[0].url</code> hoặc <code class="rounded bg-ink-800 px-1">b64_json</code>) — không cần cấu hình thêm.</p>
                 <p>· Ví dụ có sẵn trong <b class="text-cream-100">danh sách mẫu</b>: CKEY (api.xah.io/v1 · giá VND · ~120–1.100 ₫/ảnh qwen-image), OpenRouter, Together, Groq, SiliconFlow, DeepInfra, DashScope quốc tế.</p>
@@ -877,7 +877,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     <StudioIcon name="key" size="h-4 w-4" class="text-brand-300" /> API Keys
                     <span :class="[BADGE, BADGE_TONE.neutral]">{{ keys.length }}</span>
                   </h2>
-                  <p class="mt-1 max-w-2xl text-xs text-cream-300/85">
+                  <p class="mt-1 max-w-2xl text-xs text-cream-300">
                     Một provider có thể có nhiều key (Qwen: Token-Plan + Pay-As-You-Go…). Key là <b class="text-cream-100">write-only</b> — chỉ lưu, không bao giờ đọc lại.
                   </p>
                 </div>
@@ -886,20 +886,20 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
 
               <div class="mt-4 flex flex-wrap items-center gap-2">
                 <div class="relative min-w-[14rem] flex-1">
-                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300" />
                   <input v-model="q.keys" type="search" aria-label="Tìm API key" class="input !py-2 !pl-9 text-xs" placeholder="Tìm theo nhãn, provider, loại hoặc ghi chú…">
                 </div>
-                <span class="text-[11px] text-cream-300/80">{{ countText(filteredKeys.length, keys.length, 'key') }}</span>
+                <span class="text-[11px] text-cream-300">{{ countText(filteredKeys.length, keys.length, 'key') }}</span>
               </div>
 
               <div v-if="!keys.length" class="mt-4 flex flex-col items-center gap-2 rounded-lg border border-dashed border-ink-600 p-8 text-center">
-                <StudioIcon name="key" size="h-6 w-6" class="text-cream-300/75" />
+                <StudioIcon name="key" size="h-6 w-6" class="text-cream-300" />
                 <p class="text-sm font-semibold text-cream-100">Chưa có API key nào</p>
-                <p class="max-w-md text-[11px] text-cream-300/80">Provider nào có key sẽ chuyển từ stub sang gọi API thật. Key trong registry ưu tiên hơn biến môi trường trong .env.</p>
+                <p class="max-w-md text-[11px] text-cream-300">Provider nào có key sẽ chuyển từ stub sang gọi API thật. Key trong registry ưu tiên hơn biến môi trường trong .env.</p>
                 <button class="btn-brand btn-sm mt-1" @click="openKeyModal()">Thêm key đầu tiên</button>
               </div>
 
-              <div v-else-if="!filteredKeys.length" class="mt-4 rounded-lg border border-dashed border-ink-600 p-6 text-center text-xs text-cream-300/80">
+              <div v-else-if="!filteredKeys.length" class="mt-4 rounded-lg border border-dashed border-ink-600 p-6 text-center text-xs text-cream-300">
                 Không có key nào khớp « {{ q.keys }} ».
                 <button class="ml-1 underline" @click="q.keys = ''">Xoá tìm kiếm</button>
               </div>
@@ -920,7 +920,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                         <span v-if="k.kind" :class="[BADGE, BADGE_TONE.neutral]">{{ k.kind }}</span>
                         <span :class="[BADGE, BADGE_TONE.neutral]">Ưu tiên {{ k.priority }}</span>
                         <span :class="[BADGE, k.enabled ? BADGE_TONE.ok : BADGE_TONE.warn]">{{ k.enabled ? 'Đang bật' : 'Đang tắt' }}</span>
-                        <span v-if="k.created_at" class="text-[10px] text-cream-300/75">tạo {{ k.created_at }}</span>
+                        <span v-if="k.created_at" class="text-[10px] text-cream-300">tạo {{ k.created_at }}</span>
                         <span class="ml-auto flex flex-wrap items-center gap-1.5">
                           <button class="tool-btn" :disabled="testState.running === k.id" @click="testKey(k)">
                             <StudioIcon name="link" size="h-3.5 w-3.5" /> {{ testState.running === k.id ? 'Đang thử…' : 'Kiểm tra' }}
@@ -929,11 +929,11 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                             <StudioIcon :name="k.enabled ? 'eyeOff' : 'eye'" size="h-3.5 w-3.5" /> {{ k.enabled ? 'Tắt' : 'Bật' }}
                           </button>
                           <button class="tool-btn" @click="openKeyModal(k)"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa</button>
-                          <button class="tool-btn !text-red-300 hover:!bg-red-500/15" @click="askDeleteKey(k)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
+                          <button class="tool-btn !text-danger hover:!bg-red-500/15" @click="askDeleteKey(k)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
                         </span>
                       </div>
-                      <p v-if="k.note" class="mt-1 text-[11px] text-cream-300/80">{{ k.note }}</p>
-                      <p v-if="testState.id === k.id" :class="testState.ok ? 'text-emerald-300' : 'text-red-300'" class="mt-1.5 flex items-center gap-1.5 text-[11px]">
+                      <p v-if="k.note" class="mt-1 text-[11px] text-cream-300">{{ k.note }}</p>
+                      <p v-if="testState.id === k.id" :class="testState.ok ? 'text-ok' : 'text-danger'" class="mt-1.5 flex items-center gap-1.5 text-[11px]">
                         <StudioIcon :name="testState.ok ? 'check' : 'alertTriangle'" size="h-3.5 w-3.5" /> {{ testState.text }}
                       </p>
                     </li>
@@ -952,7 +952,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     <StudioIcon name="globe" size="h-4 w-4" class="text-brand-300" /> Custom Providers
                     <span :class="[BADGE, BADGE_TONE.neutral]">{{ customProviders.length }}</span>
                   </h2>
-                  <p class="mt-1 max-w-2xl text-xs text-cream-300/85">
+                  <p class="mt-1 max-w-2xl text-xs text-cream-300">
                     Route tự khai báo <b class="text-cream-100">protocol + base URL + cách xác thực</b>. Provider tích hợp (Qwen, Gemini, Fal…) không sửa được — chỉ route bạn thêm ở đây.
                   </p>
                 </div>
@@ -970,20 +970,20 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
 
               <div class="mt-4 flex flex-wrap items-center gap-2">
                 <div class="relative min-w-[14rem] flex-1">
-                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300" />
                   <input v-model="q.providers" type="search" aria-label="Tìm custom provider" class="input !py-2 !pl-9 text-xs" placeholder="Tìm theo tên, slug, base URL…">
                 </div>
-                <span class="text-[11px] text-cream-300/80">{{ countText(filteredCustomProviders.length, customProviders.length, 'route') }}</span>
+                <span class="text-[11px] text-cream-300">{{ countText(filteredCustomProviders.length, customProviders.length, 'route') }}</span>
               </div>
 
               <div v-if="!customProviders.length" class="mt-4 flex flex-col items-center gap-2 rounded-lg border border-dashed border-ink-600 p-8 text-center">
-                <StudioIcon name="globe" size="h-6 w-6" class="text-cream-300/75" />
+                <StudioIcon name="globe" size="h-6 w-6" class="text-cream-300" />
                 <p class="text-sm font-semibold text-cream-100">Chưa có custom provider</p>
-                <p class="max-w-md text-[11px] text-cream-300/80">Khai báo route đầu tiên — mọi endpoint OpenAI-compatible, DashScope hoặc Gemini đều dùng được.</p>
+                <p class="max-w-md text-[11px] text-cream-300">Khai báo route đầu tiên — mọi endpoint OpenAI-compatible, DashScope hoặc Gemini đều dùng được.</p>
                 <button class="btn-brand btn-sm mt-1" @click="openProvModal()">Thêm provider</button>
               </div>
 
-              <div v-else-if="!filteredCustomProviders.length" class="mt-4 rounded-lg border border-dashed border-ink-600 p-6 text-center text-xs text-cream-300/80">
+              <div v-else-if="!filteredCustomProviders.length" class="mt-4 rounded-lg border border-dashed border-ink-600 p-6 text-center text-xs text-cream-300">
                 Không có provider nào khớp « {{ q.providers }} ».
                 <button class="ml-1 underline" @click="q.providers = ''">Xoá tìm kiếm</button>
               </div>
@@ -998,26 +998,26 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     <span :class="[BADGE, p.enabled ? BADGE_TONE.ok : BADGE_TONE.warn]">{{ p.enabled ? 'Đang bật' : 'Đang tắt' }}</span>
                     <span :class="[BADGE, p.configured ? BADGE_TONE.ok : BADGE_TONE.warn]">{{ p.configured ? p.key_count + ' key' : 'chưa có key' }}</span>
                     <span :class="[BADGE, BADGE_TONE.neutral]" :title="'Ưu tiên trong nhóm Custom — lớn hơn được thử trước'">Ưu tiên {{ p.priority ?? 5 }}</span>
-                    <span class="text-[10px] text-cream-300/70" :title="'Thứ tự thực tế khi chọn model trong nhóm Custom'">#{{ customOrder(p) }}</span>
+                    <span class="text-[10px] text-cream-300" :title="'Thứ tự thực tế khi chọn model trong nhóm Custom'">#{{ customOrder(p) }}</span>
                     <span class="ml-auto flex flex-wrap items-center gap-1.5">
                       <button class="tool-btn" @click="gotoAddKey(p.slug)"><StudioIcon name="key" size="h-3.5 w-3.5" /> Thêm key</button>
                       <button class="tool-btn" @click="openProvModal(p)"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa</button>
-                      <button class="tool-btn !text-red-300 hover:!bg-red-500/15" @click="askDeleteProv(p)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
+                      <button class="tool-btn !text-danger hover:!bg-red-500/15" @click="askDeleteProv(p)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
                     </span>
                   </div>
-                  <p class="mt-1.5 truncate text-[11px] text-cream-300/80">
-                    <span class="text-cream-300/75">Base URL</span> <code class="text-cream-200">{{ p.base_url }}</code>
-                    <span class="mx-1.5 text-cream-300/55">·</span>
-                    <span class="text-cream-300/75">Key ref</span> <code class="text-cream-200">{{ p.api_key_ref }}</code>
-                    <span class="mx-1.5 text-cream-300/55">·</span>
-                    <span class="text-cream-300/75">Auth</span> {{ p.auth_style }}
+                  <p class="mt-1.5 truncate text-[11px] text-cream-300">
+                    <span class="text-cream-300">Base URL</span> <code class="text-cream-200">{{ p.base_url }}</code>
+                    <span class="mx-1.5 text-cream-400">·</span>
+                    <span class="text-cream-300">Key ref</span> <code class="text-cream-200">{{ p.api_key_ref }}</code>
+                    <span class="mx-1.5 text-cream-400">·</span>
+                    <span class="text-cream-300">Auth</span> {{ p.auth_style }}
                   </p>
-                  <p v-if="p.note" class="mt-1 text-[11px] text-cream-300/80">{{ p.note }}</p>
+                  <p v-if="p.note" class="mt-1 text-[11px] text-cream-300">{{ p.note }}</p>
                 </li>
               </ul>
 
-              <p class="mt-3 flex items-start gap-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5 text-[11px] text-cream-300/85">
-                <StudioIcon name="info" size="h-3.5 w-3.5 shrink-0 mt-px text-sky-300" />
+              <p class="mt-3 flex items-start gap-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5 text-[11px] text-cream-300">
+                <StudioIcon name="info" size="h-3.5 w-3.5 shrink-0 mt-px text-info" />
                 <span><b class="text-cream-100">Luồng 2 bước:</b> (1) tạo provider — ô <b>Key ref</b> chỉ là <b>TÊN NHÓM KEY</b> (vd ckey), KHÔNG dán khoá API vào; (2) thêm khoá thật ở mục <b>API Keys</b> với provider = slug. Provider ID cố định sau khi tạo vì mọi model tham chiếu theo nó. Nhiều route cùng nhóm Custom thì <b>Ưu tiên</b> quyết định route nào thử trước.</span>
               </p>
             </div>
@@ -1032,7 +1032,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     <StudioIcon name="server" size="h-4 w-4" class="text-brand-300" /> Model Registry
                     <span :class="[BADGE, BADGE_TONE.neutral]">{{ models.length }}</span>
                   </h2>
-                  <p class="mt-1 max-w-2xl text-xs text-cream-300/85">
+                  <p class="mt-1 max-w-2xl text-xs text-cream-300">
                     Vai trò quyết định model thuộc nhóm công việc nào. Danh sách xếp theo đúng thứ tự runtime: default của nhóm → luồng ưu tiên provider → Ưu tiên model giảm dần.
                   </p>
                 </div>
@@ -1041,27 +1041,27 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
 
               <div class="mt-4 flex flex-wrap items-center gap-2">
                 <div class="relative min-w-[13rem] flex-1">
-                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300" />
                   <input v-model="q.models" type="search" aria-label="Tìm model" class="input !py-2 !pl-9 text-xs" placeholder="Tìm theo tên, model ID, provider…">
                 </div>
                 <select v-model="roleFilter" aria-label="Lọc theo vai trò" class="input !w-auto !py-2 text-xs">
                   <option value="">Mọi vai trò</option>
                   <option v-for="r in ROLE_ORDER" :key="r" :value="r">{{ roleLabel(r) }}</option>
                 </select>
-                <span class="text-[11px] text-cream-300/80">{{ countText(filteredModels.length, models.length, 'model') }}</span>
+                <span class="text-[11px] text-cream-300">{{ countText(filteredModels.length, models.length, 'model') }}</span>
               </div>
 
               <div v-if="!models.length" class="mt-4 flex flex-col items-center gap-2 rounded-lg border border-dashed border-ink-600 p-8 text-center">
-                <StudioIcon name="server" size="h-6 w-6" class="text-cream-300/75" />
+                <StudioIcon name="server" size="h-6 w-6" class="text-cream-300" />
                 <p class="text-sm font-semibold text-cream-100">Registry đang trống</p>
-                <p class="max-w-md text-[11px] text-cream-300/80">Thêm model thủ công, hoặc bấm "Đồng bộ catalog" ở mục Luồng ưu tiên để nhập bộ model QwenCloud tích hợp.</p>
+                <p class="max-w-md text-[11px] text-cream-300">Thêm model thủ công, hoặc bấm "Đồng bộ catalog" ở mục Luồng ưu tiên để nhập bộ model QwenCloud tích hợp.</p>
                 <div class="mt-1 flex gap-2">
                   <button class="btn-brand btn-sm" @click="openModelModal()">Thêm model</button>
                   <button class="btn-outline btn-sm" :disabled="syncSaving" @click="syncModels()">Đồng bộ catalog</button>
                 </div>
               </div>
 
-              <div v-else-if="!filteredModels.length" class="mt-4 rounded-lg border border-dashed border-ink-600 p-6 text-center text-xs text-cream-300/80">
+              <div v-else-if="!filteredModels.length" class="mt-4 rounded-lg border border-dashed border-ink-600 p-6 text-center text-xs text-cream-300">
                 Không có model nào khớp bộ lọc hiện tại.
                 <button class="ml-1 underline" @click="q.models = ''; roleFilter = ''">Xoá bộ lọc</button>
               </div>
@@ -1084,13 +1084,13 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                         <span :class="[BADGE, BADGE_TONE.info]" :title="'Nhóm #' + flowRank(m.provider) + ' trong luồng ưu tiên'">#{{ flowRank(m.provider) }} {{ flowMeta(family(m.provider)).short }}</span>
                         <span :class="[BADGE, BADGE_TONE.neutral]">Ưu tiên {{ m.priority }}</span>
                         <span :class="[BADGE, m.enabled ? BADGE_TONE.ok : BADGE_TONE.warn]">{{ m.enabled ? 'Đang bật' : 'Đang tắt' }}</span>
-                        <span v-if="m.api_key_ref && m.api_key_ref !== m.provider" class="text-[10px] text-cream-300/75">key ref: {{ m.api_key_ref }}</span>
+                        <span v-if="m.api_key_ref && m.api_key_ref !== m.provider" class="text-[10px] text-cream-300">key ref: {{ m.api_key_ref }}</span>
                         <span class="ml-auto flex flex-wrap items-center gap-1.5">
                           <button class="tool-btn" @click="openModelModal(m)"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa</button>
-                          <button class="tool-btn !text-red-300 hover:!bg-red-500/15" @click="askDeleteModel(m)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
+                          <button class="tool-btn !text-danger hover:!bg-red-500/15" @click="askDeleteModel(m)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
                         </span>
                       </div>
-                      <p v-if="m.note" class="mt-1 text-[11px] text-cream-300/80">{{ m.note }}</p>
+                      <p v-if="m.note" class="mt-1 text-[11px] text-cream-300">{{ m.note }}</p>
                     </li>
                   </ul>
                 </div>
@@ -1107,7 +1107,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
               <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
                 <StudioIcon name="target" size="h-4 w-4" class="text-brand-300" /> Model theo nhóm công việc
               </h2>
-              <p class="mt-1 max-w-2xl text-xs text-cream-300/85">
+              <p class="mt-1 max-w-2xl text-xs text-cream-300">
                 Mỗi card / tính năng trong Studio một nhóm. Chọn model mặc định riêng — thay đổi được lưu ngay.
                 Để <b class="text-cream-100">Tự động</b> thì nhóm dùng model đầu tiên theo ưu tiên.
               </p>
@@ -1118,9 +1118,9 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     <StudioIcon :name="roleIcon(g)" size="h-4 w-4" class="text-brand-300/80" />
                     <div class="min-w-0 flex-1">
                       <p class="text-sm font-semibold text-cream-50">{{ taskGroups[g].label }}</p>
-                      <p class="mt-0.5 text-[11px] text-cream-300/85">
+                      <p class="mt-0.5 text-[11px] text-cream-300">
                         {{ taskGroups[g].models.length }} model trong nhóm · đang dùng:
-                        <b :class="taskGroups[g].default ? 'text-emerald-300' : 'text-amber-300'">{{ taskDefaultLabel(g) }}</b>
+                        <b :class="taskGroups[g].default ? 'text-ok' : 'text-warn'">{{ taskDefaultLabel(g) }}</b>
                       </p>
                     </div>
                     <span :class="[BADGE, taskGroups[g].assigned ? BADGE_TONE.brand : BADGE_TONE.neutral]">
@@ -1136,7 +1136,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     <button v-if="taskGroups[g].assigned" class="tool-btn" :disabled="taskSaving === g" @click="clearTaskDefault(g)">
                       <StudioIcon name="undo" size="h-3.5 w-3.5" /> Về tự động
                     </button>
-                    <span v-if="taskSaving === g" class="flex items-center gap-1.5 text-[11px] text-cream-300/80">
+                    <span v-if="taskSaving === g" class="flex items-center gap-1.5 text-[11px] text-cream-300">
                       <StudioIcon name="refresh" size="h-3.5 w-3.5" class="animate-spin" /> đang lưu…
                     </span>
                   </div>
@@ -1146,10 +1146,10 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                           :title="m.label + ' · nhóm #' + flowRank(m.provider)">
                       <span class="opacity-70">#{{ flowRank(m.provider) }}</span> {{ m.label }}
                     </span>
-                    <span v-if="taskGroups[g].models.length > 6" class="text-[10px] text-cream-300/75">+{{ taskGroups[g].models.length - 6 }} nữa</span>
+                    <span v-if="taskGroups[g].models.length > 6" class="text-[10px] text-cream-300">+{{ taskGroups[g].models.length - 6 }} nữa</span>
                     <button class="tool-btn" @click="roleFilter = g; goTo('models')">Quản lý model <StudioIcon name="arrowRight" size="h-3.5 w-3.5" /></button>
                   </div>
-                  <p v-else class="mt-2 rounded-lg border border-dashed border-ink-600 p-2.5 text-[11px] text-cream-300/80">
+                  <p v-else class="mt-2 rounded-lg border border-dashed border-ink-600 p-2.5 text-[11px] text-cream-300">
                     Chưa có model nào trong nhóm — đang kế thừa cấu hình cũ. Thêm model với vai trò <b class="text-cream-200">{{ roleLabel(g) }}</b> ở mục Model Registry.
                   </p>
                 </li>
@@ -1161,7 +1161,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
               <div class="mt-3 overflow-x-auto">
                 <table class="w-full text-left text-xs">
                   <thead>
-                    <tr class="border-b border-ink-700 text-cream-300/80">
+                    <tr class="border-b border-ink-700 text-cream-300">
                       <th class="py-2 pr-3 font-semibold">Card / tính năng</th>
                       <th class="py-2 pr-3 font-semibold">Nhóm</th>
                       <th class="py-2 font-semibold">Model hiện hành</th>
@@ -1194,13 +1194,13 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
               <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
                 <StudioIcon name="gear" size="h-4 w-4" class="text-brand-300" /> Cấu hình chung
               </h2>
-              <p class="mt-1 max-w-2xl text-xs text-cream-300/85">
+              <p class="mt-1 max-w-2xl text-xs text-cream-300">
                 Mặc định cho pipeline gọi model. Thứ tự thực tế: model mặc định của nhóm (Nhóm công việc) → Luồng ưu tiên provider → Ưu tiên model giảm dần.
               </p>
 
               <div class="mt-4 space-y-5">
                 <fieldset>
-                  <legend class="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-cream-300/80">
+                  <legend class="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-cream-300">
                     <StudioIcon name="image" size="h-3.5 w-3.5" /> Tạo ảnh
                   </legend>
                   <div class="grid gap-3 sm:grid-cols-3">
@@ -1220,7 +1220,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                 </fieldset>
 
                 <fieldset>
-                  <legend class="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-cream-300/80">
+                  <legend class="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-cream-300">
                     <StudioIcon name="film" size="h-3.5 w-3.5" /> Video &amp; suy luận
                   </legend>
                   <div class="grid gap-3 sm:grid-cols-3">
@@ -1240,7 +1240,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                 </fieldset>
 
                 <fieldset>
-                  <legend class="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-cream-300/80">
+                  <legend class="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-cream-300">
                     <StudioIcon name="sliders" size="h-3.5 w-3.5" /> Vận hành &amp; credit
                   </legend>
                   <div class="grid gap-3 sm:grid-cols-3">
@@ -1270,10 +1270,10 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                 <button class="tool-btn" :disabled="!cfgDirty || cfgSaving" @click="syncCfg()">
                   <StudioIcon name="undo" size="h-3.5 w-3.5" /> Hoàn tác thay đổi
                 </button>
-                <span v-if="cfgDirty" class="flex items-center gap-1.5 text-[11px] text-amber-300">
+                <span v-if="cfgDirty" class="flex items-center gap-1.5 text-[11px] text-warn">
                   <StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> Có thay đổi chưa lưu
                 </span>
-                <span v-else class="flex items-center gap-1.5 text-[11px] text-cream-300/75">
+                <span v-else class="flex items-center gap-1.5 text-[11px] text-cream-300">
                   <StudioIcon name="check" size="h-3.5 w-3.5" /> Đã lưu
                 </span>
               </div>
@@ -1285,7 +1285,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
               </h3>
               <div class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                 <div v-for="u in usageCards" :key="u.key" class="rounded-lg border border-ink-700 bg-ink-900/60 p-2.5">
-                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/75">{{ u.label }}</p>
+                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">{{ u.label }}</p>
                   <p class="mt-1 text-lg font-semibold text-cream-50">{{ u.value }}</p>
                 </div>
               </div>
@@ -1305,19 +1305,19 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
               <option value="">— Chọn provider —</option>
               <option v-for="p in sortedProviders" :key="p.slug" :value="p.slug">{{ p.name }} ({{ p.slug }})</option>
             </select>
-            <p v-if="keyModal.errors.provider" class="mt-1 text-[11px] text-red-300">{{ keyModal.errors.provider }}</p>
+            <p v-if="keyModal.errors.provider" class="mt-1 text-[11px] text-danger">{{ keyModal.errors.provider }}</p>
           </div>
           <div>
             <label class="label" for="k-label">Nhãn</label>
             <input id="k-label" v-model="keyModal.form.label" class="input !py-2" :class="keyModal.errors.label ? '!border-red-500/70' : ''" placeholder="VD: Qwen Token-Plan">
-            <p v-if="keyModal.errors.label" class="mt-1 text-[11px] text-red-300">{{ keyModal.errors.label }}</p>
+            <p v-if="keyModal.errors.label" class="mt-1 text-[11px] text-danger">{{ keyModal.errors.label }}</p>
           </div>
         </div>
         <div>
           <label class="label" for="k-value">Khoá API {{ keyModal.mode === 'edit' ? '(để trống = giữ nguyên)' : '' }}</label>
           <input id="k-value" v-model="keyModal.form.value" type="password" autocomplete="new-password" class="input !py-2 font-mono text-xs" :class="keyModal.errors.value ? '!border-red-500/70' : ''" placeholder="sk-…">
-          <p v-if="keyModal.errors.value" class="mt-1 text-[11px] text-red-300">{{ keyModal.errors.value }}</p>
-          <p class="mt-1 text-[11px] text-cream-300/75">
+          <p v-if="keyModal.errors.value" class="mt-1 text-[11px] text-danger">{{ keyModal.errors.value }}</p>
+          <p class="mt-1 text-[11px] text-cream-300">
             {{ providerOf(keyModal.form.provider) && providerOf(keyModal.form.provider).hint ? providerOf(keyModal.form.provider).hint : 'Key được mã hoá trước khi lưu và không bao giờ hiển thị lại.' }}
           </p>
         </div>
@@ -1329,7 +1329,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           <div>
             <label class="label" for="k-priority">Ưu tiên</label>
             <input id="k-priority" type="number" min="0" max="100" v-model.number="keyModal.form.priority" class="input !py-2" :class="keyModal.errors.priority ? '!border-red-500/70' : ''">
-            <p v-if="keyModal.errors.priority" class="mt-1 text-[11px] text-red-300">{{ keyModal.errors.priority }}</p>
+            <p v-if="keyModal.errors.priority" class="mt-1 text-[11px] text-danger">{{ keyModal.errors.priority }}</p>
           </div>
           <div class="flex items-end pb-2">
             <label class="flex items-center gap-2 text-xs text-cream-200">
@@ -1357,19 +1357,19 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           <div>
             <label class="label" for="p-slug">Provider ID (slug)</label>
             <input id="p-slug" v-model="provModal.form.slug" :disabled="provModal.mode === 'edit'" class="input !py-2 font-mono text-xs disabled:opacity-60" :class="provModal.errors.slug ? '!border-red-500/70' : ''" placeholder="VD: openrouter">
-            <p v-if="provModal.errors.slug" class="mt-1 text-[11px] text-red-300">{{ provModal.errors.slug }}</p>
-            <p v-else-if="provModal.mode === 'edit'" class="mt-1 text-[11px] text-cream-300/75">Provider ID cố định sau khi tạo (model và generation tham chiếu theo slug).</p>
+            <p v-if="provModal.errors.slug" class="mt-1 text-[11px] text-danger">{{ provModal.errors.slug }}</p>
+            <p v-else-if="provModal.mode === 'edit'" class="mt-1 text-[11px] text-cream-300">Provider ID cố định sau khi tạo (model và generation tham chiếu theo slug).</p>
           </div>
           <div>
             <label class="label" for="p-name">Tên hiển thị</label>
             <input id="p-name" v-model="provModal.form.name" class="input !py-2" :class="provModal.errors.name ? '!border-red-500/70' : ''" placeholder="VD: OpenRouter">
-            <p v-if="provModal.errors.name" class="mt-1 text-[11px] text-red-300">{{ provModal.errors.name }}</p>
+            <p v-if="provModal.errors.name" class="mt-1 text-[11px] text-danger">{{ provModal.errors.name }}</p>
           </div>
         </div>
         <div>
           <label class="label" for="p-url">Base URL</label>
           <input id="p-url" v-model="provModal.form.base_url" class="input !py-2 font-mono text-xs" :class="provModal.errors.base_url ? '!border-red-500/70' : ''" placeholder="https://openrouter.ai/api/v1">
-          <p v-if="provModal.errors.base_url" class="mt-1 text-[11px] text-red-300">{{ provModal.errors.base_url }}</p>
+          <p v-if="provModal.errors.base_url" class="mt-1 text-[11px] text-danger">{{ provModal.errors.base_url }}</p>
         </div>
         <div class="grid gap-3 sm:grid-cols-2">
           <div>
@@ -1388,20 +1388,20 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
             </select>
           </div>
         </div>
-        <p class="flex items-start gap-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5 text-[11px] text-cream-300/85">
-          <StudioIcon name="info" size="h-3.5 w-3.5 shrink-0 mt-px text-sky-300" />
+        <p class="flex items-start gap-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5 text-[11px] text-cream-300">
+          <StudioIcon name="info" size="h-3.5 w-3.5 shrink-0 mt-px text-info" />
           <span>{{ PROTOCOL_HINT[provModal.form.protocol] }}</span>
         </p>
         <div>
-          <label class="label" for="p-keyref">Key ref — TÊN NHÓM KEY <span class="font-normal normal-case text-cream-300/75">(bỏ trống = dùng Provider ID)</span></label>
+          <label class="label" for="p-keyref">Key ref — TÊN NHÓM KEY <span class="font-normal normal-case text-cream-300">(bỏ trống = dùng Provider ID)</span></label>
           <input id="p-keyref" v-model="provModal.form.api_key_ref" class="input !py-2 font-mono text-xs" :class="provModal.errors.api_key_ref ? '!border-red-500/70' : ''" placeholder="vd: ckey — KHÔNG dán khoá API vào đây">
-          <p v-if="provModal.errors.api_key_ref" class="mt-1 text-[11px] text-red-300">{{ provModal.errors.api_key_ref }}</p>
-          <p v-else class="mt-1 text-[11px] text-cream-300/75">Khoá API thật thêm ở mục API Keys với provider = slug này.</p>
+          <p v-if="provModal.errors.api_key_ref" class="mt-1 text-[11px] text-danger">{{ provModal.errors.api_key_ref }}</p>
+          <p v-else class="mt-1 text-[11px] text-cream-300">Khoá API thật thêm ở mục API Keys với provider = slug này.</p>
         </div>
         <div>
-          <label class="label" for="p-prio">Ưu tiên trong nhóm Custom <span class="font-normal normal-case text-cream-300/75">(lớn hơn = thử trước)</span></label>
+          <label class="label" for="p-prio">Ưu tiên trong nhóm Custom <span class="font-normal normal-case text-cream-300">(lớn hơn = thử trước)</span></label>
           <input id="p-prio" type="number" min="0" max="100" v-model.number="provModal.form.priority" class="input !py-2 sm:max-w-[10rem]">
-          <p class="mt-1 text-[11px] text-cream-300/75">Tab 🔥 quyết định THỨ TỰ NHÓM; số này phân định các route nằm CÙNG nhóm — ví dụ nhiều custom provider: route điểm cao được gọi trước, lỗi thì mới rơi xuống route dưới.</p>
+          <p class="mt-1 text-[11px] text-cream-300">Tab 🔥 quyết định THỨ TỰ NHÓM; số này phân định các route nằm CÙNG nhóm — ví dụ nhiều custom provider: route điểm cao được gọi trước, lỗi thì mới rơi xuống route dưới.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
           <label class="flex items-center gap-2 text-xs text-cream-200">
@@ -1433,7 +1433,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           <div>
             <label class="label" for="m-name">Tên model</label>
             <input id="m-name" v-model="modelModal.form.name" class="input !py-2" :class="modelModal.errors.name ? '!border-red-500/70' : ''" placeholder="VD: Qwen Image 3.0 Pro">
-            <p v-if="modelModal.errors.name" class="mt-1 text-[11px] text-red-300">{{ modelModal.errors.name }}</p>
+            <p v-if="modelModal.errors.name" class="mt-1 text-[11px] text-danger">{{ modelModal.errors.name }}</p>
           </div>
         </div>
         <div class="grid gap-3 sm:grid-cols-2">
@@ -1443,25 +1443,25 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
               <option value="">— Chọn provider —</option>
               <option v-for="p in sortedProviders" :key="p.slug" :value="p.slug">{{ p.name }} ({{ p.slug }})</option>
             </select>
-            <p v-if="modelModal.errors.provider" class="mt-1 text-[11px] text-red-300">{{ modelModal.errors.provider }}</p>
+            <p v-if="modelModal.errors.provider" class="mt-1 text-[11px] text-danger">{{ modelModal.errors.provider }}</p>
           </div>
           <div>
             <label class="label" for="m-model-id">Model ID</label>
             <input id="m-model-id" v-model="modelModal.form.model_id" class="input !py-2 font-mono text-xs" :class="modelModal.errors.model_id ? '!border-red-500/70' : ''" placeholder="qwen-image-3.0-pro">
-            <p v-if="modelModal.errors.model_id" class="mt-1 text-[11px] text-red-300">{{ modelModal.errors.model_id }}</p>
+            <p v-if="modelModal.errors.model_id" class="mt-1 text-[11px] text-danger">{{ modelModal.errors.model_id }}</p>
           </div>
         </div>
         <div class="grid gap-3 sm:grid-cols-2">
           <div>
-            <label class="label" for="m-keyref">Key ref <span class="font-normal normal-case text-cream-300/75">(tên nhóm key)</span></label>
+            <label class="label" for="m-keyref">Key ref <span class="font-normal normal-case text-cream-300">(tên nhóm key)</span></label>
             <input id="m-keyref" v-model="modelModal.form.api_key_ref" class="input !py-2 font-mono text-xs" :class="modelModal.errors.api_key_ref ? '!border-red-500/70' : ''" placeholder="mặc định = provider">
-            <p v-if="modelModal.errors.api_key_ref" class="mt-1 text-[11px] text-red-300">{{ modelModal.errors.api_key_ref }}</p>
+            <p v-if="modelModal.errors.api_key_ref" class="mt-1 text-[11px] text-danger">{{ modelModal.errors.api_key_ref }}</p>
           </div>
           <div>
             <label class="label" for="m-priority">Ưu tiên (0–100)</label>
             <input id="m-priority" type="number" min="0" max="100" v-model.number="modelModal.form.priority" class="input !py-2" :class="modelModal.errors.priority ? '!border-red-500/70' : ''">
-            <p v-if="modelModal.errors.priority" class="mt-1 text-[11px] text-red-300">{{ modelModal.errors.priority }}</p>
-            <p v-else class="mt-1 text-[11px] text-cream-300/75">Chỉ so trong cùng nhóm provider — xem Luồng ưu tiên.</p>
+            <p v-if="modelModal.errors.priority" class="mt-1 text-[11px] text-danger">{{ modelModal.errors.priority }}</p>
+            <p v-else class="mt-1 text-[11px] text-cream-300">Chỉ so trong cùng nhóm provider — xem Luồng ưu tiên.</p>
           </div>
         </div>
         <div>

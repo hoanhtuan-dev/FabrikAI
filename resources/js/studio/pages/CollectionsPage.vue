@@ -61,6 +61,18 @@ const WORKFLOW_STEPS = [
   { state: 'approved', label: 'Đã duyệt', hint: 'Chốt sản xuất', bar: '#2d9d6f' },
 ];
 
+// Màu CHIP trạng thái đi qua TOKEN ngữ nghĩa (không dùng mã hex của server cho phần chữ):
+// cùng một hex cho hai theme thì không thể đạt tương phản ở cả hai (đo được 2,7–3,0:1).
+// Mã hex của server vẫn dùng cho THANH tiến độ (trang trí, không phải chữ).
+const STATUS_TONE = { draft: 'neutral', in_progress: 'info', review: 'warn', approved: 'ok', archived: 'neutral' };
+const TONE_CLASS = {
+  neutral: 'bg-ink-700 text-cream-200',
+  info: 'bg-info/15 text-info',
+  warn: 'bg-warn/15 text-warn',
+  ok: 'bg-ok/15 text-ok',
+};
+function statusToneClass(s) { return TONE_CLASS[STATUS_TONE[s] || 'neutral']; }
+
 const STATUS_ORDER = ['draft', 'in_progress', 'review', 'approved', 'archived'];
 const STATUS_LABELS = { draft: 'Nháp', in_progress: 'Đang làm', review: 'Chờ duyệt', approved: 'Đã duyệt', archived: 'Lưu trữ' };
 
@@ -158,9 +170,9 @@ const statusFilters = computed(() => {
 function statusLabel(s) { return (statuses.value[s] && statuses.value[s].label) || STATUS_LABELS[s] || s; }
 function statusColor(s) { return (statuses.value[s] && statuses.value[s].color) || '#6b6657'; }
 function stateTone(state) {
-  if (state === 'approved') return 'bg-emerald-500/85 text-ink-900';
-  if (state === 'rejected') return 'bg-red-500/85 text-ink-900';
-  if (state === 'campaign_ready') return 'bg-amber-500/90 text-ink-900';
+  if (state === 'approved') return 'bg-emerald-500/85 text-on-accent';
+  if (state === 'rejected') return 'bg-red-500/85 text-on-accent';
+  if (state === 'campaign_ready') return 'bg-amber-500/90 text-on-accent';
   return 'bg-ink-800/85 text-cream-100';
 }
 function deadlineDays(d) {
@@ -184,10 +196,10 @@ function deadlineLabel(p) {
 }
 function deadlineToneClass(p) {
   const n = deadlineDays(p && p.deadline);
-  if (n === null) return 'text-cream-300/60';
-  if (n < 0) return 'text-red-400';
-  if (n <= 3) return 'text-amber-300';
-  return 'text-emerald-300';
+  if (n === null) return 'text-cream-400';
+  if (n < 0) return 'text-danger';
+  if (n <= 3) return 'text-warn';
+  return 'text-ok';
 }
 function formatDate(iso) {
   if (!iso) return '';
@@ -378,11 +390,11 @@ onBeforeUnmount(() => {
           </div>
           <div>
             <h1 class="font-display text-lg font-semibold text-cream-50">Bộ sưu tập</h1>
-            <p class="text-xs text-cream-300/70">{{ welcomeText }}</p>
+            <p class="text-xs text-cream-300">{{ welcomeText }}</p>
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <span v-if="runningCount" class="flex items-center gap-1.5 rounded-full bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-sky-300">
+          <span v-if="runningCount" class="flex items-center gap-1.5 rounded-full bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-info">
             <span class="h-3 w-3 animate-spin rounded-full border-2 border-sky-400/40 border-t-sky-300"></span>
             {{ runningCount }} ảnh đang tạo
           </span>
@@ -400,7 +412,7 @@ onBeforeUnmount(() => {
         <!-- ĐANG TẢI -->
         <div v-if="initialLoading" class="flex flex-col items-center justify-center gap-3 py-24">
           <span class="h-8 w-8 animate-spin rounded-full border-2 border-ink-700 border-t-brand-500"></span>
-          <p class="text-sm text-cream-300/60">Đang tải bộ sưu tập…</p>
+          <p class="text-sm text-cream-400">Đang tải bộ sưu tập…</p>
         </div>
 
         <!-- ── NGƯỜI MỚI: ONBOARDING 4 BƯỚC ── -->
@@ -410,7 +422,7 @@ onBeforeUnmount(() => {
               <StudioIcon name="sparkles" size="h-8 w-8" />
             </div>
             <h2 class="font-display text-2xl font-semibold text-cream-50">Bắt đầu bộ sưu tập đầu tiên</h2>
-            <p class="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-cream-300/80">
+            <p class="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-cream-300">
               FabrikAI tổ chức ảnh theo <b class="text-cream-100">bộ sưu tập</b> — mỗi bộ là một mùa vụ hoặc đơn hàng.
               Làm theo 4 bước dưới đây, chỉ mất vài phút.
             </p>
@@ -426,7 +438,7 @@ onBeforeUnmount(() => {
                     <span class="rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-bold text-white">{{ idx + 1 }}</span>
                     {{ step.title }}
                   </p>
-                  <p class="mt-1.5 text-xs leading-relaxed text-cream-300/80">{{ step.desc }}</p>
+                  <p class="mt-1.5 text-xs leading-relaxed text-cream-300">{{ step.desc }}</p>
                 </div>
               </div>
             </div>
@@ -435,7 +447,7 @@ onBeforeUnmount(() => {
             <button class="btn-brand" @click="createOpen = true">
               <StudioIcon name="plus" size="h-4 w-4" /> Tạo bộ sưu tập đầu tiên
             </button>
-            <p class="mt-2 text-xs text-cream-300/50">Chỉ cần tên — mọi thứ khác bổ sung sau được.</p>
+            <p class="mt-2 text-xs text-cream-400">Chỉ cần tên — mọi thứ khác bổ sung sau được.</p>
           </div>
         </div>
 
@@ -451,7 +463,7 @@ onBeforeUnmount(() => {
                   </p>
                   <h2 class="mt-1 truncate font-display text-xl font-semibold text-cream-50">{{ applied.name }}</h2>
                   <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" :style="{ background: statusColor(applied.status) + '2e', color: statusColor(applied.status) }">
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" :class="statusToneClass(applied.status)">
                       <span class="h-1.5 w-1.5 rounded-full" :style="{ background: statusColor(applied.status) }"></span>
                       {{ statusLabel(applied.status) }}
                     </span>
@@ -463,7 +475,7 @@ onBeforeUnmount(() => {
                       <StudioIcon name="pinOff" size="h-3 w-3" class="mr-1 inline align-[-2px]" />Ngắt
                     </button>
                   </div>
-                  <p v-if="applied.brief" class="mt-2 max-w-2xl text-xs leading-relaxed text-cream-300/70">{{ applied.brief }}</p>
+                  <p v-if="applied.brief" class="mt-2 max-w-2xl text-xs leading-relaxed text-cream-300">{{ applied.brief }}</p>
                 </div>
                 <div class="flex shrink-0 flex-col items-end gap-1.5">
                   <div class="flex gap-2">
@@ -476,9 +488,9 @@ onBeforeUnmount(() => {
 
               <!-- THANH TIẾN TRÌNH 6 BƯỚC DUYỆT MẪU -->
               <div class="mt-5">
-                <div class="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">
+                <div class="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-cream-400">
                   <span>Tiến trình duyệt mẫu ({{ totalShots }} ảnh)</span>
-                  <span class="text-emerald-300">{{ progressPct }}% đã duyệt</span>
+                  <span class="text-ok">{{ progressPct }}% đã duyệt</span>
                 </div>
                 <ol v-if="totalShots" class="flex items-stretch gap-1.5">
                   <li v-for="(step, idx) in workflowProgress" :key="step.state" class="flex flex-1 flex-col gap-1" :title="step.label + ' — ' + step.hint + ': ' + step.count + ' ảnh'">
@@ -486,13 +498,13 @@ onBeforeUnmount(() => {
                       <div class="h-full rounded-full transition-all duration-base" :class="step.count > 0 ? 'opacity-100' : 'opacity-0'" :style="{ background: step.bar, width: '100%' }"></div>
                     </div>
                     <div class="flex items-baseline gap-1">
-                      <span class="text-[10px] font-bold" :class="step.count > 0 ? 'text-cream-100' : 'text-cream-300/40'">{{ step.count }}</span>
-                      <span class="truncate text-[10px]" :class="step.count > 0 ? 'text-cream-300' : 'text-cream-300/40'">{{ step.label }}</span>
+                      <span class="text-[10px] font-bold" :class="step.count > 0 ? 'text-cream-100' : 'text-cream-400'">{{ step.count }}</span>
+                      <span class="truncate text-[10px]" :class="step.count > 0 ? 'text-cream-300' : 'text-cream-400'">{{ step.label }}</span>
                     </div>
                     <span v-if="idx < workflowProgress.length - 1 && idx === furthestStep" class="text-[10px] text-brand-300">↓ đang ở đây</span>
                   </li>
                 </ol>
-                <div v-else class="rounded-xl border border-dashed border-ink-600 px-4 py-3 text-center text-xs text-cream-300/60">
+                <div v-else class="rounded-xl border border-dashed border-ink-600 px-4 py-3 text-center text-xs text-cream-400">
                   Chưa có ảnh nào trong bộ này — ảnh tạo trong Studio sẽ tự gắn vào.
                 </div>
               </div>
@@ -510,7 +522,7 @@ onBeforeUnmount(() => {
 
               <!-- HÀNH ĐỘNG NHANH -->
               <div class="mt-4 flex flex-wrap gap-2">
-                <button class="tool-btn btn-sm" :class="awaiting.length ? '!border-amber-500/40 !bg-amber-500/10 !text-amber-200' : ''" @click="openReview()">
+                <button class="tool-btn btn-sm" :class="awaiting.length ? '!border-amber-500/40 !bg-amber-500/10 !text-warn' : ''" @click="openReview()">
                   <StudioIcon name="checkSquare" size="h-4 w-4" /> Duyệt mẫu<span v-if="awaiting.length"> · {{ awaiting.length }} chờ</span>
                 </button>
                 <button class="tool-btn btn-sm" @click="openShare()">
@@ -524,20 +536,20 @@ onBeforeUnmount(() => {
               <!-- SỐ LIỆU (chi phí · phản hồi khách) -->
               <div v-if="stats" class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <div class="rounded-xl border border-ink-700/60 bg-ink-900/50 p-3">
-                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/50">Ảnh xong</p>
-                  <p class="mt-0.5 text-lg font-semibold text-emerald-300">{{ stats.images.completed }}</p>
+                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Ảnh xong</p>
+                  <p class="mt-0.5 text-lg font-semibold text-ok">{{ stats.images.completed }}</p>
                 </div>
                 <div class="rounded-xl border border-ink-700/60 bg-ink-900/50 p-3">
-                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/50">Credit đã dùng</p>
+                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Credit đã dùng</p>
                   <p class="mt-0.5 text-lg font-semibold text-cream-100">{{ stats.credits.used }}</p>
                 </div>
                 <div class="rounded-xl border border-ink-700/60 bg-ink-900/50 p-3">
-                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/50">Phản hồi khách</p>
-                  <p class="mt-0.5 text-lg font-semibold" :class="stats.feedback.count ? 'text-brand-300' : 'text-cream-300/50'">{{ stats.feedback.count || 0 }}</p>
+                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Phản hồi khách</p>
+                  <p class="mt-0.5 text-lg font-semibold" :class="stats.feedback.count ? 'text-brand-300' : 'text-cream-400'">{{ stats.feedback.count || 0 }}</p>
                 </div>
                 <div class="rounded-xl border border-ink-700/60 bg-ink-900/50 p-3">
-                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/50">Ảnh lỗi</p>
-                  <p class="mt-0.5 text-lg font-semibold" :class="stats.images.failed ? 'text-red-400' : 'text-cream-300/50'">{{ stats.images.failed || 0 }}</p>
+                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Ảnh lỗi</p>
+                  <p class="mt-0.5 text-lg font-semibold" :class="stats.images.failed ? 'text-danger' : 'text-cream-400'">{{ stats.images.failed || 0 }}</p>
                 </div>
               </div>
               <p v-if="stats && stats.feedback.latest && stats.feedback.latest.message" class="mt-2 rounded-xl border border-brand-500/25 bg-brand-600/10 px-3.5 py-2.5 text-xs text-cream-200">
@@ -549,7 +561,7 @@ onBeforeUnmount(() => {
           <!-- CHƯA ÁP DỤNG BỘ NÀO -->
           <div v-else class="mb-6 rounded-2xl border border-dashed border-ink-600 bg-ink-900/40 p-5 text-center">
             <p class="text-sm text-cream-200">Chưa chọn bộ sưu tập nào để làm việc.</p>
-            <p class="mt-1 text-xs text-cream-300/60">Ảnh tạo ra sẽ KHÔNG tự gắn vào bộ nào — chọn một bộ bên dưới để bắt đầu.</p>
+            <p class="mt-1 text-xs text-cream-400">Ảnh tạo ra sẽ KHÔNG tự gắn vào bộ nào — chọn một bộ bên dưới để bắt đầu.</p>
           </div>
 
           <!-- ── DANH SÁCH BỘ SƯU TẬP ── -->
@@ -561,7 +573,7 @@ onBeforeUnmount(() => {
                   v-for="chip in statusFilters" :key="chip.key"
                   class="rounded-full border px-3 py-1 text-xs font-semibold transition"
                   :class="statusFilter === chip.key
-                    ? 'border-brand-500 bg-brand-600/25 text-brand-100'
+                    ? 'border-brand-500 bg-brand-600/25 text-brand-200'
                     : 'border-ink-600 text-cream-300 hover:border-ink-500 hover:text-cream-100'"
                   @click="statusFilter = chip.key"
                 >
@@ -571,7 +583,7 @@ onBeforeUnmount(() => {
             </div>
 
             <!-- Danh sách rỗng theo filter -->
-            <div v-if="!filteredProjects.length" class="rounded-2xl border border-dashed border-ink-600 p-10 text-center text-sm text-cream-300/50">
+            <div v-if="!filteredProjects.length" class="rounded-2xl border border-dashed border-ink-600 p-10 text-center text-sm text-cream-400">
               <template v-if="statusFilter === 'all'">
                 {{ applied ? 'Chỉ có bộ đang làm — tạo thêm bằng nút «Tạo bộ sưu tập».' : 'Chưa có bộ sưu tập nào khác.' }}
               </template>
@@ -591,16 +603,16 @@ onBeforeUnmount(() => {
                   <div class="flex items-start justify-between gap-2">
                     <button class="min-w-0 text-left" @click="pick(p)" :title="'Áp dụng «' + p.name + '» cho phiên tạo ảnh'">
                       <p class="truncate text-sm font-semibold text-cream-50 group-hover:text-white">{{ p.name }}</p>
-                      <p v-if="p.brief" class="mt-0.5 line-clamp-1 text-xs text-cream-300/60">{{ p.brief }}</p>
+                      <p v-if="p.brief" class="mt-0.5 line-clamp-1 text-xs text-cream-400">{{ p.brief }}</p>
                     </button>
-                    <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" :style="{ background: statusColor(p.status) + '2e', color: statusColor(p.status) }">{{ statusLabel(p.status) }}</span>
+                    <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="statusToneClass(p.status)">{{ statusLabel(p.status) }}</span>
                   </div>
 
                   <div v-if="p.thumbnail" class="mt-3 h-28 w-full overflow-hidden rounded-xl bg-ink-800">
                     <img :src="thumbUrl(p.thumbnail)" :alt="p.name" class="h-full w-full object-cover transition group-hover:scale-105" loading="lazy" @error="onThumbError($event, p.thumbnail)">
                   </div>
 
-                  <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-cream-300/70">
+                  <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-cream-300">
                     <span class="inline-flex items-center gap-1"><StudioIcon name="image" size="h-3.5 w-3.5" />{{ p.generations_count || 0 }} ảnh</span>
                     <span v-if="p.deadline" class="inline-flex items-center gap-1 font-semibold" :class="deadlineToneClass(p)">
                       <StudioIcon name="calendar" size="h-3.5 w-3.5" />{{ deadlineLabel(p) }}
@@ -648,7 +660,7 @@ onBeforeUnmount(() => {
         </div>
         <form class="space-y-4" @submit.prevent="submit">
           <div>
-            <label class="label" for="col-name">Tên bộ sưu tập <span class="text-red-400">*</span></label>
+            <label class="label" for="col-name">Tên bộ sưu tập <span class="text-danger">*</span></label>
             <input id="col-name" v-model="form.name" class="input" placeholder="VD: Thu Đông 2026 · Lookbook" :disabled="saving">
           </div>
           <div class="grid grid-cols-2 gap-4">
@@ -682,10 +694,10 @@ onBeforeUnmount(() => {
           <div class="flex items-start justify-between gap-3">
             <div>
               <h3 class="font-display text-base font-semibold text-cream-50">Duyệt mẫu — {{ applied.name }}</h3>
-              <p class="mt-0.5 text-xs text-cream-300/70">
-                {{ shots.length }} ảnh · <span class="text-amber-300">{{ awaiting.length }} chờ duyệt</span> ·
-                <span class="text-emerald-300">{{ approvedCount }} đã duyệt</span> ·
-                <span class="text-red-300">{{ rejectedCount }} đã loại</span>
+              <p class="mt-0.5 text-xs text-cream-300">
+                {{ shots.length }} ảnh · <span class="text-warn">{{ awaiting.length }} chờ duyệt</span> ·
+                <span class="text-ok">{{ approvedCount }} đã duyệt</span> ·
+                <span class="text-danger">{{ rejectedCount }} đã loại</span>
               </p>
             </div>
             <button class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 transition hover:bg-ink-700" @click="reviewOpen = false">
@@ -693,13 +705,13 @@ onBeforeUnmount(() => {
             </button>
           </div>
           <!-- giải thích luồng cho người mới, đặt ngay trong khối duyệt -->
-          <p class="mt-2 rounded-lg bg-ink-900 px-3 py-2 text-[11px] leading-relaxed text-cream-300/80">
+          <p class="mt-2 rounded-lg bg-ink-900 px-3 py-2 text-[11px] leading-relaxed text-cream-300">
             Ảnh đi theo từng bước: <b class="text-cream-100">Ý tưởng → Phác thảo → Đã chọn → Đã chỉnh → Chờ duyệt → Đã duyệt</b>.
             Chọn ảnh rồi bấm <b class="text-cream-100">Chuyển bước tiếp</b> để đẩy lên bậc kế (không nhảy cóc) — máy chủ chặn bước không hợp lệ và nói rõ lý do.
           </p>
         </div>
         <div class="flex-1 overflow-y-auto p-5">
-          <div v-if="!shots.length" class="py-12 text-center text-sm text-cream-300/60">
+          <div v-if="!shots.length" class="py-12 text-center text-sm text-cream-400">
             Bộ này chưa có ảnh tạo xong — ảnh render xong sẽ hiện ở đây để duyệt.
           </div>
           <template v-else>
@@ -710,7 +722,7 @@ onBeforeUnmount(() => {
               <button class="tool-btn btn-sm" @click="shotsSel = []">
                 <StudioIcon name="x" size="h-3.5 w-3.5" /> Bỏ chọn
               </button>
-              <span class="text-xs text-cream-300/70">Đã chọn <b class="text-cream-100">{{ selectedCount }}</b>/{{ shots.length }}</span>
+              <span class="text-xs text-cream-300">Đã chọn <b class="text-cream-100">{{ selectedCount }}</b>/{{ shots.length }}</span>
             </div>
             <div class="grid grid-cols-3 gap-3 sm:grid-cols-4">
               <button
@@ -723,7 +735,7 @@ onBeforeUnmount(() => {
                 <img v-if="s.thumb" :src="s.thumb" :alt="'Ảnh ' + s.id" class="h-24 w-full object-cover" loading="lazy">
                 <span v-else class="flex h-24 w-full items-center justify-center bg-ink-800 text-cream-300"><StudioIcon name="image" size="h-5 w-5" /></span>
                 <span class="absolute left-2 top-2 rounded-lg px-1.5 py-0.5 text-[9px] font-bold" :class="stateTone(s.shot_state)">{{ s.shot_label }}</span>
-                <span v-if="shotsSel.includes(s.id)" class="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-brand-500 text-ink-900">
+                <span v-if="shotsSel.includes(s.id)" class="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-brand-500 text-on-accent">
                   <StudioIcon name="check" size="h-3 w-3" />
                 </span>
               </button>
@@ -739,15 +751,15 @@ onBeforeUnmount(() => {
               <button class="btn-brand btn-sm" :disabled="reviewBusy || !selectedCount" title="Chốt các ảnh đã chọn (phím A)" @click="reviewBatch('approved')">
                 <StudioIcon name="check" size="h-4 w-4" /> Duyệt {{ selectedCount }} ảnh
               </button>
-              <button class="tool-btn btn-sm !text-red-300 hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" title="Loại các ảnh đã chọn (phím R)" @click="reviewBatch('rejected')">
+              <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" title="Loại các ảnh đã chọn (phím R)" @click="reviewBatch('rejected')">
                 <StudioIcon name="ban" size="h-4 w-4" /> Loại {{ selectedCount }} ảnh
               </button>
             </div>
-            <p class="mt-3 text-[11px] text-cream-300/60">
+            <p class="mt-3 text-[11px] text-cream-400">
               Phím tắt: <b class="text-cream-100">S</b> chọn chờ duyệt · <b class="text-cream-100">N</b> chuyển bước · <b class="text-cream-100">A</b> duyệt · <b class="text-cream-100">R</b> loại · <b class="text-cream-100">Esc</b> đóng
             </p>
             <ul v-if="reviewErrors.length" class="mt-4 space-y-2">
-              <li v-for="err in reviewErrors" :key="err.id" class="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs text-red-200">
+              <li v-for="err in reviewErrors" :key="err.id" class="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs text-danger">
                 Ảnh #{{ err.id }} ({{ store.shotLabel(err.shot_state) }}): {{ err.error }}
               </li>
             </ul>
@@ -765,18 +777,18 @@ onBeforeUnmount(() => {
             <StudioIcon name="x" size="h-4 w-4" />
           </button>
         </div>
-        <div v-if="!shareInfo" class="py-6 text-center text-sm text-cream-300/60">Đang tải trạng thái chia sẻ…</div>
+        <div v-if="!shareInfo" class="py-6 text-center text-sm text-cream-400">Đang tải trạng thái chia sẻ…</div>
         <template v-else>
           <div v-if="shareInfo.share" class="space-y-3">
             <p class="text-sm font-semibold text-cream-100">Link đang hiệu lực</p>
             <input :value="shareInfo.share.url" readonly class="input" @focus="$event.target.select()">
-            <div class="flex flex-wrap items-center gap-2 text-xs text-cream-300/70">
+            <div class="flex flex-wrap items-center gap-2 text-xs text-cream-300">
               <span class="rounded-full bg-ink-800 px-2 py-1">{{ shareInfo.share.views }} lượt xem</span>
               <span v-if="shareInfo.share.expires_at" class="rounded-full bg-ink-800 px-2 py-1">hết hạn {{ shareInfo.share.expires_at }}</span>
             </div>
             <div class="flex gap-2">
               <button class="btn-brand btn-sm flex-1" @click="copyShare()"><StudioIcon name="copy" size="h-4 w-4" /> Copy link</button>
-              <button class="tool-btn btn-sm !text-red-300 hover:!bg-red-500/15" :disabled="shareBusy" @click="revokeShare()"><StudioIcon name="ban" size="h-4 w-4" /> Thu hồi</button>
+              <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="shareBusy" @click="revokeShare()"><StudioIcon name="ban" size="h-4 w-4" /> Thu hồi</button>
             </div>
           </div>
           <div v-else class="space-y-4">
@@ -802,8 +814,8 @@ onBeforeUnmount(() => {
             <ul class="mt-2 space-y-2">
               <li v-for="fb in shareInfo.feedback.slice(0, 5)" :key="fb.id" class="text-xs">
                 <span class="font-semibold text-cream-100">{{ fb.author_name }}</span>
-                <span class="ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'">{{ fb.decision_label }}</span>
-                <span class="ml-1.5 text-cream-300/50">{{ fb.created_at }}</span>
+                <span class="ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'">{{ fb.decision_label }}</span>
+                <span class="ml-1.5 text-cream-400">{{ fb.created_at }}</span>
                 <p v-if="fb.message" class="mt-0.5 whitespace-pre-line text-cream-200">{{ fb.message }}</p>
               </li>
             </ul>

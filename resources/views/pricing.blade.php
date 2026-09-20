@@ -24,7 +24,7 @@
     ];
     $checkPath = '<path d="m20 6-9 11-5-5"/>';
 @endphp
-<div class="studio-dark min-h-screen">
+<div class="studio-shell min-h-screen">
     {{-- ── Thanh điều hướng ── --}}
     <header class="sticky top-0 z-40 border-b border-ink-700 bg-ink-900/95 backdrop-blur">
         <div class="container-x flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
@@ -100,7 +100,7 @@
                         <ul class="mt-3 flex-1 space-y-1.5">
                             @foreach($persona['want'] as $want)
                                 <li class="flex items-start gap-2 text-xs text-cream-200">
-                                    <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-9 11-5-5"/></svg>
+                                    <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-9 11-5-5"/></svg>
                                     {{ $want }}
                                 </li>
                             @endforeach
@@ -135,9 +135,9 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <h3 class="font-display text-lg font-semibold text-cream-50">{{ $plan->name }}</h3>
                         @if($plan->isFree())
-                            <span class="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold text-sky-300">Bắt đầu</span>
+                            <span class="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold text-info">Bắt đầu</span>
                         @elseif($plan->is_default)
-                            <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">Mặc định</span>
+                            <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-warn">Mặc định</span>
                         @endif
                     </div>
                     @if($plan->tagline)
@@ -157,7 +157,7 @@
                         @if((int) $plan->bonus_credits > 0)
                             <div class="flex items-baseline justify-between gap-2">
                                 <dt class="text-cream-300">Tặng lần đầu</dt>
-                                <dd class="font-semibold text-emerald-300">+{{ $vn((int) $plan->bonus_credits) }}</dd>
+                                <dd class="font-semibold text-ok">+{{ $vn((int) $plan->bonus_credits) }}</dd>
                             </div>
                         @endif
                         <div class="flex items-baseline justify-between gap-2">
@@ -167,7 +167,7 @@
                         {{-- [Q4] Số ghế: chủ doanh nghiệp cần biết gói cho bao nhiêu NGƯỜI dùng chung. --}}
                         <div class="flex items-baseline justify-between gap-2">
                             <dt class="text-cream-300">Số ghế</dt>
-                            <dd class="font-semibold {{ $plan->hasTeamSeats() ? 'text-emerald-300' : 'text-cream-50' }}">{{ $plan->seatsLabel() }}</dd>
+                            <dd class="font-semibold {{ $plan->hasTeamSeats() ? 'text-ok' : 'text-cream-50' }}">{{ $plan->seatsLabel() }}</dd>
                         </div>
                         <div class="flex items-baseline justify-between gap-2">
                             <dt class="text-cream-300">Mỗi ảnh</dt>
@@ -187,13 +187,13 @@
                             <span class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200">{{ $plan->modulesCount() }}/{{ count($modules) }} tính năng</span>
                         </p>
                         <details class="group mt-1.5">
-                            <summary class="cursor-pointer list-none text-[11px] font-semibold text-brand-200 hover:text-brand-100">
+                            <summary class="cursor-pointer list-none text-[11px] font-semibold text-brand-200 hover:text-brand-300">
                                 <span class="group-open:hidden">Xem {{ $plan->modulesCount() }} tính năng ▾</span>
                                 <span class="hidden group-open:inline">Thu gọn ▴</span>
                             </summary>
                             <div class="mt-2 space-y-1.5">
                                 @foreach($plan->modulesByGroup() as $group => $names)
-                                    <p class="text-[10px] text-cream-300/75">
+                                    <p class="text-[10px] text-cream-300">
                                         <span class="font-semibold text-cream-200">{{ $group }}:</span> {{ implode(' · ', $names) }}
                                     </p>
                                 @endforeach
@@ -205,11 +205,11 @@
                          KHÔNG phải công tắc (không cấp quyền gì). --}}
                     @if(! empty($plan->manualFeatures()))
                         <div class="mt-3 border-t border-ink-800 pt-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/75">Thông tin thêm</p>
+                            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Thông tin thêm</p>
                             <ul class="mt-1.5 space-y-1.5">
                                 @foreach($plan->manualFeatures() as $feature)
                                     <li class="flex items-start gap-2 text-[11px] text-cream-200">
-                                        <svg class="mt-0.5 h-3 w-3 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-9 11-5-5"/></svg>
+                                        <svg class="mt-0.5 h-3 w-3 shrink-0 text-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-9 11-5-5"/></svg>
                                         {{ $feature }}
                                     </li>
                                 @endforeach
@@ -218,7 +218,7 @@
                     @endif
 
                     @if(! empty($badges))
-                        <p class="mt-3 rounded-lg border border-brand-500/25 bg-brand-600/10 p-2 text-[10px] text-brand-100">
+                        <p class="mt-3 rounded-lg border border-brand-500/25 bg-brand-600/10 p-2 text-[10px] text-brand-200">
                             Hợp với: {{ implode(' · ', $badges) }}
                         </p>
                     @endif
@@ -254,7 +254,7 @@
                     @if (! empty($payment['support']['zalo'])) · Zalo {{ $payment['support']['zalo'] }} @endif
                 </p>
             @endif
-            <p class="mt-2 text-cream-300/85">
+            <p class="mt-2 text-cream-300">
                 Cổng thanh toán trực tuyến (VNPay) {{ $payment['vnpay']['available'] ? 'đã hoạt động.' : 'chưa mở — bạn vẫn dùng phần miễn phí ngay hôm nay.' }}
             </p>
         </div>
@@ -282,9 +282,9 @@
                             @endforeach
                         </tr>
                         <tr class="border-b border-ink-800">
-                            <td class="py-2.5 pr-4 text-cream-300">Credit mỗi kỳ <span class="text-cream-300/70">(tháng · vụ)</span></td>
+                            <td class="py-2.5 pr-4 text-cream-300">Credit mỗi kỳ <span class="text-cream-300">(tháng · vụ)</span></td>
                             @foreach($plans as $plan)
-                                <td class="py-2.5 pr-4">{{ $vn((int) $plan->credits_per_month) }}<span class="text-cream-300/70">/{{ $plan->unitLabel() }}</span></td>
+                                <td class="py-2.5 pr-4">{{ $vn((int) $plan->credits_per_month) }}<span class="text-cream-300">/{{ $plan->unitLabel() }}</span></td>
                             @endforeach
                         </tr>
                         <tr class="border-b border-ink-800">
@@ -351,7 +351,7 @@
                     <tbody class="text-cream-200">
                         @foreach($moduleGroups as $group => $moduleIds)
                             <tr class="border-b border-ink-800/60">
-                                <td colspan="{{ $plans->count() + 1 }}" class="py-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/70">{{ $group }}</td>
+                                <td colspan="{{ $plans->count() + 1 }}" class="py-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300">{{ $group }}</td>
                             </tr>
                             @foreach($moduleIds as $moduleId)
                                 @php($module = collect($modules)->firstWhere('id', $moduleId))
@@ -359,16 +359,16 @@
                                     <td class="py-2.5 pr-4">
                                         <span class="font-semibold text-cream-50">{{ $module['name'] ?? $moduleId }}</span>
                                         @if(! empty($module['summary']))
-                                            <span class="block text-[10px] text-cream-300/75">{{ $module['summary'] }}</span>
+                                            <span class="block text-[10px] text-cream-300">{{ $module['summary'] }}</span>
                                         @endif
                                     </td>
                                     @foreach($plans as $plan)
                                         @php($has = in_array($moduleId, $planModules[$plan->slug] ?? [], true))
                                         <td class="py-2.5 pr-4">
                                             @if($has)
-                                                <span class="text-emerald-400" aria-label="có">✓</span>
+                                                <span class="text-ok" aria-label="có">✓</span>
                                             @else
-                                                <span class="text-cream-300/40" aria-label="không">—</span>
+                                                <span class="text-cream-400" aria-label="không">—</span>
                                             @endif
                                         </td>
                                     @endforeach
@@ -378,7 +378,7 @@
                     </tbody>
                 </table>
             </div>
-            <p class="mt-3 text-[11px] text-cream-300/75">
+            <p class="mt-3 text-[11px] text-cream-300">
                 Đang dùng gói nào thì Studio chỉ mở đúng các tính năng của gói đó; tính năng chưa có sẽ hiện ổ khoá kèm gợi ý nâng cấp.
             </p>
         </div>

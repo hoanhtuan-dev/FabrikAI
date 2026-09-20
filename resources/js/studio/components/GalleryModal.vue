@@ -206,12 +206,12 @@ async function usePrompt() {
 const statusMeta = computed(() => {
   const s = current.value?.status;
   return {
-    pending:    { label: 'Đang chờ',      cls: 'border-amber-500/40 bg-amber-500/15 text-amber-200' },
-    processing: { label: 'Đang xử lý',    cls: 'border-amber-500/40 bg-amber-500/15 text-amber-200' },
-    completed:  { label: 'Hoàn tất',      cls: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200' },
-    failed:     { label: 'Lỗi',           cls: 'border-red-500/40 bg-red-500/15 text-red-200' },
-    cancelled:  { label: 'Đã hủy',        cls: 'border-ink-600 bg-ink-800 text-cream-300/70' },
-  }[s] || { label: s || '—', cls: 'border-ink-600 bg-ink-800 text-cream-300/70' };
+    pending:    { label: 'Đang chờ',      cls: 'border-amber-500/40 bg-amber-500/15 text-warn' },
+    processing: { label: 'Đang xử lý',    cls: 'border-amber-500/40 bg-amber-500/15 text-warn' },
+    completed:  { label: 'Hoàn tất',      cls: 'border-emerald-500/40 bg-emerald-500/15 text-ok' },
+    failed:     { label: 'Lỗi',           cls: 'border-red-500/40 bg-red-500/15 text-danger' },
+    cancelled:  { label: 'Đã hủy',        cls: 'border-ink-600 bg-ink-800 text-cream-300' },
+  }[s] || { label: s || '—', cls: 'border-ink-600 bg-ink-800 text-cream-300' };
 });
 
 const fields = [
@@ -333,7 +333,7 @@ onBeforeUnmount(() => {
                  draggable="false" @dblclick="toggleZoom" @error="imgError = true" @load="onImgLoad" />
           </Transition>
         </div>
-        <p v-else class="absolute inset-0 grid place-items-center text-sm text-cream-300/60">{{ imgError ? 'Không tải được nội dung.' : 'Không có nội dung.' }}</p>
+        <p v-else class="absolute inset-0 grid place-items-center text-sm text-cream-400">{{ imgError ? 'Không tải được nội dung.' : 'Không có nội dung.' }}</p>
         <!-- Badge trạng thái -->
         <span v-if="current" class="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold" :class="statusMeta.cls">
           <span v-if="['pending','processing'].includes(current.status)" class="h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent"></span>
@@ -383,7 +383,7 @@ onBeforeUnmount(() => {
 
         <!-- Thông tin ảnh (thu gọn được): Dự án · Model · Provider · Tỷ lệ · Độ phân giải · Thời lượng · Ngày -->
         <div class="flex items-center justify-between">
-          <p class="text-[9px] font-semibold uppercase tracking-wide text-cream-300/50">Thông tin ảnh</p>
+          <p class="text-[9px] font-semibold uppercase tracking-wide text-cream-400">Thông tin ảnh</p>
           <button @click="fieldsOpen = !fieldsOpen"
                   class="icon-btn !h-5 !w-5"
                   :title="fieldsOpen ? 'Thu gọn thông tin ảnh' : 'Mở rộng thông tin ảnh'"
@@ -394,7 +394,7 @@ onBeforeUnmount(() => {
         <Transition name="cf">
           <div v-if="fieldsOpen" key="fields" class="grid grid-cols-2 gap-1.5">
             <div v-for="f in fields" :key="f.k" class="rounded-md bg-ink-800/70 px-2.5 py-1.5">
-              <p class="text-[9px] uppercase tracking-wide text-cream-300/50">{{ f.l }}</p>
+              <p class="text-[9px] uppercase tracking-wide text-cream-400">{{ f.l }}</p>
               <p class="truncate text-xs font-medium text-cream-100">{{ f.k === 'project' ? projectLabel : (current?.[f.k] ?? '—') }}</p>
             </div>
           </div>
@@ -420,7 +420,7 @@ onBeforeUnmount(() => {
                   <StudioIcon name="link" size="h-3 w-3" />
                   Chuyển
                 </button>
-                <button @click="detachProject" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-300 transition hover:border-red-500 hover:bg-red-600/10 hover:text-red-300" title="Gỡ khỏi dự án">
+                <button @click="detachProject" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-300 transition hover:border-red-500 hover:bg-red-600/10 hover:text-danger" title="Gỡ khỏi dự án">
                   <StudioIcon name="unlink" size="h-3 w-3" />
                   Gỡ
                 </button>
@@ -446,17 +446,17 @@ onBeforeUnmount(() => {
                 <button v-for="p in filteredProjects" :key="p.id" @click="attachToProject(p)" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] transition hover:bg-ink-700">
                   <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ backgroundColor: p.color || '#7aa2f7' }"></span>
                   <span class="flex-1 truncate text-left text-cream-200">{{ p.name }}</span>
-                  <span class="shrink-0 text-[10px] text-cream-300/50">{{ p.generations_count ?? 0 }}</span>
+                  <span class="shrink-0 text-[10px] text-cream-400">{{ p.generations_count ?? 0 }}</span>
                 </button>
               </template>
-              <p v-else class="py-1 text-center text-[10px] text-cream-300/50">Chưa có dự án nào — tạo dự án ở Studio.</p>
+              <p v-else class="py-1 text-center text-[10px] text-cream-400">Chưa có dự án nào — tạo dự án ở Studio.</p>
             </div>
         </div>
 
         <!-- Prompt + copy -->
         <div class="rounded-md border border-ink-700/60 bg-ink-800/70 p-2.5">
           <div class="mb-1 flex items-center justify-between">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/50">Prompt</p>
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Prompt</p>
             <button @click="copyPrompt" class="inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-0.5 text-[10px] font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-white" title="Sao chép prompt">
               <StudioIcon name="copy" size="h-3 w-3" />
               Sao chép
@@ -495,13 +495,13 @@ onBeforeUnmount(() => {
         <!-- ══ Vùng nguy hiểm (tách biệt, xác nhận 2 bước) ══ -->
         <div class="mt-1 border-t border-ink-700/70 pt-3">
           <template v-if="!confirming">
-            <button @click="startConfirm" class="inline-flex items-center justify-center gap-1 w-full rounded-md border border-red-500/40 bg-transparent py-2 text-xs font-semibold text-red-300 transition hover:bg-red-600/10">
+            <button @click="startConfirm" class="inline-flex items-center justify-center gap-1 w-full rounded-md border border-red-500/40 bg-transparent py-2 text-xs font-semibold text-danger transition hover:bg-red-600/10">
               <StudioIcon name="trash" size="h-3.5 w-3.5" />
               Xóa ảnh
             </button>
           </template>
           <template v-else>
-            <p class="mb-1.5 flex items-center justify-center gap-1 text-center text-[11px] font-medium text-red-200"><StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> Xóa vĩnh viễn? Hành động này không thể hoàn tác.</p>
+            <p class="mb-1.5 flex items-center justify-center gap-1 text-center text-[11px] font-medium text-danger"><StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> Xóa vĩnh viễn? Hành động này không thể hoàn tác.</p>
             <div class="flex gap-1.5">
               <button @click="resetConfirm" class="flex-1 rounded-md border border-ink-600 bg-ink-800 py-2 text-xs font-semibold text-cream-200 transition hover:bg-ink-700">Hủy</button>
               <button @click="doDelete" :disabled="deleting" class="inline-flex items-center justify-center gap-1 flex-1 rounded-md bg-red-600 py-2 text-xs font-semibold text-white transition hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed">
@@ -510,7 +510,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </template>
-          <p class="mt-1.5 text-center text-[10px] text-cream-300/40">Nhấn Esc để đóng · dùng ← → để xem ảnh khác</p>
+          <p class="mt-1.5 text-center text-[10px] text-cream-400">Nhấn Esc để đóng · dùng ← → để xem ảnh khác</p>
         </div>
       </aside>
       </Transition>

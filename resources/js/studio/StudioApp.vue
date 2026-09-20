@@ -943,7 +943,7 @@ function onTouchEnd(e) {
 }
 </script>
 <template>
-  <div v-if="!booting" class="studio-dark flex h-full w-full flex-col bg-ink-950 text-cream-100">
+  <div v-if="!booting" class="studio-shell flex h-full w-full flex-col bg-ink-950 text-cream-100">
     <!-- [Đợt 0.1] Banner 3 trạng thái xác thực — thay thế 403 im lặng bằng thông báo rõ ràng -->
     <AuthNotice />
     <!-- ══ Top account bar: thông tin người dùng + đăng nhập/đăng xuất + điều hướng quản trị ══ -->
@@ -953,14 +953,14 @@ function onTouchEnd(e) {
           <img :src="store.user.avatar || '/images/placeholder.svg'" class="h-8 w-8 shrink-0 rounded-full bg-ink-700 object-cover ring-2 ring-brand-500/40" @error="$event.target.src = '/images/placeholder.svg'" alt="Ảnh đại diện">
           <div class="min-w-0 leading-tight">
             <p class="truncate text-sm font-semibold text-cream-50">{{ store.user.name }}</p>
-            <p class="truncate text-[11px] text-cream-300/60">{{ store.user.role_label || store.user.role }}<span class="hidden sm:inline"> · {{ store.user.email }}</span></p>
+            <p class="truncate text-[11px] text-cream-400">{{ store.user.role_label || store.user.role }}<span class="hidden sm:inline"> · {{ store.user.email }}</span></p>
           </div>
         </template>
         <template v-else>
-          <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-500/20 text-amber-200"><StudioIcon name="lock" size="h-4 w-4" /></span>
+          <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-500/20 text-warn"><StudioIcon name="lock" size="h-4 w-4" /></span>
           <div class="leading-tight">
             <p class="text-sm font-semibold text-cream-50">Chưa đăng nhập</p>
-            <p class="text-[11px] text-cream-300/60">Đăng nhập để tạo ảnh/video &amp; lưu dữ liệu.</p>
+            <p class="text-[11px] text-cream-400">Đăng nhập để tạo ảnh/video &amp; lưu dữ liệu.</p>
           </div>
         </template>
       </div>
@@ -971,18 +971,18 @@ function onTouchEnd(e) {
           <div v-if="applyOpen" class="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border border-ink-700 bg-ink-900 shadow-xl">
             <div class="p-2.5">
               <p class="mb-2 text-[11px] font-semibold text-cream-200">Áp dụng bộ sưu tập cho phiên tạo ảnh</p>
-              <div v-if="store.projectScope !== 'own'" class="mb-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-200">Đang xem bộ sưu tập chờ duyệt. Mở bảng thiết kế để xem bộ sưu tập của bạn.</div>
+              <div v-if="store.projectScope !== 'own'" class="mb-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[10px] text-warn">Đang xem bộ sưu tập chờ duyệt. Mở bảng thiết kế để xem bộ sưu tập của bạn.</div>
               <div v-else class="max-h-64 overflow-y-auto">
                 <!-- Tối đa 20 dự án gần nhất, cuộn được (trước giới hạn cứng 8) -->
-                <div v-for="p in store.projects.slice(0, 20)" :key="p.id" @click="store.applyProject(p); applyOpen = false" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-ink-800" :class="store.appliedProjectId() === p.id ? 'bg-brand-600/20 text-brand-100' : 'text-cream-200'">
+                <div v-for="p in store.projects.slice(0, 20)" :key="p.id" @click="store.applyProject(p); applyOpen = false" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-ink-800" :class="store.appliedProjectId() === p.id ? 'bg-brand-600/20 text-brand-200' : 'text-cream-200'">
                   <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ background: p.color }"></span>
                   <span class="min-w-0 flex-1 truncate text-xs">{{ p.name }}</span>
-                  <span class="shrink-0 text-[9px] text-cream-300/50">{{ p.status }}</span>
-                  <StudioIcon v-if="store.appliedProjectId() === p.id" name="pin" size="h-3 w-3" class="text-brand-400" />
+                  <span class="shrink-0 text-[9px] text-cream-400">{{ p.status }}</span>
+                  <StudioIcon v-if="store.appliedProjectId() === p.id" name="pin" size="h-3 w-3" class="text-brand-300" />
                 </div>
-                <p v-if="!store.projects.length" class="px-2 py-1 text-[10px] text-cream-300/40">Chưa có bộ sưu tập nào.</p>
+                <p v-if="!store.projects.length" class="px-2 py-1 text-[10px] text-cream-400">Chưa có bộ sưu tập nào.</p>
               </div>
-              <button v-if="store.appliedProject" @click="store.unapplyProject(); applyOpen = false" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-red-500/40 bg-red-600/10 px-2 py-1.5 text-[10px] font-semibold text-red-200 transition hover:bg-red-600/20">
+              <button v-if="store.appliedProject" @click="store.unapplyProject(); applyOpen = false" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-red-500/40 bg-red-600/10 px-2 py-1.5 text-[10px] font-semibold text-danger transition hover:bg-red-600/20">
                 <StudioIcon name="pinOff" size="h-3 w-3" /> Ngắt dự án hiện tại
               </button>
               <button @click="applyOpen = false; projectsOpen = true" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-600 bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition hover:bg-ink-700">
@@ -1005,7 +1005,7 @@ function onTouchEnd(e) {
                   @click="store.togglePlanPopover()">
             <StudioIcon name="coins" size="h-3.5 w-3.5" />
             {{ store.creditsLeft }}
-            <span v-if="store.planName" class="hidden text-[10px] text-cream-300/85 lg:inline">{{ store.planName }}</span>
+            <span v-if="store.planName" class="hidden text-[10px] text-cream-300 lg:inline">{{ store.planName }}</span>
             <StudioIcon name="chevronDown" size="h-3 w-3" />
           </button>
 
@@ -1017,7 +1017,7 @@ function onTouchEnd(e) {
                 {{ store.planStatus.plan ? store.planStatus.plan.name : 'Chưa gán gói' }}
                 <span v-if="store.planStatus.plan" class="ml-auto rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-300">{{ store.planStatus.plan.price_label }}</span>
               </p>
-              <p class="mt-1 text-[11px] text-cream-300/85">
+              <p class="mt-1 text-[11px] text-cream-300">
                 Còn <b class="text-cream-50">{{ store.planStatus.credits.balance }}</b> credit
                 · hôm nay dùng {{ store.planStatus.credits.used_today }}
                 <span v-if="store.planStatus.plan && store.planStatus.plan.expires_at"> · hạn {{ store.planStatus.plan.expires_at }}</span>
@@ -1028,17 +1028,17 @@ function onTouchEnd(e) {
                 <span class="rounded bg-ink-800 px-2 py-1 text-cream-200">Ảnh tối đa {{ store.planStatus.limits.image_resolution_cap }}</span>
                 <span class="rounded bg-ink-800 px-2 py-1 text-cream-200">Video tối đa {{ store.planStatus.limits.video_resolution_cap }}p</span>
               </div>
-              <p v-if="store.planStatus.warning" class="mt-2 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-200">{{ store.planStatus.warning }}</p>
+              <p v-if="store.planStatus.warning" class="mt-2 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[10px] text-warn">{{ store.planStatus.warning }}</p>
               <!-- [Q2] Yêu cầu nâng cấp đang chờ: nói ngay để khách không gửi trùng -->
-              <p v-if="store.planStatus.upgrade && store.planStatus.upgrade.open" class="mt-2 rounded border border-sky-500/30 bg-sky-500/10 px-2 py-1.5 text-[10px] text-sky-100">
+              <p v-if="store.planStatus.upgrade && store.planStatus.upgrade.open" class="mt-2 rounded border border-sky-500/30 bg-sky-500/10 px-2 py-1.5 text-[10px] text-info">
                 Đang chờ xử lý: <b>{{ store.planStatus.upgrade.open.code }}</b> — gói {{ store.planStatus.upgrade.open.plan_name }}
                 · {{ store.planStatus.upgrade.open.amount_label }} · gửi {{ store.planStatus.upgrade.open.created_at }}
-                <span class="block text-sky-200/85">FabrikAI sẽ liên hệ theo số bạn đã để lại. Cần gấp? Gọi {{ store.planStatus.payment.support.phone || 'số hỗ trợ của FabrikAI' }}.</span>
+                <span class="block text-info">FabrikAI sẽ liên hệ theo số bạn đã để lại. Cần gấp? Gọi {{ store.planStatus.payment.support.phone || 'số hỗ trợ của FabrikAI' }}.</span>
               </p>
               <div v-if="store.planStatus.payment && store.planStatus.payment.bank.account" class="mt-2 rounded border border-ink-700 bg-ink-800/70 px-2 py-1.5 text-[10px] text-cream-200">
                 <b class="text-cream-50">Chuyển khoản:</b> {{ store.planStatus.payment.bank.name }} · STK {{ store.planStatus.payment.bank.account }}
                 <span v-if="store.planStatus.payment.bank.holder"> · {{ store.planStatus.payment.bank.holder }}</span>
-                <span class="block text-cream-300/85">Nội dung: mã yêu cầu (vd UP-2609-0001) + tên tài khoản FabrikAI của bạn.</span>
+                <span class="block text-cream-300">Nội dung: mã yêu cầu (vd UP-2609-0001) + tên tài khoản FabrikAI của bạn.</span>
               </div>
               <!-- [Q4] NHÓM LÀM VIỆC THEO SỐ GHẾ: mời/bỏ người dùng chung gói, chung credit, chung bộ sưu tập -->
               <div v-if="store.team" class="mt-2 rounded-lg border border-ink-700 bg-ink-900/70 p-2.5">
@@ -1047,24 +1047,24 @@ function onTouchEnd(e) {
                   <span class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200">
                     ghế {{ store.team.seats.used }}/{{ store.team.seats.limit }}
                   </span>
-                  <span v-if="store.team.seats.remaining" class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">còn {{ store.team.seats.remaining }} ghế</span>
-                  <span v-else class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">hết ghế</span>
+                  <span v-if="store.team.seats.remaining" class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-ok">còn {{ store.team.seats.remaining }} ghế</span>
+                  <span v-else class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-warn">hết ghế</span>
                   <button type="button" class="icon-btn ml-auto !h-5 !w-5" title="Nạp lại danh sách nhóm" aria-label="Nạp lại danh sách nhóm" @click="store.loadTeam(true)">
                     <StudioIcon name="refresh" size="h-3 w-3" />
                   </button>
                 </div>
 
                 <template v-if="store.team.is_owner">
-                  <p class="mt-1 text-[10px] leading-relaxed text-cream-300/85">
+                  <p class="mt-1 text-[10px] leading-relaxed text-cream-300">
                     Gói của bạn cho <b class="text-cream-100">{{ store.team.seats.limit }} người</b> dùng chung: cùng một bể credit và cùng bộ sưu tập.
                     Ảnh vẫn ghi rõ ai tạo. Mời thêm người bằng email bên dưới.
                   </p>
                   <ul v-if="store.team.members.length > 1" class="mt-1.5 space-y-1">
                     <li v-for="m in store.team.members.filter((x) => !x.is_owner)" :key="m.id" class="flex items-center gap-1.5 rounded bg-ink-800/70 px-2 py-1 text-[10px] text-cream-200">
-                      <StudioIcon name="user" size="h-3 w-3" class="text-cream-300/70" />
+                      <StudioIcon name="user" size="h-3 w-3" class="text-cream-300" />
                       <span class="min-w-0 flex-1 truncate">{{ m.name }} · {{ m.email }}</span>
-                      <span class="shrink-0 text-cream-300/60">{{ m.joined_at }}</span>
-                      <button type="button" class="icon-btn !h-5 !w-5 !text-red-300" title="Bỏ thành viên khỏi nhóm (giải phóng ghế)" :aria-label="'Bỏ ' + m.name + ' khỏi nhóm'" :disabled="store.teamBusy" @click="store.removeMember(m.id)">
+                      <span class="shrink-0 text-cream-400">{{ m.joined_at }}</span>
+                      <button type="button" class="icon-btn !h-5 !w-5 !text-danger" title="Bỏ thành viên khỏi nhóm (giải phóng ghế)" :aria-label="'Bỏ ' + m.name + ' khỏi nhóm'" :disabled="store.teamBusy" @click="store.removeMember(m.id)">
                         <StudioIcon name="userX" size="h-3 w-3" />
                       </button>
                     </li>
@@ -1074,37 +1074,37 @@ function onTouchEnd(e) {
                   </button>
                   <div v-if="store.teamOpen" class="mt-1.5 space-y-1.5 rounded border border-brand-500/30 bg-brand-600/10 p-2">
                     <template v-if="!store.teamResult">
-                      <label class="block text-[10px] text-cream-300/85">Tên thành viên
+                      <label class="block text-[10px] text-cream-300">Tên thành viên
                         <input v-model="store.teamForm.name" maxlength="120" class="input mt-0.5 !py-1 text-[11px]" placeholder="Nguyễn Thị B">
                       </label>
-                      <label class="block text-[10px] text-cream-300/85">Email (dùng để đăng nhập)
+                      <label class="block text-[10px] text-cream-300">Email (dùng để đăng nhập)
                         <input v-model="store.teamForm.email" type="email" maxlength="190" class="input mt-0.5 !py-1 text-[11px]" placeholder="nhanvien@shop.vn">
                       </label>
-                      <label class="block text-[10px] text-cream-300/85">Số điện thoại (tuỳ chọn)
+                      <label class="block text-[10px] text-cream-300">Số điện thoại (tuỳ chọn)
                         <input v-model="store.teamForm.phone" maxlength="32" class="input mt-0.5 !py-1 text-[11px]" placeholder="0901234567">
                       </label>
                       <button type="button" class="w-full rounded bg-brand-600 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                               :disabled="store.teamBusy" @click="store.inviteMember()">
                         {{ store.teamBusy ? 'Đang thêm…' : 'Thêm vào nhóm' }}
                       </button>
-                      <p class="text-[10px] leading-relaxed text-cream-300/85">
+                      <p class="text-[10px] leading-relaxed text-cream-300">
                         Thành viên đăng nhập bằng email này và dùng chung gói của bạn — không cần mua gói riêng. Mỗi người cần một email riêng.
                       </p>
                     </template>
                     <template v-else>
-                      <p class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[10px] text-emerald-200">
+                      <p class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[10px] text-ok">
                         Đã thêm <b>{{ store.teamResult.member.name }}</b> ({{ store.teamResult.member.email }}) vào nhóm.
                       </p>
                       <div class="rounded bg-ink-800 px-2 py-1.5 text-[10px] text-cream-200">
                         <p>Mật khẩu tạm (chỉ hiện MỘT LẦN — hãy gửi ngay cho nhân viên):</p>
                         <p class="mt-0.5 font-mono text-[12px] font-semibold text-cream-50">{{ store.teamResult.temp_password }}</p>
                       </div>
-                      <p class="text-[10px] text-cream-300/85">Nhân viên vào <b class="text-cream-100">/dang-nhap</b> bằng email + mật khẩu tạm rồi đổi mật khẩu trong phần tài khoản.</p>
+                      <p class="text-[10px] text-cream-300">Nhân viên vào <b class="text-cream-100">/dang-nhap</b> bằng email + mật khẩu tạm rồi đổi mật khẩu trong phần tài khoản.</p>
                       <button type="button" class="w-full rounded border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700" @click="store.teamResult = null; store.teamOpen = false">Xong</button>
                     </template>
                   </div>
                 </template>
-                <p v-else class="mt-1 text-[10px] leading-relaxed text-cream-300/85">
+                <p v-else class="mt-1 text-[10px] leading-relaxed text-cream-300">
                   Bạn là <b class="text-cream-100">thành viên</b> trong nhóm của <b class="text-cream-100">{{ store.team.owner.name }}</b>:
                   dùng chung credit và bộ sưu tập của nhóm. Cần thêm credit hoặc thêm ghế thì nhờ chủ nhóm nâng cấp gói.
                 </p>
@@ -1120,27 +1120,27 @@ function onTouchEnd(e) {
                 </div>
                 <ul v-if="lockedModules.length" class="mt-1.5 space-y-1">
                   <li v-for="m in lockedModules" :key="m.id" class="flex flex-wrap items-center gap-1.5 rounded bg-ink-800/70 px-2 py-1 text-[10px] text-cream-200">
-                    <StudioIcon name="lock" size="h-3 w-3" class="text-amber-300" />
+                    <StudioIcon name="lock" size="h-3 w-3" class="text-warn" />
                     <span class="font-semibold text-cream-100">{{ m.name }}</span>
-                    <span class="text-cream-300/70">{{ m.reason === 'disabled' ? 'tạm tắt' : (store.plansWithModule(m.id).length ? 'có ở gói ' + store.plansWithModule(m.id).map((p) => p.name).join(' · ') : 'chưa gói nào có') }}</span>
+                    <span class="text-cream-300">{{ m.reason === 'disabled' ? 'tạm tắt' : (store.plansWithModule(m.id).length ? 'có ở gói ' + store.plansWithModule(m.id).map((p) => p.name).join(' · ') : 'chưa gói nào có') }}</span>
                   </li>
                 </ul>
-                <p v-else class="mt-1 text-[10px] text-emerald-200">Gói của bạn đang có đủ mọi tính năng đang mở.</p>
+                <p v-else class="mt-1 text-[10px] text-ok">Gói của bạn đang có đủ mọi tính năng đang mở.</p>
               </div>
 
               <button type="button" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-600 bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition hover:bg-ink-700" @click="store.planCatalogOpen = !store.planCatalogOpen">
                 <StudioIcon name="sparkles" size="h-3 w-3" /> {{ store.planCatalogOpen ? 'Thu gọn danh mục gói' : 'Xem gói khác / nâng cấp' }}
               </button>
               <div v-if="store.planCatalogOpen" class="mt-2 max-h-64 space-y-1.5 overflow-y-auto">
-                <p class="rounded bg-ink-800 px-2 py-1 text-[10px] text-cream-300/85">Chưa có cổng thanh toán trực tuyến: bấm <b class="text-cream-100">Yêu cầu nâng cấp</b> để FabrikAI liên hệ, xác nhận thanh toán rồi kích hoạt gói cho bạn.</p>
+                <p class="rounded bg-ink-800 px-2 py-1 text-[10px] text-cream-300">Chưa có cổng thanh toán trực tuyến: bấm <b class="text-cream-100">Yêu cầu nâng cấp</b> để FabrikAI liên hệ, xác nhận thanh toán rồi kích hoạt gói cho bạn.</p>
                 <div v-for="p in store.planStatus.catalog" :key="p.id" class="rounded-lg border border-ink-700 bg-ink-900/60 p-2">
                   <p class="flex items-center gap-2 text-[11px] font-semibold text-cream-100">
                     {{ p.name }}
-                    <span class="ml-auto text-cream-300/85">{{ p.price_label }}</span>
+                    <span class="ml-auto text-cream-300">{{ p.price_label }}</span>
                   </p>
-                  <p class="mt-0.5 text-[10px] text-cream-300/85">{{ p.credits_label || (p.credits_per_month + ' credit/tháng') }} · tối đa {{ p.resolution_cap }}<span v-if="p.bonus_credits"> · +{{ p.bonus_credits }} tặng lần đầu</span></p>
-                  <p v-if="p.is_seasonal" class="mt-0.5 text-[10px] text-amber-200/85">Gói theo vụ: mua 1 {{ p.unit_label }} = {{ p.unit_months }} tháng, credit cấp MỘT LẦN cho cả vụ.</p>
-                  <p v-if="p.tagline" class="mt-0.5 text-[10px] text-cream-300/75">{{ p.tagline }}</p>
+                  <p class="mt-0.5 text-[10px] text-cream-300">{{ p.credits_label || (p.credits_per_month + ' credit/tháng') }} · tối đa {{ p.resolution_cap }}<span v-if="p.bonus_credits"> · +{{ p.bonus_credits }} tặng lần đầu</span></p>
+                  <p v-if="p.is_seasonal" class="mt-0.5 text-[10px] text-warn">Gói theo vụ: mua 1 {{ p.unit_label }} = {{ p.unit_months }} tháng, credit cấp MỘT LẦN cho cả vụ.</p>
+                  <p v-if="p.tagline" class="mt-0.5 text-[10px] text-cream-300">{{ p.tagline }}</p>
                   <!-- Nút của gói ĐANG DÙNG phải ĐỌC ĐƯỢC. Hai lần đo trên trình duyệt thật mới ra đúng
                        cách sửa: (1) bg-brand + opacity-50 ⇒ chữ trắng trên nền sáng, tương phản 1:1;
                        (2) đổi sang class Tailwind vẫn KHÔNG ăn, vì trình duyệt áp style :disabled của
@@ -1163,50 +1163,50 @@ function onTouchEnd(e) {
                   <button type="button" class="icon-btn ml-auto !h-5 !w-5" title="Đóng form" aria-label="Đóng form yêu cầu nâng cấp" @click="store.closeUpgrade()"><StudioIcon name="x" size="h-3 w-3" /></button>
                 </p>
                 <template v-if="!store.upgradeResult">
-                  <label class="block text-[10px] text-cream-300/85">Số kỳ mua (tháng/vụ)
+                  <label class="block text-[10px] text-cream-300">Số kỳ mua (tháng/vụ)
                     <select v-model.number="store.upgradeForm.units" class="input mt-0.5 !py-1 text-[11px]">
                       <option v-for="u in upgradeUnits" :key="u" :value="u">{{ u }} {{ upgradeUnitLabel }}</option>
                     </select>
                   </label>
-                  <label class="block text-[10px] text-cream-300/85">Cách thanh toán
+                  <label class="block text-[10px] text-cream-300">Cách thanh toán
                     <select v-model="store.upgradeForm.method" class="input mt-0.5 !py-1 text-[11px]">
                       <option v-for="m in (store.planStatus.upgrade ? store.planStatus.upgrade.methods : [])" :key="m.value" :value="m.value">{{ m.label }}</option>
                     </select>
                   </label>
-                  <label class="block text-[10px] text-cream-300/85">Tên người liên hệ
+                  <label class="block text-[10px] text-cream-300">Tên người liên hệ
                     <input v-model="store.upgradeForm.name" maxlength="120" class="input mt-0.5 !py-1 text-[11px]" placeholder="Tên của bạn">
                   </label>
-                  <label class="block text-[10px] text-cream-300/85">Số điện thoại (bắt buộc)
+                  <label class="block text-[10px] text-cream-300">Số điện thoại (bắt buộc)
                     <input v-model="store.upgradeForm.phone" maxlength="32" inputmode="tel" class="input mt-0.5 !py-1 text-[11px]" placeholder="0901234567">
                   </label>
-                  <label class="block text-[10px] text-cream-300/85">Ghi chú
+                  <label class="block text-[10px] text-cream-300">Ghi chú
                     <textarea v-model="store.upgradeForm.note" rows="2" maxlength="1000" class="input mt-0.5 !py-1 text-[11px]" placeholder="vd: cần cho bộ Thu Đông, xuất hoá đơn công ty"></textarea>
                   </label>
                   <button type="button" class="w-full rounded bg-brand-600 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                           :disabled="store.upgradeBusy" @click="store.submitUpgrade()">
                     {{ store.upgradeBusy ? 'Đang gửi…' : 'Gửi yêu cầu nâng cấp' }}
                   </button>
-                  <p class="text-[10px] leading-relaxed text-cream-300/85">FabrikAI sẽ liên hệ xác nhận trong giờ làm việc; gói chỉ được kích hoạt SAU khi thanh toán được xác nhận.</p>
+                  <p class="text-[10px] leading-relaxed text-cream-300">FabrikAI sẽ liên hệ xác nhận trong giờ làm việc; gói chỉ được kích hoạt SAU khi thanh toán được xác nhận.</p>
                 </template>
                 <template v-else>
-                  <p class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[10px] text-emerald-200">
+                  <p class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[10px] text-ok">
                     Đã gửi yêu cầu <b>{{ store.upgradeResult.code }}</b> — {{ store.upgradeResult.plan.name }} ·
                     {{ store.upgradeResult.units }} {{ store.upgradeResult.unit_label }}<span v-if="store.upgradeResult.unit_label !== 'tháng'"> ({{ store.upgradeResult.months }} tháng)</span> · {{ store.upgradeResult.amount_label }} · {{ store.upgradeResult.method_label }}.
                   </p>
                   <div v-if="store.planStatus.payment && store.planStatus.payment.bank.account" class="rounded bg-ink-800 px-2 py-1.5 text-[10px] text-cream-200">
                     <p><b class="text-cream-50">{{ store.planStatus.payment.bank.name }}</b></p>
                     <p>STK: <b>{{ store.planStatus.payment.bank.account }}</b><span v-if="store.planStatus.payment.bank.holder"> — {{ store.planStatus.payment.bank.holder }}</span></p>
-                    <p class="mt-0.5 text-cream-300/85">Nội dung chuyển khoản: <b class="text-cream-100">{{ store.upgradeResult.code }}</b></p>
+                    <p class="mt-0.5 text-cream-300">Nội dung chuyển khoản: <b class="text-cream-100">{{ store.upgradeResult.code }}</b></p>
                   </div>
-                  <p v-else class="rounded bg-ink-800 px-2 py-1.5 text-[10px] text-cream-300/85">FabrikAI sẽ gửi thông tin thanh toán cho bạn qua số điện thoại đã để lại.</p>
-                  <p v-if="store.planStatus.payment && store.planStatus.payment.support.phone" class="text-[10px] text-cream-300/85">
+                  <p v-else class="rounded bg-ink-800 px-2 py-1.5 text-[10px] text-cream-300">FabrikAI sẽ gửi thông tin thanh toán cho bạn qua số điện thoại đã để lại.</p>
+                  <p v-if="store.planStatus.payment && store.planStatus.payment.support.phone" class="text-[10px] text-cream-300">
                     Cần gấp: {{ store.planStatus.payment.support.phone }}<span v-if="store.planStatus.payment.support.email"> · {{ store.planStatus.payment.support.email }}</span>
                   </p>
                   <button type="button" class="w-full rounded border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700" @click="store.closeUpgrade()">Đóng</button>
                 </template>
               </div>
             </template>
-            <p v-else class="text-[11px] text-cream-300/85">Đang tải thông tin gói…</p>
+            <p v-else class="text-[11px] text-cream-300">Đang tải thông tin gói…</p>
           </div>
           <div v-if="store.planOpen" class="fixed inset-0 z-40" @click="store.planOpen = false"></div>
         </div>
@@ -1233,7 +1233,7 @@ function onTouchEnd(e) {
         <b>{{ store.selectionUnitLabels.slice(0, 4).join(' · ') }}</b><span v-if="store.selectionUnitLabels.length > 4"> · …</span><br>
       </template>
       <template v-if="store.lockedSelectionCount">
-        <span class="text-amber-300/90">{{ store.lockedSelectionCount }} đối tượng đang KHÓA sẽ được giữ lại (mở khóa rồi xóa sau).</span><br>
+        <span class="text-warn">{{ store.lockedSelectionCount }} đối tượng đang KHÓA sẽ được giữ lại (mở khóa rồi xóa sau).</span><br>
       </template>
       Chỉ gỡ khỏi canvas — ảnh kết quả vẫn còn trong <b>Output/Thư viện</b>. Có thể hoàn tác (Ctrl+Z).
     </ConfirmDialog>
@@ -1244,7 +1244,7 @@ function onTouchEnd(e) {
     <!-- Mobile top bar (chỉ ở view studio) -->
     <div v-if="store.studioView !== 'library'" class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
       <button @click="menuOpen = true" class="icon-btn !h-9 !w-9 border border-ink-600 md:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>
-      <span class="flex items-center gap-1.5 font-display text-sm font-semibold"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span>
+      <span class="flex items-center gap-1.5 font-display text-sm font-semibold"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-300" /> Studio</span>
       <div class="flex items-center gap-1.5">
         <button @click="projectsOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-600" :title="store.appliedProject ? 'Bộ sưu tập hiện tại: ' + store.appliedProject.name : 'Bộ sưu tập'" aria-label="Bộ sưu tập"><StudioIcon name="kanban" size="h-4 w-4" /><span v-if="store.appliedProject" class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand-400"></span></button>
         <button @click="outputOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-600" title="Kết quả" aria-label="Kết quả"><StudioIcon name="grid" size="h-4 w-4" /><span v-if="store.generations.length" class="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[9px] font-bold leading-none text-white">{{ store.generations.length }}</span></button>
@@ -1253,7 +1253,7 @@ function onTouchEnd(e) {
     <div v-if="store.studioView !== 'library'" class="flex flex-1 overflow-hidden">
       <!-- Activity bar (VSCode-style) + Sidebar card của activity đang chọn (desktop) -->
       <nav class="activity-bar hidden md:flex" aria-label="Công cụ">
-        <div class="mb-2 grid h-11 w-11 shrink-0 place-items-center text-brand-400" title="Studio"><StudioIcon name="bot" size="h-5 w-5" /></div>
+        <div class="mb-2 grid h-11 w-11 shrink-0 place-items-center text-brand-300" title="Studio"><StudioIcon name="bot" size="h-5 w-5" /></div>
         <!-- [Sửa 2026-09-17] MỌI nút ở đây sinh từ CẤU HÌNH owner quản lý (/admin → tab Giao diện).
              Trước đây Prompt Tạo Ảnh + Trợ lý thiết kế bị VIẾT CỨNG nên không xuất hiện trong
              danh sách quản trị ⇒ owner không đổi được nhãn/icon/thứ tự của chúng.
@@ -1266,13 +1266,13 @@ function onTouchEnd(e) {
                   class="activity-btn relative" :class="[activeActivity === a.id ? 'is-active' : '', a.locked ? 'opacity-55' : '']"
                   :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label" :aria-label="a.label">
             <StudioIcon :name="a.icon" size="h-5 w-5" />
-            <span v-if="a.locked" class="absolute -right-0.5 -top-0.5 rounded-full bg-amber-500 p-0.5 text-ink-900" aria-hidden="true"><StudioIcon name="lock" size="h-2.5 w-2.5" /></span>
+            <span v-if="a.locked" class="absolute -right-0.5 -top-0.5 rounded-full bg-amber-500 p-0.5 text-on-accent" aria-hidden="true"><StudioIcon name="lock" size="h-2.5 w-2.5" /></span>
           </button>
           <button v-else-if="a.kind === 'action'" @click="a.locked ? openUpgradeFor(a.id) : runToolbarAction(a.id)"
                   class="activity-btn relative" :class="[isToolbarActionActive(a.id) ? 'is-active' : '', a.locked ? 'opacity-55' : '']"
                   :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label" :aria-label="a.label">
             <StudioIcon :name="a.icon" size="h-5 w-5" />
-            <span v-if="a.locked" class="absolute -right-0.5 -top-0.5 rounded-full bg-amber-500 p-0.5 text-ink-900" aria-hidden="true"><StudioIcon name="lock" size="h-2.5 w-2.5" /></span>
+            <span v-if="a.locked" class="absolute -right-0.5 -top-0.5 rounded-full bg-amber-500 p-0.5 text-on-accent" aria-hidden="true"><StudioIcon name="lock" size="h-2.5 w-2.5" /></span>
           </button>
         </template>
 
@@ -1284,21 +1284,21 @@ function onTouchEnd(e) {
             <StudioIcon :name="settingsEntry.icon" size="h-5 w-5" />
           </button>
           <div v-if="settingsOpen" role="menu" class="motion-pop-in absolute bottom-0 left-full z-50 ml-2 w-64 overflow-hidden rounded-xl border border-ink-700 bg-ink-900 p-1.5 shadow-2xl">
-            <p class="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">Cài đặt của tôi</p>
+            <p class="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-400">Cài đặt của tôi</p>
             <!-- [2026-09-20] 4 lối vào nay trỏ về KHU HỢP NHẤT /cai-dat/<mục>. Giữ đủ 4 dòng thay vì
                  gộp còn một: người dùng đã quen bấm thẳng vào mục mình cần, và đích đến vẫn là khu hợp
                  nhất (có sidebar để đổi mục) nên không mất gì. Các URL cũ /presets, /stylist-data,
                  /model-settings vẫn chạy và mở đúng mục tương ứng. -->
-            <a href="/cai-dat/presets" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="template" size="h-4 w-4" class="text-brand-400" /> Preset (mẫu prompt)</a>
-            <a href="/cai-dat/model" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="user" size="h-4 w-4" class="text-brand-400" /> Khuôn mặt (model)</a>
-            <a href="/cai-dat/pose" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="pose" size="h-4 w-4" class="text-brand-400" /> Dáng pose (người mẫu)</a>
-            <a href="/cai-dat/stylist" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="shirt" size="h-4 w-4" class="text-brand-400" /> Dữ liệu Trợ lý thiết kế</a>
-            <button type="button" @click="settingsOpen = false; goLibrary()" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="grid" size="h-4 w-4" class="text-brand-400" /> Thư viện &amp; ảnh của tôi</button>
+            <a href="/cai-dat/presets" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="template" size="h-4 w-4" class="text-brand-300" /> Preset (mẫu prompt)</a>
+            <a href="/cai-dat/model" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="user" size="h-4 w-4" class="text-brand-300" /> Khuôn mặt (model)</a>
+            <a href="/cai-dat/pose" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="pose" size="h-4 w-4" class="text-brand-300" /> Dáng pose (người mẫu)</a>
+            <a href="/cai-dat/stylist" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="shirt" size="h-4 w-4" class="text-brand-300" /> Dữ liệu Trợ lý thiết kế</a>
+            <button type="button" @click="settingsOpen = false; goLibrary()" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="grid" size="h-4 w-4" class="text-brand-300" /> Thư viện &amp; ảnh của tôi</button>
             <template v-if="store.user && store.user.is_admin">
               <div class="my-1 border-t border-ink-700"></div>
-              <p class="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">Quản trị</p>
-              <a href="/settings" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="gear" size="h-4 w-4" class="text-amber-400" /> Cài đặt hệ thống (API key · model)</a>
-              <a href="/admin" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="coins" size="h-4 w-4" class="text-amber-400" /> Quản trị Owner (người dùng · gói cước)</a>
+              <p class="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-400">Quản trị</p>
+              <a href="/settings" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="gear" size="h-4 w-4" class="text-warn" /> Cài đặt hệ thống (API key · model)</a>
+              <a href="/admin" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="coins" size="h-4 w-4" class="text-warn" /> Quản trị Owner (người dùng · gói cước)</a>
             </template>
           </div>
         </div>
@@ -1319,9 +1319,9 @@ function onTouchEnd(e) {
         :inert="store.leftPanelOpen ? null : true"
       >
         <div class="panel-head border-b border-ink-700">
-          <span class="panel-title"><StudioIcon :name="activeActivityDef.icon" size="h-4 w-4" class="text-brand-400" /> {{ activeActivityDef.label }}</span>
+          <span class="panel-title"><StudioIcon :name="activeActivityDef.icon" size="h-4 w-4" class="text-brand-300" /> {{ activeActivityDef.label }}</span>
           <div class="flex shrink-0 items-center gap-1.5">
-            <span class="text-[10px] text-cream-300/50">Credit {{ store.creditsLeft }}</span>
+            <span class="text-[10px] text-cream-400">Credit {{ store.creditsLeft }}</span>
             <button @click="store.leftPanelOpen = false" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-ink-600 text-cream-300 transition hover:border-brand-400 hover:bg-ink-700 hover:text-white" title="Ẩn bảng trái" aria-label="Ẩn bảng trái"><StudioIcon name="chevronLeft" size="h-4 w-4" /></button>
           </div>
         </div>
@@ -1377,8 +1377,8 @@ function onTouchEnd(e) {
                   <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" :class="store.activeLayerId === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : ''" draggable="false" @load="store.onCanvasImgLoad()" />
                 </div>
               </div>
-              <p v-else-if="store.activeLayer.visible === false" class="text-sm text-cream-300/60">Layer đang chọn đang bị <b>ẨN</b> — bấm con mắt trong bảng Lớp để hiện lại.</p>
-              <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
+              <p v-else-if="store.activeLayer.visible === false" class="text-sm text-cream-400">Layer đang chọn đang bị <b>ẨN</b> — bấm con mắt trong bảng Lớp để hiện lại.</p>
+              <p v-else class="text-sm text-cream-400">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
             </div>
             <!-- Chế độ stack: composite tất cả layer.
                  BẬT/TẮT LAYER ẩn/hiện bằng CHÍNH thẻ layer (class .layer-el / .layer-el--hidden):
@@ -1404,7 +1404,7 @@ function onTouchEnd(e) {
                     <span @dblclick.stop="startGroupRename(l.groupId)" class="absolute -top-7 left-0 flex max-w-[140px] items-center gap-1 rounded-full border border-ink-600 bg-ink-900/95 px-1.5 py-0.5 text-[9px] font-semibold text-cream-100 shadow" :title="'Nhóm: ' + store.groupLabel(l) + ' — nhấn đúp đổi tên · Alt+click layer trong nhóm để chỉnh sửa riêng'">
                       <StudioIcon name="group" size="h-2.5 w-2.5" class="text-brand-300"/>
                       <template v-if="renamingGroupId === l.groupId">
-                        <input v-model="groupRenameVal" @keydown.enter.prevent="commitGroupRename" @keydown.esc="cancelGroupRename" @blur="commitGroupRename" class="w-24 bg-ink-800 text-[9px] text-cream-100 placeholder:text-cream-300/40 focus:outline-none" />
+                        <input v-model="groupRenameVal" @keydown.enter.prevent="commitGroupRename" @keydown.esc="cancelGroupRename" @blur="commitGroupRename" class="w-24 bg-ink-800 text-[9px] text-cream-100 placeholder:text-cream-400 focus:outline-none" />
                       </template>
                       <span v-else class="truncate">{{ store.groupLabel(l) }}</span>
                     </span>
@@ -1475,19 +1475,19 @@ function onTouchEnd(e) {
             <button v-for="l in store.layersFrontFirst" :key="l.id" @click="store.selectLayer(l)" class="h-7 w-7 shrink-0 overflow-hidden rounded-md transition" :class="store.activeLayerId === l.id ? 'ring-2 ring-brand-400' : 'opacity-60 hover:opacity-100'" :title="l.name">
               <img :src="l.image" class="h-7 w-7 object-cover" />
             </button>
-            <button @click="store.deleteLayer(store.activeLayer)" :disabled="!store.activeLayer" class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-ink-900/85 text-red-300 shadow hover:bg-red-600 hover:text-white disabled:opacity-30" title="Xóa layer khỏi canvas" aria-label="Xóa layer khỏi canvas"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+            <button @click="store.deleteLayer(store.activeLayer)" :disabled="!store.activeLayer" class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-ink-900/85 text-danger shadow hover:bg-red-600 hover:text-white disabled:opacity-30" title="Xóa layer khỏi canvas" aria-label="Xóa layer khỏi canvas"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
           </div>
           <!-- variant slider (bottom, only when multiple variants) -->
           <div v-if="store.showBatch && store.activeBatch.length > 1" class="batch-slider absolute bottom-14 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
             <div class="flex items-center gap-1.5">
-              <span class="text-[10px] text-cream-300/60">{{ store.activeBatch.length }} biến thể</span>
+              <span class="text-[10px] text-cream-400">{{ store.activeBatch.length }} biến thể</span>
               <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2 transition-all duration-base" :class="store.previewId === v.id ? 'border-brand-500 scale-105' : 'border-ink-600 hover:border-brand-400'">
                 <template v-if="v.status === 'completed' && v.media_url">
                   <img :src="v.media_url" class="batch-thumb h-full w-full bg-ink-900 object-cover" loading="lazy">
                 </template>
                 <template v-else>
                   <div class="skeleton-shimmer absolute inset-0"></div>
-                  <span class="absolute inset-0 grid place-items-center bg-black/40 text-[9px] font-semibold text-cream-200">
+                  <span class="absolute inset-0 grid place-items-center bg-scrim/40 text-[9px] font-semibold text-scrim-content">
                     <span v-if="['pending','processing'].includes(v.status)" class="batch-dot"></span>
                     <span v-else-if="v.status === 'failed'"><StudioIcon name="alertTriangle" size="h-4 w-4" /></span>
                     <span v-else-if="v.status === 'cancelled'"><StudioIcon name="ban" size="h-4 w-4" /></span>
@@ -1542,7 +1542,7 @@ function onTouchEnd(e) {
         :inert="store.outputDockOpen ? null : true"
       >
         <div class="panel-head shrink-0 border-b border-ink-700">
-          <span class="panel-title"><StudioIcon name="grid" size="h-3.5 w-3.5" class="text-brand-400" /> Outputs</span>
+          <span class="panel-title"><StudioIcon name="grid" size="h-3.5 w-3.5" class="text-brand-300" /> Outputs</span>
           <!-- Nút ẩn dock NGAY TRONG dock (đối xứng với nút chevron của bảng trái); mở lại bằng
                nút Outputs ở rail phải — người dùng không phải nhớ phím tắt nào. -->
           <button @click="store.toggleOutputDock()" class="icon-btn !h-7 !w-7 shrink-0" title="Ẩn dock Outputs" aria-label="Ẩn dock Outputs"><StudioIcon name="chevronRight" size="h-4 w-4" /></button>
@@ -1577,37 +1577,37 @@ function onTouchEnd(e) {
     <div v-if="menuOpen" role="dialog" aria-modal="true" aria-label="Menu Studio" class="fixed inset-0 z-50 lg:hidden" @click="menuOpen=false">
       <div class="motion-fade-in absolute inset-0 bg-black/60"></div>
       <div class="motion-slide-in-left absolute left-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
-        <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span><button @click="menuOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng menu" aria-label="Đóng menu"><StudioIcon name="x" size="h-4 w-4" /></button></div>
+        <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-300" /> Studio</span><button @click="menuOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng menu" aria-label="Đóng menu"><StudioIcon name="x" size="h-4 w-4" /></button></div>
         <div class="mb-3 flex gap-1.5 overflow-x-auto">
           <!-- [Sửa 2026-09-17] Panel + nút popup đều sinh từ CÙNG cấu hình owner quản lý, nên
                mobile không còn bản sao viết cứng lệch khỏi desktop. -->
           <template v-for="a in activityBar" :key="'m-' + a.id">
             <button v-if="a.kind === 'panel'" @click="a.locked ? openUpgradeFor(a.id) : selectActivity(a.id)"
                     class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors"
-                    :class="a.locked ? 'bg-ink-800/60 text-cream-300/50' : (activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70')"
+                    :class="a.locked ? 'bg-ink-800/60 text-cream-400' : (activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300')"
                     :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label">
                 <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-4 w-4" /> {{ a.label }}
             </button>
             <button v-else-if="a.kind === 'action'" @click="a.locked ? openUpgradeFor(a.id) : runToolbarAction(a.id); menuOpen = a.locked ? menuOpen : false"
                     class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors"
-                    :class="a.locked ? 'bg-ink-800/60 text-cream-300/50' : (isToolbarActionActive(a.id) ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70')"
+                    :class="a.locked ? 'bg-ink-800/60 text-cream-400' : (isToolbarActionActive(a.id) ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300')"
                     :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label">
                 <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-4 w-4" /> {{ a.label }}
             </button>
           </template>
           <!-- [Đợt 0.5] Nguồn ảnh + Thư viện: trước đây chỉ có nút ở rail hidden lg:flex (≥1024px),
                nên người dùng điện thoại KHÔNG có cách mở. Nay cho vào drawer mobile. -->
-          <button @click="menuOpen = false; store.sourcePickerOpen = true" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="store.sourcePickerOpen ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm">
+          <button @click="menuOpen = false; store.sourcePickerOpen = true" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="store.sourcePickerOpen ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300'" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm">
             <StudioIcon name="imagePlus" size="h-4 w-4" /> Nguồn ảnh
           </button>
-          <button @click="menuOpen = false; goLibrary()" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors bg-ink-800 text-cream-300/70" title="Thư viện — xem ảnh đã tạo & file tải lên">
+          <button @click="menuOpen = false; goLibrary()" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors bg-ink-800 text-cream-300" title="Thư viện — xem ảnh đã tạo & file tải lên">
             <StudioIcon name="library" size="h-4 w-4" /> Thư viện
           </button>
           <!-- [Yêu cầu 2026-09-17] Trên desktop là nút Cài đặt ở góc trái dưới; mobile phải có lối vào tương đương. -->
-          <a v-if="settingsEntry" href="/presets" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-[10px] font-semibold text-cream-300/70 transition-colors" :title="settingsEntry.label + ' — preset prompt của bạn'">
+          <a v-if="settingsEntry" href="/presets" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-[10px] font-semibold text-cream-300 transition-colors" :title="settingsEntry.label + ' — preset prompt của bạn'">
             <StudioIcon :name="settingsEntry.icon" size="h-4 w-4" /> {{ settingsEntry.label }}
           </a>
-          <a href="/model-settings" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-[10px] font-semibold text-cream-300/70 transition-colors" title="Cài đặt — khuôn mặt & dáng pose của bạn">
+          <a href="/model-settings" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-[10px] font-semibold text-cream-300 transition-colors" title="Cài đặt — khuôn mặt & dáng pose của bạn">
             <StudioIcon name="user" size="h-4 w-4" /> Mặt &amp; dáng
           </a>
         </div>
@@ -1620,7 +1620,7 @@ function onTouchEnd(e) {
       <div class="motion-fade-in absolute inset-0 bg-black/60"></div>
       <div class="motion-slide-in-right absolute right-0 top-0 flex h-full w-80 flex-col scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="panel-head -mx-3 mb-2 flex shrink-0 items-center justify-between border-b border-ink-700 px-3">
-          <span class="panel-title"><StudioIcon name="grid" size="h-3.5 w-3.5" class="text-brand-400" /> Kết quả</span>
+          <span class="panel-title"><StudioIcon name="grid" size="h-3.5 w-3.5" class="text-brand-300" /> Kết quả</span>
           <button @click="outputOpen = false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
         </div>
         <div class="min-h-0 flex-1">
@@ -1639,26 +1639,26 @@ function onTouchEnd(e) {
     <div v-if="paletteOpen" role="dialog" aria-modal="true" aria-label="Bảng lệnh" class="fixed inset-0 z-[110] flex items-start justify-center pt-[12vh]" @click.self="paletteOpen = false">
       <div class="motion-pop-in w-full max-w-lg overflow-hidden rounded-xl border border-ink-600 bg-ink-900 shadow-2xl">
         <div class="flex items-center gap-2 border-b border-ink-700 px-3 py-2.5">
-          <StudioIcon name="search" size="h-4 w-4" class="text-cream-300/60" />
-          <input ref="paletteInput" v-model="paletteQuery" class="min-w-0 flex-1 bg-transparent text-sm text-cream-100 placeholder:text-cream-300/40 focus:outline-none" placeholder="Tìm lệnh, bộ sưu tập, mẫu việc, ảnh…  ( > lệnh · # bộ sưu tập · @ ảnh )" @keydown.esc="paletteOpen = false" />
-          <span class="rounded border border-ink-700 px-1.5 py-0.5 text-[10px] text-cream-300/40">esc</span>
+          <StudioIcon name="search" size="h-4 w-4" class="text-cream-400" />
+          <input ref="paletteInput" v-model="paletteQuery" class="min-w-0 flex-1 bg-transparent text-sm text-cream-100 placeholder:text-cream-400 focus:outline-none" placeholder="Tìm lệnh, bộ sưu tập, mẫu việc, ảnh…  ( > lệnh · # bộ sưu tập · @ ảnh )" @keydown.esc="paletteOpen = false" />
+          <span class="rounded border border-ink-700 px-1.5 py-0.5 text-[10px] text-cream-400">esc</span>
         </div>
         <div class="max-h-[50vh] overflow-y-auto p-1.5">
           <!-- [Trục 4] Kết quả theo NHÓM (Lệnh · Bộ sưu tập · Mẫu việc · Ảnh đã tạo) -->
           <template v-for="grp in paletteGroups" :key="grp.name">
-            <p class="px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/40">{{ grp.name }}</p>
+            <p class="px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-cream-400">{{ grp.name }}</p>
             <button v-for="cmd in grp.items" :key="cmd.id" @click="runCommand(cmd)" class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm text-cream-100 transition hover:bg-brand-600/25">
               <StudioIcon :name="cmd.icon" size="h-4 w-4" class="shrink-0 text-brand-300" />
               <span class="min-w-0 flex-1 truncate">{{ cmd.label }}</span>
-              <span class="shrink-0 text-[10px] text-cream-300/40">{{ cmd.hint }}</span>
+              <span class="shrink-0 text-[10px] text-cream-400">{{ cmd.hint }}</span>
             </button>
           </template>
-          <p v-if="!paletteItems.length" class="px-2.5 py-6 text-center text-xs text-cream-300/50">Không tìm thấy kết quả.</p>
+          <p v-if="!paletteItems.length" class="px-2.5 py-6 text-center text-xs text-cream-400">Không tìm thấy kết quả.</p>
         </div>
-        <div class="flex items-center gap-3 border-t border-ink-700 px-3 py-1.5 text-[10px] text-cream-300/40">
-          <span><b class="text-cream-300/70">&gt;</b> lệnh</span>
-          <span><b class="text-cream-300/70">#</b> bộ sưu tập</span>
-          <span><b class="text-cream-300/70">@</b> ảnh đã tạo</span>
+        <div class="flex items-center gap-3 border-t border-ink-700 px-3 py-1.5 text-[10px] text-cream-400">
+          <span><b class="text-cream-300">&gt;</b> lệnh</span>
+          <span><b class="text-cream-300">#</b> bộ sưu tập</span>
+          <span><b class="text-cream-300">@</b> ảnh đã tạo</span>
         </div>
       </div>
     </div>

@@ -123,7 +123,14 @@ class StudioController extends Controller
      *   · hợp đồng "trang cũ trả 200" đã được khoá bằng tests/Feature/UserCatalogTest.php;
      *   · đổi mục trong app thì URL được cập nhật bằng history.pushState sang /cai-dat/<mục>.
      */
-    private const SETTINGS_SECTIONS = ['presets', 'model', 'pose', 'stylist'];
+    /**
+     * Danh sách mục hợp lệ của khu Cài đặt — phải khớp BA nơi: whitelist route
+     * (/cai-dat/{section}), hằng số này, và SECTIONS trong MySettingsApp.vue.
+     * [2026-09-23] Thêm 'appearance' (Giao diện Sáng/Tối). Thiếu ở ĐÂY thì URL vẫn trả 200
+     * nhưng app mở nhầm mục Preset — lỗi im lặng mà test "trang trả 200" không bắt được,
+     * nên ThemeSystemTest nay khẳng định thẳng data-section render ra.
+     */
+    private const SETTINGS_SECTIONS = ['presets', 'model', 'pose', 'stylist', 'appearance'];
 
     public function mySettingsPage(string $section = 'presets')
     {

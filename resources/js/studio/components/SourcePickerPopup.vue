@@ -236,7 +236,7 @@ function confirmAdd() {
           <div class="grid h-9 w-9 place-items-center rounded-md bg-brand-600/15 text-brand-300"><StudioIcon name="layers" size="h-4.5 w-4.5"/></div>
           <div>
             <p class="text-sm font-semibold text-cream-100">Thêm ảnh nguồn</p>
-            <p class="text-[11px] text-cream-300/60">Thư viện {{ refs.length + output.length }} ảnh — nhấn chọn nhiều rồi thêm vào canvas</p>
+            <p class="text-[11px] text-cream-400">Thư viện {{ refs.length + output.length }} ảnh — nhấn chọn nhiều rồi thêm vào canvas</p>
           </div>
         </div>
         <button @click="close" class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink-800 text-cream-300 transition-colors hover:bg-ink-700 hover:text-white" title="Đóng (Esc)" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4"/></button>
@@ -246,12 +246,12 @@ function confirmAdd() {
       <div class="flex min-h-0 flex-1 flex-col">
         <label class="mb-3 flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ink-600 bg-ink-800/40 text-xs font-medium text-cream-200 transition-colors hover:border-brand-400 hover:bg-ink-800">
           <StudioIcon name="imagePlus" size="h-4 w-4"/>
-          {{ uploading ? 'Đang tải lên…' : 'Tải ảnh mới' }}<span class="text-cream-300/50">(chọn nhiều file được)</span>
+          {{ uploading ? 'Đang tải lên…' : 'Tải ảnh mới' }}<span class="text-cream-400">(chọn nhiều file được)</span>
           <input ref="fileRef" type="file" accept="image/*" multiple @change="onFile" class="hidden">
         </label>
 
         <!-- [MỚI] Lỗi tải thư viện phải NÓI RA, không im lặng để người dùng tưởng thư viện rỗng. -->
-        <p v-if="loadError" class="mb-2 flex items-center gap-1.5 rounded-md border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-200">
+        <p v-if="loadError" class="mb-2 flex items-center gap-1.5 rounded-md border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-danger">
           <StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> {{ loadError }}
         </p>
 
@@ -263,12 +263,12 @@ function confirmAdd() {
               <div v-for="g in sortedOutput" :key="g.key" role="button" tabindex="0" class="group relative cursor-pointer overflow-hidden rounded-md border transition-colors" :class="isSel(g) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" :title="g.name" style="padding-bottom: 100%" :aria-pressed="isSel(g)" :aria-label="'Chọn ' + g.name" @click="clickItem(g)" @keydown.enter.prevent="clickItem(g)" @keydown.space.prevent="clickItem(g)">
                 <img :src="thumbUrl(g.url)" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt="" @error="onThumbError($event, g.url)">
                 <span v-if="isSel(g)" class="pointer-events-none absolute inset-0 grid place-items-center bg-brand-500/15"><span class="grid h-9 w-9 place-items-center rounded-full bg-brand-500 text-white shadow-lg ring-2 ring-white/50"><StudioIcon name="check" size="h-5 w-5"/></span></span>
-                <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ g.name }}</span>
+                <span class="absolute inset-x-0 bottom-0 truncate bg-scrim/60 px-1 py-0.5 text-[9px] text-scrim-content">{{ g.name }}</span>
                 <!-- [MỚI] Hành động trên từng ảnh kết quả — không cần rời popup -->
                 <div class="absolute right-1 top-1 z-20 flex gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
-                  <button type="button" class="grid h-6 w-6 place-items-center rounded-full bg-black/75 text-cream-100 hover:bg-brand-600 hover:text-white" title="Xem lớn" :aria-label="'Xem lớn ' + g.name" @click.stop="openZoom(g)"><StudioIcon name="zoomIn" size="h-3 w-3"/></button>
-                  <button type="button" class="grid h-6 w-6 place-items-center rounded-full bg-black/75 text-cream-100 hover:bg-brand-600 hover:text-white" title="Tải xuống" :aria-label="'Tải ' + g.name" @click.stop="downloadItem(g)"><StudioIcon name="download" size="h-3 w-3"/></button>
-                  <button type="button" class="grid h-6 w-6 place-items-center rounded-full bg-black/75 text-cream-100 hover:bg-brand-600 hover:text-white" title="Đặt làm ảnh nguồn" :aria-label="'Đặt ' + g.name + ' làm ảnh nguồn'" @click.stop="useAsSource(g)"><StudioIcon name="target" size="h-3 w-3"/></button>
+                  <button type="button" class="grid h-6 w-6 place-items-center rounded-full bg-scrim/75 text-scrim-content hover:bg-brand-600 hover:text-white" title="Xem lớn" :aria-label="'Xem lớn ' + g.name" @click.stop="openZoom(g)"><StudioIcon name="zoomIn" size="h-3 w-3"/></button>
+                  <button type="button" class="grid h-6 w-6 place-items-center rounded-full bg-scrim/75 text-scrim-content hover:bg-brand-600 hover:text-white" title="Tải xuống" :aria-label="'Tải ' + g.name" @click.stop="downloadItem(g)"><StudioIcon name="download" size="h-3 w-3"/></button>
+                  <button type="button" class="grid h-6 w-6 place-items-center rounded-full bg-scrim/75 text-scrim-content hover:bg-brand-600 hover:text-white" title="Đặt làm ảnh nguồn" :aria-label="'Đặt ' + g.name + ' làm ảnh nguồn'" @click.stop="useAsSource(g)"><StudioIcon name="target" size="h-3 w-3"/></button>
                 </div>
               </div>
             </div>
@@ -277,18 +277,18 @@ function confirmAdd() {
           <!-- Tìm / sắp xếp / cỡ ô + [MỚI] chọn tất cả -->
           <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
             <div class="relative flex-1">
-              <StudioIcon name="search" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-300/50"/>
-              <input v-model="query" placeholder="Tìm theo tên ảnh…" class="h-9 w-full rounded-md border border-ink-700 bg-ink-800/60 pl-9 pr-3 text-xs text-cream-100 placeholder:text-cream-300/40 focus:border-brand-500 focus:outline-none" aria-label="Tìm ảnh theo tên">
+              <StudioIcon name="search" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-400"/>
+              <input v-model="query" placeholder="Tìm theo tên ảnh…" class="h-9 w-full rounded-md border border-ink-700 bg-ink-800/60 pl-9 pr-3 text-xs text-cream-100 placeholder:text-cream-400 focus:border-brand-500 focus:outline-none" aria-label="Tìm ảnh theo tên">
             </div>
             <div class="relative">
-              <StudioIcon name="sliders" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-300/50"/>
+              <StudioIcon name="sliders" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-400"/>
               <select v-model="sortKey" class="h-9 w-full appearance-none rounded-md border border-ink-700 bg-ink-800/60 pl-9 pr-8 text-xs text-cream-100 focus:border-brand-500 focus:outline-none sm:w-52" aria-label="Sắp xếp ảnh">
                 <option v-for="o in sortOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
               </select>
-              <StudioIcon name="chevronDown" size="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-300/50"/>
+              <StudioIcon name="chevronDown" size="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-400"/>
             </div>
             <div class="flex h-9 items-center gap-2 rounded-md border border-ink-700 bg-ink-800/60 px-3" title="Kích thước ô ảnh">
-              <StudioIcon name="grid" size="h-4 w-4 shrink-0 text-cream-300/50"/>
+              <StudioIcon name="grid" size="h-4 w-4 shrink-0 text-cream-400"/>
               <input type="range" min="2" max="8" step="1" v-model.number="gridCols" class="h-1.5 w-24 cursor-pointer accent-brand-500" aria-label="Kích thước ô ảnh">
             </div>
             <!-- [MỚI] Chọn tất cả ảnh ĐANG HIỆN (sau khi lọc) — 1 cú bấm thay vì tích từng ảnh -->
@@ -306,7 +306,7 @@ function confirmAdd() {
             <div v-for="it in sortedRefs" :key="it.name" role="button" tabindex="0" class="group relative cursor-pointer overflow-hidden rounded-md border transition-colors" :class="isSel({ key: 'ref-' + it.name, url: it.url, name: it.name, kind: 'ref' }) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" :title="it.name + (it.used ? ' (đang dùng)' : '')" style="padding-bottom: 100%" :aria-pressed="isSel({ key: 'ref-' + it.name, url: it.url, name: it.name, kind: 'ref' })" :aria-label="'Chọn ' + it.name" @click="clickItem({ key: 'ref-' + it.name, url: it.url, name: it.name, kind: 'ref' })" @keydown.enter.prevent="clickItem({ key: 'ref-' + it.name, url: it.url, name: it.name, kind: 'ref' })" @keydown.space.prevent="clickItem({ key: 'ref-' + it.name, url: it.url, name: it.name, kind: 'ref' })">
               <img :src="thumbUrl(it.url)" class="absolute inset-0 h-full w-full object-cover" loading="lazy" alt="" @error="onThumbError($event, it.url)">
               <span v-if="isSel({ key: 'ref-' + it.name, url: it.url, name: it.name, kind: 'ref' })" class="pointer-events-none absolute inset-0 grid place-items-center bg-brand-500/15"><span class="grid h-9 w-9 place-items-center rounded-full bg-brand-500 text-white shadow-lg ring-2 ring-white/50"><StudioIcon name="check" size="h-5 w-5"/></span></span>
-              <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300"><StudioIcon name="check" size="h-3 w-3"/>đang dùng</span>
+              <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-ok"><StudioIcon name="check" size="h-3 w-3"/>đang dùng</span>
 
               <!-- [MỚI] Hành động trên từng ảnh thư viện. z-20 để nằm TRÊN dải chú thích (trước đây
                    nút xoá bị dải gradient che, gần như không bấm được). -->
@@ -314,17 +314,17 @@ function confirmAdd() {
                 <button v-if="!it.used" type="button" class="grid h-6 w-6 place-items-center rounded-full bg-red-600/90 text-white opacity-0 transition hover:bg-red-500 group-hover:opacity-100 group-focus-within:opacity-100" title="Xóa ảnh (chỉ ảnh chưa dùng)" :aria-label="'Xóa ảnh ' + it.name" @click.stop="delRef(it)"><StudioIcon name="trash" size="h-3.5 w-3.5"/></button>
               </div>
               <div class="absolute right-1.5 bottom-1.5 z-20 flex gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
-                <button type="button" class="grid h-6 w-6 place-items-center rounded-full bg-black/80 text-cream-100 hover:bg-brand-600 hover:text-white" title="Xem lớn" :aria-label="'Xem lớn ' + it.name" @click.stop="openZoom({ ...it, key: 'ref-' + it.name, kind: 'ref' })"><StudioIcon name="zoomIn" size="h-3 w-3"/></button>
-                <button type="button" class="grid h-6 w-6 place-items-center rounded-full bg-black/80 text-cream-100 hover:bg-brand-600 hover:text-white" title="Tải xuống" :aria-label="'Tải ' + it.name" @click.stop="downloadItem({ ...it, key: 'ref-' + it.name, kind: 'ref' })"><StudioIcon name="download" size="h-3 w-3"/></button>
-                <button type="button" class="grid h-6 w-6 place-items-center rounded-full bg-black/80 text-cream-100 hover:bg-brand-600 hover:text-white" title="Đặt làm ảnh nguồn" :aria-label="'Đặt ' + it.name + ' làm ảnh nguồn'" @click.stop="useAsSource({ ...it, key: 'ref-' + it.name, name: it.name, kind: 'ref' })"><StudioIcon name="target" size="h-3 w-3"/></button>
+                <button type="button" class="grid h-6 w-6 place-items-center rounded-full bg-scrim/80 text-scrim-content hover:bg-brand-600 hover:text-white" title="Xem lớn" :aria-label="'Xem lớn ' + it.name" @click.stop="openZoom({ ...it, key: 'ref-' + it.name, kind: 'ref' })"><StudioIcon name="zoomIn" size="h-3 w-3"/></button>
+                <button type="button" class="grid h-6 w-6 place-items-center rounded-full bg-scrim/80 text-scrim-content hover:bg-brand-600 hover:text-white" title="Tải xuống" :aria-label="'Tải ' + it.name" @click.stop="downloadItem({ ...it, key: 'ref-' + it.name, kind: 'ref' })"><StudioIcon name="download" size="h-3 w-3"/></button>
+                <button type="button" class="grid h-6 w-6 place-items-center rounded-full bg-scrim/80 text-scrim-content hover:bg-brand-600 hover:text-white" title="Đặt làm ảnh nguồn" :aria-label="'Đặt ' + it.name + ' làm ảnh nguồn'" @click.stop="useAsSource({ ...it, key: 'ref-' + it.name, name: it.name, kind: 'ref' })"><StudioIcon name="target" size="h-3 w-3"/></button>
               </div>
               <div class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-1.5 pb-1 pt-5">
                 <p class="truncate text-[10px] font-medium text-cream-100">{{ it.name }}</p>
-                <p class="truncate text-[9px] text-cream-300/75">{{ it.width }}×{{ it.height }} · {{ fmtSize(it.size) }}</p>
+                <p class="truncate text-[9px] text-cream-300">{{ it.width }}×{{ it.height }} · {{ fmtSize(it.size) }}</p>
               </div>
             </div>
             <div v-if="!sortedRefs.length" class="col-span-full flex flex-col items-center justify-center gap-2 py-8 text-center">
-              <p class="text-xs text-cream-300/50">{{ refs.length ? 'Không có ảnh khớp tìm kiếm.' : 'Chưa có ảnh nào — tải ảnh đầu tiên lên nhé.' }}</p>
+              <p class="text-xs text-cream-400">{{ refs.length ? 'Không có ảnh khớp tìm kiếm.' : 'Chưa có ảnh nào — tải ảnh đầu tiên lên nhé.' }}</p>
             </div>
           </div>
         </div>
@@ -332,7 +332,7 @@ function confirmAdd() {
 
       <!-- ══ Footer ══ -->
       <div class="mt-3 flex shrink-0 items-center justify-between gap-2">
-        <span class="text-[11px] text-cream-300/70">
+        <span class="text-[11px] text-cream-300">
           {{ totalSel ? 'Đã chọn ' + totalSel + ' ảnh' : 'Nhấn chọn 1 hoặc nhiều ảnh để thêm vào canvas' }}
         </span>
         <div class="flex items-center gap-2">

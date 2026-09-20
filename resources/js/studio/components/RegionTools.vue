@@ -5,8 +5,8 @@ const store = useStudioStore();
 
 // Đơn sắc đồng nhất với theme (cream/ink).
 const mono = {
-  on: 'bg-cream-100 text-ink-900 border-cream-300/40 shadow-cream-100/10',
-  off: 'text-cream-300/70 border-transparent hover:bg-ink-700 hover:text-cream-100',
+  on: 'bg-invert text-invert-content border-cream-300/40 shadow-cream-100/10',
+  off: 'text-cream-300 border-transparent hover:bg-ink-700 hover:text-cream-100',
 };
 const sep = 'h-px w-6 shrink-0 bg-ink-700';
 const ICON = 'h-4 w-4';

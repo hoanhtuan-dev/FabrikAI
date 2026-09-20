@@ -403,9 +403,9 @@ function trendTitle(trend) { return trend?.title || trend?.id || 'Xu hướng'; 
 function categoryLabel(value) { return CATEGORY_LABELS[value] || value || 'Khác'; }
 function lifecycleLabel(value) { return LIFECYCLE_LABELS[value] || value || 'Đang theo dõi'; }
 function lifecycleClass(value) {
-  if (value === 'emerging') return 'text-emerald-300';
+  if (value === 'emerging') return 'text-ok';
   if (value === 'peak') return 'text-brand-300';
-  return 'text-cream-300/50';
+  return 'text-cream-400';
 }
 function sourceMethod(source) { return source.status === 'local' ? 'Dữ liệu nội bộ' : 'Chưa kết nối thực tế'; }
 function sourceFrequency(source) { return source.status === 'local' ? 'Theo dữ liệu shop' : 'Bản demo'; }
@@ -522,19 +522,19 @@ watch(() => store.designAgentOpen, (open) => {
           <div class="flex flex-wrap items-center gap-2 text-[10px]">
             <span
               class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-semibold"
-              :class="modelReady ? 'bg-emerald-500/15 text-emerald-200' : 'bg-amber-500/15 text-amber-200'"
+              :class="modelReady ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'"
               :title="modelTitle"
             >
               <span class="h-1.5 w-1.5 rounded-full" :class="modelReady ? 'bg-emerald-300' : 'bg-amber-300'"></span>
               {{ modelShort }}
             </span>
-            <span class="rounded-full bg-amber-500/15 px-2 py-0.5 font-semibold text-amber-200">Nguồn: {{ sourceMode }}</span>
-            <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-200">Nội bộ: local</span>
-            <span v-if="selectedTrendCount" class="rounded-full bg-brand-500/15 px-2 py-0.5 font-semibold text-brand-100">{{ selectedTrendCount }} trend đã chọn</span>
+            <span class="rounded-full bg-amber-500/15 px-2 py-0.5 font-semibold text-warn">Nguồn: {{ sourceMode }}</span>
+            <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-ok">Nội bộ: local</span>
+            <span v-if="selectedTrendCount" class="rounded-full bg-brand-500/15 px-2 py-0.5 font-semibold text-brand-200">{{ selectedTrendCount }} trend đã chọn</span>
             <button
               type="button"
               class="motion-ui rounded-full border px-2 py-0.5 font-semibold transition"
-              :class="store.designAgentAi ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20' : 'border-ink-600 bg-ink-800 text-cream-300/70 hover:bg-ink-700'"
+              :class="store.designAgentAi ? 'border-emerald-500/40 bg-emerald-500/10 text-ok hover:bg-emerald-500/20' : 'border-ink-600 bg-ink-800 text-cream-300 hover:bg-ink-700'"
               :aria-pressed="store.designAgentAi"
               :title="aiToggleTitle"
               @click="toggleAi"
@@ -548,12 +548,12 @@ watch(() => store.designAgentOpen, (open) => {
         <p
           v-if="activeModel && !modelReady"
           role="status"
-          class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-5 text-amber-100"
+          class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-5 text-warn"
         >
           <StudioIcon name="info" size="h-3.5 w-3.5" class="shrink-0" />
           <span>{{ modelTitle }}</span>
-          <span v-if="!store.designAgentAi" class="text-amber-200/80">Bật «Suy luận AI» ở trên để phần phân tích do AI thực hiện.</span>
-          <span v-else-if="modelCandidates.length === 0" class="text-amber-200/80">Cấu hình tại Cài đặt → Nhóm công việc → “Suy luận prompt (Giám đốc sáng tạo / Thuật sỹ ảo)” và thêm khoá trong Quản lý API.</span>
+          <span v-if="!store.designAgentAi" class="text-warn">Bật «Suy luận AI» ở trên để phần phân tích do AI thực hiện.</span>
+          <span v-else-if="modelCandidates.length === 0" class="text-warn">Cấu hình tại Cài đặt → Nhóm công việc → “Suy luận prompt (Giám đốc sáng tạo / Thuật sỹ ảo)” và thêm khoá trong Quản lý API.</span>
         </p>
         <nav class="mt-3 grid grid-cols-3 gap-1.5 lg:hidden" role="tablist" aria-label="Tiến trình thiết kế">
           <button
@@ -588,24 +588,24 @@ watch(() => store.designAgentOpen, (open) => {
           >
             <span
               class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold"
-              :class="readiness[item.id] === 'done' ? 'bg-emerald-500/20 text-emerald-200' : step === item.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/60'"
+              :class="readiness[item.id] === 'done' ? 'bg-emerald-500/20 text-ok' : step === item.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-400'"
             >
               <StudioIcon v-if="readiness[item.id] === 'done'" name="check" size="h-3 w-3" />
               <span v-else>{{ index + 1 }}</span>
             </span>
             <span class="min-w-0">
               <span class="block text-xs font-semibold text-cream-100">{{ item.label }}</span>
-              <span class="mt-0.5 block text-[10px] leading-4 text-cream-300/55">{{ item.hint }}</span>
+              <span class="mt-0.5 block text-[10px] leading-4 text-cream-400">{{ item.hint }}</span>
             </span>
           </button>
 
           <div class="mt-3 rounded-lg border border-ink-700 bg-ink-900 p-3">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/50">Bối cảnh hiện tại</p>
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Bối cảnh hiện tại</p>
             <dl class="mt-2 space-y-1.5 text-[11px]">
-              <div class="flex items-center justify-between gap-2"><dt class="text-cream-300/55">Khu vực</dt><dd class="font-semibold text-cream-100">{{ regions.find((r) => r.id === selectedRegion)?.name || selectedRegion }}</dd></div>
-              <div class="flex items-center justify-between gap-2"><dt class="text-cream-300/55">Trend chọn</dt><dd class="font-semibold text-cream-100">{{ selectedTrendCount }}</dd></div>
-              <div class="flex items-center justify-between gap-2"><dt class="text-cream-300/55">Brief</dt><dd class="font-semibold" :class="collection && !briefStale ? 'text-emerald-200' : collection ? 'text-amber-200' : 'text-cream-300/50'">{{ collection && !briefStale ? 'Sẵn sàng' : collection ? 'Cần cập nhật' : 'Chưa có' }}</dd></div>
-              <div v-if="collection" class="flex items-center justify-between gap-2"><dt class="text-cream-300/55">SKU đề xuất</dt><dd class="font-semibold text-cream-100">{{ collection.structure?.total_skus || 0 }}</dd></div>
+              <div class="flex items-center justify-between gap-2"><dt class="text-cream-400">Khu vực</dt><dd class="font-semibold text-cream-100">{{ regions.find((r) => r.id === selectedRegion)?.name || selectedRegion }}</dd></div>
+              <div class="flex items-center justify-between gap-2"><dt class="text-cream-400">Trend chọn</dt><dd class="font-semibold text-cream-100">{{ selectedTrendCount }}</dd></div>
+              <div class="flex items-center justify-between gap-2"><dt class="text-cream-400">Brief</dt><dd class="font-semibold" :class="collection && !briefStale ? 'text-ok' : collection ? 'text-warn' : 'text-cream-400'">{{ collection && !briefStale ? 'Sẵn sàng' : collection ? 'Cần cập nhật' : 'Chưa có' }}</dd></div>
+              <div v-if="collection" class="flex items-center justify-between gap-2"><dt class="text-cream-400">SKU đề xuất</dt><dd class="font-semibold text-cream-100">{{ collection.structure?.total_skus || 0 }}</dd></div>
             </dl>
           </div>
         </nav>
@@ -617,7 +617,7 @@ watch(() => store.designAgentOpen, (open) => {
             <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 class="text-base font-semibold text-cream-100">Tín hiệu thị trường</h2>
-                <p class="mt-0.5 text-xs text-cream-300/55">Chọn 2–4 hướng phù hợp nhất với DNA shop. Chưa chọn cũng chạy được với nhóm mặc định.</p>
+                <p class="mt-0.5 text-xs text-cream-400">Chọn 2–4 hướng phù hợp nhất với DNA shop. Chưa chọn cũng chạy được với nhóm mặc định.</p>
               </div>
               <div class="flex flex-wrap items-center gap-2">
                 <select v-model="selectedRegion" :disabled="store.trendRadarLoading" class="input !w-auto !bg-ink-800 !py-2 !text-xs !text-cream-100">
@@ -629,13 +629,13 @@ watch(() => store.designAgentOpen, (open) => {
               </div>
             </div>
 
-            <div v-if="store.trendRadarError" role="alert" class="mb-4 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-200">
+            <div v-if="store.trendRadarError" role="alert" class="mb-4 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-danger">
               <StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ store.trendRadarError }}</span>
             </div>
 
             <div v-if="radar" class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <div v-for="item in summaryItems.slice(0, 4)" :key="item.key" class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5">
-                <p class="text-[10px] leading-4 text-cream-300/50">{{ item.label }}</p>
+                <p class="text-[10px] leading-4 text-cream-400">{{ item.label }}</p>
                 <p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatNumber(item.value) }}</p>
               </div>
             </div>
@@ -645,7 +645,7 @@ watch(() => store.designAgentOpen, (open) => {
             </p>
 
             <div v-if="store.trendRadarLoading && !radar" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-live="polite">
-              <span class="sr-only">{{ store.designAgentAi ? 'Đang gọi model để suy luận xu hướng…' : 'Đang tải TrendRadar…' }}</span>
+              <span class="sr-only">{{ store.designAgentAi ? 'AI đang suy luận xu hướng…' : 'Đang tải TrendRadar…' }}</span>
               <div v-for="i in 6" :key="i" class="h-40 animate-pulse rounded-xl border border-ink-700 bg-ink-800"></div>
             </div>
 
@@ -655,10 +655,10 @@ watch(() => store.designAgentOpen, (open) => {
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div class="min-w-0">
                     <h3 class="text-sm font-semibold text-cream-100">Định hướng từ TrendRadar ({{ directions.length }})</h3>
-                    <p class="mt-0.5 text-[11px] leading-5 text-cream-300/55">
+                    <p class="mt-0.5 text-[11px] leading-5 text-cream-400">
                       {{ modelReady
-                        ? 'Model viết trên đúng dữ liệu mẫu bên dưới — số liệu không do AI tạo.'
-                        : 'Engine tất định dựng từ catalog mẫu (chưa dùng model).' }}
+                        ? 'Phần định hướng do AI viết trên đúng dữ liệu mẫu bên dưới — số liệu không do AI tạo.'
+                        : 'Phần định hướng được dựng tự động từ dữ liệu mẫu (AI chưa tham gia bước này).' }}
                     </p>
                   </div>
                   <button type="button" class="tool-btn" title="Chọn các trend mà 3 định hướng mạnh nhất đang nhắc tới" @click="focusDirections">
@@ -671,14 +671,14 @@ watch(() => store.designAgentOpen, (open) => {
                       <h4 class="text-xs font-semibold leading-5 text-cream-100">{{ row.title }}</h4>
                       <span
                         class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
-                        :class="row.source === 'ai' ? 'bg-emerald-500/15 text-emerald-200' : 'bg-ink-700 text-cream-300/60'"
+                        :class="row.source === 'ai' ? 'bg-emerald-500/15 text-ok' : 'bg-ink-700 text-cream-400'"
                       >{{ row.source === 'ai' ? 'AI' : 'tất định' }}</span>
                     </div>
                     <p v-if="row.thesis" class="mt-1.5 text-[11px] leading-5 text-cream-200">{{ row.thesis }}</p>
                     <dl class="mt-2 space-y-1 text-[10px] leading-4">
-                      <div v-if="row.why_now" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-brand-200">Vì sao:</dt><dd class="text-cream-300/70">{{ row.why_now }}</dd></div>
-                      <div v-if="row.action" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-brand-200">Việc làm:</dt><dd class="text-cream-300/70">{{ row.action }}</dd></div>
-                      <div v-if="row.risk" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-amber-200">Rủi ro:</dt><dd class="text-cream-300/70">{{ row.risk }}</dd></div>
+                      <div v-if="row.why_now" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-brand-200">Vì sao:</dt><dd class="text-cream-300">{{ row.why_now }}</dd></div>
+                      <div v-if="row.action" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-brand-200">Việc làm:</dt><dd class="text-cream-300">{{ row.action }}</dd></div>
+                      <div v-if="row.risk" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-warn">Rủi ro:</dt><dd class="text-cream-300">{{ row.risk }}</dd></div>
                     </dl>
                     <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
                       <span v-if="directionPriceLabel(row.price_band)" class="rounded bg-ink-700 px-1.5 py-0.5 text-[9px] text-cream-200">{{ directionPriceLabel(row.price_band) }}</span>
@@ -688,7 +688,7 @@ watch(() => store.designAgentOpen, (open) => {
                         :key="id"
                         type="button"
                         class="motion-ui rounded border px-1.5 py-0.5 text-[9px] transition"
-                        :class="selectedTrendIds.includes(String(id)) ? 'border-brand-500 bg-brand-500/15 text-brand-100 hover:bg-brand-500/25' : 'border-ink-600 text-cream-300/70 hover:bg-ink-700'"
+                        :class="selectedTrendIds.includes(String(id)) ? 'border-brand-500 bg-brand-500/15 text-brand-200 hover:bg-brand-500/25' : 'border-ink-600 text-cream-300 hover:bg-ink-700'"
                         @click="toggleTrend(id)"
                       >{{ trendNameById(id) }}</button>
                     </div>
@@ -698,7 +698,7 @@ watch(() => store.designAgentOpen, (open) => {
 
               <div class="mb-3 flex flex-wrap items-center gap-2">
                 <div class="relative min-w-[12rem] flex-1">
-                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-300/50" />
+                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-400" />
                   <label for="trend-search" class="sr-only">Tìm xu hướng</label>
                   <input id="trend-search" v-model="trendQuery" type="search" class="input !py-2 !pl-8 !text-xs" placeholder="Tìm theo tên, mô tả, hành động…">
                 </div>
@@ -722,36 +722,36 @@ watch(() => store.designAgentOpen, (open) => {
                   <span class="absolute inset-y-0 left-0 w-1" :style="{ backgroundColor: trend.color || '#b9c8c2' }"></span>
                   <span class="flex items-start justify-between gap-3">
                     <span class="min-w-0">
-                      <span class="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-300/50">
+                      <span class="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-cream-400">
                         {{ categoryLabel(trend.category) }}
                         <span class="rounded bg-ink-800 px-1.5 py-0.5 normal-case tracking-normal" :class="lifecycleClass(trend.lifecycle)">{{ lifecycleLabel(trend.lifecycle) }}</span>
-                        <span v-if="trend.evidence_mode === 'demo'" class="rounded bg-amber-500/15 px-1.5 py-0.5 normal-case tracking-normal text-amber-200">mẫu</span>
+                        <span v-if="trend.evidence_mode === 'demo'" class="rounded bg-amber-500/15 px-1.5 py-0.5 normal-case tracking-normal text-warn">mẫu</span>
                       </span>
                       <span class="mt-1.5 block text-sm font-semibold text-cream-100">{{ trendTitle(trend) }}</span>
-                      <span class="mt-1 block text-[11px] leading-4 text-cream-300/60">{{ trend.description }}</span>
+                      <span class="mt-1 block text-[11px] leading-4 text-cream-400">{{ trend.description }}</span>
                     </span>
-                    <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full border" :class="selectedTrendIds.includes(String(trend.id)) ? 'border-brand-400 bg-brand-600 text-white' : 'border-ink-600 text-ink-500'">
+                    <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full border" :class="selectedTrendIds.includes(String(trend.id)) ? 'border-brand-400 bg-brand-600 text-white' : 'border-ink-600 text-cream-400'">
                       <StudioIcon :name="selectedTrendIds.includes(String(trend.id)) ? 'check' : 'square'" size="h-3 w-3" />
                     </span>
                   </span>
-                  <span class="mt-3 block text-[10px] text-cream-300/45">Đà tăng {{ trend.momentum ?? 0 }} · tin cậy {{ Math.round((trend.confidence || 0) * 100) }}% · {{ formatNumber(trend.evidence_count) }} bằng chứng (mẫu)</span>
+                  <span class="mt-3 block text-[10px] text-cream-400">Đà tăng {{ trend.momentum ?? 0 }} · tin cậy {{ Math.round((trend.confidence || 0) * 100) }}% · {{ formatNumber(trend.evidence_count) }} bằng chứng (mẫu)</span>
                   <span class="mt-1.5 block h-1 overflow-hidden rounded bg-ink-700"><span class="block h-full bg-gradient-to-r from-brand-500 to-amber-300" :style="{ width: Math.min(100, Number(trend.momentum || 0)) + '%' }"></span></span>
-                  <span class="mt-2 block text-[11px] leading-4 text-cream-300/60">{{ trend.recommended_action }}</span>
+                  <span class="mt-2 block text-[11px] leading-4 text-cream-400">{{ trend.recommended_action }}</span>
                 </button>
               </div>
-              <p v-else class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center text-xs text-cream-300/55">Không có xu hướng nào khớp bộ lọc hiện tại.</p>
+              <p v-else class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center text-xs text-cream-400">Không có xu hướng nào khớp bộ lọc hiện tại.</p>
 
               <details class="mt-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
                 <summary class="cursor-pointer text-xs font-semibold text-cream-200">Nguồn dữ liệu &amp; phương pháp ({{ sources.length }} nguồn)</summary>
-                <p class="mt-2 text-[11px] leading-5 text-cream-300/60">Nguồn ngoài đang ở chế độ demo; dữ liệu nội bộ là project/generation của chính tài khoản. Không có scraping hay POS/ERP thật trong bản này.</p>
+                <p class="mt-2 text-[11px] leading-5 text-cream-400">Nguồn ngoài đang ở chế độ demo; dữ liệu nội bộ là project/generation của chính tài khoản. Không có scraping hay POS/ERP thật trong bản này.</p>
                 <div class="mt-3 overflow-x-auto">
                   <table class="w-full min-w-[30rem] text-left text-[11px]">
-                    <thead><tr class="border-b border-ink-700 text-cream-300/50"><th class="pb-2 pr-2 font-semibold">Nguồn</th><th class="pb-2 pr-2 font-semibold">Trạng thái</th><th class="pb-2 font-semibold">Kênh / nhịp</th></tr></thead>
+                    <thead><tr class="border-b border-ink-700 text-cream-400"><th class="pb-2 pr-2 font-semibold">Nguồn</th><th class="pb-2 pr-2 font-semibold">Trạng thái</th><th class="pb-2 font-semibold">Kênh / nhịp</th></tr></thead>
                     <tbody class="divide-y divide-ink-800">
                       <tr v-for="source in sources" :key="source.id">
-                        <td class="py-2.5 pr-2"><span class="block font-semibold text-cream-100">{{ source.name }}</span><span class="block text-cream-300/50">{{ source.channels }}</span></td>
-                        <td class="py-2.5 pr-2"><span class="inline-flex rounded-full px-2 py-0.5 font-semibold" :class="source.status === 'local' ? 'bg-emerald-500/15 text-emerald-200' : 'bg-amber-500/15 text-amber-200'">{{ source.status === 'local' ? 'local' : 'demo' }}</span></td>
-                        <td class="py-2.5 text-cream-300/60"><span class="block">{{ sourceMethod(source) }}</span><span class="block text-cream-300/45">{{ sourceFrequency(source) }}</span></td>
+                        <td class="py-2.5 pr-2"><span class="block font-semibold text-cream-100">{{ source.name }}</span><span class="block text-cream-400">{{ source.channels }}</span></td>
+                        <td class="py-2.5 pr-2"><span class="inline-flex rounded-full px-2 py-0.5 font-semibold" :class="source.status === 'local' ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'">{{ source.status === 'local' ? 'local' : 'demo' }}</span></td>
+                        <td class="py-2.5 text-cream-400"><span class="block">{{ sourceMethod(source) }}</span><span class="block text-cream-400">{{ sourceFrequency(source) }}</span></td>
                       </tr>
                     </tbody>
                   </table>
@@ -765,21 +765,21 @@ watch(() => store.designAgentOpen, (open) => {
             <div class="space-y-4">
               <div class="card p-4">
                 <h2 class="text-sm font-semibold text-cream-100">Brief đầu vào</h2>
-                <p class="mt-0.5 text-xs text-cream-300/55">Mô tả khách hàng, dịp mặc, chất liệu, màu sắc hoặc định vị giá.</p>
+                <p class="mt-0.5 text-xs text-cream-400">Mô tả khách hàng, dịp mặc, chất liệu, màu sắc hoặc định vị giá.</p>
                 <label for="collection-prompt" class="label mt-4">Prompt tiếng Việt</label>
                 <textarea id="collection-prompt" ref="promptInput" v-model="prompt" rows="5" maxlength="2000" aria-describedby="collection-prompt-help" class="input w-full resize-none !text-sm" placeholder="Ví dụ: Bộ sưu tập công sở mùa hè cho nữ văn phòng, ưu tiên linen thoáng và màu pastel dịu…" @keydown.ctrl.enter="createBrief"></textarea>
-                <div class="mt-1.5 flex items-start justify-between gap-3"><p id="collection-prompt-help" class="text-[10px] leading-4 text-cream-300/45">Ctrl+Enter để tạo brief.</p><span class="shrink-0 text-[10px] tabular-nums text-cream-300/45">{{ prompt.length }}/2000</span></div>
+                <div class="mt-1.5 flex items-start justify-between gap-3"><p id="collection-prompt-help" class="text-[10px] leading-4 text-cream-400">Ctrl+Enter để tạo brief.</p><span class="shrink-0 text-[10px] tabular-nums text-cream-400">{{ prompt.length }}/2000</span></div>
 
                 <div class="mt-4">
-                  <div class="mb-2 flex items-center justify-between"><span class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/60">Trend đã chọn</span><span class="text-[10px] text-cream-300/45">{{ selectedTrendCount }} / {{ trends.length }}</span></div>
+                  <div class="mb-2 flex items-center justify-between"><span class="text-[11px] font-semibold uppercase tracking-wide text-cream-400">Trend đã chọn</span><span class="text-[10px] text-cream-400">{{ selectedTrendCount }} / {{ trends.length }}</span></div>
                   <div v-if="selectedTrendObjects.length" class="flex flex-wrap gap-2">
-                    <span v-for="trend in selectedTrendObjects" :key="trend.id" class="flex items-center gap-1.5 rounded-lg border border-brand-500/40 bg-brand-500/10 px-2 py-1 text-[11px] text-brand-100"><span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: trend.color }"></span>{{ trendTitle(trend) }}</span>
+                    <span v-for="trend in selectedTrendObjects" :key="trend.id" class="flex items-center gap-1.5 rounded-lg border border-brand-500/40 bg-brand-500/10 px-2 py-1 text-[11px] text-brand-200"><span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: trend.color }"></span>{{ trendTitle(trend) }}</span>
                   </div>
-                  <p v-else class="text-xs leading-5 text-cream-300/50">Chưa chọn trend — CollectionBot dùng nhóm mặc định.</p>
+                  <p v-else class="text-xs leading-5 text-cream-400">Chưa chọn trend — CollectionBot dùng nhóm mặc định.</p>
                 </div>
 
                 <div class="mt-4">
-                  <span class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/60">Bảng size dự kiến</span>
+                  <span class="text-[11px] font-semibold uppercase tracking-wide text-cream-400">Bảng size dự kiến</span>
                   <div class="seg mt-2">
                     <button v-for="preset in SIZE_PRESETS" :key="preset.id" type="button" class="seg-btn" :class="{ 'is-active': sizePreset === preset.id }" @click="sizePreset = preset.id">{{ preset.label }}</button>
                   </div>
@@ -788,19 +788,19 @@ watch(() => store.designAgentOpen, (open) => {
                 <button type="button" class="btn-brand btn-sm mt-5 flex w-full items-center justify-center gap-2" :disabled="store.collectionBriefLoading" @click="createBrief">
                   <StudioIcon name="wand" size="h-3.5 w-3.5" :class="store.collectionBriefLoading ? 'animate-spin' : ''" />
                   {{ store.collectionBriefLoading
-                    ? (store.designAgentAi ? 'Đang gọi model xây brief…' : 'Đang xây dựng brief…')
+                    ? (store.designAgentAi ? 'AI đang xây brief…' : 'Đang xây dựng brief…')
                     : (collection ? 'Tạo lại brief' : 'Tạo brief bộ sưu tập') }}
                 </button>
-                <div v-if="collectionError || store.collectionBriefError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs leading-5 text-red-200"><StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ collectionError || store.collectionBriefError }}</span></div>
-                <div v-if="briefStale" role="status" class="mt-3 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100"><StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Prompt/trend đã đổi. Bấm «Tạo lại brief» để cập nhật trước khi sang Canvas.</span></div>
-                <div v-else-if="briefModeMismatch" role="status" class="mt-3 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100"><StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Brief này được dựng ở chế độ {{ collection?.model?.mode === 'ai' ? 'AI' : 'tất định' }} — bấm «Tạo lại brief» nếu muốn theo đúng công tắc hiện tại.</span></div>
+                <div v-if="collectionError || store.collectionBriefError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs leading-5 text-danger"><StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ collectionError || store.collectionBriefError }}</span></div>
+                <div v-if="briefStale" role="status" class="mt-3 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-5 text-warn"><StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Prompt/trend đã đổi. Bấm «Tạo lại brief» để cập nhật trước khi sang Canvas.</span></div>
+                <div v-else-if="briefModeMismatch" role="status" class="mt-3 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-5 text-warn"><StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Brief này được dựng ở chế độ {{ collection?.model?.mode === 'ai' ? 'AI' : 'tất định' }} — bấm «Tạo lại brief» nếu muốn theo đúng công tắc hiện tại.</span></div>
               </div>
 
               <div v-if="radar" class="card p-4">
                 <h3 class="text-xs font-semibold text-cream-100">Tín hiệu thương hiệu</h3>
-                <p class="mt-1.5 text-[11px] leading-5 text-cream-300/70">{{ radar.internal_brand_signal?.narrative || 'Chưa có narrative.' }}</p>
+                <p class="mt-1.5 text-[11px] leading-5 text-cream-300">{{ radar.internal_brand_signal?.narrative || 'Chưa có narrative.' }}</p>
                 <div class="mt-2 flex flex-wrap gap-1.5">
-                  <span v-for="(item, index) in [...(radar.internal_brand_signal?.top_categories || []), ...(radar.internal_brand_signal?.top_colors || [])]" :key="index + '-' + item" class="rounded bg-brand-500/15 px-2 py-0.5 text-[10px] text-brand-100">{{ item }}</span>
+                  <span v-for="(item, index) in [...(radar.internal_brand_signal?.top_categories || []), ...(radar.internal_brand_signal?.top_colors || [])]" :key="index + '-' + item" class="rounded bg-brand-500/15 px-2 py-0.5 text-[10px] text-brand-200">{{ item }}</span>
                 </div>
               </div>
 
@@ -813,23 +813,23 @@ watch(() => store.designAgentOpen, (open) => {
                 >
                   <span class="min-w-0">
                     <span class="block text-xs font-semibold text-cream-100">Dữ liệu bán hàng của shop</span>
-                    <span class="mt-0.5 block text-[10px] leading-4 text-cream-300/50">
+                    <span class="mt-0.5 block text-[10px] leading-4 text-cream-400">
                       {{ shopRowCount ? shopRowCount + ' dòng — cơ cấu SKU và dải giá bám theo số bán THẬT' : 'Nhập tay hoặc dán từ Excel để lời khuyên sát shop của bạn' }}
                     </span>
                   </span>
-                  <StudioIcon name="chevronDown" size="h-3.5 w-3.5" class="mt-0.5 shrink-0 text-cream-300/50 transition" :class="shopOpen ? 'rotate-180' : ''" />
+                  <StudioIcon name="chevronDown" size="h-3.5 w-3.5" class="mt-0.5 shrink-0 text-cream-400 transition" :class="shopOpen ? 'rotate-180' : ''" />
                 </button>
 
                 <div v-if="shopOpen" class="mt-3 space-y-3">
-                  <div v-if="shopSummary && shopSummary.row_count" class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-[11px] leading-5 text-emerald-100">
+                  <div v-if="shopSummary && shopSummary.row_count" class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-[11px] leading-5 text-ok">
                     {{ shopSummary.narrative }}
                   </div>
-                  <p v-else class="rounded-lg border border-ink-700 bg-ink-800 p-3 text-[11px] leading-5 text-cream-300/60">
+                  <p v-else class="rounded-lg border border-ink-700 bg-ink-800 p-3 text-[11px] leading-5 text-cream-400">
                     Chưa có dữ liệu. Nhập 2–3 dòng cũng đã giúp cơ cấu SKU bám đúng nhóm bán chạy của shop thay vì đoán theo từ khoá.
                   </p>
 
                   <label class="block">
-                    <span class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">Dán từ Excel: Tên, Nhóm, Đã bán, Tồn, Đổi trả, Giá bán</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Dán từ Excel: Tên, Nhóm, Đã bán, Tồn, Đổi trả, Giá bán</span>
                     <textarea
                       v-model="shopPaste"
                       rows="3"
@@ -841,11 +841,11 @@ watch(() => store.designAgentOpen, (open) => {
                     <button type="button" class="tool-btn" @click="importShopPaste"><StudioIcon name="plus" size="h-3 w-3" /> Đọc &amp; thêm dòng</button>
                     <button type="button" class="tool-btn" @click="addShopRow">Thêm dòng trống</button>
                   </div>
-                  <p v-if="shopParseError" role="alert" class="text-[11px] text-red-300">{{ shopParseError }}</p>
+                  <p v-if="shopParseError" role="alert" class="text-[11px] text-danger">{{ shopParseError }}</p>
 
                   <div v-if="store.shopRows.length" class="max-h-64 overflow-auto rounded-lg border border-ink-700">
                     <table class="w-full min-w-[26rem] text-left text-[10px]">
-                      <thead class="sticky top-0 bg-ink-800 text-cream-300/60">
+                      <thead class="sticky top-0 bg-ink-800 text-cream-400">
                         <tr>
                           <th class="p-1.5 font-semibold">Tên</th>
                           <th class="p-1.5 font-semibold">Nhóm</th>
@@ -892,23 +892,23 @@ watch(() => store.designAgentOpen, (open) => {
                 <div class="card p-5">
                   <div class="flex flex-wrap items-start justify-between gap-3">
                     <div><p class="text-[10px] font-semibold uppercase tracking-wide text-brand-300">{{ collection.agent || 'CollectionBot' }} · {{ collection.engine || 'rule-based-v1' }}</p><h2 class="mt-1 text-lg font-semibold text-cream-100">Bộ sưu tập đề xuất</h2></div>
-                    <span class="rounded-lg bg-ink-800 px-2.5 py-1 text-[10px] text-cream-300/60">Khu vực: {{ collection.input?.region || selectedRegion }}</span>
+                    <span class="rounded-lg bg-ink-800 px-2.5 py-1 text-[10px] text-cream-400">Khu vực: {{ collection.input?.region || selectedRegion }}</span>
                   </div>
                   <div class="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
                     <span
                       class="rounded-full px-2 py-0.5 font-semibold"
-                      :class="modelReady ? 'bg-emerald-500/15 text-emerald-200' : 'bg-amber-500/15 text-amber-200'"
+                      :class="modelReady ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'"
                       :title="modelTitle"
                     >{{ modelReady ? 'AI: ' + (collection.model?.provider || '') + ' · ' + (collection.model?.model || '') : 'Engine tất định' }}</span>
-                    <span v-for="row in appliedAi" :key="row" class="rounded bg-brand-500/15 px-2 py-0.5 text-brand-100">AI viết: {{ row }}</span>
-                    <span v-if="modelReady && collection.model?.latency_ms != null" class="text-cream-300/50">{{ collection.model.latency_ms }} ms</span>
+                    <span v-for="row in appliedAi" :key="row" class="rounded bg-brand-500/15 px-2 py-0.5 text-brand-200">AI viết: {{ row }}</span>
+                    <span v-if="modelReady && collection.model?.latency_ms != null" class="text-cream-400">{{ collection.model.latency_ms }} ms</span>
                   </div>
 
                   <p class="mt-3 text-sm leading-6 text-cream-200">{{ collection.brief }}</p>
                   <div class="mt-4 grid gap-3 sm:grid-cols-3">
-                    <div class="rounded-lg border border-ink-700 bg-ink-800 p-3"><p class="text-[10px] uppercase tracking-wide text-cream-300/50">Tổng SKU</p><p class="mt-1 text-lg font-semibold text-cream-100">{{ collection.structure?.total_skus || 0 }}</p></div>
-                    <div class="rounded-lg border border-ink-700 bg-ink-800 p-3"><p class="text-[10px] uppercase tracking-wide text-cream-300/50">Dải giá</p><p class="mt-1 text-sm font-semibold text-cream-100">{{ priceBand?.recommended_label || '—' }}</p><p class="text-[10px] text-cream-300/60">{{ formatVnd(priceBand?.min_vnd) }} — {{ formatVnd(priceBand?.max_vnd) }}</p></div>
-                    <div class="rounded-lg border border-ink-700 bg-ink-800 p-3"><p class="text-[10px] uppercase tracking-wide text-cream-300/50">Mood board</p><p class="mt-1 text-lg font-semibold text-cream-100">{{ moodboardItems.length }}</p><p class="text-[10px] text-cream-300/60">ô màu đại diện</p></div>
+                    <div class="rounded-lg border border-ink-700 bg-ink-800 p-3"><p class="text-[10px] uppercase tracking-wide text-cream-400">Tổng SKU</p><p class="mt-1 text-lg font-semibold text-cream-100">{{ collection.structure?.total_skus || 0 }}</p></div>
+                    <div class="rounded-lg border border-ink-700 bg-ink-800 p-3"><p class="text-[10px] uppercase tracking-wide text-cream-400">Dải giá</p><p class="mt-1 text-sm font-semibold text-cream-100">{{ priceBand?.recommended_label || '—' }}</p><p class="text-[10px] text-cream-400">{{ formatVnd(priceBand?.min_vnd) }} — {{ formatVnd(priceBand?.max_vnd) }}</p></div>
+                    <div class="rounded-lg border border-ink-700 bg-ink-800 p-3"><p class="text-[10px] uppercase tracking-wide text-cream-400">Mood board</p><p class="mt-1 text-lg font-semibold text-cream-100">{{ moodboardItems.length }}</p><p class="text-[10px] text-cream-400">ô màu đại diện</p></div>
                   </div>
                 </div>
 
@@ -918,7 +918,7 @@ watch(() => store.designAgentOpen, (open) => {
 
                 <div v-if="briefTab === 'overview'" class="mt-4 grid gap-4 md:grid-cols-2">
                   <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Câu chuyện thương hiệu</h3><p class="mt-2 text-xs leading-5 text-cream-200">{{ collection.brand_narrative?.narrative || '—' }}</p></div>
-                  <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Gợi ý cấu hình Canvas</h3><div v-if="canvasSettings" class="mt-2 flex flex-wrap gap-1.5 text-[10px]"><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">Tỉ lệ {{ canvasSettings.ratio }}</span><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">{{ canvasSettings.variant_count }} biến thể</span><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">Negative prompt</span></div><p class="mt-2 text-[11px] leading-5 text-cream-300/60">{{ canvasSettings?.note }}</p></div>
+                  <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Gợi ý cấu hình Canvas</h3><div v-if="canvasSettings" class="mt-2 flex flex-wrap gap-1.5 text-[10px]"><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">Tỉ lệ {{ canvasSettings.ratio }}</span><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">{{ canvasSettings.variant_count }} biến thể</span><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">Negative prompt</span></div><p class="mt-2 text-[11px] leading-5 text-cream-400">{{ canvasSettings?.note }}</p></div>
                 </div>
 
                 <div v-else-if="briefTab === 'money'" class="mt-4 space-y-4">
@@ -926,7 +926,7 @@ watch(() => store.designAgentOpen, (open) => {
                     <div class="flex flex-wrap items-start justify-between gap-3">
                       <div class="min-w-0">
                         <h3 class="text-sm font-semibold text-cream-100">Đơn giá &amp; định mức của xưởng bạn</h3>
-                        <p class="mt-0.5 text-[11px] leading-5 text-cream-300/55">
+                        <p class="mt-0.5 text-[11px] leading-5 text-cream-400">
                           Con số tiền do BẠN quyết định: sửa ô nào là kế hoạch tính lại ngay. Giá thành và lợi nhuận do hệ thống tính từ đúng những ô này — không dùng model AI cho con số.
                         </p>
                       </div>
@@ -941,8 +941,8 @@ watch(() => store.designAgentOpen, (open) => {
 
                     <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       <label v-for="field in PLAN_FIELDS" :key="field.key" class="block" :title="field.hint">
-                        <span class="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">
-                          {{ field.label }}<span class="text-cream-300/40">{{ field.suffix }}</span>
+                        <span class="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-cream-400">
+                          {{ field.label }}<span class="text-cream-400">{{ field.suffix }}</span>
                         </span>
                         <input
                           type="number" min="0" step="1"
@@ -953,27 +953,27 @@ watch(() => store.designAgentOpen, (open) => {
                       </label>
                     </div>
 
-                    <p v-if="briefStale" role="status" class="mt-3 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-[11px] leading-5 text-amber-100">
+                    <p v-if="briefStale" role="status" class="mt-3 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-[11px] leading-5 text-warn">
                       <StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Brief đã cũ so với prompt/trend hiện tại — bấm «Tạo lại brief» rồi mới tin kế hoạch này.</span>
                     </p>
-                    <p v-if="store.planError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-[11px] leading-5 text-red-200">
+                    <p v-if="store.planError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-[11px] leading-5 text-danger">
                       <StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ store.planError }}</span>
                     </p>
                   </div>
 
                   <template v-if="planTotals">
                     <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
-                      <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-[10px] text-cream-300/50">Tổng sản xuất</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatNumber(planTotals.units) }} cái</p></div>
-                      <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-[10px] text-cream-300/50">Vải cần đặt</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatNumber(planTotals.fabric_order_m) }} m</p><p class="text-[10px] text-cream-300/50">{{ formatVnd(planTotals.fabric_order_cost_vnd) }}</p></div>
-                      <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-[10px] text-cream-300/50">Vốn cần</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatVnd(planTotals.capital_needed_vnd) }}</p><p class="text-[10px] text-cream-300/50">Giá vốn TB {{ formatVnd(planTotals.avg_unit_cost_vnd) }}/cái</p></div>
-                      <div class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5"><p class="text-[10px] text-emerald-200/80">Lãi gộp dự kiến</p><p class="mt-1 text-lg font-semibold tabular-nums text-emerald-100">{{ formatVnd(planTotals.profit_vnd) }}</p><p class="text-[10px] text-emerald-200/70">{{ planTotals.margin_pct }}% · {{ formatVnd(planTotals.avg_profit_unit_vnd) }}/cái</p></div>
+                      <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-[10px] text-cream-400">Tổng sản xuất</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatNumber(planTotals.units) }} cái</p></div>
+                      <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-[10px] text-cream-400">Vải cần đặt</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatNumber(planTotals.fabric_order_m) }} m</p><p class="text-[10px] text-cream-400">{{ formatVnd(planTotals.fabric_order_cost_vnd) }}</p></div>
+                      <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-[10px] text-cream-400">Vốn cần</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatVnd(planTotals.capital_needed_vnd) }}</p><p class="text-[10px] text-cream-400">Giá vốn TB {{ formatVnd(planTotals.avg_unit_cost_vnd) }}/cái</p></div>
+                      <div class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5"><p class="text-[10px] text-ok">Lãi gộp dự kiến</p><p class="mt-1 text-lg font-semibold tabular-nums text-ok">{{ formatVnd(planTotals.profit_vnd) }}</p><p class="text-[10px] text-ok">{{ planTotals.margin_pct }}% · {{ formatVnd(planTotals.avg_profit_unit_vnd) }}/cái</p></div>
                     </div>
 
                     <div
                       v-if="plan.price_check && plan.price_check.status !== 'within_band' && plan.price_check.status !== 'unknown'"
                       role="status"
                       class="flex gap-2 rounded-lg border p-3 text-[11px] leading-5"
-                      :class="plan.price_check.status === 'above_band' ? 'border-red-500/40 bg-red-500/10 text-red-100' : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'"
+                      :class="plan.price_check.status === 'above_band' ? 'border-red-500/40 bg-red-500/10 text-danger' : 'border-emerald-500/40 bg-emerald-500/10 text-ok'"
                     >
                       <StudioIcon :name="plan.price_check.status === 'above_band' ? 'alertTriangle' : 'info'" size="h-4 w-4" class="shrink-0" />
                       <span>
@@ -988,9 +988,9 @@ watch(() => store.designAgentOpen, (open) => {
                       <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <h3 class="text-sm font-semibold text-cream-100">Lệnh cắt — {{ planLines.length }} dòng</h3>
-                          <p class="mt-0.5 text-[11px] text-cream-300/55">
+                          <p class="mt-0.5 text-[11px] text-cream-400">
                             Số cái mỗi mã theo từng size, vải cần cho mỗi dòng và giá vốn/cái. Đây là bảng đưa thẳng cho thợ cắt.
-                            <span v-if="planTotals.days_total" class="text-cream-300/45"> · khoảng {{ planTotals.days_total }} ngày nếu chạy {{ plan.assumptions.daily_capacity }} cái/ngày.</span>
+                            <span v-if="planTotals.days_total" class="text-cream-400"> · khoảng {{ planTotals.days_total }} ngày nếu chạy {{ plan.assumptions.daily_capacity }} cái/ngày.</span>
                           </p>
                         </div>
                         <div class="flex flex-wrap gap-2">
@@ -1003,7 +1003,7 @@ watch(() => store.designAgentOpen, (open) => {
                       <div class="mt-3 overflow-x-auto">
                         <table class="w-full min-w-[46rem] text-left text-[11px]">
                           <thead>
-                            <tr class="border-b border-ink-700 text-cream-300/50">
+                            <tr class="border-b border-ink-700 text-cream-400">
                               <th class="pb-2 pr-2 font-semibold">Nhóm hàng</th>
                               <th class="pb-2 pr-2 font-semibold">Size</th>
                               <th class="pb-2 pr-2 text-right font-semibold">Cái</th>
@@ -1019,17 +1019,17 @@ watch(() => store.designAgentOpen, (open) => {
                             <tr v-for="(line, index) in planLines" :key="index" class="text-cream-200">
                               <td class="py-2 pr-2">
                                 {{ line.category }}
-                                <span v-if="line.source === 'shop'" class="ml-1 rounded bg-emerald-500/15 px-1 py-0.5 text-[9px] text-emerald-200">theo shop</span>
-                                <span v-else-if="line.source === 'prompt'" class="ml-1 rounded bg-brand-500/15 px-1 py-0.5 text-[9px] text-brand-100">theo prompt</span>
+                                <span v-if="line.source === 'shop'" class="ml-1 rounded bg-emerald-500/15 px-1 py-0.5 text-[9px] text-ok">theo shop</span>
+                                <span v-else-if="line.source === 'prompt'" class="ml-1 rounded bg-brand-500/15 px-1 py-0.5 text-[9px] text-brand-200">theo prompt</span>
                               </td>
                               <td class="py-2 pr-2 font-semibold">{{ line.size }}</td>
                               <td class="py-2 pr-2 text-right tabular-nums">{{ formatNumber(line.qty) }}</td>
-                              <td class="py-2 pr-2 text-right tabular-nums text-cream-300/70">{{ line.fabric_m_per_unit }}m</td>
-                              <td class="py-2 pr-2 text-right tabular-nums text-cream-300/70">{{ line.fabric_m_total }}m</td>
+                              <td class="py-2 pr-2 text-right tabular-nums text-cream-300">{{ line.fabric_m_per_unit }}m</td>
+                              <td class="py-2 pr-2 text-right tabular-nums text-cream-300">{{ line.fabric_m_total }}m</td>
                               <td class="py-2 pr-2 text-right tabular-nums">{{ formatVnd(line.unit_cost) }}</td>
                               <td class="py-2 pr-2 text-right tabular-nums">{{ formatVnd(line.sell_price_vnd) }}</td>
-                              <td class="py-2 pr-2 text-right tabular-nums" :class="line.profit_unit > 0 ? 'text-emerald-200' : 'text-red-300'">{{ formatVnd(line.profit_unit) }}</td>
-                              <td class="py-2 text-right tabular-nums text-cream-300/70">{{ line.margin_pct }}%</td>
+                              <td class="py-2 pr-2 text-right tabular-nums" :class="line.profit_unit > 0 ? 'text-ok' : 'text-danger'">{{ formatVnd(line.profit_unit) }}</td>
+                              <td class="py-2 text-right tabular-nums text-cream-300">{{ line.margin_pct }}%</td>
                             </tr>
                           </tbody>
                         </table>
@@ -1040,15 +1040,15 @@ watch(() => store.designAgentOpen, (open) => {
                       <div v-for="wave in planWaves" :key="wave.id" class="card p-4">
                         <div class="flex items-center justify-between gap-2">
                           <h4 class="text-xs font-semibold text-cream-100">{{ wave.name }}</h4>
-                          <span class="rounded bg-ink-800 px-2 py-0.5 text-[10px] text-cream-300/60">{{ wave.share_pct }}%</span>
+                          <span class="rounded bg-ink-800 px-2 py-0.5 text-[10px] text-cream-400">{{ wave.share_pct }}%</span>
                         </div>
                         <p class="mt-2 text-xl font-semibold tabular-nums text-cream-100">{{ formatNumber(wave.units) }} cái</p>
-                        <p class="text-[11px] text-cream-300/60">Vải {{ wave.fabric_order_m }}m · vốn {{ formatVnd(wave.cost_vnd) }}<span v-if="wave.days"> · {{ wave.days }} ngày</span></p>
-                        <p class="mt-1 text-[11px] text-emerald-200/80">Lãi dự kiến {{ formatVnd(wave.profit_vnd) }}</p>
-                        <p class="mt-2 text-[10px] leading-4 text-cream-300/50">{{ wave.note }}</p>
+                        <p class="text-[11px] text-cream-400">Vải {{ wave.fabric_order_m }}m · vốn {{ formatVnd(wave.cost_vnd) }}<span v-if="wave.days"> · {{ wave.days }} ngày</span></p>
+                        <p class="mt-1 text-[11px] text-ok">Lãi dự kiến {{ formatVnd(wave.profit_vnd) }}</p>
+                        <p class="mt-2 text-[10px] leading-4 text-cream-400">{{ wave.note }}</p>
                         <details class="mt-2">
-                          <summary class="cursor-pointer text-[10px] font-semibold text-cream-300/60">Chi tiết {{ wave.lines.length }} dòng</summary>
-                          <ul class="mt-1.5 space-y-0.5 text-[10px] text-cream-300/70">
+                          <summary class="cursor-pointer text-[10px] font-semibold text-cream-400">Chi tiết {{ wave.lines.length }} dòng</summary>
+                          <ul class="mt-1.5 space-y-0.5 text-[10px] text-cream-300">
                             <li v-for="(row, index) in wave.lines" :key="index">{{ row.category }} · {{ row.size }}: {{ row.qty }}</li>
                           </ul>
                         </details>
@@ -1058,11 +1058,11 @@ watch(() => store.designAgentOpen, (open) => {
                     <div class="grid gap-4 lg:grid-cols-2">
                       <div class="card p-5">
                         <h3 class="text-sm font-semibold text-cream-100">Bảng size (cm)</h3>
-                        <p class="mt-0.5 text-[11px] leading-5 text-cream-300/55">Số đo tham chiếu dáng nữ VN — phải đối chiếu rập thật của xưởng và độ co của vải.</p>
+                        <p class="mt-0.5 text-[11px] leading-5 text-cream-400">Số đo tham chiếu dáng nữ VN — phải đối chiếu rập thật của xưởng và độ co của vải.</p>
                         <div v-for="chart in planSizeChart" :key="chart.category" class="mt-3 overflow-x-auto">
                           <p class="text-[11px] font-semibold text-brand-200">{{ chart.category }}</p>
                           <table class="mt-1 w-full text-left text-[10px]">
-                            <thead><tr class="text-cream-300/50"><th class="pr-2 font-semibold">Size</th><th class="pr-2 font-semibold">Cái</th><th v-for="(value, name) in chart.rows[0].measures" :key="name" class="pr-2 font-semibold">{{ name }}</th></tr></thead>
+                            <thead><tr class="text-cream-400"><th class="pr-2 font-semibold">Size</th><th class="pr-2 font-semibold">Cái</th><th v-for="(value, name) in chart.rows[0].measures" :key="name" class="pr-2 font-semibold">{{ name }}</th></tr></thead>
                             <tbody class="divide-y divide-ink-800 text-cream-200">
                               <tr v-for="row in chart.rows" :key="row.size">
                                 <td class="py-1.5 pr-2 font-semibold">{{ row.size }}</td>
@@ -1076,17 +1076,17 @@ watch(() => store.designAgentOpen, (open) => {
 
                       <div class="card p-5">
                         <h3 class="text-sm font-semibold text-cream-100">Ba mức giá — lãi tương ứng</h3>
-                        <p class="mt-0.5 text-[11px] leading-5 text-cream-300/55">Đã trừ chiết khấu kênh {{ plan.assumptions.channel_discount_pct }}% và cộng chi phí cố định.</p>
+                        <p class="mt-0.5 text-[11px] leading-5 text-cream-400">Đã trừ chiết khấu kênh {{ plan.assumptions.channel_discount_pct }}% và cộng chi phí cố định.</p>
                         <div class="mt-3 space-y-2">
                           <div v-for="scenario in planScenarios" :key="scenario.price_vnd" class="rounded-lg border border-ink-700 bg-ink-800 p-3">
                             <div class="flex items-center justify-between gap-2">
                               <span class="text-xs font-semibold text-cream-100">{{ formatVnd(scenario.price_vnd) }}</span>
-                              <span class="rounded px-2 py-0.5 text-[10px]" :class="scenario.profit_vnd > 0 ? 'bg-emerald-500/15 text-emerald-200' : 'bg-red-500/15 text-red-200'">{{ scenario.label }}</span>
+                              <span class="rounded px-2 py-0.5 text-[10px]" :class="scenario.profit_vnd > 0 ? 'bg-emerald-500/15 text-ok' : 'bg-red-500/15 text-danger'">{{ scenario.label }}</span>
                             </div>
-                            <p class="mt-1 text-[11px] text-cream-300/70">Lãi {{ formatVnd(scenario.profit_vnd) }} · biên {{ scenario.margin_pct }}%<span v-if="scenario.breakeven_units"> · hoà vốn ở {{ formatNumber(scenario.breakeven_units) }} cái</span></p>
+                            <p class="mt-1 text-[11px] text-cream-300">Lãi {{ formatVnd(scenario.profit_vnd) }} · biên {{ scenario.margin_pct }}%<span v-if="scenario.breakeven_units"> · hoà vốn ở {{ formatNumber(scenario.breakeven_units) }} cái</span></p>
                           </div>
                         </div>
-                        <ul class="mt-3 space-y-1 text-[10px] leading-4 text-cream-300/50">
+                        <ul class="mt-3 space-y-1 text-[10px] leading-4 text-cream-400">
                           <li v-for="(note, index) in plan.notes" :key="index">• {{ note }}</li>
                         </ul>
                       </div>
@@ -1094,14 +1094,14 @@ watch(() => store.designAgentOpen, (open) => {
                   </template>
 
                   <div v-else-if="!store.planLoading" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-8 text-center">
-                    <StudioIcon name="receipt" size="h-7 w-7" class="mx-auto text-brand-400/70" />
+                    <StudioIcon name="receipt" size="h-7 w-7" class="mx-auto text-brand-300" />
                     <p class="mt-3 text-sm font-semibold text-cream-100">Chưa có kế hoạch sản xuất</p>
-                    <p class="mt-1 text-xs leading-5 text-cream-300/55">Bấm «Tính lại kế hoạch» để ra lệnh cắt, giá thành và lợi nhuận từ cấu trúc SKU ở tab «Cấu trúc».</p>
+                    <p class="mt-1 text-xs leading-5 text-cream-400">Bấm «Tính lại kế hoạch» để ra lệnh cắt, giá thành và lợi nhuận từ cấu trúc SKU ở tab «Cấu trúc».</p>
                   </div>
                 </div>
 
                 <div v-else-if="briefTab === 'moodboard'" class="mt-4 card p-5">
-                  <div class="mb-3 flex items-center justify-between"><h3 class="text-sm font-semibold text-cream-100">Bảng mood</h3><span class="text-[10px] text-cream-300/50">{{ moodboardItems.length }} ô</span></div>
+                  <div class="mb-3 flex items-center justify-between"><h3 class="text-sm font-semibold text-cream-100">Bảng mood</h3><span class="text-[10px] text-cream-400">{{ moodboardItems.length }} ô</span></div>
                   <div class="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
                     <div v-for="(item, index) in moodboardItems" :key="item.id || index" class="group relative aspect-square overflow-hidden rounded-lg border border-ink-700" :style="{ backgroundColor: item.color || palette[index % Math.max(1, palette.length)]?.hex || '#b9c8c2' }" role="img" :aria-label="(item.label || 'Mood ' + (index + 1)) + ': ' + (item.caption || '')" :title="item.caption || item.label || 'Mood board'">
                       <span class="absolute inset-x-0 bottom-0 p-1.5 text-[9px] font-semibold leading-3 text-white shadow-[0_-12px_16px_-8px_rgba(0,0,0,0.8)]">{{ item.label || 'Mood ' + (index + 1) }}</span>
@@ -1109,34 +1109,34 @@ watch(() => store.designAgentOpen, (open) => {
                   </div>
                   <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     <button v-for="(color, index) in palette" :key="color.hex || index" type="button" class="flex items-center gap-2 rounded-lg border border-ink-600 bg-ink-800 p-2 text-left" :title="'Sao chép ' + color.hex" @click="copyText(color.hex, 'mã màu ' + color.hex)">
-                      <span class="h-6 w-6 shrink-0 rounded border border-white/15" :style="{ backgroundColor: color.hex }"></span><span class="min-w-0 flex-1"><span class="block truncate text-[11px] font-semibold text-cream-100">{{ color.name || 'Màu ' + (index + 1) }}</span><span class="block text-[10px] text-cream-300/55">{{ color.role || color.hex }}</span></span><code class="text-[10px] text-cream-300/60">{{ color.hex }}</code>
+                      <span class="h-6 w-6 shrink-0 rounded border border-white/15" :style="{ backgroundColor: color.hex }"></span><span class="min-w-0 flex-1"><span class="block truncate text-[11px] font-semibold text-cream-100">{{ color.name || 'Màu ' + (index + 1) }}</span><span class="block text-[10px] text-cream-400">{{ color.role || color.hex }}</span></span><code class="text-[10px] text-cream-400">{{ color.hex }}</code>
                     </button>
                   </div>
                 </div>
 
                 <div v-else-if="briefTab === 'structure'" class="mt-4 card p-5">
-                  <h3 class="text-sm font-semibold text-cream-100">Cấu trúc danh mục</h3><p class="mt-1 text-xs text-cream-300/60">{{ collection.structure?.rationale }}</p>
+                  <h3 class="text-sm font-semibold text-cream-100">Cấu trúc danh mục</h3><p class="mt-1 text-xs text-cream-400">{{ collection.structure?.rationale }}</p>
                   <div class="mt-3 space-y-2.5">
-                    <div v-for="row in categoryRows" :key="row.category" class="rounded-lg bg-ink-800 p-3"><div class="flex items-center justify-between text-xs"><span class="font-semibold text-cream-100">{{ row.category }}</span><span class="text-brand-200">{{ row.count }} SKU · {{ row.share || 0 }}%</span></div><div class="mt-1.5 h-1 rounded bg-ink-700"><span class="block h-full rounded bg-brand-500" :style="{ width: Math.min(100, Number(row.share || 0)) + '%' }"></span></div><p class="mt-1.5 text-[10px] leading-4 text-cream-300/55">{{ row.rationale }}</p></div>
+                    <div v-for="row in categoryRows" :key="row.category" class="rounded-lg bg-ink-800 p-3"><div class="flex items-center justify-between text-xs"><span class="font-semibold text-cream-100">{{ row.category }}</span><span class="text-brand-200">{{ row.count }} SKU · {{ row.share || 0 }}%</span></div><div class="mt-1.5 h-1 rounded bg-ink-700"><span class="block h-full rounded bg-brand-500" :style="{ width: Math.min(100, Number(row.share || 0)) + '%' }"></span></div><p class="mt-1.5 text-[10px] leading-4 text-cream-400">{{ row.rationale }}</p></div>
                   </div>
                 </div>
 
                 <div v-else class="mt-4 grid gap-4 md:grid-cols-2">
-                  <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Phối outfit</h3><div class="mt-3 space-y-2.5"><div v-for="look in outfitRows" :key="look.id" class="rounded-lg border border-ink-700 bg-ink-800 p-3"><div class="flex items-center justify-between gap-2"><span class="text-xs font-semibold text-cream-100">{{ look.name }}</span><span class="text-[10px] text-cream-300/50">{{ look.goal }}</span></div><p class="mt-1.5 text-[11px] leading-4 text-cream-300/70">{{ (look.items || []).join(' · ') }}</p><div class="mt-2 flex gap-1"><span v-for="(color, index) in (look.palette || []).slice(0, 3)" :key="index" class="h-3 flex-1 rounded" :style="{ backgroundColor: color }"></span></div></div></div></div>
-                  <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Phân bổ size</h3><div class="mt-3 space-y-2.5"><div v-for="row in sizeRows" :key="row.size" class="flex items-center gap-3 text-xs"><span class="w-8 rounded bg-ink-800 py-1 text-center font-semibold text-cream-100">{{ row.size }}</span><span class="h-2 flex-1 rounded bg-ink-800"><span class="block h-full rounded bg-brand-500" :style="{ width: Math.min(100, Number(row.share || 0)) + '%' }"></span></span><span class="w-20 text-right text-cream-300/60">{{ row.count }} · {{ row.share || 0 }}%</span></div></div></div>
+                  <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Phối outfit</h3><div class="mt-3 space-y-2.5"><div v-for="look in outfitRows" :key="look.id" class="rounded-lg border border-ink-700 bg-ink-800 p-3"><div class="flex items-center justify-between gap-2"><span class="text-xs font-semibold text-cream-100">{{ look.name }}</span><span class="text-[10px] text-cream-400">{{ look.goal }}</span></div><p class="mt-1.5 text-[11px] leading-4 text-cream-300">{{ (look.items || []).join(' · ') }}</p><div class="mt-2 flex gap-1"><span v-for="(color, index) in (look.palette || []).slice(0, 3)" :key="index" class="h-3 flex-1 rounded" :style="{ backgroundColor: color }"></span></div></div></div></div>
+                  <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Phân bổ size</h3><div class="mt-3 space-y-2.5"><div v-for="row in sizeRows" :key="row.size" class="flex items-center gap-3 text-xs"><span class="w-8 rounded bg-ink-800 py-1 text-center font-semibold text-cream-100">{{ row.size }}</span><span class="h-2 flex-1 rounded bg-ink-800"><span class="block h-full rounded bg-brand-500" :style="{ width: Math.min(100, Number(row.share || 0)) + '%' }"></span></span><span class="w-20 text-right text-cream-400">{{ row.count }} · {{ row.share || 0 }}%</span></div></div></div>
                 </div>
               </template>
 
-              <div v-else class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-10 text-center"><StudioIcon name="briefcase" size="h-8 w-8" class="mx-auto text-brand-400/70" /><p class="mt-3 text-sm font-semibold text-cream-100">Chưa có brief bộ sưu tập</p><p class="mt-1 text-xs leading-5 text-cream-300/55">Nhập prompt ở bên trái rồi bấm «Tạo brief bộ sưu tập».</p></div>
+              <div v-else class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-10 text-center"><StudioIcon name="briefcase" size="h-8 w-8" class="mx-auto text-brand-300" /><p class="mt-3 text-sm font-semibold text-cream-100">Chưa có brief bộ sưu tập</p><p class="mt-1 text-xs leading-5 text-cream-400">Nhập prompt ở bên trái rồi bấm «Tạo brief bộ sưu tập».</p></div>
             </div>
           </section>
 
           <!-- BƯỚC 3: THỰC THI (CANVAS KIT) -->
           <section v-else id="agent-step-canvas" role="tabpanel" aria-label="Thực thi">
             <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-10 text-center">
-              <StudioIcon name="wand" size="h-8 w-8" class="mx-auto text-brand-400/70" />
+              <StudioIcon name="wand" size="h-8 w-8" class="mx-auto text-brand-300" />
               <p class="mt-3 text-sm font-semibold text-cream-100">Chưa có brief để chuyển sang Canvas</p>
-              <p class="mt-1 text-xs text-cream-300/55">Quay lại bước Định hướng và tạo brief trước.</p>
+              <p class="mt-1 text-xs text-cream-400">Quay lại bước Định hướng và tạo brief trước.</p>
               <button type="button" class="btn-brand btn-sm mt-4" @click="setStep('brief')">Quay lại Định hướng</button>
             </div>
 
@@ -1162,13 +1162,13 @@ watch(() => store.designAgentOpen, (open) => {
                     <h3 class="text-sm font-semibold text-cream-100">Cấu hình tạo ảnh</h3>
                     <div class="mt-3 grid gap-4 sm:grid-cols-2">
                       <div>
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/50">Tỉ lệ khung</p>
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Tỉ lệ khung</p>
                         <div class="seg mt-2">
                           <button v-for="ratio in RATIO_OPTIONS" :key="ratio" type="button" class="seg-btn" :class="{ 'is-active': canvas.ratio === ratio }" @click="canvas.ratio = ratio">{{ ratio }}</button>
                         </div>
                       </div>
                       <div>
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/50">Số biến thể</p>
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Số biến thể</p>
                         <div class="seg mt-2">
                           <button v-for="n in [1, 2, 3, 4]" :key="n" type="button" class="seg-btn" :class="{ 'is-active': Number(canvas.variantCount) === n }" @click="canvas.variantCount = n">{{ n }}</button>
                         </div>
@@ -1178,7 +1178,7 @@ watch(() => store.designAgentOpen, (open) => {
                       <input v-model="canvas.useNegative" type="checkbox" class="h-4 w-4 rounded border-ink-600 bg-ink-800">
                       Dùng negative prompt gợi ý (không ghi đè nếu bạn đã có cấu hình riêng)
                     </label>
-                    <p class="mt-2 rounded-lg border border-ink-700 bg-ink-800 p-3 text-[11px] leading-5 text-cream-300/60">{{ canvas.negativePrompt || 'Chưa có negative prompt gợi ý.' }}</p>
+                    <p class="mt-2 rounded-lg border border-ink-700 bg-ink-800 p-3 text-[11px] leading-5 text-cream-400">{{ canvas.negativePrompt || 'Chưa có negative prompt gợi ý.' }}</p>
                   </div>
                 </div>
 
@@ -1186,13 +1186,13 @@ watch(() => store.designAgentOpen, (open) => {
                   <div class="card p-5">
                     <h3 class="text-sm font-semibold text-cream-100">Sẵn sàng tạo ảnh</h3>
                     <ul class="mt-3 space-y-2 text-xs">
-                      <li class="flex items-center gap-2"><StudioIcon name="check" size="h-3.5 w-3.5" class="text-emerald-300" /><span class="text-cream-200">Prompt {{ canvasLang === 'en' ? 'tiếng Anh' : 'tiếng Việt' }} đã sẵn sàng</span></li>
-                      <li class="flex items-center gap-2"><StudioIcon name="check" size="h-3.5 w-3.5" class="text-emerald-300" /><span class="text-cream-200">Tỉ lệ {{ canvas.ratio }} · {{ canvas.variantCount }} biến thể</span></li>
-                      <li class="flex items-center gap-2"><StudioIcon :name="briefStale ? 'alertTriangle' : 'check'" size="h-3.5 w-3.5" :class="briefStale ? 'text-amber-300' : 'text-emerald-300'" /><span :class="briefStale ? 'text-amber-200' : 'text-cream-200'">{{ briefStale ? 'Brief đã cũ — nên tạo lại' : 'Brief khớp prompt/trend hiện tại' }}</span></li>
+                      <li class="flex items-center gap-2"><StudioIcon name="check" size="h-3.5 w-3.5" class="text-ok" /><span class="text-cream-200">Prompt {{ canvasLang === 'en' ? 'tiếng Anh' : 'tiếng Việt' }} đã sẵn sàng</span></li>
+                      <li class="flex items-center gap-2"><StudioIcon name="check" size="h-3.5 w-3.5" class="text-ok" /><span class="text-cream-200">Tỉ lệ {{ canvas.ratio }} · {{ canvas.variantCount }} biến thể</span></li>
+                      <li class="flex items-center gap-2"><StudioIcon :name="briefStale ? 'alertTriangle' : 'check'" size="h-3.5 w-3.5" :class="briefStale ? 'text-warn' : 'text-ok'" /><span :class="briefStale ? 'text-warn' : 'text-cream-200'">{{ briefStale ? 'Brief đã cũ — nên tạo lại' : 'Brief khớp prompt/trend hiện tại' }}</span></li>
                     </ul>
                     <div class="mt-4 rounded-lg border border-ink-700 bg-ink-800 p-3">
-                      <div class="flex items-center justify-between text-xs"><span class="text-cream-300/60">Chi phí ước tính</span><span class="font-semibold text-cream-100">~{{ estimatedCredits }} credit</span></div>
-                      <div class="mt-1 flex items-center justify-between text-[11px]"><span class="text-cream-300/50">Credit còn lại</span><span class="text-cream-200">{{ formatNumber(store.creditsLeft) }}</span></div>
+                      <div class="flex items-center justify-between text-xs"><span class="text-cream-400">Chi phí ước tính</span><span class="font-semibold text-cream-100">~{{ estimatedCredits }} credit</span></div>
+                      <div class="mt-1 flex items-center justify-between text-[11px]"><span class="text-cream-400">Credit còn lại</span><span class="text-cream-200">{{ formatNumber(store.creditsLeft) }}</span></div>
                     </div>
                     <button type="button" class="btn-brand btn-sm mt-4 flex w-full items-center justify-center gap-2" @click="applyCanvas">
                       <StudioIcon name="zap" size="h-3.5 w-3.5" /> Áp dụng &amp; mở Tạo ảnh
@@ -1203,13 +1203,13 @@ watch(() => store.designAgentOpen, (open) => {
                     <button type="button" class="tool-btn mt-2 w-full justify-center !py-2.5" @click="setStep('brief')">
                       <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Chỉnh lại brief
                     </button>
-                    <div v-if="collectionError || store.collectionBriefError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs leading-5 text-red-200"><StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ collectionError || store.collectionBriefError }}</span></div>
+                    <div v-if="collectionError || store.collectionBriefError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs leading-5 text-danger"><StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ collectionError || store.collectionBriefError }}</span></div>
                   </div>
 
                   <div class="card p-5">
                     <h3 class="text-sm font-semibold text-cream-100">Bộ sưu tập</h3>
                     <p class="mt-1.5 text-xs leading-5 text-cream-200">{{ collection.project_payload?.name }}</p>
-                    <p class="mt-1 text-[10px] text-cream-300/50">Tạo bộ sưu tập chỉ tạo vỏ dự án; ảnh vẫn do bạn chủ động tạo trong Canvas.</p>
+                    <p class="mt-1 text-[10px] text-cream-400">Tạo bộ sưu tập chỉ tạo vỏ dự án; ảnh vẫn do bạn chủ động tạo trong Canvas.</p>
                   </div>
                 </aside>
               </div>
@@ -1221,7 +1221,7 @@ watch(() => store.designAgentOpen, (open) => {
       <!-- Action bar -->
       <footer class="shrink-0 border-t border-ink-700 bg-ink-900/90 px-4 py-3 sm:px-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="min-w-0 text-[11px] text-cream-300/60">
+          <div class="min-w-0 text-[11px] text-cream-400">
             <span class="font-semibold text-cream-100">Bước {{ stepIndex + 1 }}/{{ STEPS.length }} · {{ STEPS[stepIndex].label }}</span>
             <span class="mx-1.5">·</span>
             <span v-if="step === 'radar'">{{ selectedTrendCount ? selectedTrendCount + ' trend đã chọn' : 'Chưa chọn trend' }}</span>

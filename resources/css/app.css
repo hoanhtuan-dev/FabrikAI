@@ -44,19 +44,25 @@
     --color-brand-900: #193d2b;
     --color-brand-950: #0d2619;
 
+    /* ── HAI DẢI NGỮ NGHĨA (docs/DESIGN_SYSTEM.md §1.1) ────────────────────────────────
+       ink-*   = BỀ MẶT: nền trang → panel → card → nền nổi → viền → viền mờ.
+       cream-* = NỘI DUNG: chữ/icon theo 4 bậc (50 chính → 400 ghi chú phụ).
+       Giá trị dưới đây là của theme TỐI (mặc định). Theme SÁNG ĐẢO VAI hai dải này
+       (khối [data-theme='light'] ngay sau @theme) nên mọi class sẵn có
+       (bg-ink-800 · text-cream-200 · border-ink-700 …) đúng ở CẢ HAI theme mà không phải
+       sửa markup. Mọi bậc nội dung đạt WCAG AA (≥ 4.5:1) trên mọi bề mặt. */
     --color-cream-50: #faf9f6;
     --color-cream-100: #f4f2ec;
     --color-cream-200: #e9e5db;
-    --color-cream-300: #d8d2c4;
-    --color-cream-400: #c7c0ae;
+    --color-cream-300: #d5cfc0;
+    --color-cream-400: #b3ac99;
 
     --color-ink-900: #17150f;
-    --color-ink-700: #36332a;
+    --color-ink-700: #38342a;
     --color-ink-500: #6b6657;
-    --color-ink-800: #2f2c23;
-    /* Studio dark workspace — bù các level studio SFC đang dùng mà theme thiếu
-       (trước đây class không sinh CSS trên production). Không thêm ink-100..400
-       để tránh đụng override .studio-dark .text-ink-300 của storefront. */
+    --color-ink-800: #2b2820;
+    /* Studio workspace — bù các level studio SFC đang dùng mà theme thiếu
+       (trước đây class không sinh CSS trên production). */
     --color-ink-600: #4b483c;
     --color-ink-950: #0e0d09;
 
@@ -64,6 +70,40 @@
     --color-clay-600: #9a5227;
     --color-gold-400: #d9b36c;
     --color-gold-500: #c9a45f;
+
+    /* ── MÀU TRẠNG THÁI (nội dung) — một token cho mỗi nghĩa, đổi giá trị theo theme ──
+       Thay cho text-red-300 / text-amber-200 / text-emerald-300 / text-sky-300 (các sắc
+       độ chỉ đủ tương phản trên nền TỐI). Trên nền nhạt dùng chính token này với alpha:
+       bg-danger/10 · border-danger/40 … */
+    --color-danger: #fca5a5;
+    --color-warn: #fcd34d;
+    --color-ok: #6ee7b7;
+    --color-info: #7dd3fc;
+
+    /* ── HAI TOKEN CỐ ĐỊNH (KHÔNG đổi theo theme) ────────────────────────────────────
+       invert / invert-content: khối ĐẢO màu so với bề mặt (nút "đang bật" kiểu đảo,
+         hover của .btn-outline) — theme tối thì khối sáng, theme sáng thì khối tối.
+       on-accent: chữ/icon đặt TRÊN nền màu đậm/bão hoà (bg-amber-500 · bg-brand-500 ·
+         bg-white…) — nền đó không theo theme nên chữ cũng không được theo. */
+    /* NỀN CANVAS — token CỐ ĐỊNH (không khai lại ở [data-theme='light']): canvas là MÔI TRƯỜNG
+       ẢNH, người dùng chọn "Trắng"/"Kem" để nhìn ảnh; nếu theo theme thì ở theme sáng "nền kem"
+       sẽ thành nền đen và họ mất đúng thứ vừa chọn. */
+    --color-canvas-dark: #0e0d09;
+    --color-canvas-white: #ffffff;
+    --color-canvas-cream: #f4f2ec;
+
+    /* LỚP PHỦ TRÊN ẢNH (scrim) + chữ trên nó — cũng CỐ ĐỊNH: chip "Trước/Sau", nhãn kéo-thả,
+       thanh hành động đặt TRÊN ảnh. Nếu chữ theo theme thì ở theme sáng nó thành chữ ĐEN trên
+       nền scrim tối ⇒ mất chữ (đo được 2,9:1 trước khi sửa). */
+    --color-scrim: #0e0d09;
+    --color-scrim-content: #faf9f6;
+
+    --color-invert: #f4f2ec;
+    --color-invert-content: #17150f;
+    /* Hover của khối đảo màu: cùng CỰC với invert (theme tối ⇒ sáng hơn, theme sáng ⇒ tối hơn)
+       — nếu dùng cream-* làm hover thì ở một trong hai theme nền hover sẽ cùng cực với chữ. */
+    --color-invert-hover: #ffffff;
+    --color-on-accent: #17150f;
 
     --radius-4xl: 2rem;
 
@@ -97,9 +137,83 @@
     --ease-exit: var(--motion-ease-exit);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   HỆ THỐNG THEME — hai theme, MỘT bảng token (docs/DESIGN_SYSTEM.md §1.1)
+
+   · data-theme="dark" trên thẻ html  → theme TỐI (mặc định, giao diện đang dùng)
+   · data-theme="light" trên thẻ html → theme SÁNG
+   Thuộc tính do server render theo tùy chọn đã lưu của tài khoản, và được
+   resources/views/partials/theme.blade.php cập nhật tức thì khi người dùng đổi.
+
+   Vì sao khối này nằm NGOÀI layer: biến do @theme sinh ra nằm trong layer theme, mà CSS
+   không-layer luôn thắng CSS có layer ⇒ khối dưới đây ghi đè được toàn bộ tiện ích
+   (bg-ink-800, text-cream-200, border-ink-700…) mà KHÔNG phải viết lại class nào.
+
+   Quy tắc ĐẢO VAI của theme sáng: ink-* trở thành BỀ MẶT SÁNG, cream-* trở thành
+   NỘI DUNG TỐI. Nhờ vậy "bg-ink-800 text-cream-100" là card tối/chữ sáng ở theme tối và
+   card trắng/chữ đen ở theme sáng — CÙNG một markup, không nhân đôi class.
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme='dark'] {
+    color-scheme: dark;
+    --scrollbar-thumb: rgba(179, 172, 153, 0.28);
+    --scrollbar-thumb-hover: rgba(179, 172, 153, 0.45);
+}
+
+[data-theme='light'] {
+    color-scheme: light;
+
+    /* Bề mặt */
+    --color-ink-950: #f1efe7;
+    --color-ink-900: #f8f7f2;
+    --color-ink-800: #ffffff;
+    --color-ink-700: #eae7dc;
+    --color-ink-600: #d6d0c0;
+    --color-ink-500: #b3ab98;
+
+    /* Nội dung */
+    --color-cream-50: #16150f;
+    --color-cream-100: #211f18;
+    --color-cream-200: #33302a;
+    --color-cream-300: #4a463c;
+    --color-cream-400: #5f5a4d;
+
+    /* Thương hiệu: GIỮ NGUYÊN cây xanh lá (#2d6f4d là màu nhận diện), chỉ đổi sắc độ theo VAI TRÒ
+       — vì ở theme tối cùng một bậc vừa dùng làm CHỮ vừa dùng làm NỀN TINT, mà hai vai đó cần
+       hai cực sáng/tối ngược nhau:
+         · brand-100 · 200 · 300 → CHỮ NHẤN trên nền sáng ⇒ phải ĐẬM (theme tối: nhạt).
+         · brand-700 … 950      → NỀN TINT (bg-brand-900/20 …) ⇒ phải NHẠT, để chữ đậm ở trên đọc được.
+         · brand-400 · 500 · 600 → VIỀN/NÚT, giữ nguyên vai trò ở cả hai theme. */
+    --color-brand-100: #0f5740;
+    --color-brand-200: #14614a;
+    --color-brand-300: #1f6b4d;
+    --color-brand-400: #3a8763;
+    --color-brand-500: #27714f;
+    --color-brand-600: #2d6f4d;
+    --color-brand-700: #cbe3d6;
+    --color-brand-800: #d8eade;
+    --color-brand-900: #e2f0e7;
+    --color-brand-950: #ecf5f0;
+
+    /* Trạng thái */
+    --color-danger: #b3261e;
+    /* #7a5000 (không phải #8a5a00): trên nền TINT của chính nó (bg-warn/15 ở theme sáng) mã cũ
+       chỉ đạt 4,38:1 — thiếu 0,12 so với ngưỡng AA. Đo bằng Chrome thật, không đoán. */
+    --color-warn: #7a5000;
+    --color-ok: #116b4c;
+    --color-info: #0b5d8f;
+
+    /* Khối đảo màu: ở theme sáng là khối TỐI */
+    --color-invert: #211f18;
+    --color-invert-content: #f7f5ef;
+    --color-invert-hover: #35322a;
+
+    --scrollbar-thumb: rgba(107, 102, 87, 0.28);
+    --scrollbar-thumb-hover: rgba(107, 102, 87, 0.45);
+}
+
 @layer base {
     * {
-        @apply border-cream-200;
+        @apply border-ink-600;
     }
 
     html {
@@ -107,7 +221,7 @@
     }
 
     body {
-        @apply bg-cream-50 font-sans text-ink-900 antialiased;
+        @apply bg-ink-950 font-sans text-cream-100 antialiased;
         font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     }
 
@@ -163,38 +277,45 @@
         @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
     }
 
+    /* Nút ĐẢO màu: ở theme tối là nút sáng, theme sáng là nút tối (token invert cố định,
+       không theo dải bề mặt — nếu dùng bg-ink-900 thì theme sáng sẽ ra nút TRẮNG trên nền trắng). */
     .btn-primary {
-        @apply btn bg-ink-900 px-6 py-3 text-cream-50 hover:bg-brand-700 hover:shadow-lg hover:shadow-brand-900/20 active:scale-[.98];
+        @apply btn bg-invert px-6 py-3 text-invert-content hover:bg-brand-600 hover:text-white hover:shadow-lg hover:shadow-brand-900/20 active:scale-[.98];
     }
 
     .btn-brand {
         @apply btn bg-brand-600 px-6 py-3 text-white hover:bg-brand-700 hover:shadow-lg hover:shadow-brand-900/20 active:scale-[.98];
     }
 
+    /* Nút phụ: hover ĐẢO màu (nền invert + chữ invert-content) ⇒ đúng ở cả hai theme,
+       và không còn cần ngoại lệ riêng cho studio như trước. */
     .btn-outline {
-        @apply btn border border-cream-300 bg-transparent px-6 py-3 text-ink-900 hover:border-ink-900 hover:bg-ink-900 hover:text-cream-50 active:scale-[.98];
+        @apply btn border border-ink-600 bg-transparent px-6 py-3 text-cream-200 hover:border-brand-400 hover:bg-invert hover:text-invert-content active:scale-[.98];
     }
 
     .btn-ghost {
-        @apply btn px-4 py-2 text-ink-700 hover:bg-cream-200/70 active:scale-[.98];
+        @apply btn px-4 py-2 text-cream-200 hover:bg-ink-700 hover:text-cream-100 active:scale-[.98];
     }
 
     .btn-sm {
         @apply px-4 py-2 text-xs;
     }
 
-    .input { @apply w-full rounded-2xl border border-cream-300 bg-white px-4 py-3 text-sm text-ink-900 placeholder:text-ink-500/70 transition-all focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10;
+    /* Ô nhập: bề mặt ink-900 + chữ cream-50 ⇒ theme tối là ô tối, theme sáng là ô trắng.
+       Placeholder dùng BẬC NỘI DUNG (cream-400) chứ không dùng opacity — opacity cho ra
+       tương phản không kiểm soát được (đây chính là lỗi "chữ mờ khó đọc" 2026-09-23). */
+    .input { @apply w-full rounded-2xl border border-ink-700 bg-ink-900 px-4 py-3 text-sm text-cream-50 placeholder:text-cream-400 transition-colors focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-400/20;
     }
 
     .label {
-        @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-700;
+        @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-cream-300;
     }
 
-    .card { @apply rounded-2xl border border-cream-200 bg-cream-100 shadow-sm shadow-ink-900/5;
+    .card { @apply rounded-2xl border border-ink-700 bg-ink-800 shadow-sm shadow-black/10;
     }
 
     .card-hover {
-        @apply transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-ink-900/10;
+        @apply hover:-translate-y-1 hover:shadow-xl hover:shadow-black/25;
         /* Nhấc thẻ là chuyển động MT LỚN ⇒ nhịp base; thời lượng lấy từ token, không viết số. */
         transition-duration: var(--motion-dur-base);
     }
@@ -202,28 +323,28 @@
     .badge { @apply inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide;
     }
 
-    .chip { @apply inline-flex items-center gap-2 rounded-2xl border border-cream-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:border-brand-500 hover:text-brand-700;
+    .chip { @apply inline-flex items-center gap-2 rounded-2xl border border-ink-600 bg-ink-900 px-4 py-2 text-sm font-medium text-cream-200 transition-colors hover:border-brand-400 hover:text-brand-200;
     }
 
     .section-title {
-        @apply font-display text-2xl font-semibold text-ink-900 sm:text-3xl;
+        @apply font-display text-2xl font-semibold text-cream-50 sm:text-3xl;
     }
 
     .kicker {
-        @apply text-xs font-semibold uppercase tracking-[0.2em] text-brand-600;
+        @apply text-xs font-semibold uppercase tracking-[0.2em] text-brand-300;
     }
 
     .link {
-        @apply text-brand-700 underline-offset-4 hover:underline;
+        @apply text-brand-300 underline-offset-4 hover:text-brand-200 hover:underline;
     }
 
-    .prose-content h2 { @apply mt-8 mb-3 font-display text-2xl font-semibold text-ink-900; }
-    .prose-content h3 { @apply mt-6 mb-2 font-display text-xl font-semibold text-ink-900; }
-    .prose-content p { @apply mb-4 leading-relaxed text-ink-700; }
-    .prose-content ul { @apply mb-4 list-disc space-y-1 pl-5 text-ink-700; }
-    .prose-content ol { @apply mb-4 list-decimal space-y-1 pl-5 text-ink-700; }
-    .prose-content blockquote { @apply my-5 border-l-4 border-brand-500 bg-cream-100 py-3 pl-5 italic text-ink-700; }
-    .prose-content a { @apply text-brand-700 underline underline-offset-2; }
+    .prose-content h2 { @apply mt-8 mb-3 font-display text-2xl font-semibold text-cream-50; }
+    .prose-content h3 { @apply mt-6 mb-2 font-display text-xl font-semibold text-cream-50; }
+    .prose-content p { @apply mb-4 leading-relaxed text-cream-200; }
+    .prose-content ul { @apply mb-4 list-disc space-y-1 pl-5 text-cream-200; }
+    .prose-content ol { @apply mb-4 list-decimal space-y-1 pl-5 text-cream-200; }
+    .prose-content blockquote { @apply my-5 border-l-4 border-brand-500 bg-ink-800 py-3 pl-5 italic text-cream-200; }
+    .prose-content a { @apply text-brand-300 underline underline-offset-2; }
     .prose-content img { @apply my-6 w-full rounded-2xl; }
     .studio-nav { @apply flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-cream-100 transition-colors hover:bg-ink-700 hover:text-white;
     }
@@ -235,34 +356,20 @@
     }
 }
 
-/* Studio dark theme overrides — UNLAYERED so they beat Tailwind utilities (bg-cream, text-ink, etc.) */
-    .studio-dark { @apply bg-ink-900 text-cream-100; }
-    .studio-dark .card { @apply border-ink-700 bg-ink-800 shadow-black/30 rounded-lg; }
-    .studio-dark .card-hover { @apply hover:shadow-black/50; }
-    .studio-dark .input { @apply border-ink-700 bg-ink-900 text-cream-50 rounded-md placeholder:text-cream-200/40 focus:border-brand-400 focus:ring-brand-400/20; }
-    .studio-dark .label { @apply text-cream-300; }
-    .studio-dark .btn-outline { @apply border-ink-700 text-cream-100 hover:border-cream-300 hover:bg-cream-300 hover:text-ink-900; }
-    .studio-dark .btn-ghost { @apply text-cream-200 hover:bg-ink-700; }
-    .studio-dark .chip { @apply border-ink-700 bg-ink-900 text-cream-200 rounded-md hover:border-brand-400 hover:text-brand-200; }
-    .studio-dark .link { @apply text-brand-300 hover:text-brand-200; }
-    .studio-dark .text-ink-900 { @apply text-cream-50; }
-    .studio-dark .text-ink-700 { @apply text-cream-200; }
-    .studio-dark .text-ink-500 { @apply text-cream-300; }
-    .studio-dark .text-ink-300 { @apply text-cream-300/70; }
-    .studio-dark .bg-cream-50 { @apply bg-ink-800; }
-    .studio-dark .bg-cream-100 { @apply bg-ink-800; }
-    .studio-dark .bg-cream-200 { @apply bg-ink-700; }
-    .studio-dark .border-cream-200 { @apply border-ink-700; }
-    .studio-dark .border-cream-300 { @apply border-ink-700; }
-    .studio-dark .hover\:bg-cream-100:hover { @apply bg-ink-700; }
-    .studio-dark .hover\:bg-cream-200:hover { @apply bg-ink-700; }
-    .studio-dark .bg-brand-50 { @apply bg-brand-900/40; }
-    .studio-dark .text-brand-800 { @apply text-brand-200; }
-    .studio-dark .text-brand-700 { @apply text-brand-300; }
-    .studio-dark .bg-amber-100 { @apply bg-amber-500/20; }
-    .studio-dark .text-amber-700 { @apply text-amber-300; }
-    .studio-dark .text-red-600 { @apply text-red-400; }
-    .studio-dark .bg-white { @apply bg-ink-800; }
+/* ── .studio-shell — vỏ của mọi shell trong app (Studio · Cài đặt · Quản trị · Thư viện ·
+   Bộ sưu tập · trang giá · trang chia sẻ) ──────────────────────────────────────────────
+   [2026-09-23] Trước đây khối này tên .studio-dark và làm hai việc: (1) đặt nền/chữ của vỏ,
+   (2) DỊCH các class viết theo lối "nền sáng" (bg-cream-*, text-ink-*, bg-white) sang theme tối.
+   Việc (2) nay KHÔNG còn cần thiết và cũng không còn đúng: theme sáng đảo vai hai dải
+   ink/cream (xem khối [data-theme='light'] ở trên) nên cùng một class đúng ở cả hai theme.
+   Giữ lại việc (1) + vài khác biệt bán kính của studio. Nếu bạn thấy mình đang muốn thêm
+   một dòng ".studio-shell .x { ... }" để 'sửa màu cho khớp', gần như chắc chắn là nên sửa
+   class trong component cho đúng vai (bề mặt = ink-*, nội dung = cream-*). */
+    .studio-shell { @apply bg-ink-900 text-cream-100; }
+    .studio-shell .card { @apply rounded-lg; }
+    .studio-shell .card-hover { @apply hover:shadow-black/50; }
+    .studio-shell .input { @apply rounded-md; }
+    .studio-shell .chip { @apply rounded-md; }
 
 /* ── Studio Designer Workspace — shared chrome patterns (UI-2, 2026-09-07) ──
    Dùng chung cho mọi panel/card chrome trong /studio để đồng bộ 1 phong cách.
@@ -270,7 +377,7 @@
 @layer components {
     /* Segmented control (tabs / chế độ / ngôn ngữ) — thay mọi chip lồng nhau */
     .seg { @apply flex gap-1 rounded-lg bg-ink-800 p-1; }
-    .seg-btn { @apply flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[11px] font-semibold text-cream-300/70 transition hover:text-cream-100; }
+    .seg-btn { @apply flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[11px] font-semibold text-cream-300 transition-colors hover:text-cream-100; }
     .seg-btn.is-active { @apply bg-brand-600 text-white hover:text-white; }
     /* Nút toolbar nhỏ trong card/panel (toggle lịch sử, templates, hành động phụ) */
     /* Viền NGHỈ của mọi nút phụ = border-ink-600 (xem docs/DESIGN_SYSTEM.md §5 "Viền") —
@@ -287,7 +394,7 @@
     .activity-bar { @apply flex w-14 shrink-0 flex-col items-center gap-2 border-r border-ink-700 bg-ink-900 py-2.5; }
     .activity-bar.right { @apply border-l border-r-0; }
     .activity-bar.right .activity-btn.is-active::before { left: auto; right: 0; }
-    .activity-btn { @apply relative grid h-11 w-11 shrink-0 place-items-center rounded-lg text-cream-300/60 transition-colors hover:bg-ink-800 hover:text-cream-100; }
+    .activity-btn { @apply relative grid h-11 w-11 shrink-0 place-items-center rounded-lg text-cream-400 transition-colors hover:bg-ink-700 hover:text-cream-100; }
     .activity-btn.is-active { @apply bg-ink-800 text-brand-200; }
     .activity-btn.is-active::before {
         content: '';
@@ -385,9 +492,13 @@
         /* Ô bàn cờ = quy ước "vùng trong suốt" của mọi trình chỉnh ảnh. */
         background: repeating-conic-gradient(var(--color-ink-800) 0 25%, var(--color-ink-950) 0 50%) 0 / 12px 12px;
     }
-    .canvas-bg-dark { background: var(--color-ink-950); }
-    .canvas-bg-white { background: #fff; }
-    .canvas-bg-cream { background: var(--color-cream-100); }
+    /* NỀN CANVAS là môi trường làm việc với ẢNH, không phải bề mặt giao diện ⇒ ba nền dưới đây
+       đọc từ token CỐ ĐỊNH (--color-canvas-*) nên không đảo theo theme; riêng "lưới" lấy từ bề
+       mặt để hoà vào vỏ. Vẫn là MỘT nguồn: vùng canvas và ô màu ở thanh trạng thái dùng chung
+       đúng những class này. */
+    .canvas-bg-dark { background: var(--color-canvas-dark); }
+    .canvas-bg-white { background: var(--color-canvas-white); }
+    .canvas-bg-cream { background: var(--color-canvas-cream); }
 
     /* ── 3. BẬT/TẮT LAYER (nút con mắt ở bảng Lớp) ───────────────────────────────────────
        Layer ẩn KHÔNG bị gỡ khỏi DOM — nó mờ đi tại chỗ. Vì sao không gỡ: (a) hiệu ứng phải phủ CẢ thẻ
@@ -625,19 +736,16 @@
 /* --- Elegant scrollbars (thin, subtle, animated) --- */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
+/* Thanh cuộn theo THEME (biến --scrollbar-thumb khai ở khối [data-theme=…]): trước đây
+   thanh cuộn luôn sáng màu cho nền tối nên ở theme sáng gần như vô hình. */
 ::-webkit-scrollbar-thumb {
-    background: rgba(107, 99, 88, 0.32);
+    background: var(--scrollbar-thumb);
     border-radius: 999px;
     transition: background-color var(--motion-dur-base) var(--motion-ease-standard);
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(107, 99, 88, 0.55); }
-::-webkit-scrollbar-thumb:active { background: rgba(51, 103, 77, 0.7); }
-/* Dark surfaces get a lighter thumb */
-.bg-ink-900::-webkit-scrollbar-thumb,
-.bg-ink-800::-webkit-scrollbar-thumb,
-aside::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); }
-aside::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
-* { scrollbar-width: thin; scrollbar-color: rgba(107, 99, 88, 0.35) transparent; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+::-webkit-scrollbar-thumb:active { background: var(--color-brand-500); }
+* { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
 
 @utility btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
 }
@@ -652,7 +760,7 @@ aside::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
 /* hide scrollbars + smooth scrolling (studio) */
 .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
-.studio-dark .scrollbar-hide, .studio-dark { scroll-behavior: smooth; }
+.studio-shell .scrollbar-hide, .studio-shell { scroll-behavior: smooth; }
 
 /* ==========================================================================
    Storefront Vue SPA design system

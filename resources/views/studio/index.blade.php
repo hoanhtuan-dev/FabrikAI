@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="vi" class="h-full">
+<html lang="vi" class="h-full" data-theme="{{ theme_resolved() }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#193d2b">
     <meta name="color-scheme" content="dark light">
+    @include('partials.theme')
     {{-- T5: PWA đã GỠ HẲN (2026-09-17) — đã xoá `/sw.js` + `/manifest.json` + các icon chỉ phục vụ
          manifest. Trước đó service worker không bao giờ được đăng ký lại, nên PWA vốn là code chết.
          Việc gỡ SW cũ trong trình duyệt người dùng vẫn chạy ở `pageBoot.js` (cần thiết: xoá file trên
@@ -34,7 +35,7 @@
     <script>window.__STUDIO_BOOT__ = @json($boot);</script>
 </head>
 <body class="h-screen overflow-hidden bg-ink-900 text-cream-100 antialiased">
-    <div class="absolute inset-0 flex items-center justify-center text-sm text-cream-300/60" aria-hidden="true">Đang tải FabrikAI…</div>
+    <div class="absolute inset-0 flex items-center justify-center text-sm text-cream-400" aria-hidden="true">Đang tải FabrikAI…</div>
     <div id="studio-root" class="absolute inset-0"></div>
 </body>
 </html>

@@ -181,7 +181,7 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
     <!-- ── Thanh công cụ ─────────────────────────────────────────────────── -->
     <div class="mb-4 flex flex-wrap items-center gap-2">
       <div class="relative min-w-[12rem] flex-1">
-        <StudioIcon name="search" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-300/50" />
+        <StudioIcon name="search" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-400" />
         <input v-model="query" type="search" placeholder="Tìm preset theo nhãn, prompt hoặc chú giải…"
                class="input !py-2 pl-9" aria-label="Tìm preset" />
       </div>
@@ -195,8 +195,8 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
 
     <!-- Admin: chuyển giữa bản của mình và bản dùng chung -->
     <div v-if="isAdmin" class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-      <StudioIcon name="lock" size="h-3.5 w-3.5 text-amber-300" />
-      <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-amber-100/90">
+      <StudioIcon name="lock" size="h-3.5 w-3.5 text-warn" />
+      <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-warn">
         Bạn là owner. <b>Bản của tôi</b> chỉ ảnh hưởng bạn; <b>Dùng chung</b> sửa preset cho MỌI người.
       </p>
       <div class="flex overflow-hidden rounded-md border border-ink-600">
@@ -210,21 +210,21 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
     <!-- ── Chip lọc theo danh mục ────────────────────────────────────────── -->
     <div v-if="!loading && !error" class="mb-4 flex flex-wrap gap-1.5">
       <button @click="catFilter = 'all'"
-              :class="catFilter === 'all' ? 'border-brand-500 bg-brand-600/20 text-brand-100' : 'border-ink-600 bg-ink-800/60 text-cream-300 hover:border-ink-500'"
+              :class="catFilter === 'all' ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800/60 text-cream-300 hover:border-ink-500'"
               class="rounded-full border px-2.5 py-1 text-[11px] font-medium transition">
-        Tất cả <span class="text-cream-300/60">{{ merged.length }}</span>
+        Tất cả <span class="text-cream-400">{{ merged.length }}</span>
       </button>
       <button v-for="cat in allCategories" :key="cat" @click="catFilter = cat"
               :title="STUDIO_CATEGORIES.includes(cat) ? 'Danh mục này là CHIP NHANH trong card Studio' : ''"
-              :class="catFilter === cat ? 'border-brand-500 bg-brand-600/20 text-brand-100' : 'border-ink-600 bg-ink-800/60 text-cream-300 hover:border-ink-500'"
+              :class="catFilter === cat ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800/60 text-cream-300 hover:border-ink-500'"
               class="rounded-full border px-2.5 py-1 text-[11px] font-medium transition">
-        {{ CAT_LABELS[cat] || cat }} <span class="text-cream-300/60">{{ countFor(cat) }}</span>
-        <span v-if="STUDIO_CATEGORIES.includes(cat)" class="ml-1 rounded bg-brand-600/25 px-1 py-0.5 text-[9px] font-bold text-brand-100">Studio</span>
+        {{ CAT_LABELS[cat] || cat }} <span class="text-cream-400">{{ countFor(cat) }}</span>
+        <span v-if="STUDIO_CATEGORIES.includes(cat)" class="ml-1 rounded bg-brand-600/25 px-1 py-0.5 text-[9px] font-bold text-brand-200">Studio</span>
       </button>
     </div>
 
-    <p class="mb-4 -mt-2 text-[11px] leading-5 text-cream-300/55">
-      Danh mục có nhãn <span class="rounded bg-brand-600/25 px-1 py-0.5 text-[9px] font-bold text-brand-100">Studio</span>
+    <p class="mb-4 -mt-2 text-[11px] leading-5 text-cream-400">
+      Danh mục có nhãn <span class="rounded bg-brand-600/25 px-1 py-0.5 text-[9px] font-bold text-brand-200">Studio</span>
       (Bối cảnh · Góc máy · Ống kính) trở thành <strong class="text-cream-200">chip nhanh</strong> trong card Studio.
     </p>
 
@@ -232,7 +232,7 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
     <SettingsSkeleton v-if="loading" :rows="4" />
 
     <div v-else-if="error" class="card border-red-500/40 p-5">
-      <p class="flex items-center gap-2 text-sm text-red-200"><StudioIcon name="alertTriangle" size="h-4 w-4" /> {{ error }}</p>
+      <p class="flex items-center gap-2 text-sm text-danger"><StudioIcon name="alertTriangle" size="h-4 w-4" /> {{ error }}</p>
       <button @click="load" class="btn-outline btn-sm mt-3">Thử lại</button>
     </div>
 
@@ -245,7 +245,7 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
     </SettingsEmpty>
 
     <template v-else>
-      <p class="mb-3 text-[11px] text-cream-300/60">
+      <p class="mb-3 text-[11px] text-cream-400">
         Hiện {{ visible.length }} / {{ merged.length }} preset.
         <span v-if="mode === 'mine'">Bản của bạn được lưu theo tài khoản — mở máy khác vẫn còn.</span>
       </p>
@@ -276,15 +276,15 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
                 <div class="flex items-start gap-2">
                   <span class="min-w-0 flex-1 text-sm font-semibold text-cream-50">{{ p.ui_label }}</span>
                   <span v-if="p._local" class="shrink-0 rounded bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">của bạn</span>
-                  <span class="shrink-0 font-mono text-[10px] text-cream-300/40">#{{ p.id }}</span>
+                  <span class="shrink-0 font-mono text-[10px] text-cream-400">#{{ p.id }}</span>
                 </div>
-                <p class="mt-1.5 line-clamp-2 text-xs leading-relaxed text-cream-300/70">{{ p.prompt_injection }}</p>
-                <p v-if="p.note" class="mt-1 text-[10px] italic text-cream-300/50">{{ p.note }}</p>
+                <p class="mt-1.5 line-clamp-2 text-xs leading-relaxed text-cream-300">{{ p.prompt_injection }}</p>
+                <p v-if="p.note" class="mt-1 text-[10px] italic text-cream-400">{{ p.note }}</p>
                 <div class="mt-3 flex items-center justify-end gap-2">
                   <button @click="beginEdit(p)" class="tool-btn" title="Sửa preset">
                     <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
                   </button>
-                  <button @click="askRemove(p)" class="tool-btn !text-red-300 hover:!bg-red-600/25" title="Xoá preset">
+                  <button @click="askRemove(p)" class="tool-btn !text-danger hover:!bg-red-600/25" title="Xoá preset">
                     <StudioIcon name="trash" size="h-3 w-3" /> Xoá
                   </button>
                 </div>

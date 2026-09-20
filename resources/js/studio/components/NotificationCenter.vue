@@ -22,13 +22,13 @@ const store = useStudioStore();
 
 const ICON = { success: 'check', error: 'alertTriangle', warning: 'alertTriangle', info: 'info' };
 const TONE = {
-  success: 'border-emerald-500/40 bg-emerald-950/85 text-emerald-100',
-  error: 'border-red-500/50 bg-red-950/85 text-red-100',
-  warning: 'border-amber-500/50 bg-amber-950/85 text-amber-100',
+  success: 'border-emerald-500/40 bg-emerald-950/85 text-ok',
+  error: 'border-red-500/50 bg-red-950/85 text-danger',
+  warning: 'border-amber-500/50 bg-amber-950/85 text-warn',
   info: 'border-ink-600 bg-ink-900/95 text-cream-100',
 };
 const ICON_TONE = {
-  success: 'text-emerald-300', error: 'text-red-300', warning: 'text-amber-300', info: 'text-brand-300',
+  success: 'text-ok', error: 'text-danger', warning: 'text-warn', info: 'text-brand-300',
 };
 
 function iconOf(n) { return ICON[n.type] || ICON.info; }
@@ -113,12 +113,12 @@ const progress = computed(() => {
         <button
           v-if="n.action"
           type="button"
-          class="shrink-0 rounded-md border border-ink-600 px-2 py-0.5 text-[10px] font-semibold transition hover:bg-white/10"
+          class="shrink-0 rounded-md border border-ink-600 px-2 py-0.5 text-[10px] font-semibold transition hover:bg-cream-50/10"
           @click="n.action.run(); store.dismissNotification(n.id)"
         >{{ n.action.label }}</button>
         <button
           type="button"
-          class="shrink-0 rounded-md p-0.5 opacity-60 transition hover:bg-white/10 hover:opacity-100"
+          class="shrink-0 rounded-md p-0.5 opacity-60 transition hover:bg-cream-50/10 hover:opacity-100"
           title="Đóng thông báo"
           aria-label="Đóng thông báo"
           @click="store.dismissNotification(n.id)"

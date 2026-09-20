@@ -200,10 +200,10 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
     <!-- ── Đầu card: làm gì, nói một câu cho người mới ── -->
     <div class="min-w-0">
       <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="lightbulb" /> Gợi ý từ ảnh</h2>
-      <p class="mt-0.5 text-[10px] leading-4 text-cream-300/60">Đọc ảnh bạn đang có → gợi ý <span class="text-cream-200">phong cách · bảng màu · prompt</span> để tạo ảnh mới.</p>
+      <p class="mt-0.5 text-[10px] leading-4 text-cream-400">Đọc ảnh bạn đang có → gợi ý <span class="text-cream-200">phong cách · bảng màu · prompt</span> để tạo ảnh mới.</p>
     </div>
 
-    <p v-if="!store.suggestEnabled" role="status" class="mt-2 rounded-md border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-[10px] leading-4 text-red-200">
+    <p v-if="!store.suggestEnabled" role="status" class="mt-2 rounded-md border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-[10px] leading-4 text-danger">
       Tính năng đang tắt — bật lại trong <b>Cài đặt Studio → Gợi ý từ ảnh</b>.
     </p>
 
@@ -218,14 +218,14 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
         <img :src="store.upscaleSrc" alt="Ảnh nguồn để phân tích" class="h-14 w-14 shrink-0 rounded-lg bg-ink-900 object-cover ring-1 ring-white/10">
         <div class="min-w-0 flex-1">
           <p class="truncate text-[11px] font-semibold text-cream-100">{{ sourceName }}</p>
-          <p class="mt-0.5 text-[10px] leading-4 text-cream-300/50">Muốn đổi ảnh: chọn ảnh khác trên canvas hoặc trong Thư viện ảnh.</p>
+          <p class="mt-0.5 text-[10px] leading-4 text-cream-400">Muốn đổi ảnh: chọn ảnh khác trên canvas hoặc trong Thư viện ảnh.</p>
         </div>
       </div>
 
       <p v-else class="mt-1.5 flex flex-col items-center gap-1 rounded-lg border border-dashed border-ink-600 bg-ink-900/50 px-2.5 py-3 text-center">
-        <StudioIcon name="image" size="h-5 w-5" class="text-cream-300/60" />
+        <StudioIcon name="image" size="h-5 w-5" class="text-cream-400" />
         <span class="text-[11px] font-semibold text-cream-200">Chưa có ảnh nguồn</span>
-        <span class="text-[10px] leading-4 text-cream-300/45">Bấm một ảnh trên canvas, hoặc mở Thư viện ảnh rồi chọn ảnh cần phân tích.</span>
+        <span class="text-[10px] leading-4 text-cream-400">Bấm một ảnh trên canvas, hoặc mở Thư viện ảnh rồi chọn ảnh cần phân tích.</span>
       </p>
     </div>
 
@@ -233,9 +233,9 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
     <div class="mt-4">
       <p class="flex items-center gap-1.5 text-[11px] font-semibold text-cream-100">
         <span class="grid h-4 w-4 place-items-center rounded-full bg-ink-700 text-[9px] font-bold text-cream-100">2</span>
-        Kiểu gợi ý <span class="rounded bg-ink-800 px-1.5 py-0.5 text-[9px] font-medium text-cream-300/60">tùy chọn</span>
+        Kiểu gợi ý <span class="rounded bg-ink-800 px-1.5 py-0.5 text-[9px] font-medium text-cream-400">tùy chọn</span>
       </p>
-      <p class="mt-1 text-[10px] leading-4 text-cream-300/45">
+      <p class="mt-1 text-[10px] leading-4 text-cream-400">
         Không chọn cũng được — AI tự cân bằng.
         <span v-if="activePreset" class="text-brand-200">Đang dùng: {{ activePreset.label }}.</span>
       </p>
@@ -251,31 +251,31 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
 
     <!-- NÂNG CAO (mặc định gấp) -->
     <details class="mt-3 rounded-lg border border-ink-700 bg-ink-900/50 p-2.5">
-      <summary class="cursor-pointer text-[10px] font-semibold text-cream-300/70">
+      <summary class="cursor-pointer text-[10px] font-semibold text-cream-300">
         Nâng cao: bám trang phục gốc · mức chi tiết · phần bỏ qua
-        <span v-if="activePreset" class="font-normal text-cream-300/45">(theo « {{ activePreset.label }} »)</span>
+        <span v-if="activePreset" class="font-normal text-cream-400">(theo « {{ activePreset.label }} »)</span>
       </summary>
 
       <div class="mt-2.5 space-y-2.5 text-[11px]">
         <div>
           <div class="mb-1 flex items-center justify-between text-cream-200">
             <span class="flex items-center gap-1 font-semibold"><StudioIcon name="target" size="h-3.5 w-3.5" /> Bám trang phục gốc</span>
-            <span class="text-cream-300/70">{{ store.suggestAdherence === 0 ? 'Tự động' : store.suggestAdherence + '/10' }}</span>
+            <span class="text-cream-300">{{ store.suggestAdherence === 0 ? 'Tự động' : store.suggestAdherence + '/10' }}</span>
           </div>
           <input type="range" min="0" max="10" step="1" v-model.number="store.suggestAdherence" aria-label="Mức bám trang phục gốc" class="w-full accent-brand-500" title="0 = tự theo mức sáng tạo; cao = tái tạo chính xác trang phục gốc (màu/đường may/hoạ tiết)">
-          <p class="mt-0.5 text-[10px] text-cream-300/55">
+          <p class="mt-0.5 text-[10px] text-cream-400">
             {{ store.suggestAdherence === 0 ? 'AI tự chọn mức bám phù hợp với ảnh này.' : adherenceText(store.suggestAdherence) }}
           </p>
         </div>
         <div>
           <div class="mb-1 flex items-center justify-between text-cream-200">
             <span class="flex items-center gap-1 font-semibold"><StudioIcon name="search" size="h-3.5 w-3.5" /> Mức chi tiết phân tích</span>
-            <span class="text-cream-300/70">{{ store.suggestDetailLevel }}/10</span>
+            <span class="text-cream-300">{{ store.suggestDetailLevel }}/10</span>
           </div>
           <input type="range" min="1" max="10" step="1" v-model.number="store.suggestDetailLevel" aria-label="Mức chi tiết phân tích" class="w-full accent-brand-500" title="Cao = AI liệt kê đầy đủ màu/đường may/hoạ tiết/độ dài/cổ/tay">
         </div>
         <div class="space-y-1.5">
-          <p class="text-[10px] font-semibold text-cream-300/50">Không cần phân tích</p>
+          <p class="text-[10px] font-semibold text-cream-400">Không cần phân tích</p>
           <label class="motion-ui flex cursor-pointer items-center gap-2 text-cream-200">
             <input type="checkbox" v-model="store.suggestSkipLogo" class="h-3.5 w-3.5 rounded accent-brand-500"> <span>Logo, chữ, watermark</span>
           </label>
@@ -296,7 +296,7 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
       <span v-if="store.suggesting" class="flex items-center justify-center gap-1.5"><span class="suggest-spin"></span> Đang phân tích…</span>
       <span v-else class="flex items-center justify-center gap-1.5"><StudioIcon name="lightbulb" size="h-3.5 w-3.5" /> {{ hasResult ? 'Phân tích lại ảnh này' : 'Phân tích ảnh' }}</span>
     </button>
-    <p v-if="blockReason" class="mt-1.5 text-[10px] leading-4 text-amber-200/85">↳ {{ blockReason }}</p>
+    <p v-if="blockReason" class="mt-1.5 text-[10px] leading-4 text-warn">↳ {{ blockReason }}</p>
 
     <!-- ── Tiến trình phân tích (sự kiện THẬT từ server) ── -->
     <div v-if="store.suggesting" role="status" aria-live="polite"
@@ -304,7 +304,7 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
       <LoadingSpinner size="sm" :text="phaseLabel" :subtext="progressSubtext" :progress="stagePct" />
     </div>
 
-    <div v-if="store.suggestError" role="alert" class="mt-2.5 rounded-lg border border-red-500/40 bg-red-500/10 p-2.5 text-[11px] text-red-200">
+    <div v-if="store.suggestError" role="alert" class="mt-2.5 rounded-lg border border-red-500/40 bg-red-500/10 p-2.5 text-[11px] text-danger">
       {{ store.suggestError }}
     </div>
 
@@ -312,15 +312,15 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
     <div v-if="hasResult" class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/20 p-2.5">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
-          <p class="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-100">
+          <p class="flex items-center gap-1.5 text-[11px] font-semibold text-ok">
             <StudioIcon name="check" size="h-3.5 w-3.5" /> Đã phân tích xong
           </p>
-          <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] text-cream-300/55">
+          <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] text-cream-400">
             <span v-if="lastDuration">Xong trong {{ lastDuration }}</span>
             <span>· mức bám: {{ adherenceLabel }}</span>
           </p>
         </div>
-        <button class="motion-ui grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/10 text-cream-200 transition hover:bg-red-600 hover:text-white"
+        <button class="motion-ui grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cream-50/10 text-cream-200 transition hover:bg-red-600 hover:text-white"
                 title="Xoá gợi ý này" aria-label="Xoá gợi ý này"
                 @click="store.suggestResult = null; store.suggestError = ''; lang = 'en'">
           <StudioIcon name="x" size="h-3.5 w-3.5" />
@@ -329,18 +329,18 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
 
       <!-- Đặc điểm AI đọc được từ ảnh -->
       <div class="mt-2 flex flex-wrap gap-1">
-        <span v-if="r.garment_type" class="inline-flex items-center gap-1 rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="shirt" size="h-3 w-3" class="text-brand-300" /> {{ r.garment_type }}</span>
-        <span v-if="r.fabric" class="inline-flex items-center gap-1 rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="feather" size="h-3 w-3" class="text-brand-300" /> {{ r.fabric }}</span>
-        <span v-if="r.silhouette" class="inline-flex items-center gap-1 rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="body" size="h-3 w-3" class="text-brand-300" /> {{ r.silhouette }}</span>
-        <span v-if="r.camera" class="inline-flex items-center gap-1 rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="camera" size="h-3 w-3" class="text-brand-300" /> {{ r.camera }}</span>
-        <span v-if="r.pose" class="inline-flex items-center gap-1 rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="pose" size="h-3 w-3" class="text-brand-300" /> {{ r.pose }}</span>
-        <span v-if="r.background" class="inline-flex items-center gap-1 rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="background" size="h-3 w-3" class="text-brand-300" /> {{ r.background }}</span>
-        <span v-if="r.embellishment" class="inline-flex items-center gap-1 rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="sparkles" size="h-3 w-3" class="text-brand-300" /> {{ r.embellishment }}</span>
+        <span v-if="r.garment_type" class="inline-flex items-center gap-1 rounded-full bg-cream-50/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="shirt" size="h-3 w-3" class="text-brand-300" /> {{ r.garment_type }}</span>
+        <span v-if="r.fabric" class="inline-flex items-center gap-1 rounded-full bg-cream-50/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="feather" size="h-3 w-3" class="text-brand-300" /> {{ r.fabric }}</span>
+        <span v-if="r.silhouette" class="inline-flex items-center gap-1 rounded-full bg-cream-50/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="body" size="h-3 w-3" class="text-brand-300" /> {{ r.silhouette }}</span>
+        <span v-if="r.camera" class="inline-flex items-center gap-1 rounded-full bg-cream-50/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="camera" size="h-3 w-3" class="text-brand-300" /> {{ r.camera }}</span>
+        <span v-if="r.pose" class="inline-flex items-center gap-1 rounded-full bg-cream-50/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="pose" size="h-3 w-3" class="text-brand-300" /> {{ r.pose }}</span>
+        <span v-if="r.background" class="inline-flex items-center gap-1 rounded-full bg-cream-50/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="background" size="h-3 w-3" class="text-brand-300" /> {{ r.background }}</span>
+        <span v-if="r.embellishment" class="inline-flex items-center gap-1 rounded-full bg-cream-50/8 px-2 py-0.5 text-[10px] text-cream-100"><StudioIcon name="sparkles" size="h-3 w-3" class="text-brand-300" /> {{ r.embellishment }}</span>
       </div>
 
       <!-- Bảng màu -->
       <div v-if="palette.length" class="mt-2 flex flex-wrap items-center gap-1">
-        <span class="text-[10px] text-cream-300/50">Bảng màu:</span>
+        <span class="text-[10px] text-cream-400">Bảng màu:</span>
         <span v-for="c in palette" :key="c" class="rounded-full border border-ink-600 bg-ink-800 px-2 py-0.5 text-[10px] text-cream-200">{{ c }}</span>
       </div>
 
@@ -373,7 +373,7 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
       <p v-else-if="tab === 'notes'" class="suggest-text mt-2">{{ r.detail_notes }}</p>
 
       <div v-else class="mt-2 flex flex-wrap gap-1">
-        <span v-for="k in keywords" :key="k" class="rounded-full bg-brand-900/60 px-2 py-0.5 text-[10px] text-brand-100">#{{ k }}</span>
+        <span v-for="k in keywords" :key="k" class="rounded-full bg-brand-900/60 px-2 py-0.5 text-[10px] text-brand-200">#{{ k }}</span>
       </div>
 
       <!-- Việc tiếp theo: TẠO ẢNH (nút chính) · lưu lại để dùng sau (nút phụ) -->
@@ -384,7 +384,7 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
       <button class="btn-ghost btn-sm motion-ui mt-1.5 w-full border border-ink-600 text-[11px] text-cream-200" :disabled="store.suggestSaving" @click="store.saveSuggestResult()">
         {{ store.suggestSaving ? 'Đang lưu…' : 'Lưu vào Thư viện Prompt' }}
       </button>
-      <p class="mt-1 text-center text-[9px] leading-4 text-cream-300/45">Lưu lại để lần sau mở là dùng được ngay, không phải phân tích lại.</p>
+      <p class="mt-1 text-center text-[9px] leading-4 text-cream-400">Lưu lại để lần sau mở là dùng được ngay, không phải phân tích lại.</p>
     </div>
 
     <!-- ── Tiến trình TẠO ẢNH: cùng một widget tiến trình, không vẽ bộ riêng ── -->
@@ -395,17 +395,17 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
 
     <!-- ── Gợi ý gần đây: dùng lại kết quả cũ (gấp sẵn — việc của người mới là ảnh nguồn + nút Phân tích) ── -->
     <details class="mt-3 rounded-lg border border-ink-700 bg-ink-900/50 p-2.5">
-      <summary class="flex cursor-pointer items-center gap-1.5 text-[10px] font-semibold text-cream-300/70">
+      <summary class="flex cursor-pointer items-center gap-1.5 text-[10px] font-semibold text-cream-300">
         <StudioIcon name="clock" size="h-3.5 w-3.5" /> Gợi ý gần đây
-        <span v-if="store.suggestRecentTotal" class="rounded bg-ink-800 px-1.5 py-0.5 text-[9px] font-medium text-cream-300/70">{{ store.suggestRecentTotal }}</span>
+        <span v-if="store.suggestRecentTotal" class="rounded bg-ink-800 px-1.5 py-0.5 text-[9px] font-medium text-cream-300">{{ store.suggestRecentTotal }}</span>
       </summary>
 
       <div class="mt-2 flex justify-end">
-        <button class="motion-ui rounded-full border border-ink-600 px-2 py-0.5 text-[9px] font-semibold text-cream-300/70 transition hover:border-brand-400 hover:text-brand-200" @click="loadRecent">Làm mới</button>
+        <button class="motion-ui rounded-full border border-ink-600 px-2 py-0.5 text-[9px] font-semibold text-cream-300 transition hover:border-brand-400 hover:text-brand-200" @click="loadRecent">Làm mới</button>
       </div>
 
-      <p v-if="store.suggestRecentLoading && !store.suggestRecent.length" class="mt-2 text-[10px] text-cream-300/50">Đang tải…</p>
-      <p v-else-if="!store.suggestRecent.length" class="mt-2 rounded-md border border-ink-700 bg-ink-900/60 p-2.5 text-[10px] leading-4 text-cream-300/55">
+      <p v-if="store.suggestRecentLoading && !store.suggestRecent.length" class="mt-2 text-[10px] text-cream-400">Đang tải…</p>
+      <p v-else-if="!store.suggestRecent.length" class="mt-2 rounded-md border border-ink-700 bg-ink-900/60 p-2.5 text-[10px] leading-4 text-cream-400">
         Chưa có gợi ý nào được lưu. Sau khi phân tích, bấm <b class="text-cream-200">Lưu vào Thư viện Prompt</b> để lần sau dùng lại ngay.
       </p>
 
@@ -414,10 +414,10 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
             class="motion-row flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-900/50 p-1.5 transition hover:border-brand-400">
           <button class="flex min-w-0 flex-1 items-center gap-2 text-left" :title="'Nạp lại gợi ý: ' + (item.garment_type || 'không tên')" @click="store.applyRecentSuggest(item)">
             <img v-if="item.reference_thumb || item.reference_url" :src="item.reference_thumb || item.reference_url" :alt="item.garment_type || 'Ảnh gợi ý'" class="h-9 w-9 shrink-0 rounded-md bg-ink-900 object-cover ring-1 ring-white/10">
-            <span v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-ink-800 text-cream-300/40"><StudioIcon name="image" size="h-4 w-4" /></span>
+            <span v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-ink-800 text-cream-400"><StudioIcon name="image" size="h-4 w-4" /></span>
             <span class="min-w-0 flex-1">
               <span class="block truncate text-[11px] font-semibold text-cream-100">{{ item.garment_type || (item.styles || []).join(', ') || 'Gợi ý từ ảnh' }}</span>
-              <span class="mt-0.5 block truncate text-[9px] text-cream-300/50">
+              <span class="mt-0.5 block truncate text-[9px] text-cream-400">
                 {{ item._local ? 'vừa phân tích (chưa lưu)' : (item.ago || '') }}<template v-if="item.apply_count"> · đã dùng {{ item.apply_count }} lần</template>
               </span>
             </span>
@@ -425,11 +425,11 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
           <button v-if="item._local" class="tool-btn motion-ui shrink-0 !px-2 !py-1" title="Lưu gợi ý này vào Thư viện Prompt" aria-label="Lưu gợi ý này vào Thư viện Prompt" @click="saveFromRecent(item)">
             <StudioIcon name="save" size="h-3.5 w-3.5" />
           </button>
-          <span v-else class="shrink-0 text-[9px] text-emerald-200/70">đã lưu</span>
+          <span v-else class="shrink-0 text-[9px] text-ok">đã lưu</span>
         </li>
       </ul>
 
-      <p v-if="store.suggestRecentTotal > store.suggestRecent.length" class="mt-1.5 text-[9px] text-cream-300/45">
+      <p v-if="store.suggestRecentTotal > store.suggestRecent.length" class="mt-1.5 text-[9px] text-cream-400">
         Còn {{ store.suggestRecentTotal - store.suggestRecent.length }} gợi ý nữa trong Thư viện Prompt.
       </p>
     </details>

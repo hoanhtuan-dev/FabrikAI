@@ -22,7 +22,7 @@ const sep = 'h-4 w-px shrink-0 bg-ink-600';
 <template>
   <div class="pointer-events-auto flex flex-wrap items-center gap-0.5 rounded-lg border border-ink-700/80 bg-ink-900/95 px-1.5 py-1 shadow-2xl ring-1 ring-ink-700/40 backdrop-blur">
     <!-- Số layer -->
-    <span class="flex items-center gap-1.5 px-2 text-[11px] font-semibold text-cream-300/80"><StudioIcon name="layers" size="h-3.5 w-3.5" class="text-brand-300"/> {{ store.selectionUnitCount }} đối tượng</span>
+    <span class="flex items-center gap-1.5 px-2 text-[11px] font-semibold text-cream-300"><StudioIcon name="layers" size="h-3.5 w-3.5" class="text-brand-300"/> {{ store.selectionUnitCount }} đối tượng</span>
     <span :class="sep"></span>
 
     <!-- Căn lề -->
@@ -44,6 +44,6 @@ const sep = 'h-4 w-px shrink-0 bg-ink-600';
     <span :class="sep"></span>
 
     <!-- Xóa -->
-    <button @click="store.deleteSelection()" :class="[lblBtn, 'text-red-300 hover:bg-red-600/25 hover:text-red-200']" title="Xóa các layer đang chọn (Delete)"><StudioIcon name="trash" size="h-3.5 w-3.5"/>Xóa</button>
+    <button @click="store.deleteSelection()" :class="[lblBtn, 'text-danger hover:bg-red-600/25 hover:text-danger']" title="Xóa các layer đang chọn (Delete)"><StudioIcon name="trash" size="h-3.5 w-3.5"/>Xóa</button>
   </div>
 </template>

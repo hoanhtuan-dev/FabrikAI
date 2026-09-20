@@ -3,9 +3,17 @@
 // Không props — đọc/ghi trực tiếp useStudioStore(). Mọi icon qua <StudioIcon/>.
 import { computed } from 'vue';
 import { useStudioStore } from '../store.js';
+import { useTheme } from '../composables/useTheme.js';
 import StudioIcon from './StudioIcon.vue';
 
 const store = useStudioStore();
+
+// Đổi nhanh Sáng ⇄ Tối ngay tại chỗ làm việc. Ba lựa chọn đầy đủ (gồm "Theo hệ điều hành")
+// nằm ở Cài đặt của tôi → Giao diện; ở đây bấm là chốt hẳn một trong hai giao diện, nên
+// title nói rõ điều đó để người dùng không tưởng nút này cũng xoay được chế độ "theo máy".
+const { resolved: themeResolved, setTheme } = useTheme();
+function toggleTheme() { setTheme(themeResolved.value === 'light' ? 'dark' : 'light'); }
+
 
 // Gợi ý công cụ theo chế độ đang dùng (Krita-style) — hiện khi có công cụ active.
 const toolHint = computed(() => {
@@ -88,13 +96,13 @@ const BG_OPTIONS = [
 
     <!-- 7. Spacer + Gợi ý công cụ (Krita-style) -->
     <div class="flex-1"></div>
-    <div v-if="toolHint" class="flex min-w-0 items-center gap-1.5 overflow-hidden px-1 text-[10px] text-cream-300/60" title="Hướng dẫn công cụ">
+    <div v-if="toolHint" class="flex min-w-0 items-center gap-1.5 overflow-hidden px-1 text-[10px] text-cream-400" title="Hướng dẫn công cụ">
       <StudioIcon name="info" size="h-3.5 w-3.5" class="shrink-0" />
       <span class="truncate">{{ toolHint }}</span>
     </div>
 
     <!-- 7. Trạng thái (md+) -->
-    <div class="hidden items-center gap-1.5 text-[10px] text-cream-300/60 md:flex">
+    <div class="hidden items-center gap-1.5 text-[10px] text-cream-400 md:flex">
       <StudioIcon name="layers" size="h-3.5 w-3.5" />
       <span>{{ store.canvasLayers.length }} lớp</span>
       <template v-if="store.activeLayer">
@@ -103,7 +111,22 @@ const BG_OPTIONS = [
       </template>
     </div>
 
-    <!-- 8. Lưu vật lý -->
+    <!-- 8. Giao diện Sáng/Tối (2026-09-23) — đổi ngay tại chỗ, không phải mở Cài đặt -->
+    <div class="h-4 w-px bg-ink-700" aria-hidden="true"></div>
+    <button
+      @click="toggleTheme"
+      :class="BTN"
+      :title="'Giao diện đang là ' + (themeResolved === 'light' ? 'Sáng' : 'Tối') + ' — bấm để đổi (muốn theo hệ điều hành: Cài đặt của tôi → Giao diện)'"
+      :aria-label="'Đổi giao diện Sáng/Tối, đang là ' + (themeResolved === 'light' ? 'Sáng' : 'Tối')"
+    >
+      <!-- Hai thẻ <StudioIcon> tách bằng v-if/v-else (KHÔNG dùng tam phân trong :name): test
+           quét mọi chuỗi trong thuộc tính name của <StudioIcon> và đòi chúng là icon có thật —
+           'light' trong biểu thức tam phân sẽ bị coi là một icon không tồn tại. -->
+      <StudioIcon v-if="themeResolved === 'light'" name="sun" />
+      <StudioIcon v-else name="moon" />
+    </button>
+
+    <!-- 9. Lưu vật lý -->
     <button
       @click="store.saveNow()"
       class="grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700"

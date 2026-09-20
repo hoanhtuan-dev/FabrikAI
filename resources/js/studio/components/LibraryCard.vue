@@ -12,7 +12,7 @@ function goLibrary() { store.exitCanvasTools(); store.studioView = 'library'; }
     <div class="p-2">
       <button
         @click="goLibrary"
-        class="flex aspect-square w-full flex-col items-center justify-center rounded-md border border-dashed border-ink-600 bg-ink-800/50 text-cream-300/70 transition-colors hover:border-brand-400 hover:bg-ink-800 hover:text-brand-300"
+        class="flex aspect-square w-full flex-col items-center justify-center rounded-md border border-dashed border-ink-600 bg-ink-800/50 text-cream-300 transition-colors hover:border-brand-400 hover:bg-ink-800 hover:text-brand-300"
         title="Xem ảnh trong thư viện"
         :aria-label="'Xem ảnh trong thư viện'"
       >

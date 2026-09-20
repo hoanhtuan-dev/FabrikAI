@@ -35,10 +35,10 @@ const hasProgress = computed(() => props.progress != null);
     <p :class="[sizeClasses.text, 'font-semibold text-cream-100']">{{ text }}</p>
 
     <!-- Subtext (tiến độ, thời gian, v.v.) -->
-    <p v-if="subtext" :class="[sizeClasses.sub, 'text-cream-300/60']">{{ subtext }}</p>
+    <p v-if="subtext" :class="[sizeClasses.sub, 'text-cream-400']">{{ subtext }}</p>
 
     <!-- Progress bar -->
-    <div v-if="hasProgress" class="w-full max-w-xs overflow-hidden rounded-full bg-white/10">
+    <div v-if="hasProgress" class="w-full max-w-xs overflow-hidden rounded-full bg-cream-50/10">
       <div :class="[sizeClasses.bar]"
            class="animate-pulse rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-brand-500 transition-all duration-slow"
            :style="{ width: Math.min(100, Math.max(0, progress)) + '%' }"></div>

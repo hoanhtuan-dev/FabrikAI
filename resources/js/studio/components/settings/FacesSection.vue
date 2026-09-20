@@ -138,7 +138,7 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
     <!-- Thanh công cụ -->
     <div class="mb-4 flex flex-wrap items-center gap-2">
       <div class="relative min-w-[12rem] flex-1">
-        <StudioIcon name="search" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-300/50" />
+        <StudioIcon name="search" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-400" />
         <input v-model="query" type="search" :placeholder="'Tìm ' + NOUN + ' theo tên…'" class="input !py-2 pl-9" :aria-label="'Tìm ' + NOUN" />
       </div>
       <div class="flex overflow-hidden rounded-lg border border-ink-600">
@@ -155,10 +155,10 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
     <!-- Ai thấy gì -->
     <div class="card mb-4 flex flex-wrap items-center gap-2 p-3">
       <StudioIcon :name="isModel ? 'user' : 'pose'" size="h-4 w-4 text-brand-300" />
-      <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-cream-300/70">
+      <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-cream-300">
         Bạn đang có <b class="text-cream-100">{{ myCount }}</b> mục riêng.
         Mục bạn thêm là <b>của riêng bạn</b> — người khác không thấy; mục <b>dùng chung</b> là catalog sẵn có.
-        <span v-if="isAdmin" class="text-amber-300/80">Là owner, bạn thấy và xoá được mục của mọi người.</span>
+        <span v-if="isAdmin" class="text-warn">Là owner, bạn thấy và xoá được mục của mọi người.</span>
       </p>
     </div>
 
@@ -166,7 +166,7 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
     <SettingsSkeleton v-if="loading" :rows="3" />
 
     <div v-else-if="error" class="card border-red-500/40 p-5">
-      <p class="flex items-center gap-2 text-sm text-red-200"><StudioIcon name="alertTriangle" size="h-4 w-4" /> {{ error }}</p>
+      <p class="flex items-center gap-2 text-sm text-danger"><StudioIcon name="alertTriangle" size="h-4 w-4" /> {{ error }}</p>
       <button @click="load" class="btn-outline btn-sm mt-3">Thử lại</button>
     </div>
 
@@ -179,23 +179,23 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
     </SettingsEmpty>
 
     <template v-else>
-      <p class="mb-3 text-[11px] text-cream-300/60">Hiện {{ list.length }} / {{ total }} mục.</p>
+      <p class="mb-3 text-[11px] text-cream-400">Hiện {{ list.length }} / {{ total }} mục.</p>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div v-for="it in list" :key="it.id" class="card flex items-center gap-3 p-3">
           <img v-if="it.thumb || it.image" :src="it.thumb || it.image" loading="lazy" alt="" class="h-14 w-14 shrink-0 rounded-lg object-cover ring-1 ring-white/15">
-          <span v-else class="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-ink-700 text-cream-300/50">
+          <span v-else class="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-ink-700 text-cream-400">
             <StudioIcon :name="isModel ? 'user' : 'pose'" size="h-5 w-5" />
           </span>
           <div class="min-w-0 flex-1">
             <p class="truncate text-xs font-semibold text-cream-100">
               {{ it.name }}
               <span v-if="it.mine" class="ml-1 rounded bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">của bạn</span>
-              <span v-else class="ml-1 rounded bg-ink-700 px-1.5 py-0.5 text-[9px] font-semibold text-cream-300/60">dùng chung</span>
+              <span v-else class="ml-1 rounded bg-ink-700 px-1.5 py-0.5 text-[9px] font-semibold text-cream-400">dùng chung</span>
             </p>
-            <p class="truncate text-[10px] text-cream-300/50">#{{ it.id }}<span v-if="it.ethnicity"> · {{ it.ethnicity }}</span><span v-else-if="it.skeleton"> · {{ it.skeleton }}</span></p>
+            <p class="truncate text-[10px] text-cream-400">#{{ it.id }}<span v-if="it.ethnicity"> · {{ it.ethnicity }}</span><span v-else-if="it.skeleton"> · {{ it.skeleton }}</span></p>
           </div>
           <button v-if="it.mine || isAdmin" @click="pendingDelete = it"
-                  class="tool-btn shrink-0 !text-red-300 hover:!bg-red-600/25" :title="'Xoá ' + it.name">
+                  class="tool-btn shrink-0 !text-danger hover:!bg-red-600/25" :title="'Xoá ' + it.name">
             <StudioIcon name="trash" size="h-3 w-3" />
           </button>
         </div>
@@ -211,7 +211,7 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
             <StudioIcon name="x" size="h-4 w-4" />
           </button>
         </div>
-        <p class="mb-4 text-[11px] leading-relaxed text-cream-300/60">
+        <p class="mb-4 text-[11px] leading-relaxed text-cream-400">
           {{ isModel ? 'Ảnh khuôn mặt rõ, chính diện, không bị che — dùng cho Thay người mẫu và Ghép ảnh.' : 'Ảnh toàn thân thể hiện rõ dáng đứng — dùng khi tạo ảnh người mẫu.' }}
         </p>
         <div>

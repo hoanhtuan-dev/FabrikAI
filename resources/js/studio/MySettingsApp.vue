@@ -5,6 +5,7 @@ import SettingsToasts from './components/settings/SettingsToasts.vue';
 import PresetSection from './components/settings/PresetSection.vue';
 import FacesSection from './components/settings/FacesSection.vue';
 import StylistSection from './components/settings/StylistSection.vue';
+import AppearanceSection from './components/settings/AppearanceSection.vue';
 import { notify } from './composables/useSettingsToast.js';
 import { setCatalogErrorHandler } from './composables/useLocalCatalog.js';
 
@@ -29,6 +30,9 @@ const SECTIONS = [
   { id: 'model', label: 'Khuôn mặt', icon: 'user', desc: 'Khuôn mặt người mẫu', hint: 'Dùng cho Thay người mẫu và Ghép ảnh. Mục bạn thêm là của riêng bạn.' },
   { id: 'pose', label: 'Dáng pose', icon: 'image', desc: 'Dáng đứng của người mẫu', hint: 'Dáng đứng áp dụng khi tạo ảnh người mẫu.' },
   { id: 'stylist', label: 'Trợ lý thiết kế', icon: 'sparkles', desc: 'Loại trang phục + bộ câu hỏi', hint: 'Dữ liệu dùng bởi card Trợ lý thiết kế trong Studio.' },
+  // [2026-09-23] Mục GIAO DIỆN đứng CUỐI: nó là tùy chọn hiển thị dùng chung cho mọi màn hình,
+  // không phải dữ liệu làm việc — người vào đây thường để sửa preset/khuôn mặt/dáng.
+  { id: 'appearance', label: 'Giao diện', icon: 'sun', desc: 'Sáng · Tối · Theo hệ điều hành', hint: 'Áp ngay khi chọn và lưu theo tài khoản — mở trên máy khác vẫn đúng.' },
 ];
 
 // Lớp lưu trữ catalog (nay ghi lên server) báo lỗi qua hook thay vì import vue — xem ràng buộc 1
@@ -49,7 +53,12 @@ const USER = (() => {
 })();
 
 const active = computed(() => SECTIONS.find((s) => s.id === section.value) || SECTIONS[0]);
-const component = computed(() => (section.value === 'presets' ? PresetSection : (section.value === 'stylist' ? StylistSection : FacesSection)));
+const component = computed(() => {
+  if (section.value === 'presets') return PresetSection;
+  if (section.value === 'stylist') return StylistSection;
+  if (section.value === 'appearance') return AppearanceSection;
+  return FacesSection;
+});
 
 /** Mục model/pose dùng CHUNG một component, phân biệt bằng prop `kind`. */
 const componentProps = computed(() => (section.value === 'model' || section.value === 'pose' ? { kind: section.value } : {}));
@@ -81,14 +90,14 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
 </script>
 
 <template>
-  <div class="studio-dark min-h-screen w-full">
+  <div class="studio-shell min-h-screen w-full">
     <div class="mx-auto flex w-full max-w-[100rem] lg:gap-6 lg:px-6 lg:py-6">
 
       <!-- Sidebar (màn hình rộng) -->
       <aside class="hidden w-64 shrink-0 lg:block">
         <div class="sticky top-6 flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-xl border border-ink-700 bg-ink-800/70">
           <div class="border-b border-ink-700 px-4 py-4">
-            <p class="text-[10px] font-semibold uppercase tracking-wider text-cream-300/50">FabrikAI</p>
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-cream-400">FabrikAI</p>
             <h1 class="mt-1 font-display text-base font-semibold text-cream-50">Cài đặt của tôi</h1>
           </div>
           <nav class="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Các mục cài đặt">
@@ -99,15 +108,15 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
               <StudioIcon :name="s.icon" size="mt-0.5 h-4 w-4 shrink-0" />
               <span class="min-w-0 flex-1">
                 <span class="block text-xs font-semibold">{{ s.label }}</span>
-                <span class="mt-0.5 block text-[10px] leading-snug text-cream-300/60">{{ s.desc }}</span>
+                <span class="mt-0.5 block text-[10px] leading-snug text-cream-400">{{ s.desc }}</span>
               </span>
             </button>
           </nav>
           <div class="border-t border-ink-700 p-3">
-            <a href="/" class="flex items-center justify-center gap-1.5 rounded-lg border border-ink-600 px-3 py-2 text-[11px] font-medium text-cream-200 transition hover:border-cream-300 hover:bg-cream-300 hover:text-ink-900">
+            <a href="/" class="flex items-center justify-center gap-1.5 rounded-lg border border-ink-600 px-3 py-2 text-[11px] font-medium text-cream-200 transition hover:border-cream-300 hover:bg-invert hover:text-invert-content">
               <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Về xưởng thiết kế
             </a>
-            <p v-if="USER.admin" class="mt-2 text-center text-[10px] text-amber-300/70">Tài khoản owner</p>
+            <p v-if="USER.admin" class="mt-2 text-center text-[10px] text-warn">Tài khoản owner</p>
           </div>
         </div>
       </aside>
@@ -142,7 +151,7 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
               </span>
               <div class="min-w-0">
                 <h2 class="font-display text-lg font-semibold text-cream-50">{{ active.label }}</h2>
-                <p class="mt-0.5 text-[11px] leading-snug text-cream-300/60">{{ active.hint }}</p>
+                <p class="mt-0.5 text-[11px] leading-snug text-cream-400">{{ active.hint }}</p>
               </div>
             </div>
           </header>

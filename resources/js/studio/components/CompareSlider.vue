@@ -44,11 +44,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
           <img :src="after" class="h-full w-full object-contain" draggable="false">
         </div>
         <!-- Đường chia -->
-        <div class="pointer-events-none absolute inset-y-0 w-0.5 bg-white shadow" :style="{ left: pos + '%' }"></div>
-        <div class="pointer-events-none absolute top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-white text-ink-900 shadow" :style="{ left: 'calc(' + pos + '% - 16px)' }">⇄</div>
+        <div class="pointer-events-none absolute inset-y-0 w-0.5 bg-invert shadow" :style="{ left: pos + '%' }"></div>
+        <div class="pointer-events-none absolute top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-invert text-invert-content shadow" :style="{ left: 'calc(' + pos + '% - 16px)' }">⇄</div>
         <!-- Nhãn -->
-        <span class="pointer-events-none absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-cream-100">Trước</span>
-        <span class="pointer-events-none absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-cream-100">Sau</span>
+        <span class="pointer-events-none absolute left-2 top-2 rounded-full bg-scrim/60 px-2 py-0.5 text-[10px] font-semibold text-scrim-content">Trước</span>
+        <span class="pointer-events-none absolute right-2 top-2 rounded-full bg-scrim/60 px-2 py-0.5 text-[10px] font-semibold text-scrim-content">Sau</span>
       </div>
 
       <input type="range" min="0" max="100" step="1" v-model.number="pos" class="mt-4 h-2 w-full cursor-pointer accent-brand-500">

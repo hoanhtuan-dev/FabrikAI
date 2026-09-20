@@ -59,13 +59,13 @@ const ROLE_META = {
 const roleMeta = (r) => ROLE_META[r] || { label: r, cls: 'bg-ink-700 text-cream-300' };
 
 const TYPE_META = {
-  spend: { label: 'Tiêu credit', cls: 'bg-red-500/15 text-red-300' },
-  refund: { label: 'Hoàn credit', cls: 'bg-emerald-500/15 text-emerald-300' },
-  grant: { label: 'Tặng credit', cls: 'bg-emerald-500/15 text-emerald-300' },
+  spend: { label: 'Tiêu credit', cls: 'bg-red-500/15 text-danger' },
+  refund: { label: 'Hoàn credit', cls: 'bg-emerald-500/15 text-ok' },
+  grant: { label: 'Tặng credit', cls: 'bg-emerald-500/15 text-ok' },
   purchase: { label: 'Nạp gói', cls: 'bg-brand-600/25 text-brand-100' },
   renew: { label: 'Gia hạn', cls: 'bg-brand-600/25 text-brand-100' },
-  signup: { label: 'Đăng ký', cls: 'bg-sky-500/15 text-sky-300' },
-  adjust: { label: 'Điều chỉnh', cls: 'bg-amber-500/15 text-amber-300' },
+  signup: { label: 'Đăng ký', cls: 'bg-sky-500/15 text-info' },
+  adjust: { label: 'Điều chỉnh', cls: 'bg-amber-500/15 text-warn' },
   // [2026-09-19] Cấp credit theo CHU KỲ GÓI (plans.credits_per_month) — trước đây gói chỉ hiển thị
   // số credit/tháng mà không có đường cấp nào.
   plan_grant: { label: 'Cấp theo gói', cls: 'bg-brand-600/25 text-brand-100' },
@@ -77,7 +77,7 @@ const typeMeta = (t) => TYPE_META[t] || { label: t, cls: 'bg-ink-700 text-cream-
 const GUI_PINNED = ['settings'];
 const GUI_KIND = {
   panel: { label: 'Nhóm card', cls: 'bg-brand-600/25 text-brand-100', hint: 'Mở nhóm card ở sidebar trái' },
-  action: { label: 'Popup', cls: 'bg-amber-500/20 text-amber-200', hint: 'Mở popup riêng (không đổi sidebar)' },
+  action: { label: 'Popup', cls: 'bg-amber-500/20 text-warn', hint: 'Mở popup riêng (không đổi sidebar)' },
   menu: { label: 'Menu (ghim đáy)', cls: 'bg-ink-700 text-cream-300', hint: 'Menu Cài đặt — luôn nằm ở đáy thanh công cụ' },
 };
 const isGuiPinned = (it) => GUI_PINNED.indexOf(it.id) !== -1;
@@ -85,11 +85,11 @@ const isGuiPinned = (it) => GUI_PINNED.indexOf(it.id) !== -1;
 const BADGE = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold';
 const BADGE_TONE = {
   neutral: 'bg-ink-700 text-cream-300',
-  ok: 'bg-emerald-500/15 text-emerald-300',
-  warn: 'bg-amber-500/15 text-amber-300',
-  danger: 'bg-red-500/15 text-red-300',
+  ok: 'bg-emerald-500/15 text-ok',
+  warn: 'bg-amber-500/15 text-warn',
+  danger: 'bg-red-500/15 text-danger',
   brand: 'bg-brand-600/25 text-brand-100',
-  info: 'bg-sky-500/15 text-sky-300',
+  info: 'bg-sky-500/15 text-info',
   gold: 'bg-gold-400/15 text-gold-400',
 };
 
@@ -369,9 +369,9 @@ async function grantAllModules(plan) {
 }
 const moduleKindMeta = (k) => ({
   panel: { label: 'Nhóm card', cls: 'bg-brand-600/25 text-brand-100' },
-  action: { label: 'Popup', cls: 'bg-amber-500/20 text-amber-200' },
+  action: { label: 'Popup', cls: 'bg-amber-500/20 text-warn' },
   menu: { label: 'Menu', cls: 'bg-ink-700 text-cream-300' },
-  feature: { label: 'Tính năng', cls: 'bg-sky-500/15 text-sky-300' },
+  feature: { label: 'Tính năng', cls: 'bg-sky-500/15 text-info' },
 }[k] || { label: k, cls: 'bg-ink-700 text-cream-300' });
 
 function ensureLoaded(id) {
@@ -428,10 +428,10 @@ const attention = computed(() => {
 // Bốn tông chú ý — CÙNG quy ước với viền nút: một nghĩa = ĐÚNG MỘT cặp màu + alpha (/40).
 // Xem docs/DESIGN_SYSTEM.md §5 "Viền".
 const attentionTone = (tone) => ({
-  danger: 'text-red-300 bg-red-500/10 border-red-500/40',
-  warn: 'text-amber-300 bg-amber-500/10 border-amber-500/40',
-  info: 'text-sky-300 bg-sky-500/10 border-sky-500/40',
-  ok: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/40',
+  danger: 'text-danger bg-red-500/10 border-red-500/40',
+  warn: 'text-warn bg-amber-500/10 border-amber-500/40',
+  info: 'text-info bg-sky-500/10 border-sky-500/40',
+  ok: 'text-ok bg-emerald-500/10 border-emerald-500/40',
 }[tone] || 'text-cream-300 bg-ink-700 border-ink-700');
 
 // ─────────────────────────── Hộp thoại: người dùng ───────────────────────────
@@ -716,12 +716,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="studio-dark min-h-screen w-full">
+  <div class="studio-shell min-h-screen w-full">
     <!-- Thông báo: aria-live để trình đọc màn hình đọc được kết quả thao tác -->
     <div class="pointer-events-none fixed bottom-5 right-5 z-[80] flex w-[min(92vw,26rem)] flex-col gap-2">
       <transition name="fade">
         <div v-if="toast" role="status" aria-live="polite"
-             :class="toast.ok ? 'border-emerald-500/40 bg-emerald-950/95 text-emerald-100' : 'border-red-500/50 bg-red-950/95 text-red-100'"
+             :class="toast.ok ? 'border-emerald-500/40 bg-emerald-950/95 text-ok' : 'border-red-500/50 bg-red-950/95 text-danger'"
              class="pointer-events-auto flex items-start gap-2 rounded-lg border px-3.5 py-2.5 text-xs font-semibold shadow-2xl backdrop-blur">
           <StudioIcon :name="toast.ok ? 'check' : 'alertTriangle'" size="h-4 w-4 shrink-0" class="mt-px" />
           <span>{{ toast.msg }}</span>
@@ -741,7 +741,7 @@ onMounted(async () => {
             <span class="grid h-6 w-6 place-items-center rounded-md bg-brand-600 text-[11px] font-bold text-white">F</span>
             Quản trị FabrikAI
           </h1>
-          <p class="mt-0.5 hidden truncate text-[11px] text-cream-300/75 sm:block">
+          <p class="mt-0.5 hidden truncate text-[11px] text-cream-300 sm:block">
             Người dùng · gói cước · sổ credit · giao diện Studio — thao tác ở đây ảnh hưởng toàn hệ thống.
           </p>
         </div>
@@ -770,24 +770,24 @@ onMounted(async () => {
         <!-- ═════════ Danh mục (desktop) ═════════ -->
         <nav class="hidden lg:sticky lg:top-[4.75rem] lg:block lg:self-start" aria-label="Mục quản trị">
           <div v-for="group in SECTION_GROUPS" :key="group" class="mb-4">
-            <p class="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-cream-300/75">{{ group }}</p>
+            <p class="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-cream-300">{{ group }}</p>
             <ul class="space-y-0.5">
               <li v-for="s in navSections.filter(x => x.group === group)" :key="s.id">
                 <button :data-nav="s.id" @click="goTo(s.id)" @keydown="navKey($event, navSections.indexOf(s))"
                         :aria-current="section === s.id ? 'true' : undefined"
                         :class="section === s.id ? 'bg-brand-600/20 text-cream-50 ring-1 ring-inset ring-brand-500/40' : 'text-cream-200 hover:bg-ink-800'"
                         class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors">
-                  <StudioIcon :name="s.icon" size="h-4 w-4" :class="section === s.id ? 'text-brand-300' : 'text-cream-300/75'" />
+                  <StudioIcon :name="s.icon" size="h-4 w-4" :class="section === s.id ? 'text-brand-300' : 'text-cream-300'" />
                   <span class="min-w-0 flex-1 truncate">{{ s.label }}</span>
                   <span v-if="navBadge(s.id)" :class="[BADGE, section === s.id ? BADGE_TONE.brand : BADGE_TONE.neutral]" class="!px-1.5">{{ navBadge(s.id) }}</span>
                 </button>
               </li>
             </ul>
           </div>
-          <p v-if="!isSuper" class="mx-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[10px] leading-relaxed text-amber-200">
+          <p v-if="!isSuper" class="mx-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[10px] leading-relaxed text-warn">
             Vai trò của bạn không có quyền quản lý tài khoản người dùng (chỉ Owner). Các mục còn lại vẫn dùng bình thường.
           </p>
-          <p class="mt-3 px-3 text-[10px] leading-relaxed text-cream-300/75">
+          <p class="mt-3 px-3 text-[10px] leading-relaxed text-cream-300">
             Cấu hình AI (API key · provider · model) nằm ở <a href="/settings" class="link">Cài đặt</a>.
           </p>
         </nav>
@@ -812,49 +812,49 @@ onMounted(async () => {
               <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div v-for="i in 4" :key="i" class="card h-24 animate-pulse"></div>
               </div>
-              <p class="text-center text-xs text-cream-300/75">Đang tải dữ liệu tổng quan…</p>
+              <p class="text-center text-xs text-cream-300">Đang tải dữ liệu tổng quan…</p>
             </div>
 
             <template v-else>
               <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <button class="card p-4 text-left transition-colors hover:border-brand-400" @click="isSuper && goTo('users')">
                   <div class="flex items-start justify-between gap-2">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Người dùng</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300">Người dùng</p>
                     <StudioIcon name="users" size="h-4 w-4" class="text-brand-300/80" />
                   </div>
                   <p class="mt-1.5 font-display text-2xl font-semibold text-cream-50">{{ fmtNum(kpis.total_users) }}</p>
-                  <p class="mt-0.5 text-[11px] text-emerald-300">+{{ fmtNum(kpis.new_users_7d) }} trong 7 ngày</p>
+                  <p class="mt-0.5 text-[11px] text-ok">+{{ fmtNum(kpis.new_users_7d) }} trong 7 ngày</p>
                 </button>
                 <button class="card p-4 text-left transition-colors hover:border-brand-400" @click="goTo('plans')">
                   <div class="flex items-start justify-between gap-2">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Đang trả phí</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300">Đang trả phí</p>
                     <StudioIcon name="coins" size="h-4 w-4" class="text-brand-300/80" />
                   </div>
                   <p class="mt-1.5 font-display text-2xl font-semibold text-cream-50">{{ fmtNum(kpis.paying_subscribers) }}</p>
-                  <p class="mt-0.5 text-[11px] text-cream-300/75">{{ activePlans.length }} gói đang mở bán</p>
+                  <p class="mt-0.5 text-[11px] text-cream-300">{{ activePlans.length }} gói đang mở bán</p>
                 </button>
                 <div class="card p-4">
                   <div class="flex items-start justify-between gap-2">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Ảnh đã tạo</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300">Ảnh đã tạo</p>
                     <StudioIcon name="image" size="h-4 w-4" class="text-brand-300/80" />
                   </div>
                   <p class="mt-1.5 font-display text-2xl font-semibold text-cream-50">{{ fmtNum(kpis.generations_total) }}</p>
-                  <p class="mt-0.5 text-[11px] text-cream-300/75">+{{ fmtNum(kpis.generations_today) }} hôm nay</p>
+                  <p class="mt-0.5 text-[11px] text-cream-300">+{{ fmtNum(kpis.generations_today) }} hôm nay</p>
                 </div>
                 <button class="card p-4 text-left transition-colors hover:border-brand-400" @click="goTo('ledger')">
                   <div class="flex items-start justify-between gap-2">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Credit tiêu (30 ngày)</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300">Credit tiêu (30 ngày)</p>
                     <StudioIcon name="receipt" size="h-4 w-4" class="text-brand-300/80" />
                   </div>
                   <p class="mt-1.5 font-display text-2xl font-semibold text-cream-50">{{ fmtNum(kpis.credits_spent_30d) }}</p>
-                  <p class="mt-0.5 text-[11px] text-cream-300/75">dư hệ thống: {{ fmtNum(kpis.credits_balance_total) }}</p>
+                  <p class="mt-0.5 text-[11px] text-cream-300">dư hệ thống: {{ fmtNum(kpis.credits_balance_total) }}</p>
                 </button>
               </div>
 
               <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <div class="card p-4">
                   <h2 class="flex items-center gap-2 text-sm font-semibold text-cream-50">
-                    <StudioIcon name="alertTriangle" size="h-4 w-4" class="text-amber-300" />
+                    <StudioIcon name="alertTriangle" size="h-4 w-4" class="text-warn" />
                     Việc cần xử lý
                   </h2>
                   <ul class="mt-3 space-y-2">
@@ -879,24 +879,24 @@ onMounted(async () => {
                     Phân bố gói cước
                     <button class="tool-btn ml-auto" @click="goTo('plans')">Quản lý gói</button>
                   </h2>
-                  <p class="mt-1 text-[11px] text-cream-300/75">{{ fmtNum(totalPlanUsers) }} người dùng đã được gán gói.</p>
+                  <p class="mt-1 text-[11px] text-cream-300">{{ fmtNum(totalPlanUsers) }} người dùng đã được gán gói.</p>
                   <ul class="mt-3 space-y-3">
                     <li v-for="p in dashboardPlans" :key="p.id">
                       <div class="flex items-center gap-2 text-[11px]">
                         <span class="min-w-0 flex-1 truncate font-semibold text-cream-100">{{ p.name }}</span>
-                        <span class="text-cream-300/75">{{ fmtNum(p.users_count) }} người · {{ planShare(p.users_count) }}%</span>
+                        <span class="text-cream-300">{{ fmtNum(p.users_count) }} người · {{ planShare(p.users_count) }}%</span>
                       </div>
                       <div class="mt-1 h-2 overflow-hidden rounded-full bg-ink-700">
                         <div class="h-full rounded-full bg-brand-500" :style="{ width: (Number(p.users_count) || 0) / maxPlanCount * 100 + '%' }"></div>
                       </div>
                     </li>
-                    <li v-if="!dashboardPlans.length" class="text-xs text-cream-300/75">Chưa có gói cước nào — tạo gói đầu tiên ở mục Gói cước.</li>
+                    <li v-if="!dashboardPlans.length" class="text-xs text-cream-300">Chưa có gói cước nào — tạo gói đầu tiên ở mục Gói cước.</li>
                   </ul>
                 </div>
               </div>
 
               <div class="card flex flex-wrap items-center gap-2 p-4">
-                <p class="mr-auto text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Thao tác nhanh</p>
+                <p class="mr-auto text-[11px] font-semibold uppercase tracking-wide text-cream-300">Thao tác nhanh</p>
                 <button v-if="isSuper" class="btn-brand btn-sm" @click="openCreateUser()"><StudioIcon name="plus" size="h-3.5 w-3.5" /> Thêm người dùng</button>
                 <button class="btn-outline btn-sm" @click="openCreatePlan()"><StudioIcon name="package" size="h-3.5 w-3.5" /> Thêm gói cước</button>
                 <button class="btn-outline btn-sm" @click="goTo('ledger')"><StudioIcon name="receipt" size="h-3.5 w-3.5" /> Xem sổ credit</button>
@@ -908,9 +908,9 @@ onMounted(async () => {
           <!-- ───── NGƯỜI DÙNG ───── -->
           <section v-show="section === 'users'" class="space-y-5">
             <div v-if="!isSuper" class="card flex flex-col items-center gap-2 p-8 text-center">
-              <StudioIcon name="shieldCheck" size="h-6 w-6" class="text-amber-300" />
+              <StudioIcon name="shieldCheck" size="h-6 w-6" class="text-warn" />
               <p class="text-sm font-semibold text-cream-100">Không có quyền quản lý tài khoản</p>
-              <p class="max-w-md text-[11px] text-cream-300/75">
+              <p class="max-w-md text-[11px] text-cream-300">
                 Danh sách và thao tác trên người dùng chỉ dành cho Owner (super admin) — máy chủ trả 403 cho vai trò
                 «{{ (me && me.role_label) || 'Quản trị' }}». Bạn vẫn xem được Tổng quan · Gói cước · Sổ credit · Giao diện.
               </p>
@@ -925,7 +925,7 @@ onMounted(async () => {
                       <StudioIcon name="users" size="h-4 w-4" class="text-brand-300" /> Người dùng
                       <span :class="[BADGE, BADGE_TONE.neutral]">{{ fmtNum(usersData.total) }}</span>
                     </h2>
-                    <p class="mt-1 max-w-2xl text-xs text-cream-300/75">
+                    <p class="mt-1 max-w-2xl text-xs text-cream-300">
                       Tạo · sửa · khoá · cấp credit · đặt lại mật khẩu. Mọi biến động credit đều ghi vào Sổ credit.
                     </p>
                   </div>
@@ -934,7 +934,7 @@ onMounted(async () => {
 
                 <form class="mt-4 flex flex-wrap items-center gap-2" @submit.prevent="usersData.page = 1; loadUsers()">
                   <div class="relative min-w-[13rem] flex-1">
-                    <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                    <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300" />
                     <input v-model="f.userSearch" type="search" aria-label="Tìm người dùng" class="input !py-2 !pl-9 text-xs" placeholder="Tìm theo tên, email hoặc SĐT…">
                   </div>
                   <select v-model="f.userRole" aria-label="Lọc theo vai trò" class="input !w-auto !py-2 text-xs" @change="usersData.page = 1; loadUsers()">
@@ -961,7 +961,7 @@ onMounted(async () => {
                 <div class="overflow-x-auto">
                   <table class="w-full min-w-[900px] text-left text-xs">
                     <thead>
-                      <tr class="border-b border-ink-700 text-cream-300/75">
+                      <tr class="border-b border-ink-700 text-cream-300">
                         <th class="px-4 py-3 font-semibold">Người dùng</th>
                         <th class="px-3 py-3 font-semibold">Vai trò</th>
                         <th class="px-3 py-3 text-right font-semibold">Credit</th>
@@ -975,14 +975,14 @@ onMounted(async () => {
                       <tr v-for="u in usersData.users" :key="u.id" class="motion-row hover:bg-ink-800/50">
                         <td class="px-4 py-3">
                           <div class="flex items-center gap-2.5">
-                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-600/25 text-xs font-bold text-brand-100">{{ (u.name || '?').charAt(0).toUpperCase() }}</span>
+                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-600/25 text-xs font-bold text-brand-200">{{ (u.name || '?').charAt(0).toUpperCase() }}</span>
                             <div class="min-w-0 leading-tight">
                               <p class="flex items-center gap-1.5 font-semibold text-cream-50">
                                 {{ u.name }}
                                 <span v-if="u.id === (me && me.id)" :class="[BADGE, BADGE_TONE.info]">bạn</span>
                                 <span v-if="!u.is_active" :class="[BADGE, BADGE_TONE.danger]">đã khoá</span>
                               </p>
-                              <p class="truncate text-[11px] text-cream-300/75">{{ u.email }}<span v-if="u.phone"> · {{ u.phone }}</span></p>
+                              <p class="truncate text-[11px] text-cream-300">{{ u.email }}<span v-if="u.phone"> · {{ u.phone }}</span></p>
                             </div>
                           </div>
                         </td>
@@ -990,10 +990,10 @@ onMounted(async () => {
                         <td class="px-3 py-3 text-right font-semibold text-cream-50">{{ fmtNum(u.credits_balance) }}</td>
                         <td class="px-3 py-3">
                           <span v-if="u.plan" class="text-cream-200">{{ u.plan.name }}</span>
-                          <span v-else class="text-cream-300/75">— chưa gán —</span>
+                          <span v-else class="text-cream-300">— chưa gán —</span>
                         </td>
                         <td class="px-3 py-3 text-right text-cream-200">{{ fmtNum(u.generations_count) }}</td>
-                        <td class="px-3 py-3 text-cream-300/75">{{ u.created_at }}</td>
+                        <td class="px-3 py-3 text-cream-300">{{ u.created_at }}</td>
                         <td class="px-4 py-3">
                           <div class="flex flex-wrap items-center justify-end gap-1.5">
                             <button class="tool-btn" @click="openEditUser(u)"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa</button>
@@ -1001,13 +1001,13 @@ onMounted(async () => {
                             <button class="icon-btn" title="Đặt lại mật khẩu" :aria-label="'Đặt lại mật khẩu cho ' + u.name" @click="openPwd(u)"><StudioIcon name="key" size="h-4 w-4" /></button>
                             <button class="icon-btn" title="Xem sổ credit của người này" :aria-label="'Xem sổ credit của ' + u.name" @click="openUserLedger(u)"><StudioIcon name="receipt" size="h-4 w-4" /></button>
                             <button v-if="u.is_active" class="icon-btn" title="Khoá tài khoản" :aria-label="'Khoá tài khoản ' + u.name" :disabled="u.id === (me && me.id)" @click="askBanUser(u)"><StudioIcon name="lock" size="h-4 w-4" /></button>
-                            <button v-else class="icon-btn !text-emerald-300" title="Mở khoá tài khoản" :aria-label="'Mở khoá tài khoản ' + u.name" @click="toggleUserActive(u, true)"><StudioIcon name="lockOpen" size="h-4 w-4" /></button>
-                            <button class="icon-btn !text-red-300 hover:!bg-red-500/15" title="Xoá người dùng" :aria-label="'Xoá người dùng ' + u.name" :disabled="u.id === (me && me.id)" @click="askDeleteUser(u)"><StudioIcon name="userX" size="h-4 w-4" /></button>
+                            <button v-else class="icon-btn !text-ok" title="Mở khoá tài khoản" :aria-label="'Mở khoá tài khoản ' + u.name" @click="toggleUserActive(u, true)"><StudioIcon name="lockOpen" size="h-4 w-4" /></button>
+                            <button class="icon-btn !text-danger hover:!bg-red-500/15" title="Xoá người dùng" :aria-label="'Xoá người dùng ' + u.name" :disabled="u.id === (me && me.id)" @click="askDeleteUser(u)"><StudioIcon name="userX" size="h-4 w-4" /></button>
                           </div>
                         </td>
                       </tr>
                       <tr v-if="!usersData.users.length && !loading.users">
-                        <td colspan="7" class="px-4 py-10 text-center text-xs text-cream-300/75">
+                        <td colspan="7" class="px-4 py-10 text-center text-xs text-cream-300">
                           Không có người dùng nào khớp bộ lọc.
                           <button class="ml-1 underline" @click="f.userSearch = ''; f.userRole = ''; f.userStatus = ''; usersData.page = 1; loadUsers()">Xoá bộ lọc</button>
                         </td>
@@ -1016,7 +1016,7 @@ onMounted(async () => {
                   </table>
                 </div>
                 <div class="flex flex-wrap items-center justify-between gap-2 border-t border-ink-700 px-4 py-3">
-                  <span class="text-[11px] text-cream-300/75">{{ pageInfo(usersData) }}<span v-if="loading.users" class="ml-1">· đang tải…</span></span>
+                  <span class="text-[11px] text-cream-300">{{ pageInfo(usersData) }}<span v-if="loading.users" class="ml-1">· đang tải…</span></span>
                   <div class="flex gap-1.5">
                     <button :disabled="!canPrev(usersData) || loading.users" class="tool-btn" @click="usersData.page--; loadUsers()"><StudioIcon name="chevronLeft" size="h-3.5 w-3.5" /> Trước</button>
                     <button :disabled="!canNext(usersData) || loading.users" class="tool-btn" @click="usersData.page++; loadUsers()">Sau <StudioIcon name="chevronRight" size="h-3.5 w-3.5" /></button>
@@ -1035,7 +1035,7 @@ onMounted(async () => {
                     <StudioIcon name="package" size="h-4 w-4" class="text-brand-300" /> Gói cước
                     <span :class="[BADGE, BADGE_TONE.neutral]">{{ plansData.length }}</span>
                   </h2>
-                  <p class="mt-1 max-w-2xl text-xs text-cream-300/75">
+                  <p class="mt-1 max-w-2xl text-xs text-cream-300">
                     Giá VNĐ, credit theo tháng, chi phí credit mỗi ảnh/video. Gói đang có người dùng thì nên ẨN thay vì xoá để giữ lịch sử.
                   </p>
                 </div>
@@ -1043,10 +1043,10 @@ onMounted(async () => {
               </div>
               <div class="mt-4 flex flex-wrap items-center gap-2">
                 <div class="relative min-w-[13rem] flex-1">
-                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300" />
                   <input v-model="planSearch" type="search" aria-label="Tìm gói cước" class="input !py-2 !pl-9 text-xs" placeholder="Tìm theo tên, slug hoặc mô tả…">
                 </div>
-                <span class="text-[11px] text-cream-300/75">{{ countText(filteredPlans.length, plansData.length, 'gói') }}</span>
+                <span class="text-[11px] text-cream-300">{{ countText(filteredPlans.length, plansData.length, 'gói') }}</span>
               </div>
             </div>
 
@@ -1054,12 +1054,12 @@ onMounted(async () => {
               <div v-for="i in 4" :key="i" class="card h-56 animate-pulse"></div>
             </div>
             <div v-else-if="!plansData.length" class="card flex flex-col items-center gap-2 p-10 text-center">
-              <StudioIcon name="package" size="h-6 w-6" class="text-cream-300/75" />
+              <StudioIcon name="package" size="h-6 w-6" class="text-cream-300" />
               <p class="text-sm font-semibold text-cream-100">Chưa có gói cước nào</p>
-              <p class="max-w-md text-[11px] text-cream-300/75">Tạo gói đầu tiên để người dùng tự đăng ký. Gói mặc định được gán cho tài khoản mới.</p>
+              <p class="max-w-md text-[11px] text-cream-300">Tạo gói đầu tiên để người dùng tự đăng ký. Gói mặc định được gán cho tài khoản mới.</p>
               <button class="btn-brand btn-sm mt-1" @click="openCreatePlan()">Thêm gói cước</button>
             </div>
-            <div v-else-if="!filteredPlans.length" class="card p-8 text-center text-xs text-cream-300/75">
+            <div v-else-if="!filteredPlans.length" class="card p-8 text-center text-xs text-cream-300">
               Không có gói nào khớp « {{ planSearch }} ».
               <button class="ml-1 underline" @click="planSearch = ''">Xoá tìm kiếm</button>
             </div>
@@ -1082,22 +1082,22 @@ onMounted(async () => {
                     <StudioIcon name="info" size="h-3 w-3" /> {{ p.manual_features.length }} ghi chú
                   </span>
                 </div>
-                <p class="mt-1 min-h-[2rem] text-xs text-cream-300/85">{{ p.tagline || '—' }}</p>
+                <p class="mt-1 min-h-[2rem] text-xs text-cream-300">{{ p.tagline || '—' }}</p>
                 <div class="mt-2 flex items-baseline gap-1.5">
                   <span class="font-display text-2xl font-semibold text-cream-50">{{ planPrice(p) }}</span>
-                  <span v-if="p.price_vnd > 0" class="text-[11px] text-cream-300/75">/ tháng</span>
+                  <span v-if="p.price_vnd > 0" class="text-[11px] text-cream-300">/ tháng</span>
                 </div>
                 <p class="mt-1.5 text-sm font-semibold text-brand-200">
                   {{ fmtNum(p.credits_per_month) }} credit / tháng
-                  <span v-if="p.bonus_credits" class="text-[11px] font-normal text-cream-300/85">(+{{ fmtNum(p.bonus_credits) }} tặng lần đầu)</span>
+                  <span v-if="p.bonus_credits" class="text-[11px] font-normal text-cream-300">(+{{ fmtNum(p.bonus_credits) }} tặng lần đầu)</span>
                 </p>
                 <ul class="mt-3 flex-1 space-y-1.5">
                   <li v-for="(ft, i) in p.features" :key="i" class="flex items-start gap-1.5 text-[12px] text-cream-200">
-                    <StudioIcon name="check" size="h-3.5 w-3.5" class="mt-0.5 shrink-0 text-emerald-400" />{{ ft }}
+                    <StudioIcon name="check" size="h-3.5 w-3.5" class="mt-0.5 shrink-0 text-ok" />{{ ft }}
                   </li>
-                  <li v-if="!p.features || !p.features.length" class="text-[11px] text-cream-300/75">Chưa khai đặc quyền.</li>
+                  <li v-if="!p.features || !p.features.length" class="text-[11px] text-cream-300">Chưa khai đặc quyền.</li>
                 </ul>
-                <div class="mt-3 flex flex-wrap gap-1.5 border-t border-ink-700 pt-3 text-[10px] text-cream-300/85">
+                <div class="mt-3 flex flex-wrap gap-1.5 border-t border-ink-700 pt-3 text-[10px] text-cream-300">
                   <span :class="[BADGE, BADGE_TONE.neutral]"><StudioIcon name="image" size="h-3 w-3" /> {{ p.image_credit_cost }} credit/ảnh</span>
                   <span :class="[BADGE, BADGE_TONE.neutral]"><StudioIcon name="film" size="h-3 w-3" /> {{ p.video_credit_cost }} credit/video</span>
                   <span :class="[BADGE, BADGE_TONE.neutral]">{{ p.resolution_cap }}</span>
@@ -1110,7 +1110,7 @@ onMounted(async () => {
                   <button class="tool-btn" @click="openEditPlan(p)"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa</button>
                   <button v-if="p.is_active" class="tool-btn" @click="askTogglePlan(p, false)"><StudioIcon name="eyeOff" size="h-3.5 w-3.5" /> Ẩn gói</button>
                   <button v-else class="tool-btn" @click="askTogglePlan(p, true)"><StudioIcon name="eye" size="h-3.5 w-3.5" /> Mở bán</button>
-                  <button class="tool-btn !text-red-300 hover:!bg-red-500/15" @click="askDeletePlan(p)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
+                  <button class="tool-btn !text-danger hover:!bg-red-500/15" @click="askDeletePlan(p)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
                 </div>
               </article>
             </div>
@@ -1125,7 +1125,7 @@ onMounted(async () => {
                     <StudioIcon name="receipt" size="h-4 w-4" class="text-brand-300" /> Sổ credit
                     <span :class="[BADGE, BADGE_TONE.neutral]">{{ fmtNum(ledgerData.total) }}</span>
                   </h2>
-                  <p class="mt-1 max-w-2xl text-xs text-cream-300/75">
+                  <p class="mt-1 max-w-2xl text-xs text-cream-300">
                     Mọi biến động credit (tiêu · hoàn · tặng · điều chỉnh · nạp gói) đều ghi ở đây, kèm người thực hiện.
                   </p>
                 </div>
@@ -1136,7 +1136,7 @@ onMounted(async () => {
               </div>
               <form class="mt-4 flex flex-wrap items-center gap-2" @submit.prevent="ledgerData.page = 1; loadLedger()">
                 <div class="relative min-w-[13rem] flex-1">
-                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300" />
                   <input v-model="l.search" type="search" aria-label="Tìm theo người dùng" class="input !py-2 !pl-9 text-xs" placeholder="Tìm theo tên hoặc email người dùng…">
                 </div>
                 <select v-model="l.type" aria-label="Lọc theo loại giao dịch" class="input !w-auto !py-2 text-xs" @change="ledgerData.page = 1; loadLedger()">
@@ -1156,7 +1156,7 @@ onMounted(async () => {
               <div class="overflow-x-auto">
                 <table class="w-full min-w-[880px] text-left text-xs">
                   <thead>
-                    <tr class="border-b border-ink-700 text-cream-300/75">
+                    <tr class="border-b border-ink-700 text-cream-300">
                       <th class="px-4 py-3 font-semibold">Thời gian</th>
                       <th class="px-3 py-3 font-semibold">Người dùng</th>
                       <th class="px-3 py-3 font-semibold">Loại</th>
@@ -1168,22 +1168,22 @@ onMounted(async () => {
                   </thead>
                   <tbody class="divide-y divide-ink-700/60">
                     <tr v-for="t in ledgerData.transactions" :key="t.id" class="motion-row hover:bg-ink-800/50">
-                      <td class="px-4 py-2.5 whitespace-nowrap text-cream-300/85">{{ t.created_at }}</td>
+                      <td class="px-4 py-2.5 whitespace-nowrap text-cream-300">{{ t.created_at }}</td>
                       <td class="px-3 py-2.5">
                         <p class="font-semibold text-cream-50">{{ t.user ? t.user.name : '—' }}</p>
-                        <p v-if="t.user" class="text-[10px] text-cream-300/75">{{ t.user.email }}</p>
+                        <p v-if="t.user" class="text-[10px] text-cream-300">{{ t.user.email }}</p>
                       </td>
                       <td class="px-3 py-2.5"><span :class="typeMeta(t.type).cls" class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :title="'type: ' + t.type">{{ t.type_label || typeMeta(t.type).label }}</span></td>
-                      <td class="px-3 py-2.5 text-right font-semibold" :class="t.amount > 0 ? 'text-emerald-300' : 'text-red-300'">{{ t.amount > 0 ? '+' : '' }}{{ fmtNum(t.amount) }}</td>
+                      <td class="px-3 py-2.5 text-right font-semibold" :class="t.amount > 0 ? 'text-ok' : 'text-danger'">{{ t.amount > 0 ? '+' : '' }}{{ fmtNum(t.amount) }}</td>
                       <td class="px-3 py-2.5 text-right text-cream-200">{{ fmtNum(t.balance_after) }}</td>
                       <td class="px-3 py-2.5 text-cream-200">
                         <span v-if="t.admin" class="flex items-center gap-1.5"><StudioIcon name="shieldCheck" size="h-3.5 w-3.5" class="text-gold-400" /> {{ t.admin.name }}</span>
-                        <span v-else class="text-cream-300/75">Hệ thống</span>
+                        <span v-else class="text-cream-300">Hệ thống</span>
                       </td>
-                      <td class="px-3 py-2.5 text-cream-300/85">{{ t.note || '—' }}</td>
+                      <td class="px-3 py-2.5 text-cream-300">{{ t.note || '—' }}</td>
                     </tr>
                     <tr v-if="!ledgerData.transactions.length && !loading.ledger">
-                      <td colspan="7" class="px-4 py-10 text-center text-xs text-cream-300/75">
+                      <td colspan="7" class="px-4 py-10 text-center text-xs text-cream-300">
                         Chưa có giao dịch nào khớp bộ lọc.
                         <button v-if="l.search || l.type || l.userId" class="ml-1 underline" @click="l.search = ''; l.type = ''; l.userId = null; l.userName = ''; ledgerData.page = 1; loadLedger()">Xoá bộ lọc</button>
                       </td>
@@ -1192,7 +1192,7 @@ onMounted(async () => {
                 </table>
               </div>
               <div class="flex flex-wrap items-center justify-between gap-2 border-t border-ink-700 px-4 py-3">
-                <span class="text-[11px] text-cream-300/75">{{ pageInfo(ledgerData) }}<span v-if="loading.ledger" class="ml-1">· đang tải…</span></span>
+                <span class="text-[11px] text-cream-300">{{ pageInfo(ledgerData) }}<span v-if="loading.ledger" class="ml-1">· đang tải…</span></span>
                 <div class="flex gap-1.5">
                   <button :disabled="!canPrev(ledgerData) || loading.ledger" class="tool-btn" @click="ledgerData.page--; loadLedger()"><StudioIcon name="chevronLeft" size="h-3.5 w-3.5" /> Trước</button>
                   <button :disabled="!canNext(ledgerData) || loading.ledger" class="tool-btn" @click="ledgerData.page++; loadLedger()">Sau <StudioIcon name="chevronRight" size="h-3.5 w-3.5" /></button>
@@ -1211,7 +1211,7 @@ onMounted(async () => {
                     <StudioIcon name="coins" size="h-4 w-4" class="text-brand-300" /> Yêu cầu nâng cấp gói
                     <span :class="[BADGE, pendingUpgrades ? BADGE_TONE.warn : BADGE_TONE.neutral]">{{ pendingUpgrades }} đang chờ</span>
                   </h2>
-                  <p class="mt-1 max-w-3xl text-xs text-cream-300/75">
+                  <p class="mt-1 max-w-3xl text-xs text-cream-300">
                     Hệ thống chưa có cổng thanh toán: khách gửi yêu cầu (nhận MÃ như <span class="font-mono">UP-2609-0001</span>), chuyển khoản theo mã đó,
                     rồi bạn <b class="text-cream-100">kích hoạt gói</b> ở đây. Chỉ Owner kích hoạt được — người khác vẫn đánh dấu «đã liên hệ» để cả nhóm biết ai đang chăm khách.
                   </p>
@@ -1235,7 +1235,7 @@ onMounted(async () => {
                 <StudioIcon name="receipt" size="h-4 w-4" class="text-brand-300" /> Thông tin nhận tiền &amp; hỗ trợ
                 <span v-if="!paymentForm.bank_account" :class="[BADGE, BADGE_TONE.warn]">chưa điền STK</span>
               </h3>
-              <p class="mt-1 text-xs text-cream-300/75">
+              <p class="mt-1 text-xs text-cream-300">
                 Thông tin này hiện ở <a href="/bang-gia" class="link" target="_blank" rel="noopener">trang giá</a> và trong popup «Gói &amp; credit» của Studio.
                 Để trống thì hệ thống <b class="text-cream-100">không bịa số tài khoản</b> — chỉ báo «FabrikAI sẽ gửi thông tin thanh toán».
               </p>
@@ -1284,7 +1284,7 @@ onMounted(async () => {
               <div class="overflow-x-auto">
                 <table class="w-full min-w-[960px] text-left text-xs">
                   <thead>
-                    <tr class="border-b border-ink-700 text-cream-300/75">
+                    <tr class="border-b border-ink-700 text-cream-300">
                       <th class="px-4 py-3 font-semibold">Mã · thời gian</th>
                       <th class="px-3 py-3 font-semibold">Khách</th>
                       <th class="px-3 py-3 font-semibold">Gói · số tháng</th>
@@ -1298,29 +1298,29 @@ onMounted(async () => {
                     <tr v-for="r in upgradesData.requests" :key="r.id" class="motion-row align-top hover:bg-ink-800/40">
                       <td class="px-4 py-3">
                         <span class="font-mono text-[11px] font-semibold text-cream-100">{{ r.code }}</span>
-                        <span class="mt-0.5 block text-[10px] text-cream-300/75">{{ r.created_at }}</span>
+                        <span class="mt-0.5 block text-[10px] text-cream-300">{{ r.created_at }}</span>
                         <span v-if="r.status === 'pending' && r.age_hours >= 24" :class="[BADGE, BADGE_TONE.danger]" class="mt-1">chờ {{ r.age_hours }} giờ</span>
                       </td>
                       <td class="px-3 py-3">
                         <span class="block font-semibold text-cream-100">{{ r.user ? r.user.name : '—' }}</span>
-                        <span class="block text-[10px] text-cream-300/75">{{ r.user ? r.user.email : '' }}</span>
+                        <span class="block text-[10px] text-cream-300">{{ r.user ? r.user.email : '' }}</span>
                         <a v-if="r.contact_phone" :href="'tel:' + r.contact_phone" class="mt-0.5 inline-flex items-center gap-1 text-[10px] text-brand-200 hover:underline">
                           <StudioIcon name="user" size="h-3 w-3" /> {{ r.contact_name || r.user?.name }} · {{ r.contact_phone }}
                         </a>
                       </td>
                       <td class="px-3 py-3">
                         <span class="block text-cream-100">{{ r.plan ? r.plan.name : '—' }}</span>
-                        <span class="block text-[10px] text-cream-300/75">{{ r.months }} tháng</span>
+                        <span class="block text-[10px] text-cream-300">{{ r.months }} tháng</span>
                       </td>
                       <td class="px-3 py-3 text-right font-semibold text-cream-50">{{ r.amount_label }}</td>
                       <td class="px-3 py-3">
                         <span class="block text-cream-200">{{ r.method_label }}</span>
-                        <span v-if="r.note" class="mt-0.5 block max-w-[16rem] whitespace-pre-line text-[10px] text-cream-300/75">{{ r.note }}</span>
+                        <span v-if="r.note" class="mt-0.5 block max-w-[16rem] whitespace-pre-line text-[10px] text-cream-300">{{ r.note }}</span>
                       </td>
                       <td class="px-3 py-3">
                         <span :class="[BADGE, BADGE_TONE[upgradeTone(r.status)]]">{{ r.status_label }}</span>
-                        <span v-if="r.handler" class="mt-1 block text-[10px] text-cream-300/75">{{ r.handler }} · {{ r.handled_at }}</span>
-                        <span v-if="r.admin_note" class="mt-1 block max-w-[14rem] text-[10px] italic text-cream-300/75">{{ r.admin_note }}</span>
+                        <span v-if="r.handler" class="mt-1 block text-[10px] text-cream-300">{{ r.handler }} · {{ r.handled_at }}</span>
+                        <span v-if="r.admin_note" class="mt-1 block max-w-[14rem] text-[10px] italic text-cream-300">{{ r.admin_note }}</span>
                       </td>
                       <td class="px-3 py-3">
                         <div class="flex flex-wrap justify-end gap-1.5">
@@ -1338,7 +1338,7 @@ onMounted(async () => {
                                     :title="'Kích hoạt gói ' + (r.plan ? r.plan.name : '') + ' cho ' + (r.user ? r.user.name : '') + ' sau khi đã nhận ' + r.amount_label">
                               <StudioIcon name="check" size="h-3.5 w-3.5" /> Kích hoạt
                             </button>
-                            <button class="tool-btn !text-red-300 hover:!bg-red-500/15" @click="setUpgradeStatus(r, 'cancelled')" title="Huỷ yêu cầu (khách đổi ý / trùng)">
+                            <button class="tool-btn !text-danger hover:!bg-red-500/15" @click="setUpgradeStatus(r, 'cancelled')" title="Huỷ yêu cầu (khách đổi ý / trùng)">
                               <StudioIcon name="ban" size="h-3.5 w-3.5" /> Huỷ
                             </button>
                           </template>
@@ -1348,8 +1348,8 @@ onMounted(async () => {
                   </tbody>
                 </table>
               </div>
-              <p v-if="loading.upgrades" class="px-4 py-4 text-xs text-cream-300/75">Đang nạp yêu cầu…</p>
-              <p v-else-if="!upgradesData.requests.length" class="px-4 py-4 text-xs text-cream-300/75">
+              <p v-if="loading.upgrades" class="px-4 py-4 text-xs text-cream-300">Đang nạp yêu cầu…</p>
+              <p v-else-if="!upgradesData.requests.length" class="px-4 py-4 text-xs text-cream-300">
                 Chưa có yêu cầu nâng cấp nào{{ upFilter ? ' ở trạng thái này' : '' }}. Khi khách bấm «Yêu cầu nâng cấp» trong Studio, yêu cầu sẽ hiện ở đây kèm số điện thoại liên hệ.
               </p>
             </div>
@@ -1374,7 +1374,7 @@ onMounted(async () => {
                       <StudioIcon name="alertTriangle" size="h-3 w-3" /> {{ modulesData.ungranted.length }} chưa gói nào cấp
                     </span>
                   </h2>
-                  <p class="mt-1 max-w-3xl text-xs text-cream-300/75">
+                  <p class="mt-1 max-w-3xl text-xs text-cream-300">
                     Mọi tính năng của Studio được khai ở <b class="text-cream-100">một nguồn duy nhất</b> (module registry):
                     tắt/mở ở đây là tắt/mở thật ở máy chủ, và tick vào <b class="text-cream-100">gói</b> nghĩa là gói đó cấp tính năng cho khách.
                     Thêm tính năng mới thì màn này tự có thêm dòng — không phải cấu hình lại.
@@ -1382,7 +1382,7 @@ onMounted(async () => {
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="relative min-w-[12rem]">
-                    <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                    <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300" />
                     <input v-model="moduleSearch" type="search" aria-label="Tìm tính năng" class="input !py-2 !pl-9 text-xs" placeholder="Tìm tính năng…">
                   </div>
                   <button class="tool-btn" :disabled="loading.modules" title="Nạp lại" @click="loadModules()">
@@ -1390,7 +1390,7 @@ onMounted(async () => {
                   </button>
                 </div>
               </div>
-              <p v-if="moduleDirty" class="mt-3 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+              <p v-if="moduleDirty" class="mt-3 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-warn">
                 Có thay đổi chưa lưu — nhớ bấm <b>Lưu công tắc</b> (toàn cục) hoặc <b>Lưu</b> ở từng gói.
               </p>
             </div>
@@ -1408,24 +1408,24 @@ onMounted(async () => {
                   <StudioIcon name="save" size="h-3.5 w-3.5" /> Lưu công tắc
                 </button>
               </div>
-              <p class="mt-1 text-xs text-cream-300/75">
+              <p class="mt-1 text-xs text-cream-300">
                 Tắt một tính năng ở đây là chặn ở máy chủ (khách gọi thẳng API cũng bị 403), <b class="text-cream-100">không ảnh hưởng tính năng khác</b>.
                 Tài khoản quản trị vẫn vào được để hỗ trợ khách.
               </p>
               <div class="mt-3 space-y-3">
                 <div v-for="(items, group) in moduleGroups" :key="group">
-                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/75">{{ group }}</p>
+                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">{{ group }}</p>
                   <ul class="mt-1 divide-y divide-ink-700/60">
                     <li v-for="m in items" :key="m.id" class="flex flex-wrap items-center gap-2 py-2">
-                      <StudioIcon :name="m.icon" size="h-4 w-4" class="text-cream-300/75" />
+                      <StudioIcon :name="m.icon" size="h-4 w-4" class="text-cream-300" />
                       <span class="min-w-0 flex-1">
                         <span class="block text-xs font-semibold text-cream-100">{{ m.name }}</span>
-                        <span class="block text-[10px] text-cream-300/70">{{ m.summary }}</span>
-                        <span v-if="m.depends_on.length" class="block text-[10px] text-amber-200/80">cần: {{ m.depends_on.join(' · ') }}</span>
+                        <span class="block text-[10px] text-cream-300">{{ m.summary }}</span>
+                        <span v-if="m.depends_on.length" class="block text-[10px] text-warn">cần: {{ m.depends_on.join(' · ') }}</span>
                       </span>
                       <span :class="[BADGE, moduleKindMeta(m.kind).cls]">{{ moduleKindMeta(m.kind).label }}</span>
-                      <span class="hidden text-[10px] text-cream-300/70 sm:inline">{{ plansWithModule(m.id).map((p) => p.name).join(' · ') || 'chưa gói nào' }}</span>
-                      <button class="tool-btn" :class="globalDisabled.includes(m.id) ? '!text-red-300' : '!text-emerald-300'"
+                      <span class="hidden text-[10px] text-cream-300 sm:inline">{{ plansWithModule(m.id).map((p) => p.name).join(' · ') || 'chưa gói nào' }}</span>
+                      <button class="tool-btn" :class="globalDisabled.includes(m.id) ? '!text-danger' : '!text-ok'"
                               :title="globalDisabled.includes(m.id) ? 'Đang TẮT toàn hệ thống — bấm để bật' : 'Đang BẬT — bấm để tắt toàn hệ thống'"
                               @click="toggleGlobal(m.id)">
                         <StudioIcon :name="globalDisabled.includes(m.id) ? 'eyeOff' : 'eye'" size="h-3.5 w-3.5" />
@@ -1442,7 +1442,7 @@ onMounted(async () => {
               <h3 class="flex items-center gap-2 text-sm font-semibold text-cream-50">
                 <StudioIcon name="package" size="h-4 w-4" class="text-brand-300" /> Gói cấp tính năng nào
               </h3>
-              <p class="mt-1 text-xs text-cream-300/75">
+              <p class="mt-1 text-xs text-cream-300">
                 Gói đăng ký chính là công tắc cấp phát: khách ở gói chỉ dùng được đúng những tính năng được tick.
                 Nút <b class="text-cream-100">Áp đề xuất</b> lấy gợi ý từ bản khai module (gói miễn phí giữ phần cơ bản, gói cao có thêm video · trợ lý · xuất gói · ghế…).
               </p>
@@ -1476,13 +1476,13 @@ onMounted(async () => {
                   </div>
                   <div class="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
                     <div v-for="(items, group) in moduleGroups" :key="p.slug + group">
-                      <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/70">{{ group }}</p>
+                      <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">{{ group }}</p>
                       <div class="mt-0.5 flex flex-wrap gap-1">
                         <button v-for="m in items" :key="p.slug + m.id"
                                 class="rounded border px-1.5 py-0.5 text-[10px] transition"
                                 :class="(planModules[p.slug] || []).includes(m.id)
-                                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200'
-                                  : 'border-ink-600 bg-ink-800/60 text-cream-300/70 hover:border-ink-500'"
+                                  ? 'border-emerald-500/40 bg-emerald-500/15 text-ok'
+                                  : 'border-ink-600 bg-ink-800/60 text-cream-300 hover:border-ink-500'"
                                 :title="m.summary"
                                 @click="toggleGrant(p.slug, m.id)">
                           <StudioIcon :name="(planModules[p.slug] || []).includes(m.id) ? 'check' : 'x'" size="h-3 w-3" class="mr-0.5 inline" />{{ m.name }}
@@ -1504,7 +1504,7 @@ onMounted(async () => {
                     <span :class="[BADGE, BADGE_TONE.neutral]">{{ guiItems.length }}</span>
                     <span v-if="guiHiddenCount" :class="[BADGE, BADGE_TONE.warn]">{{ guiHiddenCount }} đang ẩn</span>
                   </h2>
-                  <p class="mt-1 max-w-2xl text-xs text-cream-300/75">
+                  <p class="mt-1 max-w-2xl text-xs text-cream-300">
                     Đổi thứ tự · nhãn · icon · ẩn/hiện từng mục — áp dụng cho MỌI người dùng Studio.
                     Không thêm/xoá được mục vì mỗi mục gắn cứng một chức năng trong mã nguồn.
                   </p>
@@ -1518,9 +1518,9 @@ onMounted(async () => {
               </div>
 
               <div v-if="guiItems.length" class="mt-4 rounded-lg border border-ink-700 bg-ink-900/60 p-3">
-                <p class="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/75">
+                <p class="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300">
                   Xem trước thứ tự &amp; icon
-                  <span v-if="guiDirty" class="text-amber-300">· có thay đổi chưa lưu</span>
+                  <span v-if="guiDirty" class="text-warn">· có thay đổi chưa lưu</span>
                 </p>
                 <div class="flex items-center gap-1.5 overflow-x-auto pb-1">
                   <span v-for="it in guiPreview" :key="it.id"
@@ -1528,21 +1528,21 @@ onMounted(async () => {
                         :title="it.label + ' (' + it.id + ')'">
                     <StudioIcon :name="it.icon" size="h-5 w-5" />
                   </span>
-                  <span v-if="!guiPreview.length" class="text-xs text-cream-300/75">Tất cả mục đang bị ẩn — thanh công cụ sẽ trống.</span>
+                  <span v-if="!guiPreview.length" class="text-xs text-cream-300">Tất cả mục đang bị ẩn — thanh công cụ sẽ trống.</span>
                 </div>
               </div>
 
               <div class="mt-4 flex flex-wrap items-center gap-2">
                 <div class="relative min-w-[13rem] flex-1">
-                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300/75" />
+                  <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-300" />
                   <input v-model="guiSearch" type="search" aria-label="Tìm mục" class="input !py-2 !pl-9 text-xs" placeholder="Tìm theo id, nhãn hoặc icon…">
                 </div>
-                <span class="text-[11px] text-cream-300/75">{{ countText(filteredGui.length, guiItems.length, 'mục') }}</span>
+                <span class="text-[11px] text-cream-300">{{ countText(filteredGui.length, guiItems.length, 'mục') }}</span>
               </div>
 
               <ul class="mt-3 space-y-2">
                 <li v-for="it in filteredGui" :key="it.id" class="flex flex-wrap items-center gap-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5">
-                  <span class="w-6 shrink-0 text-center text-[10px] font-semibold text-cream-300/75">{{ guiItems.indexOf(it) + 1 }}</span>
+                  <span class="w-6 shrink-0 text-center text-[10px] font-semibold text-cream-300">{{ guiItems.indexOf(it) + 1 }}</span>
                   <span class="flex shrink-0 gap-1">
                     <button class="icon-btn" :disabled="guiItems.indexOf(it) === 0 || isGuiPinned(it)" title="Đưa lên" :aria-label="'Đưa ' + it.label + ' lên'" @click="moveGui(it, -1)"><StudioIcon name="chevronUp" size="h-4 w-4" /></button>
                     <button class="icon-btn" :disabled="guiItems.indexOf(it) === guiItems.length - 1 || isGuiPinned(it)" :title="isGuiPinned(it) ? 'Mục này luôn ở đáy thanh công cụ' : 'Đưa xuống'" :aria-label="'Đưa ' + it.label + ' xuống'" @click="moveGui(it, 1)"><StudioIcon name="chevronDown" size="h-4 w-4" /></button>
@@ -1552,15 +1552,15 @@ onMounted(async () => {
                     <option v-for="ic in guiIcons" :key="ic.name" :value="ic.name" :title="ic.note || ic.name">{{ ic.name }}</option>
                   </select>
                   <input v-model="it.label" type="text" maxlength="40" class="input !min-w-40 !flex-1 !py-1.5 text-xs" placeholder="Nhãn hiển thị" :aria-label="'Nhãn cho ' + it.id">
-                  <code class="shrink-0 rounded bg-ink-800 px-1.5 py-0.5 text-[10px] text-cream-300/85" title="Id — không đổi được">{{ it.id }}</code>
+                  <code class="shrink-0 rounded bg-ink-800 px-1.5 py-0.5 text-[10px] text-cream-300" title="Id — không đổi được">{{ it.id }}</code>
                   <span class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" :class="(GUI_KIND[it.kind] || {}).cls || 'bg-ink-700 text-cream-300'" :title="(GUI_KIND[it.kind] || {}).hint || ''">{{ (GUI_KIND[it.kind] || {}).label || it.kind }}</span>
                   <span v-if="isGuiPinned(it)" :class="[BADGE, BADGE_TONE.info]" title="Luôn nằm ở đáy thanh công cụ">ghim đáy</span>
                   <label class="flex shrink-0 cursor-pointer items-center gap-1.5 text-[11px] text-cream-200">
                     <input type="checkbox" v-model="it.visible" class="h-3.5 w-3.5 accent-brand-500"> Hiện
                   </label>
                 </li>
-                <li v-if="!guiItems.length" class="py-8 text-center text-xs text-cream-300/75">Đang tải cấu hình…</li>
-                <li v-else-if="!filteredGui.length" class="py-8 text-center text-xs text-cream-300/75">
+                <li v-if="!guiItems.length" class="py-8 text-center text-xs text-cream-300">Đang tải cấu hình…</li>
+                <li v-else-if="!filteredGui.length" class="py-8 text-center text-xs text-cream-300">
                   Không có mục nào khớp « {{ guiSearch }} ».
                   <button class="ml-1 underline" @click="guiSearch = ''">Xoá tìm kiếm</button>
                 </li>
@@ -1571,14 +1571,14 @@ onMounted(async () => {
                   <StudioIcon name="save" size="h-3.5 w-3.5" /> {{ guiSaving ? 'Đang lưu…' : 'Lưu thay đổi' }}
                 </button>
                 <button class="tool-btn" :disabled="!guiDirty || guiSaving" @click="loadGui()"><StudioIcon name="undo" size="h-3.5 w-3.5" /> Hoàn tác</button>
-                <span v-if="guiDirty" class="flex items-center gap-1.5 text-[11px] text-amber-300"><StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> Có thay đổi chưa lưu</span>
-                <span v-else class="flex items-center gap-1.5 text-[11px] text-cream-300/75"><StudioIcon name="check" size="h-3.5 w-3.5" /> Đã lưu</span>
+                <span v-if="guiDirty" class="flex items-center gap-1.5 text-[11px] text-warn"><StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> Có thay đổi chưa lưu</span>
+                <span v-else class="flex items-center gap-1.5 text-[11px] text-cream-300"><StudioIcon name="check" size="h-3.5 w-3.5" /> Đã lưu</span>
               </div>
             </div>
 
             <details class="card p-4">
               <summary class="cursor-pointer text-sm font-semibold text-cream-100">Trợ giúp · Ý nghĩa các loại mục</summary>
-              <div class="mt-2 space-y-1.5 text-[11px] text-cream-300/85">
+              <div class="mt-2 space-y-1.5 text-[11px] text-cream-300">
                 <p v-for="(m, k) in GUI_KIND" :key="k">· <b class="text-cream-100">{{ m.label }}</b> — {{ m.hint }}. Mục «ghim đáy» luôn nằm dưới cùng, không đổi được vị trí.</p>
                 <p>· Nhãn tối đa 40 ký tự. Icon lấy từ registry dùng chung (thêm icon mới = thêm một khoá vào <code class="rounded bg-ink-800 px-1">resources/js/studio/icons.json</code>).</p>
                 <p>· Lưu xong, người dùng Studio thấy thay đổi ở lần tải trang kế tiếp.</p>
@@ -1596,12 +1596,12 @@ onMounted(async () => {
           <div class="sm:col-span-2">
             <label class="label" for="u-name">Tên</label>
             <input id="u-name" v-model="userModal.form.name" class="input !py-2" :class="userModal.errors.name ? '!border-red-500/70' : ''" placeholder="VD: Nguyễn Văn A">
-            <p v-if="userModal.errors.name" class="mt-1 text-[11px] text-red-300">{{ userModal.errors.name }}</p>
+            <p v-if="userModal.errors.name" class="mt-1 text-[11px] text-danger">{{ userModal.errors.name }}</p>
           </div>
           <div>
             <label class="label" for="u-email">Email</label>
             <input id="u-email" v-model="userModal.form.email" type="email" class="input !py-2" :class="userModal.errors.email ? '!border-red-500/70' : ''" placeholder="email@example.com">
-            <p v-if="userModal.errors.email" class="mt-1 text-[11px] text-red-300">{{ userModal.errors.email }}</p>
+            <p v-if="userModal.errors.email" class="mt-1 text-[11px] text-danger">{{ userModal.errors.email }}</p>
           </div>
           <div>
             <label class="label" for="u-phone">Số điện thoại</label>
@@ -1614,7 +1614,7 @@ onMounted(async () => {
               <option value="admin">Quản trị</option>
               <option value="super_admin">Owner (super admin)</option>
             </select>
-            <p v-if="userModal.errors.role" class="mt-1 text-[11px] text-red-300">{{ userModal.errors.role }}</p>
+            <p v-if="userModal.errors.role" class="mt-1 text-[11px] text-danger">{{ userModal.errors.role }}</p>
           </div>
           <div>
             <label class="label" for="u-plan">Gói cước</label>
@@ -1626,14 +1626,14 @@ onMounted(async () => {
           <div v-if="userModal.mode === 'create'" class="sm:col-span-2">
             <label class="label" for="u-pwd">Mật khẩu (tối thiểu 8 ký tự)</label>
             <input id="u-pwd" v-model="userModal.form.password" type="password" autocomplete="new-password" class="input !py-2 font-mono text-xs" :class="userModal.errors.password ? '!border-red-500/70' : ''">
-            <p v-if="userModal.errors.password" class="mt-1 text-[11px] text-red-300">{{ userModal.errors.password }}</p>
+            <p v-if="userModal.errors.password" class="mt-1 text-[11px] text-danger">{{ userModal.errors.password }}</p>
           </div>
         </div>
         <div>
           <label class="flex items-center gap-2 text-xs text-cream-200">
             <input type="checkbox" v-model="userModal.form.is_active" class="h-4 w-4 accent-brand-500"> Tài khoản đang hoạt động
           </label>
-          <p v-if="userModal.errors.is_active" class="mt-1 text-[11px] text-red-300">{{ userModal.errors.is_active }}</p>
+          <p v-if="userModal.errors.is_active" class="mt-1 text-[11px] text-danger">{{ userModal.errors.is_active }}</p>
         </div>
         <div class="flex items-center justify-end gap-2 border-t border-ink-700 pt-3">
           <button type="button" class="tool-btn" @click="userModal.open = false">Huỷ</button>
@@ -1654,13 +1654,13 @@ onMounted(async () => {
         <div>
           <label class="label" for="c-amount">Số credit (dương = cộng, âm = trừ)</label>
           <input id="c-amount" v-model.number="creditModal.form.amount" type="number" step="1" class="input !py-2" :class="creditModal.errors.amount ? '!border-red-500/70' : ''" placeholder="vd: 500 hoặc -100">
-          <p v-if="creditModal.errors.amount" class="mt-1 text-[11px] text-red-300">{{ creditModal.errors.amount }}</p>
+          <p v-if="creditModal.errors.amount" class="mt-1 text-[11px] text-danger">{{ creditModal.errors.amount }}</p>
         </div>
         <div>
           <label class="label" for="c-note">Ghi chú</label>
           <input id="c-note" v-model="creditModal.form.note" class="input !py-2" placeholder="Lý do điều chỉnh (hiện trong Sổ credit)">
         </div>
-        <p class="text-[11px] text-cream-300/75">Giao dịch được ghi vào Sổ credit kèm tên bạn là người thực hiện.</p>
+        <p class="text-[11px] text-cream-300">Giao dịch được ghi vào Sổ credit kèm tên bạn là người thực hiện.</p>
         <div class="flex items-center justify-end gap-2 border-t border-ink-700 pt-3">
           <button type="button" class="tool-btn" @click="creditModal.open = false">Huỷ</button>
           <button type="submit" class="btn-brand btn-sm" :disabled="creditModal.saving">
@@ -1677,7 +1677,7 @@ onMounted(async () => {
         <div>
           <label class="label" for="p-pwd">Mật khẩu mới (tối thiểu 8 ký tự)</label>
           <input id="p-pwd" v-model="pwdModal.form.password" type="password" autocomplete="new-password" class="input !py-2 font-mono text-xs" :class="pwdModal.errors.password ? '!border-red-500/70' : ''">
-          <p v-if="pwdModal.errors.password" class="mt-1 text-[11px] text-red-300">{{ pwdModal.errors.password }}</p>
+          <p v-if="pwdModal.errors.password" class="mt-1 text-[11px] text-danger">{{ pwdModal.errors.password }}</p>
         </div>
         <div class="flex items-center justify-end gap-2 border-t border-ink-700 pt-3">
           <button type="button" class="tool-btn" @click="pwdModal.open = false">Huỷ</button>
@@ -1695,12 +1695,12 @@ onMounted(async () => {
           <div>
             <label class="label" for="pl-name">Tên gói</label>
             <input id="pl-name" v-model="planModal.form.name" class="input !py-2" :class="planModal.errors.name ? '!border-red-500/70' : ''" placeholder="VD: Chuyên nghiệp">
-            <p v-if="planModal.errors.name" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.name }}</p>
+            <p v-if="planModal.errors.name" class="mt-1 text-[11px] text-danger">{{ planModal.errors.name }}</p>
           </div>
           <div>
             <label class="label" for="pl-slug">Slug</label>
             <input id="pl-slug" v-model="planModal.form.slug" class="input !py-2 font-mono text-xs" :class="planModal.errors.slug ? '!border-red-500/70' : ''" placeholder="vd: pro">
-            <p v-if="planModal.errors.slug" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.slug }}</p>
+            <p v-if="planModal.errors.slug" class="mt-1 text-[11px] text-danger">{{ planModal.errors.slug }}</p>
           </div>
           <div class="sm:col-span-2">
             <label class="label" for="pl-tagline">Mô tả ngắn (tagline)</label>
@@ -1709,12 +1709,12 @@ onMounted(async () => {
           <div>
             <label class="label" for="pl-price">Giá VNĐ / tháng (0 = miễn phí)</label>
             <input id="pl-price" v-model.number="planModal.form.price_vnd" type="number" min="0" class="input !py-2" :class="planModal.errors.price_vnd ? '!border-red-500/70' : ''">
-            <p v-if="planModal.errors.price_vnd" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.price_vnd }}</p>
+            <p v-if="planModal.errors.price_vnd" class="mt-1 text-[11px] text-danger">{{ planModal.errors.price_vnd }}</p>
           </div>
           <div>
             <label class="label" for="pl-credits">Credit / tháng</label>
             <input id="pl-credits" v-model.number="planModal.form.credits_per_month" type="number" min="0" class="input !py-2" :class="planModal.errors.credits_per_month ? '!border-red-500/70' : ''">
-            <p v-if="planModal.errors.credits_per_month" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.credits_per_month }}</p>
+            <p v-if="planModal.errors.credits_per_month" class="mt-1 text-[11px] text-danger">{{ planModal.errors.credits_per_month }}</p>
           </div>
           <div>
             <label class="label" for="pl-bonus">Credit tặng lần đầu</label>
@@ -1731,17 +1731,17 @@ onMounted(async () => {
           <div>
             <label class="label" for="pl-seats">Số ghế (người dùng chung)</label>
             <input id="pl-seats" v-model.number="planModal.form.seats" type="number" min="1" max="100" class="input !py-2">
-            <p v-if="planModal.errors.seats" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.seats }}</p>
+            <p v-if="planModal.errors.seats" class="mt-1 text-[11px] text-danger">{{ planModal.errors.seats }}</p>
           </div>
           <div>
             <label class="label" for="pl-img">Credit / ảnh</label>
             <input id="pl-img" v-model.number="planModal.form.image_credit_cost" type="number" min="1" class="input !py-2" :class="planModal.errors.image_credit_cost ? '!border-red-500/70' : ''">
-            <p v-if="planModal.errors.image_credit_cost" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.image_credit_cost }}</p>
+            <p v-if="planModal.errors.image_credit_cost" class="mt-1 text-[11px] text-danger">{{ planModal.errors.image_credit_cost }}</p>
           </div>
           <div>
             <label class="label" for="pl-vid">Credit / video</label>
             <input id="pl-vid" v-model.number="planModal.form.video_credit_cost" type="number" min="1" class="input !py-2" :class="planModal.errors.video_credit_cost ? '!border-red-500/70' : ''">
-            <p v-if="planModal.errors.video_credit_cost" class="mt-1 text-[11px] text-red-300">{{ planModal.errors.video_credit_cost }}</p>
+            <p v-if="planModal.errors.video_credit_cost" class="mt-1 text-[11px] text-danger">{{ planModal.errors.video_credit_cost }}</p>
           </div>
           <div>
             <label class="label" for="pl-sort">Thứ tự hiển thị</label>
@@ -1756,19 +1756,19 @@ onMounted(async () => {
               <StudioIcon name="puzzle" size="h-4 w-4" class="text-brand-300" /> Tính năng gói này CẤP cho khách
             </p>
             <span :class="[BADGE, BADGE_TONE.brand]">{{ planFormModuleCount() }}/{{ modulesData.total_modules }} tính năng</span>
-            <span class="text-[10px] text-cream-300/75">Đây là công tắc thật: khách ở gói chỉ dùng được đúng những mục được tick.</span>
+            <span class="text-[10px] text-cream-300">Đây là công tắc thật: khách ở gói chỉ dùng được đúng những mục được tick.</span>
           </div>
-          <p v-if="!modulesData.modules.length" class="mt-2 text-[11px] text-cream-300/75">Đang nạp danh mục tính năng…</p>
+          <p v-if="!modulesData.modules.length" class="mt-2 text-[11px] text-cream-300">Đang nạp danh mục tính năng…</p>
           <template v-else>
             <div class="mt-2 max-h-64 space-y-2 overflow-y-auto pr-1">
               <div v-for="(items, group) in moduleGroups" :key="'pf-' + group">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/70">{{ group }}</p>
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">{{ group }}</p>
                 <div class="mt-0.5 flex flex-wrap gap-1">
                   <button v-for="m in items" :key="'pf-' + m.id" type="button"
                           class="rounded border px-1.5 py-0.5 text-[10px] transition"
                           :class="(planModal.form.modules || []).includes(m.id)
-                            ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200'
-                            : 'border-ink-600 bg-ink-800/60 text-cream-300/70 hover:border-ink-500'"
+                            ? 'border-emerald-500/40 bg-emerald-500/15 text-ok'
+                            : 'border-ink-600 bg-ink-800/60 text-cream-300 hover:border-ink-500'"
                           :title="m.summary + (m.depends_on.length ? ' · cần: ' + m.depends_on.join(', ') : '')"
                           @click="togglePlanFormModule(m.id)">
                     <StudioIcon :name="(planModal.form.modules || []).includes(m.id) ? 'check' : 'x'" size="h-3 w-3" class="mr-0.5 inline" />{{ m.name }}
@@ -1793,7 +1793,7 @@ onMounted(async () => {
         <!-- [Modules] KHỐI 2 — GHI CHÚ HIỂN THỊ nhập tay: chỉ để khách đọc, KHÔNG phải công tắc.-->
         <div class="rounded-lg border border-ink-700 bg-ink-900/60 p-3">
           <label class="label" for="pl-feature">Ghi chú hiển thị cho khách (Enter để thêm từng mục)</label>
-          <p class="mb-2 text-[11px] leading-relaxed text-amber-200/90">
+          <p class="mb-2 text-[11px] leading-relaxed text-warn">
             <StudioIcon name="info" size="h-3 w-3" class="mr-1 inline" />
             Phần này <b>CHỈ để khách đọc</b> trên trang giá — <b>không cấp quyền</b> và không chặn gì cả.
             Muốn mở/ khoá tính năng thì tick ở khối phía trên.
@@ -1805,19 +1805,19 @@ onMounted(async () => {
           <div class="mt-2 flex flex-wrap gap-1.5">
             <span v-for="(ft, i) in planModal.form.features" :key="i" class="inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-1 text-[11px] text-cream-100">
               {{ ft }}
-              <button type="button" class="text-cream-300/85 hover:text-red-300" :aria-label="'Xoá ghi chú ' + ft" @click="removeFeature(i)"><StudioIcon name="x" size="h-3 w-3" /></button>
+              <button type="button" class="text-cream-300 hover:text-danger" :aria-label="'Xoá ghi chú ' + ft" @click="removeFeature(i)"><StudioIcon name="x" size="h-3 w-3" /></button>
             </span>
-            <span v-if="!planModal.form.features.length" class="text-[11px] text-cream-300/75">Chưa có ghi chú nào.</span>
+            <span v-if="!planModal.form.features.length" class="text-[11px] text-cream-300">Chưa có ghi chú nào.</span>
           </div>
 
           <!-- Xem trước: khách sẽ thấy gì trên trang giá (tính năng suy từ công tắc + ghi chú ở trên)-->
           <div class="mt-3 rounded border border-ink-700 bg-ink-950/40 p-2">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/70">Khách sẽ thấy trên trang giá</p>
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Khách sẽ thấy trên trang giá</p>
             <p class="mt-1 text-[11px] text-cream-200">
               <b class="text-cream-50">{{ planFormModuleCount() }} tính năng</b><span v-if="planFormModuleNames().length">:</span>
-              <span class="text-cream-300/85">{{ planFormModuleNames().slice(0, 12).join(' · ') }}<span v-if="planFormModuleNames().length > 12"> …</span></span>
+              <span class="text-cream-300">{{ planFormModuleNames().slice(0, 12).join(' · ') }}<span v-if="planFormModuleNames().length > 12"> …</span></span>
             </p>
-            <p v-if="planModal.form.features.length" class="mt-1 text-[11px] text-cream-300/85">
+            <p v-if="planModal.form.features.length" class="mt-1 text-[11px] text-cream-300">
               Thông tin thêm: {{ planModal.form.features.join(' · ') }}
             </p>
           </div>
@@ -1827,7 +1827,7 @@ onMounted(async () => {
           <label class="flex items-center gap-2 text-xs text-cream-200"><input type="checkbox" v-model="planModal.form.is_active" class="h-4 w-4 accent-brand-500"> Đang mở bán</label>
           <label class="flex items-center gap-2 text-xs text-cream-200"><input type="checkbox" v-model="planModal.form.is_default" class="h-4 w-4 accent-brand-500"> Gói mặc định cho tài khoản mới</label>
         </div>
-        <p class="text-[11px] text-cream-300/75">Đặt gói này làm mặc định sẽ tự bỏ mặc định ở gói khác.</p>
+        <p class="text-[11px] text-cream-300">Đặt gói này làm mặc định sẽ tự bỏ mặc định ở gói khác.</p>
 
         <div class="flex items-center justify-end gap-2 border-t border-ink-700 pt-3">
           <button type="button" class="tool-btn" @click="planModal.open = false">Huỷ</button>

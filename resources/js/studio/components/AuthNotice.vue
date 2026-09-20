@@ -51,14 +51,14 @@ const copy = {
         <span v-else class="text-2xl" role="img" aria-hidden="true">🔒</span>
       </div>
       <h1 id="auth-notice-title" class="font-display text-lg font-semibold text-cream-100">{{ copy[store.authState].title }}</h1>
-      <p class="mt-2 text-sm leading-relaxed text-cream-300/70">{{ copy[store.authState].body }}</p>
+      <p class="mt-2 text-sm leading-relaxed text-cream-300">{{ copy[store.authState].body }}</p>
 
       <a
         v-if="copy[store.authState].href"
         :href="copy[store.authState].href"
         class="mt-5 inline-flex items-center gap-2 rounded-full bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-500"
       >{{ copy[store.authState].action }}</a>
-      <p v-else class="mt-5 text-xs text-cream-300/50">Liên hệ quản trị viên qua fanpage / email đã đăng ký trên website.</p>
+      <p v-else class="mt-5 text-xs text-cream-400">Liên hệ quản trị viên qua fanpage / email đã đăng ký trên website.</p>
     </div>
   </div>
 </template>

@@ -84,11 +84,11 @@ function openSettings() { settingsOpen.value = true; }
 <template>
   <div v-if="!popup" class="card p-5" style="background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
     <div class="flex items-center gap-2">
-      <button @click="open=true; step='type'" class="flex min-w-0 flex-1 items-center justify-between rounded-lg border border-ink-600 bg-white/5 p-3 text-left transition hover:border-brand-400">
+      <button @click="open=true; step='type'" class="flex min-w-0 flex-1 items-center justify-between rounded-lg border border-ink-600 bg-cream-50/5 p-3 text-left transition hover:border-brand-400">
         <span class="min-w-0 flex-1"><span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="sparkles" /> Trợ lý thiết kế</span></span>
         <span class="ml-1 shrink-0 text-lg text-cream-200">›</span>
       </button>
-      <button @click="openSettings" title="Quản lý data Trợ lý thiết kế" class="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-ink-600 bg-white/5 text-brand-300 transition hover:border-brand-400 hover:text-brand-200"><StudioIcon name="gear" /></button>
+      <button @click="openSettings" title="Quản lý data Trợ lý thiết kế" class="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-ink-600 bg-cream-50/5 text-brand-300 transition hover:border-brand-400 hover:text-brand-200"><StudioIcon name="gear" /></button>
     </div>
   </div>
 
@@ -96,7 +96,7 @@ function openSettings() { settingsOpen.value = true; }
       <div class="p-5">
       <!-- step: type -->
       <template v-if="step === 'type'">
-        <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-cream-300/60">Chọn loại trang phục</p>
+        <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-cream-400">Chọn loại trang phục</p>
         <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
           <button v-for="t in types" :key="t.id" type="button" @click="pickType(t)"
             class="group relative aspect-square overflow-hidden rounded-md border-2 border-ink-600 bg-ink-900 transition-all duration-fast hover:border-brand-400 hover:shadow-lg hover:shadow-brand-500/15 active:scale-[0.97]">
@@ -120,7 +120,7 @@ function openSettings() { settingsOpen.value = true; }
               <button v-for="opt in q.opts" :key="opt" type="button" @click="toggleOpt(q.key, opt)" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="answers[q.key]?.includes(opt) ? 'border-brand-500 bg-brand-500/25 text-white' : 'border-ink-600 text-cream-200 hover:border-brand-400'">{{ opt }}</button>
             </div>
             <input v-model="customNotes[q.key]" placeholder="Hoặc nhập tùy chỉnh…" class="mt-2 w-full rounded-lg border border-ink-700 bg-ink-900/60 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-brand-400">
-            <p v-if="selectedCount(q.key)" class="mt-1 text-[10px] text-cream-300/50">Đã chọn {{ selectedCount(q.key) }} mục</p>
+            <p v-if="selectedCount(q.key)" class="mt-1 text-[10px] text-cream-400">Đã chọn {{ selectedCount(q.key) }} mục</p>
           </div>
         </div>
         <button @click="submitPrompt" :disabled="loading" title="Tạo prompt thiết kế từ câu trả lời" class="btn-brand mt-3 w-full">{{ loading ? 'Đang tạo…' : 'Tạo prompt thiết kế' }}</button>

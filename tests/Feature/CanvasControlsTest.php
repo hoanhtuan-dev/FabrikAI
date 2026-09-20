@@ -108,10 +108,25 @@ class CanvasControlsTest extends TestCase
         }
         $this->assertStringContainsString('repeating-conic-gradient', $css,
             'Nền "lưới" phải là ô bàn cờ thật (trước đây class bàn cờ không hề được định nghĩa).');
-        $this->assertMatchesRegularExpression('/\.canvas-bg-dark\s*\{[^}]*var\(--color-ink-950\)/s', $css,
-            'Nền tối phải dùng ĐÚNG token ink-950 của canvas.');
-        $this->assertMatchesRegularExpression('/\.canvas-bg-cream\s*\{[^}]*var\(--color-cream-100\)/s', $css,
-            'Nền kem phải dùng ĐÚNG token cream-100 của canvas.');
+        /* [2026-09-23 · đợt theme Sáng/Tối] Nền canvas nay đọc token CỐ ĐỊNH --color-canvas-*
+           thay vì token bề mặt (--color-ink-950 · --color-cream-100). Lý do: hai token bề mặt đó
+           ĐỔI GIÁ TRỊ theo theme (theme sáng đảo vai hai dải ink/cream), nên "nền kem" ở theme
+           sáng sẽ thành nền ĐEN — người dùng mất đúng thứ họ vừa chọn trên thanh trạng thái.
+           Bất biến thật vẫn nguyên vẹn: canvas và ô màu dùng CHUNG một class, màu đến từ token
+           (không inline style). Test khoá cả vế "không được định nghĩa lại ở theme sáng". */
+        $this->assertMatchesRegularExpression('/\.canvas-bg-dark\s*\{[^}]*var\(--color-canvas-dark\)/s', $css,
+            'Nền tối phải dùng ĐÚNG token --color-canvas-dark (token cố định, không theo theme).');
+        $this->assertMatchesRegularExpression('/\.canvas-bg-cream\s*\{[^}]*var\(--color-canvas-cream\)/s', $css,
+            'Nền kem phải dùng ĐÚNG token --color-canvas-cream (token cố định, không theo theme).');
+
+        $this->assertStringContainsString('--color-canvas-cream: #f4f2ec;', $css,
+            'Thiếu khai báo token cố định --color-canvas-cream.');
+        preg_match("/\[data-theme='light'\]\s*\{(.*?)\n\}/s", $css, $lightBlock);
+        $this->assertNotEmpty($lightBlock[1] ?? '', "Không đọc được khối [data-theme='light'] trong app.css.");
+        foreach (['canvas-dark', 'canvas-white', 'canvas-cream'] as $fixed) {
+            $this->assertStringNotContainsString('--color-'.$fixed.':', $lightBlock[1],
+                'Token '.$fixed.' bị định nghĩa lại ở theme sáng ⇒ nền canvas đổi theo theme, sai với lựa chọn của người dùng.');
+        }
 
         // Hai nơi dùng cùng class, không nơi nào tự vẽ màu riêng.
         $this->assertStringContainsString("'canvas-bg-' +", $app, 'Vùng canvas phải dùng class .canvas-bg-*.');

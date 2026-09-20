@@ -96,7 +96,7 @@ async function copyColor(c) {
       <p class="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-cream-100">
         <StudioIcon name="layers" size="h-4 w-4" class="shrink-0 text-cream-300" />
         <span>Layers</span>
-        <span class="rounded bg-ink-800 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-cream-300/80">{{ store.canvasLayers.length }}</span>
+        <span class="rounded bg-ink-800 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-cream-300">{{ store.canvasLayers.length }}</span>
       </p>
       <div class="flex shrink-0 items-center gap-1">
         <div class="relative">
@@ -106,7 +106,7 @@ async function copyColor(c) {
           <!-- Backdrop phủ toàn màn hình: bấm ra ngoài menu → tự thoát popup (thoát tiêu điểm) -->
           <div v-if="blankMenuOpen" class="fixed inset-0 z-40" @pointerdown="blankMenuOpen = false"></div>
           <div v-if="blankMenuOpen" class="absolute right-0 top-9 z-50 flex w-56 flex-col gap-2 rounded-md border border-ink-700 bg-ink-900/95 p-3 shadow-2xl">
-            <p class="px-1 text-[10px] font-semibold text-cream-300/70">Nền layer mới</p>
+            <p class="px-1 text-[10px] font-semibold text-cream-300">Nền layer mới</p>
             <button @click="store.addBlankLayer(null, blankRatio); blankMenuOpen = false" class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-cream-100 hover:bg-ink-800"><span class="h-5 w-5 rounded border border-white/30" style="background: repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 8px 8px"></span>Trong suốt</button>
 
             <div class="grid grid-cols-6 gap-1.5">
@@ -119,20 +119,20 @@ async function copyColor(c) {
                 <span class="absolute inset-0" :style="{ background: blankColor }"></span>
               </span>
               <span class="flex-1 truncate text-left text-[11px] text-cream-100">Chọn màu tùy chỉnh…</span>
-              <span class="text-cream-300/60"><StudioIcon name="chevronDown" size="h-3 w-3" /></span>
+              <span class="text-cream-400"><StudioIcon name="chevronDown" size="h-3 w-3" /></span>
               <input type="color" :value="blankColor" @input="blankColor = $event.target.value" @change="addBlankColorLayer" class="absolute inset-0 h-full w-full cursor-pointer opacity-0">
             </label>
 
             <div class="h-px w-full bg-ink-700"></div>
 
-            <p class="px-1 text-[10px] font-semibold text-cream-300/70">Tỷ lệ khung hình</p>
+            <p class="px-1 text-[10px] font-semibold text-cream-300">Tỷ lệ khung hình</p>
             <div class="flex flex-wrap gap-1.5">
               <button v-for="r in ['1:1','4:3','3:4','9:16','16:9','4:5','21:9']" :key="r" @click="blankRatio = r" class="rounded-md px-2 py-1 text-[10px] font-semibold transition" :class="blankRatio === r ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'">{{ r }}</button>
             </div>
           </div>
         </div>
         <button @click="store.openClearCanvasConfirm()"
-          class="grid h-7 w-7 place-items-center rounded-lg text-red-300 transition-colors hover:bg-red-600/25 hover:text-red-200"
+          class="grid h-7 w-7 place-items-center rounded-lg text-danger transition-colors hover:bg-red-600/25 hover:text-danger"
           title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)"
           aria-label="Dọn canvas — bỏ hết ảnh trên canvas">
           <StudioIcon name="trash" size="h-4 w-4" />
@@ -149,21 +149,21 @@ async function copyColor(c) {
         <!-- Folder nhóm (hiện trước layer đại diện) -->
         <template v-if="isGroupTop(l)">
           <div class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1" :class="store.isGroupActive(l.groupId) ? 'border-violet-400 bg-violet-400/20' : 'border-violet-400/40 bg-ink-800/60'" @click="store.selectGroup(l.groupId)">
-            <button @click.stop="toggleGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300/70 hover:bg-ink-700 hover:text-cream-100" :title="collapsedGroups.has(l.groupId) ? 'Mở rộng nhóm' : 'Thu gọn nhóm'"><StudioIcon :name="collapsedGroups.has(l.groupId) ? 'chevronUp' : 'chevronDown'" size="h-3.5 w-3.5" /></button>
+            <button @click.stop="toggleGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700 hover:text-cream-100" :title="collapsedGroups.has(l.groupId) ? 'Mở rộng nhóm' : 'Thu gọn nhóm'"><StudioIcon :name="collapsedGroups.has(l.groupId) ? 'chevronUp' : 'chevronDown'" size="h-3.5 w-3.5" /></button>
             <StudioIcon name="group" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
             <template v-if="groupRenameId === l.groupId">
               <input v-model="groupRenameVal" @keydown.enter.prevent="commitGroupRename" @keydown.esc="cancelGroupRename" @blur="commitGroupRename" class="min-w-0 flex-1 rounded bg-ink-950 px-1 py-0.5 text-[10px] text-cream-100 outline-none ring-1 ring-brand-500" aria-label="Đổi tên nhóm" @click.stop>
             </template>
             <span v-else class="min-w-0 flex-1 truncate text-[11px] font-semibold text-cream-100" :title="'Nhóm: ' + groupName(l.groupId) + ' — nhấn đúp để đổi tên'" @dblclick.stop="startGroupRename(l.groupId)">{{ groupName(l.groupId) }}</span>
-            <span class="shrink-0 rounded bg-ink-700 px-1 text-[9px] text-cream-300/70">{{ groupCount(l.groupId) }}</span>
-            <button @click.stop="store.ungroupGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300 hover:bg-red-600/25 hover:text-red-200" :title="'Tách nhóm ' + groupName(l.groupId)"><StudioIcon name="unlink" size="h-3.5 w-3.5" /></button>
+            <span class="shrink-0 rounded bg-ink-700 px-1 text-[9px] text-cream-300">{{ groupCount(l.groupId) }}</span>
+            <button @click.stop="store.ungroupGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300 hover:bg-red-600/25 hover:text-danger" :title="'Tách nhóm ' + groupName(l.groupId)"><StudioIcon name="unlink" size="h-3.5 w-3.5" /></button>
             <!-- [2026-09-20] Ba nút (khóa · nhân đôi · gỡ) LUÔN hiện. Trước đây chúng opacity-0 và chỉ
                  hiện khi hover ⇒ người dùng không biết là có, và trên thiết bị cảm ứng thì gần như không
                  bấm được (không có hover). -->
             <div class="flex items-center gap-0.5">
               <button @click.stop="store.toggleGroupLock(l.groupId)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" :title="groupLocked(l.groupId) ? 'Mở khóa nhóm' : 'Khóa nhóm'" :aria-label="groupLocked(l.groupId) ? 'Mở khóa nhóm' : 'Khóa nhóm'"><StudioIcon :name="groupLocked(l.groupId) ? 'lock' : 'lockOpen'" size="h-3.5 w-3.5" /></button>
               <button @click.stop="store.duplicateGroup(l.groupId)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Nhân đôi nhóm" aria-label="Nhân đôi nhóm"><StudioIcon name="copy" size="h-3.5 w-3.5" /></button>
-              <button @click.stop="store.deleteGroup(l.groupId)" class="grid h-6 w-6 place-items-center rounded bg-red-600/25 text-red-200 hover:bg-red-600" title="Xóa nhóm" aria-label="Xóa nhóm"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+              <button @click.stop="store.deleteGroup(l.groupId)" class="grid h-6 w-6 place-items-center rounded bg-red-600/25 text-danger hover:bg-red-600" title="Xóa nhóm" aria-label="Xóa nhóm"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
             </div>
           </div>
         </template>
@@ -183,7 +183,7 @@ async function copyColor(c) {
         @dragleave="onRowDragLeave($event, l)"
         @drop="onRowDrop($event, l)">
         <!-- Drag handle (locked → mờ + không kéo được) -->
-        <span class="shrink-0 text-cream-300/50" :class="l.locked ? 'opacity-30' : 'cursor-grab hover:text-cream-200 active:cursor-grabbing'" :draggable="!l.locked" @dragstart="onDragStart($event, l)" @dragend="clearDrag" title="Kéo để sắp xếp layer">
+        <span class="shrink-0 text-cream-400" :class="l.locked ? 'opacity-30' : 'cursor-grab hover:text-cream-200 active:cursor-grabbing'" :draggable="!l.locked" @dragstart="onDragStart($event, l)" @dragend="clearDrag" title="Kéo để sắp xếp layer">
           <StudioIcon name="gripVertical" size="h-4 w-4" />
         </span>
         <button @click.stop="store.toggleLayerVisible(l.id)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-200 hover:bg-ink-700" :title="l.visible !== false ? 'Ẩn layer' : 'Hiện layer'" :aria-label="l.visible !== false ? 'Ẩn layer' : 'Hiện layer'">
@@ -195,7 +195,7 @@ async function copyColor(c) {
         <span v-if="renamingId !== l.id" class="min-w-0 flex-1 truncate text-[11px] text-cream-100" :title="l.name" @dblclick.stop="startRename(l)">{{ l.name }}</span>
         <input v-else v-model="renameValue" class="min-w-0 flex-1 rounded bg-ink-950 px-1 py-0.5 text-[11px] text-cream-100 outline-none ring-1 ring-brand-500" aria-label="Đổi tên layer" @keyup.enter="commitRename()" @keyup.esc="cancelRename()" @blur="commitRename()" @click.stop>
         <div class="flex shrink-0 items-center gap-0.5">
-          <button @click.stop="l.groupId ? store.toggleGroupLock(l.groupId) : store.toggleLayerLock(l.id)" class="grid h-6 w-6 place-items-center rounded" :class="l.locked ? 'bg-amber-500/20 text-amber-300' : 'text-cream-300 hover:bg-ink-700'" :title="l.groupId ? 'Khóa/Mở khóa nhóm' : (l.locked ? 'Mở khóa' : 'Khóa layer')" :aria-label="l.groupId ? 'Khóa/Mở khóa nhóm' : (l.locked ? 'Mở khóa' : 'Khóa layer')">
+          <button @click.stop="l.groupId ? store.toggleGroupLock(l.groupId) : store.toggleLayerLock(l.id)" class="grid h-6 w-6 place-items-center rounded" :class="l.locked ? 'bg-amber-500/20 text-warn' : 'text-cream-300 hover:bg-ink-700'" :title="l.groupId ? 'Khóa/Mở khóa nhóm' : (l.locked ? 'Mở khóa' : 'Khóa layer')" :aria-label="l.groupId ? 'Khóa/Mở khóa nhóm' : (l.locked ? 'Mở khóa' : 'Khóa layer')">
             <StudioIcon :name="l.locked ? 'lock' : 'lockOpen'" size="h-3.5 w-3.5" />
           </button>
           <!-- Ba nút (khóa · nhân đôi · gỡ khỏi canvas) LUÔN hiện — cùng lý do như khối nhóm ở trên. -->
@@ -203,7 +203,7 @@ async function copyColor(c) {
             <button @click.stop="l.groupId ? store.duplicateGroup(l.groupId) : store.duplicateLayer(l.id)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" :title="l.groupId ? 'Nhân đôi nhóm' : 'Nhân đôi layer'" :aria-label="l.groupId ? 'Nhân đôi nhóm' : 'Nhân đôi layer'">
               <StudioIcon name="copy" size="h-3.5 w-3.5" />
             </button>
-            <button @click.stop="l.groupId ? store.deleteGroup(l.groupId) : store.deleteLayer(l)" :disabled="l.locked" class="grid h-6 w-6 place-items-center rounded bg-red-600/25 text-red-200 hover:bg-red-600 disabled:opacity-30" :title="l.groupId ? 'Xóa nhóm' : (l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)')" :aria-label="l.groupId ? 'Xóa nhóm' : (l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)')">
+            <button @click.stop="l.groupId ? store.deleteGroup(l.groupId) : store.deleteLayer(l)" :disabled="l.locked" class="grid h-6 w-6 place-items-center rounded bg-red-600/25 text-danger hover:bg-red-600 disabled:opacity-30" :title="l.groupId ? 'Xóa nhóm' : (l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)')" :aria-label="l.groupId ? 'Xóa nhóm' : (l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)')">
               <StudioIcon name="trash" size="h-3.5 w-3.5" />
             </button>
           </div>
@@ -212,29 +212,29 @@ async function copyColor(c) {
       </template>
       <!-- Empty state -->
       <div v-if="!store.canvasLayers.length" class="flex flex-col items-center gap-1.5 px-3 py-8 text-center">
-        <StudioIcon name="layers" size="h-7 w-7" class="text-cream-300/30" />
-        <p class="text-[11px] font-semibold text-cream-300/60">Chưa có layer</p>
-        <p class="text-[10px] leading-relaxed text-cream-300/40">Chọn ảnh từ Outputs hoặc thêm layer mới</p>
+        <StudioIcon name="layers" size="h-7 w-7" class="text-cream-400" />
+        <p class="text-[11px] font-semibold text-cream-400">Chưa có layer</p>
+        <p class="text-[10px] leading-relaxed text-cream-400">Chọn ảnh từ Outputs hoặc thêm layer mới</p>
       </div>
     </div>
 
     <!-- 3. Thuộc tính layer đang chọn -->
     <section v-if="store.activeLayer" class="scrollbar-hide max-h-[42%] shrink-0 space-y-2 overflow-y-auto border-t border-ink-700 p-2.5">
       <div class="flex items-center justify-between">
-        <p class="flex items-center gap-1 text-[10px] font-semibold text-cream-300/60">
+        <p class="flex items-center gap-1 text-[10px] font-semibold text-cream-400">
           <StudioIcon name="move" size="h-3.5 w-3.5" />
           <span>Thuộc tính</span>
         </p>
-        <button @click="store.resetLayerTransform(store.activeLayer.id)" class="text-[10px] font-semibold text-red-300 hover:text-red-200" title="Đưa layer về mặc định">Đặt lại</button>
+        <button @click="store.resetLayerTransform(store.activeLayer.id)" class="text-[10px] font-semibold text-danger hover:text-danger" title="Đưa layer về mặc định">Đặt lại</button>
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-300/60">Opacity</span>
+        <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-400">Opacity</span>
         <input type="range" min="0" max="1" step="0.05" :value="store.activeLayer.opacity" @input="store.updateUnitTransform('opacity', Number($event.target.value))" class="h-1.5 min-w-0 flex-1 accent-brand-500" aria-label="Opacity">
         <span class="w-9 shrink-0 whitespace-nowrap text-right text-[10px] tabular-nums text-cream-200">{{ Math.round(store.activeLayer.opacity * 100) }}%</span>
         <button @click="store.updateUnitTransform('opacity', 1)" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset opacity" aria-label="Reset opacity"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-300/60">Blend</span>
+        <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-400">Blend</span>
         <select :value="store.activeLayer.blend" @change="store.updateUnitTransform('blend', $event.target.value)" class="min-w-0 flex-1 rounded bg-ink-800 px-1 py-0.5 text-[10px] text-cream-100" aria-label="Blend">
           <option value="normal">Normal</option>
           <option value="multiply">Multiply</option>
@@ -246,13 +246,13 @@ async function copyColor(c) {
         <button @click="store.updateUnitTransform('blend', 'normal')" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset blend" aria-label="Reset blend"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-300/60">Scale</span>
+        <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-400">Scale</span>
         <input type="range" min="0.2" max="3" step="0.05" :value="activeUnitScale" @input="store.updateUnitTransform('scale', Number($event.target.value))" class="h-1.5 min-w-0 flex-1 accent-brand-500" aria-label="Scale">
         <span class="w-9 shrink-0 whitespace-nowrap text-right text-[10px] tabular-nums text-cream-200">{{ Math.round(activeUnitScale * 100) }}%</span>
         <button @click="store.updateUnitTransform('scale', 1)" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset scale" aria-label="Reset scale"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-300/60">Xoay</span>
+        <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-400">Xoay</span>
         <input type="range" min="-180" max="180" step="1" :value="activeUnitRotation" @input="store.updateUnitTransform('rotation', Number($event.target.value))" class="h-1.5 min-w-0 flex-1 accent-brand-500" aria-label="Xoay">
         <span class="w-9 shrink-0 whitespace-nowrap text-right text-[10px] tabular-nums text-cream-200">{{ activeUnitRotation }}°</span>
         <button @click="store.resetActiveUnitRotation()" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset rotation (group = cả nhóm)" aria-label="Reset rotation"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
@@ -275,7 +275,7 @@ async function copyColor(c) {
 
     <!-- 4. Palette ảnh -->
     <section v-if="store.palette.length && store.step !== 3 && store.upscaleSrc" class="shrink-0 border-t border-ink-700 p-2.5">
-      <p class="mb-1.5 flex items-center gap-1 text-[10px] font-semibold text-cream-300/60">
+      <p class="mb-1.5 flex items-center gap-1 text-[10px] font-semibold text-cream-400">
         <StudioIcon name="palette" size="h-3.5 w-3.5" />
         <span>Palette ảnh</span>
       </p>
@@ -296,7 +296,7 @@ async function copyColor(c) {
         class="motion-ui flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold disabled:opacity-40"
         :class="store.canSaveActiveLayerToOutput
           ? 'bg-brand-600 text-white ring-1 ring-brand-400/70 hover:bg-brand-500'
-          : 'bg-ink-800 text-cream-300/70 hover:bg-ink-700'"
+          : 'bg-ink-800 text-cream-300 hover:bg-ink-700'"
         :title="store.canSaveActiveLayerToOutput ? 'Lưu layer đang chọn vào Output' : 'Ảnh này đã có trong Output — không lưu trùng'"
         :aria-label="store.canSaveActiveLayerToOutput ? 'Lưu layer đang chọn vào Output' : 'Ảnh này đã có trong Output'"
       ><StudioIcon name="save" size="h-3.5 w-3.5" /><span>Lưu Output</span></button>

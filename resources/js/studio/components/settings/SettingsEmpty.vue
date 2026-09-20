@@ -16,11 +16,11 @@ defineProps({
 </script>
 <template>
   <div class="card flex flex-col items-center justify-center gap-2.5 px-6 py-12 text-center">
-    <span class="grid h-12 w-12 place-items-center rounded-full bg-ink-700/70 text-cream-300/70">
+    <span class="grid h-12 w-12 place-items-center rounded-full bg-ink-700/70 text-cream-300">
       <StudioIcon :name="filtered ? 'search' : icon" size="h-6 w-6" />
     </span>
     <p class="text-sm font-semibold text-cream-100">{{ title }}</p>
-    <p v-if="hint" class="max-w-md text-xs leading-relaxed text-cream-300/70">{{ hint }}</p>
+    <p v-if="hint" class="max-w-md text-xs leading-relaxed text-cream-300">{{ hint }}</p>
     <div class="mt-1.5"><slot /></div>
   </div>
 </template>

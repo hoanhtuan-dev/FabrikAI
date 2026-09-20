@@ -55,14 +55,14 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     </h2>
 
     <!-- Ảnh đang chọn -->
-    <div v-if="activeImg" class="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-2.5">
+    <div v-if="activeImg" class="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-cream-50/5 p-2.5">
       <img :src="activeImg" class="h-14 w-14 shrink-0 rounded-md bg-ink-900 object-cover">
       <div class="min-w-0 text-xs text-cream-200">
         <p class="truncate font-semibold">{{ store.upscaleName || 'Ảnh đang chọn' }}</p>
-        <p class="text-cream-300/60">Sẽ sửa trực tiếp trên ảnh này</p>
+        <p class="text-cream-400">Sẽ sửa trực tiếp trên ảnh này</p>
       </div>
     </div>
-    <div v-else class="mt-3 rounded-lg border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chọn một ảnh trên <b>canvas</b> (Nguồn / Kết quả / sản phẩm) để sửa.</div>
+    <div v-else class="mt-3 rounded-lg border border-dashed border-white/15 bg-cream-50/5 p-3 text-xs text-cream-400">Chọn một ảnh trên <b>canvas</b> (Nguồn / Kết quả / sản phẩm) để sửa.</div>
 
     <!-- Vẽ mask -->
     <div v-if="activeImg" class="mt-3 space-y-2">
@@ -70,9 +70,9 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
               class="group flex w-full items-center justify-center gap-2.5 rounded-lg border px-4 py-3 text-sm font-semibold transition-all duration-base"
               :class="store.inpaintMaskMode === 'path'
                 ? 'border-emerald-400 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-900/30'
-                : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200 hover:border-emerald-400 hover:bg-emerald-500/20 hover:shadow-md hover:shadow-emerald-900/20 active:scale-[.98]'">
+                : 'border-emerald-400/40 bg-emerald-500/10 text-ok hover:border-emerald-400 hover:bg-emerald-500/20 hover:shadow-md hover:shadow-emerald-900/20 active:scale-[.98]'">
         <span class="grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors"
-              :class="store.inpaintMaskMode === 'path' ? 'bg-white/20' : 'bg-emerald-500/20 group-hover:bg-emerald-500/30'">
+              :class="store.inpaintMaskMode === 'path' ? 'bg-cream-50/20' : 'bg-emerald-500/20 group-hover:bg-emerald-500/30'">
           <StudioIcon name="penTool" size="h-4 w-4" />
         </span>
         <span class="flex flex-col items-start text-left leading-tight">
@@ -86,22 +86,22 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
         <button @click="store.inpaintPathRedo()" class="flex items-center gap-1 rounded-full border border-ink-600 px-2.5 py-1 text-[10px] font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-ink-800" title="Làm lại (Ctrl+Y)"><StudioIcon name="redo" size="h-3 w-3" /> Làm lại</button>
       </div>
       <div v-if="maskActive || store.inpaintMaskDone" class="flex justify-center">
-        <button @click="store.clearInpaintMask()" class="rounded-full bg-red-600/25 px-3 py-1 text-[10px] font-semibold text-red-200 transition-colors hover:bg-red-600 hover:text-white">Bỏ mask</button>
+        <button @click="store.clearInpaintMask()" class="rounded-full bg-red-600/25 px-3 py-1 text-[10px] font-semibold text-danger transition-colors hover:bg-red-600 hover:text-white">Bỏ mask</button>
       </div>
     </div>
     <div v-if="maskActive" class="mt-1.5 rounded-md border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] text-brand-200">Vẽ đường cong quanh vùng cần sửa — quay lại điểm đầu để đóng kín, vùng chọn tự thành mask.</div>
     <!-- Trạng thái mask đã lưu: lưới mini preview -->
-    <div v-else-if="store.inpaintMaskDone" class="mt-1.5 rounded-md border border-emerald-500/30 bg-emerald-900/20 px-2.5 py-2 text-[10px] text-emerald-200">
+    <div v-else-if="store.inpaintMaskDone" class="mt-1.5 rounded-md border border-emerald-500/30 bg-emerald-900/20 px-2.5 py-2 text-[10px] text-ok">
       <div class="grid grid-cols-[auto_1fr_auto] items-center gap-3">
         <div class="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-md border border-white/20 bg-[repeating-conic-gradient(#d8d2c4_0_25%,#fff_0_50%)] bg-[length:16px_16px]">
           <img v-if="store.inpaintBrushData" :src="'data:image/png;base64,' + store.inpaintBrushData" class="h-full w-full object-contain" alt="Mask" />
-          <span v-else class="text-[9px] text-ink-500">Xóa hộp chọn</span>
+          <span v-else class="text-[9px] text-cream-400">Xóa hộp chọn</span>
         </div>
         <div class="min-w-0">
           <p class="font-semibold">Đã vẽ mask — AI chỉ sửa vùng đen.</p>
-          <p class="mt-0.5 text-emerald-200/70">Quay lại điểm đầu để đóng, hoặc vẽ vùng mới.</p>
+          <p class="mt-0.5 text-ok">Quay lại điểm đầu để đóng, hoặc vẽ vùng mới.</p>
         </div>
-        <button @click="store.toggleInpaintMask('path')" class="shrink-0 rounded-full bg-white/10 px-2 py-0.5 font-semibold hover:bg-white/20">Chỉnh lại</button>
+        <button @click="store.toggleInpaintMask('path')" class="shrink-0 rounded-full bg-cream-50/10 px-2 py-0.5 font-semibold hover:bg-cream-50/20">Chỉnh lại</button>
       </div>
     </div>
 
@@ -126,12 +126,12 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
 
     <label class="label mt-4">Mô tả chỉnh sửa</label>
     <textarea v-model="store.inpaintPrompt" rows="3" maxlength="1000" @keydown="onPromptKeydown" class="input !text-xs" placeholder="VD: đổi màu áo thành đỏ, ngắn tay hơn, thêm túi trước… (Ctrl+Enter để gửi)"></textarea>
-    <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ store.inpaintPrompt.length }}/1000</p>
+    <p class="mt-1 text-right text-[10px] text-cream-400">{{ store.inpaintPrompt.length }}/1000</p>
 
     <!-- Model chỉnh sửa — nhóm edit (Cài đặt → 🎯 Nhóm công việc) -->
     <div v-if="store.taskGroupModels('edit').length > 1" class="mt-2 flex items-center gap-2">
-      <span class="shrink-0 text-[10px] font-medium text-cream-300/60">🤖</span>
-      <select v-model="store.inpaintModel" class="input !py-2 !text-xs" title="Model chỉnh sửa ảnh — danh sách từ Cài đặt → 🎯 Nhóm công việc (edit)">
+      <span class="shrink-0 text-[10px] font-medium text-cream-400">🤖</span>
+      <select v-model="store.inpaintModel" class="input !py-2 !text-xs" title="Model chỉnh sửa ảnh — chọn trong Cài đặt → Nhóm công việc">
         <option value="">Mặc định ({{ (store.taskGroupModels('edit')[0] || store.inpaintModels[0] || {}).label || 'Qwen Edit' }})</option>
         <option v-for="m in store.taskGroupModels('edit')" :key="m.provider + m.model" :value="m.provider + ':' + m.model">{{ m.label }}</option>
       </select>
@@ -151,18 +151,18 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     <!-- Tiến độ -->
     <div v-if="running" class="mt-3 rounded-lg border border-brand-500/30 bg-brand-900/30 p-3">
       <LoadingSpinner :text="store.inpaintStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang chỉnh sửa ảnh…'" :subtext="fmt(elapsedSec) + ' · Nhiệm vụ #' + store.inpaintGenId + (activeGen?.model ? ' · Model: ' + activeGen.model : '')" />
-      <div class="mt-2 flex justify-end"><button @click="store.cancelInpaint()" class="rounded-full bg-red-600/25 px-2.5 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">Hủy</button></div>
+      <div class="mt-2 flex justify-end"><button @click="store.cancelInpaint()" class="rounded-full bg-red-600/25 px-2.5 py-1 text-[10px] font-semibold text-danger hover:bg-red-600">Hủy</button></div>
     </div>
 
     <!-- Thành công -->
-    <div v-if="store.inpaintStage === 'done'" class="mt-3 flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
+    <div v-if="store.inpaintStage === 'done'" class="mt-3 flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-ok">
       Đã sửa xong — ảnh mới đã được chọn trong Outputs.
-      <button v-if="beforeUrl && activeGen?.media_url" @click="compareOpen = true" class="rounded-full bg-white/10 px-2 py-0.5 font-semibold hover:bg-white/20">So sánh Trước/Sau</button>
-      <button @click="store.clearInpaintStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
+      <button v-if="beforeUrl && activeGen?.media_url" @click="compareOpen = true" class="rounded-full bg-cream-50/10 px-2 py-0.5 font-semibold hover:bg-cream-50/20">So sánh Trước/Sau</button>
+      <button @click="store.clearInpaintStatus()" class="ml-auto rounded-full bg-cream-50/10 px-2 py-0.5 hover:bg-cream-50/20">Đóng</button>
     </div>
 
     <!-- Lỗi -->
-    <div v-if="store.inpaintStage === 'error' && store.inpaintError" class="mt-3 rounded-lg border border-red-500/40 bg-red-900/25 p-3 text-xs text-red-200">
+    <div v-if="store.inpaintStage === 'error' && store.inpaintError" class="mt-3 rounded-lg border border-red-500/40 bg-red-900/25 p-3 text-xs text-danger">
       <p class="font-semibold">Sửa ảnh thất bại</p>
       <p class="mt-1 whitespace-pre-line leading-relaxed">{{ store.inpaintError }}</p>
       <div class="mt-2 flex gap-2">
@@ -172,9 +172,9 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     </div>
 
     <!-- Đã hủy -->
-    <div v-if="store.inpaintStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 p-3 text-xs text-cream-200">
+    <div v-if="store.inpaintStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-cream-50/5 p-3 text-xs text-cream-200">
       Đã hủy yêu cầu sửa ảnh.
-      <button @click="store.clearInpaintStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
+      <button @click="store.clearInpaintStatus()" class="ml-auto rounded-full bg-cream-50/10 px-2 py-0.5 hover:bg-cream-50/20">Đóng</button>
     </div>
 
     <CompareSlider v-model="compareOpen" :before="beforeUrl" :after="activeGen?.media_url || ''" />

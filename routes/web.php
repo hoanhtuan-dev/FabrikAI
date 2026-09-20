@@ -10,6 +10,7 @@ use App\Http\Controllers\StudioSettingsController;
 use App\Http\Controllers\DesignAgentController;
 use App\Http\Controllers\StylistDataController;
 use App\Http\Controllers\TeamController;
+use App\Http\Controllers\ThemeController;
 use App\Http\Controllers\UserCatalogController;
 use Illuminate\Support\Facades\Route;
 
@@ -79,7 +80,7 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->group(function () {
     // chết — cả 4 cùng render MỘT app, khác nhau ở mục được mở (data-section của blade).
     Route::get('/cai-dat', [StudioController::class, 'mySettingsPage'])->name('my-settings.page');
     Route::get('/cai-dat/{section}', [StudioController::class, 'mySettingsPage'])
-        ->whereIn('section', ['presets', 'model', 'pose', 'stylist'])
+        ->whereIn('section', ['presets', 'model', 'pose', 'stylist', 'appearance'])
         ->name('my-settings.section');
 
     // [Yeu cau 2026-09-20] Trang BO SUU TAP day du - moi nguoi dung moi vao de lam viec.
@@ -90,6 +91,18 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->group(function () {
 // ("ADMIN (auth + admin): cấu hình & quản trị TOÀN CỤC"); AdminApp.vue cũng không tự chặn.
 // Nay: khách ⇒ về /dang-nhap · customer ⇒ 403 · admin ⇒ 200.
 Route::middleware(['auth', 'admin', 'nostore'])->get('/admin', [AdminController::class, 'adminPage'])->name('admin.page');
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TÙY CHỌN GIAO DIỆN — theme Sáng/Tối (2026-09-23)
+//
+// Nằm NGOÀI nhóm STUDIO (không đòi can-studio) vì đây là tùy chọn hiển thị của MỌI tài
+// khoản đã đăng nhập, kể cả người chưa có quyền vào Studio. Cũng KHÔNG thuộc module nào
+// trong ModuleRegistry: nó không phải tính năng bán theo gói nên không được để công tắc
+// gói tắt được (đã khai 'theme' vào INFRA_PREFIXES của ModuleRegistryTest).
+// ══════════════════════════════════════════════════════════════════════════════
+Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
+    Route::put('/theme', [ThemeController::class, 'update'])->name('theme.update');
+});
 
 // ══════════════════════════════════════════════════════════════════════════════
 // NHÓM STUDIO — dùng được với MỌI tài khoản đã kích hoạt (admin + customer).

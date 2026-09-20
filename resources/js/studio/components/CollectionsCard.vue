@@ -64,6 +64,18 @@ const recent = computed(() => {
     .slice(0, 4);
 });
 
+// Màu CHIP trạng thái đi qua TOKEN ngữ nghĩa (không dùng mã hex của server cho phần chữ):
+// cùng một hex cho hai theme thì không thể đạt tương phản ở cả hai (đo được 2,7–3,0:1).
+// Mã hex của server vẫn dùng cho THANH tiến độ (trang trí, không phải chữ).
+const STATUS_TONE = { draft: 'neutral', in_progress: 'info', review: 'warn', approved: 'ok', archived: 'neutral' };
+const TONE_CLASS = {
+  neutral: 'bg-ink-700 text-cream-200',
+  info: 'bg-info/15 text-info',
+  warn: 'bg-warn/15 text-warn',
+  ok: 'bg-ok/15 text-ok',
+};
+function statusToneClass(s) { return TONE_CLASS[STATUS_TONE[s] || 'neutral']; }
+
 const SHOT_STATES = ['idea', 'drafted', 'selected', 'fitted', 'campaign_ready', 'approved'];
 const workflowProgress = computed(() => SHOT_STATES.map(state => ({
   state,
@@ -72,17 +84,12 @@ const workflowProgress = computed(() => SHOT_STATES.map(state => ({
 })));
 
 function stateTone(state) {
-  if (state === 'approved') return 'bg-emerald-500/80 text-ink-900';
-  if (state === 'rejected') return 'bg-red-500/80 text-ink-900';
-  if (state === 'campaign_ready') return 'bg-amber-500/85 text-ink-900';
+  if (state === 'approved') return 'bg-emerald-500/80 text-on-accent';
+  if (state === 'rejected') return 'bg-red-500/80 text-on-accent';
+  if (state === 'campaign_ready') return 'bg-amber-500/85 text-on-accent';
   return 'bg-ink-800/85 text-cream-100';
 }
-function statusClass(p) {
-  return p && p.status_color ? '' : 'bg-ink-700 text-cream-300';
-}
-function statusStyle(p) {
-  return p && p.status_color ? { background: p.status_color + '26', color: p.status_color } : {};
-}
+function statusClass(p) { return statusToneClass(p && p.status); }
 function deadlineClass(iso) {
   if (!iso) return 'bg-ink-700 text-cream-300';
   const d = new Date(iso);
@@ -90,9 +97,9 @@ function deadlineClass(iso) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const target = new Date(d.getTime()); target.setHours(0, 0, 0, 0);
   const days = Math.ceil((target.getTime() - today.getTime()) / 86400000);
-  if (days < 0) return 'bg-red-500/15 text-red-300';
-  if (days <= 3) return 'bg-amber-500/15 text-amber-300';
-  return 'bg-emerald-500/15 text-emerald-300';
+  if (days < 0) return 'bg-red-500/15 text-danger';
+  if (days <= 3) return 'bg-amber-500/15 text-warn';
+  return 'bg-emerald-500/15 text-ok';
 }
 function deadlineLabel(iso) {
   if (!iso) return '';
@@ -290,7 +297,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-200">Đang làm</p>
           <p class="mt-0.5 truncate text-sm font-semibold text-cream-50">{{ applied.name }}</p>
           <div class="mt-1.5 flex flex-wrap items-center gap-1 text-[10px]">
-            <span class="rounded-full px-2 py-0.5 font-semibold" :class="statusClass(applied)" :style="statusStyle(applied)">{{ applied.status_label || applied.status }}</span>
+            <span class="rounded-full px-2 py-0.5 font-semibold" :class="statusClass(applied)">{{ applied.status_label || applied.status }}</span>
             <span class="rounded-full bg-ink-800 px-2 py-0.5 text-cream-200">{{ applied.generations_count || 0 }} ảnh</span>
             <span v-if="applied.deadline" class="rounded-full px-2 py-0.5 font-semibold" :class="deadlineClass(applied.deadline)">{{ deadlineLabel(applied.deadline) }}</span>
           </div>
@@ -302,14 +309,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 
       <!-- [R3] Tiến độ duyệt 6 bước — dạng CHIP NGANG, ngắn gọn cho sidebar -->
       <div class="mt-2.5">
-        <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">Tiến trình duyệt</p>
+        <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cream-400">Tiến trình duyệt</p>
         <div class="flex items-center gap-1 overflow-x-auto scrollbar-hide">
           <span
             v-for="step in workflowProgress" :key="step.state"
             class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold transition"
             :class="step.count
-              ? 'border-brand-500/40 bg-brand-600/15 text-brand-100'
-              : 'border-ink-700/60 bg-ink-900/50 text-cream-300/40'"
+              ? 'border-brand-500/40 bg-brand-600/15 text-brand-200'
+              : 'border-ink-700/60 bg-ink-900/50 text-cream-400'"
             :title="step.label + ': ' + step.count + ' ảnh'"
           >
             <span class="h-1.5 w-1.5 shrink-0 rounded-full" :class="step.count ? 'bg-brand-400' : 'bg-ink-700'"></span>
@@ -322,28 +329,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
       <!-- Chi phí & tiến độ thật (từ máy chủ) -->
       <div v-if="stats" class="mt-2.5 rounded-lg border border-ink-700/60 bg-ink-900/50 p-2">
         <div class="flex items-center justify-between">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">Chi phí &amp; tiến độ</p>
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Chi phí &amp; tiến độ</p>
           <button class="icon-btn !h-4 !w-4" title="Nạp lại" @click="store.loadProjectStats(applied.id, true)">
             <StudioIcon name="refresh" size="h-3 w-3" />
           </button>
         </div>
         <div class="mt-1.5 flex flex-wrap gap-1 text-[10px]">
-          <span class="rounded-full bg-emerald-500/12 px-2 py-0.5 font-semibold text-emerald-300">{{ stats.images.completed }} xong</span>
-          <span v-if="stats.images.running" class="rounded-full bg-sky-500/12 px-2 py-0.5 font-semibold text-sky-300">{{ stats.images.running }} chạy</span>
-          <span v-if="stats.images.failed" class="rounded-full bg-red-500/12 px-2 py-0.5 font-semibold text-red-300">{{ stats.images.failed }} lỗi</span>
+          <span class="rounded-full bg-emerald-500/12 px-2 py-0.5 font-semibold text-ok">{{ stats.images.completed }} xong</span>
+          <span v-if="stats.images.running" class="rounded-full bg-sky-500/12 px-2 py-0.5 font-semibold text-info">{{ stats.images.running }} chạy</span>
+          <span v-if="stats.images.failed" class="rounded-full bg-red-500/12 px-2 py-0.5 font-semibold text-danger">{{ stats.images.failed }} lỗi</span>
           <span class="rounded-full bg-ink-800 px-2 py-0.5 text-cream-200">{{ stats.credits.used }} credit</span>
           <span v-if="stats.deadline" class="rounded-full px-2 py-0.5 font-semibold" :class="deadlineClass(stats.deadline.days_left)">
             {{ stats.deadline.days_left < 0 ? 'Quá hạn ' + Math.abs(stats.deadline.days_left) : (stats.deadline.days_left === 0 ? 'Hạn hôm nay' : 'Còn ' + stats.deadline.days_left) }}
           </span>
         </div>
-        <p v-if="stats.feedback.latest && stats.feedback.latest.message" class="mt-1 text-[10px] leading-relaxed text-cream-300/80">
+        <p v-if="stats.feedback.latest && stats.feedback.latest.message" class="mt-1 text-[10px] leading-relaxed text-cream-300">
           <b class="text-brand-200">Khách ({{ stats.feedback.latest.decision_label }}):</b> «{{ stats.feedback.latest.message }}»
         </p>
       </div>
 
       <!-- Hành động chuyên sâu -->
       <div class="mt-2.5 flex flex-wrap gap-1.5">
-        <button class="tool-btn btn-sm flex-1" :class="awaiting.length ? '!border-amber-500/40 !bg-amber-500/8 !text-amber-200' : ''" @click="openReview()">
+        <button class="tool-btn btn-sm flex-1" :class="awaiting.length ? '!border-amber-500/40 !bg-amber-500/8 !text-warn' : ''" @click="openReview()">
           <StudioIcon name="checkSquare" size="h-3.5 w-3.5" /> Duyệt<span v-if="awaiting.length"> · {{ awaiting.length }}</span>
         </button>
         <button class="tool-btn btn-sm" @click="openShare()">
@@ -360,8 +367,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 
     <!-- ══ CHƯA CHỌN BỘ NÀO ══ -->
     <div v-else class="mx-3 mb-3 rounded-xl border border-dashed border-ink-600 bg-ink-900/30 p-3 text-center">
-      <p class="text-xs text-cream-300/70">Chưa chọn bộ sưu tập.</p>
-      <p class="mt-0.5 text-[10px] text-cream-300/50">Ảnh tạo ra không tự gắn vào đâu — chọn bộ bên dưới hoặc tạo mới.</p>
+      <p class="text-xs text-cream-300">Chưa chọn bộ sưu tập.</p>
+      <p class="mt-0.5 text-[10px] text-cream-400">Ảnh tạo ra không tự gắn vào đâu — chọn bộ bên dưới hoặc tạo mới.</p>
     </div>
 
     <!-- ══ DUYỆT MẪU (khối inline gọn) ══ -->
@@ -372,11 +379,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <StudioIcon name="x" size="h-3 w-3" />
         </button>
       </div>
-      <p class="mt-1 text-[10px] text-cream-300/70">
-        {{ shots.length }} ảnh · <span class="text-amber-300">{{ awaiting.length }} chờ</span> ·
-        <span class="text-emerald-300">{{ approvedCount }} duyệt</span> · <span class="text-red-300">{{ rejectedCount }} loại</span>
+      <p class="mt-1 text-[10px] text-cream-300">
+        {{ shots.length }} ảnh · <span class="text-warn">{{ awaiting.length }} chờ</span> ·
+        <span class="text-ok">{{ approvedCount }} duyệt</span> · <span class="text-danger">{{ rejectedCount }} loại</span>
       </p>
-      <div v-if="!shots.length" class="mt-2 rounded-lg border border-dashed border-ink-700 p-3 text-center text-[10px] text-cream-300/50">
+      <div v-if="!shots.length" class="mt-2 rounded-lg border border-dashed border-ink-700 p-3 text-center text-[10px] text-cream-400">
         Chưa có ảnh tạo xong — duyệt được ngay khi ảnh render xong.
       </div>
       <template v-else>
@@ -393,10 +400,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
             </span>
             <span class="min-w-0 flex-1">
               <span class="block truncate text-[11px] font-semibold text-cream-100">#{{ s.id }}</span>
-              <span class="block truncate text-[10px] text-cream-300/70">{{ s.shot_label }}</span>
+              <span class="block truncate text-[10px] text-cream-300">{{ s.shot_label }}</span>
             </span>
             <span class="rounded-full px-1.5 py-0.5 text-[9px] font-bold" :class="stateTone(s.shot_state)">{{ s.shot_label }}</span>
-            <span v-if="shotsSel.includes(s.id)" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500 text-ink-900">
+            <span v-if="shotsSel.includes(s.id)" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500 text-on-accent">
               <StudioIcon name="check" size="h-3 w-3" />
             </span>
           </button>
@@ -408,11 +415,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <button class="btn-brand btn-sm flex-1" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('approved')">
             <StudioIcon name="check" size="h-3.5 w-3.5" /> Duyệt {{ selectedCount }}
           </button>
-          <button class="tool-btn btn-sm !text-red-300 hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('rejected')">
+          <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('rejected')">
             <StudioIcon name="ban" size="h-3.5 w-3.5" /> Loại {{ selectedCount }}
           </button>
         </div>
-        <p class="mt-1.5 text-[9px] text-cream-300/50">
+        <p class="mt-1.5 text-[9px] text-cream-400">
           Phím tắt: S chọn · N bước tiếp · A duyệt · R loại · Esc đóng
         </p>
       </template>
@@ -424,17 +431,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
         <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Chia sẻ cho khách</p>
         <button class="icon-btn !h-5 !w-5" @click="shareOpen = false"><StudioIcon name="x" size="h-3 w-3" /></button>
       </div>
-      <div v-if="!shareInfo" class="py-3 text-center text-[10px] text-cream-300/50">Đang tải…</div>
+      <div v-if="!shareInfo" class="py-3 text-center text-[10px] text-cream-400">Đang tải…</div>
       <template v-else>
         <div v-if="shareInfo.share" class="space-y-1.5">
           <input :value="shareInfo.share.url" readonly class="input !py-1.5 text-[10px]" @focus="$event.target.select()">
           <div class="flex gap-1.5">
             <button class="btn-brand btn-sm flex-1" @click="copyShare()"><StudioIcon name="copy" size="h-3.5 w-3.5" /> Copy</button>
-            <button class="tool-btn btn-sm !text-red-300 hover:!bg-red-500/15" :disabled="shareBusy" @click="revokeShare()"><StudioIcon name="ban" size="h-3.5 w-3.5" /> Thu hồi</button>
+            <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="shareBusy" @click="revokeShare()"><StudioIcon name="ban" size="h-3.5 w-3.5" /> Thu hồi</button>
           </div>
         </div>
         <div v-else class="space-y-2">
-          <p class="text-[10px] leading-relaxed text-cream-300/80">Tạo link công khai (không cần tài khoản) — khách xem ảnh + gửi phản hồi Duyệt / Yêu cầu sửa.</p>
+          <p class="text-[10px] leading-relaxed text-cream-300">Tạo link công khai (không cần tài khoản) — khách xem ảnh + gửi phản hồi Duyệt / Yêu cầu sửa.</p>
           <div class="flex items-end gap-2">
             <select v-model.number="shareDays" class="input !py-1.5 text-[10px]">
               <option :value="7">7 ngày</option>
@@ -449,8 +456,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <ul class="mt-1 space-y-1">
             <li v-for="fb in shareInfo.feedback.slice(0, 2)" :key="fb.id" class="text-[10px]">
               <span class="font-semibold text-cream-100">{{ fb.author_name }}</span>
-              <span class="ml-1 rounded-full px-1 py-0.5 text-[8px] font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'">{{ fb.decision_label }}</span>
-              <span v-if="fb.message" class="ml-1 text-cream-300/70">{{ fb.message }}</span>
+              <span class="ml-1 rounded-full px-1 py-0.5 text-[8px] font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'">{{ fb.decision_label }}</span>
+              <span v-if="fb.message" class="ml-1 text-cream-300">{{ fb.message }}</span>
             </li>
           </ul>
         </div>
@@ -463,14 +470,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
         <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Xuất gói cho xưởng</p>
         <button class="icon-btn !h-5 !w-5" @click="exportOpen = false"><StudioIcon name="x" size="h-3 w-3" /></button>
       </div>
-      <p class="mt-1 text-[10px] leading-relaxed text-cream-300/80">Gói ZIP gồm: ảnh + phiếu kỹ thuật + bảng size + manifest.</p>
+      <p class="mt-1 text-[10px] leading-relaxed text-cream-300">Gói ZIP gồm: ảnh + phiếu kỹ thuật + bảng size + manifest.</p>
       <div class="mt-2 space-y-2">
         <div>
-          <label class="label mb-1 block text-[10px] uppercase tracking-wide text-ink-700" for="ex-sizes">Bảng size</label>
+          <label class="label mb-1 block text-[10px] uppercase tracking-wide text-cream-400" for="ex-sizes">Bảng size</label>
           <textarea id="ex-sizes" v-model="exportForm.sizes" rows="2" class="input !py-1.5 text-[10px]" placeholder="S, 84, 68, 92, 58, 56&#10;M, 88, 72, 96, 59, 57"></textarea>
         </div>
         <div>
-          <label class="label mb-1 block text-[10px] uppercase tracking-wide text-ink-700" for="ex-note">Ghi chú kỹ thuật</label>
+          <label class="label mb-1 block text-[10px] uppercase tracking-wide text-cream-400" for="ex-note">Ghi chú kỹ thuật</label>
           <textarea id="ex-note" v-model="exportForm.note" rows="1" class="input !py-1.5 text-[10px]" placeholder="Vải linen 100%, màu trắng ngà, đường may 1cm"></textarea>
         </div>
         <div class="flex justify-end gap-2">
@@ -499,12 +506,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 
     <!-- ══ BỘ GẦN ĐÂY (RÚT GỌN) ══ -->
     <div v-if="recent.length" class="border-t border-ink-700/60 px-4 py-3">
-      <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">Gần đây</p>
+      <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-cream-400">Gần đây</p>
       <ul class="space-y-1.5">
         <li v-for="p in recent" :key="p.id" class="flex items-center justify-between gap-2">
           <button class="min-w-0 flex-1 text-left" @click="pick(p)" :title="'Áp dụng «' + p.name + '»'">
             <span class="block truncate text-xs font-medium text-cream-100 hover:text-white">{{ p.name }}</span>
-            <span class="text-[10px] text-cream-300/60">{{ p.generations_count || 0 }} ảnh · {{ p.status_label || p.status }}</span>
+            <span class="text-[10px] text-cream-400">{{ p.generations_count || 0 }} ảnh · {{ p.status_label || p.status }}</span>
           </button>
           <button class="icon-btn !h-6 !w-6 shrink-0" title="Mở trong Studio" @click="goToStudio(p)">
             <StudioIcon name="arrowRight" size="h-3 w-3" />
@@ -515,8 +522,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 
     <!-- ══ ONBOARDING (khi chưa có bộ nào) ══ -->
     <div v-if="!store.projects.length && !store.projectLoading" class="border-t border-ink-700/60 px-4 py-3">
-      <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/60">Bắt đầu</p>
-      <p class="mt-1 text-[10px] leading-relaxed text-cream-300/70">
+      <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Bắt đầu</p>
+      <p class="mt-1 text-[10px] leading-relaxed text-cream-300">
         Chưa có bộ sưu tập nào. Tạo bộ đầu tiên để ảnh tạo sau này tự gắn vào đúng chỗ.
       </p>
       <a href="/bo-suu-tap" class="mt-2 block text-center text-[11px] font-semibold text-brand-300 underline decoration-dotted hover:text-brand-200">

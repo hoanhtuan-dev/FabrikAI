@@ -13,7 +13,7 @@ const store = useStudioStore();
 
     <!-- Model video — danh sách từ Cài đặt → 🎯 Nhóm công việc (video) -->
     <div v-if="store.taskGroupModels('video').length > 1" class="mt-4 flex items-center gap-2">
-      <span class="shrink-0 text-[10px] font-medium text-cream-300/60">🤖</span>
+      <span class="shrink-0 text-[10px] font-medium text-cream-400">🤖</span>
       <select v-model="store.videoModelSel" class="input !py-2 !text-xs" title="Model render video — danh sách từ Cài đặt → 🎯 Nhóm công việc (video)">
         <option value="">Mặc định ({{ store.taskGroupModels('video')[0]?.label || 'auto' }})</option>
         <option v-for="m in store.taskGroupModels('video')" :key="m.provider + m.model" :value="m.provider + ':' + m.model">{{ m.label }}</option>
@@ -39,7 +39,7 @@ const store = useStudioStore();
     <!-- Kịch bản quay (preset video_scene từ Prompt Templates) -->
     <div class="mt-4 flex items-center justify-between">
       <p class="label"><StudioIcon name="sliders" size="h-3.5 w-3.5" class="-mt-0.5 mr-1 inline text-brand-300" /> Kịch bản quay</p>
-      <span class="text-[9px] font-medium text-cream-300/40">{{ store.videoScenes.length }} mẫu</span>
+      <span class="text-[9px] font-medium text-cream-400">{{ store.videoScenes.length }} mẫu</span>
     </div>
     <div v-if="store.videoScenes.length" class="mt-1 grid grid-cols-2 gap-1.5">
       <button v-for="sc in store.videoScenes" :key="sc.id" @click="store.videoScene = String(store.videoScene) === String(sc.id) ? '' : sc.id" :title="sc.prompt"
@@ -49,20 +49,20 @@ const store = useStudioStore();
         <span class="truncate">{{ sc.label }}</span>
       </button>
     </div>
-    <p v-else class="mt-1 rounded-md border border-dashed border-white/10 bg-white/5 p-3 text-[11px] text-cream-300/60">Chưa có preset Kịch bản quay — thêm ở <b>Cài đặt → Prompt Templates</b> (category video_scene).</p>
+    <p v-else class="mt-1 rounded-md border border-dashed border-white/10 bg-cream-50/5 p-3 text-[11px] text-cream-400">Chưa có preset Kịch bản quay — thêm ở <b>Cài đặt → Prompt Templates</b> (category video_scene).</p>
 
     <!-- Nguồn ảnh -->
     <div class="mt-4 flex items-center justify-between">
       <p class="label"><StudioIcon name="image" size="h-3.5 w-3.5" class="-mt-0.5 mr-1 inline text-brand-300" /> Nguồn ảnh</p>
     </div>
-    <div v-if="store.upscaleSrc" class="mt-1 flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-2.5">
+    <div v-if="store.upscaleSrc" class="mt-1 flex items-center gap-3 rounded-lg border border-white/10 bg-cream-50/5 p-2.5">
       <img :src="store.upscaleSrc" class="h-14 w-14 shrink-0 rounded-md bg-ink-900 object-cover" alt="nguồn video">
       <div class="min-w-0 text-xs text-cream-200">
         <p class="truncate font-semibold">{{ store.upscaleName || 'Ảnh đang chọn' }}</p>
-        <p class="text-cream-300/60">Dùng làm frame đầu của video</p>
+        <p class="text-cream-400">Dùng làm frame đầu của video</p>
       </div>
     </div>
-    <div v-else class="mt-1 rounded-lg border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chọn ảnh trên canvas làm frame đầu (bỏ trống = text-to-video).</div>
+    <div v-else class="mt-1 rounded-lg border border-dashed border-white/15 bg-cream-50/5 p-3 text-xs text-cream-400">Chọn ảnh trên canvas làm frame đầu (bỏ trống = text-to-video).</div>
 
     <!-- Prompt video -->
     <p class="label mt-4"><StudioIcon name="pencil" size="h-3.5 w-3.5" class="-mt-0.5 mr-1 inline text-brand-300" /> Prompt video</p>

@@ -206,9 +206,9 @@ const visibleQuestions = computed(() => {
     <!-- Phạm vi + khôi phục -->
     <div class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-ink-700 bg-ink-800/60 px-3 py-2">
       <StudioIcon name="info" size="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-300" />
-      <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-cream-300/70">
+      <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-cream-300">
         <b class="text-cream-100">Bản của bạn</b> lưu theo <b>tài khoản</b> — mở máy khác vẫn còn.
-        <span v-if="isAdmin" class="text-amber-300/80">Bạn là owner: <b>Dùng chung</b> sửa dữ liệu cho MỌI người.</span>
+        <span v-if="isAdmin" class="text-warn">Bạn là owner: <b>Dùng chung</b> sửa dữ liệu cho MỌI người.</span>
       </p>
       <div v-if="isAdmin" class="flex overflow-hidden rounded-md border border-ink-600">
         <button @click="mode='mine'" :class="mode==='mine' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="px-2.5 py-1 text-[11px] font-medium transition">Bản của tôi</button>
@@ -230,7 +230,7 @@ const visibleQuestions = computed(() => {
         </button>
       </div>
       <div class="relative min-w-[10rem] flex-1">
-        <StudioIcon name="search" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-300/50" />
+        <StudioIcon name="search" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-400" />
         <input v-if="tab==='types'" v-model="typeQuery" type="search" placeholder="Tìm loại trang phục…" class="input !py-2 pl-9" aria-label="Tìm loại trang phục" />
         <input v-else v-model="questionQuery" type="search" placeholder="Tìm câu hỏi theo mã hoặc nội dung…" class="input !py-2 pl-9" aria-label="Tìm câu hỏi" />
       </div>
@@ -246,12 +246,12 @@ const visibleQuestions = computed(() => {
     <SettingsSkeleton v-if="loading" :rows="4" />
 
     <div v-else-if="loadError" class="card border-red-500/40 p-5">
-      <p class="flex items-center gap-2 text-sm text-red-200"><StudioIcon name="alertTriangle" size="h-4 w-4" /> {{ loadError }}</p>
+      <p class="flex items-center gap-2 text-sm text-danger"><StudioIcon name="alertTriangle" size="h-4 w-4" /> {{ loadError }}</p>
       <button @click="load" class="btn-outline btn-sm mt-3">Thử lại</button>
     </div>
 
     <template v-else-if="tab==='types'">
-      <p class="mb-3 text-[11px] text-cream-300/60">
+      <p class="mb-3 text-[11px] text-cream-400">
         Ảnh đại diện phục vụ tự động theo slug: <span class="text-brand-300">/garment/{slug}</span>
       </p>
       <SettingsEmpty v-if="!visibleTypes.length" :filtered="!!typeQuery.trim()" icon="shirt"
@@ -264,19 +264,19 @@ const visibleQuestions = computed(() => {
         <div v-for="t in visibleTypes" :key="t.id || t.slug" class="flex items-center gap-3 rounded-md border border-ink-700 bg-ink-900/60 p-2.5">
           <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-900 text-lg" :style="{ boxShadow: 'inset 0 0 0 1px ' + (t.color || '#4a7a90') }">
             <template v-if="t.emoji">{{ t.emoji }}</template>
-            <StudioIcon v-else name="shirt" size="h-4 w-4 text-cream-300/50" />
+            <StudioIcon v-else name="shirt" size="h-4 w-4 text-cream-400" />
           </span>
           <div class="min-w-0 flex-1">
             <p class="truncate text-xs font-semibold text-cream-100">{{ t.name }}
               <span v-if="t._local" class="ml-1 rounded bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">của bạn</span>
             </p>
-            <p class="truncate text-[10px] text-cream-300/50">slug: {{ t.slug }}</p>
+            <p class="truncate text-[10px] text-cream-400">slug: {{ t.slug }}</p>
           </div>
           <span class="h-5 w-5 shrink-0 rounded-full border border-white/20" :style="{ background: t.color || '#4a7a90' }"></span>
           <button @click="editType(t)" class="tool-btn" :title="'Sửa ' + t.name">
             <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
           </button>
-          <button @click="deleteType(t)" class="tool-btn !text-red-300 hover:!bg-red-600/25" :title="'Xoá ' + t.name">
+          <button @click="deleteType(t)" class="tool-btn !text-danger hover:!bg-red-600/25" :title="'Xoá ' + t.name">
             <StudioIcon name="trash" size="h-3 w-3" /> Xoá
           </button>
         </div>
@@ -284,7 +284,7 @@ const visibleQuestions = computed(() => {
     </template>
 
     <template v-else>
-      <p class="mb-3 text-[11px] text-cream-300/60">
+      <p class="mb-3 text-[11px] text-cream-400">
         Câu hỏi hiển thị theo thứ tự; dùng <span class="text-brand-300">{name}</span> để chèn tên loại trang phục.
       </p>
       <SettingsEmpty v-if="!visibleQuestions.length" :filtered="!!questionQuery.trim()" icon="search"
@@ -303,11 +303,11 @@ const visibleQuestions = computed(() => {
             <button @click="editQuestion(q)" class="tool-btn shrink-0" :title="'Sửa ' + q.key">
               <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
             </button>
-            <button @click="deleteQuestion(q)" class="tool-btn shrink-0 !text-red-300 hover:!bg-red-600/25" :title="'Xoá ' + q.key">
+            <button @click="deleteQuestion(q)" class="tool-btn shrink-0 !text-danger hover:!bg-red-600/25" :title="'Xoá ' + q.key">
               <StudioIcon name="trash" size="h-3 w-3" /> Xoá
             </button>
           </div>
-          <p class="mt-1.5 text-[10px] text-cream-300/50">{{ (q.opts || []).length }} lựa chọn</p>
+          <p class="mt-1.5 text-[10px] text-cream-400">{{ (q.opts || []).length }} lựa chọn</p>
         </div>
       </div>
     </template>
