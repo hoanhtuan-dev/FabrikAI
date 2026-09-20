@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Generation;
 use App\Models\Project;
+use App\Services\BrandLearningService;
 use App\Services\ProjectWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -263,6 +264,10 @@ class ProjectController extends Controller
 
             try {
                 $shot->transitionShotState($target, $data['note'] ?? null);
+                // [GĐ1 trí nhớ dài hạn] Duyệt/loại ảnh = chủ shop đang dạy Agent Studio gu thật của mình.
+                if (in_array($target, [Generation::SHOT_APPROVED, Generation::SHOT_REJECTED], true)) {
+                    app(BrandLearningService::class)->record($shot, $target);
+                }
             } catch (\InvalidArgumentException $e) {
                 // Whitelist từ chối: giữ nguyên ảnh, báo rõ vì sao (không "thử lại rồi tính").
                 $results[] = ['id' => $id, 'ok' => false, 'shot_state' => $from, 'error' => $e->getMessage()];

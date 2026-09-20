@@ -68,6 +68,28 @@ class ShotReviewTest extends TestCase
         ], fn ($v) => $v !== null));
     }
 
+    /** [GĐ1 trí nhớ dài hạn] Duyệt/loại ảnh phải ghi lại prompt vào brand_learning để brief sau học gu thật. */
+    public function test_approving_or_rejecting_a_shot_records_brand_memory(): void
+    {
+        $u = $this->customer();
+        $p = $this->project($u);
+
+        $approved = $this->shot($u, $p, 'campaign_ready');
+        $approved->update(['prompt' => 'đầm linen trắng ngà dáng suông']);
+        $this->review($u, $p, [$approved->id], 'approved')->assertOk();
+
+        $rejected = $this->shot($u, $p, 'campaign_ready');
+        $rejected->update(['prompt' => 'áo bóng họa tiết to']);
+        $this->review($u, $p, [$rejected->id], 'rejected')->assertOk();
+
+        $this->assertDatabaseHas('brand_learning', ['user_id' => $u->id, 'decision' => 'approved']);
+        $this->assertDatabaseHas('brand_learning', ['user_id' => $u->id, 'decision' => 'rejected']);
+
+        $prefs = app(\App\Services\BrandLearningService::class)->preferences($u);
+        $this->assertContains('đầm linen trắng ngà dáng suông', $prefs['approved']);
+        $this->assertContains('áo bóng họa tiết to', $prefs['rejected']);
+    }
+
     public function test_only_the_owner_or_super_admin_can_review_shots(): void
     {
         $owner = $this->customer();

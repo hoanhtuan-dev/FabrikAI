@@ -70,6 +70,7 @@ class DesignAgentService
         // TÍN HIỆU THỊ TRƯỜNG đo từ nguồn ngoài (thuật toán, không AI). Bắt buộc-kiểu-nullable vì lý do y
         // như ba tham số trên: có default null thì container luôn truyền null và agent mất hẳn tầng dữ liệu.
         private readonly ?MarketSignalService $market,
+        private readonly ?BrandLearningService $learning = null,
     ) {}
 
     public function radar(?User $user, string $region = 'all', bool $useAi = true): array
@@ -259,6 +260,8 @@ class DesignAgentService
             'brand_narrative' => $brand['narrative'],
             'brand_top_categories' => $brand['top_categories'],
             'brand_top_colors' => $brand['top_colors'],
+            // TRÍ NHỚ DÀI HẠN (GĐ1): prompt đã DUYỆT/LOẠI gần nhất của chủ shop.
+            'brand_memory' => $brand['brand_memory'] ?? ['approved' => [], 'rejected' => []],
             // DNA chủ shop TỰ KHAI (2026-09-23). Chỉ gửi ở đường brief — đường radar dùng cache
             // CHUNG giữa các tài khoản nên tuyệt đối không được nhét dữ liệu riêng của người dùng vào.
             'brand_dna' => [
@@ -1475,6 +1478,8 @@ class DesignAgentService
             .'tuyệt đối không đề xuất món nằm trong brand_dna.fields.avoid, không đổi định vị/khách hàng/dải giá họ đã khai. '
             .'Khi brand_dna.source khác owner thì đó là phần SUY RA: được phép dùng nhưng phải nói như phỏng đoán, không khẳng định. '
             .'Không đổi bất kỳ con số nào — cơ cấu SKU, size và dải giá là do hệ thống quyết định. '
+            // TRÍ NHỚ DÀI HẠN (GĐ1): khối internal_brand_signal.brand_memory ghi prompt ảnh chủ shop ĐÃ DUYỆT và ĐÃ LOẠI.
+            .'brand_memory.approved là các prompt ảnh chủ shop đã DUYỆT, rejected là đã LOẠI: bám phong cách đã duyệt, TRÁNH phong cách đã loại — đó là gu thật của shop. '
             .'Chỉ trả về MỘT object JSON đúng dạng: {"narrative":"...","brief":"...","moodboard_captions":["... x24"],'
             .'"category_rationale":{"TÊN NHÓM":"..."},"outfit_goals":{"look-1":"..."},"prompt_vi":"...","prompt_en":"...","next_steps":["...","...","..."]}. '
             .'narrative: 1-2 câu DNA/định vị. brief: 3-5 câu tiếng Việt cho xưởng. moodboard_captions: ĐÚNG 24 caption ngắn tiếng Việt theo thứ tự ô. '
@@ -1972,6 +1977,8 @@ class DesignAgentService
                 'derived' => 'Suy ra từ mô tả ảnh đã tạo',
                 'default' => 'Mặc định của hệ thống',
             ][$dnaSource],
+            // TRÍ NHỚ DÀI HẠN (GĐ1): prompt đã DUYỆT và đã LOẠI gần nhất — đưa vào brief để AI bám gu thật.
+            'brand_memory' => $this->learning?->preferences($user) ?? ['approved' => [], 'rejected' => []],
         ];
     }
 
