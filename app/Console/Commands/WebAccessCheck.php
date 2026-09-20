@@ -43,12 +43,16 @@ class WebAccessCheck extends Command
             $this->line('  Chưa cấu hình model nào cho nhóm công việc của agent.');
         }
         foreach ($result['model_search']['candidates'] as $row) {
-            $this->line(sprintf(
-                '  %s %s — %s',
-                $row['supported'] ? '[CÓ tìm kiếm]     ' : '[không tìm kiếm]',
-                $row['provider'].':'.$row['model'],
-                $row['label'],
-            ));
+            // BA trạng thái, không phải hai (2026-09-24): nhãn cũ chỉ có "có/không tìm kiếm" theo khả năng
+            // TÍCH HỢP của nhà cung cấp ⇒ in ra "[không tìm kiếm]" ngay cạnh dòng nói máy chủ chạy được công
+            // cụ — hai câu ngược nhau trên cùng một màn hình.
+            $badge = match (true) {
+                (bool) ($row['supported'] ?? false) => '[CÓ tìm kiếm sẵn]',
+                (bool) ($row['tool_ready'] ?? false) => '[CÔNG CỤ]       ',
+                (bool) ($row['tool'] ?? false) => '[chưa gán vai]  ',
+                default => '[không tìm kiếm]',
+            };
+            $this->line(sprintf('  %s %s — %s', $badge, $row['provider'].':'.$row['model'], $row['label']));
         }
 
         $this->newLine();

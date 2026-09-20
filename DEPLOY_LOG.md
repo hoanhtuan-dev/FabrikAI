@@ -96,6 +96,14 @@ KHÔNG có nguồn ngoài nào. Kèm test khoá: `test_the_tool_is_announced_eve
 *"Đã tự tìm 2 lượt … : 6 tin từ 1 nguồn · không có tin nào khớp từ khoá"*. Đã sửa: `error` chỉ còn có nghĩa
 khi **cả lượt không tìm được tin nào** (+ test `test_a_barren_query_does_not_mark_the_whole_run_as_failed`).
 
+**Deploy lần 2**: `66eb85c` → `7590019` (push → SSH `git pull --ff-only` → `config:cache/view:cache`).
+Verify: HEAD `7590019` · `/` `/up` `/bang-gia` `/dang-nhap` **200** · API **401** ·
+`studio:web-access --force` in đúng kết luận công cụ · **log không phát sinh dòng mới** (dòng cuối vẫn là
+cảnh báo queue lúc 01:50 — trước cả lần deploy đầu).
+Sửa kèm: lệnh `studio:web-access` in nhãn BA trạng thái (`[CÓ tìm kiếm sẵn]` · `[CÔNG CỤ]` · `[chưa gán vai]`)
+— nhãn cũ chỉ có "có/không" theo khả năng tích hợp nên in `[không tìm kiếm]` ngay cạnh dòng nói máy chủ
+chạy được công cụ.
+
 ### 6. Việc chủ dự án cần làm để BẬT (không sửa mã)
 1. Cài đặt → **Nhóm công việc** → «Agent Studio — Tìm kiếm nguồn ngoài» → gán một model (production: `deepseek:deepseek-chat` hoặc `deepseek:deepseek-flash` — cả hai gọi hàm được).
 2. Agent Studio → bước **Tín hiệu** → nút **Kiểm tra lại**: dòng kết luận phải là *"…sẽ GỌI CÔNG CỤ tìm kiếm do máy chủ chạy"*.
