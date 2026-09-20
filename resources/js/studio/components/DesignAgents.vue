@@ -659,7 +659,12 @@ async function createCollection() {
   if (creatingCollection.value) return;   // chống bấm hai lần ⇒ hai dự án trùng
   creatingCollection.value = true;
   try {
-    await store.createCollectionFromBrief(payload);
+    // [Lưu kế hoạch sản xuất] Kế hoạch tính ở tab "Sản xuất & lãi" (store.plan) — gộp vào settings để
+    // bộ sưu tập giữ trọn bản thiết kế (mood · palette · cơ cấu · kế hoạch), không chỉ dữ liệu brief.
+    await store.createCollectionFromBrief({
+      ...payload,
+      settings: { ...(payload.settings || {}), plan: store.plan || null },
+    });
   } finally {
     creatingCollection.value = false;
   }

@@ -1,0 +1,1 @@
+import{J as e,P as t,U as n}from"./pageBoot-BP_DaQlS.js";function r(r){let i=e(Date.now()),a=null;function o(){a&&=(clearInterval(a),null)}return n(r,e=>{e?(i.value=Date.now(),a||=setInterval(()=>{i.value=Date.now()},1e3)):o()},{immediate:!0}),t(o),{now:i}}export{r as t};

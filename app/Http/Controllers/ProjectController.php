@@ -641,6 +641,9 @@ class ProjectController extends Controller
             'name' => $project->name,
             'base_concept' => $project->base_concept,
             'brief' => $project->brief,
+            // [Xem lại thiết kế] Dữ liệu Định hướng đã lưu (palette · moodboard · structure · plan) —
+            // giao diện "Xem thiết kế" đọc từ đây. AsArrayObject -> mảng thuần để JSON không lỗi.
+            'settings' => $project->settings ? (array) $project->settings : [],
             'deadline' => $project->deadline?->toIso8601String(),
             'thumbnail_url' => $project->thumbnail_url,
             'tags' => $project->tags ?? [],

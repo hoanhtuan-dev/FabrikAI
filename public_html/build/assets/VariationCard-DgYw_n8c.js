@@ -1,1 +1,0 @@
-import{F as e,S as t}from"./pageBoot-Cex3dFjo.js";import{t as n}from"./RefImageCard-B9-o_iOf.js";var r={__name:`VariationCard`,setup(r){return(r,i)=>(e(),t(n,{variant:`variation`}))}};export{r as default};

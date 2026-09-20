@@ -4,8 +4,12 @@ import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import { useFocusTrap } from '../composables/useFocusTrap.js';
 import StudioIcon from './StudioIcon.vue';
+import ProjectDesignView from './ProjectDesignView.vue';
 
 const store = useStudioStore();
+
+// [Xem lại thiết kế] Bộ sưu tập đang xem bản thiết kế đã lưu (project.settings.agent_studio).
+const designView = ref(null);
 
 const open = defineModel({ type: Boolean, default: false });
 
@@ -292,6 +296,8 @@ watch(() => open.value, (v) => {
                     <div v-if="p.tags && p.tags.length" class="mt-1.5 flex flex-wrap gap-1">
                       <span v-for="t in p.tags.slice(0, 3)" :key="t" class="rounded-full bg-ink-700 px-1.5 py-0.5 text-tiny text-cream-300">{{ t }}</span>
                     </div>
+                    <!-- Xem lại thiết kế đã lưu (chỉ bộ tạo từ Agent Studio brief) -->
+                    <button v-if="p.settings?.agent_studio" type="button" @click.stop="designView = p" class="mt-1.5 inline-flex items-center gap-1 rounded border border-brand-500 bg-brand-500/10 px-2 py-1 text-tiny font-semibold text-brand-200 transition hover:bg-brand-500/20"><StudioIcon name="sparkles" size="h-3 w-3" /> Xem thiết kế</button>
                     <!-- Áp dụng nhanh (chỉ own scope) -->
                     <button v-if="store.projectScope === 'own'" @click.stop="store.appliedProject?.id === p.id ? store.unapplyProject() : store.applyProject(p)" class="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full transition" :class="store.appliedProject?.id === p.id ? 'bg-brand-600/80 text-white hover:bg-brand-500' : 'bg-ink-700/80 text-cream-300 opacity-0 hover:bg-ink-600 hover:text-brand-200 group-hover:opacity-100'" :title="store.appliedProject?.id === p.id ? 'Đang áp dụng — bấm để ngắt' : 'Áp dụng dự án này'"><StudioIcon :name="store.appliedProject?.id === p.id ? 'pin' : 'pinOff'" size="h-3.5 w-3.5" /></button>
                   </div>
@@ -490,6 +496,9 @@ watch(() => open.value, (v) => {
       </div>
     </div>
   </Teleport>
+
+  <!-- Xem lại thiết kế đã lưu (Agent Studio) -->
+  <ProjectDesignView v-model="designView" :settings="designView?.settings || {}" :name="designView?.name || ''" />
 </template>
 
 <style scoped>
