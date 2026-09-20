@@ -171,7 +171,9 @@ class DesignAgentService
      *
      * Đổi CẤU TRÚC phản hồi thì tăng phiên bản trong khoá (BRIEF_CACHE_VERSION) để bản cũ không lẫn vào.
      */
-    private const BRIEF_CACHE_VERSION = 'v1';
+    // v2 = thêm project_payload.settings (palette · moodboard · structure · …) — phải tăng để bản đệm
+    // cũ (chưa có settings) không trả lại brief thiếu dữ liệu cho "Tạo bộ sưu tập".
+    private const BRIEF_CACHE_VERSION = 'v2';
 
     private const BRIEF_CACHE_SECONDS = 3600;
 
