@@ -20,8 +20,16 @@
       "_pageBoot-BP_DaQlS.js"
     ]
   },
-  "_RefImageCard-DUlrVXIq.js": {
-    "file": "assets/RefImageCard-DUlrVXIq.js",
+  "_ProjectDesignView-BVQr2DU0.js": {
+    "file": "assets/ProjectDesignView-BVQr2DU0.js",
+    "name": "ProjectDesignView",
+    "imports": [
+      "_pageBoot-BP_DaQlS.js",
+      "_BaseModal-Pu43C8YG.js"
+    ]
+  },
+  "_RefImageCard-CpXCe8mX.js": {
+    "file": "assets/RefImageCard-CpXCe8mX.js",
     "name": "RefImageCard",
     "imports": [
       "_pageBoot-BP_DaQlS.js",
@@ -165,7 +173,7 @@
     ]
   },
   "resources/js/studio/collections.js": {
-    "file": "assets/collections-D6b0Zn1V.js",
+    "file": "assets/collections-C2dGk2O3.js",
     "name": "collections",
     "src": "resources/js/studio/collections.js",
     "isEntry": true,
@@ -173,10 +181,11 @@
       "_pageBoot-BP_DaQlS.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
       "_NotificationCenter-DU-pgyPD.js",
-      "_exportChannels-BteUkoMJ.js"
+      "_exportChannels-BteUkoMJ.js",
+      "_ProjectDesignView-BVQr2DU0.js"
     ],
     "css": [
-      "assets/collections-BPagBBZv.css"
+      "assets/collections-DXTfLk_E.css"
     ]
   },
   "resources/js/studio/components/CollectionsCard.vue": {
@@ -238,7 +247,7 @@
     ]
   },
   "resources/js/studio/components/InpaintCard.vue": {
-    "file": "assets/InpaintCard-C-PRLsPl.js",
+    "file": "assets/InpaintCard-K2xRF7o3.js",
     "name": "InpaintCard",
     "src": "resources/js/studio/components/InpaintCard.vue",
     "isDynamicEntry": true,
@@ -251,7 +260,7 @@
     ]
   },
   "resources/js/studio/components/OutfitComposeCard.vue": {
-    "file": "assets/OutfitComposeCard-IRWmwcQa.js",
+    "file": "assets/OutfitComposeCard-CTS2wMRx.js",
     "name": "OutfitComposeCard",
     "src": "resources/js/studio/components/OutfitComposeCard.vue",
     "isDynamicEntry": true,
@@ -264,7 +273,7 @@
     ]
   },
   "resources/js/studio/components/ProjectWorkspace.vue": {
-    "file": "assets/ProjectWorkspace-BVtlqG4z.js",
+    "file": "assets/ProjectWorkspace-dHuKUoEh.js",
     "name": "ProjectWorkspace",
     "src": "resources/js/studio/components/ProjectWorkspace.vue",
     "isDynamicEntry": true,
@@ -272,7 +281,8 @@
       "_pageBoot-BP_DaQlS.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
       "_NotificationCenter-DU-pgyPD.js",
-      "_BaseModal-Pu43C8YG.js"
+      "_BaseModal-Pu43C8YG.js",
+      "_ProjectDesignView-BVQr2DU0.js"
     ],
     "css": [
       "assets/ProjectWorkspace-D0lV0clj.css"
@@ -289,7 +299,7 @@
     ]
   },
   "resources/js/studio/components/StudioCard.vue": {
-    "file": "assets/StudioCard-D6SCYnK_.js",
+    "file": "assets/StudioCard-DQrsuxiR.js",
     "name": "StudioCard",
     "src": "resources/js/studio/components/StudioCard.vue",
     "isDynamicEntry": true,
@@ -302,7 +312,7 @@
     ]
   },
   "resources/js/studio/components/SuggestCard.vue": {
-    "file": "assets/SuggestCard-C00CALC7.js",
+    "file": "assets/SuggestCard-C34fDq2z.js",
     "name": "SuggestCard",
     "src": "resources/js/studio/components/SuggestCard.vue",
     "isDynamicEntry": true,
@@ -317,13 +327,13 @@
     ]
   },
   "resources/js/studio/components/TryOnCard.vue": {
-    "file": "assets/TryOnCard-CSnOdP5O.js",
+    "file": "assets/TryOnCard-BdHQU_d4.js",
     "name": "TryOnCard",
     "src": "resources/js/studio/components/TryOnCard.vue",
     "isDynamicEntry": true,
     "imports": [
       "_pageBoot-BP_DaQlS.js",
-      "_RefImageCard-DUlrVXIq.js"
+      "_RefImageCard-CpXCe8mX.js"
     ]
   },
   "resources/js/studio/components/UpscaleCard.vue": {
@@ -337,17 +347,17 @@
     ]
   },
   "resources/js/studio/components/VariationCard.vue": {
-    "file": "assets/VariationCard-BtnQTK8c.js",
+    "file": "assets/VariationCard-DF9_GfIl.js",
     "name": "VariationCard",
     "src": "resources/js/studio/components/VariationCard.vue",
     "isDynamicEntry": true,
     "imports": [
       "_pageBoot-BP_DaQlS.js",
-      "_RefImageCard-DUlrVXIq.js"
+      "_RefImageCard-CpXCe8mX.js"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-DMtk97yh.js",
+    "file": "assets/main-d9DPmVBl.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,

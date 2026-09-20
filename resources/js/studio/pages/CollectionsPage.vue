@@ -23,6 +23,10 @@ import NotificationCenter from '../components/NotificationCenter.vue';
 import { EXPORT_CHANNELS } from '../exportChannels.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import StudioIcon from '../components/StudioIcon.vue';
+import ProjectDesignView from '../components/ProjectDesignView.vue';
+
+// [Xem lại thiết kế] Bộ sưu tập đang xem bản thiết kế đã lưu.
+const designView = ref(null);
 
 const store = useStudioStore();
 // Lỗi trình duyệt hiện kèm mã tra cứu (xem clientErrors.js).
@@ -631,6 +635,9 @@ onBeforeUnmount(() => {
                     <button class="grid h-8 w-8 place-items-center rounded-lg border border-ink-600 text-cream-300 transition hover:border-brand-400 hover:text-brand-200" title="Mở trong Studio" @click="goToStudio(p)">
                       <StudioIcon name="arrowRight" size="h-3.5 w-3.5" />
                     </button>
+                    <button v-if="p.settings?.agent_studio" type="button" class="grid h-8 w-8 place-items-center rounded-lg border border-brand-500 bg-brand-500/10 text-brand-200 transition hover:bg-brand-500/20" title="Xem lại thiết kế" @click="designView = p">
+                      <StudioIcon name="sparkles" size="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               </article>
@@ -855,6 +862,9 @@ onBeforeUnmount(() => {
     <!-- store.toast() đã được gọi ở khắp trang này nhưng KHÔNG có chỗ render ⇒ thông báo (kèm mã tra cứu) vô hình. -->
     <NotificationCenter />
   </div>
+
+  <!-- Xem lại thiết kế đã lưu (Agent Studio) -->
+  <ProjectDesignView v-model="designView" :settings="designView?.settings || {}" :name="designView?.name || ''" />
 </template>
 
 <style scoped>
