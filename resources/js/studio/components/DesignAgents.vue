@@ -403,6 +403,13 @@ const aiSearchOn = computed(() => aiSearchMode.value !== 'off' && toolSearch.val
 const aiSearchShort = computed(() => {
   if (!aiSearchOn.value) return '';
   if (aiSearchMode.value === 'hosted' && aiSearchCalls.value === 0) return 'AI không tìm trên internet lượt này';
+
+  // Đếm TRUY VẤN, không đếm "lượt gọi công cụ": một lời gọi của DeepSeek có thể mang 6 câu hỏi, nên nhãn
+  // "1 lượt" vừa rồi đọc lên như thể model chỉ tra một thứ — trong khi nó tra sáu chủ đề.
+  if (aiSearchQueries.value.length) {
+    return 'AI tự tìm trên internet: ' + aiSearchQueries.value.length + ' truy vấn';
+  }
+
   return aiSearchCalls.value > 0 ? 'AI tự tìm trên internet: ' + aiSearchCalls.value + ' lượt' : 'AI có công cụ tìm kiếm (không dùng)';
 });
 const toolSearchLine = computed(() => {
