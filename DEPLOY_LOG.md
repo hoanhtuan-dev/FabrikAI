@@ -53,6 +53,9 @@ helpers.js · state.js · getters.js + 10 module actions (account · generation 
 | 13 | Sửa TDZ "Cannot access 't' before initialization" | store/actions/account.js | api() dùng `expired` trước khi khai báo ⇒ mọi HTTP lỗi ném ReferenceError thay vì câu lỗi thật |
 | 14 | Sửa radar 504 (gọi nhầm model tìm kiếm) | DesignAgentService.php | radarDirections gọi nhóm agent_search khi có model mà KHÔNG cần model tìm kiếm được ⇒ gọi nhầm ckey (api.xah.io chết) ⇒ treo 90s ⇒ 504; nay chỉ dùng nhóm tìm kiếm khi webSearch=true (khớp aiBrief) |
 | 15 | Test radar bỏ qua model tìm kiếm không tìm kiếm được | AgentRolesTest.php | 12 test / 51 assert · suite 959 XANH |
+| 16 | Thiết kế lại shell Agent Studio (mobile-first) | DesignAgents.vue | thanh tiến trình ngang dùng chung mọi kích thước · header gọn (bỏ 4 chip) · bối cảnh 1 dòng · đầu bước có nhắc việc · action bar gọn; bỏ rail trái desktop → nội dung rộng hơn |
+
+> Kết quả đợt 33 (tổng): hiệu năng main 599→179KB · tách store/DesignAgents/layers/selection · phím tắt · vai tìm kiếm + Model Registry · sửa TDZ + radar 504 · thiết kế lại UI mobile-first. Suite 959 test XANH, deploy HEAD b0ba214.
 
 > Ghi chú: skeleton loading (radar 6 ô · brief 6 ô) và empty state (trend/brief/kế hoạch) đã có sẵn từ các đợt trước — đợt này chỉ bổ sung phím tắt, không làm lại. Vai "Tìm kiếm nguồn ngoài" (nhóm công việc agent_search) ĐÃ tồn tại từ Đợt 30 (Ba vai riêng: suy luận · đọc ảnh · tìm kiếm); đợt này sửa lỗi nó không chạy được khi chỉ khai mình nó.
 
