@@ -450,6 +450,8 @@ chặn §6.3, còn `message` kỹ thuật chỉ đi vào log.
 ## 8. Trợ năng (không phải việc "làm sau")
 
 - Nút chỉ có icon **phải có** `aria-label`; nút có chữ thì thêm `title` giải thích kết quả.
+- **Vùng chạm tối thiểu 24×24 px** (WCAG 2.2 SC 2.5.8). Nút nhỏ nhất đang dùng là `h-6 w-6` (24px); các
+  nút 20px (`h-5 w-5`) đã bị nâng lên — đo lại khi thêm nút xoá/đóng dạng icon.
 - Tiến trình: `role="status" aria-live="polite"`; lỗi: `role="alert"`.
 - Không dùng MÀU làm tín hiệu duy nhất (thêm icon/chữ: "đã lưu", dấu ✓).
 - Trạng thái ẩn/hiện bằng CSS (opacity/visibility) phải đi kèm `inert` + `aria-hidden` để bàn phím
@@ -1081,8 +1083,21 @@ không gọi model · đổi DNA là mất đệm · đệm riêng từng tài k
 
 ### 19.1 Luồng
 
-`danh sách nguồn (RSS/JSON/API)` → **máy chủ GET** (timeout 12s, UA riêng) → **lọc** (từ khoá · độ mới ≤ 60 ngày · trần mỗi nguồn)
-→ **đệm 30 phút/nguồn** → **nhét vào prompt** kèm **URL + thời điểm** → model chỉ việc đọc và dẫn nguồn.
+`danh sách nguồn (RSS/JSON/API)` → **máy chủ GET** (chạy SONG SONG, connect-timeout 5s / timeout 12s, UA riêng)
+→ **lọc** (từ khoá theo ranh giới từ · độ mới ≤ 60 ngày · trần mỗi nguồn) → **đệm 30 phút/nguồn**
+→ **nhét vào prompt** kèm **URL + thời điểm** → model chỉ việc đọc và dẫn nguồn. Tin cũng được **ĐO** thành
+tín hiệu có cấu trúc (§20) — đó là phần dùng được kể cả khi không có model nào chạy.
+
+> **Lịch chạy:** `Schedule::command('studio:market-signals')` mỗi 30 phút (`routes/console.php`) ⇒ câu
+> "tự động lấy mỗi 30 phút" trên giao diện nay ĐÚNG. Trước đợt 31 không có lịch nào, nên tin chỉ được lấy
+> khi có người mở màn hình — câu đó là câu SAI.
+
+> **Nguồn chết không mất dữ liệu:** bản lấy THÀNH CÔNG gần nhất (≤24 giờ) được giữ riêng; nguồn lỗi ⇒ dùng
+> bản đó và ghi rõ *"Đang dùng bản lấy trước"*. Thà có tin cũ kèm thời điểm còn hơn mất cả nền dữ liệu.
+
+> **An toàn:** nội dung ngoài bị **bỏ thẻ TRƯỚC khi giải mã thực thể** (làm ngược lại thì `&lt;img onerror=…&gt;`
+> sống lại thành thẻ THẬT trong prompt), bỏ ký tự điều khiển; URL nguồn và **đích redirect** đều bị chặn nếu
+> trỏ vào địa chỉ nội bộ; body quá 5 MB bị từ chối.
 
 | Thành phần | Ở đâu |
 |---|---|
@@ -1111,4 +1126,74 @@ Thứ tự gọi model lấy từ **Luồng ưu tiên provider** (Cài đặt) r
 
 ```
 php artisan studio:web-sources --force   # xem nguồn + tin đang được đưa vào prompt
+php artisan studio:market-signals        # lấy tin + ĐO tín hiệu + lưu lần đo (xem §20)
 ```
+---
+
+## 20. Tín hiệu thị trường — biến TIN thành DỮ LIỆU (không cần model tìm kiếm web)
+
+> Đợt 31 (2026-09-23). Bối cảnh: §19 đã để MÁY CHỦ đi lấy tin, nhưng tin vẫn chỉ là **CHỮ** đưa vào prompt —
+> hết model là hết phân tích, và mọi con số trên màn hình vẫn là hằng số của bộ xu hướng có sẵn
+> (`momentum` 86/91/88 · `evidence_count` 18.420/24.180…). Trong khi đó model đang chạy **không có tìm
+> kiếm web thật** (§18.2). Nghĩa là: chủ xưởng vẫn đang quyết định bằng **số mẫu**, chỉ khoác thêm mấy cái URL.
+
+### 20.1 Ba tầng, ba câu hỏi khác nhau
+
+| Tầng | Trả lời câu hỏi | Ở đâu | Có cần AI? |
+|---|---|---|---|
+| Nguồn | *Máy chủ có lấy được tin không?* | `WebSourceService` + bảng `web_sources` (§19) | Không |
+| **Tín hiệu** | *Tin đang nói GÌ, bao nhiêu tin, tăng hay giảm, giá nào?* | `MarketSignalService` + bảng `market_signals` | **Không** |
+| Suy luận | *Vậy nên làm gì?* | `DesignAgentService` (AI hoặc engine tất định) | Có/không |
+
+Tầng tín hiệu là phần **đo được** — chạy được cả khi KHÔNG có model nào. Đó là lý do nó tồn tại.
+
+### 20.2 ĐO bằng gì (thuật toán, tái lập 100%)
+
+- **Từ khoá theo nhóm hàng** (`VOCABULARY`: Màu sắc · Dáng · Chất liệu · Chi tiết · Phong cách) — khớp
+  theo **ranh giới từ**, không phải khớp chuỗi con: `"áo"` KHÔNG khớp trong `"báo"`. Cụm từ (≥2 tiếng)
+  khớp thêm bản **không dấu** để bắt feed viết kiểu `"thoi trang"`; từ một tiếng thì KHÔNG hạ chuẩn
+  (`"đầm"` → `"dam"` sẽ bắt nhầm). Quy tắc dùng CHUNG ở `App\Support\VietnameseText` — một định nghĩa
+  duy nhất cho cả bộ lọc nguồn tin lẫn bộ đo.
+- **Giá trong tin**: `499.000đ` · `1,2 triệu` · `250k` ⇒ VND; chỉ nhận trong khoảng 20.000 – 500.000.000đ
+  nên `"1.200 tấn"`, `"100.000 lượt xem"`, `"năm 2026"` không thành giá. Dải giá dùng **trung vị** (một
+  tin 90 triệu không kéo lệch cả thị trường).
+- **Tăng/giảm** so với các lần đo TRƯỚC trong 14 ngày. Lần đo đầu tiên trả `change_pct = null` và giao
+  diện nói **"lần đo đầu tiên"** — không bịa 0%.
+
+### 20.3 Lịch sử là bắt buộc, và phải tự dọn
+
+Một lần đo đơn lẻ không nói được "đang lên hay chậm lại". `market_signals` lưu **ảnh chụp mỗi lần đo**
+(kèm `fingerprint` của bộ tin): cùng dữ liệu thì KHÔNG ghi thêm; quá 12 giờ thì ghi lại một mẫu; quá 120
+ngày thì `prune` xoá. Nhờ vậy bảng không phình mà vẫn có lịch sử để so sánh.
+
+### 20.4 Nguồn chạy: lịch nền + theo yêu cầu
+
+| Đường | Việc |
+|---|---|
+| `Schedule::command('studio:market-signals')` mỗi 30 phút | Lấy tin + đo + lưu (kể cả khi không ai mở trang) |
+| `php artisan studio:market-signals [--force] [--region=] [--prune]` | Chạy tay / kiểm tra |
+| `GET /api/design-agent/sources?force=1` (nút **Cập nhật tin**) | Lấy tin + đo lại ngay |
+| Lần mở Agent Studio đầu tiên | Tự đo nếu chưa có bản nào (nơi triển khai chưa bật cron vẫn có dữ liệu) |
+
+### 20.5 Nói thật ở bốn chỗ
+
+1. **Hướng có tin thật** ⇒ gắn nhãn **có tin thật**, số hiển thị là **số ĐO** ("3 tin thật nhắc tới · 2 nguồn
+   · tăng 50% · lần đo đầu tiên"), kèm link bài viết để người dùng tự kiểm.
+2. **Hướng của bộ có sẵn** ⇒ gắn nhãn **bộ có sẵn** và câu *"… bằng chứng của bộ có sẵn"*; số KPI nói rõ
+   *"từ tin thật"* hay *"từ dữ liệu của bạn"*.
+3. **Thứ tự**: hướng có tin thật xếp TRƯỚC. Xếp thuần theo "đà tăng" thì số MẪU (74–91) luôn thắng số ĐO,
+   và engine tất định sẽ mãi đọc lại 8 hướng mẫu — đúng thứ cần tránh.
+4. **Nguồn**: 5 trạng thái, không phải 2 — *Đang dùng · Bị bộ lọc loại hết · Nguồn không có tin · Đang dùng
+   bản lấy trước · Bỏ qua (nguồn của vùng khác)*. Gộp lại thành "Không lấy được" là báo lỗi cho một nguồn
+   hoàn toàn bình thường.
+
+### 20.6 Bộ test giữ luật này
+
+`tests/Feature/MarketSignalTest.php` (22 test): đo từ khoá/nhóm hàng/bằng chứng · ranh giới từ · khớp không
+dấu cho cụm từ · giá 3 kiểu viết + loại số không phải giá + trung vị · không ghi trùng ảnh chụp · `prune` ·
+tăng/giảm từ lịch sử + lần đo đầu nói thật · radar gắn số đo và giữ nhãn cho hướng mẫu · **engine tất định
+dùng số đo khi không có model** · hướng sinh từ tin chọn được (không 422) · brief mang khối tín hiệu · nguồn
+chết không làm hỏng lượt · 5 trạng thái nguồn · bản lấy trước khi nguồn chết · thẻ HTML không sống lại ·
+ngày kiểu Việt Nam · lọc từ khoá theo ranh giới từ · chống trùng theo tiêu đề · giao diện có khối tín hiệu và
+KHÔNG lộ chữ kỹ thuật · nhãn/aria cho khối mới.
+

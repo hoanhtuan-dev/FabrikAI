@@ -16,6 +16,12 @@
 >   Đọc để tra cứu; **KHÔNG trích số trực tiếp** (cả 3 đã lệch neo ít nhất một lần, có file tự mâu thuẫn).
 > - Mở **mỗi vòng** bằng `bash scripts/measure.sh` rồi dán output vào đây.
 
+**Neo đo MỚI 2026-09-20 19:25 (commit `92344b6` + việc chưa commit — `scripts/measure.sh --no-tests`):**
+`HEAD 92344b6` · **246 commit** · **204 route** · PHP `app/` **97 file / 28.638 dòng** · `app/Services` 24 · `app/Models` 29 · migrations **55** ·
+JS/Vue studio **69 file (51 .vue) / 25.060 dòng** · `public_html` 22 MB · **suite 933 test / 6.750 assert XANH** (`vendor/bin/phpunit`, 1m40s).
+Điểm nóng: `store.js` **5.658** · `StudioController.php` **5.395** · `helpers.php` **2.677** · `DesignAgentService.php` ~2.250.
+*(Neo cũ 2026-09-17: `436675d` · 99 commit · 148 route · 471 test/2.518 assert · `app/` 15.658 dòng — giữ để đối chiếu.)*
+
 **Neo đo 2026-09-17 15:53 (commit `436675d` — chạy `scripts/measure.sh`):**
 `HEAD 436675d` · **99 commit** · **148 route** · **471 test / 2.518 assertion XANH · 53 file test** ·
 PHP `app/` **58 file / 15.658 dòng** · `app/Services` 14 · `app/Models` 20 · migrations 35 ·
@@ -492,6 +498,18 @@ JS/Vue studio **51 file (38 .vue) / 14.239 dòng** · `public_html` **21 MB** ·
 - **Kiểm chứng**: `ModulesAdminTest` +1 test (payload có `users_count` · UI có hàm xác nhận ảnh hưởng với câu "SẼ RÚT" + số người dùng · có `grantAllModules`/«Cấp tất cả» và dùng đúng hộp xác nhận chuẩn) · **suite 614 test / 3.908 assert xanh**.
 - **Đo trên trình duyệt thật** (CDP): kịch bản **11/11 bước** — thẻ gói hiện số người dùng · có nút «Cấp tất cả» · bấm «Áp đề xuất» ở gói **có 7 người dùng** ⇒ **hộp xác nhận hiện ra**, nêu *"đang có 7 người dùng"*, liệt kê tính năng sắp rút (có "Trợ lý thiết kế"), **chưa gọi API**; bấm Huỷ ⇒ **0 lời gọi**; bấm «Rút và lưu» ⇒ **đúng 1 lời gọi** áp đề xuất.
 - **Deploy + kiểm chứng trên PRODUCTION** (`2e71eca → a7be776`): `GET /api/admin/modules` 200 với **số người dùng từng gói** (Miễn phí 1 · Studio 1 · còn lại 0) · cả 5 gói nay **khớp đề xuất** (`missing_suggested = 0`) · **không module nào bị tắt toàn cục** · log vẫn **đúng 6 ERROR cũ**.
+
+**Vòng 19 (2026-09-23) — TÍN HIỆU THỊ TRƯỜNG TỪ NGUỒN NGOÀI: biến TIN thành DỮ LIỆU (Đợt 31):**
+- **Yêu cầu**: *"kiểm tra sâu Agent Studio → tối ưu GUI/UX/UI → tối ưu hoá dữ liệu → kiểm tra cách tạo dữ liệu → tạo dữ liệu từ nguồn ngoài (RSS) khi không có model có khả năng tìm kiếm web."*
+- **Phát hiện cốt lõi**: sau Đợt 27, máy chủ ĐÃ lấy được tin RSS, nhưng **tin chỉ là CHỮ để model đọc** và **mọi con số trên màn hình vẫn là hằng số** của bộ xu hướng có sẵn (`momentum` 86/91/88 · `evidence_count` 18.420/24.180). Không có model ⇒ agent đọc lại 8 hướng mẫu. Tức là chủ xưởng vẫn quyết định bằng số mẫu.
+- **Tầng mới — ĐO bằng thuật toán** (`app/Services/MarketSignalService.php` + bảng `market_signals`): từ khoá theo **5 nhóm hàng** · số tin · số nguồn · **tăng/giảm so với lần đo trước** · **dải giá đọc trong tin** (trung vị). Mỗi lần đo là một **ảnh chụp** (cùng dữ liệu ⇒ không ghi thêm; >12h ⇒ ghi mẫu mới; >120 ngày ⇒ `prune`) vì **không có lịch sử thì không nói được "đang lên hay chậm lại"**.
+- **Khớp từ khoá dùng CHUNG một định nghĩa** (`App\Support\VietnameseText`): theo **ranh giới từ** (`"áo"` không khớp trong `"báo"`), cụm từ khớp thêm bản không dấu, từ một tiếng thì không hạ chuẩn.
+- **Agent dùng số ĐO**: hướng có tin thật mang số đo + link + nhãn **có tin thật**; hướng còn lại ghi rõ **bộ có sẵn**; từ khoá chỉ có trong tin thành **hướng mới** (`live-…`, chọn được, không 422); **engine tất định (không model) dẫn số đo thật** — đúng yêu cầu "tạo dữ liệu từ nguồn ngoài khi không có model tìm kiếm web". Thứ tự: **hướng có tin thật lên trước** (xếp thuần theo "đà tăng" thì số mẫu luôn thắng số đo).
+- **Lịch nền 30 phút** (`routes/console.php`) + lệnh `studio:market-signals [--force|--region|--prune]` ⇒ câu "tự động lấy tin mỗi 30 phút" trên giao diện **từ nay là câu ĐÚNG** (trước đây không có lịch nào).
+- **18 lỗi THẬT đã sửa** (chi tiết + hậu quả: `DEPLOY_LOG.md` Đợt 31 §4): giải mã thực thể sau khi bỏ thẻ làm **thẻ HTML sống lại trong prompt** · lọc từ khoá bằng `str_contains` (`"áo"` khớp `"báo"`) · gọi nguồn tuần tự (3 nguồn = tối đa 36 giây) · không chặn redirect về địa chỉ nội bộ · nguồn khác vùng hiện "Không lấy được" · mất sạch tin khi nguồn chết · `strtotime` hiểu sai ngày `d/m/Y` · chống trùng chỉ theo URL · **thiếu `use Http`** làm vai đọc ảnh qua URL chết âm thầm · radar cắt `shop_rows` còn 100 trong khi đường ghi xoá hết rồi ghi lại (**mất dữ liệu**) · khoá bộ đệm brief thiếu ảnh mẫu/brief/bảng size/nội dung shop · khoá tính theo nhóm suy luận thay vì nhóm tìm kiếm · tắt AI vẫn gọi model đọc ảnh · khối `model` báo sai nhóm · đếm ảnh tạo bị chặn ở 120 · cache radar không bọc lỗi · `sources_mode` luôn `'demo'` · **khối "khả năng đọc tin từ internet" nạp mà không hiện ở đâu**.
+- **Giao diện**: khối **"Tín hiệu đo từ tin thật"** · KPI thật + ghi rõ nguồn từng số · bảng nguồn **5 trạng thái** · bỏ chữ kỹ thuật (tên model/provider · `latency_ms` · `rule-based-v1` · `CollectionBot` · nhóm `prompt` · chip "Nguồn: demo / Nội bộ: local") · a11y (nhãn ô nhập, `scope=col`, `aria-pressed`, **vùng chạm ≥24px**) · nút Quay lại chết ở bước DNA đã bỏ · chống bấm hai lần tạo hai dự án · giữ kết quả cũ khi radar lỗi · mỗi màn một nút chính · nút khoá nói lý do.
+- **Kiểm chứng**: `MarketSignalTest` **22 test / 82 assert** · **suite 933 test / 6.750 assert XANH** (trước 911/6.668) · test bắt được **lỗi thật của chính bản mới** (phép hợp mảng giữ giá trị cũ ⇒ số đo không thay được số mẫu) · chạy thật 3 nguồn RSS: **16 tin · 8 từ khoá** · radar chạy thật không model: `source_mode=live` + 2 hướng có tin thật lên đầu · **Chrome thật (CDP)**: khối tín hiệu hiện đủ, nhãn đúng, **0 lỗi console**, không còn chữ kỹ thuật.
+- **Trạng thái**: commit `cda4ed5` — **CHƯA deploy** (cần `migrate --force` cho bảng mới + cron `schedule:run`). Nợ đã biết ghi ở `DEPLOY_LOG.md` Đợt 31 §8.
 
 ### 3.6 Sửa lỗi / đồng bộ khác
 - `900f547` `studio_config()` bỏ qua empty string từ DB → fallback config default · `565c1a8` preview-enrich nhận body/hair từ tab Phom dáng · `6e16472` fix 500 image-thumb + popup GalleryModal/SourcePickerPopup không hiển thị trong StudioApp · `d6572a1` render ProjectWorkspace popup + gọn prompt `StylistService` · `d674560` fix **cross-world SW resource mismatch** cho modulepreload.

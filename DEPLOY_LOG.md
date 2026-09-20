@@ -2191,3 +2191,125 @@ Trong lúc commit, `git status` cho thấy các thay đổi **không do đợt n
 Đây là một **tính năng KHÁC đang được viết song song** ("tín hiệu thị trường đo bằng thuật toán"), KHÔNG phải
 mã chết — nên KHÔNG xoá. Đã **loại khỏi commit của đợt này** để không trộn hai việc vào một commit và không
 commit khi việc kia còn viết dở. Bản chạy trên production là bản đã commit (không gồm các thay đổi đó).
+
+> ✅ **Việc song song đó nay đã XONG và đã commit riêng** — xem **Đợt 31** bên dưới.
+---
+
+## Phiên 2026-09-23 (Đợt 31 — TÍN HIỆU THỊ TRƯỜNG: biến RSS thành DỮ LIỆU, dùng được cả khi không có model tìm kiếm web)
+
+**Deploy:** `92344b6 → cda4ed5` (đã commit, **chưa deploy** — xem §6). **Migration mới:** `2026_09_23_000007_create_market_signals` · **lệnh mới:** `php artisan studio:market-signals` · **lịch mới:** 30 phút/lần.
+
+### 1. Vì sao phải làm việc này (không phải "thêm tính năng cho vui")
+
+Đợt 27 đã để **máy chủ tự lấy tin** (RSS/JSON) — đúng hướng, vì model không tự ra internet được. Nhưng sau khi
+đọc lại toàn bộ tầng dữ liệu thì thấy tin vẫn chỉ là **CHỮ để model đọc**, còn **mọi con số trên màn hình là
+hằng số** của bộ xu hướng có sẵn:
+
+| Chỗ | Số đang hiển thị | Thực chất |
+|---|---|---|
+| Thẻ hướng | `Đà tăng 91 · 24.180 bằng chứng` | hằng số trong mã (`trendCatalog`) |
+| Nhãn | `(mẫu)` | đúng, nhưng vẫn nằm cạnh con số trông như số liệu thị trường |
+| Engine khi không có model | 8 hướng đọc lại từ catalog | **không có việc thật nào để nói** |
+
+Nghĩa là chủ xưởng vẫn quyết định bằng số mẫu. Yêu cầu "tạo dữ liệu từ nguồn ngoài (RSS) khi không có model có
+khả năng tìm kiếm web" vì thế được hiểu đúng là: **phải ĐO được dữ liệu từ tin, bằng thuật toán, để nó dùng
+được kể cả khi không có model nào chạy.**
+
+### 2. Tầng mới: `MarketSignalService` + bảng `market_signals`
+
+- **Đo** (không AI, tái lập 100%): từ khoá theo **5 nhóm hàng** · số tin · số nguồn · **tăng/giảm so với các
+  lần đo trước** · **dải giá đọc trong tin** (trung vị).
+- **Khớp theo RANH GIỚI TỪ** — `"áo"` không khớp trong `"báo"`; cụm từ khớp thêm bản không dấu; từ một tiếng
+  thì KHÔNG hạ chuẩn. Quy tắc dùng chung ở `App\Support\VietnameseText` cho cả bộ lọc nguồn tin.
+- **Lịch sử**: mỗi lần đo là một **ảnh chụp**; cùng dữ liệu ⇒ không ghi thêm; quá 12 giờ ⇒ ghi mẫu mới; quá 120
+  ngày ⇒ `prune`. Không có lịch sử thì không thể nói "đang lên hay chậm lại".
+- **Lịch chạy nền 30 phút** (`routes/console.php`) ⇒ câu "tự động lấy tin mỗi 30 phút" trên giao diện **từ nay
+  là câu ĐÚNG** (trước đây không có lịch nào nên tin chỉ được lấy khi có người mở màn hình).
+
+### 3. Agent Studio dùng số ĐO thế nào
+
+| Trước | Nay |
+|---|---|
+| `Đà tăng 91 · 24.180 bằng chứng (mẫu)` cho MỌI hướng | Hướng có tin thật: **"3 tin thật nhắc tới · 2 nguồn · tăng 50% so với lần đo trước"** + link bài viết; hướng còn lại ghi rõ **bộ có sẵn** |
+| Không có hướng nào sinh từ tin | Từ khoá chỉ có trong tin (≥2 tin) thành **hướng mới** (`live-…`) — chọn được, không bị 422 |
+| Không có model ⇒ đọc lại 8 hướng mẫu | Không có model ⇒ engine tất định dùng **số đo thật**: `why_now` dẫn số tin/nguồn/tăng-giảm + link |
+| KPI: "Thuộc tính theo dõi 5" (hằng số) · "Ảnh phân tích mỗi tháng 0" | **Nguồn tin đang dùng · Từ khoá từ tin thật · Hướng đang theo dõi · Sản phẩm của bạn · Ảnh bạn đã tạo**, mỗi ô ghi rõ *từ tin thật* hay *từ dữ liệu của bạn* |
+
+Thứ tự hướng: **có tin thật lên trước**. Xếp thuần theo "đà tăng" thì số MẪU (74–91) luôn thắng số ĐO ⇒ engine
+tất định mãi đọc lại hướng mẫu — đúng thứ cần tránh.
+
+### 4. Lỗi THẬT bắt được khi kiểm tra sâu
+
+Ba subagent đọc song song toàn bộ tầng dữ liệu + giao diện + trình kết nối. Các lỗi đã sửa, mỗi lỗi kèm hậu quả thật:
+
+| # | Lỗi | Hậu quả | Sửa |
+|---|---|---|---|
+| 1 | `html_entity_decode(strip_tags(...))` — giải mã thực thể SAU khi bỏ thẻ | `&lt;img onerror=…&gt;` **sống lại thành thẻ THẬT trong prompt** ⇒ vô hiệu lớp chống prompt-injection | Bỏ thẻ TRƯỚC, giải mã SAU, bỏ tiếp thẻ + ký tự điều khiển |
+| 2 | Lọc từ khoá bằng `str_contains` | Từ khoá mặc định `"áo"` khớp cả `"báo"`, `"cáo"` ⇒ **tin rác vào phân tích** | Khớp theo ranh giới từ (`VietnameseText`) |
+| 3 | Gọi nguồn TUẦN TỰ, timeout 12s, không connect-timeout | 3 nguồn = tối đa **36 giây** cho một lần cache nguội | `Http::pool` song song + connect-timeout 5s (có đường lùi tuần tự) |
+| 4 | `allow_redirects` mặc định, không chặn host nội bộ | Feed công khai bị chiếm có thể 302 máy chủ đi đọc `169.254.169.254` | Chặn URL nguồn VÀ đích redirect không công khai; tối đa 2 bước |
+| 5 | Nguồn của VÙNG KHÁC hiện "Không lấy được" | Người dùng đi sửa cấu hình **không hề lỗi** | 5 trạng thái (đang dùng · bị lọc hết · không có tin · bản lấy trước · bỏ qua vùng khác) |
+| 6 | Nguồn chết ⇒ mất sạch tin của nguồn đó | Mất cả nền dữ liệu vì một lần 503 | Giữ bản lấy THÀNH CÔNG gần nhất (≤24h) + nói rõ "Đang dùng bản lấy trước" |
+| 7 | `strtotime` cho ngày kiểu Việt Nam | `05/09/2026` bị hiểu thành **tháng 5** (sai im lặng) | Thử `d/m/Y` trước; ngày tương lai kéo về hiện tại |
+| 8 | Chống trùng chỉ theo URL (nhánh tiêu đề là mã chết) | Cùng một bài qua Google News + báo gốc = **2 bản trong prompt** | Thêm khoá theo tiêu đề đã chuẩn hoá |
+| 9 | `Http::` **thiếu import** trong `DesignAgentService` | Vai ĐỌC ẢNH qua URL cùng tên miền **chết âm thầm** | Thêm import |
+| 10 | Radar cắt `shop_rows` còn 100 trong khi đường ghi XOÁ HẾT rồi ghi lại | Shop nhập 150–200 dòng ⇒ lần bấm Lưu sau **xoá vĩnh viễn** 100 dòng | Trả đủ 200 (đúng trần đường ghi nhận) |
+| 11 | Khoá bộ đệm brief thiếu **ảnh mẫu**, **brief người dùng tự viết**, **bảng size**, **nội dung shop** | Đổi ảnh/bảng size vẫn nhận brief cũ; **tốn một lượt gọi model đọc ảnh rồi vứt kết quả** | Đưa cả bốn vào khoá; đọc ảnh SAU khi biết chắc không dùng bộ đệm |
+| 12 | Khoá bộ đệm tính "kế hoạch tìm kiếm" theo nhóm SUY LUẬN, lượt chạy do nhóm TÌM KIẾM quyết định | Đổi cấu hình tìm kiếm vẫn nhận bản cũ tới 1 giờ | Tính theo đúng nhóm sẽ chạy |
+| 13 | Tắt AI vẫn gọi model đọc ảnh | Công tắc "tắt AI" chỉ tắt được một nửa số lượt gọi | `referenceStyle($urls, $useAi)` |
+| 14 | Khối `model` luôn báo nhóm `prompt` và liệt kê sai danh sách model | Cấu hình nhóm riêng xong vẫn đọc thấy nhóm khác | Trả nhóm THẬT của candidate đã dùng |
+| 15 | `generation_count` đếm trên mẫu 120 dòng nhưng hiển thị như TỔNG | Shop có 500 ảnh vẫn thấy "120" | Đếm bằng truy vấn tổng hợp |
+| 16 | Đọc/ghi cache radar không bọc lỗi (đường brief thì có) | Bộ đệm hỏng ⇒ `/radar` 500 | Bọc như đường brief |
+| 17 | `sources_mode` luôn trả `'demo'` (và test còn KHOÁ giá trị sai này) | Màn "khả năng truy cập internet" nói ngược thực tế | Đọc trạng thái THẬT của tín hiệu |
+| 18 | **Khối "Khả năng đọc tin từ internet" được nạp mỗi lần mở màn hình nhưng KHÔNG hiện ở đâu** | Tính năng chết: người dùng không bao giờ thấy kết quả đo | Hiện khối + nút **Kiểm tra lại** |
+
+### 5. Giao diện (tối ưu GUI/UX/UI trong cùng đợt)
+
+- Thêm khối **"Tín hiệu đo từ tin thật"** (số tin · số nguồn · tăng/giảm · link từng bài) và **nhãn phân biệt**
+  *có tin thật* / *bộ có sẵn* trên từng thẻ hướng.
+- Bỏ chữ kỹ thuật lộ ra người dùng: tên model/nhà cung cấp · `latency_ms` · `rule-based-v1` · `CollectionBot` ·
+  "nhóm **prompt**" · chip "Nguồn: demo / Nội bộ: local".
+- Trợ năng: ô chọn vùng có nhãn · bảng dữ liệu shop có `scope=col` + `aria-label` từng ô và từng nút xoá ·
+  các nhóm chọn-một có `aria-pressed` · **vùng chạm nút bỏ ảnh 20px → 24px** (WCAG 2.2).
+- Bớt lỗi trạng thái: nút **Quay lại** ở bước DNA (bấm không có gì xảy ra) đã bỏ · "Tạo bộ sưu tập từ brief"
+  có cờ đang-chạy (trước đây bấm hai lần tạo **hai dự án**) · câu rỗng của danh sách hướng phân biệt *chưa có
+  dữ liệu* với *không khớp bộ lọc* · lần tải radar lỗi **không xoá** kết quả đang xem · mỗi màn chỉ còn MỘT
+  nút chính · nút khoá nói rõ lý do.
+- Ô nhập bắt buộc ghi rõ *(bắt buộc)*; bỏ `opacity-70` trên chữ (kể cả chữ số tiền).
+
+### 6. Kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Test mới | `MarketSignalTest` **22 test / 82 assert**: đo từ khoá·nhóm·bằng chứng · ranh giới từ · khớp không dấu cho cụm từ · giá 3 kiểu viết + loại số không phải giá + trung vị · không ghi trùng ảnh chụp · `prune` · tăng/giảm từ lịch sử + lần đo đầu nói thật · radar gắn số đo · **engine tất định dùng số đo khi KHÔNG có model** · hướng sinh từ tin chọn được (không 422) · brief mang khối tín hiệu · nguồn chết không làm hỏng lượt · 5 trạng thái nguồn · bản lấy trước khi nguồn chết · **thẻ HTML không sống lại** · ngày kiểu Việt Nam · lọc theo ranh giới từ · chống trùng theo tiêu đề · giao diện có khối tín hiệu + không lộ chữ kỹ thuật · a11y khối mới |
+| Full suite | **933 test / 6.750 assert XANH** (trước đợt: 911/6.668) |
+| Test bắt được lỗi THẬT của chính bản mới | Phép HỢP mảng (`$trend + [...]`) giữ giá trị CŨ khi khoá trùng ⇒ số đo **không bao giờ** thay được số mẫu; đã đổi sang `array_merge` |
+| Chạy THẬT với 3 nguồn RSS | `studio:market-signals --force`: Google News 8 tin · Tuổi Trẻ 6 · VnExpress 2 ⇒ **16 tin · 8 từ khoá** (nổi nhất: *tuần lễ thời trang* 4 tin / 2 nguồn) |
+| Radar chạy THẬT (không model) | `source_mode=live` · 2 hướng **có tin thật** lên đầu (một hướng sinh từ tin: *Tuần lễ thời trang*) · định hướng tất định dẫn số đo: *"Nhắc tới trong 4 tin của 2 nguồn · lần đo đầu tiên nên chưa so sánh được"* |
+| **Chrome thật** (headless CDP, đăng nhập admin) | Modal mở ở bước Tín hiệu · chip **"Tin thị trường thật"** + **"8 tín hiệu đo được"** · khối **"Tín hiệu đo từ tin thật"** hiện đủ · thẻ hướng có nhãn *có tin thật* / *bộ có sẵn* · nguồn: *"Đang đọc 6 tin thật từ 3 nguồn · cập nhật 19:24"* · khối **"Khả năng đọc tin từ internet"** + nút **Kiểm tra lại** hiện được · **0 lỗi console** · không còn `deepseek/qwen/latency/rule-based/items_path` trên bề mặt người dùng |
+| `npm run build` | exit 0 (asset mới đã commit) |
+| **Deploy production** | ⛔ **CHƯA deploy** — cần `migrate --force` (bảng mới) + cron `schedule:run` |
+
+### 7. Việc cần làm khi deploy (theo thứ tự)
+
+1. `git pull --ff-only` (commit `cda4ed5`) → `composer dump-autoload` → `php artisan migrate --force` (**bảng `market_signals` mới**).
+2. `config:cache` + `route:cache` + `view:cache` → `queue:restart`.
+3. **Cron**: `php artisan schedule:run` mỗi phút (hPanel). Không có cron thì tín hiệu vẫn có (lần mở màn hình đầu
+   tiên tự đo) nhưng dữ liệu cũ hơn và lịch sử so tăng/giảm sẽ thưa.
+4. Chạy một lần `php artisan studio:market-signals --force` rồi đối chiếu số tin với bản local.
+5. Nhắc người dùng **Ctrl+Shift+R**.
+
+### 8. Nợ đã biết (ghi lại để không tưởng là đã xong)
+
+| Việc | Vì sao chưa làm |
+|---|---|
+| "Khổ vải" được nhập/hiển thị nhưng **không tham gia công thức** định mức vải; câu ghi chú bảng size còn in khổ MẶC ĐỊNH | Sửa công thức tiền ⇒ phải chốt cách quy đổi với chủ dự án |
+| Dán từ Excel: `"520.000"` → **520**, `"1.200.000"` → **0** ở phần parse phía giao diện | Cần chuẩn hoá theo locale; chưa có test nào chạm đường dán |
+| Hai con số LỢI NHUẬN trong cùng một kế hoạch (một cái gồm `fixed_cost`, một cái không) | Cần chốt định nghĩa + nhãn `profit_before/after_fixed` |
+| `period_days` của dữ liệu shop trộn nhiều kỳ nhưng chỉ giữ giá trị dòng cuối | Hiện chưa nơi nào đọc |
+| Từ khoá một tiếng trùng nghĩa khác (`đầm` trong `đầm phá`) | Giới hạn của khớp theo từ; muốn chắc phải dùng cụm ≥2 tiếng |
+| 19 tiêu đề card trong Agent Studio chưa theo §1.3 (`font-display` + `text-brand-300` + icon) | Việc thẩm mỹ, chạm nhiều dòng |
+| `.tool-btn.is-active` dùng `border-brand-500/70` (lệch từ vựng §5.1) | Cần sửa cả `app.css` và mở rộng `DesignSystemTest` quét CSS |
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
+
