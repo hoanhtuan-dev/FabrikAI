@@ -1480,6 +1480,10 @@ class DesignAgentService
             .'Không đổi bất kỳ con số nào — cơ cấu SKU, size và dải giá là do hệ thống quyết định. '
             // TRÍ NHỚ DÀI HẠN (GĐ1): khối internal_brand_signal.brand_memory ghi prompt ảnh chủ shop ĐÃ DUYỆT và ĐÃ LOẠI.
             .'brand_memory.approved là các prompt ảnh chủ shop đã DUYỆT, rejected là đã LOẠI: bám phong cách đã duyệt, TRÁNH phong cách đã loại — đó là gu thật của shop. '
+            // GĐ2 — học từ bán hàng thật.
+            .'shop_data.best_sellers là món shop đang BÁN CHẠY: ưu tiên phong cách/nhóm hàng của chúng; slow_movers là bán chậm — tránh đề xuất quá nhiều; category_demand là nhóm đang được cầu. '
+            // GĐ3 — dự báo từ thị trường.
+            .'market_signals.signals có change_pct: dương = hướng đang LÊN (ưu tiên), âm = đang GIẢM (thận trọng) — số ĐO từ tin thật, không tự bịa. '
             .'Chỉ trả về MỘT object JSON đúng dạng: {"narrative":"...","brief":"...","moodboard_captions":["... x24"],'
             .'"category_rationale":{"TÊN NHÓM":"..."},"outfit_goals":{"look-1":"..."},"prompt_vi":"...","prompt_en":"...","next_steps":["...","...","..."]}. '
             .'narrative: 1-2 câu DNA/định vị. brief: 3-5 câu tiếng Việt cho xưởng. moodboard_captions: ĐÚNG 24 caption ngắn tiếng Việt theo thứ tự ô. '
