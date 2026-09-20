@@ -177,7 +177,7 @@ class MarketAnalysisFromSourcesTest extends TestCase
     /** Giao diện: có chip lọc "có tin thật", có khối chủ đề, và nói rõ bao nhiêu hướng là bộ có sẵn. */
     public function test_the_screen_separates_measured_trends_from_the_builtin_set(): void
     {
-        $view = (string) file_get_contents(resource_path('js/studio/components/DesignAgents.vue'));
+        $view = static::designAgentsSource();
 
         $this->assertStringContainsString('Có tin thật ({{ liveTrendCount }})', $view);
         $this->assertStringContainsString('Chủ đề đang được nói tới trong tin', $view);

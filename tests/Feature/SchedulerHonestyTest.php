@@ -109,7 +109,7 @@ class SchedulerHonestyTest extends TestCase
     /** Giao diện đọc khối ĐO được, không viết lại câu "tự lấy tin mỗi 30 phút" bằng tay. */
     public function test_the_screen_reads_the_measured_label(): void
     {
-        $view = (string) file_get_contents(resource_path('js/studio/components/DesignAgents.vue'));
+        $view = static::designAgentsSource();
 
         $this->assertStringContainsString('autoRefresh.label', $view);
         $this->assertStringNotContainsString('FabrikAI tự lấy tin mỗi 30 phút', $view,

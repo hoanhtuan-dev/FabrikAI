@@ -469,7 +469,7 @@ class MarketSignalTest extends TestCase
     /** Giao diện phải có khối tín hiệu + nhãn phân biệt số đo với bộ có sẵn, và KHÔNG lộ chữ kỹ thuật. */
     public function test_the_agent_screen_shows_measured_signals_without_technical_jargon(): void
     {
-        $view = (string) file_get_contents(resource_path('js/studio/components/DesignAgents.vue'));
+        $view = static::designAgentsSource();
 
         foreach (['Tín hiệu đo từ tin thật', 'tin thật nhắc tới', 'có tin thật', 'bộ có sẵn', 'Kiểm tra lại'] as $needle) {
             $this->assertStringContainsString($needle, $view, 'Thiếu chữ bắt buộc trên màn hình: '.$needle);
@@ -483,7 +483,7 @@ class MarketSignalTest extends TestCase
     /** Nút khoá phải nói lý do; nút chỉ có icon phải có nhãn; vùng chạm nhỏ phải bỏ (§4 + WCAG 2.2). */
     public function test_the_screen_keeps_accessibility_rules_for_the_new_block(): void
     {
-        $view = (string) file_get_contents(resource_path('js/studio/components/DesignAgents.vue'));
+        $view = static::designAgentsSource();
 
         $this->assertStringContainsString('Khu vực đọc tín hiệu', $view, 'Ô chọn vùng phải có nhãn cho trình đọc màn hình.');
         $this->assertStringContainsString("Xoá ' + (row.name", $view, 'Nút chỉ có icon phải có nhãn nêu đúng dòng.');

@@ -100,6 +100,10 @@ class UserFacingMessagesTest extends TestCase
                 'resources/js/studio/components/StudioCard.vue',
                 'resources/js/studio/components/OutputModule.vue',
                 'resources/js/studio/components/DesignAgents.vue',
+                'resources/js/studio/components/agents/AgentDnaStep.vue',
+                'resources/js/studio/components/agents/AgentRadarStep.vue',
+                'resources/js/studio/components/agents/AgentBriefStep.vue',
+                'resources/js/studio/components/agents/AgentCanvasStep.vue',
             ] as $file) {
                 // Cho phép nhắc trong CHÚ THÍCH (giải thích lịch sử), cấm trong MÃ.
                 $code = preg_replace(['/\/\/[^\n]*/', '/\/\*.*?\*\//s', '/<!--.*?-->/s', '/^\s*\*.*$/m', '/^\s*\/\/.*$/m'], '', $this->src($file));
@@ -140,7 +144,7 @@ class UserFacingMessagesTest extends TestCase
         }
 
         // (4) Chỉ báo của Agent Studio cũng là "chỉ báo" — không được nêu provider/model.
-        $agents = $this->src('resources/js/studio/components/DesignAgents.vue');
+        $agents = static::designAgentsSource();
 
         preg_match('/const modelShort = computed\((.*?)const modelCandidates/s', $agents, $m);
         $this->assertNotEmpty($m[1] ?? '', 'Không đọc được phần chỉ báo trạng thái AI của Agent Studio.');

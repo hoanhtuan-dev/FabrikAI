@@ -152,7 +152,7 @@ class DebtFixesTest extends TestCase
     /** Và giao diện phải DÙNG module đó (không được dựng lại hàm đọc số ngay trong .vue — đó là cách lỗi cũ lọt). */
     public function test_the_screen_uses_the_shared_paste_module(): void
     {
-        $view = (string) file_get_contents(resource_path('js/studio/components/DesignAgents.vue'));
+        $view = static::designAgentsSource();
 
         $this->assertStringContainsString("from '../shopPaste.js'", $view);
         $this->assertStringNotContainsString('function parseNumberCell', $view, 'Hàm đọc số không được quay lại nằm trong .vue.');
@@ -161,7 +161,7 @@ class DebtFixesTest extends TestCase
     /** Giá dán vào mà bằng 0 thì phải CẢNH BÁO ngay (im lặng là cách lỗi này sống lâu). */
     public function test_the_screen_warns_about_broken_pasted_prices(): void
     {
-        $view = (string) file_get_contents(resource_path('js/studio/components/DesignAgents.vue'));
+        $view = static::designAgentsSource();
 
         $this->assertStringContainsString('quá nhỏ (dưới 1.000đ)', $view);
         $this->assertStringContainsString('kế hoạch sản xuất sẽ không dùng được', $view);
