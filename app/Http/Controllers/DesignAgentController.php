@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\CollectionPlanService;
 use App\Services\DesignAgentService;
+use App\Services\WebAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -23,6 +24,22 @@ class DesignAgentController extends Controller
         return response()->json($this->agents->radar(
             $request->user(), (string) ($data['region'] ?? 'all'), (bool) ($data['ai'] ?? true)
         ));
+    }
+
+    /**
+     * KHẢ NĂNG TRUY CẬP INTERNET của agent — ĐO THẬT (Đợt 22 — 2026-09-23).
+     *
+     * Giao diện Agent Studio trước đây ghi "nguồn ngoài đang ở chế độ demo" bằng VĂN BẢN TĨNH: câu đó
+     * không biết máy chủ có ra được internet hay không, cũng không biết model đang cấu hình có tìm kiếm
+     * tích hợp hay không. Endpoint này trả kết quả ĐO (cache 10 phút) để giao diện nói đúng sự thật.
+     *
+     * `?force=1` = đo lại ngay (nút "Kiểm tra lại"), có throttle riêng vì mỗi lần đo là request ra ngoài.
+     */
+    public function webAccess(Request $request, WebAccessService $web): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate(['force' => ['nullable', 'boolean']]);
+
+        return response()->json($web->probe((bool) ($data['force'] ?? false)));
     }
 
     public function collection(Request $request): \Illuminate\Http\JsonResponse

@@ -49,6 +49,10 @@ class ModuleRegistryTest extends TestCase
     protected const INFRA_PREFIXES = [
         'admin', 'boot', 'defaults', 'gui', 'plan/status', 'billing', 'settings', 'settings-vue',
         'image', 'image-thumb', 'process', 'appearance', 'client-errors',
+        // 'brand-dna' (2026-09-23): HỒ SƠ của chính người dùng (định vị · khách hàng · phong cách…).
+        // Cùng lý do với 'appearance': không phải tính năng bán theo gói, và công tắc gói không được
+        // làm người dùng mất dữ liệu hay không sửa được hồ sơ của chính mình.
+        'brand-dna',
     ];
 
     protected function setUp(): void

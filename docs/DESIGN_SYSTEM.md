@@ -762,6 +762,16 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
     dạng lỗi "hai đầu đều đúng, chỗ nối làm rơi": trước khi tin một cơ chế đã hoạt động, phải đo ở ĐẦU
     CUỐI của chuỗi (câu người dùng đọc), không phải ở chỗ mình vừa viết.
 
+49. **Đừng trả lời một câu hỏi ĐO ĐƯỢC bằng một câu VĂN.** Giao diện ghi "nguồn ngoài đang ở chế độ
+    demo" suốt nhiều tháng, trong khi câu hỏi thật của người dùng là *"agent có ra được internet không?"* —
+    và câu trả lời phụ thuộc HAI tầng khác nhau (máy chủ · nhà cung cấp model). Câu văn tĩnh không sai
+    nhưng vô dụng: nó không đổi khi mọi thứ đổi. Khi một dòng chữ mô tả NĂNG LỰC của hệ thống, hãy biến
+    nó thành phép đo có thời điểm, có số, và có nút đo lại.
+50. **Dữ liệu do NGƯỜI DÙNG khai và dữ liệu hệ thống SUY RA phải để RIÊNG, và phải nói rõ đang dùng
+    bản nào.** DNA shop trước đây chỉ là suy đoán (đếm dự án, dò từ khoá, không có gì thì câu mặc định)
+    mà giao diện vẫn gọi chung là "DNA shop" — người dùng tin rằng hệ thống đã hiểu họ. Nay có hồ sơ
+    riêng, có thứ tự ưu tiên rõ, và khoá `source` + nhãn tiếng Việt đi kèm trong payload.
+
 ### E. Quy trình và kiểm thử
 
 33. **Mỗi route mới phải khai vào `ModuleRegistry`** — nếu không, công tắc gói không chặn được nó, và
@@ -836,7 +846,7 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 
 ---
 
-## 16. Lịch sử triển khai — 28 vòng, mỗi vòng có số đo
+## 16. Lịch sử triển khai — 29 vòng, mỗi vòng có số đo
 
 > Bảng này là **bản ghi rút gọn** của các vòng đã làm. Bản đầy đủ (bối cảnh, bằng chứng từng bước, bài
 > học chi tiết) nằm trong lịch sử git của `docs/UX_PERSONA_STRATEGY.md` — tài liệu đó đã được hợp nhất
@@ -874,6 +884,8 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 | 27 | 2026-09-23 | Đo lại tương phản bằng Chrome thật: phép đo cũ đọc màu `oklab()` như RGB ⇒ **báo 14 chỗ dưới AA không có thật** và **che mất 1 chỗ dưới AA có thật** | Đo lại bằng canvas (`fillStyle` → `getImageData`) + hợp alpha theo cả cây tổ tiên; `--color-cream-400` theme Sáng `#59646f` → **`#525c67`** | Trước: **1 chỗ 4,46:1** (nhãn mô tả trên hàng đang chọn `bg-brand-600/20`) · Sau: **0 chỗ dưới AA** trên **10 tổ hợp** (5 màn hình × 2 theme), 56 phần tử bỏ qua vì nền gradient |
 
 | 28 | 2026-09-23 | **Mã tra cứu lỗi chỉ có ở phía máy chủ**: lỗi sinh trong trình duyệt (mất mạng · fetch hỏng · canvas/Blob · exception không ai bắt) hiện ra giao diện mà KHÔNG có mã và KHÔNG có dòng log nào — hỗ trợ không tra được gì | Client sinh mã cùng bảng chữ với PHP + gửi chi tiết về `POST /api/client-errors` (mở cho khách, throttle 30/phút, gộp trùng theo mã) · `userFacingError` chọn đúng nguồn mã · **54 chỗ `toast(e.message)` → `failToast(e, …)`** · **`apiError()` giữ `error_code` của máy chủ** (trước đây bị ném bỏ) · bắt cả `window.onerror` + `unhandledrejection` | 54 chỗ toast lỗi + 20 chỗ ném lỗi nay đi qua đường có mã · hàng đợi `localStorage` gửi bù khi mất mạng · 10 test mới (`ClientErrorReportTest`) |
+
+| 29 | 2026-09-23 | **Agent nói dữ liệu ngoài là "demo" bằng CÂU VĂN TĨNH** (không đo gì) · **DNA shop chỉ được SUY RA** (đếm dự án + dò từ khoá, không có thì dùng câu mặc định cứng) và chủ shop không sửa được | Giao diện nay đọc **số ĐO THẬT**: máy chủ có ra internet không (HEAD + mã HTTP + độ trễ) và model đang cấu hình có tìm kiếm tích hợp không — ba câu kết luận đúng thực tế · **DNA thành hồ sơ riêng, sửa được** (bảng `brand_dna`, bước 0 trong Agent Studio), ưu tiên `owner → shop_data → derived → default` và **đi thẳng vào prompt brief** · cờ `search` chỉ bật khi transport hỗ trợ (`enable_search`/`google_search`) và nằm trong khoá cache radar | 16 test mới (`BrandDnaTest`) · đo trên production: máy chủ **CÓ** internet (2/2 đích 200/204), model đang chạy `deepseek-flash` **KHÔNG** có tìm kiếm |
 
 ### 16.1 Số đo trước → sau của cả hành trình
 
@@ -953,3 +965,62 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 | `tests/Feature/ClientErrorReportTest.php` | §6.5 (mã tra cứu của lỗi trình duyệt: log · định dạng mã · gộp trùng · throttle · bảng chữ JS = PHP · không chỗ nào còn đẩy `e.message` thô vào toast lỗi hay ném bỏ `error_code` của máy chủ) |
 | `tests/Feature/ModuleRegistryTest.php` | §14 luật 33 (mọi route studio phải thuộc một module của gói) |
 | `tests/Feature/UserCatalogTest.php` | §15.1 (4 URL cài đặt cũ vẫn trả 200) |
+
+---
+
+## 18. Agent Studio — DNA thương hiệu & khả năng truy cập internet
+
+> Đợt 22 (2026-09-23). Hai câu hỏi người dùng đặt ra: *"agent có truy cập internet không?"* và
+> *"quản lý/sửa DNA ở đâu?"*. Trước đó cả hai đều được trả lời bằng **văn bản tĩnh**, trong khi sự thật
+> nằm ở hai chỗ khác hẳn nhau.
+
+### 18.1 DNA thương hiệu — hai nguồn, KHÔNG được trộn
+
+| Nguồn | Ở đâu | Độ tin cậy |
+|---|---|---|
+| **Chủ shop tự khai** | bảng `brand_dna` (1 hàng/tài khoản) · `BrandDnaService` | cao nhất — sửa được, có ngày cập nhật |
+| Số bán thật của shop | `shop_signals` (nhập tay/dán Excel) | cao, nhưng chỉ là số liệu |
+| Suy ra từ mô tả ảnh đã tạo | dò từ khoá trong `generations.prompt` | thấp (đoán mò) |
+| Mặc định của hệ thống | hằng số trong `DesignAgentService` | không phải dữ liệu của shop |
+
+Bốn quy tắc:
+
+1. **Thứ tự ưu tiên `owner` → `shop_data` → `derived` → `default`**, và agent trả về khoá
+   `brand_dna.source` + `source_label` để giao diện nói RÕ đang dùng bản nào (badge "Do bạn khai" /
+   "Suy ra từ mô tả ảnh đã tạo"). Gộp nhãn sẽ khiến người dùng tin nhầm rằng hệ thống đã hiểu shop họ.
+2. **Câu tóm tắt DNA CHỈ nói điều chủ shop đã khai** (`BrandDnaService::summary()` trả `''` khi chưa
+   khai) — nơi gọi tự quyết định dùng phần suy ra, KHÔNG trộn nửa thật nửa đoán vào một câu.
+3. **Chưa khai KHÔNG chặn đường**: bước DNA luôn bỏ qua được; hệ thống chỉ nhắc một lần.
+4. **Mọi trường có trần** (`TEXT_FIELDS` · `LIST_FIELDS`) và trần đó là MỘT nguồn dùng chung cho
+   validate ở controller, chuẩn hoá ở service và giao diện — dữ liệu này đi thẳng vào prompt.
+
+DNA đi vào **đường brief** (không cache, mỗi tài khoản một lần chạy). **KHÔNG** đi vào đường radar:
+radar dùng cache CHUNG giữa các tài khoản (chỉ gửi danh mục xu hướng theo vùng) — nhét dữ liệu riêng
+của người dùng vào đó là rò rỉ chéo tài khoản.
+
+### 18.2 Khả năng truy cập internet — ĐO, không hứa
+
+Hai tầng phải tách bạch vì chúng có thể lệch nhau:
+
+| Tầng | Ai quyết định | Cách đo |
+|---|---|---|
+| **Máy chủ** | nhà hosting | HEAD thật tới `config('studio.web_probe_targets')`, ghi mã HTTP + độ trễ (`WebAccessService`) |
+| **Model** | nhà cung cấp model | `WebAccessService::SEARCH_TRANSPORTS`: Qwen/DashScope `enable_search` · Gemini `google_search` · OpenAI-compatible/DeepSeek **không có** |
+
+- Giao diện **không** được viết "đang ở chế độ demo" như một câu văn tĩnh: khối "Khả năng truy cập
+  internet" trong Agent Studio đọc số ĐO (kèm nút *Kiểm tra lại* → `?force=1`), và câu kết luận có ba
+  biến thể đúng với thực tế: `no_internet` · `internet_no_search` · `internet_and_search`.
+- Cờ `search` chỉ được bật khi transport của candidate ĐẦU TIÊN thật sự hỗ trợ, và **nằm trong khoá cache**
+  của radar (nội dung trả lời khác nhau ⇒ không dùng chung cache).
+- Khi **không** có tìm kiếm, prompt giữ luật cũ: cấm nói như thể đã đọc Shopee/TikTok/POS/ERP. Khi **có**
+  tìm kiếm, luật đổi thành: chỉ được dẫn nguồn mà kết quả tìm kiếm thật sự trả về.
+- Nguồn ngoài vẫn là **dữ liệu mẫu** (`sources_mode=demo`) cho tới khi có connector thật — câu đó hiển
+  thị ngay dưới số đo để không ai đọc "máy chủ có internet" thành "dữ liệu thị trường là thật".
+
+Kiểm tra nhanh trên máy chủ: `php artisan studio:web-access --force`.
+
+### 18.3 Bộ test giữ hai luật này
+
+`tests/Feature/BrandDnaTest.php` (16 test): hồ sơ tách theo tài khoản · validate + chuẩn hoá · xoá DNA
+không xoá dự án · DNA thắng phần suy ra và **có mặt trong payload gửi model** · đo internet có/không có
+mạng · model không tìm kiếm phải nói thẳng là không · cache + `force` đo lại.

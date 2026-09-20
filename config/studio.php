@@ -49,6 +49,19 @@ return [
     | Rỗng = không chặn host nào (vẫn giữ scheme http/https + timeout + cap dung lượng).
     */
     'remote_image_hosts' => env('STUDIO_REMOTE_IMAGE_HOSTS', ''),
+
+    /*
+    |----------------------------------------------------------------------
+    | Đích đo KHẢ NĂNG RA INTERNET của máy chủ (Agent Studio · WebAccessService)
+    |----------------------------------------------------------------------
+    | Đây là các URL được gọi THẬT (HEAD, timeout 6s) khi người dùng bấm "Kiểm tra lại" hoặc khi
+    | chạy `php artisan studio:web-access`. Chọn đích nhẹ, ổn định, KHÔNG phải nguồn dữ liệu thật:
+    | mục đích duy nhất là trả lời "máy chủ này có ra được internet không". Rỗng = tắt phép đo.
+    */
+    'web_probe_targets' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('STUDIO_WEB_PROBE_TARGETS', 'https://example.com,https://www.google.com/generate_204'))
+    ))),
     'video_credits' => (int) env('STUDIO_VIDEO_CREDITS', 10),
     'processing' => env('STUDIO_PROCESSING', 'sync'), // sync | queue (async + worker)
     // [2026-09-17] Luồng ưu tiên provider mặc định: qwen → custom → flux → deepseek → gemini.

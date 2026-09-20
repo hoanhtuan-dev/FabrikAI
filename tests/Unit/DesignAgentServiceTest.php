@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Services\BrandDnaService;
 use App\Services\DesignAgentService;
 use PHPUnit\Framework\TestCase;
 
@@ -14,7 +15,9 @@ class DesignAgentServiceTest extends TestCase
         parent::setUp();
         // null = chạy đúng nhánh TẤT ĐỊNH (không container, không model) — nhánh phải luôn
         // cho ra contract y hệt để hai agent không bao giờ trả về rỗng khi chưa cấu hình model.
-        $this->agents = new DesignAgentService(null);
+        // Tham số thứ hai là DNA thương hiệu — truyền service THẬT: nhiều test dưới đây kiểm tra cả
+        // nhánh "hồ sơ do chủ shop khai" nên để null là bỏ mất một nửa đường.
+        $this->agents = new DesignAgentService(null, new BrandDnaService());
     }
 
     public function test_catalog_has_stable_data_backed_directions(): void

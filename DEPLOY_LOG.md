@@ -1671,3 +1671,81 @@ bất biến: *shell nào gọi `store.toast()` thì phải render `<Notificatio
 **Test:** full suite **866 test / 6.412 assert XANH** (thêm **12 test** ở `ClientErrorReportTest`) · `npm run build` exit 0.
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
+
+## Phiên 2026-09-23 (Đợt 22 — AGENT STUDIO: khả năng truy cập internet (đo thật) + DNA thương hiệu sửa được)
+
+**Deploy:** `601520e → <commit>`. **Migration mới:** `2026_09_23_000003_create_brand_dna_table`. **Route mới:** `GET/PUT/DELETE /api/brand-dna` · `GET /api/design-agent/web-access` · lệnh `php artisan studio:web-access`.
+
+### 0. Câu hỏi người dùng và sự thật đo được
+
+Người dùng đọc trong Agent Studio: *"Nguồn ngoài đang ở chế độ demo; dữ liệu nội bộ là project/generation của chính tài khoản. Không có scraping hay POS/ERP thật trong bản này."* — rồi hỏi: **model AI đã chạy, vậy agent có truy cập internet không?**
+
+Câu đó là **văn bản TĨNH** — nó không biết gì về năng lực thật của hệ thống. Đo trên **production** (Hostinger):
+
+| Tầng | Cách đo | Kết quả thật |
+|---|---|---|
+| **Máy chủ** có ra internet không | HEAD thật tới 2 đích (`example.com` · `google.com/generate_204`) + DNS + `allow_url_fopen` | **CÓ** — `google:200 0.069s` · `example:200` · `shopee.vn:200` · PHP `allow_url_fopen=1` |
+| **Model** có tìm kiếm tích hợp không | đọc candidate của nhóm công việc `prompt` + bảng khả năng transport | Provider đang chạy là **deepseek** (`deepseek-flash` · `deepseek-chat` · `deepseek-reasoner`) ⇒ **KHÔNG có tìm kiếm tích hợp**. Key `qwen/dashscope/gemini` **chưa cấu hình**; nhóm `image` còn **0 candidate** |
+
+⇒ Kết luận đúng phải nói: *máy chủ ra được internet, nhưng model đang dùng thì không tự tìm kiếm* — và nguồn ngoài vẫn là **dữ liệu mẫu**. Ba câu kết luận có sẵn: `no_internet` · `internet_no_search` · `internet_and_search`.
+
+### 1. Khả năng truy cập internet — ĐO, không hứa
+
+- **`WebAccessService`** (mới): `probe()` gọi HEAD thật tới `config('studio.web_probe_targets')`, ghi mã HTTP + độ trễ + thời điểm; mất mạng là **một kết quả đo** (không ném lỗi). Cache 10 phút, `force` để đo lại.
+- **`GET /api/design-agent/web-access`** (throttle 10/phút) + **`php artisan studio:web-access --force`** để kiểm tra từ SSH.
+- **Giao diện** thay câu văn tĩnh bằng khối số đo: *Máy chủ CÓ internet · đo 2 đích · 151 ms · lúc 16:18:24* + *Model KHÔNG có tìm kiếm tích hợp* + nút **Kiểm tra lại**; bên dưới vẫn ghi rõ nguồn ngoài là dữ liệu mẫu.
+- **Đường thật khi có provider hỗ trợ**: `AiModelGateway` nay truyền `enable_search: true` (Qwen/DashScope) hoặc `tools:[{google_search:{}}]` (Gemini) **chỉ khi** transport của candidate đầu tiên thật sự hỗ trợ, và cờ này **nằm trong khoá cache** của radar (`...:v2:<vùng>:<model>:search|plain`).
+- **Luật prompt đổi theo năng lực**: có tìm kiếm ⇒ *"được dẫn nguồn thật mà tìm kiếm trả về"*; không có ⇒ giữ nguyên luật cũ *"KHÔNG được nói như thể đã đọc Shopee/TikTok/SHEIN… dữ liệu là mẫu"*.
+
+### 2. DNA thương hiệu — từ "đoán" thành "hồ sơ chủ shop khai, sửa được"
+
+Trước đây: đếm project/generation + dò từ khoá trong `generations.prompt`; không có gì thì rơi về câu mặc định cứng *"tối giản, dễ phối, chất liệu thoáng"*. Chủ shop **không có chỗ nào để nói mình là ai**.
+
+| Việc | Chi tiết |
+|---|---|
+| Bảng | `brand_dna` — 1 hàng/tài khoản (`user_id unique`), cột `data` json |
+| Service | `BrandDnaService`: `empty/normalize/isEmpty/listMax/get/save/reset/summary`; **một nguồn khai báo hình dạng** (`TEXT_FIELDS` · `LIST_FIELDS` · `PRICE_BANDS`) dùng chung cho validate · chuẩn hoá · giao diện |
+| Trường | định vị · khách hàng mục tiêu · dải giá (bình dân/trung cấp/cao cấp) · phong cách · màu chủ đạo · nhóm hàng chính · chất liệu · **KHÔNG làm** · ghi chú |
+| API | `GET/PUT/DELETE /api/brand-dna` — ngoài nhóm `can-studio` và khai `brand-dna` vào `INFRA_PREFIXES`: đây là HỒ SƠ của người dùng, công tắc gói không được làm họ mất dữ liệu |
+| Ưu tiên | `owner` → `shop_data` → `derived` → `default`, kèm `brand_dna.source` + `source_label` trong payload để giao diện nói rõ đang dùng bản nào |
+| Giao diện | **Bước 0 "DNA shop"** trong Agent Studio (4 bước: DNA → Tín hiệu → Định hướng → Thực thi): xem · sửa · *Bỏ thay đổi* · *Xoá hồ sơ*; badge nguồn DNA ở bước Định hướng |
+| Vào prompt | DNA đi vào **đường brief** (không cache): `brand_dna{source,is_set,fields}` + luật *"khi source=owner thì không được đề xuất món trong avoid"*. **KHÔNG** đi vào radar — radar dùng cache chung giữa các tài khoản |
+
+### 3. Lỗi bắt được khi chạy test (đã sửa)
+
+- `DesignAgentService::internalBrandSignal(null)` (khách chưa đăng nhập) thiếu khoá `dna_*` ⇒ **7 test CollectionPlanTest nổ `Undefined array key "dna_source"`**. Đã bù đủ khoá cho nhánh ẩn danh — và đây là lý do phải chạy **cả** bộ test, không chỉ test của tính năng mới.
+- Nút **"Lưu DNA"** bị khoá mà không nói vì sao ⇒ `DesignSystemTest` bắt ngay; đã thêm computed `dnaBlockReason` + dòng `↳ Chưa có thay đổi nào để lưu.` (một nguồn cho cả điều kiện khoá lẫn câu giải thích).
+- Bài học nhỏ: HTTP client **mã hoá lại** thân request (mất `JSON_UNESCAPED_UNICODE`) nên test so chữ tiếng Việt phải `json_decode` rồi mới so.
+
+### 4. Đo bằng Chrome thật (đăng nhập owner, máy local)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Thanh bước | `["Bước 1DNA shop","Bước 2Tín hiệu","Bước 3Định hướng","Bước 4Thực thi"]` |
+| Bước DNA | 3 khối (DNA shop của bạn · Nguồn dữ liệu agent đang có · Khai hồ sơ) · **8 ô nhập** + 4 nút dải giá |
+| Nút Lưu lúc đầu | `disabled=true` kèm dòng **"↳ Chưa có thay đổi nào để lưu."** |
+| Sau khi điền + bấm Lưu | Toast *"Đã lưu DNA shop — agent sẽ dùng hồ sơ này cho các brief sau."* · badge **"Đã khai"** · *"Cập nhật lần cuối: 16:18:52 20/9/2026"* |
+| **Tải lại trang** | giá trị còn nguyên: `{pos:"Đầm linen nữ công sở, may tại xưởng nhà", styles:"tối giản, thanh lịch", avoid:"họa tiết to, hàng bóng"}` |
+| Brief dùng DNA nào | `POST /api/design-agent/collection` trả `dna_source:"owner"` · label **"Do bạn khai"** · `avoid:["họa tiết to","hàng bóng"]` · narrative *"DNA do chủ shop khai — định vị: Đầm linen nữ công sở…"* |
+| Khối internet | *"Máy chủ CÓ internet · đo 2 đích · 151 ms · lúc 16:18:24"* · *"Model KHÔNG có tìm kiếm tích hợp"* · câu kết luận + ghi chú "nguồn ngoài vẫn là dữ liệu mẫu" |
+
+### 5. Verify production (đã chạy thật)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `<commit>` (trước pull: `601520e`) |
+| Migration | `2026_09_23_000003_create_brand_dna_table` → **Ran** |
+| Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` → exit=0 |
+| md5 asset | khớp bản build ở máy |
+| `php artisan studio:web-access --force` **trên production** | xem bảng §0 — máy chủ CÓ internet, model deepseek KHÔNG có tìm kiếm |
+| Route mới | `/api/brand-dna` → **200** cho tài khoản, **401** khi chưa đăng nhập · `/api/design-agent/web-access` → **200** |
+| Trang · log | `/` · `/dang-nhap` · `/bang-gia` → 200 · `production.ERROR` không tăng · `failed_jobs` = 0 |
+
+### 6. Việc còn lại (nói thẳng)
+
+- **Chưa có connector thật** (sàn TMĐT/social/POS/ERP): nguồn ngoài vẫn `sources_mode=demo`. Muốn dữ liệu thật thì cần một trong hai: (a) cấp **key Qwen/DashScope** để bật `enable_search` — hạ tầng đã sẵn, chỉ thiếu key; (b) làm **connector server-side** (RSS/JSON/API của sàn) — máy chủ đã chứng minh ra được internet.
+- Nhóm `image` trên production hiện **0 candidate** ⇒ tạo ảnh đang ở chế độ demo; đây là việc cấu hình key, không phải lỗi mã.
+
+**Test:** full suite **882 test / 6.490 assert XANH** (thêm **16 test** ở `BrandDnaTest`) · `npm run build` exit 0.
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).

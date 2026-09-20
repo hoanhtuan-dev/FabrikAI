@@ -241,6 +241,12 @@ class AiModelGateway
             if (($options['response_format'] ?? '') === 'json_object') {
                 $body['response_format'] = ['type' => 'json_object'];
             }
+            // [2026-09-23] TÌM KIẾM WEB: chỉ bật khi nơi gọi yêu cầu VÀ transport này thật sự hỗ trợ
+            // (bảng khả năng ở WebAccessService). Không bật bừa: gửi tham số lạ cho provider không
+            // hỗ trợ có thể làm hỏng cả request, mà lại khiến giao diện tưởng đã có tìm kiếm.
+            if (! empty($options['search']) && WebAccessService::supportsSearch('qwen')) {
+                $body['enable_search'] = true;
+            }
             $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
 
             return $resp->successful() ? $this->textResult($resp->json()) : null;
@@ -254,6 +260,11 @@ class AiModelGateway
             ];
             if (($options['response_format'] ?? '') === 'json_object') {
                 $body['generationConfig']['responseMimeType'] = 'application/json';
+            }
+            // TÌM KIẾM WEB (Gemini): grounding bằng Google Search — cùng luật "chỉ bật khi được yêu cầu
+            // và transport này hỗ trợ".
+            if (! empty($options['search']) && WebAccessService::supportsSearch('gemini')) {
+                $body['tools'] = [['google_search' => new \stdClass()]];
             }
             $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout($timeout)
                 ->post($this->geminiBase($candidate).'/models/'.$candidate['model'].':generateContent', $body);

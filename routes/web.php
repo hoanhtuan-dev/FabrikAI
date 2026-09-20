@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\BrandDnaController;
 use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectShareController;
@@ -113,6 +114,14 @@ Route::middleware(['auth', 'admin', 'nostore'])->get('/bao-cao-nhom', [ReportCon
 // ══════════════════════════════════════════════════════════════════════════════
 Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
     Route::put('/appearance', [ThemeController::class, 'update'])->name('appearance.update');
+
+    // ── DNA THƯƠNG HIỆU của chính người dùng (Đợt 22 — 2026-09-23) ──────────────────────────
+    // Hồ sơ "shop tôi là ai" mà agent dùng để viết brief. Nằm NGOÀI nhóm can-studio giống
+    // /api/appearance: đây là dữ liệu CỦA người dùng, không phải tính năng bán theo gói — công tắc
+    // gói không được làm họ mất hồ sơ, và cũng không được chặn họ sửa nó.
+    Route::get('/brand-dna', [BrandDnaController::class, 'show'])->name('brand-dna.show');
+    Route::put('/brand-dna', [BrandDnaController::class, 'update'])->name('brand-dna.update');
+    Route::delete('/brand-dna', [BrandDnaController::class, 'destroy'])->name('brand-dna.destroy');
 });
 
 // ── BÁO LỖI TỪ TRÌNH DUYỆT (Đợt 21 — 2026-09-23) ────────────────────────────────
@@ -183,6 +192,10 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     // Dữ liệu bán hàng THẬT của shop (nhập tay / dán Excel) — nền tảng cho gợi ý sát thực tế.
     Route::post('/design-agent/shop-signals', [DesignAgentController::class, 'shopSignals'])
         ->middleware('throttle:30,1')->name('design-agent.shop-signals');
+    // KHẢ NĂNG TRUY CẬP INTERNET của agent — đo THẬT (HEAD ra ngoài + đọc model đang cấu hình).
+    // Throttle chặt hơn vì mỗi lần đo là một request ra ngoài; kết quả được cache 10 phút.
+    Route::get('/design-agent/web-access', [DesignAgentController::class, 'webAccess'])
+        ->middleware('throttle:10,1')->name('design-agent.web-access');
     Route::post('/upscale', [StudioController::class, 'upscale'])->name('upscale');
     Route::post('/look', [StudioController::class, 'look'])->name('look');
     Route::post('/reframe', [StudioController::class, 'reframe'])->name('reframe');

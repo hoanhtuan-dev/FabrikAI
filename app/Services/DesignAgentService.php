@@ -40,7 +40,13 @@ class DesignAgentService
      * "?AiModelGateway $gateway = null" sẽ khiến service LUÔN chạy ở chế độ tất định dù Cài đặt
      * đã có model. Truyền null tường minh khi cần test tất định thuần PHPUnit.
      */
-    public function __construct(private readonly ?AiModelGateway $gateway) {}
+    public function __construct(
+        private readonly ?AiModelGateway $gateway,
+        // DNA thương hiệu do chủ shop tự khai. Cũng là tham số BẮT BUỘC-kiểu-nullable (không default)
+        // vì lý do y như trên: default null sẽ khiến container luôn truyền null và hồ sơ DNA không
+        // bao giờ tới được prompt. Test tất định thuần PHPUnit truyền null tường minh.
+        private readonly ?BrandDnaService $dna,
+    ) {}
 
     private const SOURCES = [
         [
@@ -160,6 +166,14 @@ class DesignAgentService
             'brand_narrative' => $brand['narrative'],
             'brand_top_categories' => $brand['top_categories'],
             'brand_top_colors' => $brand['top_colors'],
+            // DNA chủ shop TỰ KHAI (2026-09-23). Chỉ gửi ở đường brief — đường radar dùng cache
+            // CHUNG giữa các tài khoản nên tuyệt đối không được nhét dữ liệu riêng của người dùng vào.
+            'brand_dna' => [
+                'source' => $brand['dna_source'],
+                'source_label' => $brand['dna_source_label'],
+                'is_set' => $brand['dna_is_set'],
+                'fields' => $brand['dna'],
+            ],
             // Dữ liệu BÁN HÀNG THẬT của shop (data_mode=local) — chỉ gửi ở đường brief vì đường này
             // KHÔNG dùng cache chung; model được phép nhắc tới chúng như số liệu của chính shop.
             'shop_data' => [
@@ -264,6 +278,16 @@ class DesignAgentService
                 'trend_ids' => $requestedIds,
             ],
             'brand_narrative' => $brand,
+            // DNA dùng cho LẦN CHẠY NÀY — tách rõ nguồn để giao diện không nói nhập nhằng giữa
+            // "do bạn khai" và "hệ thống đoán" (xem internalBrandSignal).
+            'brand_dna' => [
+                'fields' => $brand['dna'],
+                'is_set' => $brand['dna_is_set'],
+                'source' => $brand['dna_source'],
+                'source_label' => $brand['dna_source_label'],
+                'summary' => $brand['dna_summary'],
+                'updated_at' => $brand['dna_updated_at'],
+            ],
             'selected_trends' => $selected,
             'moodboard' => [
                 'count' => count($moodboard),
@@ -350,8 +374,15 @@ class DesignAgentService
         // LƯU Ý QUAN TRỌNG: chỉ gửi catalog của VÙNG (không gửi tín hiệu nội bộ của shop) nên
         // cache dùng chung giữa các tài khoản là an toàn — dữ liệu nội bộ của người dùng không
         // bao giờ rời khỏi tài khoản, kể cả khi hai người mở cùng một khu vực.
+        // TÌM KIẾM WEB (2026-09-23): chỉ bật khi transport của candidate ĐẦU TIÊN thật sự hỗ trợ
+        // (Qwen/DashScope enable_search · Gemini google_search). DeepSeek — provider đang chạy trên
+        // production — KHÔNG có, nên mặc định ở đây là false và giao diện phải nói đúng như vậy.
+        $webSearch = WebAccessService::supportsSearch((string) ($candidates[0]['transport'] ?? ''));
+
         $fingerprint = md5(implode('|', array_map(fn (array $c) => $c['provider'].':'.$c['model'], $candidates)));
-        $cacheKey = 'design-agent:radar:v1:'.$region.':'.$fingerprint;
+        // Cờ tìm kiếm nằm TRONG khoá cache: nội dung trả lời khác nhau (có/không nguồn thật) nên dùng
+        // chung cache sẽ trả về câu trả lời của chế độ khác.
+        $cacheKey = 'design-agent:radar:v2:'.$region.':'.$fingerprint.':'.($webSearch ? 'search' : 'plain');
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && ! empty($cached['directions'])) {
             return [$cached['directions'], $this->modelBlock('ai', $candidates, [
@@ -359,13 +390,17 @@ class DesignAgentService
                 'model' => $cached['model'] ?? null,
                 'latency_ms' => 0,
                 'cached' => true,
+                'web_search' => (bool) ($cached['web_search'] ?? false),
             ])];
         }
 
         $instruction = 'Bạn là TrendRadar — chuyên gia phân tích xu hướng thời trang Việt Nam cho xưởng may và thương hiệu nhỏ. '
             .'Bạn CHỈ được suy luận từ đúng khối DỮ LIỆU bên dưới (danh mục xu hướng mẫu + tín hiệu nội bộ của shop). '
-            .'TUYỆT ĐỐI KHÔNG bịa số liệu thị trường và KHÔNG được nói như thể đã đọc Shopee, TikTok, Instagram, SHEIN, TEMU, ASOS hay Runway — '
-            .'các connector đó CHƯA được kết nối, dữ liệu là mẫu. Không tự nghĩ ra mã xu hướng mới ngoài danh mục. '
+            .($webSearch
+                // CÓ tìm kiếm: được phép dẫn nguồn THẬT, nhưng chỉ nguồn mà kết quả tìm kiếm trả về.
+                ? 'Bạn CÓ công cụ tìm kiếm web: được phép dẫn nguồn thật mà tìm kiếm trả về (kèm thời điểm), nhưng TUYỆT ĐỐI KHÔNG bịa số liệu thị trường và không được nhắc tới nguồn nào mà kết quả không có. Không tự nghĩ ra mã xu hướng mới ngoài danh mục. '
+                // KHÔNG có tìm kiếm: giữ nguyên luật cũ — nói như thể đã đọc sàn TMĐT là nói sai sự thật.
+                : 'TUYỆT ĐỐI KHÔNG bịa số liệu thị trường và KHÔNG được nói như thể đã đọc Shopee, TikTok, Instagram, SHEIN, TEMU, ASOS hay Runway — các connector đó CHƯA được kết nối, dữ liệu là mẫu. Không tự nghĩ ra mã xu hướng mới ngoài danh mục. ')
             .'Nhiệm vụ: viết 5-10 ĐỊNH HƯỚNG hành động cho khu vực "'.$region.'", mỗi định hướng bám vào 1-3 id xu hướng CÓ THẬT trong dữ liệu. '
             .'Chỉ trả về JSON đúng dạng: {"directions":[{"title":"...","thesis":"...","why_now":"...","action":"...","risk":"...","price_band":"entry|mid|premium","confidence":0.8,"trend_ids":["id-co-that"]}]}. '
             .'Viết tiếng Việt, ngắn gọn, cụ thể, có thể hành động ngay: MỖI trường tối đa 25 từ, KHÔNG xuống dòng trong giá trị, KHÔNG thêm chữ nào ngoài JSON.';
@@ -385,7 +420,7 @@ class DesignAgentService
                 'description' => $trend['description'],
                 'recommended_action' => $trend['recommended_action'],
             ], $trends),
-        ], 3000, 8000, 60);
+        ], 3000, 8000, 60, $webSearch ? ['search' => true] : []);
         $latency = (int) round((microtime(true) - $started) * 1000);
         $attempted = $candidates[0]['provider'].':'.$candidates[0]['model'];
         $answer = $call['answer'];
@@ -416,6 +451,7 @@ class DesignAgentService
 
         Cache::put($cacheKey, [
             'directions' => $directions,
+            'web_search' => $webSearch,
             'provider' => $answer['provider'],
             'model' => $answer['model'],
         ], self::RADAR_CACHE_SECONDS);
@@ -425,6 +461,8 @@ class DesignAgentService
             'model' => $answer['model'],
             'latency_ms' => $latency,
             'attempts' => $call['attempts'],
+            // Nói THẬT lần chạy này có tìm kiếm web hay không (giao diện đọc để không hứa sai).
+            'web_search' => $webSearch,
         ])];
     }
 
@@ -548,6 +586,9 @@ class DesignAgentService
         $instruction = 'Bạn là CollectionBot — trưởng phòng thiết kế bộ sưu tập thời trang Việt Nam. '
             .'Bạn CHỈ được dùng đúng khối DỮ LIỆU bên dưới (DNA shop, xu hướng đã chọn, bảng màu, cơ cấu SKU, phối đồ, phân bổ size, dải giá). '
             .'TUYỆT ĐỐI KHÔNG bịa số liệu bán hàng, không nhắc tới việc đã kết nối Shopee/TikTok/POS/ERP (chưa có connector thật). '
+            .'brand_dna là điều CHÍNH CHỦ SHOP khai: khi brand_dna.source=owner thì mọi câu chữ phải tôn trọng nó — '
+            .'tuyệt đối không đề xuất món nằm trong brand_dna.fields.avoid, không đổi định vị/khách hàng/dải giá họ đã khai. '
+            .'Khi brand_dna.source khác owner thì đó là phần SUY RA: được phép dùng nhưng phải nói như phỏng đoán, không khẳng định. '
             .'Không đổi bất kỳ con số nào — cơ cấu SKU, size và dải giá là do hệ thống quyết định. '
             .'Chỉ trả về MỘT object JSON đúng dạng: {"narrative":"...","brief":"...","moodboard_captions":["... x24"],'
             .'"category_rationale":{"TÊN NHÓM":"..."},"outfit_goals":{"look-1":"..."},"prompt_vi":"...","prompt_en":"...","next_steps":["...","...","..."]}. '
@@ -606,14 +647,14 @@ class DesignAgentService
      *
      * @return array{json: ?array, answer: ?array, attempts: int}
      */
-    private function callJson(string $instruction, array $payload, int $budget, int $retryBudget, int $timeout): array
+    private function callJson(string $instruction, array $payload, int $budget, int $retryBudget, int $timeout, array $options = []): array
     {
         $messages = [
             ['role' => 'system', 'content' => $instruction],
             ['role' => 'user', 'content' => "DỮ LIỆU:\n".json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)],
         ];
 
-        $answer = $this->gateway->text(self::AI_GROUP, $messages, [
+        $answer = $this->gateway->text(self::AI_GROUP, $messages, $options + [
             'response_format' => 'json_object',
             'max_tokens' => $budget,
             'timeout' => $timeout,
@@ -636,7 +677,7 @@ class DesignAgentService
             'chars' => strlen($answer['text']),
         ]);
 
-        $retry = $this->gateway->text(self::AI_GROUP, $messages, [
+        $retry = $this->gateway->text(self::AI_GROUP, $messages, $options + [
             'response_format' => 'json_object',
             'max_tokens' => $retryBudget,
             'timeout' => $timeout * 2,
@@ -909,11 +950,19 @@ class DesignAgentService
     private function internalBrandSignal(?User $user): array
     {
         if (!$user) {
+            // Chưa đăng nhập: KHÔNG có hồ sơ DNA nào để đọc — vẫn phải trả ĐỦ khoá mà nơi gọi dùng,
+            // nếu không thì mọi đường chạy ẩn danh sẽ nổ "Undefined array key" (lỗi bắt được khi chạy test).
             return [
                 'product_count' => 0, 'generation_count' => 0, 'approved_count' => 0,
                 'narrative' => 'Chưa có dữ liệu shop; đang dùng DNA mặc định: tối giản, dễ phối, chất liệu thoáng.',
                 'top_categories' => [], 'top_colors' => [],
                 'data_mode' => 'empty', 'shop_rows' => [], 'shop' => null,
+                'dna' => BrandDnaService::empty(),
+                'dna_is_set' => false,
+                'dna_summary' => '',
+                'dna_updated_at' => null,
+                'dna_source' => 'default',
+                'dna_source_label' => 'Mặc định của hệ thống',
             ];
         }
 
@@ -933,11 +982,26 @@ class DesignAgentService
 
         $rows = $this->shopRows($user);
         $shop = $this->shopSignalSummary($rows);
-        $narrative = $shop['row_count'] > 0
-            ? $shop['narrative']
-            : ($topCategories || $topColors
-                ? sprintf('DNA shop hiện có %s và thiên về màu %s.', implode(', ', $topCategories) ?: 'sản phẩm dễ phối', implode(', ', $topColors) ?: 'trung tính')
-                : 'Chưa đủ lịch sử; dùng DNA mặc định: tối giản, dễ phối, chất liệu thoáng.');
+
+        // DNA THƯƠNG HIỆU (2026-09-23): hồ sơ chủ shop TỰ KHAI đứng trước mọi suy đoán.
+        // Thứ tự ưu tiên — và lý do phải nói ra `dna_source` cho giao diện:
+        //   1. owner      : chủ shop khai (đáng tin nhất, sửa được, có ngày cập nhật);
+        //   2. shop_data  : số bán thật từ bảng shop_signals;
+        //   3. derived    : suy ra từ chữ trong prompt đã tạo ảnh (đoán mò, chỉ để có gì đó nói);
+        //   4. default    : câu mặc định cứng khi chưa có gì.
+        // Gộp 3–4 vào một nhãn sẽ khiến người dùng tin nhầm rằng hệ thống đã hiểu shop của họ.
+        $dna = $this->dna?->get($user) ?? ['data' => BrandDnaService::empty(), 'is_set' => false, 'updated_at' => null, 'summary' => ''];
+        $dnaSummary = (string) ($dna['summary'] ?? '');
+        $narrative = $dnaSummary !== ''
+            ? $dnaSummary
+            : ($shop['row_count'] > 0
+                ? $shop['narrative']
+                : ($topCategories || $topColors
+                    ? sprintf('DNA shop hiện có %s và thiên về màu %s.', implode(', ', $topCategories) ?: 'sản phẩm dễ phối', implode(', ', $topColors) ?: 'trung tính')
+                    : 'Chưa đủ lịch sử; dùng DNA mặc định: tối giản, dễ phối, chất liệu thoáng.'));
+        $dnaSource = $dnaSummary !== ''
+            ? 'owner'
+            : ($shop['row_count'] > 0 ? 'shop_data' : (($topCategories || $topColors) ? 'derived' : 'default'));
 
         return [
             'product_count' => $projects,
@@ -950,6 +1014,18 @@ class DesignAgentService
             'data_mode' => $shop['row_count'] > 0 ? 'local' : 'empty',
             'shop_rows' => array_slice($rows, 0, 100),
             'shop' => $shop,
+            // DNA: phần CHỦ SHOP KHAI (dna) tách hẳn khỏi phần SUY RA (dna_source ≠ owner).
+            'dna' => $dna['data'] ?? BrandDnaService::empty(),
+            'dna_is_set' => (bool) ($dna['is_set'] ?? false),
+            'dna_summary' => $dnaSummary,
+            'dna_updated_at' => $dna['updated_at'] ?? null,
+            'dna_source' => $dnaSource,
+            'dna_source_label' => [
+                'owner' => 'Do bạn khai',
+                'shop_data' => 'Suy ra từ số bán của shop',
+                'derived' => 'Suy ra từ mô tả ảnh đã tạo',
+                'default' => 'Mặc định của hệ thống',
+            ][$dnaSource],
         ];
     }
 

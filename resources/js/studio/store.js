@@ -430,6 +430,18 @@ export const useStudioStore = defineStore('studio', {
     collectionBriefError: '',
     collectionBriefInput: null, // input đã sinh brief hiện tại — để UI phát hiện brief cũ
     selectedTrendIds: [],
+    // ── DNA THƯƠNG HIỆU (Đợt 22 — 2026-09-23) ──────────────────────────────────────────────
+    // Hồ sơ chủ shop TỰ KHAI. Tách khỏi mọi thứ SUY RA (số bán, prompt cũ) vì hai nguồn này có độ
+    // tin cậy khác nhau — giao diện phải nói rõ cái nào do người dùng khai.
+    brandDna: null,          // { dna, is_set, updated_at, summary, labels, price_bands, limits }
+    brandDnaLoading: false,
+    brandDnaSaving: false,
+    brandDnaError: '',
+    brandDnaDraft: null,     // bản đang sửa (chỉ ghi vào DB khi bấm Lưu)
+    // Khả năng truy cập internet của agent — ĐO THẬT, không phải câu văn tĩnh.
+    webAccess: null,
+    webAccessLoading: false,
+    webAccessError: '',
     viewer: null,
     flashMsg: '',
     flashType: 'info',
@@ -2517,9 +2529,103 @@ export const useStudioStore = defineStore('studio', {
     },
     /** Wizard Agent Studio: radar → brief → canvas. Giữ designAgentTab để tương thích code cũ. */
     setDesignAgentStep(step) {
-      const allowed = ['radar', 'brief', 'canvas'];
+      // 'dna' là bước 0: khai hồ sơ shop TRƯỚC khi đọc xu hướng — mọi bước sau đều dùng nó.
+      const allowed = ['dna', 'radar', 'brief', 'canvas'];
       this.designAgentStep = allowed.includes(step) ? step : 'radar';
       this.designAgentTab = this.designAgentStep === 'brief' ? 'collection' : 'trend';
+    },
+    // ══════════════════ DNA THƯƠNG HIỆU (Đợt 22 — 2026-09-23) ══════════════════
+    /**
+     * Nạp hồ sơ DNA của chính người dùng. Gọi MỘT lần khi mở Agent Studio.
+     *
+     * Vì sao không cache ở client: đây là dữ liệu người dùng vừa sửa — hiển thị bản cũ sau khi lưu là
+     * lỗi tệ nhất của loại màn hình này (người dùng tin là chưa lưu rồi nhập lại).
+     */
+    async loadBrandDna() {
+      this.brandDnaLoading = true;
+      this.brandDnaError = '';
+      try {
+        const res = await fetch('/api/brand-dna', { headers: { Accept: 'application/json' } });
+        if (!res.ok) throw apiError(await res.json().catch(() => ({})), 'Không tải được DNA shop.');
+        const d = await res.json();
+        this.brandDna = d;
+        this.brandDnaDraft = JSON.parse(JSON.stringify(d.dna || {}));
+        return d;
+      } catch (e) {
+        this.brandDnaError = userFacingError(e, 'Không tải được DNA shop.');
+        return null;
+      } finally {
+        this.brandDnaLoading = false;
+      }
+    },
+    /** Ghi lại bản nháp vào hồ sơ (upsert theo tài khoản). Trả true khi lưu được. */
+    async saveBrandDna() {
+      this.brandDnaSaving = true;
+      this.brandDnaError = '';
+      try {
+        const res = await fetch('/api/brand-dna', {
+          method: 'PUT',
+          headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(this.brandDnaDraft || {}),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(d, 'Không lưu được DNA shop.');
+        this.brandDna = d;
+        this.brandDnaDraft = JSON.parse(JSON.stringify(d.dna || {}));
+        this.toast('Đã lưu DNA shop — agent sẽ dùng hồ sơ này cho các brief sau.', 'success');
+        return true;
+      } catch (e) {
+        this.brandDnaError = userFacingError(e, 'Không lưu được DNA shop.');
+        this.toast(this.brandDnaError, 'error');
+        return false;
+      } finally {
+        this.brandDnaSaving = false;
+      }
+    },
+    /** Xoá hồ sơ (về "chưa khai") — KHÔNG đụng dữ liệu bán hàng hay dự án. */
+    async resetBrandDna() {
+      this.brandDnaSaving = true;
+      this.brandDnaError = '';
+      try {
+        const res = await fetch('/api/brand-dna', {
+          method: 'DELETE',
+          headers: { 'X-XSRF-TOKEN': CSRF(), Accept: 'application/json' },
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(d, 'Không xoá được DNA shop.');
+        this.brandDna = d;
+        this.brandDnaDraft = JSON.parse(JSON.stringify(d.dna || {}));
+        this.toast('Đã xoá hồ sơ DNA — hệ thống quay về suy ra từ dữ liệu của bạn.', 'info');
+        return true;
+      } catch (e) {
+        this.brandDnaError = userFacingError(e, 'Không xoá được DNA shop.');
+        return false;
+      } finally {
+        this.brandDnaSaving = false;
+      }
+    },
+    /** Bỏ thay đổi chưa lưu: quay về đúng bản đang có trên máy chủ. */
+    discardBrandDnaDraft() {
+      this.brandDnaDraft = JSON.parse(JSON.stringify(this.brandDna?.dna || {}));
+    },
+    /**
+     * ĐO khả năng truy cập internet của agent (máy chủ + model). `force = true` khi người dùng bấm
+     * "Kiểm tra lại" — kết quả được máy chủ cache 10 phút nên bấm liên tục không tạo bão request.
+     */
+    async loadWebAccess(force = false) {
+      this.webAccessLoading = true;
+      this.webAccessError = '';
+      try {
+        const res = await fetch('/api/design-agent/web-access' + (force ? '?force=1' : ''), { headers: { Accept: 'application/json' } });
+        if (!res.ok) throw apiError(await res.json().catch(() => ({})), 'Không kiểm tra được khả năng truy cập internet.');
+        this.webAccess = await res.json();
+        return this.webAccess;
+      } catch (e) {
+        this.webAccessError = userFacingError(e, 'Không kiểm tra được khả năng truy cập internet.');
+        return null;
+      } finally {
+        this.webAccessLoading = false;
+      }
     },
     /** Bật/tắt suy luận AI của Agent Studio; đổi chế độ ⇒ bỏ cache radar (kết quả khác nhau). */
     setDesignAgentAi(enabled) {

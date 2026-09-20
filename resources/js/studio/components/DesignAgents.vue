@@ -32,6 +32,10 @@ const canvasLang = ref('vi');
 const canvas = ref({ ratio: '4:5', variantCount: 2, useNegative: true, negativePrompt: '' });
 
 const STEPS = [
+  // Bước 0 — DNA: khai "shop tôi là ai" TRƯỚC khi đọc xu hướng. Trước đây DNA do hệ thống ĐOÁN
+  // (đếm dự án + dò từ khoá trong prompt, không có gì thì dùng câu mặc định cứng) và chủ shop không
+  // có chỗ nào để sửa — nay là bước đầu tiên, có thể sửa, và mọi brief sau đều dùng bản họ khai.
+  { id: 'dna', label: 'DNA shop', hint: 'Khai định vị, khách hàng, phong cách để agent viết đúng', icon: 'sparkles' },
   { id: 'radar', label: 'Tín hiệu', hint: 'Đọc xu hướng và chọn hướng đi', icon: 'scan' },
   { id: 'brief', label: 'Định hướng', hint: 'Dựng brief, mood board và cấu trúc', icon: 'briefcase' },
   { id: 'canvas', label: 'Thực thi', hint: 'Chốt prompt và tạo ảnh', icon: 'wand' },
@@ -70,6 +74,41 @@ const SIZE_PRESETS = [
 const RATIO_OPTIONS = ['1:1', '4:5', '3:4', '9:16', '4:3'];
 const CATEGORY_LABELS = { color: 'Màu sắc', silhouette: 'Dáng', fabric: 'Chất liệu', price: 'Giá', detail: 'Chi tiết' };
 const LIFECYCLE_LABELS = { emerging: 'Mới nổi', peak: 'Đang đỉnh', declining: 'Giảm dần' };
+
+// ── DNA thương hiệu: hồ sơ chủ shop tự khai (bước 0) ──────────────────────────────────────────
+const dna = computed(() => store.brandDna || null);
+const dnaDraft = computed(() => store.brandDnaDraft || {});
+const DNA_LISTS = [
+  { key: 'styles', label: 'Phong cách', hint: 'VD: tối giản, thanh lịch, công sở' },
+  { key: 'colors', label: 'Màu chủ đạo', hint: 'VD: trắng ngà, be, xanh rêu' },
+  { key: 'categories', label: 'Nhóm hàng chính', hint: 'VD: đầm linen, áo sơ mi, quần tây' },
+  { key: 'materials', label: 'Chất liệu', hint: 'VD: linen, cotton, lụa' },
+  { key: 'avoid', label: 'KHÔNG làm', hint: 'VD: hàng bóng, họa tiết to, giá dưới 200k' },
+];
+const dnaListMax = (key) => Number(store.brandDna?.limits?.lists?.[key]?.[0] || 8);
+const dnaListText = (key) => (Array.isArray(dnaDraft.value[key]) ? dnaDraft.value[key].join(', ') : '');
+function setDnaText(field, value) { store.brandDnaDraft = { ...dnaDraft.value, [field]: value }; }
+/** Ô danh sách nhập bằng dấu phẩy: gọn cho người dùng, nhưng vẫn tôn trọng trần số mục của máy chủ. */
+function setDnaList(key, value) {
+  const items = String(value)
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part !== '')
+    .slice(0, dnaListMax(key));
+  store.brandDnaDraft = { ...dnaDraft.value, [key]: items };
+}
+const dnaDirty = computed(() => JSON.stringify(dnaDraft.value) !== JSON.stringify(dna.value?.dna || {}));
+/**
+ * Vì sao nút "Lưu DNA" đang bị khoá — MỘT nguồn cho cả điều kiện khoá lẫn câu giải thích
+ * (docs/DESIGN_SYSTEM.md §4 quy tắc 4): hai chỗ viết riêng thì sớm muộn lệch nhau.
+ * Cờ đang-chạy không tính là lý do (nhãn nút đã đổi thành "Đang lưu…").
+ */
+const dnaBlockReason = computed(() => {
+  if (store.brandDnaSaving) return '';
+  if (!dnaDirty.value) return 'Chưa có thay đổi nào để lưu.';
+  return '';
+});
+const dnaEmpty = computed(() => !dna.value?.is_set);
 
 const step = computed({
   get: () => store.designAgentStep || 'radar',
@@ -153,6 +192,8 @@ const canvasPrompt = computed(() => {
 });
 const estimatedCredits = computed(() => Math.max(1, Number(store.planCostImage) || 1) * Math.max(1, Number(canvas.value.variantCount) || 1));
 const readiness = computed(() => ({
+  // DNA: 'done' khi chủ shop ĐÃ khai — không có DNA thì vẫn 'ready' (không chặn đường), chỉ là chưa xong.
+  dna: dna.value?.is_set ? 'done' : 'ready',
   radar: radar.value ? 'done' : (store.trendRadarLoading ? 'loading' : 'ready'),
   brief: collection.value && !briefStale.value ? 'done' : (radar.value ? 'ready' : 'locked'),
   canvas: collection.value && !briefStale.value ? 'ready' : 'locked',
@@ -442,6 +483,16 @@ async function createBrief() {
 }
 
 async function advance() {
+  // Bước DNA không chặn đường: người dùng có thể chưa khai gì mà vẫn đọc xu hướng (khi đó hệ thống
+  // nói rõ đang dùng phần SUY RA). Chỉ nhắc một lần để họ biết có chỗ khai.
+  if (step.value === 'dna') {
+    if (dnaDirty.value && dna.value?.is_set === false) {
+      store.toast('Chưa lưu DNA — phần phân tích sẽ dùng dữ liệu suy ra từ tài khoản của bạn.', 'info');
+    }
+    setStep('radar');
+    if (!store.trendRadar) await loadRadar(selectedRegion.value);
+    return;
+  }
   if (step.value === 'radar') {
     setStep('brief');
     await nextTick();
@@ -461,6 +512,7 @@ async function advance() {
 function back() {
   if (step.value === 'canvas') setStep('brief');
   else if (step.value === 'brief') setStep('radar');
+  else if (step.value === 'radar') setStep('dna');
 }
 function applyCanvas() {
   const value = canvasPrompt.value;
@@ -500,7 +552,12 @@ watch(collection, (value) => {
   };
 }, { immediate: true });
 watch(() => store.designAgentOpen, (open) => {
-  if (open && !store.trendRadar) loadRadar(selectedRegion.value);
+  if (!open) return;
+  // Nạp hồ sơ DNA và số đo khả năng internet MỘT lần khi mở: cả hai đều là dữ liệu mà người dùng
+  // phải nhìn thấy trước khi tin vào phần phân tích phía sau.
+  if (!store.brandDna) store.loadBrandDna();
+  if (!store.webAccess) store.loadWebAccess();
+  if (!store.trendRadar) loadRadar(selectedRegion.value);
 });
 </script>
 
@@ -612,8 +669,86 @@ watch(() => store.designAgentOpen, (open) => {
 
         <!-- Nội dung theo bước -->
         <main class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+          <!-- BƯỚC 0: DNA THƯƠNG HIỆU (chủ shop tự khai) -->
+          <section v-if="step === 'dna'" id="agent-step-dna" role="tabpanel" aria-label="DNA shop" :aria-busy="store.brandDnaLoading" class="grid gap-5 xl:grid-cols-[minmax(320px,420px)_1fr]">
+            <div class="space-y-4">
+              <div class="card p-4">
+                <h2 class="text-sm font-semibold text-cream-100">DNA shop của bạn</h2>
+                <p class="mt-1 text-body leading-5 text-cream-400">
+                  Đây là phần <b class="text-cream-100">bạn tự khai</b> — agent dùng nó để viết brief, chọn nhóm hàng và loại bỏ những thứ bạn không làm.
+                </p>
+                <p class="mt-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-label leading-5 text-cream-300">
+                  <StudioIcon name="info" size="h-3.5 w-3.5" class="mr-1 inline-block align-[-2px]" />
+                  Trước đây DNA do hệ thống <b>đoán</b> (đếm dự án + dò từ khoá trong mô tả ảnh, không có gì thì dùng câu mặc định).
+                  Nay bạn khai được, và bản bạn khai luôn được ưu tiên.
+                </p>
+                <div v-if="dna" class="mt-3 flex flex-wrap items-center gap-2 text-label">
+                  <span class="rounded-full px-2 py-0.5 font-semibold" :class="dna.is_set ? 'bg-brand-500/20 text-brand-200' : 'bg-amber-500/15 text-warn'">
+                    {{ dna.is_set ? 'Đã khai' : 'Chưa khai' }}
+                  </span>
+                  <span class="text-cream-400">Bản đang dùng khi chạy: <b class="text-cream-200">{{ dna.summary ? 'DNA bạn khai' : 'suy ra từ dữ liệu tài khoản' }}</b></span>
+                </div>
+                <p v-if="dna?.updated_at" class="mt-1 text-label text-cream-400">Cập nhật lần cuối: {{ new Date(dna.updated_at).toLocaleString('vi-VN') }}</p>
+              </div>
+
+              <div class="card p-4">
+                <h3 class="text-sm font-semibold text-cream-100">Nguồn dữ liệu agent đang có</h3>
+                <ul class="mt-2 space-y-1.5 text-label leading-5 text-cream-300">
+                  <li>· <b class="text-cream-100">DNA bạn khai</b> (màn hình này) — đáng tin nhất, sửa được bất cứ lúc nào.</li>
+                  <li>· <b class="text-cream-100">Số bán của shop</b> (nhập ở bước Định hướng) — dữ liệu thật do bạn nhập.</li>
+                  <li>· <b class="text-cream-100">Dự án & ảnh đã tạo</b> của chính tài khoản — dấu vết công việc.</li>
+                  <li>· <b class="text-cream-100">Danh mục xu hướng mẫu</b> — vẫn là dữ liệu MẪU, chưa nối sàn TMĐT.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="card p-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="text-sm font-semibold text-cream-100">Khai hồ sơ</h3>
+                <span v-if="dnaDirty" class="text-label text-warn">Có thay đổi chưa lưu</span>
+              </div>
+
+              <div v-if="store.brandDnaLoading" class="mt-3 text-body text-cream-400">Đang tải hồ sơ…</div>
+              <p v-else-if="store.brandDnaError" role="alert" class="mt-3 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-body text-danger">{{ store.brandDnaError }}</p>
+
+              <div v-else class="mt-3 grid gap-4">
+                <div>
+                  <label class="label" for="dna-positioning">Định vị (1 câu)</label>
+                  <input id="dna-positioning" class="input w-full" maxlength="200" :value="dnaDraft.positioning || ''" placeholder="VD: Thời trang nữ công sở tối giản, may tại xưởng nhà" @input="setDnaText('positioning', $event.target.value)">
+                </div>
+                <div>
+                  <label class="label" for="dna-customer">Khách hàng mục tiêu</label>
+                  <input id="dna-customer" class="input w-full" maxlength="200" :value="dnaDraft.customer || ''" placeholder="VD: nữ 25–35 tuổi, đi làm văn phòng, ngân sách 400–800k" @input="setDnaText('customer', $event.target.value)">
+                </div>
+                <div>
+                  <span class="label">Dải giá</span>
+                  <div class="mt-1 flex flex-wrap gap-1.5">
+                    <button v-for="band in (dna?.price_bands || [])" :key="band.id" type="button" class="tool-btn" :class="{ 'is-active': (dnaDraft.price_band || '') === band.id }" @click="setDnaText('price_band', band.id)">{{ band.label }}</button>
+                  </div>
+                </div>
+                <div v-for="field in DNA_LISTS" :key="field.key">
+                  <label class="label" :for="'dna-' + field.key">{{ field.label }} <span class="font-normal normal-case tracking-normal text-cream-400">(cách nhau bằng dấu phẩy, tối đa {{ dnaListMax(field.key) }})</span></label>
+                  <input :id="'dna-' + field.key" class="input w-full" :value="dnaListText(field.key)" :placeholder="field.hint" @input="setDnaList(field.key, $event.target.value)">
+                </div>
+                <div>
+                  <label class="label" for="dna-notes">Ghi chú thêm</label>
+                  <textarea id="dna-notes" class="input w-full" rows="3" maxlength="500" :value="dnaDraft.notes || ''" placeholder="VD: chỉ dùng vải nội địa, không nhận đơn dưới 20 cái" @input="setDnaText('notes', $event.target.value)"></textarea>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 border-t border-ink-700 pt-3">
+                  <button type="button" class="btn-brand btn-sm" :disabled="store.brandDnaSaving || !!dnaBlockReason" @click="store.saveBrandDna()">
+                    <StudioIcon name="save" size="h-3.5 w-3.5" /> {{ store.brandDnaSaving ? 'Đang lưu…' : 'Lưu DNA' }}
+                  </button>
+                  <span v-if="dnaBlockReason" class="text-label text-cream-400">↳ {{ dnaBlockReason }}</span>
+                  <button type="button" class="btn-ghost btn-sm" :disabled="!dnaDirty" @click="store.discardBrandDnaDraft()">Bỏ thay đổi</button>
+                  <button type="button" class="btn-ghost btn-sm" :disabled="store.brandDnaSaving || dnaEmpty" @click="store.resetBrandDna()">Xoá hồ sơ</button>
+                </div>
+                <p v-if="!dnaBlockReason && dna?.is_set" class="text-label text-cream-400">Bản đang lưu trùng với bản bạn đang thấy.</p>
+              </div>
+            </div>
+          </section>
           <!-- BƯỚC 1: TÍN HIỆU -->
-          <section v-if="step === 'radar'" id="agent-step-radar" role="tabpanel" aria-label="Tín hiệu" :aria-busy="store.trendRadarLoading">
+          <section v-else-if="step === 'radar'" id="agent-step-radar" role="tabpanel" aria-label="Tín hiệu" :aria-busy="store.trendRadarLoading">
             <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 class="text-base font-semibold text-cream-100">Tín hiệu thị trường</h2>
@@ -743,7 +878,39 @@ watch(() => store.designAgentOpen, (open) => {
 
               <details class="mt-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
                 <summary class="cursor-pointer text-xs font-semibold text-cream-200">Nguồn dữ liệu &amp; phương pháp ({{ sources.length }} nguồn)</summary>
-                <p class="mt-2 text-body leading-5 text-cream-400">Nguồn ngoài đang ở chế độ demo; dữ liệu nội bộ là project/generation của chính tài khoản. Không có scraping hay POS/ERP thật trong bản này.</p>
+                <!-- KHẢ NĂNG TRUY CẬP INTERNET: số ĐO THẬT từ máy chủ, không phải câu văn tĩnh. -->
+                <div class="mt-3 rounded-xl border border-ink-700 bg-ink-900 p-3">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-label font-semibold uppercase tracking-wide text-cream-300">Khả năng truy cập internet</p>
+                    <button type="button" class="tool-btn" :disabled="store.webAccessLoading" @click="store.loadWebAccess(true)">
+                      <StudioIcon name="refresh" size="h-3 w-3" /> {{ store.webAccessLoading ? 'Đang kiểm tra…' : 'Kiểm tra lại' }}
+                    </button>
+                  </div>
+                  <p v-if="!store.webAccess && store.webAccessLoading" class="mt-2 text-body text-cream-400">Đang đo…</p>
+                  <p v-else-if="store.webAccessError" role="alert" class="mt-2 text-body text-danger">{{ store.webAccessError }}</p>
+                  <template v-else-if="store.webAccess">
+                    <ul class="mt-2 space-y-1 text-body leading-5 text-cream-300">
+                      <li>
+                        <b :class="store.webAccess.outbound.ok ? 'text-ok' : 'text-warn'">{{ store.webAccess.outbound.ok ? 'Máy chủ CÓ internet' : 'Máy chủ KHÔNG ra được internet' }}</b>
+                        <span class="text-cream-400"> · đo {{ formatNumber(store.webAccess.outbound.results.length) }} đích · {{ (store.webAccess.outbound.results[0] || {}).ms || 0 }} ms · lúc {{ new Date(store.webAccess.outbound.checked_at).toLocaleTimeString('vi-VN') }}</span>
+                      </li>
+                      <li>
+                        <b :class="store.webAccess.model_search.supported ? 'text-ok' : 'text-warn'">{{ store.webAccess.model_search.supported ? 'Model CÓ tìm kiếm tích hợp' : 'Model KHÔNG có tìm kiếm tích hợp' }}</b>
+                        <span v-if="store.webAccess.model_search.active" class="text-cream-400"> · {{ store.webAccess.model_search.active.model }}</span>
+                      </li>
+                    </ul>
+                    <p class="mt-2 text-body leading-5 text-cream-200">{{ store.webAccess.verdict_label }}</p>
+                    <p class="mt-1 text-label leading-5 text-cream-400">Nguồn ngoài vẫn là <b>dữ liệu mẫu</b> (chưa nối sàn TMĐT, chưa có scraping hay POS/ERP thật). Dữ liệu nội bộ là dự án/ảnh của chính tài khoản bạn.</p>
+                    <details class="mt-2">
+                      <summary class="cursor-pointer text-label text-cream-400">Chi tiết phép đo</summary>
+                      <ul class="mt-1 space-y-0.5 text-label text-cream-400">
+                        <li v-for="row in store.webAccess.outbound.results" :key="row.url">· {{ row.url }} — {{ row.status ? 'HTTP ' + row.status : (row.error || 'không kết nối được') }} ({{ row.ms }} ms)</li>
+                        <li v-for="row in store.webAccess.model_search.candidates" :key="row.provider + row.model">· {{ row.provider }}:{{ row.model }} — {{ row.label }}</li>
+                      </ul>
+                    </details>
+                  </template>
+                </div>
+                <p class="mt-3 text-body leading-5 text-cream-400">Dữ liệu nội bộ là project/generation của chính tài khoản.hay POS/ERP thật trong bản này.</p>
                 <div class="mt-3 overflow-x-auto">
                   <table class="w-full min-w-[30rem] text-left text-body">
                     <thead><tr class="border-b border-ink-700 text-cream-400"><th class="pb-2 pr-2 font-semibold">Nguồn</th><th class="pb-2 pr-2 font-semibold">Trạng thái</th><th class="pb-2 font-semibold">Kênh / nhịp</th></tr></thead>
@@ -918,7 +1085,17 @@ watch(() => store.designAgentOpen, (open) => {
                 </div>
 
                 <div v-if="briefTab === 'overview'" class="mt-4 grid gap-4 md:grid-cols-2">
-                  <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Câu chuyện thương hiệu</h3><p class="mt-2 text-xs leading-5 text-cream-200">{{ collection.brand_narrative?.narrative || '—' }}</p></div>
+                  <div class="card p-5">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <h3 class="text-sm font-semibold text-cream-100">Câu chuyện thương hiệu</h3>
+                      <!-- Nói RÕ brief này dựa trên DNA nào: bạn khai hay hệ thống suy ra. -->
+                      <button type="button" class="rounded-full px-2 py-0.5 text-label font-semibold" :class="collection.brand_dna?.source === 'owner' ? 'bg-brand-500/20 text-brand-200' : 'bg-amber-500/15 text-warn'" @click="setStep('dna')">
+                        {{ collection.brand_dna?.source_label || 'Chưa rõ nguồn DNA' }}
+                      </button>
+                    </div>
+                    <p class="mt-2 text-xs leading-5 text-cream-200">{{ collection.brand_narrative?.narrative || '—' }}</p>
+                    <p v-if="collection.brand_dna?.fields?.avoid?.length" class="mt-2 text-label leading-5 text-cream-400">Không đề xuất: {{ collection.brand_dna.fields.avoid.join(', ') }}</p>
+                  </div>
                   <div class="card p-5"><h3 class="text-sm font-semibold text-cream-100">Gợi ý cấu hình Canvas</h3><div v-if="canvasSettings" class="mt-2 flex flex-wrap gap-1.5 text-label"><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">Tỉ lệ {{ canvasSettings.ratio }}</span><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">{{ canvasSettings.variant_count }} biến thể</span><span class="rounded bg-ink-800 px-2 py-0.5 text-cream-200">Negative prompt</span></div><p class="mt-2 text-body leading-5 text-cream-400">{{ canvasSettings?.note }}</p></div>
                 </div>
 
@@ -1226,14 +1403,15 @@ watch(() => store.designAgentOpen, (open) => {
           <div class="min-w-0 text-body text-cream-400">
             <span class="font-semibold text-cream-100">Bước {{ stepIndex + 1 }}/{{ STEPS.length }} · {{ STEPS[stepIndex].label }}</span>
             <span class="mx-1.5">·</span>
-            <span v-if="step === 'radar'">{{ selectedTrendCount ? selectedTrendCount + ' trend đã chọn' : 'Chưa chọn trend' }}</span>
+            <span v-if="step === 'dna'">{{ dna?.is_set ? 'DNA đã khai · ' + (dna.source_label || '') : 'Chưa khai DNA — đang dùng phần suy ra' }}</span>
+            <span v-else-if="step === 'radar'">{{ selectedTrendCount ? selectedTrendCount + ' trend đã chọn' : 'Chưa chọn trend' }}</span>
             <span v-else-if="step === 'brief'">{{ collection ? (briefStale ? 'Brief cần cập nhật' : 'Brief đã sẵn sàng') : 'Chưa có brief' }}</span>
             <span v-else>~{{ estimatedCredits }} credit cho {{ canvas.variantCount }} biến thể</span>
           </div>
           <div class="flex items-center gap-2">
             <button v-if="step !== 'radar'" type="button" class="tool-btn !px-3 !py-2" @click="back"><StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Quay lại</button>
-            <button v-if="step !== 'canvas'" type="button" class="btn-brand btn-sm flex items-center gap-2" :disabled="step === 'brief' && store.collectionBriefLoading" @click="advance">
-              {{ step === 'radar' ? (selectedTrendCount ? 'Phân tích thành brief' : 'Tiếp tục với mặc định') : 'Chốt brief & sang Canvas' }}
+            <button v-if="step !== 'canvas'" type="button" class="btn-brand btn-sm flex items-center gap-2" :disabled="(step === 'brief' && store.collectionBriefLoading)" @click="advance">
+              {{ step === 'dna' ? 'Đọc tín hiệu thị trường' : (step === 'radar' ? (selectedTrendCount ? 'Phân tích thành brief' : 'Tiếp tục với mặc định') : 'Chốt brief & sang Canvas') }}
               <StudioIcon name="arrowRight" size="h-3.5 w-3.5" />
             </button>
             <button v-else type="button" class="btn-brand btn-sm flex items-center gap-2" @click="applyCanvas">
