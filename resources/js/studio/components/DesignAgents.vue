@@ -135,6 +135,12 @@ const referenceNote = computed(() => {
 const liveSources = computed(() => (store.trendRadar?.source_mode === 'live') || !!(store.webSources && store.webSources.mode === 'live'));
 /** Số hướng đang được ĐO từ tin thật (khác hướng của bộ có sẵn) — hiện trên chip lọc. */
 const liveTrendCount = computed(() => trends.value.filter((trend) => trend.evidence_mode === 'live').length);
+/**
+ * Trong số hướng "đo từ tin thật", bao nhiêu hướng có bằng chứng đến từ CÂU HỎI CỦA MODEL (máy chủ chạy lại
+ * câu hỏi đó trên nguồn tìm kiếm thật) — khác với tin của feed định kỳ. Người dùng cần phân biệt được hai
+ * nguồn này: một cái là ảnh chụp định kỳ, một cái là do AI chủ động đi tra trong lượt này.
+ */
+const aiTrendCount = computed(() => trends.value.filter((trend) => (trend.live?.origin || trend.evidence_origin) === 'ai').length);
 /** Tin hiển thị ưu tiên lấy từ radar (thứ phân tích THẬT SỰ đã dùng), rơi về báo cáo nguồn khi radar chưa có. */
 const newsItems = computed(() => {
   const items = (store.trendRadar?.external_evidence?.items?.length ? store.trendRadar.external_evidence.items : (store.webSources?.items || []));
@@ -385,6 +391,13 @@ const toolSearch = computed(() => activeModel.value?.tool_search || null);
 const aiSearchCalls = computed(() => Number(toolSearch.value?.calls || 0));
 const aiSearchQueries = computed(() => (toolSearch.value?.queries || []).filter(Boolean));
 const aiSearchSources = computed(() => (toolSearch.value?.sources || []).filter(Boolean));
+/**
+ * TIN MÁY CHỦ LẤY ĐƯỢC khi chạy lại câu hỏi của model — kèm URL để người dùng tự kiểm.
+ *
+ * Đây là phần biến "AI đã tra" thành DỮ LIỆU KIỂM CHỨNG ĐƯỢC: API /responses chỉ trả về câu hỏi model đã
+ * hỏi (không trả kết quả), nên máy chủ chạy lại chính câu hỏi đó trên nguồn tìm kiếm thật.
+ */
+const aiSearchItems = computed(() => (toolSearch.value?.items || []).filter((row) => row && row.url));
 const aiSearchMode = computed(() => String(toolSearch.value?.mode || 'off'));
 const aiSearchOn = computed(() => aiSearchMode.value !== 'off' && toolSearch.value?.enabled !== false);
 const aiSearchShort = computed(() => {
@@ -842,6 +855,7 @@ provide('refImages', refImages);
 provide('referenceNote', referenceNote);
 provide('liveSources', liveSources);
 provide('liveTrendCount', liveTrendCount);
+provide('aiTrendCount', aiTrendCount);
 provide('newsItems', newsItems);
 provide('activeSourceCount', activeSourceCount);
 provide('fetchedAtLabel', fetchedAtLabel);
@@ -895,6 +909,7 @@ provide('toolSearchLine', toolSearchLine);
 provide('aiSearchShort', aiSearchShort);
 provide('aiSearchQueries', aiSearchQueries);
 provide('aiSearchSources', aiSearchSources);
+provide('aiSearchItems', aiSearchItems);
 provide('aiSearchMode', aiSearchMode);
 provide('aiSearchOn', aiSearchOn);
 provide('aiToggleTitle', aiToggleTitle);

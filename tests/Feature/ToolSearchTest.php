@@ -462,7 +462,7 @@ class ToolSearchTest extends TestCase
     }
 
     /** Phản hồi /responses: `$searches` mục web_search_call + một message chứa JSON. */
-    private function responsesBody(string $text, int $searches = 1): array
+    private function responsesBody(string $text, int $searches = 1, array $queries = []): array
     {
         $output = [['type' => 'reasoning', 'id' => 'rs_1']];
         for ($i = 0; $i < $searches; $i++) {
@@ -470,7 +470,7 @@ class ToolSearchTest extends TestCase
                 'type' => 'web_search_call', 'id' => 'call_'.$i, 'status' => 'completed',
                 'action' => [
                     'type' => 'search',
-                    'queries' => ['xu hướng thu đông 2026 '.$i, 'ws_call_id=call_'.$i],
+                    'queries' => $queries !== [] ? $queries : ['xu hướng thu đông 2026 '.$i, 'ws_call_id=call_'.$i],
                     'sources' => [['url' => 'https://bao.example/tin-'.$i]],
                 ],
             ];
@@ -572,7 +572,52 @@ class ToolSearchTest extends TestCase
         $this->assertSame(0, $brief['model']['tool_search']['calls']);
         $this->assertTrue(collect($urls)->contains(fn ($u) => str_contains((string) $u, '/chat/completions')), 'Phải có lời gọi dự phòng /chat/completions.');
     }
+
+    /**
+     * CÂU HỎI CỦA MODEL → CHẠY TRÊN CÔNG CỤ CỦA MÁY CHỦ → THÀNH DỮ LIỆU (2026-09-21).
+     *
+     * Vì sao cần: API /responses chỉ trả về CÂU HỎI model đã hỏi, KHÔNG trả kết quả — dừng ở đó thì việc AI
+     * tự tra không để lại gì cho máy chủ: hướng vẫn gắn "bộ có sẵn", không có link cho người dùng kiểm, và
+     * tầng đo không có gì để đếm. Test này khoá cả ba chặng: máy chủ CHẠY LẠI đúng câu hỏi đó → tin lấy được
+     * VÀO payload → hướng khớp từ khoá được gắn "có tin thật" kèm nguồn gốc "ai".
+     */
+    public function test_the_models_queries_are_re_run_on_the_server_and_become_evidence(): void
+    {
+        $this->hostedProvider('gw-hosted', 'v4-pro');
+        $this->searchSource();
+
+        Http::fake([
+            // Model trả lời + khai nó đã hỏi gì (đúng thứ /responses trả về: chỉ có queries).
+            'gw-hosted.example/*' => Http::response($this->responsesBody($this->directionsJson(), 1, ['xu hướng pastel 2026']), 200),
+            'news.example/*' => function ($request) {
+                // Tin của FEED (máy chủ lấy sẵn) KHÔNG nhắc pastel; chỉ tin do CÂU HỎI CỦA MODEL mang về mới có.
+                return str_contains(urldecode($request->url()), 'pastel')
+                    ? Http::response($this->rss('Màu pastel lên ngôi mùa thu 2026', 'https://bao.example/pastel'), 200)
+                    : Http::response($this->rss('Tin chung về ngành may mặc', 'https://bao.example/chung'), 200);
+            },
+        ]);
+
+        $radar = app(DesignAgentService::class)->radar($this->customer(), 'all', true);
+
+        // (1) Máy chủ ĐÃ chạy lại câu hỏi của model trên nguồn tìm kiếm thật.
+        $this->assertContains('xu hướng pastel 2026', $radar['model']['tool_search']['server_queries'] ?? []);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'news.example')
+            && str_contains(urldecode($request->url()), 'pastel'));
+
+        // (2) Tin lấy được VÀO payload — giao diện có link thật để người dùng tự kiểm.
+        $items = $radar['model']['tool_search']['items'] ?? [];
+        $this->assertNotEmpty($items, 'Tin do câu hỏi của model mang về phải có trong payload.');
+        $this->assertContains('https://bao.example/pastel', array_column($items, 'url'));
+
+        // (3) Hướng khớp từ khoá trong tin đó được gắn "có tin thật", và KHAI RÕ nguồn gốc là AI tự tra.
+        $pastel = collect($radar['trends'])->firstWhere('id', 'soft-pastel');
+        $this->assertNotNull($pastel);
+        $this->assertSame('live', $pastel['evidence_mode'], 'Hướng khớp tin AI tìm được phải mang bằng chứng thật.');
+        $this->assertSame('ai', $pastel['live']['origin'] ?? null, 'Phải phân biệt được tin do AI tra với tin của feed định kỳ.');
+        $this->assertStringContainsString('AI tự tra', (string) $pastel['regional_note']);
+    }
 }
+
 
 
 

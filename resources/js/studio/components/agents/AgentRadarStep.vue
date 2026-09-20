@@ -12,6 +12,7 @@ const liveOnly = inject('liveOnly');
 const lifecycleFilter = inject('lifecycleFilter');
 const liveSources = inject('liveSources');
 const liveTrendCount = inject('liveTrendCount');
+const aiTrendCount = inject('aiTrendCount');
 const newsItems = inject('newsItems');
 const activeSourceCount = inject('activeSourceCount');
 const fetchedAtLabel = inject('fetchedAtLabel');
@@ -30,6 +31,7 @@ const toolSearchLine = inject('toolSearchLine');
 const aiSearchShort = inject('aiSearchShort');
 const aiSearchQueries = inject('aiSearchQueries');
 const aiSearchSources = inject('aiSearchSources');
+const aiSearchItems = inject('aiSearchItems');
 const aiSearchMode = inject('aiSearchMode');
 const aiSearchOn = inject('aiSearchOn');
 const step = inject('step');
@@ -130,7 +132,10 @@ const formatVnd = inject('formatVnd');
                   <span class="flex flex-wrap items-center gap-2">
                     <StudioIcon name="scan" size="h-4 w-4" class="text-ok" />
                     <span class="font-display text-base font-semibold text-cream-50">Tín hiệu đo từ tin thật ({{ marketSignals.length }})</span>
-                    <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-label font-semibold text-ok">đo tự động · không cần AI</span>
+                    <!-- Nhãn cũ "đo tự động · không cần AI" đọc lên thành "agent không dùng AI" — trong khi
+                         lượt chạy có thể đang dùng công cụ tìm kiếm của model. Nhãn này nói ĐÚNG phạm vi của
+                         nó: CON SỐ ở khối này do thuật toán đo, không phải AI đoán. -->
+                    <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-label font-semibold text-ok" title="Các con số trong khối này do thuật toán đếm từ bài báo, không phải AI viết ra">số đo từ tin thật · không phải AI đoán</span>
                   </span>
                   <span class="mt-1 block text-label leading-4 text-cream-400">Máy chủ đọc tin từ các nguồn đã nối rồi đếm từ khoá đang được nhắc tới — số liệu THẬT kèm nguồn, không phải dự đoán của AI.{{ marketAgeLabel ? ' · đo ' + marketAgeLabel : '' }}</span>
                 </summary>
@@ -184,6 +189,18 @@ const formatVnd = inject('formatVnd');
                       <span v-if="aiSearchQueries.length" class="text-cream-400">từ khoá: {{ aiSearchQueries.slice(0, 3).join(' · ') }}<template v-if="aiSearchQueries.length > 3"> · …</template></span>
                       <span v-if="aiSearchSources.length" class="text-cream-400">· mở {{ aiSearchSources.length }} trang nguồn</span>
                     </p>
+                    <!-- TIN THẬT lấy được từ chính câu hỏi của model — có URL để người dùng tự kiểm. Đây là
+                         câu trả lời cho "AI tìm rồi, nhưng tìm được gì?": không có phần này thì việc AI tự tra
+                         không để lại dấu vết nào kiểm chứng được. -->
+                    <details v-if="aiSearchItems.length" class="mt-2">
+                      <summary class="cursor-pointer text-label text-cream-400">AI tìm được {{ aiSearchItems.length }} tin — bấm để xem nguồn</summary>
+                      <ul class="mt-1.5 space-y-1 text-label leading-4 text-cream-300">
+                        <li v-for="item in aiSearchItems.slice(0, 6)" :key="item.url">
+                          · <a :href="item.url" target="_blank" rel="noopener" class="underline decoration-dotted hover:text-cream-100">{{ item.title }}</a>
+                          <span class="text-cream-400"> — {{ item.source_name }}<template v-if="item.published_at"> · {{ shortDate(item.published_at) }}</template></span>
+                        </li>
+                      </ul>
+                    </details>
                   </div>
                   <button type="button" class="tool-btn" title="Chọn các trend mà 3 định hướng mạnh nhất đang nhắc tới" @click="focusDirections">
                     <StudioIcon name="target" size="h-3 w-3" /> Chọn 3 hướng đầu
@@ -261,11 +278,16 @@ const formatVnd = inject('formatVnd');
               <div class="mb-2 flex flex-wrap items-center gap-2 text-label text-cream-400">
                 <span>Hiện {{ visibleTrends.length }}/{{ trends.length }} hướng</span>
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-ok"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>{{ liveTrendCount }} đo từ tin thật</span>
+                <!-- TÁCH RIÊNG phần do AI chủ động tra trong lượt này: đó không phải ảnh chụp định kỳ của
+                     nguồn cấu hình, và gộp vào "đo từ tin thật" là nói thiếu sự thật về nguồn gốc số liệu. -->
+                <span v-if="aiTrendCount" class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/15 px-2 py-0.5 font-semibold text-brand-200" title="Hướng này khớp tin mà AI tự tra trong lượt này — máy chủ chạy lại câu hỏi của model trên nguồn tìm kiếm thật">
+                  <span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span>{{ aiTrendCount }} AI tìm thấy
+                </span>
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-0.5 font-semibold text-warn"><span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>{{ trends.length - liveTrendCount }} bộ có sẵn</span>
                 <details class="ml-auto">
                   <summary class="cursor-pointer text-tiny text-cream-400 underline decoration-dotted">Giải thích</summary>
                   <p class="mt-1 max-w-md rounded-lg bg-ink-900 px-2.5 py-2 text-tiny leading-4 text-cream-300">
-                    <b class="text-cream-200">Đo từ tin thật</b> = hướng xuất hiện trong bài báo máy chủ vừa lấy (kèm nguồn). <b class="text-cream-200">Bộ có sẵn</b> = hướng mẫu của FabrikAI, chưa gắn với tin vừa lấy. Số liệu thật giúp bạn chọn đúng hướng đang được thị trường nhắc tới.
+                    <b class="text-cream-200">Đo từ tin thật</b> = hướng xuất hiện trong bài báo máy chủ vừa lấy (kèm nguồn) — tin của các nguồn bạn cấu hình. <b class="text-cream-200">AI tìm thấy</b> = hướng khớp tin mà AI tự tra trong lượt này: model quyết định hỏi gì, máy chủ chạy lại đúng câu hỏi đó trên nguồn tìm kiếm thật rồi đếm — cũng có nguồn để bấm vào kiểm. <b class="text-cream-200">Bộ có sẵn</b> = hướng mẫu của FabrikAI, chưa gắn với tin nào. Số liệu thật giúp bạn chọn đúng hướng đang được thị trường nhắc tới.
                   </p>
                 </details>
               </div>
@@ -286,8 +308,11 @@ const formatVnd = inject('formatVnd');
                       <span class="flex flex-wrap items-center gap-1.5 text-label font-semibold uppercase tracking-wide text-cream-400">
                         {{ categoryLabel(trend.category) }}
                         <span class="rounded bg-ink-800 px-1.5 py-0.5 normal-case tracking-normal" :class="lifecycleClass(trend.lifecycle)">{{ lifecycleLabel(trend.lifecycle) }}</span>
-                        <span v-if="trend.evidence_mode === 'live'" class="rounded bg-emerald-500/15 px-1.5 py-0.5 normal-case tracking-normal text-ok" title="Hướng này có tin thật nhắc tới — số liệu bên dưới là số ĐO từ các tin đó">có tin thật</span>
-                        <span v-else class="rounded bg-amber-500/15 px-1.5 py-0.5 normal-case tracking-normal text-warn" title="Hướng này lấy từ bộ xu hướng có sẵn của FabrikAI, chưa gắn với tin thị trường vừa lấy">bộ có sẵn</span>
+                        <!-- BA nhãn, không phải hai: tin của feed định kỳ · tin do AI tự tra trong lượt này ·
+                             hướng mẫu chưa gắn tin nào. Gộp hai cái đầu là nói thiếu nguồn gốc số liệu. -->
+                        <span v-if="(trend.live?.origin || trend.evidence_origin) === 'ai'" class="rounded bg-brand-500/15 px-1.5 py-0.5 normal-case tracking-normal text-brand-200" title="Hướng này khớp tin mà AI tự tra trong lượt này (model hỏi, máy chủ đi lấy) — số liệu bên dưới đo từ chính những tin đó, có link để bạn kiểm">AI tìm thấy</span>
+                        <span v-else-if="trend.evidence_mode === 'live'" class="rounded bg-emerald-500/15 px-1.5 py-0.5 normal-case tracking-normal text-ok" title="Hướng này có tin thật nhắc tới — số liệu bên dưới là số ĐO từ các tin đó">có tin thật</span>
+                        <span v-else class="rounded bg-amber-500/15 px-1.5 py-0.5 normal-case tracking-normal text-warn" :title="'Hướng mẫu của FabrikAI — chưa có tin nào (của nguồn bạn cấu hình hoặc do AI tra) nhắc tới hướng này'">bộ có sẵn</span>
                       </span>
                       <span class="mt-1.5 block text-sm font-semibold text-cream-100">{{ trendTitle(trend) }}</span>
                       <span class="mt-1 block text-body leading-4 text-cream-400">{{ trend.description }}</span>

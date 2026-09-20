@@ -757,6 +757,13 @@ onMounted(async () => {
           <span v-if="me && !isSuper" :class="[BADGE, BADGE_TONE.warn]" title="Chỉ Owner (super admin) quản lý được tài khoản người dùng">
             <StudioIcon name="info" size="h-3 w-3" /> không quản lý người dùng
           </span>
+          <!-- [2026-09-25] Thư viện theme nằm CÙNG trang với bảng token: import liên kết daisyUI Theme
+               Generator, bật theme cho từng chế độ Sáng/Tối, và đo luôn tỉ lệ tương phản của theme
+               đang chạy. Để ngay cạnh "Cài đặt" vì cả hai đều là việc cấu hình toàn hệ thống. -->
+          <a href="/he-thong-thiet-ke" class="tool-btn" title="Hệ thống thiết kế: thư viện theme daisyUI · bảng token hai chế độ">
+            <StudioIcon name="palette" size="h-3.5 w-3.5" />
+            <span class="hidden sm:inline">Thiết kế</span>
+          </a>
           <a href="/settings" class="tool-btn" title="Cài đặt AI: API key · provider · model">
             <StudioIcon name="gear" size="h-3.5 w-3.5" />
             <span class="hidden sm:inline">Cài đặt</span>
@@ -792,7 +799,9 @@ onMounted(async () => {
             Vai trò của bạn không có quyền quản lý tài khoản người dùng (chỉ Owner). Các mục còn lại vẫn dùng bình thường.
           </p>
           <p class="mt-3 px-3 text-label leading-relaxed text-cream-300">
-            Cấu hình AI (API key · provider · model) nằm ở <a href="/settings" class="link">Cài đặt</a>.
+            Cấu hình AI (API key · provider · model) nằm ở <a href="/settings" class="link">Cài đặt</a>.<br>
+            Bảng màu của cả sản phẩm nằm ở <a href="/he-thong-thiet-ke" class="link">Hệ thống thiết kế</a>
+            — nơi import theme từ liên kết daisyUI và bật cho từng chế độ Sáng/Tối.
           </p>
         </nav>
 

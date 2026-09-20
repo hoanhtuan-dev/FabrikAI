@@ -52,6 +52,19 @@ class DesignAgentService
     private const RADAR_CACHE_SECONDS = 600;
 
     /**
+     * Trần số CÂU HỎI của model được đem đi chạy lại trên công cụ CỦA MÁY CHỦ (2026-09-21).
+     *
+     * Vì sao cần: đường /responses cho model tự tìm, nhưng API chỉ trả về CÂU HỎI nó đã hỏi — KHÔNG trả
+     * kết quả (đã đo: mục web_search_call chỉ có queries, 0 URL kể cả khi xin include=sources). Nghĩa là
+     * việc AI tìm được gì thì máy chủ KHÔNG biết, nên không thể gắn nhãn "có tin thật", không có link cho
+     * người dùng kiểm, và tầng đo không có gì để đếm. Chạy lại đúng những câu hỏi đó trên nguồn tìm kiếm
+     * thật là cách duy nhất biến "AI đã tra" thành DỮ LIỆU.
+     *
+     * Mỗi câu hỏi là một lần đi mạng (có đệm 15 phút theo nguồn · từ khoá), nên phải có trần.
+     */
+    private const AI_QUERY_LIMIT = 3;
+
+    /**
      * Tham số này BẮT BUỘC (kiểu nullable, không có default): container của Laravel KHÔNG tự
      * inject tham số nullable-có-default — nó lấy giá trị default null — nên viết
      * "?AiModelGateway $gateway = null" sẽ khiến service LUÔN chạy ở chế độ tất định dù Cài đặt
@@ -97,7 +110,9 @@ class DesignAgentService
         // Định hướng TẤT ĐỊNH luôn được dựng trước: vừa là kết quả khi không có model,
         // vừa là lưới an toàn nếu model trả về thiếu/không hợp lệ.
         $ruleDirections = $this->ruleDirections($trends);
-        [$directions, $model] = $this->radarDirections($trends, $ruleDirections, $candidates, $region, $useAi, $evidence, $search);
+        // Trả về CẢ danh mục xu hướng: sau khi model chạy, câu hỏi của nó được đem đi tìm trên nguồn thật
+        // nên một số hướng có thể VỪA được gắn bằng chứng thật (xem bước trong radarDirections).
+        [$directions, $model, $trends] = $this->radarDirections($trends, $ruleDirections, $candidates, $region, $useAi, $evidence, $search, $market);
 
         return [
             'agent' => 'TrendRadar',
@@ -692,6 +707,126 @@ class DesignAgentService
     }
 
     /**
+     * CÂU HỎI CỦA MODEL → CHẠY TRÊN CÔNG CỤ CỦA MÁY CHỦ → TIN THẬT (kèm URL + ngày).
+     *
+     * Model quyết định HỎI GÌ (đó là phần nó giỏi), máy chủ đi TÌM (đó là phần nó có thật). Kết quả trả về
+     * là tin thật nên dùng được làm DỮ LIỆU: đếm từ khoá, gắn link, gắn nhãn "có tin thật".
+     *
+     * KHÔNG bao giờ ném lỗi: không có trình kết nối / nguồn chết / từ khoá rỗng đều là KẾT QUẢ ĐO — một
+     * bước phụ không được phép làm hỏng lượt đọc xu hướng.
+     *
+     * @param  list<string>  $queries
+     * @return array{queries:list<string>, items:list<array<string,mixed>>, sources:list<string>, count:int, error:?string}
+     */
+    private function collectAiEvidence(array $queries, string $region): array
+    {
+        $out = ['queries' => [], 'items' => [], 'sources' => [], 'count' => 0, 'error' => null];
+
+        if ($this->sources === null) {
+            $out['error'] = 'không có trình kết nối nguồn ngoài';
+
+            return $out;
+        }
+
+        $wanted = [];
+        foreach ($queries as $query) {
+            $query = trim((string) $query);
+            if ($query !== '' && ! in_array($query, $wanted, true)) {
+                $wanted[] = $query;
+            }
+        }
+        $wanted = array_slice($wanted, 0, self::AI_QUERY_LIMIT);
+
+        if ($wanted === []) {
+            return $out;
+        }
+
+        $seen = [];
+        foreach ($wanted as $query) {
+            try {
+                $found = $this->sources->search($query, $region);
+            } catch (Throwable $e) {
+                $out['error'] = 'lỗi khi tìm: '.class_basename($e);
+                continue;
+            }
+
+            $out['queries'][] = $query;
+
+            foreach ((array) ($found['items'] ?? []) as $item) {
+                $url = (string) ($item['url'] ?? '');
+                if ($url !== '' && isset($seen[$url])) {
+                    continue;
+                }
+                if ($url !== '') {
+                    $seen[$url] = true;
+                }
+                $out['items'][] = $item;
+            }
+
+            foreach ((array) ($found['sources'] ?? []) as $row) {
+                $name = (string) ($row['name'] ?? '');
+                if ($name !== '' && ! in_array($name, $out['sources'], true)) {
+                    $out['sources'][] = $name;
+                }
+            }
+
+            if (($found['error'] ?? null) !== null) {
+                $out['error'] = (string) $found['error'];
+            }
+        }
+
+        $out['count'] = count($out['items']);
+
+        return $out;
+    }
+
+    /**
+     * BIẾN TIN AI TÌM ĐƯỢC THÀNH TÍN HIỆU ĐO ĐƯỢC — dùng ĐÚNG phép đo của tầng tín hiệu thị trường.
+     *
+     * Vì sao không viết phép khớp riêng: hai bản sao sẽ lệch nhau (bài học "bản sao lệch chuẩn" đã gặp
+     * nhiều lần trong dự án này). Ở đây chỉ ĐO thêm rồi chạy lại đúng hàm gắn nhãn đang dùng cho tin của
+     * feed — nên hướng nào khớp từ khoá sẽ tự động mang nhãn "có tin thật" kèm link kiểm chứng.
+     *
+     * KHÁC một điểm có chủ ý: tín hiệu đo từ tin AI tìm được KHÔNG ghi vào bảng đo định kỳ. Chuỗi số đo
+     * (tăng/giảm theo lịch sử) là ẢNH CHỤP của các nguồn đã cấu hình, chèn câu hỏi tuỳ hứng của model vào
+     * đó là làm hỏng chính chuỗi mà người dùng dùng để so sánh — nên chúng chỉ sống trong lượt chạy này.
+     *
+     * @param  list<array<string, mixed>>  $trends
+     * @param  array<string, mixed>  $market
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function withAiSignals(array $trends, array $market, array $items): array
+    {
+        if ($this->market === null || $items === []) {
+            return $trends;
+        }
+
+        try {
+            $measured = $this->market->extract($items);
+        } catch (Throwable $e) {
+            return $trends;
+        }
+
+        $signals = (array) ($measured['signals'] ?? []);
+        if ($signals === []) {
+            return $trends;
+        }
+
+        // Đánh dấu NGUỒN GỐC của từng tín hiệu: tin do AI hỏi rồi máy chủ đi lấy KHÁC tin của feed định kỳ,
+        // và người dùng phải phân biệt được hai thứ này trên màn hình.
+        foreach ($signals as $index => $row) {
+            $signals[$index] = $row + ['origin' => 'ai'];
+        }
+
+        $merged = $market;
+        $merged['mode'] = 'live';
+        $merged['signals'] = array_merge((array) ($market['signals'] ?? []), $signals);
+
+        return $this->withMarketSignals($trends, $merged);
+    }
+
+    /**
      * Hướng có sẵn + bằng chứng thật: số đo THAY số mẫu, và nói rõ nguồn nào nhắc tới nó.
      *
      * @param  array<string, mixed>  $trend
@@ -715,13 +850,25 @@ class DesignAgentService
 
         // array_merge (KHÔNG dùng phép hợp mảng): phép hợp giữ giá trị CŨ khi khoá trùng, nên số đo sẽ
         // không bao giờ thay được số mẫu — đúng lỗi mà test bắt được.
+        // NGUỒN GỐC của bằng chứng: tin của feed định kỳ, hay tin do AI hỏi rồi máy chủ đi lấy. Hai thứ
+        // này phải NÓI KHÁC NHAU — người dùng cần biết con số này đo từ đâu để biết có so sánh được không.
+        $origin = 'feed';
+        foreach ($hits as $hit) {
+            if (($hit['origin'] ?? '') === 'ai') {
+                $origin = 'ai';
+                break;
+            }
+        }
+
         return array_merge($trend, [
             'momentum' => $this->momentumFromSignal($mentions, $change),
             'confidence' => $this->confidenceFromSignal($mentions, $sources),
             'evidence_count' => $mentions,
             'evidence_mode' => 'live',
             'momentum_source' => 'signal',
-            'regional_note' => 'Số liệu đo từ tin thật của nguồn ngoài (không dùng AI).',
+            'regional_note' => $origin === 'ai'
+                ? 'Số liệu đo từ tin AI tự tra trong lượt này (máy chủ đi lấy theo câu hỏi của model).'
+                : 'Số liệu đo từ tin thật của nguồn ngoài (không dùng AI).',
             'live' => [
                 'mentions' => $mentions,
                 'source_count' => $sources,
@@ -729,6 +876,7 @@ class DesignAgentService
                 'terms' => array_values(array_map(fn (array $row) => (string) $row['term'], $hits)),
                 'articles' => array_slice($articles, 0, 3),
                 'captured_at' => $market['captured_at'] ?? null,
+                'origin' => $origin,
             ],
         ]);
     }
@@ -759,6 +907,8 @@ class DesignAgentService
             'confidence' => $this->confidenceFromSignal($mentions, $sources),
             'evidence_count' => $mentions,
             'color' => $this->categoryColor($category),
+            // Hướng sinh từ tin AI tự tra cũng phải khai rõ nguồn gốc (xem enrichTrend).
+            'evidence_origin' => ($signal['origin'] ?? '') === 'ai' ? 'ai' : 'feed',
             'region' => $market['region'] ?? 'all',
             'description' => sprintf(
                 'Nhắc tới trong %d tin của %d nguồn%s%s',
@@ -1313,7 +1463,7 @@ class DesignAgentService
      * @param  array<string, mixed>  $search  kết quả của `searchSetup()` (model + cách tìm kiếm)
      * @return array{0: list<array>, 1: array}
      */
-    private function radarDirections(array $trends, array $ruleDirections, array $candidates, string $region, bool $useAi, array $evidence = [], array $search = []): array
+    private function radarDirections(array $trends, array $ruleDirections, array $candidates, string $region, bool $useAi, array $evidence = [], array $search = [], array $market = []): array
     {
         $callCandidates = (array) ($search['rows'] ?? []);
 
@@ -1321,7 +1471,7 @@ class DesignAgentService
         // Trước đây kiểm `$candidates === []` (nhóm suy luận) TRƯỚC khi xét nhóm tìm kiếm ⇒ người dùng chỉ
         // khai nhóm "Tìm kiếm nguồn ngoài" mà không khai nhóm suy luận thì agent im lặng rơi về engine tất định.
         if (! $useAi || $this->gateway === null || ($candidates === [] && $callCandidates === [])) {
-            return [$ruleDirections, $this->modelBlock('rule', $candidates)];
+            return [$ruleDirections, $this->modelBlock('rule', $candidates), $trends];
         }
 
         // LƯU Ý QUAN TRỌNG: chỉ gửi catalog của VÙNG (không gửi tín hiệu nội bộ của shop) nên
@@ -1358,7 +1508,7 @@ class DesignAgentService
                 // Số đo của lượt ĐÃ CHẠY được giữ nguyên trong đệm — bản đệm không được biến một lượt CÓ
                 // tìm kiếm thành một lượt "không tìm gì".
                 'tool_search' => is_array($cached['tool_search'] ?? null) ? $cached['tool_search'] : null,
-            ])];
+            ]), $trends];
         }
 
         $instruction = 'Bạn là TrendRadar — chuyên gia phân tích xu hướng thời trang Việt Nam cho xưởng may và thương hiệu nhỏ. '
@@ -1467,7 +1617,7 @@ class DesignAgentService
         if ($answer === null) {
             logger()->warning('TrendRadar: model không trả về nội dung, dùng engine tất định', ['group' => self::AI_GROUP, 'attempted' => $attempted]);
 
-            return [$ruleDirections, $this->modelBlock('rule', $runner, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch, 'tool_search' => $toolSearch])];
+            return [$ruleDirections, $this->modelBlock('rule', $runner, ['reason' => 'model_error', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch, 'tool_search' => $toolSearch]), $trends];
         }
 
         $directions = $this->normalizeDirections($call['json'], $trends, $ruleDirections);
@@ -1490,7 +1640,30 @@ class DesignAgentService
                 'raw' => substr($answer['text'], 0, 800),
             ]);
 
-            return [$ruleDirections, $this->modelBlock('rule', $runner, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch, 'tool_search' => $toolSearch])];
+            return [$ruleDirections, $this->modelBlock('rule', $runner, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch, 'tool_search' => $toolSearch]), $trends];
+        }
+
+        // CÂU HỎI CỦA MODEL CHẠY LẠI TRÊN CÔNG CỤ CỦA MÁY CHỦ → TIN THẬT → thành DỮ LIỆU.
+        //
+        // Vì sao đặt ở ĐÂY (sau khi model trả lời, trước khi ghi đệm): hướng nào khớp từ khoá trong tin
+        // vừa lấy được thì mang nhãn "có tin thật" + link kiểm chứng, và bản đệm phải giữ ĐÚNG kết quả đã
+        // hiện cho người dùng — ghi đệm trước bước này là lần mở sau thấy một màn hình khác.
+        if (WebAccessService::isHostedMode($search['hosted'] ?? null) && ($toolSearch['queries'] ?? []) !== []) {
+            $aiEvidence = $this->collectAiEvidence((array) $toolSearch['queries'], $region);
+            // Số đo của bước này thuộc về khối tool_search: giao diện đọc nó để nói "AI tìm được N tin".
+            $toolSearch['server_queries'] = $aiEvidence['queries'];
+            $toolSearch['items'] = $aiEvidence['items'];
+            $toolSearch['server_hits'] = $aiEvidence['count'];
+            if ($aiEvidence['error'] !== null) {
+                $toolSearch['error'] = $aiEvidence['error'];
+            }
+
+            if ($aiEvidence['items'] !== []) {
+                $trends = $this->withAiSignals($trends, $market, $aiEvidence['items']);
+                // Gắn lại bằng chứng cho định hướng: hướng nhắc tới trend VỪA thành "có tin thật" cũng phải
+                // mang link — nếu không, thẻ hướng nói "có tin thật" mà không có gì để bấm vào.
+                $directions = $this->attachTrendEvidence($directions, $trends);
+            }
         }
 
         try {
@@ -1510,10 +1683,11 @@ class DesignAgentService
             'model' => $answer['model'],
             'latency_ms' => $latency,
             'attempts' => $call['attempts'],
+            // (khối tool_search được dựng ở dưới, sau bước chạy lại câu hỏi của model trên máy chủ)
             // Nói THẬT lần chạy này có tìm kiếm web hay không (giao diện đọc để không hứa sai).
             'web_search' => $webSearch,
             'tool_search' => $toolSearch,
-        ])];
+        ]), $trends];
     }
 
     /**

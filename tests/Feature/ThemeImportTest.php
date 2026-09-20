@@ -12,6 +12,7 @@ use App\Support\ThemeDeriver;
 use App\Support\ThemeLibrary;
 use App\Support\ThemeRamp;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route as RouteFacade;
 use Tests\TestCase;
 
 /**
@@ -384,6 +385,41 @@ class ThemeImportTest extends TestCase
             ->assertSee('FabrikAI · Tối', false)            // theme gốc vẫn hiện để có đường quay về
             ->assertSee('Dùng bảng màu gốc', false)
             ->assertSee('Bảng token hai theme', false);      // phần đọc số liệu vẫn còn nguyên
+    }
+
+    /**
+     * ĐƯỜNG VÀO phải có thật — nếu không thì tính năng coi như không tồn tại.
+     *
+     * Đây không phải lo xa: chính khối menu này đã có ghi chú về lần mục "Giao diện" bị thiếu lối vào
+     * (tính năng đổi Sáng/Tối có từ trước nhưng người dùng không tìm thấy). Trang /he-thong-thiet-ke là
+     * chỗ DUY NHẤT import được theme, nên nó phải có mặt ở cả hai nơi chủ sản phẩm hay đứng: menu
+     * Cài đặt trong Studio (khối Quản trị) và console Owner.
+     */
+    public function test_the_owner_has_a_visible_way_to_the_theme_library(): void
+    {
+        $this->assertNotNull(RouteFacade::getRoutes()->getByName('design-tokens.page'), 'Thiếu route /he-thong-thiet-ke.');
+
+        $studio = (string) file_get_contents(resource_path('js/studio/StudioApp.vue'));
+
+        // Khối Quản trị trong menu Cài đặt là khối is_admin CUỐI CÙNG của tệp; link phải nằm TRONG đó
+        // (sau dấu mở khối và trước </nav>) — nếu không thì khách cũng thấy một link dẫn tới 403.
+        $ownerBlock = strripos($studio, 'v-if="store.user && store.user.is_admin"');
+        $link = strpos($studio, 'href="/he-thong-thiet-ke"');
+        $navEnd = strpos($studio, '</nav>', (int) $ownerBlock);
+
+        $this->assertNotFalse($ownerBlock, 'Không tìm thấy khối Quản trị trong menu Cài đặt của Studio.');
+        $this->assertNotFalse($link, 'Menu Cài đặt của Studio thiếu lối vào /he-thong-thiet-ke.');
+        $this->assertGreaterThan($ownerBlock, $link, 'Lối vào /he-thong-thiet-ke phải nằm TRONG khối Quản trị (is_admin).');
+        $this->assertLessThan($navEnd, $link, 'Lối vào /he-thong-thiet-ke phải nằm trong menu Cài đặt.');
+
+        // Console Owner: /admin đã bị middleware admin chặn nên nút này không cần gate thêm.
+        $admin = (string) file_get_contents(resource_path('js/studio/AdminApp.vue'));
+        $this->assertStringContainsString('href="/he-thong-thiet-ke"', $admin,
+            'Console Owner thiếu lối vào /he-thong-thiet-ke.');
+
+        // Biểu tượng phải có thật trong icons.json (nguồn icon duy nhất của cả Vue lẫn PHP).
+        $icons = json_decode((string) file_get_contents(resource_path('js/studio/icons.json')), true);
+        $this->assertArrayHasKey('palette', $icons, 'Thiếu icon palette cho lối vào Hệ thống thiết kế.');
     }
 
     public function test_the_sync_command_reports_drift_instead_of_writing(): void

@@ -1331,6 +1331,11 @@ function onTouchEnd(e) {
               <a href="/settings" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="gear" size="h-4 w-4" class="text-warn" /> Cài đặt hệ thống (API key · model)</a>
               <a href="/admin" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="coins" size="h-4 w-4" class="text-warn" /> Quản trị Owner (người dùng · gói cước)</a>
               <a href="/bao-cao-nhom" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="receipt" size="h-4 w-4" class="text-warn" /> Chi phí theo nhóm (báo cáo)</a>
+              <!-- [2026-09-25] Đường vào THƯ VIỆN THEME. Bài học của chính khối này (xem ghi chú ở mục
+                   Giao diện phía trên): tính năng có mà không có lối vào thì người dùng tưởng nó không
+                   tồn tại. Trang /he-thong-thiet-ke là chỗ DUY NHẤT import được theme từ liên kết
+                   daisyUI và bật theme theo từng chế độ Sáng/Tối. -->
+              <a href="/he-thong-thiet-ke" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="palette" size="h-4 w-4" class="text-warn" /> Hệ thống thiết kế (thư viện theme · bảng token)</a>
             </template>
           </div>
         </div>
