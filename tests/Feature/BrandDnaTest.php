@@ -223,6 +223,8 @@ class BrandDnaTest extends TestCase
      */
     public function test_model_without_builtin_search_is_reported_honestly(): void
     {
+        // Khả năng là của GIAO THỨC, không phải của nhà cung cấp: thêm một nhà cung cấp mới nói cùng
+        // giao thức thì không phải sửa mã. Giao thức lạ ⇒ KHÔNG hứa (false), không đoán.
         $this->assertFalse(WebAccessService::supportsSearch('openai'));
         $this->assertTrue(WebAccessService::supportsSearch('qwen'));
         $this->assertTrue(WebAccessService::supportsSearch('gemini'));
@@ -230,12 +232,125 @@ class BrandDnaTest extends TestCase
 
         Cache::flush();
         Http::fake(['*' => Http::response('', 204)]);
-        $result = app(WebAccessService::class)->probe(true);
 
-        // Bộ seed không cấu hình model cho nhóm agent ⇒ không có candidate nào có tìm kiếm.
-        $this->assertFalse($result['model_search']['supported']);
-        $this->assertSame('internet_no_search', $result['verdict']);
-        $this->assertStringContainsString('KHÔNG có tìm kiếm tích hợp', $result['verdict_label']);
+        // (a) CHƯA có model dùng được ⇒ phải nói "chưa cấu hình", KHÔNG được nói "model không có tìm kiếm"
+        // (hai chuyện khác nhau: một cái là việc ở Cài đặt, một cái là năng lực của model).
+        $none = app(WebAccessService::class)->probe(true);
+        $this->assertFalse($none['model_search']['has_model']);
+        $this->assertFalse($none['model_search']['supported']);
+        $this->assertSame('no_model_configured', $none['verdict']);
+        $this->assertStringContainsString('chưa có model dùng được', $none['verdict_label']);
+
+        // (b) CÓ model nhưng giao thức không khai tìm kiếm ⇒ verdict khác hẳn, và vẫn không nêu tên ai.
+        \App\Models\StudioProvider::create([
+            'slug' => 'provider-khong-search', 'name' => 'Gateway thường', 'protocol' => 'openai',
+            'base_url' => 'https://plain.example/v1', 'auth_style' => 'bearer',
+            'search_param' => null, 'api_key_ref' => 'provider-khong-search',
+            'priority' => 9, 'enabled' => true,
+        ]);
+        \App\Models\StudioApiKey::create([
+            'provider' => 'provider-khong-search', 'label' => 'x', 'value' => 'sk-x',
+            'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+        ]);
+        \App\Models\StudioModel::create([
+            'group' => 'prompt', 'name' => 'Model thường', 'provider' => 'provider-khong-search',
+            'model_id' => 'thuong', 'api_key_ref' => 'provider-khong-search', 'priority' => 9, 'enabled' => true,
+        ]);
+        set_setting('studio_task_prompt_model', 'provider-khong-search:thuong');
+
+        $configured = app(WebAccessService::class)->probe(true);
+        $this->assertTrue($configured['model_search']['has_model']);
+        $this->assertFalse($configured['model_search']['supported']);
+        $this->assertSame('internet_no_search', $configured['verdict']);
+        $this->assertStringContainsString('KHÔNG có tìm kiếm web', $configured['verdict_label']);
+        // Câu kết luận KHÔNG được đẩy người dùng sang một nhà cung cấp cụ thể nào — việc chọn model là
+        // ở Cài đặt, và mã nguồn không được quyết hộ.
+        foreach (['Qwen', 'DashScope', 'DeepSeek', 'Gemini'] as $vendor) {
+            $this->assertStringNotContainsString($vendor, $configured['verdict_label']);
+        }
+    }
+
+    /**
+     * TÌM KIẾM WEB DO CÀI ĐẶT QUYẾT ĐỊNH: một Custom Provider tự khai `search_param` ⇒ hệ thống bật
+     * đúng tham số đó, và gateway gửi nó trong request. Không có dòng mã nào biết tên nhà cung cấp.
+     */
+    public function test_search_follows_the_configured_custom_provider(): void
+    {
+        \App\Models\StudioProvider::create([
+            'slug' => 'gateway-abc', 'name' => 'Gateway ABC', 'protocol' => 'openai',
+            'base_url' => 'https://gateway.example/v1', 'auth_style' => 'bearer',
+            'search_param' => 'enable_search', 'api_key_ref' => 'gateway-abc',
+            'priority' => 9, 'enabled' => true,
+        ]);
+        \App\Models\StudioApiKey::create([
+            'provider' => 'gateway-abc', 'label' => 'gateway-abc', 'value' => 'sk-abc',
+            'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+        ]);
+        \App\Models\StudioModel::create([
+            'group' => 'prompt', 'name' => 'ABC large', 'provider' => 'gateway-abc',
+            'model_id' => 'abc-large', 'api_key_ref' => 'gateway-abc', 'priority' => 9, 'enabled' => true,
+        ]);
+        set_setting('studio_task_prompt_model', 'gateway-abc:abc-large');
+
+        // 1) Khả năng đọc từ CẤU HÌNH: candidate mang theo search_param đã khai.
+        $candidate = app(\App\Services\AiModelGateway::class)->candidates('prompt')[0];
+        $plan = WebAccessService::planFor($candidate);
+        $this->assertNotNull($plan, 'Provider tự khai tham số tìm kiếm thì phải được coi là CÓ.');
+        $this->assertSame('enable_search', $plan['param']);
+        $this->assertStringContainsString('Cài đặt', $plan['source']);
+
+        // 2) Request thật có gửi tham số đó (không chỉ hiện trên giao diện).
+        Cache::flush();
+        Http::fake([
+            'gateway.example/*' => Http::response(['choices' => [['message' => ['content' => json_encode([
+                'narrative' => 'n', 'brief' => 'b', 'prompt_vi' => 'vi', 'prompt_en' => 'en',
+                'moodboard_captions' => [], 'category_rationale' => [], 'outfit_goals' => [], 'next_steps' => [],
+            ], JSON_UNESCAPED_UNICODE)]]]], 200),
+        ]);
+
+        app(DesignAgentService::class)->collectionBrief(['prompt' => 'đầm'], $this->customer(), true);
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), 'gateway.example')
+                && (json_decode((string) $request->body(), true)['enable_search'] ?? null) === true;
+        });
+    }
+
+    /** Nhóm công việc chưa có model là trạng thái CẤU HÌNH — báo cáo phải nói đúng, không phải lỗi. */
+    public function test_task_group_status_comes_from_settings(): void
+    {
+        Cache::flush();
+        Http::fake(['*' => Http::response('', 204)]);
+
+        $groups = collect(app(WebAccessService::class)->probe(true)['task_groups']);
+
+        $this->assertNotEmpty($groups);
+
+        // Báo cáo phải PHẢN ÁNH ĐÚNG Cài đặt — kiểm bằng cách so với chính nguồn cấu hình, KHÔNG hard-code
+        // nhóm nào "phải rỗng": bộ seed đổi thì test vẫn đúng, mà lệch khỏi Cài đặt là ĐỎ.
+        foreach ($groups as $row) {
+            $this->assertSame(
+                studio_task_group_models($row['group']) !== [],
+                $row['configured'],
+                'Trạng thái nhóm '.$row['group'].' không khớp Cài đặt.',
+            );
+            $this->assertSame(count(studio_task_group_models($row['group'])), $row['candidates']);
+        }
+
+        // Và nó phải ĐỔI THEO khi Cài đặt đổi: thêm model tạo ảnh cho một provider mới ⇒ báo cáo thấy ngay.
+        \App\Models\StudioApiKey::create([
+            'provider' => 'provider-moi', 'label' => 'provider-moi', 'value' => 'sk-x',
+            'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+        ]);
+        \App\Models\StudioModel::create([
+            'group' => 'image', 'name' => 'Model mới', 'provider' => 'provider-moi',
+            'model_id' => 'anh-moi', 'api_key_ref' => 'provider-moi', 'priority' => 99, 'enabled' => true,
+        ]);
+
+        $again = collect(app(WebAccessService::class)->probe(true)['task_groups'])->keyBy('group');
+        $this->assertTrue($again['image']['configured']);
+        $this->assertContains('provider-moi:anh-moi', $again['image']['models'],
+            'Model vừa thêm trong Cài đặt phải xuất hiện trong báo cáo — không có danh sách cứng nào chen vào.');
     }
 
     /** Endpoint chỉ mở cho tài khoản studio, và KHÔNG gọi model nào (chỉ đo + đọc cấu hình). */

@@ -341,7 +341,7 @@ async function toggleKey(k) {
 }
 
 // ─────────────────────────── Hộp thoại: custom provider ───────────────────────────
-const blankProv = () => ({ name: '', protocol: 'openai', base_url: '', auth_style: 'bearer', api_key_ref: '', priority: 5, note: '', enabled: true, slug: '' });
+const blankProv = () => ({ name: '', protocol: 'openai', base_url: '', auth_style: 'bearer', search_param: '', api_key_ref: '', priority: 5, note: '', enabled: true, slug: '' });
 // slugKey = KHOÁ ĐỊNH TUYẾN của bản ghi (routeKey của model là slug, KHÔNG phải id số)
 // — trước đây form gửi id nên PUT/DELETE đều 404 (không sửa/xoá được provider).
 const provModal = reactive({ open: false, mode: 'create', id: null, slugKey: null, form: blankProv(), errors: {}, saving: false });
@@ -359,7 +359,7 @@ function openProvModal(row = null, preset = null) {
     errors: {},
     saving: false,
     form: row
-      ? { slug: row.slug, name: row.name, protocol: row.protocol, base_url: row.base_url, auth_style: row.auth_style, api_key_ref: row.api_key_ref, priority: row.priority ?? 5, note: row.note || '', enabled: !!row.enabled }
+      ? { slug: row.slug, name: row.name, protocol: row.protocol, base_url: row.base_url, auth_style: row.auth_style, search_param: row.search_param || '', api_key_ref: row.api_key_ref, priority: row.priority ?? 5, note: row.note || '', enabled: !!row.enabled }
       : Object.assign(blankProv(), preset || {}),
   });
 }
@@ -381,6 +381,7 @@ async function submitProv() {
   const f = provModal.form;
   const payload = {
     name: f.name.trim(), protocol: f.protocol, base_url: f.base_url.trim(), auth_style: f.auth_style,
+    search_param: String(f.search_param || '').trim(),
     api_key_ref: f.api_key_ref.trim(), priority: Number(f.priority) || 0, note: f.note, enabled: !!f.enabled,
   };
   if (provModal.mode === 'create') payload.slug = f.slug.trim();
@@ -411,6 +412,7 @@ function applyProviderTemplate(key) {
     protocol: tpl.protocol || 'openai',
     base_url: tpl.base_url || '',
     auth_style: tpl.auth_style || 'bearer',
+    search_param: tpl.search_param || '',
     api_key_ref: tpl.api_key_ref || '',
     note: tpl.note || '',
   });
@@ -1401,6 +1403,11 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           <input id="p-keyref" v-model="provModal.form.api_key_ref" class="input !py-2 font-mono text-xs" :class="provModal.errors.api_key_ref ? '!border-red-500/70' : ''" placeholder="vd: ckey — KHÔNG dán khoá API vào đây">
           <p v-if="provModal.errors.api_key_ref" class="mt-1 text-body text-danger">{{ provModal.errors.api_key_ref }}</p>
           <p v-else class="mt-1 text-body text-cream-300">Khoá API thật thêm ở mục API Keys với provider = slug này.</p>
+        </div>
+        <div>
+          <label class="label" for="p-search">Tham số bật TÌM KIẾM WEB <span class="font-normal normal-case text-cream-300">(tuỳ chọn — gateway của bạn bật tìm kiếm bằng tham số nào?)</span></label>
+          <input id="p-search" v-model="provModal.form.search_param" class="input !py-2 font-mono text-xs" placeholder="VD: enable_search · bỏ trống nếu không có">
+          <p class="mt-1 text-body text-cream-300">Điền thì FabrikAI gửi kèm tham số này khi agent cần tìm kiếm web; bỏ trống nghĩa là "không khai" — hệ thống KHÔNG đoán là có.</p>
         </div>
         <div>
           <label class="label" for="p-prio">Ưu tiên trong nhóm Custom <span class="font-normal normal-case text-cream-300">(lớn hơn = thử trước)</span></label>

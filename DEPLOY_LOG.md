@@ -1749,3 +1749,58 @@ Trước đây: đếm project/generation + dò từ khoá trong `generations.pr
 **Test:** full suite **882 test / 6.490 assert XANH** (thêm **16 test** ở `BrandDnaTest`) · `npm run build` exit 0.
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
+
+## Phiên 2026-09-23 (Đợt 23 — BỎ GIẢ ĐỊNH CỨNG VỀ NHÀ CUNG CẤP: tìm kiếm web & khả năng truy cập theo CÀI ĐẶT)
+
+**Deploy:** `<prev> → <commit>`. **Migration mới:** `2026_09_23_000004_add_search_param_to_studio_providers` (thêm cột `studio_providers.search_param`).
+
+### 0. Phản hồi dẫn tới đợt này
+
+Người dùng: *"không nên code cứng (a) cấp key Qwen/DashScope → **nên tôn trọng trong cài đặt provider|model** → hiện tại deepseek đang hoạt động (có thể đọc ảnh). Tạm thời cứ tối ưu cho qwen: Nhóm image trên production hiện 0 candidate → **chờ cài đặt key sau**."*
+
+Đúng ở cả ba điểm, và Đợt 22 đã phạm đúng lỗi này: phần "khả năng tìm kiếm" tôi khoá theo **tên nhà cung cấp** (`qwen` · `gemini` · `deepseek`) và câu kết luận đẩy người dùng về một nhà cung cấp cụ thể. Việc chọn provider/model là của **Cài đặt**, không phải của mã nguồn.
+
+### 1. Sửa gốc: khả năng là của GIAO THỨC + do CÀI ĐẶT khai
+
+| Trước (Đợt 22 — sai) | Nay |
+|---|---|
+| `SEARCH_TRANSPORTS` khoá theo **tên nhà cung cấp** (qwen · gemini · deepseek…) | `SEARCH_DIALECTS` khoá theo **giao thức** (qwen/dashscope → `enable_search` · gemini → `google_search`); giao thức lạ ⇒ `null` = KHÔNG hứa |
+| Nhánh gateway tự kiểm `supportsSearch('qwen')` / `supportsSearch('gemini')` | Một hàm dùng chung `AiModelGateway::applySearch()`: lấy **kế hoạch** từ `WebAccessService::planFor($candidate)` rồi áp dụng (`body_flag` hoặc `tools`) |
+| Nhà cung cấp tự khai (Custom Providers) không có cách nào nói mình bật tìm kiếm bằng gì | **Cột mới `studio_providers.search_param`** + ô **"Tham số bật TÌM KIẾM WEB"** trong Cài đặt → Custom Providers. Khai ⇒ hệ thống gửi đúng tham số đó; bỏ trống ⇒ **không đoán** |
+| Câu kết luận đẩy về một nhà cung cấp | Câu kết luận **không nêu tên nhà cung cấp nào** (test khoá), chỉ nói *việc cần làm nằm ở Cài đặt → Nhóm công việc* |
+| Nhóm rỗng bị hiểu là "model không có tìm kiếm" | Tách `model_search.has_model` khỏi `model_search.supported` ⇒ verdict mới `no_model_configured` |
+
+### 2. Bốn câu kết luận thay vì hai (mỗi câu là một việc cần làm KHÁC nhau)
+
+| verdict | Khi nào | Người dùng làm gì |
+|---|---|---|
+| `no_internet` | máy chủ không ra được internet | báo quản trị hosting |
+| `no_model_configured` | **chưa có model dùng được** cho nhóm suy luận (thiếu key/chưa gán model) | vào Cài đặt; agent đang chạy bằng bộ quy tắc có sẵn |
+| `internet_no_search` | có model nhưng model đó không có tìm kiếm web | chọn model/nhà cung cấp có tìm kiếm, hoặc khai `search_param` |
+| `internet_and_search` | có model VÀ có tìm kiếm | không cần làm gì |
+
+### 3. Trạng thái CẤU HÌNH hiện ngay trong Agent Studio
+
+Kết quả đo có thêm khối `task_groups`: 5 nhóm công việc (`prompt` · `vision` · `image` · `edit` · `video`) đọc thẳng từ `studio_task_group_models()`. Nhóm rỗng hiển thị là **"chưa có model — tính năng đó đang chờ bạn cài đặt key/model"**, không phải lỗi. Đúng với thực tế production bạn nêu: **nhóm `image` 0 candidate ⇒ chờ cài đặt key sau**, và giao diện nay nói đúng như vậy thay vì để người dùng đi tìm lỗi ở agent.
+
+### 4. "Tạm thời cứ tối ưu cho qwen" — đã làm, nhưng qua CÀI ĐẶT
+
+- Đường Qwen/DashScope đã sẵn đầy đủ: `enable_search` cho chat, và **cả đường radar lẫn đường brief** đều bật khi candidate đang cấu hình hỗ trợ.
+- Khoá cache radar gồm **cả cách bật tìm kiếm** (`...:v2:<vùng>:<model>:search:enable_search|plain`$) ⇒ đổi tham số trong Cài đặt là nội dung đổi theo, không dùng lại cache cũ.
+- Khi bạn thêm key/model sau này: **không phải sửa mã** — chỉ cần chọn model trong Cài đặt → Nhóm công việc; hoặc thêm Custom Provider và khai tham số tìm kiếm.
+
+### 5. Kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Test mới | `test_search_follows_the_configured_custom_provider`: Custom Provider khai `search_param=enable_search` ⇒ `planFor()` trả đúng tham số **và request thật có gửi** `enable_search=true` (bắt bằng `Http::assertSent`) |
+| | `test_task_group_status_comes_from_settings`: mọi nhóm báo cáo **khớp** `studio_task_group_models()`; thêm model mới trong Cài đặt ⇒ báo cáo đổi ngay |
+| | `test_model_without_builtin_search_is_reported_honestly`: phân biệt `no_model_configured` vs `internet_no_search`; câu kết luận **không chứa** tên Qwen/DashScope/DeepSeek/Gemini |
+| Full suite | **884 test / 6.516 assert XANH** |
+| Chrome thật (local) | Panel Agent Studio: *"Máy chủ CÓ internet · đo 2 đích · 159 ms"* + *"Chưa có model dùng được cho nhóm suy luận"* + danh sách 5 nhóm công việc |
+| Chrome thật — Cài đặt | Tab **Custom Providers → Thêm provider** có ô **"Tham số bật TÌM KIẾM WEB (tuỳ chọn…)"**, placeholder `VD: enable_search · bỏ trống nếu không có` |
+| Production | `php artisan studio:web-access --force` → máy chủ **CÓ internet** (200/204) · nhóm suy luận: 3 model deepseek **không có tìm kiếm** · verdict `internet_no_search` |
+
+**Test:** full suite **884 test / 6.516 assert XANH** · `npm run build` exit 0.
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).

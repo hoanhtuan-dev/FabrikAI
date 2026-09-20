@@ -1005,7 +1005,7 @@ Hai tầng phải tách bạch vì chúng có thể lệch nhau:
 | Tầng | Ai quyết định | Cách đo |
 |---|---|---|
 | **Máy chủ** | nhà hosting | HEAD thật tới `config('studio.web_probe_targets')`, ghi mã HTTP + độ trễ (`WebAccessService`) |
-| **Model** | nhà cung cấp model | `WebAccessService::SEARCH_TRANSPORTS`: Qwen/DashScope `enable_search` · Gemini `google_search` · OpenAI-compatible/DeepSeek **không có** |
+| **Model** | CÀI ĐẶT (Model Registry · Nhóm công việc · Luồng ưu tiên · Custom Providers) | `WebAccessService::planFor($candidate)`: nhà cung cấp **tự khai** `studio_providers.search_param` trước, sau đó tới **giao thức** (`SEARCH_DIALECTS`: qwen/dashscope → `enable_search` · gemini → `google_search`). Giao thức lạ ⇒ `null` = KHÔNG hứa |
 
 - Giao diện **không** được viết "đang ở chế độ demo" như một câu văn tĩnh: khối "Khả năng truy cập
   internet" trong Agent Studio đọc số ĐO (kèm nút *Kiểm tra lại* → `?force=1`), và câu kết luận có ba
@@ -1016,6 +1016,22 @@ Hai tầng phải tách bạch vì chúng có thể lệch nhau:
   tìm kiếm, luật đổi thành: chỉ được dẫn nguồn mà kết quả tìm kiếm thật sự trả về.
 - Nguồn ngoài vẫn là **dữ liệu mẫu** (`sources_mode=demo`) cho tới khi có connector thật — câu đó hiển
   thị ngay dưới số đo để không ai đọc "máy chủ có internet" thành "dữ liệu thị trường là thật".
+
+Bốn câu kết luận (đừng gộp — mỗi câu là một việc cần làm KHÁC nhau):
+
+| verdict | Khi nào | Người dùng cần làm gì |
+|---|---|---|
+| `no_internet` | máy chủ không ra được internet | báo quản trị hosting |
+| `no_model_configured` | chưa có model **dùng được** cho nhóm suy luận (thiếu key · chưa gán model) | vào Cài đặt thêm key/model — agent đang chạy bằng bộ quy tắc có sẵn |
+| `internet_no_search` | có model nhưng model đó không có tìm kiếm web | muốn nguồn thật thì chọn model/nhà cung cấp có tìm kiếm, hoặc khai `search_param` cho Custom Provider |
+| `internet_and_search` | có model VÀ có tìm kiếm | không cần làm gì |
+
+Kết quả đo còn có khối `task_groups`: trạng thái **cấu hình** của 5 nhóm công việc (`prompt` · `vision` ·
+`image` · `edit` · `video`) đọc thẳng từ `studio_task_group_models()` — nhóm rỗng hiển thị là *"chưa có
+model (chờ cài đặt)"*, KHÔNG phải lỗi. Nhóm rỗng không bao giờ bị coi là "model không có tìm kiếm".
+
+**Không viết cứng tên nhà cung cấp ở bất kỳ đâu quyết định hành vi**: mã nguồn chỉ biết *giao thức*;
+việc chọn provider/model là của Cài đặt. Câu kết luận cũng không nêu tên nhà cung cấp nào (test khoá).
 
 Kiểm tra nhanh trên máy chủ: `php artisan studio:web-access --force`.
 

@@ -374,15 +374,18 @@ class DesignAgentService
         // LƯU Ý QUAN TRỌNG: chỉ gửi catalog của VÙNG (không gửi tín hiệu nội bộ của shop) nên
         // cache dùng chung giữa các tài khoản là an toàn — dữ liệu nội bộ của người dùng không
         // bao giờ rời khỏi tài khoản, kể cả khi hai người mở cùng một khu vực.
-        // TÌM KIẾM WEB (2026-09-23): chỉ bật khi transport của candidate ĐẦU TIÊN thật sự hỗ trợ
-        // (Qwen/DashScope enable_search · Gemini google_search). DeepSeek — provider đang chạy trên
-        // production — KHÔNG có, nên mặc định ở đây là false và giao diện phải nói đúng như vậy.
-        $webSearch = WebAccessService::supportsSearch((string) ($candidates[0]['transport'] ?? ''));
+        // TÌM KIẾM WEB (2026-09-23): quyết định lấy từ CHÍNH candidate đang được cấu hình trong Cài đặt
+        // (giao thức biết cách bật, hoặc nhà cung cấp tự khai `search_param`). Mã nguồn KHÔNG chọn hộ
+        // nhà cung cấp nào: đổi model trong Cài đặt là hành vi đổi theo, không phải sửa mã.
+        $searchPlan = WebAccessService::planFor($candidates[0]);
+        $webSearch = $searchPlan !== null;
 
         $fingerprint = md5(implode('|', array_map(fn (array $c) => $c['provider'].':'.$c['model'], $candidates)));
         // Cờ tìm kiếm nằm TRONG khoá cache: nội dung trả lời khác nhau (có/không nguồn thật) nên dùng
         // chung cache sẽ trả về câu trả lời của chế độ khác.
-        $cacheKey = 'design-agent:radar:v2:'.$region.':'.$fingerprint.':'.($webSearch ? 'search' : 'plain');
+        // Khoá cache gồm CẢ cách bật tìm kiếm: đổi tham số trong Cài đặt (hoặc bật/tắt) là nội dung trả
+        // lời khác đi, nên không được dùng lại bản cache cũ.
+        $cacheKey = 'design-agent:radar:v2:'.$region.':'.$fingerprint.':'.($webSearch ? 'search:'.$searchPlan['param'] : 'plain');
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && ! empty($cached['directions'])) {
             return [$cached['directions'], $this->modelBlock('ai', $candidates, [
@@ -597,8 +600,13 @@ class DesignAgentService
             .'prompt_vi: 1 đoạn mô tả ảnh tiếng Việt. prompt_en: 1 đoạn prompt ảnh tiếng Anh giàu chi tiết (chất liệu, dáng, ánh sáng, bố cục). '
             .'next_steps: đúng 3 việc cần làm tiếp.';
 
+        // TÌM KIẾM WEB cho đường BRIEF: cùng luật với radar — quyết định từ candidate đang được CẤU HÌNH
+        // (giao thức hỗ trợ, hoặc Custom Provider tự khai `search_param`), không từ danh sách cứng.
+        $searchPlan = WebAccessService::planFor($candidates[0] ?? []);
+        $webSearch = $searchPlan !== null;
+
         $started = microtime(true);
-        $call = $this->callJson($instruction, $context, 4000, 8000, 75);
+        $call = $this->callJson($instruction, $context, 4000, 8000, 75, $webSearch ? ['search' => true] : []);
         $latency = (int) round((microtime(true) - $started) * 1000);
         $attempted = $candidates[0]['provider'].':'.$candidates[0]['model'];
         $answer = $call['answer'];
@@ -633,6 +641,7 @@ class DesignAgentService
                 'attempts' => $call['attempts'],
             ]),
             'data' => $data,
+            'web_search' => $webSearch,
         ];
     }
 

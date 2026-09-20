@@ -98,6 +98,8 @@ function setDnaList(key, value) {
   store.brandDnaDraft = { ...dnaDraft.value, [key]: items };
 }
 const dnaDirty = computed(() => JSON.stringify(dnaDraft.value) !== JSON.stringify(dna.value?.dna || {}));
+/** Nhóm công việc CHƯA cấu hình model — đọc từ số đo (tức là từ Cài đặt), không phải danh sách cứng. */
+const missingGroups = computed(() => (store.webAccess?.task_groups || []).filter((row) => !row.configured));
 /**
  * Vì sao nút "Lưu DNA" đang bị khoá — MỘT nguồn cho cả điều kiện khoá lẫn câu giải thích
  * (docs/DESIGN_SYSTEM.md §4 quy tắc 4): hai chỗ viết riêng thì sớm muộn lệch nhau.
@@ -895,17 +897,29 @@ watch(() => store.designAgentOpen, (open) => {
                         <span class="text-cream-400"> · đo {{ formatNumber(store.webAccess.outbound.results.length) }} đích · {{ (store.webAccess.outbound.results[0] || {}).ms || 0 }} ms · lúc {{ new Date(store.webAccess.outbound.checked_at).toLocaleTimeString('vi-VN') }}</span>
                       </li>
                       <li>
-                        <b :class="store.webAccess.model_search.supported ? 'text-ok' : 'text-warn'">{{ store.webAccess.model_search.supported ? 'Model CÓ tìm kiếm tích hợp' : 'Model KHÔNG có tìm kiếm tích hợp' }}</b>
+                        <b :class="store.webAccess.model_search.supported ? 'text-ok' : 'text-warn'">
+                          {{ !store.webAccess.model_search.has_model
+                            ? 'Chưa có model dùng được cho nhóm suy luận'
+                            : (store.webAccess.model_search.supported ? 'Model đang cấu hình CÓ tìm kiếm web' : 'Model đang cấu hình KHÔNG có tìm kiếm web') }}
+                        </b>
                         <span v-if="store.webAccess.model_search.active" class="text-cream-400"> · {{ store.webAccess.model_search.active.model }}</span>
                       </li>
                     </ul>
                     <p class="mt-2 text-body leading-5 text-cream-200">{{ store.webAccess.verdict_label }}</p>
                     <p class="mt-1 text-label leading-5 text-cream-400">Nguồn ngoài vẫn là <b>dữ liệu mẫu</b> (chưa nối sàn TMĐT, chưa có scraping hay POS/ERP thật). Dữ liệu nội bộ là dự án/ảnh của chính tài khoản bạn.</p>
+                    <!-- Nhóm công việc CHƯA có model là trạng thái CẤU HÌNH, không phải lỗi: nói đúng
+                         để người dùng biết việc cần làm là vào Cài đặt, chứ không đi tìm lỗi ở agent. -->
+                    <ul v-if="missingGroups.length" class="mt-2 space-y-0.5 text-label leading-5 text-warn">
+                      <li v-for="row in missingGroups" :key="row.group">↳ Nhóm {{ row.label }} chưa có model — tính năng đó đang chờ bạn cài đặt key/model (Cài đặt → Nhóm công việc).</li>
+                    </ul>
                     <details class="mt-2">
                       <summary class="cursor-pointer text-label text-cream-400">Chi tiết phép đo</summary>
                       <ul class="mt-1 space-y-0.5 text-label text-cream-400">
                         <li v-for="row in store.webAccess.outbound.results" :key="row.url">· {{ row.url }} — {{ row.status ? 'HTTP ' + row.status : (row.error || 'không kết nối được') }} ({{ row.ms }} ms)</li>
                         <li v-for="row in store.webAccess.model_search.candidates" :key="row.provider + row.model">· {{ row.provider }}:{{ row.model }} — {{ row.label }}</li>
+                        <li v-for="row in (store.webAccess.task_groups || [])" :key="row.group">
+                          · Nhóm {{ row.label }}: {{ row.configured ? row.models.join(', ') : 'CHƯA cấu hình model (chờ cài đặt)' }}
+                        </li>
                       </ul>
                     </details>
                   </template>

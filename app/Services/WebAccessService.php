@@ -28,52 +28,70 @@ class WebAccessService
     private const CACHE_MINUTES = 10;
 
     /**
-     * Provider có TÌM KIẾM TÍCH HỢP hay không, và bật bằng tham số nào.
+     * CÁCH BẬT TÌM KIẾM của từng GIAO THỨC (không phải của từng NHÀ CUNG CẤP).
      *
-     * Đây là khai báo DUY NHẤT về khả năng tìm kiếm — AiModelGateway đọc lại đúng bảng này khi
-     * dựng payload, nên không thể có chuyện giao diện nói "có tìm kiếm" mà request không bật gì.
+     * Vì sao khoá theo giao thức: chọn dùng nhà cung cấp/model nào là việc của CÀI ĐẶT (Model Registry ·
+     * Nhóm công việc · Luồng ưu tiên · Custom Providers). Mã nguồn chỉ được biết "giao thức này bật tìm
+     * kiếm bằng cách nào" — thêm một nhà cung cấp mới nói cùng giao thức thì KHÔNG phải sửa mã.
+     * Nhà cung cấp tự khai (Custom Providers) có thể nói tham số của riêng họ ở cột `search_param`.
      */
-    public const SEARCH_TRANSPORTS = [
-        'qwen' => [
-            'supported' => true,
-            'param' => 'enable_search',
-            'label' => 'Qwen/DashScope — bật enable_search',
-        ],
-        'gemini' => [
-            'supported' => true,
-            'param' => 'google_search',
-            'label' => 'Gemini — grounding bằng Google Search',
-        ],
-        'openai' => [
-            'supported' => false,
-            'param' => '',
-            'label' => 'OpenAI-compatible — KHÔNG có tìm kiếm tích hợp',
-        ],
-        'dashscope' => [
-            'supported' => true,
-            'param' => 'enable_search',
-            'label' => 'DashScope — bật enable_search',
-        ],
+    public const SEARCH_DIALECTS = [
+        // OpenAI-compatible trên DashScope: bật bằng cờ trong body.
+        'qwen' => ['mode' => 'body_flag', 'param' => 'enable_search'],
+        'dashscope' => ['mode' => 'body_flag', 'param' => 'enable_search'],
+        // Gemini: grounding bằng Google Search (một "tool").
+        'gemini' => ['mode' => 'tools', 'param' => 'google_search'],
     ];
 
-    /** Transport này có tìm kiếm tích hợp không? (mặc định KHÔNG — thiếu khai báo thì đừng hứa) */
-    public static function supportsSearch(?string $transport): bool
+    /**
+     * Kế hoạch bật tìm kiếm cho MỘT candidate ĐANG ĐƯỢC CẤU HÌNH — null = không hỗ trợ/không rõ.
+     *
+     * Thứ tự: nhà cung cấp tự khai (`search_param`) trước, sau đó tới giao thức. Không đoán: thiếu cả hai
+     * thì trả null và giao diện phải nói "không có tìm kiếm" thay vì hứa suông.
+     *
+     * @param  array{provider?:string, model?:string, transport?:string, search_param?:?string}  $candidate
+     * @return array{mode:string, param:string, source:string}|null
+     */
+    public static function planFor(array $candidate): ?array
     {
-        return (bool) (self::SEARCH_TRANSPORTS[(string) $transport]['supported'] ?? false);
+        $declared = trim((string) ($candidate['search_param'] ?? ''));
+        if ($declared !== '') {
+            return [
+                'mode' => 'body_flag',
+                'param' => $declared,
+                'source' => 'khai trong Cài đặt (Custom Provider)',
+            ];
+        }
+
+        $dialect = self::SEARCH_DIALECTS[(string) ($candidate['transport'] ?? '')] ?? null;
+        if ($dialect === null) {
+            return null;
+        }
+
+        return $dialect + ['source' => 'giao thức '.$candidate['transport']];
     }
 
-    /** Bảng khả năng tìm kiếm theo TÊN PROVIDER (đã cấu hình trong Model Registry). */
+    /** Giao thức này có tìm kiếm tích hợp không? (giữ cho nơi gọi cũ; mặc định KHÔNG) */
+    public static function supportsSearch(?string $transport): bool
+    {
+        return isset(self::SEARCH_DIALECTS[(string) $transport]);
+    }
+
+    /** Bảng khả năng tìm kiếm theo TỪNG model ĐANG ĐƯỢC CẤU HÌNH (không theo nhà cung cấp nào cả). */
     public function providerSearchMap(): array
     {
         $out = [];
         foreach ($this->candidates() as $candidate) {
-            $transport = (string) ($candidate['transport'] ?? '');
+            $plan = self::planFor($candidate);
             $out[] = [
                 'provider' => (string) ($candidate['provider'] ?? ''),
                 'model' => (string) ($candidate['model'] ?? ''),
-                'transport' => $transport,
-                'supported' => self::supportsSearch($transport),
-                'label' => self::SEARCH_TRANSPORTS[$transport]['label'] ?? 'Không rõ transport',
+                'transport' => (string) ($candidate['transport'] ?? ''),
+                'supported' => $plan !== null,
+                'plan' => $plan,
+                'label' => $plan === null
+                    ? 'Không có tìm kiếm web (giao thức không khai tham số tìm kiếm)'
+                    : 'Bật tìm kiếm bằng `'.$plan['param'].'` — '.$plan['source'],
             ];
         }
 
@@ -128,17 +146,24 @@ class WebAccessService
         $outbound = collect($results)->contains(fn (array $row) => $row['ok'] === true);
         $map = $this->providerSearchMap();
         $active = collect($map)->firstWhere('supported', true);
+        // "Chưa cấu hình model dùng được" KHÁC "model không có tìm kiếm" — gộp hai thứ này là nói sai với
+        // người dùng: nhóm rỗng nghĩa là việc cần làm nằm ở Cài đặt (thêm key/model), không phải lỗi agent.
+        $hasModel = $map !== [];
 
         // Câu kết luận nói ĐÚNG cái đang có — đây là câu người dùng đọc để quyết định có tin hay không.
         if (! $outbound) {
             $verdict = 'no_internet';
             $verdictLabel = 'Máy chủ KHÔNG gọi được ra internet — mọi phân tích chỉ dựa trên dữ liệu bạn nhập.';
+        } elseif (! $hasModel) {
+            $verdict = 'no_model_configured';
+            $verdictLabel = 'Máy chủ có internet nhưng NHÓM SUY LUẬN chưa có model dùng được (thiếu key hoặc chưa gán model) — agent đang chạy bằng bộ quy tắc có sẵn. Vào Cài đặt → Nhóm công việc để cấu hình; khi đã có model thì khả năng tìm kiếm web phụ thuộc chính model đó.';
         } elseif ($active) {
             $verdict = 'internet_and_search';
-            $verdictLabel = 'Máy chủ có internet và model đang dùng CÓ tìm kiếm tích hợp — kết quả phân tích có thể kèm nguồn thật.';
+            $verdictLabel = 'Máy chủ có internet và model bạn đang cấu hình CÓ tìm kiếm web — kết quả phân tích có thể kèm nguồn thật.';
         } else {
             $verdict = 'internet_no_search';
-            $verdictLabel = 'Máy chủ có internet nhưng MODEL đang cấu hình KHÔNG có tìm kiếm tích hợp — câu trả lời chỉ dựa trên dữ liệu hệ thống gửi vào (hiện là dữ liệu mẫu + dữ liệu của chính bạn).';
+            // KHÔNG nêu tên nhà cung cấp nào và KHÔNG gợi ý mua key của ai: việc chọn model là ở Cài đặt.
+            $verdictLabel = 'Máy chủ có internet nhưng model bạn đang cấu hình KHÔNG có tìm kiếm web — câu trả lời chỉ dựa trên dữ liệu hệ thống gửi vào (hiện là dữ liệu mẫu + dữ liệu của chính bạn). Muốn có nguồn thật: chọn một model/nhà cung cấp có tìm kiếm trong Cài đặt → Nhóm công việc (hoặc khai tham số tìm kiếm cho Custom Provider).';
         }
 
         return [
@@ -149,11 +174,17 @@ class WebAccessService
                 'cache_minutes' => self::CACHE_MINUTES,
             ],
             'model_search' => [
+                // supported = có model dùng được VÀ model đó có tìm kiếm. has_model tách riêng để giao diện
+                // phân biệt "chưa cấu hình" với "đã cấu hình nhưng không có tìm kiếm".
+                'has_model' => $hasModel,
                 'supported' => $active !== null,
                 'active' => $active ? ['provider' => $active['provider'], 'model' => $active['model']] : null,
                 'candidates' => $map,
                 'note' => 'Tìm kiếm tích hợp là tính năng của NHÀ CUNG CẤP model, không phải của FabrikAI.',
             ],
+            // NHÓM CÔNG VIỆC nào chưa có model — đọc từ CHÍNH Cài đặt, không phải danh sách cứng.
+            // Người dùng cần thấy "nhóm tạo ảnh chưa có model" như một trạng thái CẤU HÌNH, không phải lỗi.
+            'task_groups' => $this->taskGroups(),
             // Nguồn ngoài vẫn là dữ liệu MẪU cho tới khi có connector thật (chưa có scraping/POS/ERP).
             'sources_mode' => 'demo',
             'verdict' => $verdict,
@@ -165,5 +196,41 @@ class WebAccessService
     private function candidates(): array
     {
         return app(AiModelGateway::class)->candidates(DesignAgentService::AI_GROUP);
+    }
+
+    /**
+     * Trạng thái CẤU HÌNH của các nhóm công việc mà Studio cần — đọc thẳng từ Cài đặt.
+     *
+     * Nhóm rỗng KHÔNG phải lỗi: đó là "chưa cài đặt model/key". Giao diện phải nói đúng như vậy, và
+     * danh sách nhóm lấy từ hằng số của ứng dụng (không phải tên nhà cung cấp nào).
+     *
+     * @return list<array{group:string, label:string, configured:bool, candidates:int, models:list<string>}>
+     */
+    public function taskGroups(): array
+    {
+        $labels = [
+            'prompt' => 'Suy luận & viết nội dung (Agent Studio)',
+            'vision' => 'Đọc ảnh',
+            'image' => 'Tạo ảnh',
+            'edit' => 'Sửa ảnh',
+            'video' => 'Video',
+        ];
+
+        $out = [];
+        foreach ($labels as $group => $label) {
+            $rows = function_exists('studio_task_group_models') ? studio_task_group_models($group) : [];
+            $out[] = [
+                'group' => $group,
+                'label' => $label,
+                'configured' => $rows !== [],
+                'candidates' => count($rows),
+                'models' => array_values(array_map(
+                    fn ($row) => trim((string) ($row['provider'] ?? '').':'.(string) ($row['model'] ?? '')),
+                    $rows,
+                )),
+            ];
+        }
+
+        return $out;
     }
 }

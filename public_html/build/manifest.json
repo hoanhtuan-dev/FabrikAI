@@ -134,7 +134,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-3fW4xdFT.js",
+    "file": "assets/main-CLldMcYp.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -161,7 +161,7 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-PjWdlmUS.js",
+    "file": "assets/settings-DIVbfr5Z.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
@@ -171,7 +171,7 @@
       "_BaseModal-C-M9BAln.js"
     ],
     "css": [
-      "assets/settings-CAN3dm2B.css"
+      "assets/settings-D7dF-oUt.css"
     ]
   }
 }

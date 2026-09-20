@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Http;
  */
 class AiModelGateway
 {
-    /** @return list<array{provider:string, model:string, transport:string, base:string, keys:list<string>}> */
+    /** @return list<array{provider:string, model:string, transport:string, base:string, keys:list<string>, search_param?:?string}> */
     public function candidates(string $group): array
     {
         if (! function_exists('studio_task_group_models')) {
@@ -205,7 +205,12 @@ class AiModelGateway
             $protocol = (string) ($custom['protocol'] ?? 'openai');
             $transport = in_array($protocol, ['openai', 'dashscope', 'gemini'], true) ? $protocol : 'openai';
 
-            return ['provider' => $provider, 'model' => $model, 'transport' => $transport, 'base' => $base, 'keys' => $keys];
+            // `search_param`: nhà cung cấp TỰ KHAI cách bật tìm kiếm web (Cài đặt → Custom Providers).
+            // Có mặt ở đây thì WebAccessService::planFor() đọc được mà không phải truy vấn thêm lần nữa.
+            return [
+                'provider' => $provider, 'model' => $model, 'transport' => $transport, 'base' => $base, 'keys' => $keys,
+                'search_param' => trim((string) ($custom['search_param'] ?? '')) ?: null,
+            ];
         }
 
         $catalog = function_exists('studio_provider_catalog') ? studio_provider_catalog() : [];
@@ -241,12 +246,10 @@ class AiModelGateway
             if (($options['response_format'] ?? '') === 'json_object') {
                 $body['response_format'] = ['type' => 'json_object'];
             }
-            // [2026-09-23] TÌM KIẾM WEB: chỉ bật khi nơi gọi yêu cầu VÀ transport này thật sự hỗ trợ
-            // (bảng khả năng ở WebAccessService). Không bật bừa: gửi tham số lạ cho provider không
-            // hỗ trợ có thể làm hỏng cả request, mà lại khiến giao diện tưởng đã có tìm kiếm.
-            if (! empty($options['search']) && WebAccessService::supportsSearch('qwen')) {
-                $body['enable_search'] = true;
-            }
+            // [2026-09-23] TÌM KIẾM WEB — áp dụng theo KẾ HOẠCH của candidate đang được CẤU HÌNH
+            // (`WebAccessService::planFor`): giao thức biết cách bật, còn chọn nhà cung cấp/model nào là
+            // việc của Cài đặt. Không bật bừa: provider không khai thì gửi tham số lạ có thể hỏng request.
+            $this->applySearch($body, $options, $candidate);
             $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
 
             return $resp->successful() ? $this->textResult($resp->json()) : null;
@@ -261,11 +264,8 @@ class AiModelGateway
             if (($options['response_format'] ?? '') === 'json_object') {
                 $body['generationConfig']['responseMimeType'] = 'application/json';
             }
-            // TÌM KIẾM WEB (Gemini): grounding bằng Google Search — cùng luật "chỉ bật khi được yêu cầu
-            // và transport này hỗ trợ".
-            if (! empty($options['search']) && WebAccessService::supportsSearch('gemini')) {
-                $body['tools'] = [['google_search' => new \stdClass()]];
-            }
+            // TÌM KIẾM WEB (Gemini): cùng một cơ chế — kế hoạch lấy từ candidate đang cấu hình.
+            $this->applySearch($body, $options, $candidate);
             $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout($timeout)
                 ->post($this->geminiBase($candidate).'/models/'.$candidate['model'].':generateContent', $body);
 
@@ -289,9 +289,42 @@ class AiModelGateway
         if (($options['response_format'] ?? '') === 'json_object') {
             $body['response_format'] = ['type' => 'json_object'];
         }
+        // OpenAI-compatible KHÔNG có cờ tìm kiếm chuẩn — chỉ bật khi CHÍNH nhà cung cấp tự khai tham số
+        // (`studio_providers.search_param`), tức là đến từ Cài đặt.
+        $this->applySearch($body, $options, $candidate);
         $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
 
         return $resp->successful() ? $this->textResult($resp->json()) : null;
+    }
+
+    /**
+     * Bật tìm kiếm web cho MỘT request — CHỈ khi nơi gọi yêu cầu và candidate đang cấu hình có kế hoạch.
+     *
+     * Một chỗ duy nhất để cả ba nhánh giao thức dùng chung: nếu mỗi nhánh tự viết, sớm muộn có nhánh
+     * quên (hoặc bật tham số mà provider không hiểu).
+     *
+     * @param  array<string,mixed>  $body
+     * @param  array<string,mixed>  $options
+     * @param  array<string,mixed>  $candidate
+     */
+    protected function applySearch(array &$body, array $options, array $candidate): void
+    {
+        if (empty($options['search'])) {
+            return;
+        }
+
+        $plan = WebAccessService::planFor($candidate);
+        if ($plan === null) {
+            return;
+        }
+
+        if ($plan['mode'] === 'tools') {
+            $body['tools'] = [[$plan['param'] => new \stdClass()]];
+
+            return;
+        }
+
+        $body[$plan['param']] = true;
     }
 
     /**

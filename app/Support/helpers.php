@@ -1289,6 +1289,9 @@ if (! function_exists('studio_custom_provider')) {
             'protocol' => (string) $p->protocol,
             'base_url' => rtrim((string) $p->base_url, '/'),
             'auth_style' => (string) $p->auth_style,
+            // Tham số bật tìm kiếm web của gateway này (rỗng = chưa khai). Quyết định "có tìm kiếm" đến
+            // từ CÀI ĐẶT chứ không từ danh sách nhà cung cấp viết cứng trong mã — xem WebAccessService.
+            'search_param' => trim((string) ($p->search_param ?? '')) ?: null,
             'api_key_ref' => $p->api_key_ref ?: $p->slug,
         ];
     }
