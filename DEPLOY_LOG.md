@@ -82,6 +82,20 @@ là nhánh mô tả công cụ **không được dùng tới**. Trên production
 và việc hỏi đúng chủ đề đang cần là hai thứ bổ sung; nhánh "TUYỆT ĐỐI KHÔNG bịa…" chỉ còn áp dụng khi
 KHÔNG có nguồn ngoài nào. Kèm test khoá: `test_the_tool_is_announced_even_when_live_news_is_present`.
 
+**ĐO LẠI SAU KHI SỬA — công cụ chạy thật trên production (`66eb85c`):**
+
+| Số đo | Kết quả |
+|---|---|
+| Radar thật (TP.HCM, bộ đệm xoá) | `engine=ai-v1` · `deepseek:deepseek-flash` · 16,8 s · **10 định hướng do AI viết** |
+| `tool_search` | `mode=tool · accepted=true · `**`calls=2`** · `results=6` · nguồn *Google News — thời trang (VN)* |
+| Từ khoá model TỰ HỎI | *"xu hướng thời trang thu 2026 TP.HCM"* · *"giá vải linen cotton xưởng may 2026"* |
+| Định hướng đầu | *Váy midi pastel cho dân văn phòng quận 1* · *Bộ đôi blazer tối giản và quần ống rộng* |
+
+**LỖI THẬT thứ hai do chính phép đo bắt được:** lượt chạy 2 truy vấn (một ra **6 tin**, một ra 0) nhưng
+`tool_search.error` đang giữ lý do của **truy vấn cuối** ⇒ giao diện hiện câu tự mâu thuẫn
+*"Đã tự tìm 2 lượt … : 6 tin từ 1 nguồn · không có tin nào khớp từ khoá"*. Đã sửa: `error` chỉ còn có nghĩa
+khi **cả lượt không tìm được tin nào** (+ test `test_a_barren_query_does_not_mark_the_whole_run_as_failed`).
+
 ### 6. Việc chủ dự án cần làm để BẬT (không sửa mã)
 1. Cài đặt → **Nhóm công việc** → «Agent Studio — Tìm kiếm nguồn ngoài» → gán một model (production: `deepseek:deepseek-chat` hoặc `deepseek:deepseek-flash` — cả hai gọi hàm được).
 2. Agent Studio → bước **Tín hiệu** → nút **Kiểm tra lại**: dòng kết luận phải là *"…sẽ GỌI CÔNG CỤ tìm kiếm do máy chủ chạy"*.

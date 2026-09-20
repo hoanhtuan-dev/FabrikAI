@@ -207,7 +207,19 @@ class WebSearchTool
      */
     public function report(): array
     {
-        return $this->report;
+        $report = $this->report;
+
+        // `error` CHỈ có nghĩa khi CẢ LƯỢT không tìm được tin nào.
+        //
+        // [LỖI THẬT — đo trên production 2026-09-21] Model gọi 2 lượt: lượt đầu ra **6 tin**, lượt sau ra 0.
+        // Bản đầu ghi lý do của LƯỢT CUỐI vào `error` của cả lượt chạy ⇒ giao diện hiện câu tự mâu thuẫn:
+        // *"Đã tự tìm 2 lượt … : 6 tin từ 1 nguồn · không có tin nào khớp từ khoá"*. Một truy vấn không ra
+        // kết quả KHÔNG phải lỗi — nó chỉ là lượt đó không có gì.
+        if ($report['results'] > 0) {
+            $report['error'] = null;
+        }
+
+        return $report;
     }
 
     /** Có ít nhất một lời gọi công cụ đã chạy thật trong lượt này? */

@@ -424,7 +424,33 @@ class ToolSearchTest extends TestCase
         $this->assertSame('web_search', data_get($sent[0] ?? [], 'tools.0.function.name'), 'Công cụ phải nằm trong request.');
         $this->assertTrue($brief['model']['tool_search']['enabled']);
     }
+
+    /** Lý do của MỘT truy vấn không được ghi thành "lỗi của cả lượt chạy" khi truy vấn khác đã ra tin. */
+    public function test_a_barren_query_does_not_mark_the_whole_run_as_failed(): void
+    {
+        $this->searchSource();
+        Http::fake([
+            'news.example/*' => function ($request) {
+                // Truy vấn "không có gì" trả feed rỗng; truy vấn còn lại trả tin thật.
+                return str_contains(urldecode($request->url()), 'khong-co-gi')
+                    ? Http::response('<?xml version="1.0"?><rss version="2.0"><channel></channel></rss>', 200)
+                    : Http::response($this->rss('Tin thật', 'https://bao.example/1'), 200);
+            },
+        ]);
+
+        $tool = new WebSearchTool(app(WebSourceService::class));
+        $tool->enable(true);
+
+        $tool->handle(['query' => 'tin that'], 'all');
+        $tool->handle(['query' => 'khong-co-gi'], 'all');
+
+        $report = $tool->report();
+        $this->assertSame(2, $report['calls']);
+        $this->assertSame(1, $report['results']);
+        $this->assertNull($report['error'], 'Đã có tin thật thì không được báo lỗi cho cả lượt chạy.');
+    }
 }
+
 
 
 
