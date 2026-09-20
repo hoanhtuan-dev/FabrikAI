@@ -1009,6 +1009,7 @@ Hai tầng phải tách bạch vì chúng có thể lệch nhau:
 | **Máy chủ** | nhà hosting | HEAD thật tới `config('studio.web_probe_targets')`, ghi mã HTTP + độ trễ (`WebAccessService`) |
 | **Model (tìm kiếm SẴN của nhà cung cấp)** | CÀI ĐẶT (Model Registry · Nhóm công việc · Luồng ưu tiên · Custom Providers) | `WebAccessService::planFor($candidate)`: nhà cung cấp **tự khai** `studio_providers.search_param` trước, sau đó tới **giao thức** (`SEARCH_DIALECTS`: qwen/dashscope → `enable_search` · gemini → `google_search`). Giao thức lạ ⇒ `null` = KHÔNG hứa |
 | **Công cụ do MÁY CHỦ chạy** (2026-09-24) | CÀI ĐẶT (gán model cho vai *Agent Studio — Tìm kiếm nguồn ngoài*) | `WebAccessService::supportsToolSearch($transport)` + nhóm THẬT ĐÃ DÙNG là `agent_search`. Model gọi hàm `web_search` → máy chủ đi tìm thật (`WebSourceService::search`) → kết quả quay lại prompt. Không phụ thuộc nhà cung cấp có tìm kiếm tích hợp |
+| **Công cụ CỦA nhà cung cấp qua `/responses`** (2026-09-21) | CÀI ĐẶT (Custom Provider khai Kiểu = `responses_web_search`) + gán model cho vai *Tìm kiếm nguồn ngoài* | `WebAccessService::isHostedMode()`. Gọi `{base}/responses` kèm `tools:[{type:web_search}]`; đếm mục `web_search_call` trong `output[]`. **Chỉ model hỗ trợ mới tìm thật** — model khác nhận tham số rồi tự BỊA tin + URL, nên `web_search` chỉ bật khi số lượt tìm > 0 |
 
 **Vì sao phải có tầng thứ ba**: đo trên production, model văn bản đang chạy là DeepSeek trên giao thức
 OpenAI-compatible — giao thức này **không có cờ tìm kiếm**, nên gán model vào vai «Tìm kiếm nguồn ngoài»
@@ -1047,7 +1048,7 @@ Bốn câu kết luận (đừng gộp — mỗi câu là một việc cần là
 | `no_model_configured` | chưa có model **dùng được** cho nhóm suy luận (thiếu key · chưa gán model) | vào Cài đặt thêm key/model — agent đang chạy bằng bộ quy tắc có sẵn |
 | `internet_no_search` | lượt chạy này KHÔNG có tìm kiếm: model không có tìm kiếm tích hợp **và** vai «Tìm kiếm nguồn ngoài» chưa được gán model | gán một model cho vai «Agent Studio — Tìm kiếm nguồn ngoài» trong Cài đặt → Nhóm công việc |
 | `internet_and_tool_search` | model không có tìm kiếm tích hợp NHƯNG gọi được công cụ, và đang nằm ở đúng vai tìm kiếm | không cần làm gì — máy chủ đi tìm theo từ khoá model hỏi |
-| `internet_and_search` | có model VÀ nhà cung cấp tự có tìm kiếm | không cần làm gì |
+| `internet_and_search` | có model VÀ nhà cung cấp tự có tìm kiếm (kể cả đường `/responses` của chính nhà cung cấp) | không cần làm gì; với `/responses` hãy mở một lượt phân tích để đối chiếu **số lượt tìm thật** |
 
 Kết quả đo còn có khối `task_groups` cho 5 nhóm công việc (`prompt` · `vision` · `image` · `edit` · `video`),
 đọc thẳng từ Cài đặt và tách **HAI** chuyện rất khác nhau:
