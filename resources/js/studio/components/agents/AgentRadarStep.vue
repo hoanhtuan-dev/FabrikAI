@@ -25,6 +25,7 @@ const marketPrices = inject('marketPrices');
 const marketAgeLabel = inject('marketAgeLabel');
 const internetVerdict = inject('internetVerdict');
 const groupsNeedingSetup = inject('groupsNeedingSetup');
+const toolSearchLine = inject('toolSearchLine');
 const step = inject('step');
 const radar = inject('radar');
 const regions = inject('regions');
@@ -341,7 +342,8 @@ const formatVnd = inject('formatVnd');
                       Chỉ giữ tin trong {{ store.webSources?.limits?.max_age_days }} ngày và tối đa {{ store.webSources?.limits?.limit }} tin cho mỗi lần phân tích.
                     </p>
                     <p class="mt-1 text-label leading-5 text-cream-400">
-                      AI đọc tin qua máy chủ FabrikAI, không phải model tự tìm kiếm.
+                      AI không tự ra internet: mọi tin đều do máy chủ FabrikAI đi lấy — kể cả khi model gọi
+                      công cụ tìm kiếm thì người đi lấy vẫn là máy chủ.
                     </p>
                   </details>
                 </div>
@@ -370,6 +372,9 @@ const formatVnd = inject('formatVnd');
                       <p v-if="store.webAccessError" role="alert" class="mt-2 text-body text-danger">{{ store.webAccessError }}</p>
                       <p v-else-if="internetVerdict" class="mt-1.5 text-body leading-5 text-cream-300">{{ internetVerdict }}</p>
                       <p v-else class="mt-1.5 text-body leading-5 text-cream-400">Chưa đo được — bấm «Kiểm tra lại».</p>
+                      <!-- SỐ ĐO CỦA LƯỢT CHẠY NÀY: lượt vừa rồi có tìm thật hay không, hỏi gì, được mấy tin.
+                           Đây là câu trả lời cho "nguồn ngoài ở đâu ra", nên chỉ hiện khi lượt chạy CÓ tìm kiếm. -->
+                      <p v-if="toolSearchLine" class="mt-1.5 text-body leading-5 text-cream-300">{{ toolSearchLine }}</p>
                       <ul v-if="groupsNeedingSetup.length" class="mt-2 space-y-0.5 text-label leading-5 text-cream-300">
                         <li v-for="row in groupsNeedingSetup" :key="row.group">· {{ row.label }}: {{ row.configured ? 'chưa có khoá dùng được' : 'chưa gán model' }}</li>
                       </ul>

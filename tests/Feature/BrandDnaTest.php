@@ -271,6 +271,66 @@ class BrandDnaTest extends TestCase
     }
 
     /**
+     * TOOL SEARCH là đường TÌM KIẾM THỨ HAI (2026-09-24): model ở ĐÚNG vai "Tìm kiếm nguồn ngoài" và gọi
+     * được công cụ ⇒ máy chủ chạy công cụ. Câu kết luận phải nói đúng cơ chế đó thay vì nói "KHÔNG có
+     * tìm kiếm web" như trước — đó chính là chỗ dễ nói sai nhất với người dùng.
+     */
+    public function test_a_search_role_model_with_tool_calling_is_reported_as_tool_search(): void
+    {
+        $this->assertTrue(WebAccessService::supportsToolSearch('openai'), 'OpenAI-compatible gọi được công cụ.');
+        $this->assertTrue(WebAccessService::supportsToolSearch('qwen'));
+        $this->assertFalse(WebAccessService::supportsToolSearch('gemini'), 'Gemini đi đường grounding riêng.');
+        $this->assertFalse(WebAccessService::supportsToolSearch('khong-ton-tai'));
+
+        Cache::flush();
+        Http::fake(['*' => Http::response('', 204)]);
+
+        \App\Models\StudioProvider::create([
+            'slug' => 'gw-cong-cu', 'name' => 'Gateway công cụ', 'protocol' => 'openai',
+            'base_url' => 'https://gw-cong-cu.example/v1', 'auth_style' => 'bearer',
+            'search_param' => null, 'api_key_ref' => 'gw-cong-cu', 'priority' => 9, 'enabled' => true,
+        ]);
+        \App\Models\StudioApiKey::create([
+            'provider' => 'gw-cong-cu', 'label' => 'x', 'value' => 'sk-x',
+            'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+        ]);
+        \App\Models\StudioModel::create([
+            'group' => DesignAgentService::SEARCH_GROUP, 'name' => 'Model tìm kiếm',
+            'provider' => 'gw-cong-cu', 'model_id' => 'tim-kiem', 'api_key_ref' => 'gw-cong-cu',
+            'priority' => 9, 'enabled' => true,
+        ]);
+        set_setting('studio_task_'.DesignAgentService::SEARCH_GROUP.'_model', 'gw-cong-cu:tim-kiem');
+
+        $probe = app(WebAccessService::class)->probe(true);
+
+        $this->assertFalse($probe['model_search']['supported'], 'Nhà cung cấp KHÔNG có tìm kiếm tích hợp.');
+        $this->assertTrue($probe['model_search']['tool_search']['available'], 'Nhưng máy chủ chạy được công cụ cho model này.');
+        $this->assertTrue($probe['model_search']['tool_search']['role_configured']);
+        $this->assertSame('internet_and_tool_search', $probe['verdict']);
+        $this->assertStringContainsString('CÔNG CỤ', $probe['verdict_label']);
+
+        // Không nêu tên nhà cung cấp nào — việc chọn model vẫn là ở Cài đặt.
+        foreach (['Qwen', 'DashScope', 'DeepSeek', 'Gemini'] as $vendor) {
+            $this->assertStringNotContainsString($vendor, $probe['verdict_label']);
+        }
+
+        // Model gọi được công cụ nhưng nằm ở NHÓM KHÁC ⇒ KHÔNG được coi là vai tìm kiếm đã khai.
+        \App\Models\StudioModel::query()->where('group', DesignAgentService::SEARCH_GROUP)->delete();
+        set_setting('studio_task_'.DesignAgentService::SEARCH_GROUP.'_model', '');
+        \App\Models\StudioModel::create([
+            'group' => 'prompt', 'name' => 'Model thường', 'provider' => 'gw-cong-cu',
+            'model_id' => 'thuong', 'api_key_ref' => 'gw-cong-cu', 'priority' => 9, 'enabled' => true,
+        ]);
+        set_setting('studio_task_prompt_model', 'gw-cong-cu:thuong');
+        Cache::flush();
+
+        $again = app(WebAccessService::class)->probe(true);
+        $this->assertFalse($again['model_search']['tool_search']['available'], 'Chưa gán vai tìm kiếm thì công cụ KHÔNG được bật.');
+        $this->assertSame('internet_no_search', $again['verdict']);
+        $this->assertStringContainsString('Tìm kiếm nguồn ngoài', $again['verdict_label'], 'Phải chỉ đúng việc cần làm ở Cài đặt.');
+    }
+
+    /**
      * TÌM KIẾM WEB DO CÀI ĐẶT QUYẾT ĐỊNH: một Custom Provider tự khai `search_param` ⇒ hệ thống bật
      * đúng tham số đó, và gateway gửi nó trong request. Không có dòng mã nào biết tên nhà cung cấp.
      */

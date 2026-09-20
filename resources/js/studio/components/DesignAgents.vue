@@ -366,6 +366,33 @@ const modelTitle = computed(() => {
   return MODEL_REASON_LABELS[m.reason] || 'Đang chạy bằng bộ quy tắc có sẵn.';
 });
 const modelCandidates = computed(() => activeModel.value?.available || []);
+/**
+ * TÌM KIẾM BẰNG CÔNG CỤ — SỐ ĐO, không phải lời hứa (docs/DESIGN_SYSTEM.md §18.2).
+ *
+ * Backend trả khối `model.tool_search` cho MỌI lượt chạy: đã bật công cụ chưa · nhà cung cấp có nhận tham
+ * số công cụ không · model đã gọi mấy lượt · hỏi từ khoá gì · được bao nhiêu tin. Giao diện chỉ được nói
+ * những gì khối này đo được — trước đây chỗ này là câu văn tĩnh nên nói sai cả khi agent không hề tìm.
+ */
+const toolSearch = computed(() => activeModel.value?.tool_search || null);
+const toolSearchLine = computed(() => {
+  const t = toolSearch.value;
+  if (!t || t.mode === 'off') return '';
+  if (t.mode === 'native') return 'Lượt này tìm kiếm nguồn ngoài do chính nhà cung cấp model thực hiện.';
+  // mode === 'tool': công cụ do MÁY CHỦ chạy. Ba mức rất khác nhau, không được gộp thành một câu.
+  if (t.accepted === false) {
+    return 'Model bạn chọn KHÔNG nhận công cụ tìm kiếm nên lượt này không đọc được nguồn ngoài — đổi model cho vai «Tìm kiếm nguồn ngoài» trong Cài đặt nếu cần dẫn nguồn.';
+  }
+  if (Number(t.calls) > 0) {
+    const queries = (t.queries || []).filter(Boolean);
+    const who = queries.length ? ' theo từ khoá “' + queries.join('”, “') + '”' : '';
+    const sources = (t.sources || []).length ? ' từ ' + t.sources.length + ' nguồn' : '';
+    return 'Đã tự tìm trên internet ' + t.calls + ' lượt' + who + ': ' + Number(t.results || 0) + ' tin' + sources
+      + (t.error ? ' · ' + t.error : '');
+  }
+  return t.enabled
+    ? 'Lượt này CÓ công cụ tìm kiếm nhưng model không cần dùng — câu trả lời dựa trên dữ liệu đã đưa vào.'
+    : '';
+});
 const aiToggleTitle = computed(() => (store.designAgentAi
   ? 'Đang BẬT: mỗi lần đọc radar/tạo brief sẽ nhờ AI phân tích.'
   : 'Đang TẮT: chỉ dùng bộ quy tắc có sẵn, không gọi AI.'));
@@ -833,6 +860,8 @@ provide('modelReady', modelReady);
 provide('modelShort', modelShort);
 provide('modelTitle', modelTitle);
 provide('modelCandidates', modelCandidates);
+provide('toolSearch', toolSearch);
+provide('toolSearchLine', toolSearchLine);
 provide('aiToggleTitle', aiToggleTitle);
 provide('directions', directions);
 provide('appliedAi', appliedAi);

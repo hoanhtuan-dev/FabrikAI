@@ -92,22 +92,49 @@ class WebAccessService
         return isset(self::SEARCH_DIALECTS[(string) $transport]);
     }
 
+    /**
+     * Giao thức này gọi được CÔNG CỤ theo chuẩn function-calling không? (đường "tool search" của máy chủ)
+     *
+     * Đây là đường thứ hai, KHÔNG thay đường thứ nhất: nhà cung cấp có tìm kiếm tích hợp thì dùng luôn cho
+     * rẻ; không có (đo trên production: DeepSeek — model văn bản đang chạy) thì máy chủ khai công cụ
+     * `web_search`, tự đi tìm rồi trả kết quả về prompt. Danh sách giao thức nằm Ở ĐÂY (một nguồn): cả
+     * DesignAgentService lẫn màn hình Cài đặt đều đọc từ đây nên không thể nói lệch nhau.
+     */
+    public static function supportsToolSearch(?string $transport): bool
+    {
+        return in_array((string) $transport, ['qwen', 'dashscope', 'openai'], true);
+    }
+
     /** Bảng khả năng tìm kiếm theo TỪNG model ĐANG ĐƯỢC CẤU HÌNH (không theo nhà cung cấp nào cả). */
     public function providerSearchMap(): array
     {
         $out = [];
         foreach ($this->candidates() as $candidate) {
             $plan = self::planFor($candidate);
+            $group = (string) ($candidate['group'] ?? '');
+            // Công cụ chỉ được KHAI khi model nằm ở vai "Tìm kiếm nguồn ngoài" — đúng điều mà
+            // DesignAgentService::searchSetup() làm. Nói khác đi là màn hình hứa một việc agent không làm.
+            $tool = $plan === null && self::supportsToolSearch($candidate['transport'] ?? null);
+            $toolReady = $tool && $group === DesignAgentService::SEARCH_GROUP;
+
             $out[] = [
                 'provider' => (string) ($candidate['provider'] ?? ''),
                 'model' => (string) ($candidate['model'] ?? ''),
                 'transport' => (string) ($candidate['transport'] ?? ''),
+                'group' => $group,
                 'supported' => $plan !== null,
                 'plan' => $plan,
-                'label' => $plan === null
-                    ? 'Không có tìm kiếm web (giao thức không khai tham số tìm kiếm)'
-                    : 'Bật tìm kiếm ('.($plan['mode'] ?? 'body_flag').') bằng `'.$plan['param'].'` — '.$plan['source']
+                // Số đo cho đường "máy chủ chạy công cụ": model này gọi được hàm không, và nó có nằm ở
+                // đúng vai tìm kiếm không (khai model vào vai khác thì công cụ KHÔNG được bật).
+                'tool' => $tool,
+                'tool_ready' => $toolReady,
+                'label' => match (true) {
+                    $plan !== null => 'Bật tìm kiếm ('.($plan['mode'] ?? 'body_flag').') bằng `'.$plan['param'].'` — '.$plan['source']
                         .(($plan['verified'] ?? false) ? '' : ' · CHƯA kiểm chứng: gateway không hỗ trợ thì tham số bị bỏ qua'),
+                    $toolReady => 'Máy chủ chạy công cụ tìm kiếm (web_search) khi model gọi — không cần nhà cung cấp có tìm kiếm tích hợp',
+                    $tool => 'Gọi được công cụ, nhưng model này chưa nằm ở vai "Agent Studio — Tìm kiếm nguồn ngoài"',
+                    default => 'Không có tìm kiếm web (giao thức không khai tham số tìm kiếm và không gọi được công cụ)',
+                },
             ];
         }
 
@@ -162,6 +189,8 @@ class WebAccessService
         $outbound = collect($results)->contains(fn (array $row) => $row['ok'] === true);
         $map = $this->providerSearchMap();
         $active = collect($map)->firstWhere('supported', true);
+        // Đường thứ hai: model ở ĐÚNG vai tìm kiếm và gọi được công cụ do máy chủ chạy.
+        $toolReady = collect($map)->first(fn (array $row) => ($row['tool_ready'] ?? false) === true);
         // "Chưa cấu hình model dùng được" KHÁC "model không có tìm kiếm" — gộp hai thứ này là nói sai với
         // người dùng: nhóm rỗng nghĩa là việc cần làm nằm ở Cài đặt (thêm key/model), không phải lỗi agent.
         $hasModel = $map !== [];
@@ -180,10 +209,20 @@ class WebAccessService
             $verdictLabel = ($active['plan']['verified'] ?? false)
                 ? 'Máy chủ có internet và model bạn đang cấu hình CÓ tìm kiếm web — kết quả phân tích có thể kèm nguồn thật.'
                 : 'Máy chủ có internet và model bạn đang cấu hình được KHAI là có tìm kiếm web (chưa kiểm chứng được từ phía máy chủ) — nếu gateway không hỗ trợ thì tham số bị bỏ qua và câu trả lời vẫn chỉ dựa trên dữ liệu hệ thống gửi vào.';
+        } elseif ($toolReady) {
+            // ĐƯỜNG THỨ HAI: nhà cung cấp không có tìm kiếm tích hợp, nhưng model biết gọi hàm ⇒ MÁY CHỦ đi
+            // tìm thật rồi trả kết quả về prompt. Câu này nói đúng cơ chế, không hứa "model tự tìm".
+            $verdict = 'internet_and_tool_search';
+            $verdictLabel = 'Máy chủ có internet và model bạn gán cho vai «Tìm kiếm nguồn ngoài» sẽ GỌI CÔNG CỤ tìm kiếm do máy chủ chạy: '
+                .'máy chủ đi tìm tin thật theo từ khoá model hỏi rồi đưa kết quả (kèm nguồn và thời điểm) trở lại cho model đọc. '
+                .'Cách này không phụ thuộc việc nhà cung cấp model có sẵn tìm kiếm hay không.';
         } else {
             $verdict = 'internet_no_search';
             // KHÔNG nêu tên nhà cung cấp nào và KHÔNG gợi ý mua key của ai: việc chọn model là ở Cài đặt.
-            $verdictLabel = 'Máy chủ có internet nhưng model bạn đang cấu hình KHÔNG có tìm kiếm web — câu trả lời chỉ dựa trên dữ liệu hệ thống gửi vào (hiện là dữ liệu mẫu + dữ liệu của chính bạn). Muốn có nguồn thật: chọn một model/nhà cung cấp có tìm kiếm trong Cài đặt → Nhóm công việc (hoặc khai tham số tìm kiếm cho Custom Provider).';
+            $verdictLabel = 'Máy chủ có internet nhưng lượt chạy này KHÔNG có tìm kiếm web: model đang cấu hình không có tìm kiếm tích hợp, '
+                .'và vai «Agent Studio — Tìm kiếm nguồn ngoài» chưa được gán model nên công cụ tìm kiếm của máy chủ không được bật. '
+                .'Câu trả lời chỉ dựa trên dữ liệu hệ thống gửi vào (dữ liệu mẫu + dữ liệu của chính bạn). '
+                .'Muốn có nguồn thật: gán một model cho vai «Agent Studio — Tìm kiếm nguồn ngoài» trong Cài đặt → Nhóm công việc.';
         }
 
         return [
@@ -204,6 +243,13 @@ class WebAccessService
                 'active' => $active ? ['provider' => $active['provider'], 'model' => $active['model']] : null,
                 'candidates' => $map,
                 'note' => 'Tìm kiếm tích hợp là tính năng của NHÀ CUNG CẤP model, không phải của FabrikAI.',
+                // ĐƯỜNG TÌM KIẾM THỨ HAI — số đo riêng, không gộp với tìm kiếm tích hợp: hai cơ chế khác
+                // nhau, và gộp lại thì không ai biết vì sao lần này có nguồn còn lần khác thì không.
+                'tool_search' => [
+                    'available' => $toolReady !== null,
+                    'role_configured' => $map !== [] && ($map[0]['group'] ?? '') === DesignAgentService::SEARCH_GROUP,
+                    'note' => 'Công cụ do MÁY CHỦ chạy: model chỉ cần biết gọi hàm, không cần nhà cung cấp có tìm kiếm tích hợp.',
+                ],
             ],
             // NHÓM CÔNG VIỆC nào chưa có model — đọc từ CHÍNH Cài đặt, không phải danh sách cứng.
             // Người dùng cần thấy "nhóm tạo ảnh chưa có model" như một trạng thái CẤU HÌNH, không phải lỗi.
@@ -245,7 +291,9 @@ class WebAccessService
         foreach ([DesignAgentService::SEARCH_GROUP, DesignAgentService::REASON_GROUP, DesignAgentService::AI_GROUP] as $group) {
             $rows = $gateway->candidates($group);
             if ($rows !== []) {
-                return $rows;
+                // Gắn NHÓM THẬT ĐÃ DÙNG vào từng dòng: màn hình phải phân biệt được "model ở vai tìm kiếm"
+                // với "model rơi về nhóm suy luận" — hai chuyện cho ra hai câu kết luận khác nhau.
+                return array_map(fn (array $row) => $row + ['group' => $group], $rows);
             }
         }
 

@@ -47,6 +47,8 @@ const briefStale = inject('briefStale');
 const modelReady = inject('modelReady');
 const modelShort = inject('modelShort');
 const modelTitle = inject('modelTitle');
+// Số ĐO của lượt chạy: có tìm nguồn ngoài thật hay không, hỏi gì, được mấy tin (xem shell).
+const toolSearchLine = inject('toolSearchLine');
 const appliedAi = inject('appliedAi');
 const briefModeMismatch = inject('briefModeMismatch');
 const plan = inject('plan');
@@ -264,6 +266,8 @@ const copyText = inject('copyText');
                     <!-- Nói THẬT bản này mới chạy model hay lấy từ bộ đệm (và cũ bao lâu). -->
                     <span v-if="collection.model?.cached" class="rounded bg-ink-800 px-2 py-0.5 text-cream-400" title="Cùng yêu cầu trước đó nên không cần tạo lại">Đã tạo {{ cacheAgeLabel }}</span>
                     <span v-else-if="modelReady" class="text-cream-400">Vừa phân tích xong</span>
+                    <!-- Nguồn ngoài ở đâu ra: chỉ hiện khi lượt chạy THẬT SỰ có tìm kiếm (số đo từ máy chủ). -->
+                    <span v-if="toolSearchLine" class="w-full text-cream-400">{{ toolSearchLine }}</span>
                     <button
                       v-if="collection"
                       type="button"

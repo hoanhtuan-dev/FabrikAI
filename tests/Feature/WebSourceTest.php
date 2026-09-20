@@ -240,6 +240,104 @@ class WebSourceTest extends TestCase
         $this->assertSame('https://e/that', $radar['external_evidence']['items'][0]['url']);
     }
 
+// ── (B2) TÌM THEO TỪ KHOÁ (nền của công cụ `web_search`) ──────────────
+
+    /**
+     * Nguồn có chỗ điền từ khoá (`q=` sẵn có, hoặc `{query}` tường minh) là nguồn TÌM ĐƯỢC.
+     *
+     * Vì sao nhận cả hai dạng: nguồn Google News mặc định đã có `?q=thời+trang` từ trước, nên nhận dạng
+     * `q=` khiến nó thành nguồn tìm kiếm NGAY trên production mà không phải migrate dữ liệu đang chạy.
+     */
+    public function test_only_sources_with_a_query_slot_are_searchable(): void
+    {
+        $searchable = $this->source(['slug' => 'co-q', 'url' => 'https://news.example/rss/search?q=thoi+trang&hl=vi']);
+        $placeholder = $this->source(['slug' => 'co-query', 'url' => 'https://news.example/rss?q={query}&hl=vi']);
+        $plain = $this->source(['slug' => 'khong-tim', 'url' => 'https://feed.example/rss']);
+
+        $this->assertTrue(WebSourceService::isSearchable($searchable));
+        $this->assertTrue(WebSourceService::isSearchable($placeholder));
+        $this->assertFalse(WebSourceService::isSearchable($plain), 'Feed cố định KHÔNG được coi là nguồn tìm kiếm.');
+
+        $slugs = array_map(fn (WebSource $s) => $s->slug, app(WebSourceService::class)->searchableSources('all'));
+        $this->assertContains('co-q', $slugs);
+        $this->assertContains('co-query', $slugs);
+        $this->assertNotContains('khong-tim', $slugs);
+    }
+
+    /**
+     * TÌM THẬT: từ khoá của người gọi phải được ĐIỀN VÀO URL rồi mới gọi ra ngoài — đây là điều phân biệt
+     * "tìm theo từ khoá" với "đọc lại feed cố định".
+     */
+    public function test_search_replaces_the_keyword_in_the_source_url(): void
+    {
+        $this->source(['slug' => 'google-news', 'url' => 'https://news.example/rss/search?q=thoi+trang&hl=vi&gl=VN']);
+        Http::fake(['news.example/*' => Http::response($this->rss('Áo dạ tweed lên ngôi', 'https://bao.example/tweed'), 200)]);
+
+        $found = app(WebSourceService::class)->search('áo dạ tweed', 'all');
+
+        $this->assertSame('live', $found['mode']);
+        $this->assertSame(1, $found['count']);
+        $this->assertSame('Áo dạ tweed lên ngôi', $found['items'][0]['title']);
+        $this->assertSame('áo dạ tweed', $found['query']);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'news.example')
+            && str_contains($request->url(), rawurlencode('áo dạ tweed'))
+            // Phần còn lại của query string phải được GIỮ NGUYÊN — mất `hl/gl` là đổi cả thị trường tìm.
+            && str_contains($request->url(), 'hl=vi'));
+    }
+
+    /** Nguồn `{query}` được điền y như vậy, và KHÔNG lọc theo từ khoá cấu hình của nguồn. */
+    public function test_search_uses_placeholder_sources_and_skips_the_keyword_filter(): void
+    {
+        // `keywords` cố tình KHÔNG khớp tiêu đề: ở đường tìm kiếm, chính TRUY VẤN là bộ lọc.
+        $this->source(['slug' => 'tim-theo-query', 'url' => 'https://news.example/rss?q={query}', 'keywords' => 'linen']);
+        Http::fake(['news.example/*' => Http::response($this->rss('Tin không có từ khoá cấu hình', 'https://bao.example/x'), 200)]);
+
+        $found = app(WebSourceService::class)->search('tweed', 'all');
+
+        $this->assertSame(1, $found['count'], 'Kết quả tìm không được bị bộ lọc từ khoá của nguồn nuốt mất.');
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'q=tweed'));
+    }
+
+    /** Không nguồn tìm kiếm nào được bật ⇒ nói THẲNG lý do, không im lặng trả về rỗng. */
+    public function test_search_reports_when_no_search_source_is_configured(): void
+    {
+        $this->source(['slug' => 'feed-thuong', 'url' => 'https://feed.example/rss']);
+
+        $found = app(WebSourceService::class)->search('tweed', 'all');
+
+        $this->assertSame('empty', $found['mode']);
+        $this->assertSame(0, $found['count']);
+        $this->assertSame('chưa có nguồn tìm kiếm nào được bật', $found['error']);
+    }
+
+    /** Từ khoá rỗng (model gọi công cụ mà không truyền gì) ⇒ KHÔNG đi mạng, và nói rõ. */
+    public function test_search_refuses_an_empty_query(): void
+    {
+        $this->source(['slug' => 'google-news', 'url' => 'https://news.example/rss?q=thoi+trang']);
+        Http::fake();
+
+        $found = app(WebSourceService::class)->search('   ', 'all');
+
+        $this->assertSame('empty', $found['mode']);
+        $this->assertSame('từ khoá rỗng', $found['error']);
+        Http::assertNothingSent();
+    }
+
+    /** Nguồn chỉ có `{query}` KHÔNG được đọc ở đường đọc tin cố định (nếu không là đi hỏi chuỗi "{query}"). */
+    public function test_placeholder_sources_are_skipped_by_the_fixed_feed_reader(): void
+    {
+        $this->source(['slug' => 'chi-tim-kiem', 'url' => 'https://news.example/rss?q={query}']);
+        Http::fake();
+
+        $evidence = app(WebSourceService::class)->evidence('all');
+        $row = collect($evidence['sources'])->firstWhere('slug', 'chi-tim-kiem');
+
+        $this->assertSame('skipped', $row['state']);
+        $this->assertStringContainsString('tìm kiếm', (string) $row['state_label']);
+        Http::assertNothingSent();
+    }
+
     // ── (C) API CẤU HÌNH ───────────────────────────────────────────────────
 
     /** Chỉ QUẢN TRỊ VIÊN cấu hình được nguồn (đây là thiết lập toàn cục, không phải dữ liệu của khách). */

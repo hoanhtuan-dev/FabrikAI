@@ -215,27 +215,52 @@ class AgentRolesTest extends TestCase
     }
 
     /**
-     * Radar KHÔNG được gọi nhóm tìm kiếm khi model đó KHÔNG tìm kiếm được (không khai search_param,
-     * giao thức không có dialect) — trước đây "nhóm tìm kiếm cứ có model là gọi" nên một model CHẾT
-     * nằm trong agent_search (vd custom provider timeout) làm radar treo 90s và proxy trả 504.
+     * Nhóm tìm kiếm CÓ model OpenAI-compatible (không khai `search_param`) ⇒ radar DÙNG model đó và KHAI
+     * công cụ `web_search` cho nó. Trước 2026-09-24 ca này bị coi là "không tìm kiếm được" nên radar lặng lẽ
+     * bỏ qua vai tìm kiếm — đúng với cách bật tìm kiếm cũ (chỉ nhà cung cấp tự có tìm kiếm), SAI với công cụ
+     * do máy chủ chạy: model không cần có tìm kiếm tích hợp, nó chỉ cần biết gọi hàm.
      */
-    public function test_radar_ignores_a_search_group_model_that_cannot_search(): void
+    public function test_radar_uses_an_openai_compatible_search_model_with_the_web_search_tool(): void
     {
-        // Nhóm tìm kiếm CÓ model nhưng provider KHÔNG khai search_param ⇒ planFor = null.
+        // Nhóm tìm kiếm CÓ model; provider KHÔNG khai search_param ⇒ planFor = null (không có tìm kiếm sẵn).
         $this->model(DesignAgentService::SEARCH_GROUP, 'gw-search', 'search-1');
         // Nhóm suy luận có model bình thường.
         $this->model(DesignAgentService::REASON_GROUP, 'gw-reason', 'reason-1');
-        Http::fake(['gw-reason.example/*' => Http::response(['choices' => [['message' => ['content' => json_encode([
+        Http::fake(['gw-search.example/*' => Http::response(['choices' => [['message' => ['content' => json_encode([
             'directions' => array_fill(0, 6, ['title' => 'Hướng', 'thesis' => 't', 'why_now' => 'w', 'action' => 'a', 'risk' => 'r', 'price_band' => 'mid']),
         ], JSON_UNESCAPED_UNICODE)]]]], 200)]);
 
         $radar = app(DesignAgentService::class)->radar($this->customer(), 'all', true);
 
-        $this->assertSame('gw-reason', $radar['model']['provider'], 'Radar phải dùng nhóm suy luận khi model tìm kiếm không tìm kiếm được.');
-        $this->assertFalse($radar['model']['web_search']);
+        $this->assertSame('gw-search', $radar['model']['provider'], 'Vai tìm kiếm đã khai thì lượt chạy phải dùng model của nó.');
+        $this->assertTrue($radar['model']['web_search'], 'Provider chấp nhận công cụ thì web_search phải bật.');
+        $this->assertSame('tool', $radar['model']['tool_search']['mode']);
+        $this->assertTrue($radar['model']['tool_search']['accepted']);
 
-        // KHÔNG được gọi model tìm kiếm (gw-search) — nó không tìm kiếm được, gọi là lãng phí + treo.
-        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'gw-search.example'));
+        // Công cụ phải THẬT SỰ nằm trong request gửi model, không chỉ là cờ báo cáo.
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'gw-search.example')
+            && str_contains((string) $request->body(), 'web_search'));
+    }
+
+    /**
+     * Model trong nhóm tìm kiếm KHÔNG gọi được công cụ (giao thức Gemini — đường tìm kiếm của nó là
+     * grounding riêng, không phải `tools` kiểu OpenAI) và KHÔNG khai `search_param` ⇒ không tính là tìm được;
+     * radar phải quay về nhóm suy luận chứ không gọi nhóm tìm kiếm rồi treo.
+     */
+    public function test_radar_ignores_a_search_group_model_that_cannot_search_at_all(): void
+    {
+        // Transport gemini có kế hoạch tìm kiếm riêng nên vẫn tính là tìm được; để mô phỏng "không tìm được"
+        // ta dùng một giao thức lạ (không openai/qwen/dashscope/gemini) — đúng ca mà cả hai đường đều không có.
+        $this->model(DesignAgentService::SEARCH_GROUP, 'gw-la', 'la-1', ['protocol' => 'la']);
+
+        $this->assertNull(
+            \App\Services\WebAccessService::planFor(['provider' => 'gw-la', 'model' => 'la-1', 'transport' => 'la']),
+            'Giao thức lạ không được coi là có tìm kiếm sẵn.',
+        );
+        $this->assertFalse(
+            (new \ReflectionMethod(DesignAgentService::class, 'toolSearchCapable'))->invoke(null, ['transport' => 'la']),
+            'Giao thức lạ không được coi là gọi được công cụ.',
+        );
     }
 
     // ── (B) VAI ĐỌC ẢNH ────────────────────────────────────────────────────

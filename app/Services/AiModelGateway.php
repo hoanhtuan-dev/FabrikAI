@@ -124,8 +124,13 @@ class AiModelGateway
      * Gọi model văn bản theo nhóm công việc (prompt / translate / …).
      *
      * @param  list<array{role:string, content:mixed}>  $messages
-     * @param  array{response_format?:string, max_tokens?:int, timeout?:int, json?:bool}  $options
-     * @return array{text:string, provider:string, model:string, finish_reason:?string, reasoning_only:bool}|null
+     * CÔNG CỤ: khai `tools` (danh sách khai báo hàm) + `tool_handler` (hàm chạy công cụ ở phía máy chủ) thì
+     * gateway tự chạy vòng lặp "model gọi → máy chủ thực thi → kết quả quay lại prompt". Kết quả trả về nói
+     * THẬT chuyện đã xảy ra: `tools_accepted` (provider có hiểu `tools` không), `tool_calls`, `tool_queries`,
+     * `tool_results` — giao diện đọc những số này chứ không đọc lời hứa.
+     *
+     * @param  array{response_format?:string, max_tokens?:int, timeout?:int, json?:bool, tools?:list<array<string,mixed>>, tool_handler?:callable, tool_rounds?:int}  $options
+     * @return array{text:string, provider:string, model:string, group:string, finish_reason:?string, reasoning_only:bool, tools_accepted:?bool, tool_calls:int, tool_queries:list<string>, tool_results:int}|null
      */
     public function text(string $group, array $messages, array $options = []): ?array
     {
@@ -186,6 +191,12 @@ class AiModelGateway
                         'group' => $candidate['group'],
                         'finish_reason' => $result['finish_reason'],
                         'reasoning_only' => $result['reasoning_only'],
+                        // CÔNG CỤ: đường KHÔNG có công cụ để null (không khai) thay vì false — "chưa từng thử"
+                        // khác hẳn "đã thử và provider từ chối", và giao diện phải phân biệt được hai chuyện đó.
+                        'tools_accepted' => $result['tools_accepted'] ?? null,
+                        'tool_calls' => (int) ($result['tool_calls'] ?? 0),
+                        'tool_queries' => array_values((array) ($result['tool_queries'] ?? [])),
+                        'tool_results' => (int) ($result['tool_results'] ?? 0),
                     ];
                 }
 
@@ -300,9 +311,192 @@ class AiModelGateway
     }
 
     /**
-     * @return array{text:string, finish_reason:?string, reasoning_only:bool}|null
+     * Điểm vào của một lời gọi văn bản: có CÔNG CỤ thì đi đường vòng lặp công cụ, không thì đi đường thường.
+     *
+     * @return array{text:string, finish_reason:?string, reasoning_only:bool, tools_accepted?:bool, tool_calls?:int, tool_queries?:list<string>, tool_results?:int}|null
      */
     protected function callText(array $candidate, string $key, array $messages, array $options): ?array
+    {
+        $tools = $this->toolDefinitions($options);
+
+        // CÔNG CỤ (function calling): chỉ trên họ giao thức OpenAI-compatible — đó là nơi chuẩn "tools" là
+        // chung và cũng là nơi model văn bản đang chạy trên production (DeepSeek) thuộc về. Gemini đi đường
+        // riêng (grounding bằng tools của chính nó) nên KHÔNG vào đây, tránh gửi sai hình dạng tham số.
+        if ($tools !== [] && in_array((string) $candidate['transport'], ['qwen', 'dashscope', 'openai'], true)) {
+            return $this->callWithTools($candidate, $key, $messages, $options, $tools);
+        }
+
+        return $this->callPlain($candidate, $key, $messages, $options);
+    }
+
+    /**
+     * Danh sách công cụ hợp lệ của lời gọi này — RỖNG khi thiếu hàm thực thi.
+     *
+     * Vì sao kiểm cả hai: khai công cụ mà không có hàm chạy nó thì model gọi vào khoảng không, và lượt chạy
+     * hỏng ở chỗ khó thấy nhất. Thà không khai công cụ (lượt chạy vẫn xong) còn hơn khai rồi treo.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function toolDefinitions(array $options): array
+    {
+        $tools = $options['tools'] ?? [];
+        if (! is_array($tools) || $tools === [] || ! is_callable($options['tool_handler'] ?? null)) {
+            return [];
+        }
+
+        return array_values(array_filter($tools, 'is_array'));
+    }
+
+    /** Base URL chat-completions của một candidate (qwen/dashscope dùng compatible-mode của DashScope). */
+    protected function chatBase(array $candidate, string $key): string
+    {
+        if ($candidate['transport'] === 'qwen') {
+            return dashscope_base_url($key).'/compatible-mode/v1';
+        }
+
+        if ($candidate['transport'] === 'dashscope' && ($candidate['base'] ?? '') === '') {
+            return dashscope_base_url($key).'/compatible-mode/v1';
+        }
+
+        return rtrim((string) $candidate['base'], '/');
+    }
+
+    /**
+     * VÒNG LẶP CÔNG CỤ — model hỏi, MÁY CHỦ chạy công cụ, kết quả quay lại prompt, model trả lời.
+     *
+     * Vì sao ở lớp gateway chứ không ở từng tính năng: vòng lặp này phải giống nhau ở mọi nơi gọi, và nó
+     * phải nằm CÙNG CHỖ với các ràng buộc sẵn có (tắt suy luận, cờ tìm kiếm của nhà cung cấp, gọi lại khi
+     * provider không hiểu tham số). Viết lại ở nơi gọi là tạo bản sao sẽ lệch chuẩn.
+     *
+     * BA điều bắt buộc, đều là bài học từ lỗi thật của dự án:
+     *   1. Provider KHÔNG hiểu `tools` ⇒ gọi lại y như đường thường, và GHI RÕ `tools_accepted=false`. Một
+     *      tham số tuỳ chọn không được phép làm hỏng cả lượt chạy, nhưng cũng không được im lặng nói dối là
+     *      đã có công cụ.
+     *   2. Lượt CUỐI không gửi công cụ: model buộc phải trả lời bằng dữ liệu đang có, thay vì đòi tìm tiếp
+     *      cho tới khi hết thời gian chờ.
+     *   3. Kết quả công cụ là DỮ LIỆU do người ngoài viết — chỉ được đưa vào như nội dung của role "tool",
+     *      không bao giờ được ghép vào phần chỉ dẫn hệ thống.
+     *
+     * @param  list<array<string, mixed>>  $tools
+     * @return array<string, mixed>|null
+     */
+    protected function callWithTools(array $candidate, string $key, array $messages, array $options, array $tools): ?array
+    {
+        $timeout = (int) ($options['timeout'] ?? 90);
+        $maxTokens = (int) ($options['max_tokens'] ?? 1024);
+        $handler = $options['tool_handler'];
+        // Trần vòng: đủ cho "tìm → đọc kết quả → tìm tiếp nếu cần", không đủ để một model lan man quay
+        // vòng cho tới khi proxy trả 504.
+        $maxRounds = max(1, min(5, (int) ($options['tool_rounds'] ?? 3)));
+        // Tên công cụ ĐÃ KHAI: model bịa tên khác thì trả lỗi đọc được cho nó tự sửa, không chạy bừa.
+        $allowed = array_values(array_filter(array_map(
+            fn (array $tool) => (string) ($tool['function']['name'] ?? ''),
+            $tools,
+        ), 'strlen'));
+        $base = $this->chatBase($candidate, $key);
+
+        // Mở LẦN THỬ mới: công cụ tự tính lại trần lời gọi của mình (lần thử lại bắt đầu hội thoại mới nên
+        // kết quả tìm cũ không còn trong prompt — xem WebSearchTool::beginAttempt()).
+        if (is_callable($options['tool_begin'] ?? null)) {
+            ($options['tool_begin'])();
+        }
+
+        $conversation = $messages;
+        $queries = [];
+        $calls = 0;
+        $results = 0;
+
+        for ($round = 1; $round <= $maxRounds + 1; $round++) {
+            $offerTools = $round <= $maxRounds;
+
+            $body = ['model' => $candidate['model'], 'messages' => $conversation, 'max_tokens' => $maxTokens];
+            if (($options['response_format'] ?? '') === 'json_object') {
+                $body['response_format'] = ['type' => 'json_object'];
+            }
+            if ($offerTools) {
+                $body['tools'] = $tools;
+                $body['tool_choice'] = 'auto';
+            }
+            $this->applySearch($body, $options, $candidate);
+            $thinkingOff = $this->applyThinkingOff($body, $candidate, $options);
+
+            $response = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
+            if ($thinkingOff && ! $response->successful()) {
+                unset($body['enable_thinking']);
+                $response = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
+            }
+
+            if (! $response->successful()) {
+                if (! $offerTools) {
+                    return null;
+                }
+
+                // (1) Provider không hiểu `tools`: chạy lại đúng đường thường rồi NÓI THẬT là không có công cụ.
+                $plain = $this->callPlain($candidate, $key, $messages, $options);
+
+                return $plain === null ? null : $plain + [
+                    'tools_accepted' => false, 'tool_calls' => 0, 'tool_queries' => [], 'tool_results' => 0,
+                ];
+            }
+
+            $json = $response->json();
+            $toolCalls = data_get($json, 'choices.0.message.tool_calls');
+
+            if (! is_array($toolCalls) || $toolCalls === [] || ! $offerTools) {
+                return $this->textResult($json) + [
+                    'tools_accepted' => true, 'tool_calls' => $calls, 'tool_queries' => $queries, 'tool_results' => $results,
+                ];
+            }
+
+            // Lời gọi công cụ phải được ghi lại NGUYÊN VẸN trong hội thoại: thiếu nó thì lượt sau provider
+            // từ chối vì thấy role "tool" không có lời gọi tương ứng.
+            $assistant = (array) data_get($json, 'choices.0.message', []);
+            $conversation[] = [
+                'role' => 'assistant',
+                'content' => (string) ($assistant['content'] ?? ''),
+                'tool_calls' => array_values($toolCalls),
+            ];
+
+            foreach ($toolCalls as $index => $call) {
+                $id = (string) (data_get($call, 'id') ?: 'call_'.$round.'_'.$index);
+                $name = (string) data_get($call, 'function.name');
+                $arguments = json_decode((string) data_get($call, 'function.arguments'), true);
+                $arguments = is_array($arguments) ? $arguments : [];
+                $calls++;
+
+                if ($name === '' || ! in_array($name, $allowed, true)) {
+                    // Model bịa tên hàm: trả về lỗi ĐỌC ĐƯỢC để nó tự sửa, không ném ngoại lệ.
+                    $payload = ['error' => 'không có công cụ tên "'.$name.'"'];
+                } else {
+                    $payload = (array) $handler($name, $arguments);
+                    $query = trim((string) ($payload['query'] ?? ''));
+                    if ($query !== '') {
+                        $queries[] = $query;
+                    }
+                    $results += (int) ($payload['found'] ?? 0);
+                }
+
+                // CHỈ `role` + `tool_call_id` + `content`: đó là hình dạng TỐI THIỂU mà mọi gateway
+                // OpenAI-compatible chấp nhận. Thêm trường tuỳ chọn (`name`) là rủi ro không đáng có — một
+                // gateway khắt khe từ chối cả lượt chạy chỉ vì một khoá thừa, trong khi khoá đó không cần
+                // thiết (`tool_call_id` đã nối kết quả với đúng lời gọi).
+                $conversation[] = [
+                    'role' => 'tool',
+                    'tool_call_id' => $id,
+                    'content' => (string) json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Đường gọi THƯỜNG (không công cụ) — thân cũ của callText, giữ nguyên hành vi.
+     *
+     * @return array{text:string, finish_reason:?string, reasoning_only:bool}|null
+     */
+    protected function callPlain(array $candidate, string $key, array $messages, array $options): ?array
     {
         $timeout = (int) ($options['timeout'] ?? 90);
         $maxTokens = (int) ($options['max_tokens'] ?? 1024);

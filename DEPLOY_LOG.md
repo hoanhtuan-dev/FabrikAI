@@ -5,6 +5,71 @@
 
 ---
 
+## Phiên 2026-09-24 (Tool search — vai «Tìm kiếm nguồn ngoài» của Agent Studio chạy được thật)
+
+### Mục tiêu (yêu cầu chủ dự án)
+"Khảo sát Agent Studio → **bật tool search** cho **Agent Studio — Tìm kiếm nguồn ngoài**".
+
+### 1. Khảo sát — vì sao vai tìm kiếm có tên mà không chạy
+| Chặng | Thực tế đo được trong mã |
+|---|---|
+| Nhóm công việc | `agent_search` **đã có** từ Đợt 30 (ba vai: suy luận · đọc ảnh · tìm kiếm); Model Registry + `SettingsApp.vue` nhận đủ 3 vai |
+| Chọn model | `DesignAgentService::searchCandidates()` ưu tiên `agent_search` → `agent_reason` → `prompt`; radar + brief đã dùng độc lập được (sửa ở đợt 33) |
+| **BẬT tìm kiếm** | `WebAccessService::planFor()` **chỉ biết 2 đường**: giao thức qwen/dashscope → `enable_search` · gemini → `tools:[{google_search:{}}]`; thêm Custom Provider tự khai `search_param`. **Giao thức `openai` không có đường nào** |
+| Hệ quả trên production | model văn bản đang chạy là **DeepSeek (OpenAI-compatible)** ⇒ `planFor` trả `null` ⇒ `webSearch=false` ⇒ gán model vào vai tìm kiếm **vẫn không tìm được gì**, lượt chạy lặng lẽ quay về nhóm suy luận |
+
+⇒ Nút thắt không nằm ở Cài đặt mà ở **cơ chế**: chỉ nhà cung cấp CÓ tìm kiếm tích hợp mới tìm được.
+
+### 2. Cách sửa — CÔNG CỤ do MÁY CHỦ chạy (không phụ thuộc nhà cung cấp)
+Máy chủ khai công cụ `web_search` theo chuẩn function-calling → model tự quyết định hỏi gì → **máy chủ đi
+tìm thật** → kết quả (kèm nguồn + thời điểm) quay lại prompt → model viết JSON. Chạy được với **mọi model
+biết gọi hàm**, kể cả model không có tìm kiếm tích hợp.
+
+| # | Thay đổi | File |
+|---|---|---|
+| 1 | `WebSourceService::search()` — tìm theo TỪ KHOÁ: nguồn có `{query}` hoặc sẵn `q=`; đệm riêng theo (nguồn · từ khoá); KHÔNG áp bộ lọc `keywords` của nguồn (truy vấn đã là bộ lọc); nguồn `{query}` bị bỏ qua ở đường đọc tin cố định | `app/Services/WebSourceService.php` |
+| 2 | `WebSearchTool` — khai báo hàm + thực thi + **số đo** (calls · queries · results · sources · truncated · error); trần `MAX_CALLS=3` mỗi lần thử; kết quả là DỮ LIỆU, không phải mệnh lệnh | `app/Services/WebSearchTool.php` (mới) |
+| 3 | Vòng lặp công cụ trong gateway: gửi `tools` → đọc `tool_calls` → chạy hàm → trả `role:"tool"` → lặp (tối đa 3 vòng, **vòng cuối không gửi công cụ** để buộc trả lời); provider từ chối `tools` ⇒ gọi lại đường thường + ghi `tools_accepted=false` | `app/Services/AiModelGateway.php` |
+| 4 | `searchSetup()`: một chỗ quyết định «cách tìm kiếm» cho cả radar lẫn brief — `native` (nhà cung cấp tự tìm) hoặc `tool` (máy chủ chạy công cụ). **Công cụ chỉ bật khi vai `agent_search` được gán model** | `app/Services/DesignAgentService.php` |
+| 5 | Khối `model.tool_search` trong phản hồi + `web_search` nói THẬT (provider từ chối công cụ ⇒ `false`); `BRIEF_CACHE_VERSION v2→v3`, khoá radar `v3→v4` | `app/Services/DesignAgentService.php` |
+| 6 | `WebAccessService::supportsToolSearch()` (một nguồn cho cả agent lẫn giao diện) + verdict mới `internet_and_tool_search` + khối `model_search.tool_search` | `app/Services/WebAccessService.php` |
+| 7 | Giao diện: câu **số đo** của lượt chạy (*"Đã tự tìm trên internet 2 lượt theo từ khoá … : 5 tin từ 1 nguồn"*), phân biệt 3 mức (chưa bật · có công cụ mà không dùng · provider không nhận công cụ) | `DesignAgents.vue` + `agents/AgentRadarStep.vue` + `agents/AgentBriefStep.vue` |
+| 8 | Sửa câu nói sai: *"AI đọc tin qua máy chủ FabrikAI, không phải model tự tìm kiếm"* → *"AI không tự ra internet: mọi tin đều do máy chủ FabrikAI đi lấy — kể cả khi model gọi công cụ tìm kiếm"* | `agents/AgentRadarStep.vue` |
+
+### 3. Ba ràng buộc (đều khoá bằng test)
+1. **Chỉ bật khi vai tìm kiếm được gán model** — bật ở mọi lượt chạy chỉ vì nhóm suy luận là OpenAI-compatible là tự thêm một vòng gọi model + đi mạng cho MỌI lần đọc xu hướng.
+2. **Provider từ chối `tools`** ⇒ gọi lại không công cụ (lượt chạy vẫn xong) và **KHÔNG** được nói là đã tìm kiếm (`web_search=false`, `tool_search.accepted=false`).
+3. **Trần lời gọi** `MAX_CALLS=3` cho mỗi lần thử, **cấp lại** khi tầng gọi thử lại vì JSON bị cắt (lần thử lại mở hội thoại mới nên kết quả tìm cũ không còn).
+
+### 4. Đo THẬT (không chỉ test giả)
+| Phép đo | Kết quả |
+|---|---|
+| Nguồn tìm kiếm mặc định | `google-news-thoi-trang` (`?q=thời+trang`) ⇒ `isSearchable = true` — **không phải migrate**, không phải khai thêm |
+| Gọi công cụ thật với từ khoá «áo dạ tweed» | **586 ms** · 1 tin trong 60 ngày · nguồn *Google News — thời trang (VN)* · có URL + thời điểm |
+| Cùng câu hỏi lần hai | **10 ms** (đệm theo nguồn · từ khoá) |
+| Từ khoá không tồn tại | `found=0` + câu *"Không có tin nào khớp từ khoá này. TUYỆT ĐỐI không được bịa tin hay nguồn."* |
+| Vượt trần | `found=0` + *"Đã dùng hết 3 lượt tìm cho phép trong lần chạy này. Hãy trả lời bằng dữ liệu đã có."* |
+| Tin đọc được nhưng đều quá cũ | tách khỏi "không có tin": `read=40 · too_old=39` — nói đúng *"có 40 tin đọc được nhưng đều cũ hơn 60 ngày"* |
+
+### 5. Kiểm chứng
+- `ToolSearchTest` (**10 test**): brief chạy đủ 4 chặng (gọi công cụ → máy chủ tìm đúng từ khoá → kết quả vào prompt → model viết JSON) · radar cũng chạy công cụ · provider từ chối `tools` vẫn xong + nói thật · tìm ra 0 kết quả thì model đọc được `"found":0` · vai tìm kiếm trống thì KHÔNG gửi `tools` · trần lời gọi · cấp lại trần cho lần thử mới · tất cả quá cũ · giao diện đọc số đo + câu mô tả không được nói model tự ra internet.
+- `WebSourceTest` 13→19 test (nhận dạng nguồn tìm được · điền từ khoá vào URL và GIỮ `hl/gl` · nguồn `{query}` không lọc từ khoá · chưa khai nguồn tìm kiếm · từ khoá rỗng không đi mạng · nguồn `{query}` bị bỏ qua ở đường đọc tin cố định).
+- `AgentRolesTest` 12→13: ca "model OpenAI-compatible trong nhóm tìm kiếm" nay **được dùng kèm công cụ** (trước đây bị bỏ qua — đúng với cơ chế cũ, sai với cơ chế mới) + ca giao thức lạ thì vẫn không tính là tìm được.
+- `BrandDnaTest` +1 test: verdict `internet_and_tool_search` + `tool_search.available` chỉ bật khi model nằm ở ĐÚNG vai tìm kiếm.
+- `vite build` OK · **suite 978 test / 6.974 assert XANH** (trước 959/6.827 ở đầu phiên 2026-09-24, 975 trước đợt này).
+- Tài liệu: `docs/DESIGN_SYSTEM.md` §18.2 thêm tầng thứ ba + verdict mới + quy tắc "nguồn TÌM ĐƯỢC".
+- Commit: `299b0f4` (chưa deploy production — chờ chủ dự án gán model cho vai tìm kiếm rồi kiểm chứng).
+
+### 6. Việc chủ dự án cần làm để BẬT (không sửa mã)
+1. Cài đặt → **Nhóm công việc** → «Agent Studio — Tìm kiếm nguồn ngoài» → gán một model (production: `deepseek:deepseek-chat` hoặc `deepseek:deepseek-flash` — cả hai gọi hàm được).
+2. Agent Studio → bước **Tín hiệu** → nút **Kiểm tra lại**: dòng kết luận phải là *"…sẽ GỌI CÔNG CỤ tìm kiếm do máy chủ chạy"*.
+3. Muốn thêm nguồn tìm kiếm: Cài đặt → Nguồn dữ liệu ngoài → thêm URL có `q=` (vd Bing News RSS) — không cần sửa mã.
+
+### Việc còn lại (không chặn)
+- Công cụ hiện chạy trên họ giao thức **OpenAI-compatible** (qwen · dashscope · openai). Gemini đã có đường tìm kiếm riêng (grounding) nên không đi vào đây — nếu sau này cần công cụ cho Gemini thì phải dựng hình dạng `functionDeclarations` riêng.
+- Chưa có bộ kiểm frontend (Vitest) nên phần giao diện vẫn khoá bằng quét source như các đợt trước.
+
+---
 ## Phiên 2026-09-24 (Tối ưu hiệu năng tải trang + tách code theo miền — Đợt 33)
 
 ### Mục tiêu (yêu cầu chủ dự án)

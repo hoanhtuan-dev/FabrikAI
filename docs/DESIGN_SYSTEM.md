@@ -1007,11 +1007,31 @@ Hai tầng phải tách bạch vì chúng có thể lệch nhau:
 | Tầng | Ai quyết định | Cách đo |
 |---|---|---|
 | **Máy chủ** | nhà hosting | HEAD thật tới `config('studio.web_probe_targets')`, ghi mã HTTP + độ trễ (`WebAccessService`) |
-| **Model** | CÀI ĐẶT (Model Registry · Nhóm công việc · Luồng ưu tiên · Custom Providers) | `WebAccessService::planFor($candidate)`: nhà cung cấp **tự khai** `studio_providers.search_param` trước, sau đó tới **giao thức** (`SEARCH_DIALECTS`: qwen/dashscope → `enable_search` · gemini → `google_search`). Giao thức lạ ⇒ `null` = KHÔNG hứa |
+| **Model (tìm kiếm SẴN của nhà cung cấp)** | CÀI ĐẶT (Model Registry · Nhóm công việc · Luồng ưu tiên · Custom Providers) | `WebAccessService::planFor($candidate)`: nhà cung cấp **tự khai** `studio_providers.search_param` trước, sau đó tới **giao thức** (`SEARCH_DIALECTS`: qwen/dashscope → `enable_search` · gemini → `google_search`). Giao thức lạ ⇒ `null` = KHÔNG hứa |
+| **Công cụ do MÁY CHỦ chạy** (2026-09-24) | CÀI ĐẶT (gán model cho vai *Agent Studio — Tìm kiếm nguồn ngoài*) | `WebAccessService::supportsToolSearch($transport)` + nhóm THẬT ĐÃ DÙNG là `agent_search`. Model gọi hàm `web_search` → máy chủ đi tìm thật (`WebSourceService::search`) → kết quả quay lại prompt. Không phụ thuộc nhà cung cấp có tìm kiếm tích hợp |
+
+**Vì sao phải có tầng thứ ba**: đo trên production, model văn bản đang chạy là DeepSeek trên giao thức
+OpenAI-compatible — giao thức này **không có cờ tìm kiếm**, nên gán model vào vai «Tìm kiếm nguồn ngoài»
+vẫn không tìm được gì và lượt chạy lặng lẽ quay về nhóm suy luận. Tầng công cụ biến việc tìm kiếm thành
+việc của **máy chủ** (thứ chắc chắn ra được internet) và chỉ cần model biết **gọi hàm**.
+
+Ba ràng buộc của tầng công cụ, đều khoá bằng test:
+
+| Ràng buộc | Vì sao |
+|---|---|
+| Chỉ bật khi vai `agent_search` được **gán model** | bật ở mọi lượt chạy chỉ vì nhóm suy luận tình cờ là OpenAI-compatible là tự thêm một vòng gọi model + đi mạng cho MỌI lần đọc xu hướng |
+| Nhà cung cấp **từ chối** `tools` ⇒ gọi lại không công cụ, và `tool_search.accepted=false` | một tham số tuỳ chọn không được làm hỏng lượt chạy — nhưng cũng KHÔNG được im lặng nói là đã có tìm kiếm |
+| Trần `WebSearchTool::MAX_CALLS` lời gọi cho mỗi lần thử (và **cấp lại** khi tầng gọi thử lại vì JSON bị cắt) | không có trần thì model lan man biến một lượt radar thành hàng chục lời gọi mạng; không cấp lại thì lần thử lại vừa mất kết quả tìm cũ vừa không được tìm nữa |
+
+**Nguồn TÌM ĐƯỢC** là nguồn có **chỗ điền từ khoá**: URL chứa `{query}` tường minh, hoặc đã có sẵn tham
+số `q=` (nguồn Google News mặc định rơi vào trường hợp này ⇒ thành nguồn tìm kiếm **ngay** trên
+production, không phải migrate dữ liệu). Ở đường tìm kiếm, bộ lọc `keywords` của nguồn **không** được áp:
+chính TRUY VẤN đã là bộ lọc, lọc thêm bằng từ khoá cấu hình sẽ nuốt mất kết quả đúng. Nguồn chỉ có
+`{query}` bị **bỏ qua** ở đường đọc tin cố định (nếu không là đi hỏi internet đúng chuỗi `"{query}"`).
 
 - Giao diện **không** được viết "đang ở chế độ demo" như một câu văn tĩnh: khối "Khả năng truy cập
   internet" trong Agent Studio đọc số ĐO (kèm nút *Kiểm tra lại* → `?force=1`), và câu kết luận có ba
-  biến thể đúng với thực tế: `no_internet` · `internet_no_search` · `internet_and_search`.
+  biến thể đúng với thực tế: `no_internet` · `internet_no_search` · `internet_and_tool_search` · `internet_and_search`.
 - Cờ `search` chỉ được bật khi transport của candidate ĐẦU TIÊN thật sự hỗ trợ, và **nằm trong khoá cache**
   của radar (nội dung trả lời khác nhau ⇒ không dùng chung cache).
 - Khi **không** có tìm kiếm, prompt giữ luật cũ: cấm nói như thể đã đọc Shopee/TikTok/POS/ERP. Khi **có**
@@ -1025,8 +1045,9 @@ Bốn câu kết luận (đừng gộp — mỗi câu là một việc cần là
 |---|---|---|
 | `no_internet` | máy chủ không ra được internet | báo quản trị hosting |
 | `no_model_configured` | chưa có model **dùng được** cho nhóm suy luận (thiếu key · chưa gán model) | vào Cài đặt thêm key/model — agent đang chạy bằng bộ quy tắc có sẵn |
-| `internet_no_search` | có model nhưng model đó không có tìm kiếm web | muốn nguồn thật thì chọn model/nhà cung cấp có tìm kiếm, hoặc khai `search_param` cho Custom Provider |
-| `internet_and_search` | có model VÀ có tìm kiếm | không cần làm gì |
+| `internet_no_search` | lượt chạy này KHÔNG có tìm kiếm: model không có tìm kiếm tích hợp **và** vai «Tìm kiếm nguồn ngoài» chưa được gán model | gán một model cho vai «Agent Studio — Tìm kiếm nguồn ngoài» trong Cài đặt → Nhóm công việc |
+| `internet_and_tool_search` | model không có tìm kiếm tích hợp NHƯNG gọi được công cụ, và đang nằm ở đúng vai tìm kiếm | không cần làm gì — máy chủ đi tìm theo từ khoá model hỏi |
+| `internet_and_search` | có model VÀ nhà cung cấp tự có tìm kiếm | không cần làm gì |
 
 Kết quả đo còn có khối `task_groups` cho 5 nhóm công việc (`prompt` · `vision` · `image` · `edit` · `video`),
 đọc thẳng từ Cài đặt và tách **HAI** chuyện rất khác nhau:

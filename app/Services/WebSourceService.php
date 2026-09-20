@@ -91,6 +91,15 @@ class WebSourceService
                 ]);
                 continue;
             }
+            // Nguồn TÌM KIẾM chỉ có nghĩa khi có từ khoá điền vào (`{query}`); gọi thẳng URL đó ở đường đọc
+            // tin cố định là đi hỏi internet đúng chuỗi "{query}" rồi nhận về rác. Bỏ qua và NÓI RA lý do.
+            if (str_contains((string) $source->url, self::SEARCH_PLACEHOLDER)) {
+                $statuses[] = $this->status($source, false, null, 0, 0, 'bỏ qua: nguồn tìm kiếm theo từ khoá', [
+                    'state' => 'skipped',
+                    'state_label' => 'Bỏ qua (chỉ dùng khi model gọi công cụ tìm kiếm)',
+                ]);
+                continue;
+            }
             $usable[] = $source;
         }
 
@@ -142,6 +151,302 @@ class WebSourceService
                 ? ['alive' => true, 'label' => 'Máy chủ tự làm mới tin mỗi 30 phút, kể cả khi bạn không mở trang.']
                 : ['alive' => false, 'label' => 'Máy chủ chưa bật lịch chạy nền — tin được làm mới khi bạn mở màn hình hoặc bấm «Cập nhật tin».'],
         ];
+    }
+
+// ───────────────────────── TÌM THEO TỪ KHOÁ (CÔNG CỤ web_search) ─────────────────────────
+
+    /**
+     * Chỗ điền từ khoá trong URL nguồn. Nguồn nào có `{query}` (hoặc sẵn tham số `q=`) thì trở thành
+     * nguồn TÌM ĐƯỢC: máy chủ thay từ khoá của model vào rồi đi lấy, thay vì chỉ đọc feed cố định.
+     */
+    public const SEARCH_PLACEHOLDER = '{query}';
+
+    /** Trần tin trả về cho MỘT truy vấn — kết quả này đi thẳng vào prompt nên phải ngắn. */
+    public const SEARCH_LIMIT = 6;
+
+    /** Trần số nguồn chạy cho một truy vấn: ba nguồn là đủ, và mỗi nguồn là một lần gọi mạng. */
+    private const SEARCH_MAX_SOURCES = 3;
+
+    /** Đệm kết quả tìm theo (nguồn · từ khoá): model hay hỏi lại cùng câu trong một lượt chạy. */
+    private const SEARCH_CACHE_MINUTES = 15;
+
+    private const SEARCH_CACHE_PREFIX = 'studio:web-search:v1:';
+
+    /** Tham số query string được coi là chỗ điền từ khoá khi URL không có `{query}`. */
+    private const SEARCH_QUERY_KEYS = ['q', 'query', 'keyword', 'keywords'];
+
+    /**
+     * Nguồn này TÌM ĐƯỢC theo từ khoá không?
+     *
+     * Nhận hai dạng, cố ý KHÔNG cần cột cấu hình mới: `{query}` tường minh, hoặc URL đã có sẵn một
+     * tham số từ khoá (`q=`) — dạng thứ hai làm nguồn Google News mặc định trở thành nguồn tìm kiếm
+     * ngay mà không phải migrate dữ liệu đang chạy trên production.
+     */
+    public static function isSearchable(WebSource $source): bool
+    {
+        return self::querySlot((string) $source->url) !== null;
+    }
+
+    /** Tên chỗ điền từ khoá trong URL ('{query}' hoặc tên tham số), null = không tìm được. */
+    private static function querySlot(string $url): ?string
+    {
+        if (str_contains($url, self::SEARCH_PLACEHOLDER)) {
+            return self::SEARCH_PLACEHOLDER;
+        }
+
+        $query = (string) (parse_url($url, PHP_URL_QUERY) ?: '');
+        if ($query === '') {
+            return null;
+        }
+
+        parse_str($query, $params);
+        foreach (self::SEARCH_QUERY_KEYS as $key) {
+            if (isset($params[$key]) && is_string($params[$key])) {
+                return $key;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Danh sách nguồn TÌM ĐƯỢC đang bật cho một vùng — theo đúng thứ tự ưu tiên như đường đọc tin.
+     *
+     * @return list<WebSource>
+     */
+    public function searchableSources(string $region = 'all'): array
+    {
+        return WebSource::query()
+            ->where('enabled', true)
+            ->orderBy('priority')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (WebSource $source) => $source->matchesRegion($region) && self::isSearchable($source))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * TÌM THẬT theo từ khoá — đây là việc máy chủ làm khi model gọi công cụ `web_search`.
+     *
+     * Vì sao ở đây chứ không ở lớp công cụ: mọi ràng buộc an toàn của việc ra internet (chỉ http/https,
+     * chặn địa chỉ nội bộ, trần dung lượng, đệm, làm sạch nội dung) đã nằm ở lớp này. Viết một đường HTTP
+     * thứ hai cho công cụ là tạo bản sao lệch chuẩn — đúng loại lỗi đã gặp nhiều lần trong dự án.
+     *
+     * KHÁC đường đọc tin ở MỘT điểm có chủ ý: KHÔNG lọc theo từ khoá khai trong nguồn. Từ khoá của nguồn
+     * dùng để giữ feed tin chung cho đúng chủ đề; còn ở đây chính TRUY VẤN đã là bộ lọc (nguồn tìm kiếm
+     * trả về đúng thứ được hỏi) — lọc thêm bằng từ khoá cấu hình sẽ nuốt mất kết quả đúng.
+     *
+     * @return array{query:string, mode:string, count:int, parsed:int, dropped:int, items:list<array<string,mixed>>, sources:list<array<string,mixed>>, checked_at:string, error:?string}
+     */
+    public function search(string $query, string $region = 'all', ?int $limit = null): array
+    {
+        $query = $this->normalizeQuery($query);
+        $limit = max(1, min(20, $limit ?? self::SEARCH_LIMIT));
+        $out = [
+            'query' => $query, 'mode' => 'empty', 'count' => 0,
+            // Số ĐO để phân biệt "internet không có gì" với "có tin nhưng đều quá cũ" — hai chuyện rất khác
+            // nhau, và gộp chúng thành "0 kết quả" là nói thiếu sự thật.
+            'parsed' => 0, 'dropped' => 0,
+            'items' => [], 'sources' => [],
+            'checked_at' => now()->toISOString(), 'error' => null,
+        ];
+
+        if ($query === '') {
+            $out['error'] = 'từ khoá rỗng';
+
+            return $out;
+        }
+
+        $targets = array_slice($this->searchableSources($region), 0, self::SEARCH_MAX_SOURCES);
+        if ($targets === []) {
+            // Chưa khai nguồn tìm kiếm nào = một trạng thái CẤU HÌNH, phải nói ra chứ không im lặng.
+            $out['error'] = 'chưa có nguồn tìm kiếm nào được bật';
+
+            return $out;
+        }
+
+        $items = [];
+        $seen = [];
+        $seenTitles = [];
+        $okCount = 0;
+
+        foreach ($targets as $source) {
+            $row = $this->searchOnce($source, $query, $limit);
+            $out['sources'][] = $this->statusFromResult($source, $row);
+            $out['parsed'] += (int) ($row['parsed'] ?? 0);
+            $out['dropped'] += (int) ($row['dropped'] ?? 0);
+            if (($row['ok'] ?? false) === true) {
+                $okCount++;
+            }
+
+            foreach ((array) ($row['items'] ?? []) as $item) {
+                $key = $this->dedupeKey($item);
+                $titleKey = $this->titleKey($item);
+                if (($key !== '' && isset($seen[$key])) || ($titleKey !== '' && isset($seenTitles[$titleKey]))) {
+                    continue;
+                }
+                if ($key !== '') {
+                    $seen[$key] = true;
+                }
+                if ($titleKey !== '') {
+                    $seenTitles[$titleKey] = true;
+                }
+                $items[] = $item;
+            }
+        }
+
+        usort($items, fn (array $a, array $b) => strcmp((string) ($b['published_at'] ?? ''), (string) ($a['published_at'] ?? '')));
+        $out['items'] = array_slice($items, 0, $limit);
+        $out['count'] = count($out['items']);
+        // mode=live CHỈ khi có tin thật: model phải đọc được "tìm rồi mà không có gì" khác "không tìm được".
+        $out['mode'] = $out['count'] > 0 ? 'live' : 'empty';
+        if ($out['count'] === 0 && $okCount === 0) {
+            $out['error'] = 'không nguồn tìm kiếm nào trả lời được';
+        }
+
+        return $out;
+    }
+
+    /**
+     * Một truy vấn trên MỘT nguồn, CÓ ĐỆM riêng theo (nguồn · từ khoá).
+     *
+     * Vì sao không dùng `fetch()`: đệm của `fetch()` khoá theo nguồn nên hai truy vấn khác nhau sẽ nuốt
+     * kết quả của nhau; và nó ghi thêm bản "lấy tốt nhất 24 giờ" — với từ khoá tuỳ ý thì đó là rác đệm
+     * không bao giờ đọc lại.
+     *
+     * @return array<string, mixed>
+     */
+    private function searchOnce(WebSource $source, string $query, int $limit): array
+    {
+        $target = $this->withQuery($source, $query);
+        $key = self::SEARCH_CACHE_PREFIX.md5($source->slug.'|'.$query.'|'.$target->url);
+
+        try {
+            $hit = Cache::get($key);
+            if (is_array($hit)) {
+                return $hit;
+            }
+        } catch (\Throwable) {
+            // Đệm hỏng KHÔNG được làm hỏng việc tìm: đi lấy thật.
+        }
+
+        $started = microtime(true);
+        try {
+            $result = $this->interpretSearch($target, $this->request($target), $started, $limit);
+        } catch (\Throwable $e) {
+            // Nguồn chết là một KẾT QUẢ ĐO, không phải lỗi của tính năng.
+            $result = $this->failure($source, $e, $started);
+        }
+
+        try {
+            Cache::put($key, $result, now()->addMinutes(self::SEARCH_CACHE_MINUTES));
+        } catch (\Throwable) {
+            // Bộ đệm là tối ưu tốc độ.
+        }
+
+        return $result;
+    }
+
+    /** Bản sao nguồn với từ khoá đã điền vào URL (không sửa bản ghi thật trong DB). */
+    private function withQuery(WebSource $source, string $query): WebSource
+    {
+        $clone = clone $source;
+        $url = (string) $source->url;
+        $slot = self::querySlot($url);
+
+        if ($slot === self::SEARCH_PLACEHOLDER) {
+            $clone->url = str_replace(self::SEARCH_PLACEHOLDER, rawurlencode($query), $url);
+
+            return $clone;
+        }
+
+        if ($slot === null) {
+            $clone->url = $url;
+
+            return $clone;
+        }
+
+        // Thay ĐÚNG tham số từ khoá, giữ nguyên phần còn lại của query string (hl/gl/ceid/format…).
+        $clone->url = (string) preg_replace_callback(
+            '/([?&]'.preg_quote($slot, '/').'=)[^&#]*/u',
+            fn (array $m) => $m[1].rawurlencode($query),
+            $url,
+            1,
+        );
+
+        return $clone;
+    }
+
+    /**
+     * Đọc phản hồi của một truy vấn thành kết quả chuẩn.
+     *
+     * Giống `interpret()` ở mọi ràng buộc (trần dung lượng, làm sạch nội dung, phân biệt lỗi), KHÁC ở chỗ
+     * không áp bộ lọc từ khoá của nguồn — xem chú thích ở `search()`.
+     *
+     * @return array<string, mixed>
+     */
+    private function interpretSearch(WebSource $source, Response $response, float $started, int $limit): array
+    {
+        $result = [
+            'ok' => false, 'http' => $response->status(), 'ms' => 0, 'items' => [],
+            'error' => null, 'parsed' => 0, 'dropped' => 0, 'stale' => false,
+        ];
+
+        $body = (string) $response->body();
+        $declared = (int) $response->header('Content-Length');
+        $oversized = ($declared > 0 && $declared > self::MAX_BYTES) || strlen($body) > self::MAX_BYTES;
+
+        if (! $response->successful()) {
+            $result['error'] = 'HTTP '.$response->status();
+        } elseif ($oversized) {
+            $result['error'] = 'nội dung quá lớn';
+        } else {
+            $parsed = $source->kind === 'json' ? $this->parseJson($body, $source) : $this->parseRss($body);
+            $result['parsed'] = count($parsed);
+            $result['ok'] = true;
+
+            $cutoff = now()->subDays(self::MAX_AGE_DAYS)->getTimestamp();
+            $kept = [];
+            foreach ($parsed as $item) {
+                if ($item['published_at'] !== null) {
+                    $ts = strtotime((string) $item['published_at']);
+                    if ($ts !== false && $ts < $cutoff) {
+                        continue;
+                    }
+                }
+                $kept[] = $item + ['source' => $source->slug, 'source_name' => $source->name];
+            }
+
+            usort($kept, fn (array $a, array $b) => strcmp((string) ($b['published_at'] ?? ''), (string) ($a['published_at'] ?? '')));
+            $result['dropped'] = max(0, count($parsed) - count($kept));
+            $result['items'] = array_slice($kept, 0, max(1, min(30, $limit)));
+            if ($parsed === [] && trim($body) !== '') {
+                $result['error'] = $source->kind === 'json'
+                    ? 'không đọc được mục nào theo ánh xạ đã khai'
+                    : 'nội dung không phải RSS/Atom đọc được';
+            }
+        }
+
+        $result['ms'] = (int) round((microtime(true) - $started) * 1000);
+
+        return $result;
+    }
+
+    /**
+     * Chuẩn hoá từ khoá do MODEL đưa vào — đầu vào không đáng tin: cắt ký tự điều khiển, gộp khoảng
+     * trắng, chặn chuỗi dài bất thường. Rỗng = không tìm gì cả (nơi gọi phải nói thật là không tìm được).
+     */
+    private function normalizeQuery(string $query): string
+    {
+        $query = str_replace(["\r", "\n", "\t"], ' ', $query);
+        $query = (string) preg_replace('/[\x00-\x1F\x7F]/u', '', $query);
+        $query = (string) preg_replace('/\s+/u', ' ', $query);
+        $query = trim($query);
+        $query = strip_tags($query);
+
+        // Trần 120 ký tự: một "truy vấn" dài hơn thế là model đang dán cả đoạn văn, không phải từ khoá.
+        return mb_substr($query, 0, 120);
     }
 
     /** Trần hiệu dụng — trả về ĐÚNG con số đã dùng, không phải con số người gọi xin (0 vẫn phải có trần thật). */
