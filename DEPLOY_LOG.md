@@ -1409,3 +1409,79 @@ mẫu có sẵn ở `StudioCard`), nên câu giải thích và điều kiện kh
       (hiện CỐ Ý chỉ ghi phản hồi) · cron `studio:grant-plan-credits` trên hPanel · báo cáo chi phí **theo nhóm**.
 - [ ] `border-white/*` (48 chỗ) là viền vẽ TRÊN ẢNH — cố ý cố định; nếu có chỗ mới dùng cho bề mặt giao diện
       thì phải đổi sang `border-cream-50/*`.
+
+---
+
+## Phiên 2026-09-23 (Đợt 19 — LẤY ĐÚNG BẢNG MÀU CỦA THEME daisyUI tham chiếu + BỘ TOKEN daisyUI + MỞ ĐƯỜNG VÀO cài đặt)
+
+**Deploy:** `412e693 → ea00306`. **Không migration, không route mới.** Asset mới `app-BPWynqnA.css` + `main-Ba414MAr.js`.
+
+### 0. Khiếu nại và sự thật
+
+Người dùng nói: *"chưa thấy thay đổi về giao diện + cài đặt theme | không thấy có sự học hỏi hay ảnh hưởng gì từ <theme daisyUI>"*.
+**Đúng cả ba điểm**, và là ba lỗi khác nhau:
+
+| # | Sự thật đo được | Loại lỗi |
+|---|---|---|
+| 1 | Đợt theme trước đổi **cấu trúc** token nhưng **giữ nguyên giá trị màu cũ** (nâu ấm `#17150f`/`#f4f2ec`) ⇒ mắt người dùng không thấy gì khác | Đổi cấu trúc ≠ đổi giao diện |
+| 2 | "Học từ theme tham chiếu" mới ở mức ý tưởng: **không có giá trị màu nào** và **không có tên token nào** của theme đó được dùng | Tham chiếu không để lại dấu vết |
+| 3 | Mục "Giao diện" CÓ thật (trang + 3 lựa chọn + lưu theo tài khoản + test) nhưng menu Cài đặt trong Studio **chỉ có 4 mục cũ**, nút đổi nhanh ở thanh trạng thái là **icon trần giữa ~20 icon** | Tính năng chết vì không có lối vào |
+
+### 1. Tiếp nhận theme tham chiếu bằng GIÁ TRỊ THẬT (oklch → hex)
+
+| Vai | Trước | Nay |
+|---|---|---|
+| Nền trang · panel · card (theme Tối) | `#0e0d09 · #17150f · #2b2820` (nâu ấm) | **`#15191e · #191e24 · #1d232a`** (xám nguội — đúng `base-300/200/100` của theme tham chiếu) |
+| Chữ chính | `#f4f2ec` | **`#ecf9ff`** (base-content của theme tham chiếu) |
+| Lỗi · cảnh báo · thành công · thông tin | `#fca5a5 · #fcd34d · #6ee7b7 · #7dd3fc` (pastel) | **`#ff627d · #fcb700 · #00d390 · #00bafe`** (đúng sắc độ theme tham chiếu) |
+| Theme Sáng | nền kem ấm `#f1efe7/#f8f7f2` | nền trung tính nguội **`#eef1f5 · #f7f9fb · #ffffff`** |
+| Thương hiệu | `#2d6f4d` | **GIỮ NGUYÊN** `#2d6f4d` — nay đóng vai `primary` |
+
+Tương phản đo lại: bậc chữ **6,0 – 17,8 : 1** · màu trạng thái **5,0 – 9,5 : 1** · chữ trắng trên `primary` **6,0 : 1**.
+
+### 2. Bộ tên token daisyUI thành LỚP NGỮ NGHĨA CHÍNH
+
+Dùng được ngay trong class: `bg-base-100 · bg-base-200 · bg-base-300 · text-base-content · bg-primary text-primary-content ·
+bg-secondary · bg-accent · bg-neutral · text-error · text-warning · text-success · text-info · bg-error/10` … (mỗi màu có cặp `-content` theo đúng quy ước daisyUI).
+Các tên cũ của app (`ink`/`cream`/`danger`/`warn`/`ok`) trở thành **BÍ DANH** trỏ về lớp này ⇒ 3.000+ chỗ đang dùng không phải sửa mà vẫn chỉ có MỘT nguồn giá trị.
+
+`App\\Support\\ThemePalette` nay **giải bí danh `var()`** (trước chỉ đọc hex) nên bảng token ở `/he-thong-thiet-ke` và `ThemeSystemTest` vẫn đo đúng giá trị cuối; trang token tự có thêm lớp mới.
+Khối chọn giao diện dùng **chính** các tiện ích mới (`bg-base-100/base-200/base-300`, `text-base-content`, `bg-primary/15`) và nói rõ nguồn bảng màu cho người dùng đọc.
+
+### 3. Mở ĐƯỜNG VÀO (chỗ người dùng đã quen bấm)
+
+- Menu Cài đặt (bánh răng) trong Studio: **4 → 5 mục**, thêm **"Giao diện (Sáng · Tối · Theo máy)"** lên ĐẦU nhóm.
+- Nút đổi giao diện ở thanh trạng thái: từ icon trần thành **CHIP CÓ CHỮ** ("Sáng"/"Tối").
+- `title` nút bánh răng nay có chữ "giao diện".
+
+### 4. Verify production (đã chạy thật)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | **ea00306** (trước pull: `412e693`) |
+| Migration | **0 pending** |
+| Cache | `view:cache` · `route:cache` · `config:cache` · `queue:restart` → **exit=0** |
+| Asset | `app-BPWynqnA.css` **145.647 B** · `main-Ba414MAr.js` **577.289 B** |
+| **Bản phục vụ = bản build ở máy** | md5 **trùng**: CSS `611a1d4bafdaad9705204be14430dc6a` · JS `e5f0be301f966171b382bc852faf38d6` |
+| Màu nền mới trong CSS phục vụ | `#1d232a` **có mặt** · token `color-base-100 · color-base-content · color-primary · color-error · color-success` **đều có** |
+| Lối vào mới trong JS phục vụ | `cai-dat/appearance` **có mặt** |
+| Trang | `/` `/dang-nhap` `/bang-gia` `/up` → **200** · `ERROR` trong log vẫn **9** (0 lỗi mới) |
+
+### 5. Đo bằng Chrome thật (local, đăng nhập owner)
+
+- computed style: body **`rgb(25,30,36)`** · chữ **`rgb(236,249,255)`** · `--color-primary #2d6f4d` · `--color-base-100 #1d232a` · `--color-success #00d390` · `--color-error #ff627d`.
+- Bấm bánh răng ⇒ menu **5 mục**, mục đầu `/cai-dat/appearance`; chip trạng thái hiện chữ **"Sáng"**.
+- Trang `/cai-dat/appearance`: `data-section=appearance` · 3 lựa chọn · có nhắc **daisyUI** + **WCAG AA**.
+- Tương phản: **5 màn hình × 2 theme → 0 chỗ dưới ngưỡng AA**.
+- Luồng thật: bấm "Sáng" ⇒ body `#f7f9fb`, chữ `#121821`; tải lại vẫn Sáng.
+
+### 6. Bài học (đã thành luật §14)
+
+- **Luật 41:** đổi *cấu trúc* mà giữ *giá trị* thì người dùng không thấy gì — khi được đưa một theme tham chiếu,
+  phải tiếp nhận thứ ĐO ĐƯỢC từ nó (**bộ tên token** + **giá trị màu**), và luôn trả lời được: *người dùng sẽ thấy gì khác?*
+- **Luật 42:** tính năng mới phải có **đường vào ở chỗ người dùng đang đứng**; điều khiển quan trọng thì **có chữ**, không chỉ icon.
+
+**Test:** full suite **847 test / 6.268 assert XANH**. `DesignSystemTest` 9/9 · `ThemeSystemTest` 12/12. `npm run build` exit 0.
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)**: app là SPA, tab đang mở giữ JS cũ nên deploy không tự cập nhật
+> (bài học đã ghi ở §14 luật 9). Không tải lại thì vẫn thấy giao diện cũ.
