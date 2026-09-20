@@ -300,13 +300,13 @@ const formatVnd = inject('formatVnd');
                     </li>
                   </ul>
 
-                  <details v-if="liveSources" class="mt-2">
+                  <details v-if="store.webSources" class="mt-2">
                     <summary class="cursor-pointer text-label text-cream-400">Danh sách nguồn &amp; cách hoạt động</summary>
                     <div class="mt-1.5 overflow-x-auto">
                       <table class="w-full min-w-[26rem] text-left text-label">
                         <thead><tr class="border-b border-ink-700 text-cream-400"><th scope="col" class="pb-1.5 pr-2 font-semibold">Nguồn</th><th scope="col" class="pb-1.5 pr-2 font-semibold">Trạng thái</th><th scope="col" class="pb-1.5 font-semibold">Tin dùng được</th></tr></thead>
                         <tbody class="divide-y divide-ink-800">
-                          <tr v-for="row in store.webSources.sources" :key="row.slug">
+                          <tr v-for="row in (store.webSources?.sources || [])" :key="row.slug">
                             <td class="py-1.5 pr-2"><a :href="row.url" target="_blank" rel="noopener" class="text-cream-200 underline decoration-dotted">{{ row.name }}</a></td>
                             <!-- Trạng thái nói ĐÚNG việc đang xảy ra: đang dùng · bị lọc hết · nguồn không có tin ·
                                  đang dùng bản lấy trước · bỏ qua vì khác vùng. Không gộp thành "Không lấy được". -->
@@ -324,7 +324,7 @@ const formatVnd = inject('formatVnd');
                          Bản trước viết cứng "tự lấy tin mỗi 30 phút" trong khi host KHÔNG có cron nào. -->
                     <p class="mt-1.5 text-label leading-5" :class="autoRefresh.alive ? 'text-cream-400' : 'text-warn'">
                       {{ autoRefresh.label }}
-                      Chỉ giữ tin trong {{ store.webSources.limits.max_age_days }} ngày và tối đa {{ store.webSources.limits.limit }} tin cho mỗi lần phân tích.
+                      Chỉ giữ tin trong {{ store.webSources?.limits?.max_age_days }} ngày và tối đa {{ store.webSources?.limits?.limit }} tin cho mỗi lần phân tích.
                     </p>
                     <p class="mt-1 text-label leading-5 text-cream-400">
                       AI đọc tin qua máy chủ FabrikAI, không phải model tự tìm kiếm.

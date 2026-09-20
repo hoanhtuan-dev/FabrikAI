@@ -21,8 +21,8 @@
       "_pageBoot-DlVWSYEo.js"
     ]
   },
-  "_RefImageCard-CCpWnSaB.js": {
-    "file": "assets/RefImageCard-CCpWnSaB.js",
+  "_RefImageCard-CuS5tXW1.js": {
+    "file": "assets/RefImageCard-CuS5tXW1.js",
     "name": "RefImageCard",
     "imports": [
       "_pageBoot-DlVWSYEo.js",
@@ -212,7 +212,7 @@
     ]
   },
   "resources/js/studio/components/DesignAgents.vue": {
-    "file": "assets/DesignAgents-DPNK4ZGG.js",
+    "file": "assets/DesignAgents-DbvIA08q.js",
     "name": "DesignAgents",
     "src": "resources/js/studio/components/DesignAgents.vue",
     "isDynamicEntry": true,
@@ -246,7 +246,7 @@
     ]
   },
   "resources/js/studio/components/InpaintCard.vue": {
-    "file": "assets/InpaintCard-BqAr_7Ft.js",
+    "file": "assets/InpaintCard-DeuL1i93.js",
     "name": "InpaintCard",
     "src": "resources/js/studio/components/InpaintCard.vue",
     "isDynamicEntry": true,
@@ -259,7 +259,7 @@
     ]
   },
   "resources/js/studio/components/OutfitComposeCard.vue": {
-    "file": "assets/OutfitComposeCard-DQa6_HFt.js",
+    "file": "assets/OutfitComposeCard-CIWuS-9s.js",
     "name": "OutfitComposeCard",
     "src": "resources/js/studio/components/OutfitComposeCard.vue",
     "isDynamicEntry": true,
@@ -297,7 +297,7 @@
     ]
   },
   "resources/js/studio/components/StudioCard.vue": {
-    "file": "assets/StudioCard-Di0WbiIp.js",
+    "file": "assets/StudioCard-CK0uISNi.js",
     "name": "StudioCard",
     "src": "resources/js/studio/components/StudioCard.vue",
     "isDynamicEntry": true,
@@ -310,7 +310,7 @@
     ]
   },
   "resources/js/studio/components/SuggestCard.vue": {
-    "file": "assets/SuggestCard-C8pOqTKR.js",
+    "file": "assets/SuggestCard-CsrQgsFm.js",
     "name": "SuggestCard",
     "src": "resources/js/studio/components/SuggestCard.vue",
     "isDynamicEntry": true,
@@ -325,13 +325,13 @@
     ]
   },
   "resources/js/studio/components/TryOnCard.vue": {
-    "file": "assets/TryOnCard-B4tfXL-I.js",
+    "file": "assets/TryOnCard-CNgi-uEh.js",
     "name": "TryOnCard",
     "src": "resources/js/studio/components/TryOnCard.vue",
     "isDynamicEntry": true,
     "imports": [
       "_pageBoot-DlVWSYEo.js",
-      "_RefImageCard-CCpWnSaB.js"
+      "_RefImageCard-CuS5tXW1.js"
     ]
   },
   "resources/js/studio/components/UpscaleCard.vue": {
@@ -345,17 +345,17 @@
     ]
   },
   "resources/js/studio/components/VariationCard.vue": {
-    "file": "assets/VariationCard-CzS-G7sS.js",
+    "file": "assets/VariationCard-MmRdHdoU.js",
     "name": "VariationCard",
     "src": "resources/js/studio/components/VariationCard.vue",
     "isDynamicEntry": true,
     "imports": [
       "_pageBoot-DlVWSYEo.js",
-      "_RefImageCard-CCpWnSaB.js"
+      "_RefImageCard-CuS5tXW1.js"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-08XCkDRl.js",
+    "file": "assets/main-CFKPgES7.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
