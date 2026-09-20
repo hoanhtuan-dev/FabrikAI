@@ -313,7 +313,7 @@ JS/Vue studio **51 file (38 .vue) / 14.239 dòng** · `public_html` **21 MB** ·
 
 **Kiểm chứng**: `PlanCreditCycleTest` 8 test mới (cấp một lần/chu kỳ · gia hạn cấp tiếp · gói hết hạn không cấp · gói miễn phí 0 credit · dry-run không ghi · chi phí theo gói khi tạo ảnh · boot trả gói) · **499 test / 2.682 assert xanh** (trước: 491/2.657) · chạy thật trên DB local: gán gói Khởi nghiệp cho `user@fabrikai.shop` ⇒ credit 200 → **350** và **đúng một** dòng `plan_grant` *"Cấp 120 credit theo gói Khởi nghiệp (kỳ từ 17/09/2026)"*.
 
-**Tài liệu chiến lược kèm theo**: `docs/UX_PERSONA_STRATEGY.md` (3 persona · 6 lỗ hổng gói cước có bằng chứng · 7 nguyên tắc thiết kế · roadmap 4 đợt có tiêu chí đo · 4 câu hỏi cần chủ dự án quyết).
+**Tài liệu chiến lược kèm theo**: `docs/DESIGN_SYSTEM.md` §11–§13 (3 persona · 6 lỗ hổng gói cước có bằng chứng · 7 nguyên tắc thiết kế · roadmap có tiêu chí đo · 4 câu hỏi cần chủ dự án quyết) — tài liệu `docs/UX_PERSONA_STRATEGY.md` đã được **hợp nhất** vào đó ngày 2026-09-22.
 
 **Còn nợ (các vòng sau)**: UI gói cước trong Studio · cờ `studio_enforce_credits` (hiện vẫn không chặn khi hết credit) · thực thi `resolution_cap` · trang giá công khai · không gian làm việc theo persona (bộ sưu tập/đơn/xuất gói cho xưởng).
 
@@ -401,7 +401,7 @@ JS/Vue studio **51 file (38 .vue) / 14.239 dòng** · `public_html` **21 MB** ·
 - **Chạy thật bằng SỰ KIỆN BÀN PHÍM THẬT** (Chrome CDP `Input.dispatchKeyEvent`, không phải `dispatchEvent` giả): **16/16 bước** — `A` gửi đúng 1 lượt duyệt với đúng 2 id đang chọn + giao diện lên "3 đã duyệt" · `N` khi chưa chọn ảnh ⇒ **không gửi lời gọi nào** + hiện nhắc "Chọn ảnh trước" · chọn ảnh #104 rồi `N` ⇒ đúng 1 lời gọi `next` cho id 104, ảnh lên "Đã chọn" · `R` ⇒ "Đã loại" · **gõ chữ "a" trong ô ghi chú ⇒ KHÔNG duyệt và chữ trong ô còn nguyên** · `S` chọn lại ảnh chờ duyệt · `Esc` đóng khối.
 - **Không hồi quy**: chạy lại kịch bản duyệt theo lô 33 bước ⇒ **33/33**.
 - **Deploy**: `e0980d9 → d18b0ae`, production verify: bundle `main-CTz8TrVd.js` 200 (569.648 B) chứa "Phím tắt khi khối này đang mở" + "Chọn ảnh trước" · `/up` `/` `/bang-gia` 200 · log vẫn **đúng 6 ERROR cũ**.
-- **Đóng goal**: `docs/UX_PERSONA_STRATEGY.md` thêm **§8 Kết quả đã triển khai** — đối chiếu 4 chặng với bằng chứng, việc đã giao cho từng persona, bảng số đo trước → sau, và danh sách việc còn lại (Q1–Q4 chờ chủ dự án quyết). Cả 4 đợt trong roadmap nay đã ĐÓNG phần cốt lõi.
+- **Đóng goal**: `docs/DESIGN_SYSTEM.md` **§16** (hợp nhất từ `docs/UX_PERSONA_STRATEGY.md` §8 ngày 2026-09-22) giữ **kết quả đã triển khai** — đối chiếu 4 chặng với bằng chứng, việc đã giao cho từng persona, bảng số đo trước → sau, và danh sách việc còn lại (Q1–Q4 chờ chủ dự án quyết). Cả 4 đợt trong roadmap nay đã ĐÓNG phần cốt lõi.
 
 **Vòng 12 (2026-09-19) — Q1 BẬT CHẶN KHI HẾT CREDIT + Q2 YÊU CẦU NÂNG CẤP (chủ dự án đã quyết):**
 - **Q1 — BẬT chặn khi hết credit.** Mặc định đổi ở **HAI chỗ** (bài học: lần sửa đầu chỉ đổi tham số mặc định của `studio_config()` nên **vô hiệu**, vì `config/studio.php` được ưu tiên trước): `config/studio.php` + `studio_plan_limits()`. Tắt lại KHÔNG cần sửa mã: setting `studio_enforce_credits=0` hoặc env `STUDIO_ENFORCE_CREDITS=false`.

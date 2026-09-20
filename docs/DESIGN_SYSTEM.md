@@ -1,35 +1,112 @@
-# FabrikAI Studio — HƯỚNG DẪN PHONG CÁCH THIẾT KẾ CHUNG
+# FabrikAI Studio — HƯỚNG DẪN PHONG CÁCH THIẾT KẾ & UX CHUNG
 
-> Áp dụng cho **mọi card/panel/popup trong /studio** (và các trang Cài đặt/Quản trị dùng chung
-> bảng màu). Storefront có bộ class riêng ở nửa dưới `app.css` — không trộn hai bộ vào nhau.
+> **Tài liệu chuẩn DUY NHẤT cho giao diện và trải nghiệm.** Áp dụng cho **mọi card/panel/popup trong
+> /studio** (và các trang Cài đặt/Quản trị dùng chung bảng màu). Storefront có bộ class riêng ở nửa dưới
+> `app.css` — không trộn hai bộ vào nhau.
 >
-> Đọc file này TRƯỚC khi thêm một card mới hoặc "làm đẹp" một card cũ. Mục tiêu không phải là
-> "trông giống nhau" cho vui, mà để: (1) người dùng học MỘT lần rồi dùng được mọi card,
-> (2) sửa một chỗ là toàn app đổi theo, (3) không có hai cách làm cho cùng một việc.
+> Đọc file này TRƯỚC khi thêm một card mới, "làm đẹp" một card cũ, hoặc sửa một luồng có giao diện.
+> Mục tiêu không phải là "trông giống nhau" cho vui, mà để: (1) người dùng học MỘT lần rồi dùng được mọi
+> card, (2) sửa một chỗ là toàn app đổi theo, (3) không có hai cách làm cho cùng một việc.
+>
+> **Hợp nhất 2026-09-22.** File này nay gộp trọn `docs/UX_PERSONA_STRATEGY.md` (persona ·
+> nguyên tắc UX · gói cước · 21 vòng triển khai kèm số đo) vào một nguồn chân lý. Cách đọc:
+>
+> | Phần | Nội dung | Tính chất |
+> |---|---|---|
+> | **§1 – §10** | Luật giao diện: **hệ thống theme Sáng/Tối + token màu** · chuyển động · chữ · class/component dùng chung · trình bày cho người mới · viền · thông báo · bố cục · trợ năng · icon | **LUẬT** — khoá bằng test |
+> | **§11 – §13** | Người dùng & việc cần làm · bảy nguyên tắc UX · gói cước & credit trên giao diện | **LUẬT** sản phẩm |
+> | **§14 – §15** | Luật rút ra từ thực tế (mỗi luật đã trả giá bằng một lỗi thật) · khung Studio đã chốt | **LUẬT** kinh nghiệm |
+> | **§16 – §17** | Lịch sử 21 vòng có số đo · quyết định đã chốt & việc còn nợ | Tham chiếu |
 
 ---
 
 ## 1. Một nguồn chân lý — không tự nghĩ ra màu/con số mới
 
-### 1.1 Màu — `@theme` trong `resources/css/app.css`
+### 1.1 Màu — HAI DẢI NGỮ NGHĨA + token cố định (`resources/css/app.css`)
 
-| Nhóm | Token | Dùng cho |
+> **[2026-09-23] Đổi gốc: chữ KHÔNG còn dùng ĐỘ MỜ để tạo bậc.** Khiếu nại thật: *"chữ có độ tương
+> phản hơi thấp, khó đọc"*. Đo lại thì đúng — toàn bộ bậc chữ phụ được tạo bằng opacity trên một
+> sắc duy nhất: **741 chỗ** `text-cream-300/25 … /85`, trong đó `/40` chỉ đạt **2,9:1** (WCAG AA cần
+> ≥ 4,5:1 cho chữ thường). Độ mờ trộn với NỀN nên tương phản phụ thuộc chỗ đặt — không kiểm soát
+> được. Nay: **4 bậc nội dung ĐẶC**, mỗi bậc đạt AA trên mọi bề mặt của **cả hai** theme.
+
+| Dải / nhóm | Token | Vai trò |
 |---|---|---|
-| Thương hiệu | `brand-50 … brand-950` (xanh lá) | nút chính · trạng thái đang chọn · nhấn mạnh |
-| Nền sáng | `cream-50 … cream-400` | chữ trên nền tối · viền sáng · nền storefront |
-| Nền tối (studio) | `ink-500 · 600 · 700 · 800 · 900 · 950` | nền panel/card · viền · chữ mờ |
-| Điểm nhấn phụ | `clay-500/600` · `gold-400/500` | cảnh báo mềm (layer khoá) · nhãn phụ |
+| **Bề mặt** | `ink-950 · ink-900 · ink-800 · ink-700 · ink-600 · ink-500` | nền trang → nền panel → nền card → nền nổi → viền → viền mờ |
+| **Nội dung** | `cream-100 · cream-200 · cream-300 · cream-400` (+ `cream-50` cho tiêu đề lớn) | 4 bậc chữ/icon: chính → phụ → ghi chú → ghi chú rất phụ |
+| **Thương hiệu** | `brand-50 … brand-950` (xanh lá) | nút chính · trạng thái đang chọn · nhấn mạnh |
+| **Trạng thái** | `danger · warn · ok · info` | chữ/viền/badge; nền tint dùng alpha (`bg-danger/10 · border-warn/40`) |
+| **Điểm nhấn phụ** | `clay-500/600` · `gold-400/500` | cảnh báo mềm (layer khoá) · nhãn phụ |
+| **CỐ ĐỊNH** (không theo theme) | `invert · invert-content · invert-hover · on-accent` | khối đảo màu (nút "đang bật" kiểu đảo, hover `.btn-outline`) · chữ trên nền màu |
 
-Quy tắc:
+**Bảng tương phản đã đo** (độ chói tương đối theo WCAG 2.1, giữ bằng `tests/Feature/ThemeSystemTest.php`):
 
-- **Không viết mã màu mới trong `<style scoped>`.** Dùng tiện ích Tailwind (`bg-ink-800`,
-  `border-ink-700`, `text-cream-200`, `bg-brand-600/30`…) hoặc `var(--color-…)`.
-- **Ngoại lệ duy nhất:** lớp nền gradient nhận diện của MỘT card — đúng **một dòng**, alpha thấp
-  (≤ 0.15), và phải lấy từ màu trong bảng trên. Ví dụ đang dùng:
-  `background: linear-gradient(160deg, rgba(85,155,120,.13), transparent 62%)` (card Gợi ý từ ảnh).
-- Độ mờ của chữ nói lên tầm quan trọng: `text-cream-100` (chính) → `text-cream-200` →
-  `text-cream-300/70` → `/45` (ghi chú phụ). **Không xuống dưới `/45`** — đã từng có đợt phải
-  nâng hàng loạt mức `/40–/60` lên `/75–/85` vì không đạt WCAG AA.
+| Bậc nội dung | Theme tối · trên card | Theme sáng · trên card | Ngưỡng |
+|---|---|---|---|
+| `cream-100` (chính) | 13,1 : 1 | 16,5 : 1 | ≥ 4,5 |
+| `cream-200` | 11,7 : 1 | 13,2 : 1 | ≥ 4,5 |
+| `cream-300` (phụ) | 9,5 : 1 | 9,4 : 1 | ≥ 4,5 |
+| `cream-400` (ghi chú) | 6,7 : 1 | 6,9 : 1 | ≥ 4,5 |
+| `brand-300` · `danger` · `warn` · `ok` · `info` | 6,4 – 10,2 : 1 | 4,8 – 6,5 : 1 | ≥ 4,5 |
+
+**Bảy quy tắc:**
+
+1. **`ink-*` = BỀ MẶT, `cream-*` = NỘI DUNG.** Không dùng lẫn vai (`text-ink-700` để viết chữ
+   trên nền tối là sai — xem quy tắc 4). Hai dải này **đảo vai theo theme** nên cùng một class
+   đúng ở cả Sáng lẫn Tối.
+2. **Không dùng opacity cho chữ.** Chọn bậc: ghi chú phụ = `text-cream-400`, chữ phụ = `text-cream-300`,
+   chữ thường = `text-cream-200`, chữ chính/tiêu đề = `text-cream-100`/`cream-50`. Ngoại lệ duy nhất là
+   placeholder trong ô nhập — và nó cũng phải dùng bậc đặc (`placeholder:text-cream-400`).
+   Test **ĐỎ** nếu thấy `text-cream-*/NN` trong mã.
+3. **Màu trạng thái dùng token ngữ nghĩa**, không viết sắc độ thô: `text-danger` (không `text-red-300`),
+   `text-warn`, `text-ok`, `text-info`. Sắc độ 100–400 chỉ đủ tương phản trên nền TỐI; ở
+   theme sáng chúng thành chữ vàng nhạt trên nền trắng. Test cũng **ĐỎ** nếu thấy `text-red-*/amber/emerald/sky-NN`.
+4. **Chữ/icon đặt TRÊN nền màu thì dùng token CỐ ĐỊNH**: `text-on-accent` (trên `bg-amber-500` ·
+   `bg-emerald-500/80` · `bg-brand-500` · `bg-white`), và `bg-invert text-invert-content` cho khối
+   đảo màu. Nền đó không theo theme nên chữ cũng không được theo — nếu dùng `text-ink-900` thì theme
+   sáng sẽ ra chữ sáng trên nền sáng.
+5. **Môi trường ẢNH là cố định, không theo theme.** Ba nhóm, cả ba đều dùng token CỐ ĐỊNH (khai
+   MỘT lần trong `@theme`, **không** định nghĩa lại ở theme sáng):
+   · nền canvas — `.canvas-bg-dark/white/cream` đọc `--color-canvas-*` (người dùng chọn "nền Kem"
+     để nhìn ảnh; nếu theo theme thì ở theme sáng nó thành nền ĐEN, mất đúng thứ họ vừa chọn);
+   · lớp phủ TRÊN ảnh (chip "Trước/Sau", nhãn kéo-thả, thanh hành động) — `bg-scrim/NN` +
+     `text-scrim-content`; nếu chữ theo theme thì ở theme sáng nó thành chữ đen trên scrim tối
+     (đo được **2,9:1** trước khi sửa);
+   · viền trắng vẽ trên ảnh — `border-white/*` ở tay cầm crop, con trỏ cọ, ô màu trong suốt.
+6. **Không viết mã màu mới trong `<style scoped>`.** Ngoại lệ duy nhất: lớp nền gradient nhận diện của
+   MỘT card — đúng **một dòng**, alpha thấp (≤ 0.15), lấy từ bảng trên. Ví dụ đang dùng:
+   `background: linear-gradient(160deg, rgba(85,155,120,.13), transparent 62%)` (card Gợi ý từ ảnh).
+7. **Sao chép màu là tạo nguồn lệch thứ hai.** Ô swatch tự vẽ màu bằng inline style chỉ cần một lần đổi
+   token là lệch ngay (đã xảy ra với 4 ô nền canvas). Cách sửa rẻ và bền: cho cả hai chỗ dùng **cùng một
+   class** (`.canvas-bg-grid/dark/white/cream`).
+
+### 1.4 Theme Sáng/Tối — cách hoạt động (2026-09-23)
+
+| Việc | Ở đâu |
+|---|---|
+| Khai token của hai theme | `resources/css/app.css`: khối `@theme` (giá trị của theme **TỐI**) + khối **ngoài layer** `[data-theme='light']` (đảo vai hai dải) |
+| Quyết định theme trước lần vẽ đầu | `resources/views/partials/theme.blade.php` (script inline trong `<head>`, `@include` ở **mọi** blade) + `data-theme="{{ theme_resolved() }}"` render sẵn trên thẻ `<html>` |
+| Người dùng chọn | **Cài đặt của tôi → Giao diện** (`AppearanceSection.vue`: Sáng · Tối · Theo hệ điều hành) + nút đổi nhanh ở **thanh trạng thái Studio** |
+| Lưu | `users.theme` (migration `2026_09_23_000001`) qua `PUT /api/theme` — whitelist cứng `light|dark|system`; localStorage `fabrikai.theme` là **cache** để vào trang là đúng ngay |
+| Hàm PHP | `theme_pref()` (mặc định `dark` khi chưa chọn) · `theme_resolved()` (`system` ⇒ trả `dark`, script sửa lại trước khi vẽ) |
+| Hàm JS | `window.FabrikAITheme` · bọc Vue: `composables/useTheme.js` |
+
+**Đo lại bằng Chrome thật (2026-09-23)** — bốn màn hình (bảng giá · Studio · Cài đặt của tôi ·
+Bộ sưu tập) × hai theme, **2.578 phần tử chữ mỗi theme**: **0 chỗ** dưới ngưỡng WCAG AA. Phép đo
+tính cả alpha của nền (nền trong suốt được trộn lên), nên nó bắt được cả những chỗ mà mắt thường
+bỏ qua — và chính nó tìm ra hai lỗi còn sót sau khi đã đổi token: chip trạng thái (dùng mã hex của
+server cho phần chữ ⇒ 2,7–3,0:1) và chip đặt trên ảnh (chữ theo theme ⇒ 2,9:1 trên scrim tối).
+
+Ba quyết định đáng nhớ:
+
+- **Mặc định là TỐI**, không phải "theo hệ điều hành": người dùng hiện hữu không bị đổi giao diện
+  sau khi tính năng lên. `users.theme = NULL` = "chưa từng chọn" (khác hẳn `'dark'` = đã chọn Tối), nhờ
+  vậy sau này đổi mặc định sản phẩm vẫn áp được cho người chưa chọn mà không ghi đè lựa chọn của ai.
+- **Script theme KHÔNG nằm trong bundle**: bundle tải bất đồng bộ nên sẽ có một nháy sai màu; và các
+  trang server-render (bảng giá · chia sẻ · đăng nhập · trang lỗi) không chạy app JS nào nhưng vẫn
+  phải đổi được theme.
+- **Không bị công tắc gói chặn**: `/api/theme` nằm ngoài nhóm `can-studio` và không thuộc module nào
+  (đã khai `'theme'` vào `INFRA_PREFIXES` của `ModuleRegistryTest`) — giao diện là quyền của mọi tài khoản.
 
 ### 1.2 Chuyển động — token, không viết số
 
@@ -49,6 +126,9 @@ Quy tắc:
 - **Bật "giảm chuyển động" của hệ điều hành là TOÀN APP tắt** (`prefers-reduced-motion` đưa mọi
   token về 0ms). Hiệu ứng CHẠY VÒNG LẶP (pulse · spin · shimmer) **không** tự tắt theo token — phải
   dùng token hoặc chấp nhận bị luật chung tắt; đừng viết `animation: x 1s infinite` với số cứng.
+- **Một nguồn số, kể cả khi JS cần biết thời lượng:** `motion.js` đọc lại đúng biến CSS
+  `--motion-dur-dock` thay vì chép `260` vào JS; test đối chiếu bảng dự phòng trong JS với token
+  trong CSS để hai bên không trôi khỏi nhau.
 
 ### 1.3 Chữ
 
@@ -74,7 +154,7 @@ Quy tắc:
 | Chuyển động | `.motion-ui` (+ `--instant/--base/--slow`) | `transition-all` |
 | Xuất hiện | `.motion-fade-in` · `.motion-pop-in` · `.motion-rise-in` · `.motion-slide-in-*` | animation chép tay |
 | Dock co/giãn | `.dock-panel` (+ `data-collapsed`) + `DockResizer` | |
-| Nền canvas | `.canvas-bg-grid/dark/white/cream` | |
+| Nền canvas | `.canvas-bg-grid/dark/white/cream` | tự khai `rgba()` cho ô màu |
 | Thanh cuộn ẩn | `.scrollbar-hide` | |
 
 ---
@@ -83,13 +163,19 @@ Quy tắc:
 
 | Component | Thay cho |
 |---|---|
-| `StudioIcon.vue` (`icons.json` — **129 icon**, cũng là nguồn cho PHP `App\Support\IconRegistry`) | mọi `<svg>` chép tay, mọi emoji |
+| `StudioIcon.vue` (`icons.json` — **132 icon**, cũng là nguồn cho PHP `App\Support\IconRegistry`) | mọi `<svg>` chép tay, mọi emoji |
 | `LoadingSpinner.vue` (`text · subtext · progress`) | **mọi bộ tiến trình tự chế** (chấm · thanh · phần trăm) |
 | `ConfirmDialog.vue` | popup xác nhận tự viết (đã từng có 3 bản khác nhau) |
 | `BaseModal.vue` | khung modal tự viết |
 | `SourceLibraryPicker.vue` | tự làm danh sách chọn ảnh |
 | `CompareSlider.vue` | tự làm trượt so sánh trước/sau |
-| `DockResizer.vue` | tự làm vách ngăn kéo |
+| `DockResizer.vue` (+ `useDockResize.js`) | tự làm vách ngăn kéo — dùng chung cho **cả ba** dock |
+| `CanvasEmptyState.vue` | màn hình canvas trống kiểu "một dòng chữ" |
+| `NotificationCenter.vue` | khay thông báo tự chế (từng có 3 kiểu, 3 vị trí, 3 thời lượng) |
+| `SettingsSkeleton.vue` · `SettingsToasts.vue` | khung xương + khay thông báo tự chế ở khu Cài đặt |
+| `StylistSection.vue` | bản sao trình cài đặt Trợ lý thiết kế trong từng app |
+| `AppearanceSection.vue` | mục Giao diện (Sáng/Tối/Theo hệ điều hành) tự viết lại ở từng app |
+| `MultiSelectBar.vue` · `GalleryModal.vue` | thanh chọn nhiều · trình xem thư viện tự viết |
 
 > **Luật:** nếu hành vi đã có người làm rồi thì **dùng lại**; chỉ tạo mới khi bài toán KHÁC về bản
 > chất, và khi đó viết vào file này một dòng để người sau biết nó tồn tại.
@@ -151,7 +237,7 @@ Quy tắc:
 | Thông tin | `border-sky-500/40` | |
 | Giữ chỗ cho hover | `border-transparent` | hàng bảng đổi viền khi chọn |
 | **Khối CHỨA (không bấm được)** | `border-ink-700` | card con · `<details>` · hàng danh sách · biểu mẫu |
-| Ô nhập | `border-ink-700` → `focus:border-brand-400` | `.studio-dark .input` |
+| Ô nhập | `border-ink-700` → `focus:border-brand-400` | `.studio-shell .input` |
 | Bảng "tông chú ý" (badge) | `...-500/40` cho cả 4 tông | danger · warn · info · ok |
 
 **Ba ngoại lệ DUY NHẤT, phải kèm lý do trong mã:**
@@ -161,8 +247,9 @@ Quy tắc:
 2. **Màu nhấn riêng của card** (hiện có: `RefImageCard.vue` · `ConceptCard.vue` · `InpaintCard.vue`
    dùng `emerald-400`): phải dùng **nhất quán cả viền + nền + icon** trong đúng card đó, và
    **KHÔNG BAO GIỜ** dùng cho nút hành động chung (Chạy · Lưu · Xoá · Tạo ảnh).
-3. **Nút kiểu `.btn-outline` trên nền tối**: hover `border-cream-300` (đảo sáng), đúng như
-   `.studio-dark .btn-outline` trong `app.css`.
+3. **Nút kiểu `.btn-outline`** (nút phụ toàn app): hover ĐẢO màu bằng token cố định
+   `hover:bg-invert hover:text-invert-content` + `hover:border-brand-400` — đúng ở cả hai theme nên
+   không cần nhánh riêng cho studio như trước.
 
 ### 5.2 Vì sao phải là từ vựng ĐÓNG
 
@@ -170,6 +257,11 @@ Quy tắc:
 ĐỎ nếu gặp token ngoài bảng trên. Nhờ vậy "hai nút cạnh nhau lệch màu viền" trở thành lỗi bắt được
 bằng máy, không phải thứ chỉ lộ ra khi có người ngồi nhìn. Muốn thêm token: sửa bảng này + danh sách
 trong test **trong cùng một commit** — đó là chủ ý, không phải tai nạn.
+
+### 5.3 Nền của nút — nợ đã biết
+
+Nền nút vẫn còn trộn `bg-ink-800` / `bg-white/5` / `bg-ink-900/90`. Cùng cách đo như viền, có thể
+đồng bộ tiếp ở đợt sau; khi làm thì áp đúng luật "một nghĩa, một token" ở mục này.
 
 ---
 
@@ -235,6 +327,13 @@ thông báo lỗi **không được** chứa tên model/provider.
 > **Quy tắc rút ra:** người dùng chỉ cần biết *chuyện gì* và *làm gì tiếp*. Mọi thứ giải thích
 > *tại sao hỏng ở tầng nào* là để trong log — nơi lập trình viên đọc, không phải nơi khách hàng đọc.
 
+### 6.5 Còn nợ (đề xuất)
+
+- Vài câu lỗi còn dài dòng kiểu hệ thống ("Lỗi hệ thống, vui lòng thử lại.") — nên nói rõ người dùng
+  làm gì tiếp.
+- **Chưa có mã tra cứu lỗi** cho người dùng đọc cho tổng đài ⇒ hỗ trợ phải hỏi giờ + tài khoản mới
+  tra được log. Nên sinh mã ngắn (vd `L-8F3K`) ghi ở **cả** giao diện **và** log.
+
 ---
 
 ## 7. Bố cục & cuộn
@@ -246,7 +345,11 @@ thông báo lỗi **không được** chứa tên model/provider.
 - **Khung cuộn NGANG: lớp trong `w-max` + `mx-auto`.**
   **Không** dùng `justify-center` trên chính khung cuộn — nó đẩy mép TRÁI ra ngoài vùng cuộn và
   người dùng không bao giờ kéo tới được phần đầu.
-- Dock: bề rộng do JS đặt qua inline style, CSS lo chuyển động + trạng thái thu gọn.
+- Dock: bề rộng do JS đặt qua inline style, CSS lo chuyển động + trạng thái thu gọn. Bề rộng là
+  **state của store** (nguồn sự thật duy nhất), chỉ ghi khi thả tay, và lưu bền cùng khoá
+  `fabrikai.bar` đã có — không thêm khoá localStorage mới.
+- **Flex item mặc định `min-width: auto` nên KHÔNG co được xuống 0** — thiếu `min-width: 0` thì
+  "co dock" trông như bị đứng. Đã khoá bằng test.
 - Không để nội dung tràn ngang trong card: đo bằng Chrome thật ở **260px và 300px**
   (đo cả khi đã mở hết `<details>`).
 
@@ -261,6 +364,14 @@ thông báo lỗi **không được** chứa tên model/provider.
   và trình đọc màn hình không đi vào vùng đã ẩn.
 - Focus bàn phím phải NHÌN THẤY; nếu đã có tín hiệu khác (đường kẻ đổi màu) thì bỏ vòng focus mặc
   định để không chồng hai tín hiệu.
+- **Ẩn bằng `v-if` là mất hai thứ cùng lúc: hiệu ứng VÀ trạng thái.** Thu bề rộng về 0 giữ nguyên
+  card bên trong (ô đang gõ, vị trí cuộn) và cho canvas nở ra theo từng frame.
+- **Ẩn xong phải TRẢ focus về chỗ còn dùng được** (nút mở lại), không để rơi về `<body>`. Chụp focus
+  trong watcher (chạy TRƯỚC khi patch DOM) rồi mới chuyển ở `nextTick`.
+- **Kẹp vào "vùng của tôi" chưa đủ — phải kẹp vào "vùng còn NHÌN THẤY".** Lớp phủ của chính ứng dụng
+  (ngăn kéo bảng Lớp, thanh công cụ floating) cũng che mất điều khiển; muốn biết chỗ nào bấm được thì
+  phải hỏi `elementFromPoint`, và các lớp phủ nên **tự khai** vùng chúng chiếm
+  (`[data-covers-canvas="right|bottom"]`).
 
 ---
 
@@ -292,6 +403,16 @@ thông báo lỗi **không được** chứa tên model/provider.
 - [ ] **Thông báo/tiến trình không rò rỉ chi tiết kỹ thuật** (§6): không tên model/nhà cung cấp,
       không `e.message` thô — dùng `userFacingError()` / `studio_fail()`.
 - [ ] Nút chỉ-icon có `aria-label`; tiến trình `role="status"`, lỗi `role="alert"`.
+- [ ] **Đúng ở CẢ HAI theme**: mở màn hình vừa sửa ở theme Sáng **và** Tối (nút đổi nhanh ở thanh
+      trạng thái Studio, hoặc Cài đặt của tôi → Giao diện) — không chỉ theme đang dùng để code.
+- [ ] Chữ dùng **bậc nội dung** (`text-cream-100/200/300/400`), **không** dùng `text-cream-*/NN` (§1.1).
+- [ ] Màu trạng thái dùng token ngữ nghĩa (`text-danger|warn|ok|info`); chữ trên nền màu dùng
+      `text-on-accent`; khối đảo màu dùng `bg-invert text-invert-content` — không dùng `text-ink-*` làm chữ.
+- [ ] Nền canvas và viền vẽ TRÊN ẢNH (`.canvas-bg-*` · `border-white/*`) giữ màu CỐ ĐỊNH (§1.1 quy tắc 5).
+- [ ] **Việc người dùng làm có nằm trong §11–§12 không** (đúng một luồng · không nhập lại · chi phí
+      hiện TRƯỚC khi bấm · kết quả có bước tiếp theo · trạng thái nhìn thấy) — và **không rơi vào
+      luật nào ở §14** (đặc biệt: nút "Lưu" phải kết thúc bằng một dòng CSDL; không có điều kiện
+      tiên quyết ngầm; điều khiển phải bấm được ở mọi trạng thái).
 - [ ] Đo lại bằng Chrome thật ở bề ngang hẹp nhất (260–300px) — không tràn ngang.
 - [ ] `npm run build` rồi commit asset (máy chủ không có node).
 
@@ -299,3 +420,374 @@ thông báo lỗi **không được** chứa tên model/provider.
 tiến trình, không emoji, không mã màu cứng, có nút chính + lý do khoá; (b) **từ vựng viền nút của
 toàn studio** (§5.2); (c) tài liệu phải tồn tại và không được nói sai. Và
 `tests/Feature/ToolbarAreaTest.php` (vùng toolbar cao cố định + cuộn trục X).
+
+---
+
+## 11. Người dùng & việc họ phải hoàn thành (3 persona)
+
+Mọi quyết định giao diện phải trả lời được: **persona nào, đang làm việc gì, và việc đó dễ hơn ở chỗ nào**.
+
+| | **Nhà thiết kế thời trang** | **Chủ doanh nghiệp / thương hiệu** | **Chủ xưởng may** |
+|---|---|---|---|
+| Việc hằng ngày | Ra ý tưởng → phác thảo → nhiều biến thể → lookbook để chào khách | Duyệt bộ sưu tập, kiểm soát chi phí, giao việc cho nhóm, giữ nhận diện thương hiệu | Nhận yêu cầu mẫu, chuẩn hoá ảnh kỹ thuật + mô tả chất liệu, gửi thợ may |
+| Cần từ công cụ | Nhiều biến thể nhanh, giữ đúng phom/chất liệu, prompt tái dùng | Con số (chi phí/ảnh, tiến độ), tài khoản cho nhân viên, quy trình duyệt | Ảnh đúng kỹ thuật, mô tả rõ, xuất được gói file để sản xuất |
+| Đã giao | Tạo hàng loạt · mẫu việc theo ngành · bộ sưu tập là điểm vào · phím tắt duyệt mẫu | Chi phí & tiến độ theo bộ · chia sẻ link khách duyệt (không cần tài khoản) · trang giá công khai | Xuất gói cho xưởng (ZIP: ảnh + phiếu kỹ thuật + bảng size + manifest) |
+| Còn thiếu | Bộ sưu tập theo mùa vụ xuyên suốt (đã có nền, chưa đủ sâu) | Báo cáo chi phí/tiến độ theo nhóm | Mẫu kỹ thuật chuyên sâu hơn |
+
+> Ghi chú kiến trúc: `projects` **hiện là dự án của từng user**, chưa có khái niệm tổ chức đầy đủ —
+> ghế theo gói + nhóm dùng chung đã có (Q4), nhưng báo cáo theo nhóm thì chưa.
+
+---
+
+## 12. Bảy nguyên tắc UX bắt buộc
+
+> Định hướng: **TIÊN TIẾN – THUẬN TIỆN – TỐI ƯU – TIẾT KIỆM THỜI GIAN.** Bảy nguyên tắc dưới đây là
+> tiêu chí chấm mọi thay đổi giao diện.
+
+1. **Một việc = một luồng.** Người dùng chọn *việc* ("Ra 5 ảnh lookbook cho bộ Thu 2026"), không chọn
+   *công cụ*.
+2. **Không nhập lại.** Mọi thứ đã nhập (chất liệu, người mẫu, bối cảnh, phom) thuộc về **Bộ sưu
+   tập/Dự án** và tự có mặt ở mọi card.
+3. **Chi phí hiển thị TRƯỚC khi bấm** ("1 ảnh = 1 credit · còn 34"), không bao giờ trừ xong mới báo.
+4. **Không chặn giữa chừng.** Cảnh báo sớm khi credit thấp; khi hết thì đề xuất nâng cấp ngay tại chỗ
+   (không đá ra trang khác).
+5. **Kết quả luôn có bước tiếp theo.** Sau mỗi ảnh: *Biến thể · Sửa · Ghép · Tải · Gửi duyệt* — một
+   cú bấm. (Đã làm: thanh hành động ngay trên thumbnail — Canvas · Tải · Biến thể · Sửa.)
+6. **Tái dùng là mặc định.** Preset prompt theo ngành (lookbook, sàn TMĐT, mẫu kỹ thuật xưởng),
+   prompt library, người mẫu/dáng đã lưu — đặt ngay chỗ bắt đầu, không phải vào card rồi mới tìm.
+7. **Trạng thái luôn nhìn thấy.** Gói hiện tại · credit còn lại · hạn mức còn lại của chu kỳ · việc
+   đang chạy — ở một chỗ, không phải đi tìm.
+
+**Cách kiểm đã áp dụng thật** (đợt UX theo VSCode/OpenArt, 2026-09-20):
+
+- Nguyên tắc 3: màn hình canvas trống hiện `~N credit` và **co giãn theo số biến thể**
+  (đo trên trình duyệt thật: 1 biến thể `~1` · 2 → `~2` · 4 → `~4`).
+- Nguyên tắc 5: 4 hành động một cú bấm ngay trên thumbnail (đo: 5 ảnh × 4 nút; thanh hành động
+  **luôn hiện**, không ẩn theo hover — ẩn theo hover là bẫy trên thiết bị cảm ứng).
+- Nguyên tắc 6–7: mẫu việc theo ngành + gói/credit/việc đang chạy nằm cùng chỗ với hành động.
+
+---
+
+## 13. Gói cước & credit trên giao diện
+
+### 13.1 Luật hiển thị
+
+1. **Chi phí TRƯỚC khi bấm** (nguyên tắc 3) — kể cả ước tính cho lượt hàng loạt (số ảnh × credit
+   theo gói), luôn kèm credit còn lại.
+2. **Cảnh báo trước, không chặn giữa việc.** Khi credit sắp cạn (< 3 thao tác) trả `credit_warning`
+   và hiện cảnh báo; khi đã hết và cờ `studio_enforce_credits` BẬT thì trả **402 kèm hướng dẫn
+   nâng cấp ngay tại chỗ**. Super Admin được miễn chặn để không tự khoá mình.
+3. **Vượt hạn mức của gói thì HẠ xuống mức gói cho phép, không chặn** (`resolution_cap`), và
+   **nói rõ lý do** trong `notice` — người dùng đang làm dở thì không bị chặn ngang.
+4. **Nói thật về thanh toán.** Hệ thống **chưa có cổng thanh toán VNĐ**: nút "Nâng cấp" phải nói rõ
+   là "kích hoạt, thanh toán sau". Quảng cáo sai sự thật là lỗi sản phẩm, không phải chi tiết kỹ thuật.
+5. **Bảng gói đọc TRỰC TIẾP TỪ DB** (`/bang-gia` render phía máy chủ) — không có con số nào ghi cứng
+   trong template, để giá/credit đổi ở một chỗ.
+6. **Gói và credit là trạng thái luôn nhìn thấy** (nguyên tắc 7): badge credit trên thanh công cụ
+   Studio là **nút mở popup "Gói & credit"** — gói đang dùng · credit còn lại · chi phí **theo gói**
+   của ảnh/video · độ phân giải tối đa · hạn gói · cảnh báo sắp cạn · danh mục gói để đổi ngay.
+   Dữ liệu từ `GET /api/plan/status`; `/api/boot` trả `user.plan` + `cycle`.
+
+### 13.2 Gói phải khác nhau ở thứ khách CẢM NHẬN được
+
+| Trục khác biệt | Miễn phí | Khởi nghiệp | Chuyên nghiệp | Studio | Xưởng theo vụ |
+|---|---|---|---|---|---|
+| Ảnh/tháng (credit) | 100 dùng thử | 120 | 350 | 1.200 | 3.000 / vụ (3 tháng, cấp MỘT LẦN) |
+| Độ phân giải | 1K | 2K | 2K | 2K + Max | 2K + Max |
+| Số ghế (nhân viên) | 1 | 1 | 3 | 10 | 5 |
+| Hàng đợi | thường | thường | ưu tiên | ưu tiên cao | ưu tiên cao |
+| Xuất gói cho xưởng | — | — | ✓ | ✓ + bảng size | ✓ + bảng size |
+| Duyệt nội bộ/khách | — | — | ✓ | ✓ + nhiều cấp | ✓ + nhiều cấp |
+| Bộ sưu tập lưu trữ | 1 | 5 | 20 | Không giới hạn | Không giới hạn |
+
+> Nguyên tắc: **credit là đơn vị công việc**, còn **gói là đơn vị năng lực**. Nếu hai gói chỉ khác số
+> credit thì khách sẽ luôn chọn gói rẻ và mua lẻ.
+>
+> **Bài học doanh thu (đã sửa):** cam kết "N credit/tháng" mà không cấp credit thì biên gộp tháng thứ
+> hai trở đi là ~100% — tức là "lãi" bằng cách không thực hiện cam kết. Cấp credit chu kỳ nay là
+> **idempotent (CAS)** và có cả đường **lazy** (boot + trước khi tạo ảnh) lẫn **cron**
+> `php artisan studio:grant-plan-credits`, để không phụ thuộc hPanel.
+
+---
+
+## 14. Luật rút ra từ thực tế — mỗi luật đã trả giá bằng một lỗi thật
+
+> Đây là phần đắt nhất của tài liệu. Mỗi luật dưới đây từng là một khiếu nại thật của người dùng
+> hoặc một lần test xanh mà sản phẩm vẫn hỏng. Đọc trước khi sửa một lỗi "trông có vẻ đơn giản".
+
+### A. Đo và chẩn đoán
+
+1. **Đo tách từng chiều trước khi sửa.** "Không lưu" và "không nạp" là hai lỗi khác nhau — chiều nạp
+   hoàn toàn đúng, chỉ chiều lưu hỏng; gộp chung rồi sửa cả hai là vừa mất công vừa phá phần đang tốt.
+2. **Tham số bị bỏ qua ÂM THẦM nguy hiểm hơn tham số bị từ chối.** `POST /api/reframe` kèm
+   `project_id` trả **200** nhưng dòng CSDL có `project_id = NULL`; chỉ khi đọc thẳng CSDL mới thấy.
+3. **Nghi ngờ "chậm" bằng cách đo BYTE phải đi qua mạng, không đo cảm giác.** Lưu layer "chỉ" 85 ms
+   trên localhost — nhưng đó là 0,9–4,4 MB đi qua đường lên của người dùng. Số đúng phải đo là **byte**.
+4. **Test ĐỎ chưa chắc là sản phẩm sai — nghi cách ĐO trước.** Đã có lần phải sửa TEST vì đo sai:
+   CSS `uppercase` đổi chuỗi; icon SVG chen giữa `innerText`; đo `<aside>` thay vì phần tử
+   `sticky`; dò `#app` thay vì `#studio-root`; đọc computed style trước khi Vue patch xong.
+5. **Kiểm chứng trên môi trường THẬT bắt được lỗi mà test xanh không thấy.** `UserCatalogApiTest`
+   (23 test) xanh vì `RefreshDatabase` tự migrate — nhưng DB dev chưa migrate nên API trả **500**.
+6. **Kiểm thử trên trạng thái SẠCH có thể che đúng cái lỗi người dùng đang gặp.** Layer mới luôn đủ
+   `baseW/baseH`; chỉ khi gieo **dữ liệu cũ/thiếu trường** mới tái hiện được "không có tay cầm".
+7. **Gieo dữ liệu kiểm thử phải làm TRƯỚC khi app mount** — app có handler `beforeunload` ghi đè
+   localStorage; gieo sai thời điểm thì bài test đo chính cái rỗng do mình vừa tạo.
+8. **Audit theo TRẠNG THÁI hiệu quả hơn sửa theo phỏng đoán.** Duyệt 12 trạng thái khung canvas chỉ ra
+   ngay 2 lỗi mà ba vòng sửa trước không thấy.
+9. **Khi một khiếu nại lặp lại y nguyên, tìm TRẠNG THÁI làm cả hai điều cùng sai** — đừng sửa sâu hơn
+   cái đã sửa, và **hỏi "đã tải lại trang chưa"** trước khi sửa mã (deploy KHÔNG cập nhật tab đang mở).
+10. **Danh từ mơ hồ phải hỏi lại trước khi sửa.** "Layer dock" là **bảng Layers**, không phải layer vẽ
+    trên canvas — hiểu sai một danh từ tốn nhiều đợt sửa sai đối tượng.
+
+### B. Dữ liệu và lưu trữ
+
+11. **Mọi nút "Lưu" phải kết thúc bằng MỘT DÒNG CSDL, hoặc một lỗi rõ ràng.** "Báo thành công mà không
+    ghi gì" nặng hơn "báo lỗi": người dùng tin là đã lưu, đóng tab, và mất ảnh (đã xảy ra 2 đợt liền).
+12. **Trường phái sinh trong bộ nhớ phải có đường TỰ VÁ.** `ensureLayerSizes()` đo lại kích thước cho
+    layer cũ ⇒ layer cũ tự lành sau một lần tải, người dùng không phải xoá rồi thêm lại.
+13. **Chuyển lớp lưu trữ là thay đổi có thể MẤT DỮ LIỆU — phải có đường lùi và một test khẳng định.**
+    Chỉ cần quên `await catalog.load()` ở một chỗ là người dùng không thấy tùy chỉnh của chính mình.
+14. **Chống trùng phải dựa trên DANH TÍNH — và danh tính có thể KHÔNG đổi sau khi lưu.** Layer ghép
+    (data URL) lưu xong vẫn là chính nó ⇒ phải **đánh dấu** ngay trên layer vừa lưu, không chỉ so sánh.
+15. **Nhất quán giữa hai loại dữ liệu cùng nằm một chỗ.** Ảnh AI tạo và ảnh người dùng tải lên nằm
+    chung một Thư viện; chỉ một loại vào được bộ sưu tập là điều vô lý với người dùng, dù về kỹ thuật
+    chúng khác nhau hoàn toàn.
+16. **Không nới bảo mật để tiện.** `studio_assets` là đường tắt hấp dẫn nhưng sẽ làm rò ảnh cá nhân
+    vào picker chung; mọi thao tác ghi lên ảnh tải lên đi qua đúng hai lớp mà đường xoá đang dùng.
+17. **Xoá một tính năng là xoá cả DÂY CHUYỀN, nhưng phải biết chỗ CỐ Ý giữ** — và ghi lý do ngay tại
+    chỗ, nếu không người sau sẽ "dọn mã chết" và làm hỏng hàng đợi cũ.
+
+### C. Trạng thái và điều kiện
+
+18. **Điều kiện tiên quyết NGẦM là nguồn của "tính năng không tồn tại".** Tay cầm *có* trong mã, *có*
+    hiệu ứng, *có* test — nhưng chỉ khi layer đang được chọn. Với người dùng, "chỉ hiện khi X" đọc
+    thành "không có". **Bỏ điều kiện trước khi viết thêm hướng dẫn.**
+19. **"Đặt cờ rồi quên render" là loại lỗi âm thầm tệ nhất.** `confirmDeleteOpen` được bật nhưng không
+    có popup nào render cờ đó — và tệ hơn, cờ treo ấy còn **chặn luôn phím tắt** của cả bảng Lớp.
+    Mỗi cờ mở modal phải có một test bất biến "cờ này CÓ nơi render".
+20. **Ẩn bằng `v-if` là mất hai thứ cùng lúc: hiệu ứng VÀ trạng thái bên trong.**
+21. **Computed có ĐO DOM thì phải có phụ thuộc cho MỌI thứ nó đo.** Toạ độ tay cầm phụ thuộc kích
+    thước vùng canvas, nhưng computed chỉ biết `zoom`/`pan`/`layer` ⇒ "đóng băng" sau lần tính đầu.
+    Cách sửa đúng là thêm một NGUỒN SỰ THẬT cho kích thước (`viewportTick` + `ResizeObserver`).
+22. **Đường LÙI (fallback) của hàm hiển thị có thể che mất hành vi người dùng đang kiểm.**
+    `upscaleSrc` lùi sang ảnh khác để "luôn có gì đó để xem" — chính nó làm thao tác ẩn/hiện layer
+    trở nên VÔ HÌNH.
+23. **Chế độ ẩn của ứng dụng phải TỰ KHAI.** "Chỉ hiện 1 layer" là chế độ hợp lệ, nhưng không có nhãn
+    thì người dùng đọc nó thành "ứng dụng hỏng". Một nhãn + một nút thoát rẻ hơn nhiều một vòng sửa lỗi.
+24. **Hai nguồn dữ liệu khác nhau KHÔNG được dùng chung một thuộc tính đang chuyển động.** Gộp "độ mờ
+    riêng của layer" và "hệ số ẩn/hiện" vào một `opacity` rồi transition ⇒ thanh trượt bị trễ 220ms.
+25. **Thuộc tính vừa do inline style vừa do CSS quản thì phải đưa về MỘT biến** — nếu không, hiệu ứng
+    chỉ chạy trên `<img>` còn viền chọn/tay cầm đứng nguyên tới lúc phần tử bị gỡ.
+
+### D. Giao diện và chuyển động
+
+26. **"Đã có token" KHÁC "cả app theo token".** Chỗ nối hoá ra chỉ là **hai biến theme**
+    (`--default-transition-duration` · `--default-transition-timing-function`): ghi đè hai biến đó là
+    **199 chỗ** dùng `transition*` tự chạy theo token. Tìm chỗ nối TRƯỚC khi viết class dùng chung.
+27. **Tailwind v4 dùng `translate/scale/rotate` làm thuộc tính RIÊNG.** `transition-property` thiếu
+    chúng thì hiệu ứng "nhấc thẻ khi hover" đứng im mà **không có lỗi nào** — test phải khoá danh sách
+    thuộc tính lại.
+28. **Class CSS không tồn tại thì không ai báo lỗi.** Tên class bàn cờ nằm trong template từ lâu mà
+    không có định nghĩa nào trong CSS — trình duyệt im lặng bỏ qua. Test quét class phải **đối chiếu
+    với CSS**, không chỉ kiểm sự có mặt của chuỗi trong template.
+29. **`overflow:hidden` + phần tử con định vị ngoài khung = mất chức năng im lặng**; và
+    **`pointer-events` là thuộc tính KẾ THỪA** — lớp phủ `pointer-events:none` làm hai tay cầm con
+    CÂM luôn: vẽ ra đủ, toạ độ đúng, mà bấm không có gì xảy ra. Chỉ `elementFromPoint` mới lộ ra.
+30. **Ẩn theo hover là bẫy trên thiết bị cảm ứng.** "Gọn mắt" không đáng đánh đổi khả năng dùng được.
+31. **Dựa vào tính năng nền tảng mới thì phải có đường lùi.** `@property` + transition trên biến đã
+    đăng ký: trình duyệt không hỗ trợ thì **không có hiệu ứng nào** và cũng không có lỗi nào.
+32. **Sửa quá tay cũng là một loại lỗi.** Các bản vá thêm dần (tay cầm mọi layer, nhãn chữ trên canvas,
+    đổi nguồn ảnh chế độ 1 layer) đều không được yêu cầu và làm không gian làm việc rối hơn. Điểm ngọt
+    = giữ phần sửa ĐÚNG lỗi, bỏ phần trang trí thêm vào.
+
+### F. Theme và tương phản (thêm 2026-09-23 — đợt theme Sáng/Tối)
+
+37. **ĐỘ MỜ không phải là cách tạo bậc chữ.** Toàn bộ thang chữ phụ của app từng được dựng bằng
+    opacity trên một sắc duy nhất: **741 chỗ** `text-cream-300/25…/85`, trong đó `/40` chỉ đạt **2,9:1**
+    (WCAG AA cần 4,5:1). Loại lỗi này **không có triệu chứng trong mã** — không exception, không log,
+    test nào cũng xanh; chỉ người ngồi đọc mới thấy mỏi mắt. Cách sửa bền: **4 bậc ĐẶC** (cream-100 →
+    400) + một test tính tương phản bằng công thức WCAG. Đo bằng cảm nhận là đo sai công cụ.
+38. **Thêm theme thứ hai là bài kiểm tra mọi chỗ viết màu theo lối "nền sáng".** Vỏ `.studio-dark` cũ
+    phải dịch hộ hơn 20 class (`bg-cream-*` → `bg-ink-*`, `text-ink-900` → `text-cream-50`, `bg-white` → `bg-ink-800`…)
+    chỉ để cứu những chỗ viết ngược vai. Cách đúng — và nay đang dùng — là **để hai dải token ĐẢO VAI
+    theo theme** (`ink-*` = bề mặt, `cream-*` = nội dung) + **4 token CỐ ĐỊNH** cho những nền không theo
+    theme (`invert` · `invert-content` · `invert-hover` · `on-accent`). Nhờ vậy không class nào phải
+    nhân đôi cho hai theme, và không còn khối "dịch màu" nào để mục nát dần.
+39. **Giá trị người dùng chọn mà đi thẳng vào thuộc tính HTML thì phải có whitelist CỨNG.** `users.theme`
+    được render vào `data-theme` của thẻ `<html>` ở MỌI blade ⇒ nhận chuỗi tự do ở endpoint là một lỗ XSS
+    (thuộc tính do người dùng kiểm soát). Whitelist `light|dark|system` + test 422 cho sáu giá trị lạ, và test
+    khẳng định thứ ghi xuống DB là giá trị CHUẨN (middleware TrimStrings cắt khoảng trắng trước khi kiểm).
+
+40. **Đo tương phản phải chuẩn hoá MỌI cú pháp màu — và alpha có HAI cú pháp.** Lần đo đầu của
+    đợt này báo **529 chỗ dưới chuẩn** ở theme sáng; sự thật là **0**. Nguyên nhân: bộ đo chỉ hiểu
+    `rgba(r,g,b,a)` nên đọc `rgba(0,0,0,0)` (TRONG SUỐT) thành ĐEN ĐẶC và lấy nền sai; Chrome
+    còn trả màu bằng `oklch()`/`oklab()`/`color(srgb …)` (bảng màu Tailwind v4) và `color-mix()` cho
+    các tiện ích có alpha. Bài học kép: (1) chuẩn hoá màu qua canvas rồi mới tính; (2) **khi phép đo
+    cho kết quả bất thường, nghi phép đo trước** — đúng vệt với các lần "test đỏ mà sản phẩm đúng"
+    ở nhóm A.
+
+### E. Quy trình và kiểm thử
+
+33. **Mỗi route mới phải khai vào `ModuleRegistry`** — nếu không, công tắc gói không chặn được nó, và
+    `ModuleRegistryTest` ĐỎ ngay. Rào chắn của dự án bắt lỗi thay người viết; giữ những test kiểu này
+    đáng giá hơn nhiều test chỉ kiểm tra đúng thứ vừa viết.
+34. **Không tự ý sửa DOM của component khác.** Bản đầu của màn hình trống tự `querySelector` ô prompt
+    của card khác để điền chữ — vỡ ngay khi card đổi bố cục. Dùng **kênh store**
+    (`requestWorkspace()` · `requestActivity()` · `requestBatchPrompts()`).
+35. **Cơ sở dùng chung chỉ có giá trị khi thành phần THỨ BA dùng nó.** Dock Layers chỉ cần khai preset
+    + gắn vách ngăn, không chép logic kéo/kẹp/lưu/trả focus — đó là bằng chứng thiết kế dock đã đúng.
+36. **Kiểm chứng bằng mắt phải so khớp đúng thứ NGƯỜI DÙNG thấy**, không phải thứ mình viết; và khi
+    không xem được ảnh thì **phân tích điểm ảnh** (lưới độ sáng) là cách đọc ảnh bằng số.
+
+---
+
+## 15. Khung Studio đã chốt — không sửa lại từ đầu
+
+> Studio đã có xương sống kiểu VSCode (activity bar · command palette · status bar · dock trái/phải ·
+> phím tắt canvas) và đã qua 21 vòng tinh chỉnh. Dưới đây là những thứ **đã đúng, đừng làm lại** —
+> chỉ vá đúng chỗ còn phải "tự tìm đường".
+
+### 15.1 Shell & điều hướng
+
+- **8 nhóm card** trên activity bar trái: `collection` (Bộ sưu tập — đứng ĐẦU) · `concept` (Tạo ảnh) ·
+  `variation` · `tryon` · `inpaint` · `compose` · `upscale` · `director` — cộng 3 mục điều khiển
+  `prompt` · `stylist` · `settings` (ghim đáy).
+- **Quick Open `Ctrl+K` đa nguồn**: 4 nhóm (Lệnh · Bộ sưu tập & dự án · Mẫu việc theo ngành · Ảnh đã
+  tạo) với tiền tố quen thuộc `>` lệnh · `#` dự án · `@` ảnh.
+- **Kênh nối card ↔ shell qua store, không đụng DOM** (luật 34 ở §14).
+- **Khu Cài đặt là MỘT app** (`/cai-dat` + `/cai-dat/{mục}`) với sidebar 5 mục: Preset · Khuôn mặt ·
+  Dáng pose · Trợ lý thiết kế · **Giao diện** (Sáng · Tối · Theo hệ điều hành); 4 URL cũ (`/presets` · `/stylist-data` · `/model-settings?tab=…`) vẫn
+  trả 200 và render cùng blade. Tùy chỉnh lưu **theo tài khoản** (`user_catalogs`), không chỉ localStorage.
+
+### 15.2 Dock (trái · Outputs · Layers)
+
+- Ba dock dùng **cùng một cơ sở**: preset `DOCK_PRESETS` (trái 288px · Outputs 156px · Layers 256px =
+  đúng kích thước cũ), `useDockResize.js` + `DockResizer.vue`.
+- Kéo bằng pointer (bắt pointer nên lệch 7px vẫn dính) · bàn phím (←/→, Shift = bước lớn, Home/End,
+  Enter ẩn/hiện, Esc về mặc định) · nhấp đúp = mặc định · kẹp `[min, max]` với trần mềm theo bề rộng
+  cửa sổ (Layers: 42%).
+- **Ẩn = thu bề rộng về 0** kèm `data-collapsed` + `inert` (KHÔNG dùng `v-if`); `visibility` trễ đúng
+  bằng thời lượng để nội dung không biến mất trước khi khung co xong.
+- Bề rộng **lưu bền** trong khoá `fabrikai.bar`; tay cầm vách ngăn hiện sẵn ở mức mờ 0.45 (chỉ hiện
+  khi hover thì người mới không bao giờ thấy nó).
+
+### 15.3 Canvas
+
+- **Tay cầm chỉnh kích cỡ**: layer **đang chọn** (đủ kích cỡ + xoay) và layer **đang trỏ vào** (mờ).
+  Kéo tay cầm của layer chưa chọn = tự chọn layer đó rồi chỉnh luôn.
+- Tay cầm là **lớp phủ theo toạ độ màn hình, KẸP vào vùng còn nhìn thấy** (trừ vùng các lớp phủ tự
+  khai) ⇒ không bao giờ bị `overflow:hidden` cắt và luôn bấm được.
+- Layer **khoá vẫn có tay cầm** (màu hổ phách, bấm để mở khoá) — biến mất không giải thích là lỗi UX.
+- **Bật/tắt layer**: giữ trong DOM, mờ tại chỗ (`opacity` ở thẻ ngoài + độ mờ riêng ở thẻ trong, không
+  transition) ⇒ hiệu ứng chạy trên mọi trình duyệt và thanh trượt Độ mờ vẫn tức thì.
+- Nền canvas: bốn class `.canvas-bg-{grid,dark,white,cream}` dùng cho **cả** vùng canvas **và** ô màu
+  ở thanh trạng thái.
+- **Màn hình canvas trống giàu nội dung** (`CanvasEmptyState.vue`): thanh prompt ngay trên canvas ·
+  biến thể · 7 tỉ lệ · credit còn lại · mẫu việc theo ngành · ảnh gần đây · gợi ý phím tắt.
+- **Nhắc trạng thái nằm ở thanh trạng thái**, không dán nhãn chữ lên canvas.
+
+### 15.4 Thông báo & kết quả
+
+- `NotificationCenter.vue`: hàng đợi **xếp chồng** góc phải-dưới (tối đa 4) · lỗi giữ **8s** (thường
+  4,2s) · đóng tay từng mục · nút **Xoá hết** · kèm thẻ tiến trình đọc số THẬT.
+  `store.toast(msg, type)` vẫn là API duy nhất mọi nơi gọi (chỉ đẩy thêm vào hàng đợi).
+- **Mỗi ảnh kết quả có thanh hành động luôn hiện** (không ẩn theo hover): **Canvas · Tải · Biến thể ·
+  Sửa** — nguyên tắc 5.
+- **Đổi giao diện nhanh** ngay tại chỗ làm việc: nút Sáng/Tối ở thanh trạng thái Studio (đổi tức
+  thì, không tải lại trang); ba lựa chọn đầy đủ nằm ở Cài đặt của tôi → Giao diện.
+- **Bộ sưu tập** là điểm vào công việc hằng ngày: đang làm bộ nào · số ảnh · hạn chót đếm ngược ·
+  việc đang chạy · chi phí & tiến độ · phản hồi khách · nút Xuất gói cho xưởng.
+
+---
+
+## 16. Lịch sử triển khai — 21 vòng, mỗi vòng có số đo
+
+> Bảng này là **bản ghi rút gọn** của các vòng đã làm. Bản đầy đủ (bối cảnh, bằng chứng từng bước, bài
+> học chi tiết) nằm trong lịch sử git của `docs/UX_PERSONA_STRATEGY.md` — tài liệu đó đã được hợp nhất
+> vào đây ngày 2026-09-22. Cột "Số đo chốt" là con số kiểm chứng được, không phải mô tả ý định.
+
+| # | Ngày | Vấn đề | Đã làm | Số đo chốt |
+|---|---|---|---|---|
+| 1 | 2026-09-19 | `credits_per_month` **không bao giờ được cấp**; chi phí/cap theo gói là cột trang trí; không có UI gói | Cấp credit chu kỳ idempotent (CAS) + lazy + cron · `studio_credit_cost()` (8 chỗ) · hạ `resolution_cap` kèm `notice` · cờ `studio_enforce_credits` (402 + `credit_warning`) · UI "Gói & credit" · trang `/bang-gia` đọc từ DB | 8 test mới · 499 test/2.682 assert · gán gói thật: 200 → **350** credit, đúng **một** dòng `plan_grant` |
+| 2 | 2026-09-19 | Người làm nghề không có "bộ sưu tập" xuyên suốt | Panel Bộ sưu tập (8 panel, đứng đầu) · tạo bộ trong panel + tự áp dụng · `/api/job-templates` 4 mẫu việc · `/api/projects/{id}/stats` · duyệt mẫu theo lô | 4 test mới + 2 test cũ cập nhật có ý thức · 519 test · Chrome CDP **17/17** |
+| 3 | 2026-09-19 | Tạo nhiều ảnh phải bấm/sửa prompt từng lần | Tab **Hàng loạt** (12 mục × 1–4 biến thể) · tiến trình từng mục · "Chạy lại N mục lỗi" · phím tắt duyệt mẫu `S/N/A/R/Esc` | 4 test mới · 515 test · CDP **24/24** · credit trừ đúng 6 (200 → 194) |
+| 4 | 2026-09-19 | Xưởng không nhận được gói đủ nghĩa; khách duyệt phải có tài khoản | Xuất gói ZIP (ảnh đánh số + phiếu kỹ thuật + bảng size CSV + manifest + README; **ghi rõ ảnh không tải được**) · link chia sẻ `/chia-se/{token}` (hạn 7/30/90 · thu hồi · đếm lượt xem · noindex) | 5 test mới · 524 test · CDP **12/12** · chạy thật trên production |
+| 5 | 2026-09-20 | Người dùng phải "tự tìm đường" (canvas trống, toast ghi đè, thumbnail 1 hành động) | `CanvasEmptyState.vue` · `NotificationCenter.vue` xếp chồng · 4 hành động trên ảnh kết quả · Quick Open 4 nguồn | 614 test/3.908 assert (không sửa test nào) · credit `1→~1 · 2→~2 · 4→~4` · 3 toast cùng sống |
+| 6 | 2026-09-20 | Cài đặt là 4 trang rời rạc; **tùy chỉnh nằm trong localStorage ⇒ đổi máy là mất** | Một app `/cai-dat` + sidebar · bảng `user_catalogs` + API · di trú localStorage một lần · Studio dùng lại `StylistSection.vue` | 639 test/4.039 assert · CDP **21/21** · di trú **7/7** · WCAG AA 0 chỗ dưới chuẩn |
+| 7 | 2026-09-20 | Ảnh phái sinh **không được gắn vào bộ sưu tập** (9 phép bỏ qua `project_id` âm thầm) | `resolveProjectId()` cho cả 9 phép + trả `project_id` về client · bảng `upload_project_links` cho ảnh tải lên | 658 test/4.089 assert · CDP: 50 ảnh tải lên, 1 ảnh đổi ⇒ giữ đúng sau khi tải lại |
+| 8 | 2026-09-20 | "Lưu Output" **không lưu** (chỉ chèn bản ghi GIẢ `layer-…`) và rất chậm (tải lại 0,9–4,4 MB) | `POST /api/layers/save`: có `source_url` ⇒ chỉ ghi dòng CSDL, không tải byte nào | 85 ms → **22 ms** · byte tải lên 889.470 → **0** · id chuỗi → **số thật** · 666 test |
+| 9 | 2026-09-20 | Dock có bề rộng HẰNG SỐ, ẩn bằng `v-if` (mất trạng thái), chuyển động mỗi chỗ một số | Token chuyển động + `.motion-ui` · `useDockResize` + `DockResizer.vue` · thu bề rộng về 0 kèm `inert` | 676 test/4.343 assert · kéo 288 → **428px** · thu gọn **260ms** · `prefers-reduced-motion` ⇒ 0ms |
+| 10 | 2026-09-20 | **199 chỗ** `transition*` đi theo mặc định cứng của Tailwind; 17 chỗ ms viết tay; vách ngăn không có chỉ báo | Ghi đè **2 biến theme** ⇒ cả 199 chỗ theo token · `duration-*`/`ease-*` theo tên nghĩa · tay cầm 14×30 · vòng lặp tắt theo công tắc | 683 test/4.462 assert · ms viết tay **17 → 0** · bề mặt hover thiếu chuyển động **6 → 0** |
+| 11 | 2026-09-20 | Bấm Delete **không có gì xảy ra** (cờ treo còn chặn phím tắt); nền "lưới" trong suốt; ô màu lệch màu thật | `ConfirmDialog.vue` dùng chung (Esc · focus trả về chỗ cũ) · 4 class `.canvas-bg-*` · `TransitionGroup` cho layer | 689 test/4.539 assert · 4 nền khớp computed style · hiệu ứng layer 0.22s |
+| 12 | 2026-09-20 | Hiệu ứng layer chỉ mờ mỗi ảnh; nút hành động chỉ hiện khi hover; "Lưu Output" tạo bản trùng | `--layer-opacity` (CSS nhân với hệ số ẩn/hiện) · gỡ trọn "Xóa nền AI" (UI→route→controller→module) · 3 nút luôn hiện · chống trùng theo danh tính | 692 test/4.570 assert · opacity `1 → 0` mượt · nút hành động `opacity 0 → 1` |
+| 13 | 2026-09-20 | Tay cầm bị `overflow:hidden` **cắt mất**; layer khoá mất tay cầm; thanh trượt Độ mờ trễ 220ms | Tay cầm thành lớp phủ theo toạ độ màn hình + kẹp · chốt HƯỚNG khi kéo · tách hai nguồn độ mờ | 695 test/4.619 assert · `elementFromPoint` trả về chính tay cầm · độ mờ **0.5 sau 30ms** |
+| 14 | 2026-09-20 | **Vẫn không có tay cầm**: layer cũ thiếu `baseW/baseH` (trạng thái thử của tôi khác trạng thái thật) | `ensureLayerSizes()` tự vá + đường đo dự phòng từ DOM · bỏ phụ thuộc `@property` | 696 test/4.627 assert · gieo dữ liệu cũ: tay cầm **0 → 2** |
+| 15 | 2026-09-20 | Toạ độ tay cầm "đóng băng" khi vùng canvas đổi; trên mobile bị ngăn kéo che | `viewportTick` + `ResizeObserver` · kẹp vào **vùng còn nhìn thấy** (lớp phủ tự khai `data-covers-canvas`) | 698 test/4.639 assert · mobile 390×844 và 1024×700: cả hai tay cầm bấm được |
+| 16 | 2026-09-20 | Gốc rễ cuối: chế độ "CHỈNH 1 LAYER" làm mất tay cầm **và** làm con mắt như không có tác dụng | Tay cầm ở cả hai chế độ · chế độ 1 layer hiện ĐÚNG ảnh của layer đang chọn · nhãn chế độ + nút Thoát | 699 test/4.646 assert · ẩn layer ⇒ ảnh lớn trên canvas 1 → 0 |
+| 17 | 2026-09-20 | **Bỏ điều kiện tiên quyết**: tay cầm chỉ có cho layer đang chọn ⇒ 4 trạng thái "không có tay cầm" | `layerHandles`: mọi layer đang hiện đều có tay cầm; kéo = tự chọn rồi chỉnh · thumbnail bảng Lớp mờ khi layer tắt | 700 test/4.654 assert · "bỏ chọn hết" tay cầm **0 → 2** |
+| 18 | 2026-09-20 | Yêu cầu thật là **DOCK LAYERS** (bảng Layers) — đã hiểu sai thành layer trên canvas suốt nhiều vòng | Preset `DOCK_PRESETS.inspector` + vách ngăn + lưu bền · bỏ `v-if` · canvas lấy **điểm ngọt** (bỏ tay cầm mọi layer, bỏ nhãn trên canvas) | 701 test/4.675 assert · bảng Layers 256 → **376px** kéo được · bật/tắt mượt |
+| 19 | 2026-09-22 | Card «Gợi ý từ ảnh» vi phạm gần hết quy ước chung (2 nút chính · emoji · 40 mã `rgba()` · 2 hệ tiến trình) | Viết lại theo 6 quy tắc (§4) · ra đời **tài liệu này** + `DesignSystemTest` | **586 → 455 dòng** · 7 trạng thái: 1 nút chính · 0 emoji · không tràn ngang ở 260/300px |
+| 20 | 2026-09-22 | **30 biến thể viền** cho ~8 nghĩa trên nút toàn Studio | Từ vựng ĐÓNG 16 token (§5) · `.tool-btn` và badge về cùng quy ước `/40` | 26 file · 134 chỗ thay thế · CSS gửi cho khách **−1,64 kB** (166,25 → 164,61) |
+| 21 | 2026-09-22 | Giao diện **nói với lập trình viên**: lộ nguyên văn lỗi nhà cung cấp, tên model, lệnh CLI | Ba tầng chặn (§6): PHP · cửa chặn ở biên `toast/notify` · state dùng `userFacingError()` (14 chỗ) · gỡ chip "DeepSeek · deepseek-chat" | `UserFacingMessagesTest` + `SuggestStreamTest` · 6 phép đột biến ĐỎ đúng chỗ |
+| 22 | 2026-09-23 | **Chữ dùng ĐỘ MỜ để tạo bậc ⇒ khó đọc**: 741 chỗ `text-cream-300/NN`, trong đó `/40` ≈ **2,9:1** (WCAG AA cần 4,5:1); app chỉ có MỘT giao diện (tối) và không cài đặt được | **4 bậc nội dung ĐẶC** + token trạng thái ngữ nghĩa · **theme Sáng/Tối** (hai dải token đảo vai, script chạy TRƯỚC khi vẽ, lưu theo tài khoản qua `users.theme` + `PUT /api/theme`) · mục **Giao diện** ở Cài đặt + nút đổi nhanh ở thanh trạng thái Studio | 50 file dọn màu (741 chỗ opacity + 345 chỗ sắc độ trạng thái) · mọi bậc chữ **6,7–18,3 : 1** · Chrome thật: 4 màn hình × 2 theme, **2.578 phần tử chữ/theme — 0 chỗ dưới AA** · CSS build **164,61 → 155,33 kB** (−9,3 kB) · 11 test mới (`ThemeSystemTest` 10 + 1 ở `CanvasControlsTest`) · icon 129 → **132** |
+
+### 16.1 Số đo trước → sau của cả hành trình
+
+| Chỉ số | Trước | Sau |
+|---|---|---|
+| Test tự động | 491 test / 2.657 assert | **701 test / 4.675 assert** (0 đỏ) — số đo tại 2026-09-22; bộ test vẫn tiếp tục lớn lên sau đó |
+| Credit theo chu kỳ | **không bao giờ được cấp** | cấp idempotent (CAS) + lazy + cron |
+| Chi phí ảnh/video theo gói | **cột trang trí** (9 chỗ đọc setting toàn cục) | `studio_credit_cost()` — 8 chỗ dùng theo gói |
+| `resolution_cap` | **không được kiểm ở đâu** | hạ xuống cap + `notice` nói rõ lý do |
+| Trang giá cho khách chưa đăng nhập | **không có** | `/bang-gia` render từ DB |
+| Vòng đời duyệt ảnh | có backend, **không giao diện nào gọi** | duyệt theo lô + phím tắt + nhãn trạng thái |
+| Một bộ 8 SKU × 2 bối cảnh | 16 lần sửa prompt + 16 lần bấm | **1 lần dán + 1 lần bấm** |
+| Viền nút | 30 biến thể | **16 token** · CSS −1,64 kB |
+| Tùy chỉnh người dùng | `localStorage` (mất khi đổi máy) | theo tài khoản (`user_catalogs`) + di trú một lần |
+| "Lưu layer" | 85 ms · 0,9 MB · **không ghi CSDL** | 22 ms · **0 byte** · dòng CSDL thật |
+| **Tương phản chữ ghi chú phụ** | `text-cream-300/40` ≈ **2,9 : 1** (dưới WCAG AA) | bậc thấp nhất **6,7 : 1** (Tối) · **6,9 : 1** (Sáng) |
+| **Giao diện** | chỉ có Tối, không cài đặt được | Sáng · Tối · Theo hệ điều hành — lưu theo tài khoản, áp trước khi vẽ (không nháy màu) |
+| CSS gửi cho khách | 164,61 kB | **155,33 kB** (−9,3 kB: bỏ hàng chục tiện ích opacity/sắc độ chỉ dùng một lần) |
+| Deploy lên production | — | 11 vòng, mỗi vòng `npm run build` thoát 0 + asset trong `public_html/build` |
+
+---
+
+## 17. Phụ lục — quyết định đã chốt & việc còn nợ
+
+### 17.1 Bốn câu hỏi của chủ dự án — ĐÃ CHỐT
+
+| # | Việc | Quyết định |
+|---|---|---|
+| Q1 | Chặn khi hết credit? | **ĐÃ QUYẾT: BẬT** (2026-09-19). Mặc định BẬT (`config/studio.php` + `studio_plan_limits()`); tắt bằng setting `studio_enforce_credits=0`. 402 có cấu trúc + tự mở bảng nâng cấp; Super Admin được miễn chặn |
+| Q2 | Cổng thanh toán (VNPay/MoMo/chuyển khoản) | **CHƯA CÓ.** Nút "Nâng cấp" phải nói thật là "kích hoạt, thanh toán sau" (§13.1 luật 4) |
+| Q3 | Gói theo mùa vụ/xưởng | **ĐÃ LÀM: bán theo VỤ.** "Xưởng theo vụ" 3.290.000 ₫/vụ (3 tháng) · 3.000 credit cấp MỘT LẦN · `plans.unit_months · cycle_months · units` |
+| Q4 | Số ghế theo gói | **ĐÃ LÀM: nhóm làm việc theo ghế.** Miễn phí 1 · Khởi nghiệp 1 · Chuyên nghiệp 3 · Studio 10 · Xưởng 5. Chủ nhóm mời bằng email; cả nhóm dùng chung gói + credit + bộ sưu tập |
+
+### 17.2 Việc còn nợ (không chặn khách)
+
+- [ ] **Mã chết của "Storefront Vue SPA"**: các lớp `.sf-shell · .sf-btn* · .glass · .card-surface · .sf-input` trong `app.css` không còn file nào dùng và vẫn viết theo lối "nền sáng" — nên xoá hẳn thay vì để mục nát (chúng KHÔNG theo theme).
+- [ ] `border-white/*` (48 chỗ) là viền vẽ TRÊN ẢNH (tay cầm crop · con trỏ cọ · ô màu trong suốt) — cố ý cố định theo §1.1 quy tắc 5. Nếu có chỗ mới dùng cho BỀ MẶT giao diện thì phải đổi sang `border-cream-50/*`.
+- [ ] Chưa có trang "xem token" cho người thiết kế (liệt kê mọi bậc màu + tỉ lệ tương phản của cả hai theme) — hiện số liệu chỉ nằm trong test.
+- [ ] **Emoji toàn studio**: 23/65 file · 134 lần xuất hiện. Sửa tới file nào dọn file đó (§9).
+- [ ] Nhiều card khác vẫn còn **2 nút chính** hoặc **nút khoá không nêu lý do** — rà theo checklist §10.
+- [ ] Card «Gợi ý từ ảnh» chưa cho **chọn ảnh nguồn ngay trong card** (`SourceLibraryPicker` đã có sẵn).
+- [ ] Ba card còn **màu nhấn riêng** (emerald) — muốn về một mối thì phải thiết kế lại 3 card đó.
+- [ ] **Nền nút** còn trộn `bg-ink-800` / `bg-white/5` / `bg-ink-900/90` — đồng bộ tiếp theo §5.
+- [ ] **Mã tra cứu lỗi** cho người dùng đọc cho tổng đài (`L-8F3K`) — ghi ở cả giao diện và log (§6.5).
+- [ ] Preset **tên file ảnh theo kênh bán** (sàn TMĐT/catalogue).
+- [ ] Tự động chuyển trạng thái bộ sưu tập khi khách bấm "Duyệt" — hiện **CỐ Ý** chỉ ghi phản hồi
+      (chuyển trạng thái là quyết định của chủ, có whitelist riêng).
+- [ ] Cron `studio:grant-plan-credits` trên hPanel (đường lazy đã chạy nên chưa gấp).
+- [ ] Báo cáo chi phí/tiến độ **theo nhóm** cho chủ doanh nghiệp.
+
+### 17.3 Bộ test đang giữ các luật trong tài liệu này
+
+| Test | Giữ luật |
+|---|---|
+| `tests/Feature/DesignSystemTest.php` | §1–§5 (tài liệu tồn tại & không nói sai · component nêu tên phải có thật · số icon khớp `icons.json` · không tự chế tiến trình · không emoji · không bảng màu riêng · 1 nút chính + lý do khoá · **từ vựng viền**) |
+| `tests/Feature/ThemeSystemTest.php` | §1.1 + §1.4 (hai theme cùng bộ token · **tương phản WCAG AA** của mọi bậc nội dung/màu trạng thái ở cả hai theme · không còn chữ dùng opacity · không còn sắc độ trạng thái thô · nền canvas cố định · mọi blade render `data-theme` + có script theme · whitelist + lưu theo tài khoản của `PUT /api/theme` · theme không bị công tắc gói chặn) |
+| `tests/Feature/UserFacingMessagesTest.php` | §6 (không rò rỉ chi tiết kỹ thuật ở nhãn tiến trình, luồng stream, cửa chặn ở biên, state lỗi) |
+| `tests/Feature/SuggestStreamTest.php` | §6 (cấm nêu tên model/provider trong nhãn tiến trình & lỗi) |
+| `tests/Feature/ToolbarAreaTest.php` | §7 (vùng toolbar cao cố định + cuộn trục X) |
+| `tests/Feature/ModuleRegistryTest.php` | §14 luật 33 (mọi route studio phải thuộc một module của gói) |
+| `tests/Feature/UserCatalogTest.php` | §15.1 (4 URL cài đặt cũ vẫn trả 200) |
