@@ -1966,7 +1966,7 @@ Nếu người dùng khai `search_param=enable_search` cho một gateway **khôn
 
 ## Phiên 2026-09-23 (Đợt 27 — TRÌNH KẾT NỐI NGUỒN NGOÀI: máy chủ tự lấy RSS/JSON → nhét vào prompt kèm URL + thời điểm)
 
-**Deploy:** `<prev> → <commit>`. **Migration mới:** `2026_09_23_000006_create_web_sources` · route mới `GET /api/design-agent/sources` + 6 route `api/admin/web-sources*` · lệnh `php artisan studio:web-sources`.
+**Deploy:** `9c98f97 → 8ba8c30`. **Migration mới:** `2026_09_23_000006_create_web_sources` · route mới `GET /api/design-agent/sources` + 6 route `api/admin/web-sources*` · lệnh `php artisan studio:web-sources`.
 
 ### 1. Vì sao phải là MÁY CHỦ đi lấy (không phải bật tìm kiếm cho model)
 
