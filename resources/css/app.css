@@ -226,7 +226,10 @@
     --color-cream-100: #121821;
     --color-cream-200: #29323d;
     --color-cream-300: #414c59;
-    --color-cream-400: #59646f;
+    /* #525c67 (không phải #59646f): bậc chữ mờ nhất còn phải đạt AA 4,5:1 KỂ CẢ khi nằm trên
+       hàng đang chọn có nền tint brand-600/20 (nền tint làm nền tối đi ⇒ 4,46:1 là THIẾU).
+       Đo lại sau khi đổi: 4,97:1 trên nền tint · 6,81:1 trên nền trắng. */
+    --color-cream-400: #525c67;
 
     /* Thương hiệu: GIỮ NGUYÊN cây xanh lá (#2d6f4d là màu nhận diện), chỉ đổi sắc độ theo VAI TRÒ
        — vì ở theme tối cùng một bậc vừa dùng làm CHỮ vừa dùng làm NỀN TINT, mà hai vai đó cần
