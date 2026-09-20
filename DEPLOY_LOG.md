@@ -1328,3 +1328,84 @@ bảng tương phản đo được**; thêm §1.4 "Theme hoạt động thế n�
 - [ ] **Mã tra cứu lỗi** cho người dùng đọc cho tổng đài (`L-8F3K`) — ghi ở cả giao diện và log (§6.5).
 - [ ] Preset **tên file ảnh theo kênh bán** · tự động chuyển trạng thái bộ sưu tập khi khách bấm "Duyệt"
       (hiện CỐ Ý chỉ ghi phản hồi) · cron `studio:grant-plan-credits` trên hPanel · báo cáo chi phí **theo nhóm**.
+
+---
+
+## Phiên 2026-09-23 (Đợt 18 — BA CARD hết màu nhấn riêng + NÚT CHÍNH có lý do khoá + hết 2 nút chính cùng lúc)
+
+**Deploy:** `39b87c6 → eb259b0` (1 commit). **Không migration, không route/lớp PHP mới** — chỉ Vue/CSS/tài liệu + asset.
+
+### 1. Ba card hết MÀU NHẤN RIÊNG (emerald: 26 → 0)
+
+`RefImageCard` · `ConceptCard` · `InpaintCard` từng được **miễn trừ** khỏi từ vựng chung vì "có màu nhấn riêng".
+Hệ quả thật: cùng một trạng thái **"đang chọn"** mà card thì emerald, chỗ khác thì xanh lá thương hiệu ⇒ người
+dùng phải học hai lần, bảng màu có thêm một họ màu không thuộc hệ. Nay cả ba về đúng vai:
+
+| Vai | Token dùng |
+|---|---|
+| Đang chọn | `border-brand-500` + `bg-brand-600/20` + `ring-brand-500/40` |
+| Hover | `hover:border-brand-400` |
+| Khối chứa | `border-ink-700` + `bg-ink-900` |
+| **Thành công** (mask đã lưu · đã sửa xong) | token ngữ nghĩa `ok`: `border-ok/40` · `bg-ok/10` · `text-ok` |
+| Nút chính của Inpaint | gradient thương hiệu `brand-600 → brand-500` |
+
+Đồng thời sửa hai chỗ dùng **sai nghĩa**: `text-ok` cho tiêu đề/mô tả khối (không phải trạng thái thành công)
+và icon chip (trạng thái đã do VIỀN + NỀN nói, icon về trung tính).
+**Hệ quả quan trọng nhất:** đã **XOÁ HẲN danh sách miễn trừ** (`$accentAllowed`/`$accentTokens`) trong
+`DesignSystemTest` — từ nay **bất kỳ token emerald nào làm viền nút là test ĐỎ**.
+
+### 2. Nút chính bị khoá phải NÓI RÕ LÝ DO (§4 quy tắc 4) — 12 chỗ
+
+Trước: người dùng chỉ thấy một nút mờ và phải tự đoán thiếu gì. Nay mỗi nút có dòng `↳ <lý do>` ngay dưới,
+lấy từ **MỘT computed `blockReason`** — và điều kiện khoá **suy ra từ chính nó** (`canRun = !blockReason && !busy`,
+mẫu có sẵn ở `StudioCard`), nên câu giải thích và điều kiện khoá không thể lệch nhau:
+
+| Card | Lý do nay được nói rõ |
+|---|---|
+| CanvasEmptyState | "Chưa nhập mô tả ảnh — gõ mô tả vào ô ngay trên rồi bấm Tạo ảnh." |
+| InpaintCard | "Chưa có ảnh để sửa — chọn một ảnh trên canvas hoặc trong Kết quả." · "Chưa nhập yêu cầu sửa…" |
+| RefImageCard | "Chưa có ảnh nguồn — chọn một ảnh trong Kết quả hoặc tải ảnh lên." |
+| ConceptCard (×2) | "Chưa có mục nào — dán danh sách vào ô phía trên…" · "Chưa nhập mô tả ảnh…" |
+| OutfitComposeCard (×2) | "Cần ít nhất 2 ảnh…" · "Chưa có mô tả — gõ cách ghép mong muốn…" |
+| UpscaleCard | "Chưa có ảnh để nâng cấp — bấm vào một ảnh trên canvas hoặc trong Kết quả." |
+| DirectorCard | "Chưa có nội dung — nhập mô tả video, hoặc chọn ảnh trên canvas để ghép tự động." |
+| CollectionsCard · CollectionsPage | "Chưa chọn ảnh nào — bấm vào ảnh trong danh sách để chọn trước khi duyệt." |
+| DesignAgents (×2) | "Chưa có dòng dữ liệu nào…" · "Brief đã cũ so với dữ liệu shop — tạo lại brief rồi mới tính kế hoạch." |
+
+**Miễn trừ có lý do:** khoá vì **ĐANG CHẠY** thì KHÔNG thêm dòng lý do — nhãn nút đã đổi thành "Đang gửi…".
+
+### 3. Hết cảnh HAI NÚT CHÍNH cùng lúc (§4 quy tắc 3)
+
+- **CanvasEmptyState**: "Mở Agent Studio" là đường KHÁC, không được ngang hàng nút chính ⇒ hạ xuống `btn-outline`.
+- **ConceptCard**: thanh CTA dưới cùng **ẩn khi ở tab "Hàng loạt"** (ở đó nút chạy hàng loạt LÀ hành động chính).
+
+### 4. Khoá bằng máy
+
+- `DesignSystemTest::test_blocked_primary_buttons_explain_the_reason` (**mới**): nút `btn-brand` bị khoá bởi điều
+  kiện có **phủ định một thứ không phải cờ đang-chạy** thì trong cùng thẻ nút phải có dòng `↳`.
+- `test_button_borders_use_one_token_per_meaning`: siết lại — không còn danh sách miễn trừ emerald.
+- Full suite: **847 test / 6.242 assert XANH** (trước đợt này 846/6.240). `DesignSystemTest` **9/9**.
+  `npm run build` exit 0.
+
+### 5. Verify production (đã chạy thật)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | **eb259b0** (trước pull: `39b87c6`) |
+| Migration | **0 pending** (đợt này không có) |
+| Cache | `view:cache` · `route:cache` · `config:cache` · `queue:restart` → **exit=0** cả bốn |
+| Asset mới | `app-uZE6ViH6.css` **144.722 B** · `main-CaD8aYqt.js` **576.754 B** |
+| **Bản phục vụ = bản build ở máy** | `md5sum` **trùng**: CSS `533e06a6a47064fa5307bbcd772edfbe` · JS `01c96b914e51c6d5aafcb7ce60b8f273` |
+| Dòng lý do trong bundle | **14** chuỗi `↳` (12 nút mới + 2 nút có sẵn ở SuggestCard/StudioCard) |
+| CSS nhỏ hơn | 145.722 → **144.722 B** (bớt tiện ích emerald chỉ dùng một lần) |
+| Trang | `/` `/dang-nhap` `/bang-gia` `/up` → **200** |
+| Nhật ký | **9 ERROR** — y như trước deploy (dòng mới nhất vẫn `2026-09-20 00:44`) ⇒ **0 lỗi mới** |
+
+### Còn lại (đề xuất)
+
+- [ ] Card «Gợi ý từ ảnh» chưa cho **chọn ảnh nguồn ngay trong card** (`SourceLibraryPicker` đã có sẵn).
+- [ ] **Mã tra cứu lỗi** cho người dùng đọc cho tổng đài (`L-8F3K`) — ghi ở cả giao diện và log (§6.5).
+- [ ] Preset **tên file ảnh theo kênh bán** · tự động chuyển trạng thái bộ sưu tập khi khách bấm "Duyệt"
+      (hiện CỐ Ý chỉ ghi phản hồi) · cron `studio:grant-plan-credits` trên hPanel · báo cáo chi phí **theo nhóm**.
+- [ ] `border-white/*` (48 chỗ) là viền vẽ TRÊN ẢNH — cố ý cố định; nếu có chỗ mới dùng cho bề mặt giao diện
+      thì phải đổi sang `border-cream-50/*`.
