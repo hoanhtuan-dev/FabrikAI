@@ -215,10 +215,22 @@ class WebAccessService
         ];
     }
 
-    /** Candidate của nhóm công việc agent — cùng nhóm mà hai agent dùng để suy luận. */
+    /**
+     * Model dùng cho phần SUY LUẬN của agent — đọc theo thứ tự vai: tìm kiếm → suy luận → nhóm nền.
+     *
+     * Đọc y như DesignAgentService để màn hình "khả năng truy cập internet" không nói khác điều agent làm.
+     */
     private function candidates(): array
     {
-        return app(AiModelGateway::class)->candidates(DesignAgentService::AI_GROUP);
+        $gateway = app(AiModelGateway::class);
+        foreach ([DesignAgentService::SEARCH_GROUP, DesignAgentService::REASON_GROUP, DesignAgentService::AI_GROUP] as $group) {
+            $rows = $gateway->candidates($group);
+            if ($rows !== []) {
+                return $rows;
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -232,8 +244,11 @@ class WebAccessService
     public function taskGroups(): array
     {
         $labels = [
-            'prompt' => 'Suy luận & viết nội dung (Agent Studio)',
-            'vision' => 'Đọc ảnh',
+            DesignAgentService::REASON_GROUP => 'Agent Studio — Suy luận & viết nội dung',
+            DesignAgentService::VISION_GROUP => 'Agent Studio — Đọc ảnh mẫu',
+            DesignAgentService::SEARCH_GROUP => 'Agent Studio — Tìm kiếm nguồn ngoài',
+            'prompt' => 'Suy luận & viết nội dung (dùng chung)',
+            'vision' => 'Đọc ảnh (dùng chung)',
             'image' => 'Tạo ảnh',
             'edit' => 'Sửa ảnh',
             'video' => 'Video',

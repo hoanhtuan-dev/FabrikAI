@@ -157,7 +157,7 @@ class DesignAgentController extends Controller
     private function validatedCollectionInput(Request $request): array
     {
         $payload = $request->only([
-            'prompt', 'region', 'trend_ids', 'brief', 'size_distribution', 'ai', 'force',
+            'prompt', 'region', 'trend_ids', 'brief', 'size_distribution', 'ai', 'force', 'reference_images',
         ]);
         $payload['prompt'] = trim((string) ($payload['prompt'] ?? ''));
         $payload['brief'] = trim((string) ($payload['brief'] ?? ''));
@@ -167,6 +167,12 @@ class DesignAgentController extends Controller
         ));
         $payload['size_distribution'] = is_array($payload['size_distribution'] ?? null)
             ? $payload['size_distribution'] : [];
+        // Ảnh mẫu cho VAI ĐỌC ẢNH: tối đa 3, mỗi cái là đường dẫn trong site ('/…') hoặc URL http(s).
+        // Không nhận giá trị khác ⇒ không có đường lách để máy chủ đi lấy tài nguyên nội bộ.
+        $payload['reference_images'] = array_values(array_filter(
+            array_map('trim', (array) ($payload['reference_images'] ?? [])),
+            'strlen',
+        ));
 
         $validator = Validator::make($payload, [
             'prompt' => ['required', 'string', 'max:2000'],
@@ -175,6 +181,8 @@ class DesignAgentController extends Controller
             'trend_ids.*' => ['required', 'string', 'regex:/^[a-z0-9][a-z0-9-]{0,79}$/'],
             'brief' => ['nullable', 'string', 'max:4000'],
             'size_distribution' => ['nullable', 'array', 'max:20'],
+            'reference_images' => ['nullable', 'array', 'max:3'],
+            'reference_images.*' => ['nullable', 'string', 'max:400', 'regex:#^(/|https?://)#'],
             'size_distribution.*' => ['nullable', 'integer', 'min:0', 'max:10000'],
             'ai' => ['nullable', 'boolean'],
             'force' => ['nullable', 'boolean'],

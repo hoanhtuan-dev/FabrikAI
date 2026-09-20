@@ -2235,6 +2235,16 @@ if (! function_exists('studio_task_groups')) {
                 return $p.':'.$m;
             }],
             'translate' => ['label' => 'Dịch prompt (VI ↔ EN)', 'legacy_default' => fn () => 'gemini:'.(string) studio_config('translate_model', 'gemini-2.5-flash')],
+
+            // ── NHÓM RIÊNG CHO AGENT STUDIO (2026-09-23) ──────────────────────────────────────
+            // Ba VAI khác nhau, không gộp: viết nội dung cần model suy luận; đọc ảnh mẫu cần model
+            // NHÌN được ảnh; tra cứu nguồn ngoài cần model/nhà cung cấp CÓ tìm kiếm. Gộp chung vào
+            // 'prompt' thì chủ shop không thể đổi một vai mà giữ nguyên hai vai còn lại.
+            // Nhóm nào bỏ trống ⇒ agent tự dùng nhóm nền ('prompt' cho suy luận, 'vision' cho đọc ảnh),
+            // nên cấu hình cũ vẫn chạy y như trước.
+            'agent_reason' => ['label' => 'Agent Studio — Suy luận & viết nội dung', 'legacy_default' => fn () => ''],
+            'agent_vision' => ['label' => 'Agent Studio — Đọc ảnh mẫu (bám phong cách)', 'legacy_default' => fn () => ''],
+            'agent_search' => ['label' => 'Agent Studio — Tìm kiếm nguồn ngoài', 'legacy_default' => fn () => ''],
         ];
     }
 }

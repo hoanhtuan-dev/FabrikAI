@@ -2122,3 +2122,59 @@ và bản cũ rơi vào nhánh chung nên khách chỉ nhận một câu mơ h�
   `expired` ⇒ hiện thẻ **AuthNotice** mời đăng nhập lại (thay vì im lặng).
 - Ngữ cảnh log ghi rõ `api <đường dẫn> → hết phiên`, nên lần sau mã tra cứu là tra được ngay.
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
+
+---
+
+## Phiên 2026-09-23 (Đợt 30 — BA VAI RIÊNG của Agent Studio: Suy luận · Đọc ảnh · Tìm kiếm)
+
+**Deploy:** `26d61b1 → <commit>`. Không migration mới.
+
+### 1. Ba nhóm công việc mới (khai trong Cài đặt → Nhóm công việc)
+
+| Nhóm | Nhãn người dùng thấy | Dùng cho |
+|---|---|---|
+| `agent_reason` | **Agent Studio — Suy luận & viết nội dung** | đọc xu hướng, viết brief, caption, prompt |
+| `agent_vision` | **Agent Studio — Đọc ảnh mẫu (bám phong cách)** | nhìn 1-3 ảnh mẫu người dùng chọn → mô tả chất liệu/tông màu/phom dáng |
+| `agent_search` | **Agent Studio — Tìm kiếm nguồn ngoài** | model/nhà cung cấp CÓ tìm kiếm, dùng cho lượt chạy cần dẫn nguồn |
+
+Vì sao tách: ba việc cần ba loại model khác nhau — viết nội dung không cần nhìn ảnh, đọc ảnh không cần
+suy luận dài, tìm kiếm thì phải là model/nhà cung cấp hỗ trợ. Gộp vào một nhóm thì đổi một vai là đổi cả ba.
+
+### 2. Bỏ trống thì KHÔNG vỡ cấu hình cũ
+
+| Nhóm bỏ trống | Tự dùng |
+|---|---|
+| `agent_reason` | nhóm **prompt** (như trước) |
+| `agent_vision` | nhóm **vision** (như trước) |
+| `agent_search` | nhóm **agent_reason** → rồi **prompt** ⇒ ai đang có model tìm kiếm ở nhóm cũ vẫn giữ nguyên hành vi |
+
+Cơ chế: `DesignAgentService::candidatesIn($nhóm, [$nhómNền…])` — nhóm riêng đứng trước, rỗng thì rơi về nhóm nền,
+và ghi lại **nhóm thật đã dùng** vào khối `model` để giao diện nói đúng.
+
+### 3. Vai ĐỌC ẢNH nay có thật và có đường vào
+
+- Bước **Định hướng** có khối **"Ảnh mẫu để AI bám phong cách (tuỳ chọn, tối đa 3)"** — chọn từ Thư viện
+  (dùng lại `SourceLibraryPicker`), xoá được từng ảnh.
+- Máy chủ đọc ảnh → gọi model **nhóm `agent_vision`** → nhận một đoạn mô tả ngắn → nhét vào prompt brief như
+  khối `reference_style`; brief trả về và giao diện hiện **"AI đọc ảnh mẫu: …"**.
+- Đệm theo (danh sách ảnh + model) 24 giờ ⇒ bấm lại không tốn thêm lượt gọi ảnh.
+- An toàn: chỉ nhận đường dẫn nội bộ (`/…`) hoặc URL **cùng tên miền**; host lạ trả `null` (chống SSRF).
+  Quá 3 ảnh · `ftp://` ⇒ **422**.
+- Không có model đọc ảnh hoặc ảnh hỏng ⇒ **bỏ qua và nói rõ lý do**, brief vẫn chạy bình thường.
+
+### 4. Vai TÌM KIẾM quyết định lượt chạy có dẫn nguồn hay không
+
+- Có model ở `agent_search` **và** model ấy biết bật tìm kiếm ⇒ **gọi chính model đó** cho lượt radar/brief.
+- Màn hình *Nguồn dữ liệu cho phân tích* đọc đúng thứ tự vai này (tìm kiếm → suy luận → nền), nên không
+  nói khác điều agent thật sự làm.
+
+### 5. Kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Test mới (7 — `AgentRolesTest`) | 3 nhóm có trong `studio_task_groups()` · khai `agent_reason` ⇒ dùng đúng model & đúng endpoint · bỏ trống ⇒ rơi về `prompt` (engine vẫn `ai-v1`) · **vai đọc ảnh: ảnh thật được gửi (base64) và mô tả vào prompt của brief** · thiếu model đọc ảnh ⇒ bỏ qua, brief vẫn chạy · host lạ bị từ chối · quá 3 ảnh / `ftp://` ⇒ 422 |
+| Chrome thật — Cài đặt | sidebar *Nhóm công việc* hiện đủ 3 nhãn **Agent Studio — …**; `/api/settings-vue/data` trả `agent_reason · agent_vision · agent_search` |
+| Full suite | **911 test / 6.668 assert XANH** |
+| `npm run build` | exit 0 |
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).

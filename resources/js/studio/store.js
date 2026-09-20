@@ -450,6 +450,8 @@ export const useStudioStore = defineStore('studio', {
     webSources: null,
     webSourcesLoading: false,
     webSourcesError: '',
+    // Ảnh mẫu cho VAI ĐỌC ẢNH (tối đa 3): người dùng chọn ở bước Định hướng, AI nhìn rồi bám phong cách.
+    briefReferenceImages: [],
     viewer: null,
     flashMsg: '',
     flashType: 'info',
@@ -2721,11 +2723,14 @@ export const useStudioStore = defineStore('studio', {
       }
     },
     /** Chuẩn hoá input để so sánh brief hiện tại với input đang nhập (phát hiện brief cũ). */
+    /** Đầu vào của brief (để phát hiện brief cũ) — GỒM cả ảnh mẫu: đổi ảnh là phải tạo lại. */
     designBriefInput(payload = {}) {
       return {
         prompt: String(payload.prompt || '').trim(),
         region: String(payload.region || 'all'),
         trend_ids: [...new Set((payload.trend_ids || []).map(String))].sort(),
+        // Đổi ảnh mẫu ⇒ brief cũ không còn đúng ⇒ phải tạo lại (nếu không sẽ hiện "brief đã sẵn sàng" sai).
+        reference_images: [...(this.briefReferenceImages || [])].map(String).sort(),
       };
     },
     /** Brief hiện tại đã cũ so với prompt/trend người dùng đang chọn? */
@@ -2747,6 +2752,8 @@ export const useStudioStore = defineStore('studio', {
           ...(payload || {}),
           ai: this.designAgentAi,
           force: !!opts.force,
+          // Ảnh mẫu đã chọn ở bước Định hướng — vai ĐỌC ẢNH dùng chúng để bám phong cách thật của shop.
+          reference_images: (this.briefReferenceImages || []).slice(0, 3),
         });
         this.collectionBrief = data || null;
         this.collectionBriefInput = this.designBriefInput(payload);

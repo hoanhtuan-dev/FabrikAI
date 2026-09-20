@@ -28,8 +28,21 @@ class DesignAgentService
 {
     private const REGIONS = ['all', 'hcm', 'hanoi', 'danang'];
 
-    /** Nhóm công việc dùng cho MỌI suy luận của hai agent (Settings → Nhóm công việc). */
+    /** Nhóm NỀN cho suy luận — giữ nguyên để cấu hình cũ chạy y như trước. */
     public const AI_GROUP = 'prompt';
+
+    /**
+     * BA VAI RIÊNG của Agent Studio (Settings → Nhóm công việc).
+     *
+     * Vì sao tách: viết nội dung, đọc ảnh và tra cứu nguồn ngoài cần ba loại model khác nhau. Gộp vào
+     * một nhóm thì đổi một vai là đổi cả ba; tách ra thì chủ shop thay được từng vai, và nhóm nào bỏ
+     * trống sẽ tự rơi về nhóm nền nên không có cấu hình nào bị vỡ.
+     */
+    public const REASON_GROUP = 'agent_reason';
+
+    public const VISION_GROUP = 'agent_vision';
+
+    public const SEARCH_GROUP = 'agent_search';
 
     /** Cache định hướng radar theo vùng + model đang cấu hình (tránh gọi lại mỗi lần mở). */
     private const RADAR_CACHE_SECONDS = 600;
@@ -91,10 +104,14 @@ class DesignAgentService
         // ⇒ `mode=empty` và mọi câu nói về dữ liệu thị trường vẫn phải là "dữ liệu mẫu".
         $evidence = $this->externalEvidence($region);
 
+        // VAI TÌM KIẾM: nhóm riêng (nếu khai) quyết định model nào chạy lượt này; bỏ trống thì dùng nhóm
+        // suy luận như trước.
+        $callCandidates = $this->searchCandidates();
+
         // Định hướng TẤT ĐỊNH luôn được dựng trước: vừa là kết quả khi không có model,
         // vừa là lưới an toàn nếu model trả về thiếu/không hợp lệ.
         $ruleDirections = $this->ruleDirections($trends);
-        [$directions, $model] = $this->radarDirections($trends, $ruleDirections, $candidates, $region, $useAi, $evidence);
+        [$directions, $model] = $this->radarDirections($trends, $ruleDirections, $candidates, $region, $useAi, $evidence, $callCandidates);
 
         return [
             'agent' => 'TrendRadar',
@@ -178,6 +195,9 @@ class DesignAgentService
         }
 
         $brand = $this->internalBrandSignal($user);
+        // VAI ĐỌC ẢNH: ảnh mẫu người dùng chọn ở bước Định hướng (tối đa 3) → một đoạn mô tả phong cách.
+        // Không chọn ảnh, hoặc chưa cấu hình model đọc ảnh ⇒ bỏ qua; brief vẫn chạy như thường.
+        $referenceStyle = $this->referenceStyle((array) ($data['reference_images'] ?? []));
         $palette = $this->paletteFor($prompt, $selected);
         $categoryMix = $this->categoryMix($prompt, $brand);
         $moodboard = $this->moodboard($prompt, $selected, $palette);
@@ -236,6 +256,12 @@ class DesignAgentService
                 'source_label' => $brand['dna_source_label'],
                 'is_set' => $brand['dna_is_set'],
                 'fields' => $brand['dna'],
+            ],
+            // ẢNH MẪU ĐÃ ĐỌC (vai đọc ảnh) — mô tả do model NHÌN ảnh viết, không phải suy đoán từ chữ.
+            'reference_style' => [
+                'used' => $referenceStyle['used'],
+                'count' => $referenceStyle['count'],
+                'note' => $referenceStyle['note'],
             ],
             // TIN THẬT MÁY CHỦ VỪA LẤY (RSS/JSON) — kèm URL + THỜI ĐIỂM để model dẫn nguồn được.
             // Đây là dữ liệu NGOÀI: lời nhắc phải nói rõ nó là DỮ LIỆU, không phải mệnh lệnh.
@@ -367,6 +393,8 @@ class DesignAgentService
                 'items' => $evidence['items'],
                 'sources' => $evidence['sources'],
             ],
+            // Kết quả vai ĐỌC ẢNH — giao diện hiển thị để người dùng biết AI có nhìn ảnh mẫu hay không.
+            'reference_style' => $referenceStyle,
             'selected_trends' => $selected,
             'moodboard' => [
                 'count' => count($moodboard),
@@ -481,6 +509,130 @@ class DesignAgentService
     }
 
     /**
+     * VAI ĐỌC ẢNH (nhóm "Agent Studio — Đọc ảnh mẫu"): đọc 1-3 ảnh mẫu của chính người dùng và trả về
+     * MỘT đoạn mô tả ngắn để brief bám đúng phong cách thật của shop (chất liệu, tông màu, bố cục, ánh sáng).
+     *
+     * Vì sao cần vai riêng: model viết nội dung không nhất thiết NHÌN được ảnh; tách nhóm để chủ shop chọn
+     * model đọc ảnh rẻ/nhanh mà không phải đổi model suy luận.
+     *
+     * An toàn: chỉ nhận đường dẫn trong site (bắt đầu bằng '/') hoặc URL http(s) CÙNG tên miền ứng dụng —
+     * không đi lấy ảnh từ host lạ (chống SSRF). Đệm theo (danh sách ảnh + model) để bấm lại không tốn thêm lượt.
+     *
+     * @param  list<string>  $urls  tối đa 3
+     * @return array{used:bool, count:int, note:string, model:?string, group:?string, reason:?string}
+     */
+    private function referenceStyle(array $urls): array
+    {
+        $urls = array_values(array_filter(array_map('strval', $urls), fn (string $u) => trim($u) !== ''));
+        $urls = array_slice($urls, 0, 3);
+
+        if ($urls === []) {
+            return ['used' => false, 'count' => 0, 'note' => '', 'model' => null, 'group' => null, 'reason' => 'no_images'];
+        }
+
+        $candidates = $this->visionCandidates();
+        if ($candidates === [] || $this->gateway === null) {
+            return ['used' => false, 'count' => count($urls), 'note' => '', 'model' => null, 'group' => null, 'reason' => 'no_vision_model'];
+        }
+
+        $group = (string) ($candidates[0]['group'] ?? 'vision');
+        $cacheKey = 'design-agent:ref-style:v1:'.md5(implode('|', $urls).'|'.($candidates[0]['provider'] ?? '').':'.($candidates[0]['model'] ?? ''));
+        $hit = $this->readBriefCache($cacheKey);
+        if (is_array($hit)) {
+            return $hit;
+        }
+
+        $images = [];
+        foreach ($urls as $url) {
+            $uri = $this->imageDataUri($url);
+            if ($uri !== null) {
+                $images[] = $uri;
+            }
+        }
+        if ($images === []) {
+            return ['used' => false, 'count' => count($urls), 'note' => '', 'model' => null, 'group' => $group, 'reason' => 'images_unreadable'];
+        }
+
+        $instruction = 'Bạn nhận 1-3 ảnh mẫu của một shop thời trang Việt Nam. Hãy mô tả NGẮN GỌN (tối đa 80 từ, tiếng Việt, một đoạn): chất liệu chính, tông màu, phom dáng, bố cục và ánh sáng đặc trưng. Chỉ mô tả điều NHÌN THẤY, không suy đoán giá, không nhắc tên thương hiệu, không đề xuất.';
+
+        $answer = null;
+        try {
+            $answer = $this->gateway->vision($group, $instruction, $images, ['max_tokens' => 320, 'timeout' => 60]);
+        } catch (\Throwable $e) {
+            $answer = null;
+        }
+
+        $note = trim((string) ($answer['text'] ?? ''));
+        $result = $note === ''
+            ? ['used' => false, 'count' => count($images), 'note' => '', 'model' => null, 'group' => $group, 'reason' => 'vision_failed']
+            : [
+                'used' => true,
+                'count' => count($images),
+                'note' => Str::limit($note, 600, ''),
+                'model' => ($answer['provider'] ?? '').':'.($answer['model'] ?? ''),
+                'group' => $group,
+                'reason' => null,
+            ];
+
+        try {
+            Cache::put($cacheKey, $result, now()->addHours(24));
+        } catch (\Throwable) {
+            // bộ đệm là tối ưu, không phải điều kiện chạy
+        }
+
+        return $result;
+    }
+
+    /**
+     * Ảnh của CHÍNH hệ thống → data URI cho model đọc ảnh. Chỉ nhận đường dẫn nội bộ hoặc URL cùng tên miền.
+     *
+     * Trả null khi không đọc được (ảnh hỏng, host lạ, quá lớn) — nơi gọi BỎ QUA ảnh đó chứ không làm hỏng lượt.
+     */
+    private function imageDataUri(string $url): ?string
+    {
+        $path = trim($url);
+        if ($path === '') {
+            return null;
+        }
+
+        $bytes = null;
+        $mime = null;
+
+        if (str_starts_with($path, '/')) {
+            $local = public_path(ltrim((string) (parse_url($path, PHP_URL_PATH) ?: $path), '/'));
+            if (is_file($local) && filesize($local) > 0 && filesize($local) <= 12 * 1024 * 1024) {
+                $bytes = (string) file_get_contents($local);
+                $mime = mime_content_type($local) ?: null;
+            }
+        } else {
+            $host = (string) (parse_url($path, PHP_URL_HOST) ?: '');
+            $allowed = array_values(array_filter(array_merge(
+                [(string) (parse_url((string) config('app.url'), PHP_URL_HOST) ?: '')],
+                array_map('trim', explode(',', (string) config('studio.remote_image_hosts', ''))),
+            )));
+            if ($host === '' || ! in_array($host, $allowed, true)) {
+                return null;
+            }
+            try {
+                $res = Http::timeout(15)->get($path);
+                if ($res->successful() && strlen((string) $res->body()) <= 12 * 1024 * 1024) {
+                    $bytes = (string) $res->body();
+                    $mime = $res->header('Content-Type') ?: null;
+                }
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        if ($bytes === null || $bytes === '') {
+            return null;
+        }
+
+        $mime = str_starts_with((string) $mime, 'image/') ? (string) $mime : 'image/jpeg';
+
+        return 'data:'.$mime.';base64,'.base64_encode($bytes);
+    }
+    /**
      * Khoá đệm cho MỘT lần brief — xem BRIEF_CACHE_VERSION ở trên để biết vì sao gồm đúng những thứ này.
      *
      * @param  list<array<string,mixed>>  $candidates
@@ -550,7 +702,51 @@ class DesignAgentService
      */
     private function aiCandidates(): array
     {
-        return $this->gateway?->candidates(self::AI_GROUP) ?? [];
+        return $this->candidatesIn(self::REASON_GROUP, [self::AI_GROUP]);
+    }
+
+    /**
+     * Candidate của một nhóm, có NHÓM NỀN dự phòng theo thứ tự.
+     *
+     * Vì sao cần: nhóm mới (agent_*) bỏ trống là chuyện bình thường — khi đó agent phải chạy bằng nhóm nền
+     * chứ KHÔNG được im lặng quay về engine tất định (người dùng sẽ tưởng AI hỏng).
+     *
+     * @param  list<string>  $fallbacks
+     * @return list<array<string, mixed>>
+     */
+    private function candidatesIn(string $group, array $fallbacks = []): array
+    {
+        if ($this->gateway === null) {
+            return [];
+        }
+
+        foreach (array_merge([$group], $fallbacks) as $candidateGroup) {
+            $rows = $this->gateway->candidates($candidateGroup);
+            if ($rows !== []) {
+                // Ghi lại nhóm THẬT ĐÃ DÙNG để khối `model` nói đúng (người dùng cấu hình nhóm nào, ai chạy).
+                return array_map(fn (array $row) => $row + ['group' => $candidateGroup], $rows);
+            }
+        }
+
+        return [];
+    }
+
+    /** Candidate cho vai ĐỌC ẢNH (nhóm riêng của agent → nhóm 'vision' chung). */
+    private function visionCandidates(): array
+    {
+        return $this->candidatesIn(self::VISION_GROUP, ['vision']);
+    }
+
+    /**
+     * Candidate cho vai TÌM KIẾM.
+     *
+     * Nhóm "Agent Studio — Tìm kiếm nguồn ngoài" đứng trước; BỎ TRỐNG thì rơi về nhóm suy luận — nhờ vậy ai
+     * đang dùng một model có sẵn tìm kiếm ở nhóm cũ vẫn giữ nguyên hành vi, còn ai muốn tách vai thì khai
+     * nhóm riêng.
+     */
+    private function searchCandidates(): array
+    {
+        return $this->candidatesIn(self::SEARCH_GROUP, [self::REASON_GROUP, self::AI_GROUP]);
     }
 
     /**
@@ -578,7 +774,7 @@ class DesignAgentService
      *
      * @return array{0: list<array>, 1: array}
      */
-    private function radarDirections(array $trends, array $ruleDirections, array $candidates, string $region, bool $useAi, array $evidence = []): array
+    private function radarDirections(array $trends, array $ruleDirections, array $candidates, string $region, bool $useAi, array $evidence = [], array $callCandidates = []): array
     {
         if (! $useAi || $this->gateway === null || $candidates === []) {
             return [$ruleDirections, $this->modelBlock('rule', $candidates)];
@@ -587,13 +783,13 @@ class DesignAgentService
         // LƯU Ý QUAN TRỌNG: chỉ gửi catalog của VÙNG (không gửi tín hiệu nội bộ của shop) nên
         // cache dùng chung giữa các tài khoản là an toàn — dữ liệu nội bộ của người dùng không
         // bao giờ rời khỏi tài khoản, kể cả khi hai người mở cùng một khu vực.
-        // TÌM KIẾM WEB (2026-09-23): quyết định lấy từ CHÍNH candidate đang được cấu hình trong Cài đặt
-        // (giao thức biết cách bật, hoặc nhà cung cấp tự khai `search_param`). Mã nguồn KHÔNG chọn hộ
-        // nhà cung cấp nào: đổi model trong Cài đặt là hành vi đổi theo, không phải sửa mã.
-        $searchPlan = WebAccessService::planFor($candidates[0]);
+        // TÌM KIẾM (2026-09-23): nhóm "Agent Studio — Tìm kiếm nguồn ngoài" quyết định. Có model ở nhóm đó
+        // VÀ model ấy biết cách bật tìm kiếm ⇒ gọi CHÍNH model đó cho lần chạy này; không có ⇒ quay về
+        // nhóm suy luận (chạy bình thường, chỉ là không có nguồn ngoài).
+        $searchPlan = WebAccessService::planFor($callCandidates[0] ?? []);
         $webSearch = $searchPlan !== null;
 
-        $fingerprint = md5(implode('|', array_map(fn (array $c) => $c['provider'].':'.$c['model'], $candidates)));
+        $fingerprint = md5(implode('|', array_map(fn (array $c) => $c['provider'].':'.$c['model'], $callCandidates !== [] ? $callCandidates : $candidates)));
         // Cờ tìm kiếm nằm TRONG khoá cache: nội dung trả lời khác nhau (có/không nguồn thật) nên dùng
         // chung cache sẽ trả về câu trả lời của chế độ khác.
         // Khoá cache gồm CẢ cách bật tìm kiếm: đổi tham số trong Cài đặt (hoặc bật/tắt) là nội dung trả
@@ -626,6 +822,7 @@ class DesignAgentService
             .'Viết tiếng Việt, ngắn gọn, cụ thể, có thể hành động ngay: MỖI trường tối đa 25 từ, KHÔNG xuống dòng trong giá trị, KHÔNG thêm chữ nào ngoài JSON.';
 
         $started = microtime(true);
+        $runner = $callCandidates !== [] ? $callCandidates : $candidates;
         $call = $this->callJson($instruction, [
             'region' => $region,
             'region_name' => $this->regionName($region),
@@ -651,7 +848,7 @@ class DesignAgentService
                 'description' => $trend['description'],
                 'recommended_action' => $trend['recommended_action'],
             ], $trends),
-        ], 3000, 8000, 60, $webSearch ? ['search' => true] : []);
+        ], 3000, 8000, 60, $webSearch ? ['search' => true] : [], $runner);
         $latency = (int) round((microtime(true) - $started) * 1000);
         $attempted = $candidates[0]['provider'].':'.$candidates[0]['model'];
         $answer = $call['answer'];
@@ -832,15 +1029,17 @@ class DesignAgentService
             .'prompt_vi: 1 đoạn mô tả ảnh tiếng Việt. prompt_en: 1 đoạn prompt ảnh tiếng Anh giàu chi tiết (chất liệu, dáng, ánh sáng, bố cục). '
             .'next_steps: đúng 3 việc cần làm tiếp.';
 
-        // TÌM KIẾM WEB cho đường BRIEF: cùng luật với radar — quyết định từ candidate đang được CẤU HÌNH
-        // (giao thức hỗ trợ, hoặc Custom Provider tự khai `search_param`), không từ danh sách cứng.
-        $searchPlan = WebAccessService::planFor($candidates[0] ?? []);
+        // TÌM KIẾM: nhóm "Agent Studio — Tìm kiếm nguồn ngoài" quyết định (giống đường radar). Có model ở
+        // nhóm đó và model ấy biết bật tìm kiếm ⇒ gọi chính model đó; không ⇒ dùng nhóm suy luận.
+        $searchGroup = $this->searchCandidates();
+        $searchPlan = WebAccessService::planFor($searchGroup[0] ?? []);
         $webSearch = $searchPlan !== null;
+        $runner = $webSearch ? $searchGroup : $candidates;
 
         $started = microtime(true);
-        $call = $this->callJson($instruction, $context, 4000, 8000, 75, $webSearch ? ['search' => true] : []);
+        $call = $this->callJson($instruction, $context, 4000, 8000, 75, $webSearch ? ['search' => true] : [], $runner);
         $latency = (int) round((microtime(true) - $started) * 1000);
-        $attempted = $candidates[0]['provider'].':'.$candidates[0]['model'];
+        $attempted = ($runner[0]['provider'] ?? '?').':'.($runner[0]['model'] ?? '?');
         $answer = $call['answer'];
 
         if ($answer === null) {
@@ -888,16 +1087,22 @@ class DesignAgentService
      * trên production: lần đầu trả về đúng 6 ký tự '{"dire'. Vì vậy khi lần đầu không đọc được
      * JSON, thử LẠI MỘT lần với ngân sách token lớn hơn hẳn trước khi chịu thua.
      *
+     * `$candidates`: model ĐÃ CHỌN cho lần gọi này (nhóm suy luận, hoặc nhóm tìm kiếm khi chạy có tìm kiếm).
+     * Rỗng ⇒ dùng nhóm nền của agent. Mỗi candidate mang theo khoá `group` do `candidatesIn()` gắn vào, nên
+     * lời gọi đi đúng nhóm đã cấu hình chứ không âm thầm quay về nhóm cũ.
+     *
+     * @param  list<array<string, mixed>>  $candidates
      * @return array{json: ?array, answer: ?array, attempts: int}
      */
-    private function callJson(string $instruction, array $payload, int $budget, int $retryBudget, int $timeout, array $options = []): array
+    private function callJson(string $instruction, array $payload, int $budget, int $retryBudget, int $timeout, array $options = [], array $candidates = []): array
     {
         $messages = [
             ['role' => 'system', 'content' => $instruction],
             ['role' => 'user', 'content' => "DỮ LIỆU:\n".json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)],
         ];
+        $group = (string) ($candidates[0]['group'] ?? self::AI_GROUP);
 
-        $answer = $this->gateway->text(self::AI_GROUP, $messages, $options + [
+        $answer = $this->gateway->text($group, $messages, $options + [
             'response_format' => 'json_object',
             'max_tokens' => $budget,
             'timeout' => $timeout,
@@ -920,7 +1125,7 @@ class DesignAgentService
             'chars' => strlen($answer['text']),
         ]);
 
-        $retry = $this->gateway->text(self::AI_GROUP, $messages, $options + [
+        $retry = $this->gateway->text($group, $messages, $options + [
             'response_format' => 'json_object',
             'max_tokens' => $retryBudget,
             'timeout' => $timeout * 2,

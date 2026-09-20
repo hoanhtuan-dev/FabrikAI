@@ -18,6 +18,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 import StudioIcon from './StudioIcon.vue';
+import SourceLibraryPicker from './SourceLibraryPicker.vue';
 
 const store = useStudioStore();
 const prompt = ref('');
@@ -98,6 +99,23 @@ function setDnaList(key, value) {
   store.brandDnaDraft = { ...dnaDraft.value, [key]: items };
 }
 const dnaDirty = computed(() => JSON.stringify(dnaDraft.value) !== JSON.stringify(dna.value?.dna || {}));
+
+// ── VAI ĐỌC ẢNH: ảnh mẫu để AI bám phong cách (tối đa 3) ──────────────────────────────────────
+const refPickerOpen = ref(false);
+const refImages = computed(() => store.briefReferenceImages || []);
+function onPickReference(item) {
+  const url = String((item && (item.url || item.media_url)) || '');
+  if (!url || refImages.value.includes(url) || refImages.value.length >= 3) return;
+  store.briefReferenceImages = [...refImages.value, url];
+}
+function removeReference(url) {
+  store.briefReferenceImages = refImages.value.filter((u) => u !== url);
+}
+/** Câu mô tả kết quả vai đọc ảnh — chỉ hiện khi brief vừa chạy và AI THỰC SỰ đã nhìn ảnh. */
+const referenceNote = computed(() => {
+  const row = collection.value?.reference_style;
+  return row && row.used ? String(row.note || '') : '';
+});
 // ── Nguồn dữ liệu: nhãn TIẾNG NGƯỜI DÙNG (không để chữ kỹ thuật trong template) ──────────────
 /** Đang có tin thật để AI đọc? (máy chủ tự lấy, không phải model tự tìm kiếm) */
 const liveSources = computed(() => !!(store.webSources && store.webSources.mode === 'live'));
@@ -984,6 +1002,28 @@ watch(() => store.designAgentOpen, (open) => {
                 <label for="collection-prompt" class="label mt-4">Prompt tiếng Việt</label>
                 <textarea id="collection-prompt" ref="promptInput" v-model="prompt" rows="5" maxlength="2000" aria-describedby="collection-prompt-help" class="input w-full resize-none !text-sm" placeholder="Ví dụ: Bộ sưu tập công sở mùa hè cho nữ văn phòng, ưu tiên linen thoáng và màu pastel dịu…" @keydown.ctrl.enter="createBrief"></textarea>
                 <div class="mt-1.5 flex items-start justify-between gap-3"><p id="collection-prompt-help" class="text-label leading-4 text-cream-400">Ctrl+Enter để tạo brief.</p><span class="shrink-0 text-label tabular-nums text-cream-400">{{ prompt.length }}/2000</span></div>
+
+                <!-- VAI ĐỌC ẢNH: chọn tối đa 3 ảnh mẫu để AI nhìn và bám phong cách thật của shop. -->
+                <div class="mt-4 rounded-lg border border-ink-700 bg-ink-900/60 p-3">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-body font-semibold text-cream-100">Ảnh mẫu để AI bám phong cách <span class="font-normal text-cream-400">(tuỳ chọn, tối đa 3)</span></p>
+                    <button type="button" class="tool-btn" :disabled="refImages.length >= 3" @click="refPickerOpen = true">
+                      <StudioIcon name="library" size="h-3 w-3" /> Chọn ảnh mẫu
+                    </button>
+                  </div>
+                  <div v-if="refImages.length" class="mt-2 flex flex-wrap gap-2">
+                    <div v-for="url in refImages" :key="url" class="relative">
+                      <img :src="url" alt="Ảnh mẫu" class="h-14 w-14 rounded-lg border border-ink-600 object-cover">
+                      <button type="button" class="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-ink-800 text-cream-300" aria-label="Bỏ ảnh mẫu" @click="removeReference(url)">
+                        <StudioIcon name="x" size="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <p v-else class="mt-1.5 text-label leading-5 text-cream-400">Chọn 1-3 ảnh bạn thích — AI sẽ đọc chúng và mô tả chất liệu, tông màu, phom dáng để brief sát shop hơn.</p>
+                  <p v-if="referenceNote" class="mt-2 rounded-lg border border-brand-500/30 bg-brand-500/10 px-2.5 py-2 text-label leading-5 text-cream-200">AI đọc ảnh mẫu: {{ referenceNote }}</p>
+                </div>
+
+                <SourceLibraryPicker v-model="refPickerOpen" mode="pick" @pick="onPickReference" />
 
                 <div class="mt-4">
                   <div class="mb-2 flex items-center justify-between"><span class="text-body font-semibold uppercase tracking-wide text-cream-400">Trend đã chọn</span><span class="text-label text-cream-400">{{ selectedTrendCount }} / {{ trends.length }}</span></div>
