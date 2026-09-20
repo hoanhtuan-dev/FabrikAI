@@ -26,6 +26,12 @@ const marketAgeLabel = inject('marketAgeLabel');
 const internetVerdict = inject('internetVerdict');
 const groupsNeedingSetup = inject('groupsNeedingSetup');
 const toolSearchLine = inject('toolSearchLine');
+// Số đo "AI có tự ra internet không" — hiện NGAY trên đầu khối định hướng (không gấp lại).
+const aiSearchShort = inject('aiSearchShort');
+const aiSearchQueries = inject('aiSearchQueries');
+const aiSearchSources = inject('aiSearchSources');
+const aiSearchMode = inject('aiSearchMode');
+const aiSearchOn = inject('aiSearchOn');
 const step = inject('step');
 const radar = inject('radar');
 const regions = inject('regions');
@@ -166,6 +172,18 @@ const formatVnd = inject('formatVnd');
                   <div class="min-w-0">
                     <h3 class="font-display text-base font-semibold text-brand-300">Định hướng từ TrendRadar ({{ directions.length }})</h3>
                     <p class="mt-0.5 text-body leading-5 text-cream-400">Chọn trend gắn với hướng bạn muốn — AI sẽ dựng brief bám theo các trend đã chọn.</p>
+                    <!-- AI CÓ TỰ RA INTERNET KHÔNG — hỏi thẳng câu người dùng hay hỏi, trả lời bằng SỐ ĐO của
+                         lượt chạy này. Trước đây câu này nằm trong <details> nên mở màn hình chỉ thấy danh
+                         sách tin máy chủ lấy sẵn ⇒ tưởng agent không hề dùng công cụ tìm kiếm. -->
+                    <p v-if="aiSearchShort" class="mt-1.5 flex flex-wrap items-center gap-1.5 text-label">
+                      <span
+                        class="rounded-full px-2 py-0.5 font-semibold"
+                        :class="aiSearchQueries.length ? 'bg-brand-500/15 text-brand-200' : 'bg-ink-800 text-cream-400'"
+                        :title="toolSearchLine"
+                      >{{ aiSearchShort }}</span>
+                      <span v-if="aiSearchQueries.length" class="text-cream-400">từ khoá: {{ aiSearchQueries.slice(0, 3).join(' · ') }}<template v-if="aiSearchQueries.length > 3"> · …</template></span>
+                      <span v-if="aiSearchSources.length" class="text-cream-400">· mở {{ aiSearchSources.length }} trang nguồn</span>
+                    </p>
                   </div>
                   <button type="button" class="tool-btn" title="Chọn các trend mà 3 định hướng mạnh nhất đang nhắc tới" @click="focusDirections">
                     <StudioIcon name="target" size="h-3 w-3" /> Chọn 3 hướng đầu
@@ -337,6 +355,17 @@ const formatVnd = inject('formatVnd');
                     </div>
                     <!-- Số ĐO, không phải lời hứa: câu này đổi theo nhịp tim của lịch chạy nền trên máy chủ.
                          Bản trước viết cứng "tự lấy tin mỗi 30 phút" trong khi host KHÔNG có cron nào. -->
+                    <!-- HAI KÊNH, NÓI RÕ KÊNH NÀO RA CÁI GÌ: tin máy chủ lấy sẵn theo nguồn cấu hình (nuôi cả phần đo
+                         tín hiệu thị trường), và tin AI tự tìm trong lượt này (ảnh hưởng phần chữ AI viết). -->
+                    <p v-if="aiSearchOn" class="mt-2 rounded-lg border border-ink-700 bg-ink-900 p-2.5 text-label leading-5 text-cream-300">
+                      <b class="text-cream-100">Hai nguồn tin khác nhau:</b>
+                      danh sách trên là tin <b class="text-cream-100">máy chủ lấy sẵn</b> theo nguồn bạn cấu hình (cũng là số liệu cho khối tín hiệu thị trường);
+                      <template v-if="aiSearchQueries.length">
+                        còn AI <b class="text-cream-100">tự tìm trên internet {{ aiSearchQueries.length }} truy vấn</b> trong lượt này:
+                        <span v-for="(q, i) in aiSearchQueries" :key="q">{{ q }}<span v-if="i < aiSearchQueries.length - 1"> · </span></span>
+                      </template>
+                      <template v-else>còn AI <b class="text-cream-100">không tự tìm trên internet</b> trong lượt này.</template>
+                    </p>
                     <p class="mt-1.5 text-label leading-5" :class="autoRefresh.alive ? 'text-cream-400' : 'text-warn'">
                       {{ autoRefresh.label }}
                       Chỉ giữ tin trong {{ store.webSources?.limits?.max_age_days }} ngày và tối đa {{ store.webSources?.limits?.limit }} tin cho mỗi lần phân tích.

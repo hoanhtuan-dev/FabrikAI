@@ -374,6 +374,24 @@ const modelCandidates = computed(() => activeModel.value?.available || []);
  * những gì khối này đo được — trước đây chỗ này là câu văn tĩnh nên nói sai cả khi agent không hề tìm.
  */
 const toolSearch = computed(() => activeModel.value?.tool_search || null);
+/**
+ * NHÃN NGẮN cho phần "AI có tự ra internet không" — hiện NGAY TRÊN ĐẦU khối định hướng, không gấp lại.
+ *
+ * Vì sao phải đổi chỗ: bản trước đặt câu số đo này bên trong <details> "Nguồn dữ liệu cho phân tích" nên
+ * mở màn hình ra chỉ thấy danh sách tin MÁY CHỦ LẤY SẴN theo nguồn cấu hình — người dùng kết luận (đúng theo
+ * những gì nhìn thấy) rằng "vẫn dùng nguồn trong Cài đặt, không dùng công cụ tìm kiếm". Số đo thì vẫn đúng,
+ * chỉ là bị chôn.
+ */
+const aiSearchCalls = computed(() => Number(toolSearch.value?.calls || 0));
+const aiSearchQueries = computed(() => (toolSearch.value?.queries || []).filter(Boolean));
+const aiSearchSources = computed(() => (toolSearch.value?.sources || []).filter(Boolean));
+const aiSearchMode = computed(() => String(toolSearch.value?.mode || 'off'));
+const aiSearchOn = computed(() => aiSearchMode.value !== 'off' && toolSearch.value?.enabled !== false);
+const aiSearchShort = computed(() => {
+  if (!aiSearchOn.value) return '';
+  if (aiSearchMode.value === 'hosted' && aiSearchCalls.value === 0) return 'AI không tìm trên internet lượt này';
+  return aiSearchCalls.value > 0 ? 'AI tự tìm trên internet: ' + aiSearchCalls.value + ' lượt' : 'AI có công cụ tìm kiếm (không dùng)';
+});
 const toolSearchLine = computed(() => {
   const t = toolSearch.value;
   if (!t || t.mode === 'off') return '';
@@ -874,6 +892,11 @@ provide('modelTitle', modelTitle);
 provide('modelCandidates', modelCandidates);
 provide('toolSearch', toolSearch);
 provide('toolSearchLine', toolSearchLine);
+provide('aiSearchShort', aiSearchShort);
+provide('aiSearchQueries', aiSearchQueries);
+provide('aiSearchSources', aiSearchSources);
+provide('aiSearchMode', aiSearchMode);
+provide('aiSearchOn', aiSearchOn);
 provide('aiToggleTitle', aiToggleTitle);
 provide('directions', directions);
 provide('appliedAi', appliedAi);
