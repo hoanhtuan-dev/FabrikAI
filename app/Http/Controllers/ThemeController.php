@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ThemeLibrary;
 use App\Support\ThemePalette;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -79,6 +80,11 @@ class ThemeController extends Controller
     public function tokensPage(): View
     {
         return view('studio.design-tokens', [
+            // [2026-09-25] Thư viện theme (import liên kết daisyUI · bật theo chế độ) nằm CÙNG trang
+            // với bảng token: đây là hai nửa của một việc — chọn bảng màu, rồi xem con số tương phản
+            // của chính bảng màu đang chạy. Tách sang trang khác là mở đường cho hai trang nói hai
+            // con số khác nhau.
+            'library' => ThemeLibrary::overview(),
             'themes' => [
                 'Tối' => ThemePalette::matrix('dark'),
                 'Sáng' => ThemePalette::matrix('light'),

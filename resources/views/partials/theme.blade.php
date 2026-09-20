@@ -24,7 +24,18 @@
 @php
     $themePref = theme_pref();
     $themeResolved = theme_resolved();
+    // BẢNG MÀU ĐANG BẬT (2026-09-25): nếu Quản trị viên đã import và bật một theme khác theme gốc,
+    // token của nó được phát NGAY Ở ĐÂY — trong <head>, trước khung hình đầu tiên.
+    // Vì sao không để trong bundle JS: cùng lý do với cả tệp này (bundle tải bất đồng bộ ⇒ nháy màu).
+    // Chuỗi rỗng khi đang dùng theme gốc: bảng màu đó đã nằm trong app.css, phát lại là thừa.
+    $themeOverrideCss = \App\Support\ThemeLibrary::overrideCss();
 @endphp
+@if ($themeOverrideCss !== '')
+{{-- Xuất bằng cặp ngoặc nhọn THƯỜNG (không dùng raw): repo cấm mọi sink thô trong blade — StudioXssSinksTest canh
+     điều đó. Vì vậy ThemeLibrary::cssBlock() cố ý sinh CSS KHÔNG chứa ký tự nào bị HTML escape
+     (& " ' < >), nên chuỗi đi qua đây vẫn nguyên vẹn. --}}
+<style id="fabrikai-theme-override">{{ $themeOverrideCss }}</style>
+@endif
 <script>
 (function () {
   'use strict';
@@ -34,6 +45,9 @@
   var FONT_VALID = @json(font_scale_options());
   var SERVER_PREF = @json($themePref);
   var SERVER_FONT = @json(font_scale());
+  // Màu thanh trình duyệt của TỪNG chế độ, lấy từ nền trang của chính theme đang bật (server render
+  // sẵn) — không còn hai hằng số hex nằm trong tệp này.
+  var THEME_COLORS = @json(theme_meta_colors());
   var CAN_SAVE = @json(auth()->check());
   var root = document.documentElement;
   var media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
@@ -69,8 +83,8 @@
   function paint(theme) {
     root.setAttribute('data-theme', theme);
     var meta = document.querySelector('meta[name="theme-color"]');
-    // Màu thanh trình duyệt theo ĐÚNG dải base của theme (nền trang của từng theme).
-    if (meta) meta.setAttribute('content', theme === 'light' ? '#eef1f5' : '#15191e');
+    // Màu thanh trình duyệt theo ĐÚNG nền trang của theme đang bật (server render sẵn hai giá trị).
+    if (meta) meta.setAttribute('content', THEME_COLORS[theme] || THEME_COLORS.dark || '#15191e');
   }
 
   var pref = readLocal() || SERVER_PREF || 'dark';

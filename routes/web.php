@@ -15,6 +15,7 @@ use App\Http\Controllers\DesignAgentController;
 use App\Http\Controllers\StylistDataController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\ThemeController;
+use App\Http\Controllers\ThemeLibraryController;
 use App\Http\Controllers\UserCatalogController;
 use Illuminate\Support\Facades\Route;
 
@@ -100,6 +101,26 @@ Route::middleware(['auth', 'admin', 'nostore'])->get('/admin', [AdminController:
 // tính từ resources/css/app.css. Cấp OWNER: đây là công cụ nội bộ của người làm sản phẩm, không phải
 // trang cho khách (khách đã có "Cài đặt của tôi → Giao diện" để chọn Sáng/Tối).
 Route::middleware(['auth', 'admin', 'nostore'])->get('/he-thong-thiet-ke', [ThemeController::class, 'tokensPage'])->name('design-tokens.page');
+
+// [2026-09-25] THƯ VIỆN THEME — dán liên kết daisyUI Theme Generator vào để import, bật một theme
+// cho chế độ Sáng/Tối, hoặc quay về bảng màu gốc.
+//
+// Vì sao nằm ở đây (cấp OWNER, cạnh trang xem token) chứ không phải "Cài đặt của tôi": đổi bảng màu
+// là quyết định của SẢN PHẨM — nó đổi màu cho mọi khách, mọi trang. Còn "Cài đặt của tôi → Giao diện"
+// vẫn là chỗ mỗi người chọn Sáng/Tối/Theo hệ điều hành cho riêng mình.
+//
+// Vì sao KHÔNG đặt dưới /api: ba đường này là form POST của trình duyệt (đổi rồi quay lại trang kèm
+// thông báo), không phải endpoint cho app JS — và nhờ vậy chúng không bị công tắc gói chi phối.
+Route::middleware(['auth', 'admin', 'nostore'])->prefix('he-thong-thiet-ke')->name('theme.')->group(function () {
+    Route::post('/theme/import', [ThemeLibraryController::class, 'import'])->name('import');
+    // Đặt 'reset' TRƯỚC '/theme/{theme}/activate' không bắt buộc, nhưng đường dẫn phải khác nhau:
+    // {theme} là id số nên 'reset' không thể bị hiểu nhầm thành id.
+    Route::post('/theme/reset/{scheme}', [ThemeLibraryController::class, 'reset'])
+        ->whereIn('scheme', ['light', 'dark'])->name('reset');
+    Route::post('/theme/{theme}/activate', [ThemeLibraryController::class, 'activate'])->name('activate');
+    Route::delete('/theme/{theme}', [ThemeLibraryController::class, 'destroy'])->name('destroy');
+    Route::delete('/batch/{batch}', [ThemeLibraryController::class, 'destroyBatch'])->name('batch.destroy');
+});
 
 // [2026-09-23] BÁO CÁO CHI PHÍ THEO NHÓM cho chủ doanh nghiệp (nợ đã ghi trong DEPLOY_LOG):
 // gói cước đã có ghế, nhưng chủ nhóm không có chỗ nào nhìn ra "nhóm tôi tiêu bao nhiêu".

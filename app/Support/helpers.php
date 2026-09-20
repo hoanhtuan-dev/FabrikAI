@@ -2630,6 +2630,34 @@ if (! function_exists('theme_resolved')) {
     }
 }
 
+if (! function_exists('theme_color')) {
+    /**
+     * Màu thanh trình duyệt (meta theme-color) của chế độ ĐANG render.
+     *
+     * [2026-09-25] Trước đây là hai hằng số viết thẳng trong blade và trong partial JS ("#eef1f5" và
+     * "#15191e") — tức là chỗ thứ ba và thứ tư chứa bảng màu. Nay nó là NỀN TRANG của chính theme
+     * đang bật (App\Support\ThemeLibrary), nên import một theme mới là thanh trình duyệt đổi theo,
+     * không phải đi sửa hai chuỗi hex nằm rải rác.
+     */
+    function theme_color(): string
+    {
+        return \App\Support\ThemeLibrary::metaColors()[theme_resolved()] ?? '#15191e';
+    }
+}
+
+if (! function_exists('theme_meta_colors')) {
+    /**
+     * Màu thanh trình duyệt của CẢ HAI chế độ — script trong partials/theme.blade.php cần cả hai để
+     * đổi tức thì khi người dùng bấm Sáng/Tối (không chờ tải lại trang).
+     *
+     * @return array<string,string>
+     */
+    function theme_meta_colors(): array
+    {
+        return \App\Support\ThemeLibrary::metaColors();
+    }
+}
+
 
 /* ══════════════════════════════════════════════════════════════════════════════
    CỠ CHỮ TOÀN CỤC (2026-09-23) — cùng chỗ với theme, cùng cách xử lý.

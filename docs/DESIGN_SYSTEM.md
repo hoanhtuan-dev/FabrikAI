@@ -30,41 +30,60 @@
 > ≥ 4,5:1 cho chữ thường). Độ mờ trộn với NỀN nên tương phản phụ thuộc chỗ đặt — không kiểm soát
 > được. Nay: **4 bậc nội dung ĐẶC**, mỗi bậc đạt AA trên mọi bề mặt của **cả hai** theme.
 
-> **[2026-09-23 · bổ sung] Bảng màu lấy theo THEME daisyUI mà chủ dự án đưa làm tham chiếu.**
-> Học ở đây không phải "ý tưởng chung chung" mà là hai thứ ĐO ĐƯỢC: (a) **bộ tên token ngữ nghĩa** của
-> daisyUI, (b) **chính các giá trị màu** của theme đó cho nền và màu trạng thái. Màu **thương hiệu xanh
-> lá GIỮ NGUYÊN** và đóng vai `primary`. (Bài học của chính đợt này: đổi *cấu trúc* token mà giữ
-> *giá trị* cũ thì người dùng KHÔNG THẤY GÌ — xem §14 luật 41.)
+> **[2026-09-25 · ĐỔI GỐC] Bảng màu KHÔNG còn được viết tay — nó được SINH từ một theme daisyUI.**
+> Chủ dự án đưa một liên kết cụ thể: `daisyui.com/theme-generator/#theme=eJxtlOuO2yAQ…` (theme `dark`
+> của daisyUI). Đợt 2026-09-23 đã học **bộ tên token** của nó, nhưng **giá trị** thì vẫn viết tay — và
+> đo lại thì bảng viết tay đã TRÔI: `primary` còn là xanh lá `#2d6f4d` trong khi theme gốc là **tím
+> `#605dff`**, `secondary`/`accent` cũng lệch hẳn. Nay:
+>
+> - Liên kết được **đọc bằng đúng định dạng của daisyUI** (base64url + zlib) — xem
+>   `App\Support\DaisyThemeLink`; `resources/themes/daisyui-dark.theme.json` là payload gốc.
+> - **Toàn bộ** bảng màu (nền · 4 bậc chữ · 3 mức viền · dải brand 11 bậc · 8 màu vai trò + 8 màu chữ
+>   · bán kính · độ dày viền) là **hàm của 20 token của theme** — `App\Support\ThemeRamp`.
+> - `resources/css/app.css` là tệp ĐÃ SINH (`php artisan theme:sync`), có test canh lệch
+>   (`ThemeImportTest::test_the_builtin_theme_is_served_exactly_and_app_css_matches_it`).
+> - Chủ sản phẩm **import được theme mới** từ liên kết và bật theo từng chế độ: xem **§1.5 Thư viện theme**.
+>
+> Ba giá trị của theme gốc KHÔNG được giữ nguyên, và lý do là **đo được**: `primary-content` (4,13:1)
+> và `secondary-content` (3,04:1) do chính daisyUI đặt **dưới ngưỡng WCAG AA** — chúng được chỉnh
+> thành màu chữ đọc được, và mọi lần import đều BÁO RÕ những màu đã phải chỉnh.
 
 | Lớp | Token (dùng được ngay trong class) | Vai trò |
 |---|---|---|
 | **Bề mặt** (tên daisyUI) | `base-100 · base-200 · base-300` · `base-content` | nền card → panel → nền trang, và chữ trên chúng. Trỏ vào dải `ink-*`/`cream-*` nên tự đúng ở cả hai theme |
 | **Bề mặt** (tên cũ của app) | `ink-950 · 900 · 800 · 700 · 600 · 500` | y hệt `base-*`, chỉ khác tên (3.000+ chỗ đang dùng) |
 | **Nội dung** | `cream-100 · 200 · 300 · 400` (+ `cream-50`) | 4 bậc chữ/icon: chính → phụ → ghi chú → ghi chú rất phụ |
-| **Thương hiệu** | `brand-50 … brand-950` → `primary` (+ `primary-content`) | nút chính · đang chọn · nhấn mạnh |
+| **Thương hiệu** | `brand-50 … brand-950` → `primary` (+ `primary-content`) | nút chính · đang chọn · nhấn mạnh. Dải brand là HÀM của `primary`: 50–300 là bậc CHỮ (đạt AA), 400–600 là nút/viền, 700–950 là nền tint |
 | **Điểm nhấn phụ** | `clay-500/600` → `secondary` · `gold-400/500` → `accent` · `neutral` | nhãn phụ · cảnh báo mềm (layer khoá) · nền chìm |
 | **Trạng thái** | `error · warning · success · info` (+ mỗi cái một `-content`) | chữ/viền/badge; tint bằng alpha (`bg-error/10 · border-warning/40`). Bí danh cũ `danger · warn · ok` trỏ về đây |
 | **CỐ ĐỊNH** (không theo theme) | `invert · invert-content · invert-hover · on-accent` · `canvas-*` · `scrim(-content)` | khối đảo màu · chữ trên nền màu · nền canvas · lớp phủ trên ảnh |
 
-**Giá trị nền/màu trạng thái lấy từ theme tham chiếu** (oklch → hex, tính bằng công thức):
+**Giá trị của theme gốc** (oklch → hex, tính bằng công thức; cột Sáng là bản đối ứng tự sinh):
 
-| Vai | Theme TỐI (đang chạy) | Theme SÁNG |
+| Vai | Chế độ TỐI (đúng theme gốc) | Chế độ SÁNG (bản đối ứng) |
 |---|---|---|
-| Nền trang · panel · card | `#15191e · #191e24 · #1d232a` (xám nguội) | `#eef1f5 · #f7f9fb · #ffffff` |
-| Chữ chính | `#ecf9ff` (base-content của theme tham chiếu) | `#121821` |
-| Lỗi · cảnh báo · thành công · thông tin | `#ff627d · #fcb700 · #00d390 · #00bafe` | `#b3261e · #7a5000 · #116b4c · #0b5d8f` |
-| Thương hiệu (GIỮ NGUYÊN) | `#2d6f4d` (primary) | `#2d6f4d` |
+| Nền trang · panel · card | `#15191e · #191e24 · #1d232a` | `#e5eef8 · #eff8ff · #f6feff` |
+| Chữ chính (base-content) | `#ecf9ff` | `#1c262a` |
+| Nhấn (`primary`) | `#605dff` (tím) | `#605dff` — **giống hệt**: đổi chế độ KHÔNG đổi màu nhận diện |
+| Phụ · điểm nhấn (`secondary` · `accent`) | `#f43098` · `#00d3bb` | `#f43098` · `#00d3bb` |
+| Trung tính (`neutral`) | `#09090b` | `#09090b` |
+| Lỗi · cảnh báo · thành công · thông tin | `#ff627d · #fcb700 · #00d390 · #00bafe` (ĐÚNG theme gốc) | `#b54357 · #8b6400 · #007a52 · #00729e` (hạ sắc độ để đạt AA trên nền sáng) |
+| Hình học (bán kính · viền) | `0.5 / 0.25 / 0.5rem` · `1px` | y hệt (không đổi theo chế độ) |
 
 **Bảng tương phản đã đo** (độ chói tương đối theo WCAG 2.1, giữ bằng `tests/Feature/ThemeSystemTest.php`):
 
-| Bậc nội dung | Theme tối · trên card | Theme sáng · trên card | Ngưỡng |
+| Bậc nội dung | Chế độ tối (trên card / xấu nhất) | Chế độ sáng (trên card / xấu nhất) | Ngưỡng |
 |---|---|---|---|
-| `cream-100` (chính) | 14,8 : 1 | 17,8 : 1 | ≥ 4,5 |
-| `cream-200` | 11,0 : 1 | 13,0 : 1 | ≥ 4,5 |
-| `cream-300` (phụ) | 7,8 : 1 | 8,7 : 1 | ≥ 4,5 |
-| `cream-400` (ghi chú) | 6,0 : 1 | 6,0 : 1 | ≥ 4,5 |
-| `brand-300` · `error` · `warning` · `success` · `info` | 5,0 – 9,5 : 1 | 5,4 – 6,2 : 1 | ≥ 4,5 |
-| chữ trắng trên nút `primary` | 6,0 : 1 | 6,0 : 1 | ≥ 4,5 |
+| `cream-100` (chính) | 14,75 / 12,57 | 15,10 / 13,00 | ≥ 4,5 |
+| `cream-200` | 9,99 / 8,51 | 9,93 / 8,55 | ≥ 4,5 |
+| `cream-300` (phụ) | 7,07 / 6,03 | 7,01 / 6,04 | ≥ 4,5 |
+| `cream-400` (ghi chú) | 5,52 / 4,71 | 5,49 / 4,73 | ≥ 4,5 |
+| `brand-300` · `error` · `warning` · `success` · `info` | 4,69 – 7,66 | 4,51 – 10,51 | ≥ 4,5 |
+| chữ trắng trên nút `brand-600` | 4,66 | 4,66 | ≥ 4,5 |
+
+> **Bậc 400 nằm SÁT ngưỡng là cố ý.** Ba bậc phụ (200 · 300 · 400) được sinh bằng cách pha màu chữ về
+> phía nền **xa nhất mà vẫn còn đạt tỉ lệ mục tiêu** (8,5 : 1 · 6,0 : 1 · 4,7 : 1). Nhờ vậy thang bậc
+> dùng hết dải tương phản cho phép, thay vì bậc mờ nhất rơi xuống dưới AA khi ai đó đổi theme.
 
 **Bảy quy tắc:**
 
@@ -110,12 +129,21 @@
 | Hàm PHP | `theme_pref()` (mặc định `dark` khi chưa chọn) · `theme_resolved()` (`system` ⇒ trả `dark`, script sửa lại trước khi vẽ) |
 | Hàm JS | `window.FabrikAITheme` · bọc Vue: `composables/useTheme.js` |
 | **Xem bảng token + tỉ lệ tương phản** | **`/he-thong-thiet-ke`** (cấp OWNER, server-render) — đọc thẳng `resources/css/app.css` qua `App\Support\ThemePalette`, CÙNG lớp mà `ThemeSystemTest` dùng nên trang và test không thể lệch số |
+| **Bảng màu đang bật (khi Quản trị viên đã import theme)** | `resources/views/partials/theme.blade.php` phát thêm `<style id="fabrikai-theme-override">` **trong `<head>`** — server render, nên không nháy màu. Rỗng khi đang dùng theme gốc (bảng màu đó đã nằm trong app.css) |
+| **Màu thanh trình duyệt** | `theme_color()` / `theme_meta_colors()` — lấy NỀN TRANG của chính theme đang bật, không phải hằng số hex trong blade |
 
 **Đo lại bằng Chrome thật (2026-09-23)** — bốn màn hình (bảng giá · Studio · Cài đặt của tôi ·
 Bộ sưu tập) × hai theme, **2.578 phần tử chữ mỗi theme**: **0 chỗ** dưới ngưỡng WCAG AA. Phép đo
 tính cả alpha của nền (nền trong suốt được trộn lên), nên nó bắt được cả những chỗ mà mắt thường
 bỏ qua — và chính nó tìm ra hai lỗi còn sót sau khi đã đổi token: chip trạng thái (dùng mã hex của
 server cho phần chữ ⇒ 2,7–3,0:1) và chip đặt trên ảnh (chữ theo theme ⇒ 2,9:1 trên scrim tối).
+
+> **[2026-09-25] Phép đo Chrome ở trên thuộc bảng màu CŨ.** Bảng màu hiện tại khác hẳn (§1.1: primary
+> từ xanh lá sang tím), nên phép đo đó KHÔNG còn là bằng chứng cho giao diện đang chạy. Thứ đang giữ
+> chuẩn lúc này là **bất biến số**: `ThemeImportTest::test_both_schemes_meet_wcag_aa_after_any_import`
+> (mọi bậc chữ + màu trạng thái + chữ trắng trên nút, ở cả hai chế độ, kể cả với theme import về) và
+> `ThemeSystemTest`. **Việc còn nợ: chạy lại phép đo Chrome** trên bốn màn hình với bảng màu mới —
+> ghi ở §6.6.
 
 Ba quyết định đáng nhớ:
 
@@ -127,6 +155,57 @@ Ba quyết định đáng nhớ:
   phải đổi được theme.
 - **Không bị công tắc gói chặn**: `/api/theme` nằm ngoài nhóm `can-studio` và không thuộc module nào
   (đã khai `'theme'` vào `INFRA_PREFIXES` của `ModuleRegistryTest`) — giao diện là quyền của mọi tài khoản.
+
+### 1.5 Thư viện theme — import từ liên kết daisyUI (2026-09-25)
+
+Chủ sản phẩm dán liên kết từ `daisyui.com/theme-generator` vào **`/he-thong-thiet-ke`** (cấp OWNER) và
+bấm **Import**. Mỗi liên kết được lưu thành **NHIỀU theme**, và mỗi chế độ (Sáng/Tối) có **đúng một**
+theme đang bật.
+
+| Việc | Ở đâu |
+|---|---|
+| Đọc liên kết (base64url + zlib → JSON, có trần chống bom nén) | `App\Support\DaisyThemeLink` |
+| Kiểm payload (allowlist khoá + giá trị màu + đơn vị) | `App\Support\DaisyTheme` |
+| Sinh bảng token từ theme (AA ép bằng số) | `App\Support\ThemeRamp` · toán màu: `App\Support\ThemeColor` |
+| Sinh bản đối ứng Sáng ⇄ Tối | `App\Support\ThemeDeriver` |
+| Thư viện (import · bật · xoá · hoàn tác lô · CSS ghi đè) | `App\Support\ThemeLibrary` + bảng `themes` |
+| Giao diện | `ThemeLibraryController` + `resources/views/studio/design-tokens.blade.php` |
+| Sinh lại bảng màu trong app.css | `php artisan theme:sync` (thêm `--check` cho CI) |
+
+**Vì sao mỗi lần import lưu NHIỀU theme.** Payload của Theme Generator chỉ chứa MỘT theme (`"color-scheme"`
+chỉ có một giá trị). Nhưng sản phẩm luôn có hai chế độ và người dùng đổi qua lại bất cứ lúc nào — import
+một theme Tối mà chế độ Sáng vẫn là bảng màu cũ thì hai chế độ nói hai thứ tiếng khác nhau. Nên mỗi liên
+kết sinh ra: **bản gốc** + **bản đối ứng** (giữ hue, đổi bậc sáng theo chuẩn của chế độ đích, hạ sắc độ
+màu trạng thái cho đạt AA). Dán nhiều liên kết một lượt thì nhân lên; mọi theme của cùng một lần dán mang
+chung một mã lô để **hoàn tác cả lô** bằng một nút.
+
+**Bốn bất biến (giữ bằng `tests/Feature/ThemeImportTest.php`):**
+
+1. **Không giá trị nào vào CSS mà chưa qua allowlist.** Giá trị của theme đi thẳng vào `<style>` của MỌI
+   trang ⇒ đây là đường XSS nếu lớp kiểm hở. Chỉ nhận `#rgb/#rrggbb · oklch() · rgb() · hsl()` (không
+   alpha), độ dài phải là số + `px/rem/em`, công tắc chỉ 0/1; khoá lạ bị BỎ QUA chứ không phát ra. Có
+   chốt chặn thứ hai ngay trước khi ghép chuỗi (`ThemeRamp::verified`, `ThemeLibrary::cssBlock`).
+2. **Mọi bậc chữ và màu trạng thái đạt WCAG AA ở CẢ HAI chế độ** — kể cả với một theme import về có
+   bảng màu hoàn toàn khác. Màu NHẬN DIỆN (`primary · secondary · accent · neutral`) thì lấy ĐÚNG giá
+   trị của theme: tự ý chỉnh chúng là theme import về không còn giống thứ người dùng thấy trên trang
+   Theme Generator.
+3. **Màu nào phải chỉnh thì NÓI RA.** daisyUI không ràng buộc AA (chính theme mặc định của nó có hai cặp
+   màu chữ dưới ngưỡng). Thông báo sau khi import liệt kê đúng những token đã phải chỉnh.
+4. **Một chế độ = một theme đang bật.** Con trỏ nằm ở bảng `settings` (`theme.active_dark` ·
+   `theme.active_light`) chứ không phải một cột boolean trên `themes` — hai cột boolean thì hai dòng
+   cùng bật được. Xoá theme đang bật ⇒ chế độ đó tự quay về theme gốc; nút **"Dùng bảng màu gốc"** cho
+   đường quay về mà không phải xoá gì.
+
+**Quy trình khi đổi theme gốc:**
+
+```bash
+# 1. Lấy payload mới (dán liên kết vào trang Theme Generator, hoặc dùng chính liên kết khách đưa)
+#    rồi cập nhật resources/themes/daisyui-dark.theme.json
+php artisan theme:sync        # 2. sinh lại bảng màu trong resources/css/app.css
+php artisan theme:sync --check # 3. CI: khác ⇒ mã lỗi 1 (test cũng gọi đường này)
+php artisan test tests/Feature/ThemeImportTest.php tests/Feature/ThemeSystemTest.php
+npm run build                 # 4. CSS bán cho khách
+```
 
 ### 1.2 Chuyển động — token, không viết số
 
@@ -425,6 +504,10 @@ chặn §6.3, còn `message` kỹ thuật chỉ đi vào log.
 
 - Vài câu lỗi còn dài dòng kiểu hệ thống ("Lỗi hệ thống, vui lòng thử lại.") — nên nói rõ người dùng
   làm gì tiếp.
+- **[2026-09-25] Đo lại tương phản bằng Chrome thật với bảng màu mới** (đổi gốc ở §1.1). Phép đo
+  2026-09-23 (2.578 phần tử chữ × 2 theme, 0 chỗ dưới AA) thuộc bảng màu CŨ — nó từng bắt được hai lỗi
+  mà bất biến số không thấy (chip trạng thái 2,7–3,0:1 · chip trên ảnh 2,9:1), nên nó vẫn là bước kiểm
+  cuối đáng làm sau mỗi lần đổi bảng màu.
 
 ---
 

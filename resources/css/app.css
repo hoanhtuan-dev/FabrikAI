@@ -32,86 +32,104 @@
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
     --font-display: 'Fraunces', ui-serif, Georgia, serif;
 
-    --color-brand-50: #f0f7f2;
-    --color-brand-100: #dcece1;
-    --color-brand-200: #b6d9c4;
-    --color-brand-300: #85bd9f;
-    --color-brand-400: #559b78;
-    --color-brand-500: #38815a;
-    --color-brand-600: #2d6f4d;
-    --color-brand-700: #265d40;
-    --color-brand-800: #1f4d36;
-    --color-brand-900: #193d2b;
-    --color-brand-950: #0d2619;
+    /* ══ BẢNG MÀU — KHỐI SINH TỰ ĐỘNG, KHÔNG SỬA TAY ═══════════════════════════════════════
+       [2026-09-25] Từ đây bảng màu KHÔNG còn được viết tay. Nó được sinh bởi
+       "php artisan theme:sync" từ resources/themes/daisyui-dark.theme.json — đúng payload của
+       một liên kết daisyUI Theme Generator (xem docs/DESIGN_SYSTEM.md §1.1).
 
-    /* ── HAI DẢI NGỮ NGHĨA (docs/DESIGN_SYSTEM.md §1.1) ────────────────────────────────
-       ink-*   = BỀ MẶT: nền trang → panel → card → nền nổi → viền → viền mờ.
-       cream-* = NỘI DUNG: chữ/icon theo 4 bậc (50 chính → 400 ghi chú phụ).
-       Giá trị dưới đây là của theme TỐI (mặc định). Theme SÁNG ĐẢO VAI hai dải này
-       (khối [data-theme='light'] ngay sau @theme) nên mọi class sẵn có
-       (bg-ink-800 · text-cream-200 · border-ink-700 …) đúng ở CẢ HAI theme mà không phải
-       sửa markup. Mọi bậc nội dung đạt WCAG AA (≥ 4.5:1) trên mọi bề mặt. */
-    --color-cream-50: #f7fcff;
-    --color-cream-100: #ecf9ff;
-    --color-cream-200: #cdd9e4;
-    --color-cream-300: #a9b8c6;
-    --color-cream-400: #93a1b0;
+       Vì sao đổi từ viết tay sang sinh: bảng viết tay TRÔI khỏi theme gốc lúc nào không biết —
+       đợt này đo được primary/secondary/accent đã lệch hẳn so với theme người dùng đưa, và bốn
+       bậc chữ · ba mức viền · dải brand 11 bậc thì không có cách nào suy ra nhất quán bằng tay.
+       Nay mọi bậc đều là hàm của 20 token của theme (App\Support\ThemeRamp), và
+       ThemeSystemTest khoá lại: sinh lại rồi so với tệp này, lệch một ký tự là đỏ.
 
-    --color-ink-900: #191e24;
-    --color-ink-700: #232a33;
-    --color-ink-500: #4d5866;
-    --color-ink-800: #1d232a;
-    /* Studio workspace — bù các level studio SFC đang dùng mà theme thiếu
-       (trước đây class không sinh CSS trên production). */
-    --color-ink-600: #333c47;
+       Sửa tay khối dưới đây sẽ bị lần chạy theme:sync kế tiếp ghi đè. */
+    /* @theme:sync:start */
+    /* ── theme gốc · chế độ TỐI · 50 token · sinh bởi "php artisan theme:sync" ── */
+    /* BỀ MẶT (nền trang → panel → card → ba mức viền) */
     --color-ink-950: #15191e;
+    --color-ink-900: #191e24;
+    --color-ink-800: #1d232a;
+    --color-ink-700: #292f37;
+    --color-ink-600: #3d444b;
+    --color-ink-500: #5e666d;
 
-    --color-clay-500: #b56a37;
-    --color-clay-600: #9a5227;
-    --color-gold-400: #d9b36c;
-    --color-gold-500: #c9a45f;
+    /* BỐN BẬC NỘI DUNG (chữ chính → ghi chú phụ; mọi bậc đạt WCAG AA) */
+    --color-cream-50: #f3fbff;
+    --color-cream-100: #ecf9ff;
+    --color-cream-200: #c4cfd6;
+    --color-cream-300: #a4afb5;
+    --color-cream-400: #909aa1;
+
+    /* DẢI NHẤN (50–300 là bậc CHỮ, 400–600 là nút/viền, 700–950 là nền tint) */
+    --color-brand-50: #f0f3ff;
+    --color-brand-100: #d7deff;
+    --color-brand-200: #bcc6ff;
+    --color-brand-300: #9ba7ff;
+    --color-brand-400: #8590ff;
+    --color-brand-500: #7178ff;
+    --color-brand-600: #605dff;
+    --color-brand-700: #3f4599;
+    --color-brand-800: #333b75;
+    --color-brand-900: #293154;
+    --color-brand-950: #222a3d;
+
+    /* HAI DẢI PHỤ (badge: clay ← secondary · gold ← accent) */
+    --color-clay-500: #f43098;
+    --color-clay-600: #bb2274;
+    --color-gold-400: #5fdcc7;
+    --color-gold-500: #00d3bb;
+
+    /* MÀU VAI TRÒ CỦA THEME (mỗi màu kèm màu chữ "-content") */
+    --color-primary: #605dff;
+    --color-primary-content: #ffffff;
+    --color-secondary: #f43098;
+    --color-secondary-content: #000000;
+    --color-accent: #00d3bb;
+    --color-accent-content: #084d49;
+    --color-neutral: #09090b;
+    --color-neutral-content: #e4e4e7;
+    --color-info: #00bafe;
+    --color-info-content: #042e49;
+    --color-success: #00d390;
+    --color-success-content: #004c39;
+    --color-warning: #fcb700;
+    --color-warning-content: #793205;
+    --color-error: #ff627d;
+    --color-error-content: #4d0218;
+
+    /* HÌNH HỌC (từ theme: bán kính · kích thước · độ dày viền · độ sâu) */
+    --radius-selector: 0.5rem;
+    --radius-field: 0.25rem;
+    --radius-box: 0.5rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 0;
+    /* @theme:sync:end */
 
     /* ── LỚP NGỮ NGHĨA THEO ĐÚNG BỘ TÊN CỦA daisyUI ──────────────────────────────────────
        [2026-09-23] Người dùng đưa một theme daisyUI để tham chiếu. Bộ tên của nó nay là lớp
        NGỮ NGHĨA CHÍNH của FabrikAI (dùng được ngay: bg-base-100 · text-base-content ·
-       bg-primary text-primary-content · text-success · bg-error/10 …), còn các tên cũ của app
-       (ink/cream/danger/warn/ok/info) trở thành BÍ DANH trỏ về đây — nhờ vậy 3.000+ chỗ đang
-       dùng tên cũ không phải sửa, mà vẫn chỉ có MỘT nguồn giá trị.
-       Vì lớp này trỏ vào dải ink/cream (đổi theo theme), nó tự đúng ở cả Sáng lẫn Tối. */
-    --color-base-100: var(--color-ink-800);      /* bề mặt CHÍNH (card) — nền sáng nhất của theme tối */
+       bg-primary text-primary-content · text-success · bg-error/10 …).
+
+       [2026-09-25] Phân vai rõ hơn, sau khi bảng màu chuyển sang sinh tự động:
+         · Màu VAI TRÒ (primary · secondary · accent · neutral · info · success · warning ·
+           error + cặp -content) lấy ĐÚNG giá trị của theme — chúng nằm trong khối sinh ở trên.
+         · BỐN BỀ MẶT (base-100/200/300 · base-content) là BÍ DANH của dải ink/cream: cùng một
+           bề mặt, hai cách gọi tên. Nhờ vậy 3.000+ chỗ dùng tên cũ của app (bg-ink-800 ·
+           text-cream-200 · border-ink-700 …) chạy nguyên mà vẫn chỉ có MỘT nguồn giá trị.
+         · danger · warn · ok là bí danh của error · warning · success (mã cũ của app). */
+    --color-base-100: var(--color-ink-800);      /* bề mặt CHÍNH (card) */
     --color-base-200: var(--color-ink-900);      /* bề mặt panel, chìm hơn card */
     --color-base-300: var(--color-ink-950);      /* nền trang, chìm nhất */
     --color-base-content: var(--color-cream-100); /* chữ trên base-* */
-    --color-primary: var(--color-brand-600);     /* GIỮ NGUYÊN xanh lá thương hiệu */
-    --color-primary-content: #ffffff;
-    --color-secondary: var(--color-clay-500);
-    --color-secondary-content: #1a1204;
-    --color-accent: var(--color-gold-500);
-    --color-accent-content: #1a1204;
-    --color-neutral: #09090b;                    /* đúng giá trị neutral của theme tham chiếu */
-    --color-neutral-content: #e4e4e7;
-
-    /* ── MÀU TRẠNG THÁI — lấy ĐÚNG sắc độ của theme tham chiếu (tươi hơn bảng pastel cũ) ──
-       Trên nền nhạt dùng chính token này với alpha: bg-error/10 · border-warning/40 …
-       Bốn bí danh bên dưới giữ cho mã cũ (text-danger · text-ok · text-warn) chạy nguyên. */
-    --color-error: #ff627d;
-    --color-error-content: #4d0218;
-    --color-warning: #fcb700;
-    --color-warning-content: #793205;
-    --color-success: #00d390;
-    --color-success-content: #004c39;
-    --color-info: #00bafe;
-    --color-info-content: #042e49;
     --color-danger: var(--color-error);
     --color-warn: var(--color-warning);
     --color-ok: var(--color-success);
 
-    /* ── HAI TOKEN CỐ ĐỊNH (KHÔNG đổi theo theme) ────────────────────────────────────
-       invert / invert-content: khối ĐẢO màu so với bề mặt (nút "đang bật" kiểu đảo,
-         hover của .btn-outline) — theme tối thì khối sáng, theme sáng thì khối tối.
-       on-accent: chữ/icon đặt TRÊN nền màu đậm/bão hoà (bg-amber-500 · bg-brand-500 ·
-         bg-white…) — nền đó không theo theme nên chữ cũng không được theo. */
-    /* NỀN CANVAS — token CỐ ĐỊNH (không khai lại ở [data-theme='light']): canvas là MÔI TRƯỜNG
+    /* ── NỀN CANVAS — token CỐ ĐỊNH (không khai lại ở [data-theme='light']): canvas là MÔI TRƯỜNG
        ẢNH, người dùng chọn "Trắng"/"Kem" để nhìn ảnh; nếu theo theme thì ở theme sáng "nền kem"
        sẽ thành nền đen và họ mất đúng thứ vừa chọn. */
     --color-canvas-dark: #0e0d09;
@@ -124,6 +142,8 @@
     --color-scrim: #0e0d09;
     --color-scrim-content: #faf9f6;
 
+    /* KHỐI ĐẢO MÀU + chữ trên nền màu đậm: hai cực cố định, đổi theo theme ở khối
+       [data-theme='light'] bên dưới (theme tối ⇒ khối sáng, theme sáng ⇒ khối tối). */
     --color-invert: #f4f2ec;
     --color-invert-content: #17150f;
     /* Hover của khối đảo màu: cùng CỰC với invert (theme tối ⇒ sáng hơn, theme sáng ⇒ tối hơn)
@@ -189,20 +209,25 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   HỆ THỐNG THEME — hai theme, MỘT bảng token (docs/DESIGN_SYSTEM.md §1.1)
+   HỆ THỐNG THEME — hai chế độ, MỘT bảng token (docs/DESIGN_SYSTEM.md §1.1)
 
-   · data-theme="dark" trên thẻ html  → theme TỐI (mặc định, giao diện đang dùng)
-   · data-theme="light" trên thẻ html → theme SÁNG
+   · data-theme="dark" trên thẻ html  → chế độ TỐI (mặc định, giao diện đang dùng)
+   · data-theme="light" trên thẻ html → chế độ SÁNG
    Thuộc tính do server render theo tùy chọn đã lưu của tài khoản, và được
    resources/views/partials/theme.blade.php cập nhật tức thì khi người dùng đổi.
+
+   [2026-09-25] Cả hai khối nay đều chứa một KHỐI SINH TỰ ĐỘNG (theme:sync) — chế độ TỐI là
+   chính theme gốc, chế độ SÁNG là bản đối ứng do App\Support\ThemeDeriver sinh ra (giữ hue,
+   đổi bậc sáng, hạ sắc độ màu trạng thái cho đạt WCAG AA). Theme Quản trị viên import thêm sẽ
+   được phát thành <style> ngay trong <head> và ghi đè đúng khối này (App\Support\ThemeLibrary).
 
    Vì sao khối này nằm NGOÀI layer: biến do @theme sinh ra nằm trong layer theme, mà CSS
    không-layer luôn thắng CSS có layer ⇒ khối dưới đây ghi đè được toàn bộ tiện ích
    (bg-ink-800, text-cream-200, border-ink-700…) mà KHÔNG phải viết lại class nào.
 
-   Quy tắc ĐẢO VAI của theme sáng: ink-* trở thành BỀ MẶT SÁNG, cream-* trở thành
-   NỘI DUNG TỐI. Nhờ vậy "bg-ink-800 text-cream-100" là card tối/chữ sáng ở theme tối và
-   card trắng/chữ đen ở theme sáng — CÙNG một markup, không nhân đôi class.
+   Quy tắc ĐẢO VAI của chế độ sáng: ink-* trở thành BỀ MẶT SÁNG, cream-* trở thành
+   NỘI DUNG TỐI. Nhờ vậy "bg-ink-800 text-cream-100" là card tối/chữ sáng ở chế độ tối và
+   card trắng/chữ đen ở chế độ sáng — CÙNG một markup, không nhân đôi class.
    ═══════════════════════════════════════════════════════════════════════════ */
 [data-theme='dark'] {
     color-scheme: dark;
@@ -213,57 +238,62 @@
 [data-theme='light'] {
     color-scheme: light;
 
-    /* Bề mặt — trung tính NGUỘI, đồng bộ với dải base-* của theme tham chiếu */
-    --color-ink-950: #eef1f5;
-    --color-ink-900: #f7f9fb;
-    --color-ink-800: #ffffff;
-    --color-ink-700: #e7ebf0;
-    --color-ink-600: #cbd3dc;
-    --color-ink-500: #9aa5b1;
+    /* @theme:sync:start */
+    /* ── bản đối ứng · chế độ SÁNG · 42 token · sinh bởi "php artisan theme:sync" ── */
+    /* BỀ MẶT (nền trang → panel → card → ba mức viền) */
+    --color-ink-950: #e5eef8;
+    --color-ink-900: #eff8ff;
+    --color-ink-800: #f6feff;
+    --color-ink-700: #e5edee;
+    --color-ink-600: #cad3d4;
+    --color-ink-500: #a2abae;
 
-    /* Nội dung */
-    --color-cream-50: #0a0e13;
-    --color-cream-100: #121821;
-    --color-cream-200: #29323d;
-    --color-cream-300: #414c59;
-    /* #525c67 (không phải #59646f): bậc chữ mờ nhất còn phải đạt AA 4,5:1 KỂ CẢ khi nằm trên
-       hàng đang chọn có nền tint brand-600/20 (nền tint làm nền tối đi ⇒ 4,46:1 là THIẾU).
-       Đo lại sau khi đổi: 4,97:1 trên nền tint · 6,81:1 trên nền trắng. */
-    --color-cream-400: #525c67;
+    /* BỐN BẬC NỘI DUNG (chữ chính → ghi chú phụ; mọi bậc đạt WCAG AA) */
+    --color-cream-50: #0b1013;
+    --color-cream-100: #1c262a;
+    --color-cream-200: #394347;
+    --color-cream-300: #50595d;
+    --color-cream-400: #60696d;
 
-    /* Thương hiệu: GIỮ NGUYÊN cây xanh lá (#2d6f4d là màu nhận diện), chỉ đổi sắc độ theo VAI TRÒ
-       — vì ở theme tối cùng một bậc vừa dùng làm CHỮ vừa dùng làm NỀN TINT, mà hai vai đó cần
-       hai cực sáng/tối ngược nhau:
-         · brand-100 · 200 · 300 → CHỮ NHẤN trên nền sáng ⇒ phải ĐẬM (theme tối: nhạt).
-         · brand-700 … 950      → NỀN TINT (bg-brand-900/20 …) ⇒ phải NHẠT, để chữ đậm ở trên đọc được.
-         · brand-400 · 500 · 600 → VIỀN/NÚT, giữ nguyên vai trò ở cả hai theme. */
-    --color-brand-100: #0f5740;
-    --color-brand-200: #14614a;
-    --color-brand-300: #1f6b4d;
-    --color-brand-400: #3a8763;
-    --color-brand-500: #27714f;
-    --color-brand-600: #2d6f4d;
-    --color-brand-700: #cbe3d6;
-    --color-brand-800: #d8eade;
-    --color-brand-900: #e2f0e7;
-    --color-brand-950: #ecf5f0;
+    /* DẢI NHẤN (50–300 là bậc CHỮ, 400–600 là nút/viền, 700–950 là nền tint) */
+    --color-brand-50: #f0f3ff;
+    --color-brand-100: #04041b;
+    --color-brand-200: #131242;
+    --color-brand-300: #2a287a;
+    --color-brand-400: #3b39a4;
+    --color-brand-500: #4d4bd1;
+    --color-brand-600: #605dff;
+    --color-brand-700: #9cabff;
+    --color-brand-800: #b6c5ff;
+    --color-brand-900: #d0ddff;
+    --color-brand-950: #e5efff;
 
-    /* Trạng thái — ở theme SÁNG, bốn token này là CHỮ nên phải ĐẬM (bộ sắc độ tươi của theme
-       tham chiếu chỉ hợp làm NỀN ở đây; chữ trên nền trắng thì phải đạt AA).
-       #7a5000 (không phải #8a5a00): trên nền TINT của chính nó (bg-warning/15) mã cũ chỉ đạt
-       4,38:1 — thiếu 0,12 so với ngưỡng AA. Đo bằng Chrome thật, không đoán. */
-    --color-error: #b3261e;
-    --color-warning: #7a5000;
-    --color-success: #116b4c;
-    --color-info: #0b5d8f;
-    --color-error-content: #ffffff;
-    --color-warning-content: #ffffff;
-    --color-success-content: #ffffff;
+    /* HAI DẢI PHỤ (badge: clay ← secondary · gold ← accent) */
+    --color-clay-500: #f43098;
+    --color-clay-600: #bb2274;
+    --color-gold-400: #00786a;
+    --color-gold-500: #00d3bb;
+
+    /* MÀU VAI TRÒ CỦA THEME (mỗi màu kèm màu chữ "-content") */
+    --color-primary: #605dff;
+    --color-primary-content: #ffffff;
+    --color-secondary: #f43098;
+    --color-secondary-content: #000000;
+    --color-accent: #00d3bb;
+    --color-accent-content: #084d49;
+    --color-neutral: #09090b;
+    --color-neutral-content: #e4e4e7;
+    --color-info: #00729e;
     --color-info-content: #ffffff;
-    --color-secondary-content: #ffffff;
-    --color-accent-content: #241703;
+    --color-success: #007a52;
+    --color-success-content: #ffffff;
+    --color-warning: #8b6400;
+    --color-warning-content: #ffffff;
+    --color-error: #b54357;
+    --color-error-content: #ffffff;
+    /* @theme:sync:end */
 
-    /* Khối đảo màu: ở theme sáng là khối TỐI */
+    /* Khối đảo màu: ở chế độ sáng là khối TỐI */
     --color-invert: #211f18;
     --color-invert-content: #f7f5ef;
     --color-invert-hover: #35322a;
@@ -271,6 +301,7 @@
     --scrollbar-thumb: rgba(107, 102, 87, 0.28);
     --scrollbar-thumb-hover: rgba(107, 102, 87, 0.45);
 }
+
 
 @layer base {
     :root {

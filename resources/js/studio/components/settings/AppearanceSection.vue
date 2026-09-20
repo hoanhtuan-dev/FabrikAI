@@ -109,11 +109,17 @@ async function choose(id) {
 
     <!-- Một dòng nói RÕ nguồn gốc bảng màu: người dùng đã đưa một theme daisyUI để tham chiếu. -->
     <div class="mt-3 space-y-2">
+      <!-- [2026-09-25] Câu này đã đổi: bảng màu KHÔNG còn là một danh sách hex viết tay trong app.css
+           (đợt đó primary/secondary/accent đã lệch khỏi theme người dùng đưa). Nay nó được sinh từ một
+           theme daisyUI thật — xem resources/themes/ và docs/DESIGN_SYSTEM.md §1.1. -->
       <p class="rounded-lg border border-base-300 bg-base-100 p-3 text-label leading-relaxed text-cream-200">
-        <b class="text-base-content">Bảng màu:</b> nền và màu trạng thái lấy theo <b class="text-base-content">bộ token của daisyUI</b>
+        <b class="text-base-content">Bảng màu:</b> toàn bộ bảng màu được <b class="text-base-content">sinh từ một theme daisyUI</b>
         (<span class="font-mono">base-100 · base-200 · base-300 · base-content · primary · secondary · accent · neutral ·
-        info · success · warning · error</span> cùng cặp <span class="font-mono">-content</span>) — xem bảng đầy đủ kèm tỉ lệ tương phản
-        ở <span class="font-mono">/he-thong-thiet-ke</span> (cấp Owner). Màu <b class="text-base-content">thương hiệu xanh lá vẫn giữ nguyên</b> và đóng vai <span class="font-mono">primary</span>.
+        info · success · warning · error</span> cùng cặp <span class="font-mono">-content</span>) — nền, màu nhấn, màu trạng thái
+        lẫn bán kính/độ dày viền đều lấy từ đó. Chủ sản phẩm có thể dán liên kết từ
+        <span class="font-mono">daisyui.com/theme-generator</span> để đổi theme tại
+        <span class="font-mono">/he-thong-thiet-ke</span> (cấp Owner); bảng đầy đủ kèm tỉ lệ tương phản của
+        theme đang chạy cũng nằm ở đó.
       </p>
       <p class="rounded-lg border border-base-300 bg-base-100 p-3 text-label leading-relaxed text-cream-200">
         Mọi bậc chữ đạt chuẩn <b class="text-base-content">WCAG AA</b> (≥ 4.5:1 trên nền của nó) — đo bằng công thức tương phản,
