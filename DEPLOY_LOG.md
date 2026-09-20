@@ -1087,3 +1087,76 @@ Thẻ `@imageN` **không còn lọt** vào prompt cuối — đã dịch hết t
 
 - Quy ước này áp dụng cho MỌI prompt của Studio, kể cả khi người dùng tự viết — nên viết `@imageN` là an toàn.
 - Card «Ghép trang phục» (`mode='outfit'`) vẫn để backend tự dựng prompt nên không bị ảnh hưởng bởi thay đổi này.
+
+---
+
+## Phiên 2026-09-22 (Đợt 15 — Card «Gợi ý từ ảnh» theo chuẩn chung + HƯỚNG DẪN PHONG CÁCH THIẾT KẾ + ĐỒNG BỘ VIỀN nút)
+
+**Deploy:** `636ab96 → 7f3da11` (2 commit: `eb324fd` tinh chỉnh card + tài liệu · `7f3da11` đồng bộ viền).
+**Không migration, không route mới, không lớp PHP mới.** Asset mới `app-CZdUYLe1.css` + `main-rqFttwoM.js`.
+
+### 1. Tinh chỉnh card «Gợi ý từ ảnh» (đo bằng Chrome thật, 7 trạng thái)
+
+| Vấn đề đo được | Sau khi sửa |
+|---|---|
+| 2 nút chính to ngang nhau cùng hiện | **1** nút chính ở mọi trạng thái (nút phân tích tự lùi về thứ yếu khi có kết quả) |
+| Nút mờ không nói vì sao | `↳` lý do cụ thể ngay dưới nút |
+| 2 hệ tiến trình tự chế (~90 dòng CSS trùng) | **1** `LoadingSpinner` dùng chung cho cả phân tích và tạo ảnh |
+| 5 chip + 1 nút + 8 nhãn dùng emoji | **0 emoji** — toàn bộ bằng `StudioIcon` |
+| 40 mã `rgba()` tự khai trong `<style scoped>` | token + tiện ích dùng chung; còn 1 dòng gradient nhận diện |
+| Danh sách lịch sử luôn chiếm chỗ | gấp trong `<details>` |
+| **586 dòng** | **455 dòng** · không tràn ngang ở 300px **và** 260px (đo khi mở hết `<details>`) |
+
+### 2. Tài liệu chuẩn (mới): `docs/DESIGN_SYSTEM.md`
+
+Nguồn chân lý về màu/chuyển động/chữ · bảng "cần gì → dùng class nào" · component dùng chung ·
+**6 quy tắc trình bày cho NGƯỜI MỚI** · **§5 từ vựng VIỀN** · bố cục & cuộn · trợ năng · icon/emoji ·
+checklist trước khi merge. Ba bất biến được máy giữ: `DesignSystemTest` + `ToolbarAreaTest`.
+
+### 3. Đồng bộ VIỀN của nút toàn Studio — 30 → 16 token
+
+| Đo trước | Con số |
+|---|---|
+| "Nút nghỉ" viết bằng HAI token | `border-ink-700` **58** chỗ vs `border-ink-600` **54** chỗ |
+| "Đang chọn" viết bằng HAI token | `border-brand-400` **21** vs `border-brand-500` **18** |
+| Màu ngữ nghĩa rải 3–4 alpha | red `/30 /40 /60` · amber `/40 /50` · emerald `/40 /50 /80` |
+| Nút dùng ngôn ngữ "kính trắng" | 10 chỗ `border-white/5–/20` |
+| `.tool-btn` lệch với nút viết tay | ink-700 vs ink-600 |
+
+Nay: **nút nghỉ `border-ink-600`** · **đang chọn `border-brand-500`** · **hover `hover:border-brand-400`** ·
+hover nút rất phụ `hover:border-ink-500` · nguy hiểm `border-red-500/40` (+ `hover:border-red-500`) ·
+cảnh báo/thành công/thông tin `...-500/40` · **khối CHỨA vẫn `border-ink-700` nhưng KHÔNG BAO GIỜ trên nút**.
+Ba ngoại lệ có lý do ghi trong mã: checkbox chọn ảnh trên ảnh · màu nhấn riêng của 3 card
+(RefImageCard · ConceptCard · InpaintCard) · nút kiểu `.btn-outline` trên nền tối.
+
+**Hệ quả đo được: CSS gửi cho khách GIẢM 1,64 kB** (166,25 → 164,61 kB) — Tailwind không còn sinh
+hàng chục tiện ích viền chỉ dùng một lần.
+
+### 4. Verify production (đã chạy thật)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | `7f3da11` (trước pull: `636ab96`) |
+| Migration | `Nothing to migrate` (đúng — không có migration mới) |
+| Cache | `config` · `route` · `view` · `queue:restart` → **exit=0** cả bốn |
+| Trang | `/` `/dang-nhap` `/up` `/bang-gia` → **200** |
+| Asset mới | `app-CZdUYLe1.css` 200 · **164.615 B** · `main-rqFttwoM.js` 200 · **576.511 B** |
+| **Bản phục vụ = bản build ở máy** | `md5sum` **trùng** cho CẢ JS lẫn CSS (1 hash duy nhất) |
+| JS phục vụ thật | có `border-ink-600` (140) · `border-brand-500` (78) · `hover:border-ink-500` (4); `border-ink-700` còn 196 (đúng — dùng cho khối chứa) |
+| Nhật ký | **0 ERROR mới** do app. Dòng thứ 9 mới nhất KHÔNG phải lỗi app: `guiprobe.tmp.php:15` — **file thăm dò tạm do phiên khác để lại ở thư mục gốc** (ngoài `public_html` nên không phục vụ qua web) |
+| Hàng đợi | `jobs=1` (job cũ) · `failed_jobs=0` · `generations pending=0` |
+
+**Test:** `DesignSystemTest` **6 test / 56 assert** (đã **thử đột biến**: thêm emoji · dựng lại tiến trình
+tự chế · bỏ lùi nút chính · tự khai mã màu hex · xoá dòng lý do khoá · nút quay lại `border-ink-700` ·
+thêm `border-red-500/60` · card khác dùng emerald làm viền nút → **ĐỎ cả 8**). Full suite **827 test**;
+6 fail vẫn là **6 lỗi SẴN CÓ** ở HEAD (CollectionsHub · JobTemplates · MotionFoundation · ShotReview ×2 ·
+StaticIntegrity).
+
+### Còn lại (đề xuất)
+
+- [ ] **Nợ emoji toàn studio**: 23/65 file · 134 lần xuất hiện (ConceptCard 43 · store.js 18 · AdminApp 7…) —
+      sửa tới file nào dọn file đó, không thêm emoji mới.
+- [ ] Ba card còn **màu nhấn riêng** (emerald) và nền nút còn trộn `bg-ink-800` / `bg-white/5` /
+      `bg-ink-900/90` — cùng cách đo, đồng bộ tiếp được ở đợt sau.
+- [ ] Nhiều card khác vẫn còn **2 nút chính** hoặc **nút khoá không nêu lý do** — rà theo checklist §9.
+- [ ] Dọn `guiprobe.tmp.php` còn sót ở thư mục gốc production (của phiên khác, không tự xoá).
