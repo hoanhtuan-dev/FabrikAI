@@ -846,141 +846,100 @@ provide('copyText', copyText);
     title="Agent Studio — từ tín hiệu xu hướng tới ảnh hoàn chỉnh"
   >
     <div class="flex h-full min-h-0 flex-col">
-      <!-- Thanh tiến trình + trạng thái -->
-      <header class="shrink-0 border-b border-ink-700 bg-ink-900/80 px-4 py-3 sm:px-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-label font-semibold uppercase tracking-[0.18em] text-brand-300">Agent Studio</p>
-            <p class="mt-0.5 truncate text-sm font-semibold text-cream-100">Từ tín hiệu xu hướng đến ảnh hoàn chỉnh</p>
+      <!-- Đầu modal: nhận diện + điều khiển AI — gọn, không nhồi chip trạng thái -->
+      <header class="shrink-0 border-b border-ink-700 bg-ink-900/80 px-4 py-2.5 sm:px-5">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex min-w-0 items-center gap-2.5">
+            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-4 w-4" /></span>
+            <div class="min-w-0">
+              <p class="truncate text-sm font-bold text-cream-50">Agent Studio</p>
+              <p class="hidden truncate text-label text-cream-400 sm:block">Từ tín hiệu xu hướng đến ảnh hoàn chỉnh</p>
+            </div>
           </div>
-          <div class="flex flex-wrap items-center gap-2 text-label">
-            <span
-              class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-semibold"
-              :class="modelReady ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'"
-              :title="modelTitle"
-            >
+          <div class="flex shrink-0 items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label font-semibold" :class="modelReady ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'" :title="modelTitle">
               <span class="h-1.5 w-1.5 rounded-full" :class="modelReady ? 'bg-emerald-300' : 'bg-amber-300'"></span>
-              {{ modelShort }}
+              <span class="hidden md:inline">{{ modelShort }}</span>
+              <span class="md:hidden">{{ modelReady ? 'Có AI' : 'Chưa bật AI' }}</span>
             </span>
-            <!-- Nguồn dữ liệu nói bằng CÂU NGƯỜI ĐỌC ĐƯỢC: "live/demo/local" là từ của lập trình viên. -->
-            <span
-              class="rounded-full px-2 py-0.5 font-semibold"
-              :class="liveSources ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'"
-              :title="liveSources ? 'Máy chủ đang đọc tin thật từ các nguồn đã nối' : 'Chưa nối được nguồn tin nào — phần xu hướng dùng bộ có sẵn'"
-            >{{ liveSources ? 'Tin thị trường thật' : 'Bộ xu hướng có sẵn' }}</span>
-            <span v-if="marketSignals.length" class="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-ok">{{ marketSignals.length }} tín hiệu đo được</span>
-            <span v-if="selectedTrendCount" class="rounded-full bg-brand-500/15 px-2 py-0.5 font-semibold text-brand-200">{{ selectedTrendCount }} trend đã chọn</span>
-            <button
-              type="button"
-              class="motion-ui rounded-full border px-2 py-0.5 font-semibold transition"
-              :class="store.designAgentAi ? 'border-emerald-500/40 bg-emerald-500/10 text-ok hover:bg-emerald-500/20' : 'border-ink-600 bg-ink-800 text-cream-300 hover:bg-ink-700'"
-              :aria-pressed="store.designAgentAi"
-              :title="aiToggleTitle"
-              @click="toggleAi"
-            >
-              Suy luận AI: {{ store.designAgentAi ? 'BẬT' : 'TẮT' }}
+            <button type="button" class="seg-btn !px-2.5 !py-1.5" :class="{ 'is-active': store.designAgentAi }" :aria-pressed="store.designAgentAi" :title="aiToggleTitle" @click="toggleAi">
+              <StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Suy luận AI
             </button>
           </div>
         </div>
-
-        <!-- Vì sao đang chạy tất định? Nói thẳng lý do + nơi cấu hình, không để người dùng đoán. -->
-        <p
-          v-if="activeModel && !modelReady"
-          role="status"
-          class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-body leading-5 text-warn"
-        >
+        <!-- Vì sao đang chạy tất định? Nói thẳng lý do + nơi cấu hình. -->
+        <p v-if="activeModel && !modelReady" role="status" class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-body leading-5 text-warn">
           <StudioIcon name="info" size="h-3.5 w-3.5" class="shrink-0" />
           <span>{{ modelTitle }}</span>
           <span v-if="!store.designAgentAi" class="text-warn">Bật «Suy luận AI» ở trên để phần phân tích do AI thực hiện.</span>
-          <span v-else-if="modelCandidates.length === 0" class="text-warn">Cấu hình tại Cài đặt → Nhóm công việc → “Suy luận prompt (Giám đốc sáng tạo / Thuật sỹ ảo)” và thêm khoá trong Quản lý API.</span>
+          <span v-else-if="modelCandidates.length === 0" class="text-warn">Cấu hình tại Cài đặt → Nhóm công việc → “Suy luận prompt” và thêm khoá trong Quản lý API.</span>
         </p>
-        <!-- 4 bước ⇒ lưới 2 cột (lưới 3 cột để hàng dưới lẻ một nút, nhìn như lỗi).
-             Không dùng role=tab ở đây: mỗi lúc chỉ MỘT bước tồn tại trong DOM, nên aria-controls sẽ trỏ
-             vào phần tử không có thật — trình đọc màn hình đọc ra tham chiếu gãy. -->
-        <nav class="mt-3 grid grid-cols-2 gap-1.5 lg:hidden" aria-label="Tiến trình thiết kế">
-          <button
-            v-for="(item, index) in STEPS"
-            :key="item.id"
-            type="button"
-            class="seg-btn !flex-col !items-start !gap-0.5 !px-2 !py-2 text-left"
-            :class="{ 'is-active': step === item.id }"
-            :aria-current="step === item.id ? 'step' : undefined"
-            @click="setStep(item.id)"
-          >
-            <span class="text-tiny text-cream-400">Bước {{ index + 1 }}</span>
-            <span class="text-body font-semibold">{{ item.label }}</span>
-          </button>
-        </nav>
       </header>
 
-      <div class="flex min-h-0 flex-1">
-        <!-- Rail tiến trình (desktop) -->
-        <nav class="hidden w-60 shrink-0 flex-col gap-1 border-r border-ink-700 bg-ink-900/40 p-3 lg:flex" aria-label="Tiến trình thiết kế">
-          <button
-            v-for="(item, index) in STEPS"
-            :key="item.id"
-            type="button"
-            class="motion-ui flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition"
-            :class="step === item.id ? 'border-brand-500 bg-brand-600/15' : 'border-transparent hover:border-ink-500 hover:bg-ink-800'"
-            :aria-current="step === item.id ? 'step' : undefined"
-            :aria-controls="'agent-step-' + item.id"
-            @click="setStep(item.id)"
-          >
-            <span
-              class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-label font-bold"
-              :class="readiness[item.id] === 'done' ? 'bg-emerald-500/20 text-ok' : step === item.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-400'"
+      <!-- Thanh tiến trình NGANG — một thanh dùng chung cho MỌI kích thước (mobile-first) -->
+      <nav class="shrink-0 border-b border-ink-700 bg-ink-900/50 px-3 py-2.5 sm:px-5" aria-label="Tiến trình thiết kế">
+        <div class="flex items-center gap-1 sm:gap-2">
+          <template v-for="(item, index) in STEPS" :key="item.id">
+            <button
+              type="button"
+              class="group flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 py-1 text-left transition sm:px-2"
+              :class="step === item.id ? 'bg-brand-600/10' : 'hover:bg-ink-800'"
+              :aria-current="step === item.id ? 'step' : undefined"
+              @click="setStep(item.id)"
             >
-              <StudioIcon v-if="readiness[item.id] === 'done'" name="check" size="h-3 w-3" />
-              <span v-else>{{ index + 1 }}</span>
-            </span>
-            <span class="min-w-0">
-              <span class="block text-xs font-semibold text-cream-100">{{ item.label }}</span>
-              <span class="mt-0.5 block text-label leading-4 text-cream-400">{{ item.hint }}</span>
-            </span>
-          </button>
+              <span
+                class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-label font-bold transition"
+                :class="readiness[item.id] === 'done' ? 'bg-emerald-500/20 text-ok' : step === item.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-400 group-hover:text-cream-200'"
+              >
+                <StudioIcon v-if="readiness[item.id] === 'done'" name="check" size="h-3.5 w-3.5" />
+                <span v-else>{{ index + 1 }}</span>
+              </span>
+              <span class="min-w-0">
+                <span class="block truncate text-body font-semibold" :class="step === item.id ? 'text-cream-50' : 'text-cream-300'">{{ item.label }}</span>
+                <span class="hidden truncate text-tiny text-cream-400 md:block">{{ item.hint }}</span>
+              </span>
+            </button>
+            <span v-if="index < STEPS.length - 1" class="h-px w-2 shrink-0 bg-ink-600 sm:w-4" aria-hidden="true"></span>
+          </template>
+        </div>
+      </nav>
 
-          <div class="mt-3 rounded-lg border border-ink-700 bg-ink-900 p-3">
-            <p class="text-label font-semibold uppercase tracking-wide text-cream-400">Bối cảnh hiện tại</p>
-            <dl class="mt-2 space-y-1.5 text-body">
-              <div class="flex items-center justify-between gap-2"><dt class="text-cream-400">Khu vực</dt><dd class="font-semibold text-cream-100">{{ regions.find((r) => r.id === selectedRegion)?.name || selectedRegion }}</dd></div>
-              <div class="flex items-center justify-between gap-2"><dt class="text-cream-400">Trend chọn</dt><dd class="font-semibold text-cream-100">{{ selectedTrendCount }}</dd></div>
-              <div class="flex items-center justify-between gap-2"><dt class="text-cream-400">Brief</dt><dd class="font-semibold" :class="collection && !briefStale ? 'text-ok' : collection ? 'text-warn' : 'text-cream-400'">{{ collection && !briefStale ? 'Sẵn sàng' : collection ? 'Cần cập nhật' : 'Chưa có' }}</dd></div>
-              <div v-if="collection" class="flex items-center justify-between gap-2"><dt class="text-cream-400">SKU đề xuất</dt><dd class="font-semibold text-cream-100">{{ collection.structure?.total_skus || 0 }}</dd></div>
-            </dl>
-          </div>
-        </nav>
-
-        <!-- Nội dung theo bước -->
-        <main class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
-          <!-- BƯỚC 0: DNA THƯƠNG HIỆU (chủ shop tự khai) -->
-          <AgentDnaStep v-if="step === 'dna'" />
-          <AgentRadarStep v-else-if="step === 'radar'" />
-          <AgentBriefStep v-else-if="step === 'brief'" />
-          <AgentCanvasStep v-else />
-        </main>
+      <!-- Bối cảnh hiện tại — một dòng gọn, hiện trên mọi kích thước -->
+      <div class="shrink-0 border-b border-ink-700/60 bg-ink-900/30 px-4 py-1.5 sm:px-5">
+        <dl class="flex flex-wrap items-center gap-x-4 gap-y-1 text-label text-cream-400">
+          <div class="flex items-center gap-1.5"><StudioIcon name="pin" size="h-3 w-3" class="text-brand-300" /><dt class="sr-only">Khu vực</dt><dd class="font-semibold text-cream-200">{{ regions.find((r) => r.id === selectedRegion)?.name || selectedRegion }}</dd></div>
+          <div class="flex items-center gap-1.5"><StudioIcon name="scan" size="h-3 w-3" class="text-brand-300" /><dt class="sr-only">Trend chọn</dt><dd :class="selectedTrendCount ? 'font-semibold text-cream-200' : ''">{{ selectedTrendCount ? selectedTrendCount + ' trend đã chọn' : 'Chưa chọn trend' }}</dd></div>
+          <div class="flex items-center gap-1.5"><StudioIcon name="briefcase" size="h-3 w-3" class="text-brand-300" /><dt class="sr-only">Brief</dt><dd :class="collection && !briefStale ? 'font-semibold text-ok' : collection ? 'font-semibold text-warn' : ''">{{ collection && !briefStale ? 'Brief sẵn sàng' : collection ? 'Brief cần cập nhật' : 'Chưa có brief' }}</dd></div>
+          <div v-if="collection" class="flex items-center gap-1.5"><StudioIcon name="package" size="h-3 w-3" class="text-brand-300" /><dt class="sr-only">SKU</dt><dd class="font-semibold text-cream-200">{{ collection.structure?.total_skus || 0 }} SKU</dd></div>
+        </dl>
       </div>
+
+      <!-- Nội dung bước -->
+      <main class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+        <!-- Đầu bước: nhắc nhẹ đang ở đâu + việc cần làm — giúp người mới không lạc -->
+        <header class="mb-4 flex items-baseline gap-2 sm:mb-5">
+          <p class="shrink-0 text-label font-semibold uppercase tracking-[0.14em] text-brand-300">Bước {{ stepIndex + 1 }}</p>
+          <p class="truncate text-body text-cream-400">{{ STEPS[stepIndex].hint }}</p>
+        </header>
+        <AgentDnaStep v-if="step === 'dna'" />
+        <AgentRadarStep v-else-if="step === 'radar'" />
+        <AgentBriefStep v-else-if="step === 'brief'" />
+        <AgentCanvasStep v-else />
+      </main>
 
       <!-- Action bar -->
       <footer class="shrink-0 border-t border-ink-700 bg-ink-900/90 px-4 py-3 sm:px-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="min-w-0 text-body text-cream-400">
-            <span class="font-semibold text-cream-100">Bước {{ stepIndex + 1 }}/{{ STEPS.length }} · {{ STEPS[stepIndex].label }}</span>
-            <span class="mx-1.5">·</span>
-            <span v-if="step === 'dna'">{{ dna?.is_set ? 'DNA đã khai · ' + (dna.source_label || '') : 'Chưa khai DNA — đang dùng phần suy ra' }}</span>
-            <span v-else-if="step === 'radar'">{{ selectedTrendCount ? selectedTrendCount + ' trend đã chọn' : 'Chưa chọn trend' }}</span>
-            <span v-else-if="step === 'brief'">{{ collection ? (briefStale ? 'Brief cần cập nhật' : 'Brief đã sẵn sàng') : 'Chưa có brief' }}</span>
-            <span v-else>~{{ estimatedCredits }} credit cho {{ canvas.variantCount }} biến thể</span>
-            <span class="hidden text-tiny text-cream-400 lg:inline"> · Ctrl+←/→ chuyển bước · 1–4 nhảy bước · Ctrl+Enter tiếp tục</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <!-- Bước DNA là bước ĐẦU nên không có bước trước: nút "Quay lại" ở đây từng bấm không có gì xảy ra. -->
-            <button v-if="stepIndex > 0" type="button" class="tool-btn !px-3 !py-2" title="Quay lại (Ctrl+←)" @click="back"><StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Quay lại</button>
-            <button v-if="step !== 'canvas'" type="button" class="btn-brand btn-sm flex items-center gap-2" :disabled="(step === 'brief' && store.collectionBriefLoading)" title="Tiếp tục (Ctrl+→ hoặc Ctrl+Enter)" @click="advance">
+        <div class="flex items-center justify-between gap-3">
+          <button v-if="stepIndex > 0" type="button" class="tool-btn !px-3 !py-2.5" title="Quay lại (Ctrl+←)" @click="back"><StudioIcon name="arrowLeft" size="h-4 w-4" /><span class="hidden sm:inline"> Quay lại</span></button>
+          <span v-else></span>
+          <div class="flex items-center gap-3">
+            <span class="hidden text-label text-cream-400 sm:inline">Bước {{ stepIndex + 1 }}/{{ STEPS.length }}</span>
+            <button v-if="step !== 'canvas'" type="button" class="btn-brand flex items-center gap-2 !px-4 !py-2.5 text-sm" :disabled="(step === 'brief' && store.collectionBriefLoading)" title="Tiếp tục (Ctrl+→)" @click="advance">
               {{ step === 'dna' ? 'Đọc tín hiệu thị trường' : (step === 'radar' ? (selectedTrendCount ? 'Phân tích thành brief' : 'Tiếp tục với mặc định') : 'Chốt brief & sang Canvas') }}
-              <StudioIcon name="arrowRight" size="h-3.5 w-3.5" />
+              <StudioIcon name="arrowRight" size="h-4 w-4" />
             </button>
-            <button v-else type="button" class="btn-brand btn-sm flex items-center gap-2" @click="applyCanvas">
-              <StudioIcon name="zap" size="h-3.5 w-3.5" /> Áp dụng vào Canvas
+            <button v-else type="button" class="btn-brand flex items-center gap-2 !px-4 !py-2.5 text-sm" @click="applyCanvas">
+              <StudioIcon name="zap" size="h-4 w-4" /> Áp dụng vào Canvas
             </button>
           </div>
         </div>
