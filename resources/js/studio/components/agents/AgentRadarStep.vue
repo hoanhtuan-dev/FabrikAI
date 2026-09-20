@@ -95,6 +95,15 @@ const formatVnd = inject('formatVnd');
                   ? 'Số đầu tiên là số ĐO từ tin thật; các hướng còn lại ghi rõ hướng nào có tin thật, hướng nào thuộc bộ có sẵn.'
                   : 'Chưa có tin thật nào: các hướng đang hiển thị thuộc BỘ XU HƯỚNG CÓ SẴN của FabrikAI, không phải số liệu thị trường.' }}
               </p>
+              <!-- CÁCH DỮ LIỆU ĐƯỢC LƯU · QUẢN LÝ · TÁI SỬ DỤNG — trả lời "lưu ở đâu, ai lưu, dùng lại ra sao". -->
+              <details class="mt-1.5">
+                <summary class="cursor-pointer text-label text-cream-400 underline decoration-dotted">Cách dữ liệu này được lưu &amp; tái sử dụng</summary>
+                <div class="mt-1.5 space-y-1 rounded-lg bg-ink-900 px-3 py-2 text-label leading-5 text-cream-300">
+                  <p><b class="text-cream-200">Lưu tự động:</b> mỗi lần đo, hệ thống ghi một "ảnh chụp" (snapshot) nếu dữ liệu đổi hoặc đã cũ hơn 12 giờ — bạn không phải bấm lưu.</p>
+                  <p><b class="text-cream-200">Quản lý:</b> ảnh chụp cũ hơn 120 ngày tự xoá để CSDL không phình.</p>
+                  <p><b class="text-cream-200">Tái sử dụng:</b> số "tăng/giảm %" được tính bằng cách so ảnh chụp mới nhất với các lần đo trước — nhờ vậy bạn thấy hướng nào đang lên hay chậm lại theo thời gian, không cần AI.</p>
+                </div>
+              </details>
             </div>
 
             <p v-if="store.trendRadarLoading && store.designAgentAi" class="mb-3 flex items-center gap-2 text-body text-brand-200" role="status" aria-live="polite">

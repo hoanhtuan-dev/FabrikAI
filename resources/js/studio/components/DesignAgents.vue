@@ -257,15 +257,15 @@ const sourceMode = computed(() => radar.value?.source_mode || 'demo');
  */
 const summaryItems = computed(() => {
   const summary = radar.value?.summary || {};
-  const order = ['live_sources', 'market_signals', 'active_trends', 'internal_products', 'internal_generations', 'tracked_attributes', 'images_analyzed_monthly'];
+  // [TỐI GIẢN] Bỏ 2 ô hằng số vô nghĩa ("Thuộc tính theo dõi: 5" · "Ảnh phân tích mỗi tháng: 0") — chỉ giữ
+  // các số THẬT người dùng dùng để quyết định.
+  const order = ['live_sources', 'market_signals', 'active_trends', 'internal_products', 'internal_generations'];
   const labels = {
     live_sources: 'Nguồn tin đang dùng',
     market_signals: 'Từ khoá từ tin thật',
     active_trends: 'Hướng đang theo dõi',
     internal_products: 'Sản phẩm của bạn',
     internal_generations: 'Ảnh bạn đã tạo',
-    tracked_attributes: 'Thuộc tính theo dõi',
-    images_analyzed_monthly: 'Ảnh phân tích mỗi tháng',
   };
   const live = new Set(['live_sources', 'market_signals']);
   return order
