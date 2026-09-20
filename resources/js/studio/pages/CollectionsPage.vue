@@ -740,6 +740,7 @@ onBeforeUnmount(() => {
               <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" title="Loại các ảnh đã chọn (phím R)" @click="reviewBatch('rejected')">
                 <StudioIcon name="ban" size="h-4 w-4" /> Loại {{ selectedCount }} ảnh
               </button>
+              <p v-if="!reviewBusy && !selectedCount" class="mt-1.5 text-[10px] leading-4 text-warn">↳ Chưa chọn ảnh nào — bấm vào ảnh trong danh sách để chọn trước khi duyệt.</p>
             </div>
             <p class="mt-3 text-[11px] text-cream-400">
               Phím tắt khi khối này đang mở: <b class="text-cream-100">S</b> chọn ảnh chờ duyệt · <b class="text-cream-100">N</b> chuyển bước · <b class="text-cream-100">A</b> duyệt · <b class="text-cream-100">R</b> loại · <b class="text-cream-100">Esc</b> đóng

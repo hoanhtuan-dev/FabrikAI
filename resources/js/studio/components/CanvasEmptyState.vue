@@ -31,7 +31,12 @@ const variantCount = computed({
 });
 
 const creditEstimate = computed(() => (store.planCostImage || 1) * variantCount.value);
-const canGenerate = computed(() => (store.imagePromptEn || '').trim().length > 0 && !store.generating);
+/** Lý do nút "Tạo ảnh" bị khoá — MỘT nguồn: canGenerate suy ra từ đây (§4.4). */
+const blockReason = computed(() => {
+  const empty = (store.imagePromptEn || '').trim().length === 0;
+  return empty ? 'Chưa nhập mô tả ảnh — gõ mô tả vào ô ngay trên rồi bấm Tạo ảnh.' : '';
+});
+const canGenerate = computed(() => !blockReason.value && !store.generating);
 const ratioOptions = ['1:1', '4:5', '3:4', '16:9', '9:16'];
 
 const projectName = computed(() => store.appliedProject?.name || '');
@@ -144,6 +149,8 @@ const shortcuts = [
               </div>
             </div>
 
+            <p v-if="blockReason" class="mt-2 text-[10px] leading-4 text-warn">↳ {{ blockReason }}</p>
+
             <div class="mt-3 flex flex-wrap items-center gap-2">
               <div class="flex items-center gap-1 rounded-lg bg-ink-800 p-1" role="group" aria-label="Số biến thể">
                 <span class="px-1 text-[10px] text-cream-400">Biến thể</span>
@@ -163,7 +170,7 @@ const shortcuts = [
                 <h3 class="text-sm font-semibold text-cream-100">Hoặc bắt đầu có định hướng</h3>
                 <p class="mt-0.5 text-[11px] text-cream-400">Agent Studio dẫn từ tín hiệu thị trường đến prompt tạo ảnh.</p>
               </div>
-              <button type="button" class="btn-brand btn-sm flex items-center gap-2" @click="openAgent('radar')">
+              <button type="button" class="btn-outline btn-sm flex items-center gap-2" @click="openAgent('radar')">
                 <StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Mở Agent Studio
               </button>
             </div>

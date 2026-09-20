@@ -74,6 +74,7 @@ function setv(field, val) { store[field] = Number(val); store.saveUpscaleMemory(
     </div>
 
     <button @click="runUpscale" :disabled="store.upscaling || !store.upscaleSrc" class="btn-brand mt-3 w-full whitespace-nowrap">{{ store.upscaling ? 'Đang nâng cấp…' : 'Nâng cấp Ảnh' }}</button>
+    <p v-if="!store.upscaling && !store.upscaleSrc" class="mt-1.5 text-[10px] leading-4 text-warn">↳ Chưa có ảnh để nâng cấp — bấm vào một ảnh trên canvas hoặc trong Kết quả.</p>
     <button v-if="beforeUrl && afterUrl" @click="compareOpen = true" title="So sánh ảnh trước/sau khi nâng cấp" class="btn-outline mt-1.5 w-full whitespace-nowrap"><StudioIcon name="columns" size="h-3.5 w-3.5" /> So sánh Trước/Sau</button>
 
     <CompareSlider v-model="compareOpen" :before="beforeUrl" :after="afterUrl" title="So sánh Trước/Sau khi nâng cấp" />

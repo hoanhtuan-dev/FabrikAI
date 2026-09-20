@@ -101,7 +101,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-CDTA1bwx.css",
+    "file": "assets/app-uZE6ViH6.css",
     "name": "app",
     "names": [
       "app.css"
@@ -124,7 +124,7 @@
     ]
   },
   "resources/js/studio/collections.js": {
-    "file": "assets/collections-CSHRueJD.js",
+    "file": "assets/collections-CGEWISuT.js",
     "name": "collections",
     "src": "resources/js/studio/collections.js",
     "isEntry": true,
@@ -134,11 +134,11 @@
       "_useStudioThumb-CEUyBvt1.js"
     ],
     "css": [
-      "assets/collections-BH-Nh1Bq.css"
+      "assets/collections-DdFGwJGq.css"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-t0yeM8hV.js",
+    "file": "assets/main-CaD8aYqt.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -150,7 +150,7 @@
       "_useTheme-mNUCLvJz.js"
     ],
     "css": [
-      "assets/main-DCyNV2Hz.css"
+      "assets/main-DCvjaDb0.css"
     ]
   },
   "resources/js/studio/my-settings.js": {

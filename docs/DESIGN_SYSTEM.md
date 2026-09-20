@@ -194,7 +194,12 @@ Ba quyết định đáng nhớ:
    đứng hình. Khi trạng thái đổi (đã có kết quả) thì nút cũ phải **lùi về thứ yếu**, không phải
    thêm một nút chính thứ hai.
 4. **Nút bị khoá phải NÓI RÕ LÝ DO ngay dưới nó**: `↳ Chưa có ảnh nguồn — chọn một ảnh trên canvas…`.
-   Không bao giờ để người dùng đoán vì sao nút mờ.
+   Không bao giờ để người dùng đoán vì sao nút mờ. **Một nguồn**: câu lý do và điều kiện khoá cùng
+   suy ra từ MỘT computed (mẫu: `StudioCard.vue` — `blockReason` rồi `canRun = !blockReason && !busy`), nên
+   chúng không thể lệch nhau. **Miễn trừ duy nhất:** khoá vì ĐANG CHẠY (`busy/saving/loading`…) —
+   lúc đó nhãn nút đã đổi thành "Đang gửi…" nên không cần thêm dòng lý do.
+   Khoá bằng `DesignSystemTest::test_blocked_primary_buttons_explain_the_reason` (12 nút đã được bổ sung lý do
+   trong đợt 2026-09-23).
 5. **Thứ ít dùng / nâng cao thu vào `<details>`, mặc định ĐÓNG** (nhãn ghi rõ có gì bên trong:
    "Nâng cao: biến thể · tỉ lệ · prompt gửi AI"). Trạng thái mở không cần nhớ giữa các lần.
 6. **Chỉ lỗi/cảnh báo nằm gần nút chạy; ghi chú, giải thích dài, thông số kỹ thuật đưa vào khối Nâng cao.**
@@ -241,16 +246,21 @@ Ba quyết định đáng nhớ:
 | Ô nhập | `border-ink-700` → `focus:border-brand-400` | `.studio-shell .input` |
 | Bảng "tông chú ý" (badge) | `...-500/40` cho cả 4 tông | danger · warn · info · ok |
 
-**Ba ngoại lệ DUY NHẤT, phải kèm lý do trong mã:**
+**HAI ngoại lệ DUY NHẤT, phải kèm lý do trong mã:**
 
 1. **Checkbox chọn ảnh** đặt TRÊN ảnh: `border-cream-300/50` → `hover:border-cream-200`
    (viền xám tan biến trên nền ảnh bất kỳ).
-2. **Màu nhấn riêng của card** (hiện có: `RefImageCard.vue` · `ConceptCard.vue` · `InpaintCard.vue`
-   dùng `emerald-400`): phải dùng **nhất quán cả viền + nền + icon** trong đúng card đó, và
-   **KHÔNG BAO GIỜ** dùng cho nút hành động chung (Chạy · Lưu · Xoá · Tạo ảnh).
-3. **Nút kiểu `.btn-outline`** (nút phụ toàn app): hover ĐẢO màu bằng token cố định
+2. **Nút kiểu `.btn-outline`** (nút phụ toàn app): hover ĐẢO màu bằng token cố định
    `hover:bg-invert hover:text-invert-content` + `hover:border-brand-400` — đúng ở cả hai theme nên
    không cần nhánh riêng cho studio như trước.
+
+> **[2026-09-23] Ngoại lệ "MÀU NHẤN RIÊNG CỦA CARD" đã bị GỠ HẲN.** Ba card từng được phép dùng emerald
+> (`RefImageCard.vue` · `ConceptCard.vue` · `InpaintCard.vue`) đã được thiết kế lại:
+> trạng thái "đang chọn" về `border-brand-500 + bg-brand-600/20 + ring-brand-500/40`, "khối chứa" về
+> `border-ink-700 + bg-ink-900`, còn thứ đúng nghĩa "thành công" thì dùng token ngữ nghĩa `ok`
+> (`border-ok/40 · bg-ok/10 · text-ok`). Lý do gỡ: cùng một trạng thái "đang chọn" mà chỗ thì xanh lá
+> thương hiệu, chỗ thì emerald ⇒ người dùng phải học hai lần, và bảng màu có thêm một họ màu không thuộc hệ.
+> Danh sách miễn trừ trong `DesignSystemTest` cũng đã xoá: nay **bất kỳ token emerald nào làm viền nút là ĐỎ**.
 
 ### 5.2 Vì sao phải là từ vựng ĐÓNG
 
@@ -751,6 +761,8 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 
 | 23 | 2026-09-23 | **6 test đỏ tồn đọng** ở HEAD (Bộ sưu tập · Duyệt mẫu · a11y lớp phủ · chuyển động hover) + **5 món nợ** đã ghi trong DEPLOY_LOG | Sửa **SẢN PHẨM** ở chỗ là lỗi thật: 4 lớp phủ thiếu `role/aria-modal` · 2 bề mặt hover thiếu nhịp · state `reviewErrors` chết (nay hiện lỗi **từng ảnh kèm bước**) · trả lại nút **Xử lý ngay** (`processQueue`) đã mất khi card sidebar thu gọn · gom đường xuất gói về `store.exportProject()` (bỏ 2 bản fetch trùng 26 dòng) · 2 test cập nhật theo **bề mặt thật** | 6 → **0 test đỏ** · emoji **134 → 0** (23 file) · xoá ~115 dòng CSS chết + `.section-title` · `transition-all` 19 → **0** · nền nút 3 kiểu → **1 token** (51 thẻ) · thêm trang **`/he-thong-thiet-ke`** · 10 test mới/ cập nhật |
 
+| 24 | 2026-09-23 | **3 card còn MÀU NHẤN RIÊNG** (emerald: RefImageCard · ConceptCard · InpaintCard) + **12 nút chính bị khoá không nói vì sao** + 2 màn hình có **2 nút chính cùng lúc** | Thiết kế lại 3 card về đúng từ vựng: "đang chọn" = `border-brand-500 + bg-brand-600/20 + ring-brand-500/40` · "khối chứa" = `border-ink-700 + bg-ink-900` · "thành công" = token `ok` · nút chính của Inpaint về gradient thương hiệu · 12 nút khoá có dòng `↳` suy ra từ MỘT computed `blockReason` · hạ "Mở Agent Studio" xuống nút phụ · ẩn thanh CTA khi ở tab Hàng loạt | emerald trong 3 card **26 → 0** · **xoá hẳn danh sách miễn trừ emerald** trong `DesignSystemTest` · 2 test mới/bổ sung · `DesignSystemTest` **9/9 XANH** |
+
 ### 16.1 Số đo trước → sau của cả hành trình
 
 | Chỉ số | Trước | Sau |
@@ -785,12 +797,13 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 
 ### 17.2 Việc còn nợ (không chặn khách)
 
-> **Đã dọn trong đợt 2026-09-23** (xem §16 vòng 23): mã chết "Storefront Vue SPA" · **nợ emoji (134 → 0)** ·
+> **Đã dọn trong đợt 2026-09-23** (xem §16 vòng 23–24): mã chết "Storefront Vue SPA" · **nợ emoji (134 → 0)** ·
 > **nền nút** (ba kiểu → một token) · **trang xem token** (`/he-thong-thiet-ke`) · file thăm dò lạ trên production ·
-> và 6 test đỏ sẵn có ở HEAD.
+> 6 test đỏ sẵn có ở HEAD · **3 card hết màu nhấn riêng** (emerald 26 → 0, bỏ luôn danh sách miễn trừ trong test) ·
+> **12 nút chính bị khoá nay có dòng lý do** `↳` · hết cảnh **2 nút chính cùng lúc** (màn hình canvas trống · tab Hàng loạt).
+> Còn nợ duy nhất thuộc nhóm này: các nút bị khoá vì **ĐANG CHẠY** thì cố ý KHÔNG thêm dòng lý do (nhãn nút đã đổi thành "Đang gửi…").
 
 - [ ] `border-white/*` (48 chỗ) là viền vẽ TRÊN ẢNH (tay cầm crop · con trỏ cọ · ô màu trong suốt) — cố ý cố định theo §1.1 quy tắc 5. Nếu có chỗ mới dùng cho BỀ MẶT giao diện thì phải đổi sang `border-cream-50/*`.
-- [ ] Nhiều card khác vẫn còn **2 nút chính** hoặc **nút khoá không nêu lý do** — rà theo checklist §10.
 - [ ] Card «Gợi ý từ ảnh» chưa cho **chọn ảnh nguồn ngay trong card** (`SourceLibraryPicker` đã có sẵn).
 - [ ] **Mã tra cứu lỗi** cho người dùng đọc cho tổng đài (`L-8F3K`) — ghi ở cả giao diện và log (§6.5).
 - [ ] Preset **tên file ảnh theo kênh bán** (sàn TMĐT/catalogue).

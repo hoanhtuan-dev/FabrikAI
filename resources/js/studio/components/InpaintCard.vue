@@ -42,7 +42,13 @@ const elapsedSec = computed(() => store.inpaintStartTs ? Math.max(0, Math.floor(
 const fmt = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 
 const activeGen = computed(() => store.inpaintGenId ? store.generations.find(g => g.id === Number(store.inpaintGenId)) : null);
-const canSubmit = computed(() => !!activeImg.value && !store.inpainting && !!store.inpaintPrompt.trim());
+/** Lý do nút "Sửa ảnh" bị khoá — MỘT nguồn: canSubmit suy ra từ đây (§4.4). */
+const blockReason = computed(() => {
+  if (!activeImg.value) return 'Chưa có ảnh để sửa — chọn một ảnh trên canvas hoặc trong Kết quả.';
+  if (!store.inpaintPrompt.trim()) return 'Chưa nhập yêu cầu sửa — gõ mô tả vùng cần sửa, hoặc chọn một gợi ý bên dưới.';
+  return '';
+});
+const canSubmit = computed(() => !blockReason.value && !store.inpainting);
 const running = computed(() => store.inpaintStage === 'send' || store.inpaintStage === 'processing');
 const maskActive = computed(() => store.inpaintMaskMode !== 'none');
 </script>
@@ -69,10 +75,10 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
       <button @click="store.toggleInpaintMask('path')"
               class="group flex w-full items-center justify-center gap-2.5 rounded-lg border px-4 py-3 text-sm font-semibold motion-ui motion-ui--size duration-base"
               :class="store.inpaintMaskMode === 'path'
-                ? 'border-emerald-400 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-900/30'
-                : 'border-emerald-400/40 bg-emerald-500/10 text-ok hover:border-emerald-400 hover:bg-emerald-500/20 hover:shadow-md hover:shadow-emerald-900/20 active:scale-[.98]'">
+                ? 'border-brand-500 bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-lg shadow-brand-900/30'
+                : 'border-ink-600 bg-brand-600/10 text-brand-200 hover:border-brand-400 hover:bg-brand-600/20 hover:shadow-md hover:shadow-brand-900/20 active:scale-[.98]'">
         <span class="grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors"
-              :class="store.inpaintMaskMode === 'path' ? 'bg-cream-50/20' : 'bg-emerald-500/20 group-hover:bg-emerald-500/30'">
+              :class="store.inpaintMaskMode === 'path' ? 'bg-cream-50/20' : 'bg-brand-600/25 group-hover:bg-brand-600/35'">
           <StudioIcon name="penTool" size="h-4 w-4" />
         </span>
         <span class="flex flex-col items-start text-left leading-tight">
@@ -91,7 +97,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     </div>
     <div v-if="maskActive" class="mt-1.5 rounded-md border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] text-brand-200">Vẽ đường cong quanh vùng cần sửa — quay lại điểm đầu để đóng kín, vùng chọn tự thành mask.</div>
     <!-- Trạng thái mask đã lưu: lưới mini preview -->
-    <div v-else-if="store.inpaintMaskDone" class="mt-1.5 rounded-md border border-emerald-500/30 bg-emerald-900/20 px-2.5 py-2 text-[10px] text-ok">
+    <div v-else-if="store.inpaintMaskDone" class="mt-1.5 rounded-md border border-ok/40 bg-ok/10 px-2.5 py-2 text-[10px] text-ok">
       <div class="grid grid-cols-[auto_1fr_auto] items-center gap-3">
         <div class="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-md border border-white/20 bg-[repeating-conic-gradient(#d8d2c4_0_25%,#fff_0_50%)] bg-[length:16px_16px]">
           <img v-if="store.inpaintBrushData" :src="'data:image/png;base64,' + store.inpaintBrushData" class="h-full w-full object-contain" alt="Mask" />
@@ -147,6 +153,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
       <span v-else-if="store.inpainting">AI đang chỉnh sửa…</span>
       <span v-else>Sửa ảnh <span class="opacity-70">· {{ store.imageCreditCost }} credit</span></span>
     </button>
+    <p v-if="blockReason" class="mt-1.5 text-[10px] leading-4 text-warn">↳ {{ blockReason }}</p>
 
     <!-- Tiến độ -->
     <div v-if="running" class="mt-3 rounded-lg border border-brand-500/30 bg-brand-900/30 p-3">
@@ -155,7 +162,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     </div>
 
     <!-- Thành công -->
-    <div v-if="store.inpaintStage === 'done'" class="mt-3 flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-ok">
+    <div v-if="store.inpaintStage === 'done'" class="mt-3 flex items-center gap-2 rounded-lg border border-ok/40 bg-ok/10 p-3 text-xs text-ok">
       Đã sửa xong — ảnh mới đã được chọn trong Outputs.
       <button v-if="beforeUrl && activeGen?.media_url" @click="compareOpen = true" class="rounded-full bg-ink-800 px-2 py-0.5 font-semibold hover:bg-ink-700">So sánh Trước/Sau</button>
       <button @click="store.clearInpaintStatus()" class="ml-auto rounded-full bg-ink-800 px-2 py-0.5 hover:bg-ink-700">Đóng</button>

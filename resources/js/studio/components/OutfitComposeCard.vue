@@ -302,6 +302,8 @@ function saveSettings() {
     <button @click="run" :disabled="busy || selectedCount < 2 || !prompt.trim()" class="btn-brand mt-3 w-full whitespace-nowrap">
       {{ busy ? 'Đang lai tạo…' : (variants > 1 ? 'Lai tạo ' + variants + ' biến thể' : 'Ghép trang phục') }} <span v-if="!busy" class="opacity-70">· {{ variants * store.imageCreditCost }} credit</span>
     </button>
+    <p v-if="!busy && selectedCount < 2" class="mt-1.5 text-[10px] leading-4 text-warn">↳ Cần ít nhất 2 ảnh — chọn ảnh ở các ô bên trên (trang phục 1 · trang phục 2).</p>
+    <p v-if="!busy && selectedCount >= 2 && !prompt.trim()" class="mt-1.5 text-[10px] leading-4 text-warn">↳ Chưa có mô tả — gõ cách ghép mong muốn, hoặc chọn một gợi ý bên dưới.</p>
 
     <!-- Tiến độ -->
     <div v-if="running" class="mt-3 rounded-lg border border-brand-500/30 bg-brand-900/30 p-3">

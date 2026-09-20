@@ -72,5 +72,6 @@ const store = useStudioStore();
       <span v-if="store.videoBusy" class="flex items-center justify-center gap-2"><StudioIcon name="refresh" size="h-4 w-4" class="animate-spin" /> Đang gửi…</span>
       <span v-else class="flex items-center justify-center gap-2"><StudioIcon name="film" size="h-4 w-4" /> Render Video thời trang</span>
     </button>
+    <p v-if="!store.videoBusy && !store.videoPromptEn && !store.upscaleSrc" class="mt-1.5 text-[10px] leading-4 text-warn">↳ Chưa có nội dung — nhập mô tả video, hoặc chọn ảnh trên canvas để ghép tự động.</p>
   </div>
 </template>

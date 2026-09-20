@@ -811,14 +811,14 @@ const bodyHipsLabel = computed(() => {
 
         <!-- ===== TAB: TƯ THẾ (kế thừa từ chip Thử đồ) ===== -->
         <div v-show="activeTab === 'pose'" class="space-y-3">
-          <div class="rounded-lg border border-emerald-500/20 bg-emerald-900/10 p-3">
-            <p class="flex items-center gap-1.5 text-xs font-semibold text-ok"><StudioIcon name="pose" size="h-3.5 w-3.5" /> Tư thế người mẫu</p>
-            <p class="mt-0.5 text-[10px] text-ok">Kế thừa từ chip Thử đồ. AI sẽ đọc ảnh pose để tạo mô tả tư thế. Để trống = AI tự chọn.</p>
+          <div class="rounded-lg border border-ink-700 bg-ink-900 p-3">
+            <p class="flex items-center gap-1.5 text-xs font-semibold text-cream-100"><StudioIcon name="pose" size="h-3.5 w-3.5" /> Tư thế người mẫu</p>
+            <p class="mt-0.5 text-[10px] text-cream-300">Kế thừa từ chip Thử đồ. AI sẽ đọc ảnh pose để tạo mô tả tư thế. Để trống = AI tự chọn.</p>
           </div>
-          <div v-if="!imagePosesLoaded" class="py-4 text-center"><div class="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent"></div></div>
+          <div v-if="!imagePosesLoaded" class="py-4 text-center"><div class="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-brand-400 border-t-transparent"></div></div>
           <div v-else class="grid grid-cols-2 gap-1.5">
             <button v-for="p in imagePoses" :key="p.id" @click="store.imagePoseId = (String(store.imagePoseId) === String(p.id)) ? '' : String(p.id)"
-                    :class="String(store.imagePoseId) === String(p.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-600 bg-ink-800 hover:border-emerald-400'"
+                    :class="String(store.imagePoseId) === String(p.id) ? 'border-brand-500 bg-brand-600/20 ring-1 ring-brand-500/40' : 'border-ink-600 bg-ink-800 hover:border-brand-400'"
                     class="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
               <img v-if="p.thumb || p.image" :src="p.thumb || p.image" loading="lazy" class="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
               <span v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-700"><StudioIcon name="user" size="h-4 w-4" /></span>
@@ -867,9 +867,9 @@ const bodyHipsLabel = computed(() => {
 
         <!-- Enrich Preview popup -->
         <div v-if="showEnrich" role="dialog" aria-modal="true" aria-label="Xem trước prompt đã làm giàu" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showEnrich = false">
-          <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-emerald-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
+          <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-ink-700 bg-ink-900 p-5 shadow-2xl" @click.stop>
             <div class="mb-3 flex items-center justify-between">
-              <span class="flex items-center gap-2 text-sm font-semibold text-ok"><StudioIcon name="wand" /> Prompt Enrich Preview</span>
+              <span class="flex items-center gap-2 text-sm font-semibold text-cream-100"><StudioIcon name="wand" /> Prompt Enrich Preview</span>
               <div class="flex items-center gap-2">
                 <button @click="doEnrichPreview" :disabled="enrichLoading" class="rounded-full bg-ink-700 px-3 py-1 text-[10px] text-cream-200 hover:bg-brand-600" title="Tải lại bản xem trước prompt đã làm giàu">{{ enrichLoading ? 'Đang xử lý…' : 'Làm mới' }}</button>
                 <button @click="showEnrich = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
@@ -879,8 +879,8 @@ const bodyHipsLabel = computed(() => {
               <p class="mb-1 text-[10px] text-cream-400">Prompt gốc:</p>
               <p class="text-xs leading-relaxed text-cream-200 whitespace-pre-wrap">{{ store.imagePromptEn || '(chưa nhập prompt)' }}</p>
             </div>
-            <div class="rounded-md border border-emerald-500/30 bg-emerald-900/20 p-3">
-              <p class="mb-1 text-[10px] text-ok">Prompt sau khi enrich (gửi lên model):</p>
+            <div class="rounded-md border border-brand-500/30 bg-brand-600/10 p-3">
+              <p class="mb-1 text-[10px] text-brand-200">Prompt sau khi enrich (gửi lên model):</p>
               <div v-if="enrichLoading" class="py-4 text-center"><div class="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-brand-400 border-t-transparent"></div></div>
               <div v-else-if="enrichError" class="text-xs text-danger">{{ enrichError }}</div>
               <p v-else-if="enrichPreview" class="max-h-60 overflow-y-auto text-xs leading-relaxed text-ok whitespace-pre-wrap">{{ enrichPreview }}</p>
@@ -978,6 +978,7 @@ const bodyHipsLabel = computed(() => {
               </span>
               <span v-else class="flex items-center justify-center gap-2"><StudioIcon name="zap" size="h-4 w-4" /> Tạo {{ batchImages || 0 }} ảnh hàng loạt</span>
             </button>
+            <p v-if="!store.generating && !batchItemsUsed.length" class="mt-1.5 text-[10px] leading-4 text-warn">↳ Chưa có mục nào — dán danh sách vào ô phía trên, mỗi dòng một sản phẩm/ý tưởng.</p>
           </div>
 
           <div v-if="store.batchSend" class="rounded-lg border border-ink-700 bg-ink-900/60 p-2.5">
@@ -1017,7 +1018,9 @@ const bodyHipsLabel = computed(() => {
         </div>
 
         <!-- Reset + Generate (fixed bottom) -->
-        <div class="sticky bottom-0 z-10 -mx-1 mt-4 border-t border-ink-700/50 bg-ink-900/95 backdrop-blur-sm px-1 pb-1 pt-3">
+        <!-- §4.3: trong tab "Hàng loạt" thì nút chạy hàng loạt LÀ hành động chính — thanh CTA dưới
+             cùng ẩn đi để không có hai nút chính cùng lúc trên một màn hình. -->
+        <div v-if="activeTab !== 'batch'" class="sticky bottom-0 z-10 -mx-1 mt-4 border-t border-ink-700/50 bg-ink-900/95 backdrop-blur-sm px-1 pb-1 pt-3">
           <div class="flex items-center justify-between mb-2">
             <button @click="resetToDefaults" class="text-xs text-cream-400 underline hover:text-brand-300" title="Đưa tất cả cài đặt về mặc định hệ thống">Đặt lại mặc định</button>
           </div>
@@ -1031,6 +1034,7 @@ const bodyHipsLabel = computed(() => {
               <StudioIcon name="zap" size="h-4 w-4" /> Tạo Ảnh
             </span>
           </button>
+          <p v-if="!store.generating && !store.imagePromptEn" class="mt-1.5 text-[10px] leading-4 text-warn">↳ Chưa nhập mô tả ảnh — gõ mô tả ở tab Prompt, hoặc mở bảng đầy đủ.</p>
         </div>
         </div>
       </template>

@@ -68,7 +68,9 @@ const selectedPose = computed(() => poses.value.find(p => String(p.id) === Strin
 // sinh ảnh — không cần người dùng chọn. selectedModel = null → backend dùng default settings.
 
 // Cho phép tạo ngay cả khi chưa nhập mô tả — backend tự dựng prompt "create a fresh variation".
-const canSubmit = computed(() => !!img.value && !busy.value);
+/** Lý do nút chính bị khoá — MỘT nguồn: canSubmit suy ra từ đây (§4.4). */
+const blockReason = computed(() => (img.value ? '' : 'Chưa có ảnh nguồn — chọn một ảnh trong Kết quả hoặc tải ảnh lên.'));
+const canSubmit = computed(() => !blockReason.value && !busy.value);
 
 // ── Nền Studio: 16 màu nền studio (dùng chung cho cả "Tạo ảnh mới" và "Thử đồ") ──
 const presets = [
@@ -254,40 +256,40 @@ async function runRefgen() {
       <!-- 4 chip điều khiển: chỉ 1 chip mở/tô sáng tại 1 thời điểm -->
       <div class="mt-4 grid grid-cols-4 gap-1.5">
         <button @click="togglePanel('face')"
-                :class="openPanel === 'face' ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-600 bg-ink-800 hover:border-emerald-400'"
+                :class="openPanel === 'face' ? 'border-brand-500 bg-brand-600/20 ring-1 ring-brand-500/40' : 'border-ink-600 bg-ink-800 hover:border-brand-400'"
                 class="flex flex-col items-center gap-1 rounded-lg border px-1 py-2.5 text-center transition">
-          <StudioIcon name="user" size="h-5 w-5" class="text-ok" />
+          <StudioIcon name="user" size="h-5 w-5" class="text-cream-300" />
           <span class="text-[11px] font-semibold leading-none text-cream-100">Khuôn mặt</span>
           <span class="max-w-full truncate text-[9px] leading-none text-cream-400">{{ selectedFace ? selectedFace.name : 'Mặc định' }}</span>
         </button>
         <button @click="togglePanel('body')"
-                :class="openPanel === 'body' ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-600 bg-ink-800 hover:border-emerald-400'"
+                :class="openPanel === 'body' ? 'border-brand-500 bg-brand-600/20 ring-1 ring-brand-500/40' : 'border-ink-600 bg-ink-800 hover:border-brand-400'"
                 class="flex flex-col items-center gap-1 rounded-lg border px-1 py-2.5 text-center transition">
-          <StudioIcon name="body" size="h-5 w-5" class="text-ok" />
+          <StudioIcon name="body" size="h-5 w-5" class="text-cream-300" />
           <span class="text-[11px] font-semibold leading-none text-cream-100">Phom dáng</span>
           <span class="max-w-full truncate text-[9px] leading-none text-cream-400">{{ bodyTouched ? bodyBuildLabel : 'Mặc định' }}</span>
         </button>
         <button @click="togglePanel('pose')"
-                :class="openPanel === 'pose' ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-600 bg-ink-800 hover:border-emerald-400'"
+                :class="openPanel === 'pose' ? 'border-brand-500 bg-brand-600/20 ring-1 ring-brand-500/40' : 'border-ink-600 bg-ink-800 hover:border-brand-400'"
                 class="flex flex-col items-center gap-1 rounded-lg border px-1 py-2.5 text-center transition">
-          <StudioIcon name="pose" size="h-5 w-5" class="text-ok" />
+          <StudioIcon name="pose" size="h-5 w-5" class="text-cream-300" />
           <span class="text-[11px] font-semibold leading-none text-cream-100">Pose</span>
           <span class="max-w-full truncate text-[9px] leading-none text-cream-400">{{ selectedPose ? selectedPose.name : 'Tự do' }}</span>
         </button>
         <button @click="togglePanel('bg')"
-                :class="openPanel === 'bg' ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-600 bg-ink-800 hover:border-emerald-400'"
+                :class="openPanel === 'bg' ? 'border-brand-500 bg-brand-600/20 ring-1 ring-brand-500/40' : 'border-ink-600 bg-ink-800 hover:border-brand-400'"
                 class="flex flex-col items-center gap-1 rounded-lg border px-1 py-2.5 text-center transition">
-          <StudioIcon name="background" size="h-5 w-5" class="text-ok" />
+          <StudioIcon name="background" size="h-5 w-5" class="text-cream-300" />
           <span class="text-[11px] font-semibold leading-none text-cream-100">Nền Studio</span>
           <span class="max-w-full truncate text-[9px] leading-none text-cream-400">{{ activePreset ? 'Đã chọn' : 'Mặc định' }}</span>
         </button>
       </div>
 
       <!-- Khuôn mặt mẫu (lưới 2x, không title) -->
-      <div v-if="openPanel === 'face'" class="mt-2 rounded-lg border border-emerald-400/20 bg-emerald-900/10 p-2.5">
+      <div v-if="openPanel === 'face'" class="mt-2 rounded-lg border border-ink-700 bg-ink-900 p-2.5">
         <div class="grid grid-cols-2 gap-1.5">
           <button v-for="f in faces" :key="f.id" @click="faceModelId = (String(faceModelId) === String(f.id)) ? '' : String(f.id)"
-                  :class="String(faceModelId) === String(f.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-600 bg-ink-800 hover:border-emerald-400'"
+                  :class="String(faceModelId) === String(f.id) ? 'border-brand-500 bg-brand-600/20 ring-1 ring-brand-500/40' : 'border-ink-600 bg-ink-800 hover:border-brand-400'"
                   class="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
             <img v-if="f.thumb || f.image" :src="f.thumb || f.image" loading="lazy" class="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
             <span v-else class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-ink-700"><StudioIcon name="user" size="h-4 w-4" /></span>
@@ -298,34 +300,34 @@ async function runRefgen() {
       </div>
 
       <!-- Phom dáng người mẫu (dropdown) -->
-      <div v-if="openPanel === 'body'" class="mt-2 space-y-2 rounded-lg border border-emerald-400/20 bg-emerald-900/10 p-3">
+      <div v-if="openPanel === 'body'" class="mt-2 space-y-2 rounded-lg border border-ink-700 bg-ink-900 p-3">
         <div>
-          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Chiều cao</span><span class="font-semibold text-ok">{{ bodyHeightLabel }}</span></p>
-          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyHeight" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Chiều cao</span><span class="font-semibold text-cream-100">{{ bodyHeightLabel }}</span></p>
+          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyHeight" class="h-1.5 w-full cursor-pointer accent-brand-400">
         </div>
         <div>
-          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Vóc dáng</span><span class="font-semibold text-ok">{{ bodyBuildLabel }}</span></p>
-          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyBuild" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Vóc dáng</span><span class="font-semibold text-cream-100">{{ bodyBuildLabel }}</span></p>
+          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyBuild" class="h-1.5 w-full cursor-pointer accent-brand-400">
         </div>
         <div>
-          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Eo</span><span class="font-semibold text-ok">{{ bodyWaistLabel }}</span></p>
-          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyWaist" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Eo</span><span class="font-semibold text-cream-100">{{ bodyWaistLabel }}</span></p>
+          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyWaist" class="h-1.5 w-full cursor-pointer accent-brand-400">
         </div>
         <div>
-          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Vai</span><span class="font-semibold text-ok">{{ bodyShouldersLabel }}</span></p>
-          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyShoulders" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Vai</span><span class="font-semibold text-cream-100">{{ bodyShouldersLabel }}</span></p>
+          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyShoulders" class="h-1.5 w-full cursor-pointer accent-brand-400">
         </div>
         <div>
-          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Hông</span><span class="font-semibold text-ok">{{ bodyHipsLabel }}</span></p>
-          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyHips" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Hông</span><span class="font-semibold text-cream-100">{{ bodyHipsLabel }}</span></p>
+          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyHips" class="h-1.5 w-full cursor-pointer accent-brand-400">
         </div>
       </div>
 
       <!-- Pose mẫu (lưới 2x, không title) — AI đọc ẢNH pose để tạo mô tả tư thế -->
-      <div v-if="openPanel === 'pose'" class="mt-2 rounded-lg border border-emerald-400/20 bg-emerald-900/10 p-2.5">
+      <div v-if="openPanel === 'pose'" class="mt-2 rounded-lg border border-ink-700 bg-ink-900 p-2.5">
         <div class="grid grid-cols-2 gap-1.5">
           <button v-for="p in poses" :key="p.id" @click="poseId = (String(poseId) === String(p.id)) ? '' : String(p.id)"
-                  :class="String(poseId) === String(p.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-600 bg-ink-800 hover:border-emerald-400'"
+                  :class="String(poseId) === String(p.id) ? 'border-brand-500 bg-brand-600/20 ring-1 ring-brand-500/40' : 'border-ink-600 bg-ink-800 hover:border-brand-400'"
                   class="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
             <img v-if="p.thumb || p.image" :src="p.thumb || p.image" loading="lazy" class="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
             <span v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-700"><StudioIcon name="user" size="h-4 w-4" /></span>
@@ -336,11 +338,11 @@ async function runRefgen() {
       </div>
 
       <!-- Nền Studio (lưới 2x, không title) -->
-      <div v-if="openPanel === 'bg'" class="mt-2 rounded-lg border border-emerald-400/20 bg-emerald-900/10 p-2.5">
+      <div v-if="openPanel === 'bg'" class="mt-2 rounded-lg border border-ink-700 bg-ink-900 p-2.5">
         <div class="grid grid-cols-2 gap-1.5">
           <button v-for="p in presets" :key="p.id" @click="applyPreset(p)"
                   class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold motion-ui motion-ui--size"
-                  :class="activePreset === p.id ? 'border-emerald-400 bg-emerald-600/25 text-cream-50' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-emerald-400'">
+                  :class="activePreset === p.id ? 'border-brand-500 bg-brand-600/20 text-cream-50' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">
             <span class="h-4 w-4 shrink-0 rounded-full border border-white/25 shadow-inner ring-1 ring-black/30" :style="{ background: p.color }"></span>
             <span class="truncate">{{ p.label }}</span>
           </button>
@@ -367,6 +369,7 @@ async function runRefgen() {
       <span v-if="busy">Đang tạo {{ variants }} ảnh…</span>
       <span v-else>{{ isTryon ? 'Mặc thử đồ ' + variants + ' bản' : 'Tạo ' + variants + ' biến thể' }} <span class="opacity-70">· {{ store.imageCreditCost * variants }} credit</span></span>
     </button>
+    <p v-if="blockReason" class="mt-1.5 text-[10px] leading-4 text-warn">↳ {{ blockReason }}</p>
     <LoadingSpinner v-if="busy" :text="isTryon ? 'AI đang tạo người mẫu mặc đồ…' : 'AI đang tạo biến thể từ ảnh mẫu…'" subtext="Quá trình này có thể mất vài giây" size="sm" />
     <p class="mt-2 text-[10px] leading-relaxed text-cream-400">Kết quả xuất hiện trong <b>Outputs</b> — chọn ảnh nào cũng được để xem lớn / làm ảnh gốc tiếp theo.</p>
   </div>

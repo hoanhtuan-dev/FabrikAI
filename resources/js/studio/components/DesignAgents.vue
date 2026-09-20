@@ -876,6 +876,7 @@ watch(() => store.designAgentOpen, (open) => {
                     <button type="button" class="btn-brand btn-sm" :disabled="store.shopSaving || !shopRowCount" @click="saveShop">
                       {{ store.shopSaving ? 'Đang lưu…' : 'Lưu dữ liệu shop' }}
                     </button>
+                    <p v-if="!store.shopSaving && !shopRowCount" class="mt-1.5 text-[10px] leading-4 text-warn">↳ Chưa có dòng dữ liệu nào — thêm ít nhất một dòng ở bảng trên rồi lưu.</p>
                     <button v-if="store.shopRows.length" type="button" class="tool-btn" @click="store.shopRows = []">Xoá hết</button>
                   </div>
                 </div>
@@ -936,6 +937,7 @@ watch(() => store.designAgentOpen, (open) => {
                           <StudioIcon name="refresh" size="h-3.5 w-3.5" :class="store.planLoading ? 'animate-spin' : ''" />
                           {{ store.planLoading ? 'Đang tính…' : 'Tính lại kế hoạch' }}
                         </button>
+                        <p v-if="!store.planLoading && briefStale" class="mt-1.5 text-[10px] leading-4 text-warn">↳ Brief đã cũ so với dữ liệu shop — tạo lại brief rồi mới tính kế hoạch.</p>
                       </div>
                     </div>
 

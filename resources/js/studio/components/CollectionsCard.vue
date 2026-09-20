@@ -398,6 +398,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('rejected')">
             <StudioIcon name="ban" size="h-3.5 w-3.5" /> Loại {{ selectedCount }}
           </button>
+        <p v-if="!reviewBusy && !selectedCount" class="mt-1.5 text-[10px] leading-4 text-warn">↳ Chưa chọn ảnh nào — bấm vào ảnh trong danh sách trên để chọn trước khi duyệt.</p>
         </div>
         <p class="mt-1.5 text-[9px] text-cream-400">
           Phím tắt khi khối này đang mở: S chọn ảnh chờ duyệt · N bước tiếp · A duyệt · R loại · Esc đóng

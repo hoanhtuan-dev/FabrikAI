@@ -185,14 +185,15 @@ class DesignSystemTest extends TestCase
             'hover:border-cream-300' => true,                                  // nút kiểu btn-outline trên nền tối
         ];
 
-        /* Màu NHẤN RIÊNG của card — ngoại lệ DUY NHẤT, và phải dùng nhất quán trong cả card
-           (viền + nền + icon cùng một họ màu), KHÔNG bao giờ dùng cho nút hành động chung:
-             · RefImageCard.vue — bộ chọn khuôn mặt/dáng/tư thế (49 token emerald: viền, nền, icon)
-             · ConceptCard.vue  — khối "Tư thế người mẫu (kế thừa từ chip Thử đồ)"
-             · InpaintCard.vue  — nút bật/tắt vùng chọn
-           Danh sách này ĐÓNG: card khác dùng emerald-400 làm viền nút là ĐỎ. */
-        $accentAllowed = ['RefImageCard.vue' => true, 'ConceptCard.vue' => true, 'InpaintCard.vue' => true];
-        $accentTokens = ['border-emerald-400', 'border-emerald-400/40', 'hover:border-emerald-400'];
+        /* [2026-09-23] NGOẠI LỆ "MÀU NHẤN RIÊNG CỦA CARD" ĐÃ ĐƯỢC GỠ HẲN.
+           Trước đây ba card (RefImageCard · ConceptCard · InpaintCard) được phép dùng emerald-400 làm
+           viền nút vì chúng "có màu nhấn riêng". Hệ quả thật: cùng một trạng thái "đang chọn" mà chỗ
+           thì xanh lá thương hiệu, chỗ thì emerald — người dùng phải học hai lần, và bảng màu có thêm
+           một họ màu không thuộc hệ. Nay cả ba đã được thiết kế lại:
+             · "đang chọn"  -> border-brand-500 + bg-brand-600/20 + ring-brand-500/40
+             · "khối chứa"  -> border-ink-700 + bg-ink-900
+             · "thành công" -> token ngữ nghĩa ok (border-ok/40 · bg-ok/10 · text-ok)
+           Nên KHÔNG còn danh sách miễn trừ nào: bất kỳ token emerald nào làm viền nút là ĐỎ. */
 
         $violations = [];
         foreach (\Illuminate\Support\Facades\File::allFiles(resource_path('js/studio')) as $file) {
@@ -209,7 +210,6 @@ class DesignSystemTest extends TestCase
                     foreach ($found[0] as $token) {
                         $token = str_replace('!', '', $token);
                         if (isset($allowed[$token])) continue;
-                        if (in_array($token, $accentTokens, true) && isset($accentAllowed[$name])) continue;
                         $violations[] = $name.': '.$token;
                     }
                 }
@@ -227,6 +227,60 @@ class DesignSystemTest extends TestCase
             $css, 'Nút nghỉ của .tool-btn phải là border-ink-600 — lệch với nút viết tay là hai nút cạnh nhau khác viền.');
         $this->assertStringNotContainsString('rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1.5',
             $css, 'Đã quay lại viền nghỉ border-ink-700 cho .tool-btn.');
+    }
+
+    /**
+     * NÚT CHÍNH BỊ KHOÁ PHẢI NÓI RÕ LÝ DO (docs/DESIGN_SYSTEM.md §4 quy tắc 4).
+     *
+     * Đo trước khi sửa (2026-09-23): 12 nút chính bị khoá mà không có dòng lý do — người dùng chỉ
+     * thấy một nút mờ và phải tự đoán thiếu gì (thiếu ảnh nguồn? thiếu mô tả? chưa chọn ảnh?).
+     *
+     * Bất biến: nút chính (`btn-brand`) bị khoá bởi điều kiện có PHỦ ĐỊNH một thứ KHÔNG phải trạng
+     * thái "đang chạy" thì ngay dưới nó phải có dòng lý do bắt đầu bằng ↳.
+     * Miễn trừ hợp lệ: điều kiện CHỈ là cờ đang-chạy (nhãn nút đã đổi thành "Đang gửi…") hoặc chỉ là
+     * chốt theo bước (step === 'brief' && đang tải) — không phải điều kiện người dùng cần gỡ.
+     */
+    public function test_blocked_primary_buttons_explain_the_reason(): void
+    {
+        // Cờ "đang chạy": khoá nút trong lúc chờ, KHÔNG cần dòng lý do (nhãn nút tự nói).
+        $busyFlags = ['busy', 'loading', 'saving', 'sending', 'running', 'generating', 'inpainting', 'upscaling',
+            'shareBusy', 'editorBusy', 'reviewBusy', 'videoBusy', 'shopSaving', 'planLoading',
+            'collectionBriefLoading', 'renderBusy', 'savingSettings'];
+
+        $violations = [];
+        foreach (\Illuminate\Support\Facades\File::allFiles(resource_path('js/studio/components')) as $file) {
+            if ($file->getExtension() !== 'vue') continue;
+            $name = $file->getFilename();
+            $src = (string) file_get_contents($file->getPathname());
+
+            preg_match_all('/<(button|a)\b[^>]*>/s', $src, $tags, PREG_OFFSET_CAPTURE);
+            foreach ($tags[0] as [$tag, $offset]) {
+                if (! str_contains($tag, 'btn-brand')) continue;
+                if (! preg_match('/:disabled="([^"]*)"/', $tag, $dm)) continue;
+
+                // Có phủ định một thứ KHÔNG phải cờ đang-chạy ⇒ đây là điều kiện người dùng cần gỡ.
+                preg_match_all('/!\s*([a-zA-Z_][a-zA-Z0-9_.]*)/', $dm[1], $neg);
+                $needsReason = false;
+                foreach ($neg[1] as $flag) {
+                    $bare = str_replace(['store.', '.value'], '', $flag);
+                    if (! in_array($bare, $busyFlags, true)) { $needsReason = true; break; }
+                }
+                if (! $needsReason) continue;
+
+                // Cửa sổ đo tính tới HẾT thẻ nút rồi cộng thêm 400 ký tự: nút có thể nhiều dòng
+                // (thuộc tính + span bên trong), nên cửa sổ cố định dễ trượt qua dòng lý do.
+                $closeAt = strpos($src, '</button>', $offset);
+                $after = substr($src, $offset, ($closeAt === false ? 900 : $closeAt - $offset + 400));
+                if (! str_contains($after, '↳')) {
+                    $line = substr_count(substr($src, 0, $offset), "\n") + 1;
+                    $violations[] = $name.':'.$line.' — '.trim(preg_replace('/\s+/', ' ', $dm[1]));
+                }
+            }
+        }
+
+        $this->assertSame([], array_values(array_unique($violations)),
+            "Nút chính bị khoá mà KHÔNG nói vì sao. Xem docs/DESIGN_SYSTEM.md §4 quy tắc 4 — thêm ngay dưới nút "
+            .'một dòng ↳ nói rõ đang thiếu gì, lấy từ MỘT computed blockReason để điều kiện khoá và câu giải thích không lệch nhau.');
     }
 
     /**
