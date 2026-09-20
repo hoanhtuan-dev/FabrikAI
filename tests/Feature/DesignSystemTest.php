@@ -1,0 +1,151 @@
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+/**
+ * HƯỚNG DẪN PHONG CÁCH THIẾT KẾ CHUNG (docs/DESIGN_SYSTEM.md) — khoá lại bằng máy.
+ *
+ * Vì sao có file test này: hướng dẫn thiết kế chỉ có giá trị khi nó (a) TỒN TẠI, (b) KHÔNG NÓI SAI
+ * (mọi component nó bảo dùng phải thật sự có), và (c) những luật dễ vi phạm nhất được máy giữ hộ.
+ *
+ * Ba luật dễ vi phạm nhất, mỗi luật đều đã từng xảy ra thật ở card "Gợi ý từ ảnh" trước 2026-09-22:
+ *   · TỰ CHẾ TIẾN TRÌNH: card có 2 bộ chấm/thanh tiến trình riêng (~90 dòng CSS gần trùng nhau)
+ *     trong khi app đã có <LoadingSpinner> dùng chung;
+ *   · EMOJI TRONG CHROME: 5 chip chế độ + 1 nút + 8 nhãn đặc điểm đều dùng emoji ⇒ mỗi hệ điều hành
+ *     vẽ một kiểu, không theo bảng màu, và trình đọc màn hình đọc tên emoji thành tiếng;
+ *   · BẢNG MÀU RIÊNG: <style scoped> tự khai 40 mã rgba() ⇒ card lệch hẳn tông của app.
+ */
+class DesignSystemTest extends TestCase
+{
+    private function src(string $rel): string
+    {
+        return (string) file_get_contents(base_path($rel));
+    }
+
+    private function guide(): string
+    {
+        return $this->src('docs/DESIGN_SYSTEM.md');
+    }
+
+    public function test_the_shared_style_guide_exists_and_covers_the_required_ground(): void
+    {
+        $this->assertFileExists(base_path('docs/DESIGN_SYSTEM.md'),
+            'Thiếu hướng dẫn phong cách thiết kế chung — người sau lại tự nghĩ ra chuẩn riêng.');
+
+        foreach ([
+            '## 1. Một nguồn chân lý',
+            '## 2. Class dùng chung',
+            '## 3. Component dùng chung',
+            '## 4. Trình bày cho NGƯỜI MỚI',
+            '## 5. Bố cục & cuộn',
+            '## 6. Trợ năng',
+            '## 7. Icon & emoji',
+            '## 8. Checklist',
+        ] as $section) {
+            $this->assertStringContainsString($section, $this->guide(), 'Hướng dẫn thiết kế thiếu mục: '.$section);
+        }
+
+        // Sáu quy tắc cho người mới phải còn nguyên (đây là phần dễ bị "viết lại cho gọn" rồi mất).
+        foreach (['MỘT hành động chính', 'NÓI RÕ LÝ DO', 'mặc định ĐÓNG', 'bắt buộc'] as $rule) {
+            $this->assertStringContainsString($rule, $this->guide(), 'Thiếu quy tắc trình bày: '.$rule);
+        }
+
+        // Hướng dẫn phải trỏ tới đúng hai bộ test đang giữ luật này.
+        $this->assertStringContainsString('DesignSystemTest', $this->guide(), 'Hướng dẫn phải nói rõ luật nào được máy giữ.');
+        $this->assertStringContainsString('ToolbarAreaTest', $this->guide(), 'Hướng dẫn phải trỏ tới test khoá vùng toolbar.');
+    }
+
+    public function test_every_shared_component_named_in_the_guide_really_exists(): void
+    {
+        // Chống mục "tài liệu mục": hướng dẫn bảo dùng component nào thì component đó phải có thật.
+        // Tên component trong hướng dẫn ghi kèm ".vue" (cũng để không lẫn với lớp PHP).
+        preg_match_all('/\x60([A-Z][A-Za-z]+\.vue)\x60/', $this->guide(), $m);
+        $named = array_unique($m[1] ?? []);
+        $this->assertGreaterThanOrEqual(5, count($named), 'Không đọc được danh sách component dùng chung trong hướng dẫn.');
+
+        // Tìm trong TOÀN BỘ resources/js/studio (component nằm ở components/, app gốc nằm ở ngoài).
+        $onDisk = [];
+        foreach (\Illuminate\Support\Facades\File::allFiles(resource_path('js/studio')) as $f) {
+            $onDisk[$f->getFilename()] = true;
+        }
+
+        foreach ($named as $file) {
+            $this->assertArrayHasKey($file, $onDisk,
+                'Hướng dẫn nhắc tới '.$file.' nhưng file này không tồn tại trong resources/js/studio.');
+        }
+
+        // Con số icon trong hướng dẫn phải khớp icons.json (nguồn duy nhất của cả Vue lẫn PHP).
+        $icons = json_decode((string) file_get_contents(resource_path('js/studio/icons.json')), true);
+        $this->assertIsArray($icons);
+        $this->assertStringContainsString('**'.count($icons).' icon**', $this->guide(),
+            'Số icon ghi trong hướng dẫn đã lệch với icons.json — sửa tài liệu, đừng để nó nói sai.');
+    }
+
+    public function test_the_suggest_card_does_not_build_its_own_progress_widget(): void
+    {
+        $card = $this->src('resources/js/studio/components/SuggestCard.vue');
+
+        // Phải DÙNG component tiến trình dùng chung…
+        $this->assertStringContainsString("import LoadingSpinner from './LoadingSpinner.vue'", $card,
+            'Card phải dùng <LoadingSpinner> dùng chung thay vì tự vẽ tiến trình.');
+        $this->assertStringContainsString('<LoadingSpinner', $card, 'Import rồi mà không render thì vô nghĩa.');
+
+        // …và KHÔNG được dựng lại bộ chấm/thanh riêng (đúng thứ đã bị gỡ ở đợt 2026-09-22).
+        foreach (['genflow-step', 'genflow-dot', 'genflow-bar', 'suggest-stage', 'suggest-bar', 'suggest-connector'] as $dead) {
+            $this->assertStringNotContainsString($dead, $card,
+                'Card lại tự dựng tiến trình riêng ('.$dead.') — hãy dùng LoadingSpinner.');
+        }
+    }
+
+    public function test_the_suggest_card_has_no_emoji_and_no_private_palette(): void
+    {
+        $card = $this->src('resources/js/studio/components/SuggestCard.vue');
+
+        // (1) Không emoji trong chrome. (Mũi tên kiểu chữ → ↳ không tính — đó là quy ước chung.)
+        $this->assertSame(0, preg_match('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{FE0F}]/u', $card),
+            'Card còn emoji — dùng <StudioIcon> (icons.json) thay thế.');
+
+        // (2) Không bảng màu riêng: <style scoped> phải NGẮN, chỉ một gradient nhận diện.
+        // Neo ở ĐẦU DÒNG: chuỗi "<style scoped>" có thể xuất hiện trong chú thích của script.
+        preg_match('/^<style scoped>\n(.*?)^<\/style>/ms', $card, $m);
+        $this->assertNotEmpty($m[1] ?? '', 'Không đọc được khối <style scoped> của card.');
+        $style = $m[1];
+        $lines = substr_count(trim($style), "\n") + 1;
+
+        $this->assertLessThanOrEqual(35, $lines,
+            'Khối <style scoped> phình to ('.$lines.' dòng): giao diện phải dựng bằng class dùng chung + token, không phải CSS riêng.');
+        $this->assertSame(1, substr_count($style, 'linear-gradient'),
+            'Card chỉ được có ĐÚNG MỘT gradient nhận diện — thêm nữa là tự tạo bảng màu riêng.');
+
+        // Màu phải lấy từ token, không phải mã màu hex tự nghĩ.
+        $this->assertSame(0, preg_match('/#[0-9a-fA-F]{6}\b/', $style),
+            'Khối style tự khai mã màu hex — dùng var(--color-…) hoặc tiện ích Tailwind.');
+    }
+
+    public function test_the_suggest_card_keeps_one_primary_action_and_explains_blocked_buttons(): void
+    {
+        $card = $this->src('resources/js/studio/components/SuggestCard.vue');
+
+        // Quy tắc 3: chỉ MỘT nút chính tại một thời điểm ⇒ nút ở bước ③ phải LÙI về thứ yếu khi có kết quả.
+        $this->assertMatchesRegularExpression(
+            "/:class=\"hasResult \? '[^']*btn-ghost[^']*' : 'btn-brand'\"/",
+            $card,
+            'Nút phân tích phải tự lùi về thứ yếu khi đã có kết quả — nếu không sẽ có HAI nút chính cùng lúc.'
+        );
+
+        // Quy tắc 4: nút bị khoá phải nói rõ lý do ngay dưới.
+        $this->assertStringContainsString('const blockReason = computed', $card, 'Thiếu lý do khoá nút.');
+        $this->assertMatchesRegularExpression('/\{\{ blockReason \}\}/', $card, 'Lý do khoá nút chưa được hiển thị.');
+
+        // Quy tắc 5: thứ nâng cao/ít dùng thu vào <details> đóng sẵn (Nâng cao + Gợi ý gần đây).
+        $this->assertGreaterThanOrEqual(2, substr_count($card, '<details'),
+            'Thứ nâng cao và danh sách lịch sử phải gấp trong <details> để card không dài trước mắt người mới.');
+        $this->assertStringNotContainsString('<details open', $card, 'Không mở sẵn khối nâng cao.');
+
+        // Quy tắc 1: có đánh số bước.
+        $this->assertStringContainsString('Ảnh nguồn', $card);
+        $this->assertStringContainsString('Kiểu gợi ý', $card);
+    }
+}

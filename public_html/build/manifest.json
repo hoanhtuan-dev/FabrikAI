@@ -94,7 +94,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-CEW7CMRx.css",
+    "file": "assets/app-DfcT8lUB.css",
     "name": "app",
     "names": [
       "app.css"
@@ -131,7 +131,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-VjeY-hLh.js",
+    "file": "assets/main-BFGPbSWS.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -142,7 +142,7 @@
       "_BaseModal-DlTw-u4R.js"
     ],
     "css": [
-      "assets/main-ufNgDk4T.css"
+      "assets/main-CmqMHeVT.css"
     ]
   },
   "resources/js/studio/my-settings.js": {

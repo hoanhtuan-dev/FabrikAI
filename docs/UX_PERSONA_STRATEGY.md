@@ -1292,3 +1292,58 @@ là thấy tay cầm của layer đó, kéo là layer đó được chọn và c
 
 
 
+
+---
+
+## 23. Tinh chỉnh card «Gợi ý từ ảnh» + HƯỚNG DẪN PHONG CÁCH THIẾT KẾ CHUNG (2026-09-22)
+
+> Đây là đợt đầu tiên có **tài liệu chuẩn** cho giao diện: **`docs/DESIGN_SYSTEM.md`**.
+> Từ nay mọi card/panel trong /studio đọc tài liệu đó trước khi thêm hoặc sửa giao diện.
+
+### 23.1 Vấn đề — đo được, không suy đoán
+
+Card «Gợi ý từ ảnh» (586 dòng) đã mọc thêm nhiều lớp qua các đợt trước và vi phạm gần hết quy ước
+chung mà đợt 12 (card Studio) vừa chốt:
+
+| # | Đo được | Hệ quả với người mới |
+|---|---|---|
+| 1 | **2 nút chính to ngang nhau** cùng hiện ("Gợi ý phong cách & prompt" + "Tạo ảnh ngay") | không biết bấm cái nào trước; bấm sai thì ăn toast lỗi |
+| 2 | Nút mờ **không nói vì sao** | phải đoán |
+| 3 | **2 hệ tiến trình tự chế** (~90 dòng CSS gần trùng nhau) | hai kiểu hiển thị cho cùng một việc |
+| 4 | **Emoji trong chrome**: 5 chip chế độ + 1 nút + 8 nhãn đặc điểm | mỗi hệ điều hành vẽ một kiểu, không theo bảng màu, trình đọc màn hình đọc thành tiếng |
+| 5 | **40 mã `rgba()` tự khai** trong `<style scoped>` | card lệch hẳn tông xanh của app |
+| 6 | Danh sách "Gợi ý gần đây" luôn chiếm chỗ | card dài trước mắt người mới |
+
+### 23.2 Đã làm
+
+- **`SuggestCard.vue` viết lại theo đúng 6 quy tắc trình bày** (nay là §4 của tài liệu chuẩn):
+  3 bước có số ①② (Ảnh nguồn · Kiểu gợi ý) + khối **Nâng cao** gấp sẵn; **một** hành động chính;
+  nút khoá có dòng lý do `↳`; **0 emoji** (toàn bộ bằng `StudioIcon`); tiến trình dùng
+  **`LoadingSpinner`** dùng chung cho cả phân tích lẫn tạo ảnh; "Gợi ý gần đây" gấp trong `<details>`.
+  **586 → 455 dòng.**
+- **`docs/DESIGN_SYSTEM.md`** (mới): nguồn chân lý về màu/chuyển động/chữ, bảng "cần gì → dùng class
+  nào", danh sách component dùng chung, 6 quy tắc cho người mới, quy tắc bố cục & cuộn, trợ năng,
+  icon/emoji, và checklist trước khi merge.
+- **Test khoá bất biến** `tests/Feature/DesignSystemTest.php` (5 test): không tự chế tiến trình ·
+  không emoji · không bảng màu riêng (style ≤ 35 dòng, đúng 1 gradient) · đúng 1 nút chính + có lý do
+  khoá · tài liệu phải tồn tại, **mọi component nó bảo dùng phải có thật**, và **số icon ghi trong
+  tài liệu phải khớp `icons.json`** (tài liệu không được phép nói sai).
+
+### 23.3 Đo lại bằng Chrome thật (component thật + CSS build thật, 7 trạng thái)
+
+| Trạng thái | Nút chính | Tràn ngang (300px) | Tràn ngang (260px, mở hết `<details>`) | Emoji |
+|---|---|---|---|---|
+| Chưa có ảnh · Có ảnh · Đã chọn chế độ · Đang phân tích · Có kết quả · Lỗi · Gần đây | **1** ở mọi trạng thái | **không** | **không** | **0** |
+
+Chiều cao card giảm ở mọi trạng thái (riêng trạng thái "có kết quả": 1018 → 941px; "gần đây": 623 → 489px).
+Test đã được **thử đột biến**: thêm emoji → ĐỎ · dựng lại tiến trình tự chế → ĐỎ · bỏ lùi nút chính → ĐỎ ·
+tự khai mã màu hex → ĐỎ · xoá dòng lý do khoá → ĐỎ.
+
+### 23.4 Còn lại (đề xuất)
+
+- [ ] **Nợ emoji toàn studio**: đo được **23/65 file · 134 lần xuất hiện** (ConceptCard 43 · store.js 18 ·
+      AdminApp 7 · StudioApp 6 · …). Không cần đợt riêng: sửa tới file nào dọn file đó.
+- [ ] Nhiều card khác vẫn còn **2 nút chính** hoặc **nút khoá không nêu lý do** — nên rà theo checklist §8
+      của tài liệu chuẩn khi có dịp sửa.
+- [ ] Card «Gợi ý từ ảnh» chưa cho **chọn ảnh nguồn ngay trong card** (phải chọn trên canvas/Thư viện);
+      `SourceLibraryPicker` đã có sẵn nên việc này rẻ.
