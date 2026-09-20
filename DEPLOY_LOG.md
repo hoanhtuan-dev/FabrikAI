@@ -1160,3 +1160,105 @@ StaticIntegrity).
       `bg-ink-900/90` — cùng cách đo, đồng bộ tiếp được ở đợt sau.
 - [ ] Nhiều card khác vẫn còn **2 nút chính** hoặc **nút khoá không nêu lý do** — rà theo checklist §9.
 - [ ] Dọn `guiprobe.tmp.php` còn sót ở thư mục gốc production (của phiên khác, không tự xoá).
+
+---
+
+## Phiên 2026-09-23 — Hợp nhất tài liệu (một nguồn chân lý) + HỆ THỐNG THEME Sáng/Tối + TƯƠNG PHẢN CHỮ đạt WCAG AA
+
+**Deploy:** `98b6389 → 1088f77` (3 commit: `ee8baa8` hợp nhất tài liệu · `985f55e` theme + tương phản · `1088f77` ghi chú).
+**CÓ MIGRATION** `2026_09_23_000001_add_theme_to_users_table` (cột nullable `users.theme`).
+**Sao lưu TRƯỚC khi migrate:** `~/backup-before-theme-20260920-0652.sql` — 188K · **35 bảng** · `mysqldump` exit=0.
+**Không route mới ngoài `PUT /api/theme`** · asset mới `app-DG3z1aZB.css` + `main-CAXQY34O.js`.
+
+### 1. Vấn đề gốc — đo được, không suy đoán
+
+Khiếu nại: *"màu chữ có độ tương phản hơi thấp, khó đọc"*. Đo trên mã nguồn thì đúng:
+
+| Đo được | Con số | Hệ quả |
+|---|---|---|
+| Chữ phụ tạo bằng ĐỘ MỜ trên một sắc duy nhất | **741 chỗ** `text-cream-300/25…/85` | độ mờ trộn với nền ⇒ tương phản không kiểm soát được |
+| Mức thấp nhất đang dùng | `/40` ≈ **2,9 : 1** | dưới ngưỡng AA (4,5:1) — **không có triệu chứng nào trong mã** |
+| Màu trạng thái viết bằng sắc độ thô | **345 chỗ** `text-red-300` · `text-amber-200` · … | các sắc độ đó chỉ đủ tương phản trên nền TỐI |
+| Chip trạng thái lấy **mã hex của server** làm màu chữ | 2,7 – 3,0 : 1 | cùng một hex cho hai theme ⇒ không thể đạt ở cả hai |
+| Chip/nhãn đặt TRÊN ẢNH: scrim đen cố định + chữ theo theme | 2,9 : 1 (ở theme Sáng) | theme sáng ⇒ chữ tối trên nền tối |
+| Giao diện | chỉ có **Tối**, không cài đặt được | người dùng không có lựa chọn nào |
+
+### 2. Hệ thống theme toàn cục (Sáng / Tối)
+
+- `resources/css/app.css`: `@theme` = giá trị theme **Tối**; khối **ngoài layer** `[data-theme='light']`
+  **đảo vai** hai dải token (`ink-*` = BỀ MẶT · `cream-*` = NỘI DUNG) ⇒ mọi class sẵn có
+  (`bg-ink-800` · `text-cream-200` · `border-ink-700`…) đúng ở CẢ HAI theme mà **không phải sửa markup**.
+- Token **CỐ ĐỊNH** (không theo theme): `invert · invert-content · invert-hover · on-accent` ·
+  `--color-canvas-*` (nền canvas) · `--color-scrim(-content)` (lớp phủ trên ảnh).
+- `.studio-dark` → **`.studio-shell`**: xoá hẳn khối "dịch màu" 20+ dòng — hệ theme làm việc đó.
+- `resources/views/partials/theme.blade.php`: script **inline trong `<head>`** chạy TRƯỚC lần vẽ đầu
+  (bundle Vite tải bất đồng bộ ⇒ sẽ nháy màu; trang server-render không chạy app JS nhưng vẫn phải đổi được
+  theme). Thứ tự quyết định: `localStorage` (cache máy) → tùy chọn theo **TÀI KHOẢN** → mặc định `dark`.
+- Lưu theo tài khoản: `users.theme` + `PUT /api/theme` (whitelist CỨNG `light|dark|system`, 422 với
+  giá trị lạ — cột này render vào `data-theme` của thẻ `<html>` ở MỌI blade nên nhận chuỗi tự do là lỗ XSS).
+- UI: mục **Giao diện** trong *Cài đặt của tôi* + nút đổi nhanh ở **thanh trạng thái Studio**.
+  **Mặc định là TỐI** ⇒ người dùng hiện hữu không bị đổi giao diện.
+- Endpoint nằm NGOÀI nhóm `can-studio` và KHÔNG thuộc module nào (`theme` đã khai vào `INFRA_PREFIXES`)
+  ⇒ giao diện là quyền của mọi tài khoản, không bị công tắc gói tắt.
+
+### 3. Tương phản — kết quả
+
+| | Trước | Sau |
+|---|---|---|
+| Bậc chữ thấp nhất | 2,9 : 1 | **6,7 : 1** (Tối) · **6,9 : 1** (Sáng) |
+| Bậc chữ chính | 12 – 13 : 1 | 13,1 : 1 (Tối) · 16,5 : 1 (Sáng) |
+| Màu trạng thái / nhấn | 2,7 – 3,0 : 1 | 4,8 – 10,2 : 1 (cả hai theme) |
+| CSS gửi cho khách | 164,61 kB | **155,33 kB** (−9,3 kB) |
+
+Đo bằng **Chrome thật**: 4 màn hình (bảng giá · Studio · Cài đặt của tôi · Bộ sưu tập) × 2 theme =
+**2.578 phần tử chữ mỗi theme → 0 chỗ dưới ngưỡng WCAG AA**. Phép đo trộn alpha của nền nên bắt được cả
+chỗ mắt thường bỏ qua — và chính nó tìm ra hai lỗi còn sót sau khi đã đổi token (chip trạng thái · chip trên ảnh).
+
+### 4. Verify production (đã chạy thật)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | **1088f77** (trước pull: `98b6389`) |
+| Migration | `2026_09_23_000001_add_theme_to_users_table` **DONE** (101 ms) · pending **0** · cột `users.theme` = **CÓ** |
+| Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` → **exit=0** cả bốn |
+| Asset mới | `app-DG3z1aZB.css` **156.871 B** · `main-CAXQY34O.js` **574.723 B** |
+| **Bản phục vụ = bản build ở máy** | `md5sum` **trùng**: CSS `a8ba962fbcff32de8a30d1ca75d26098` · JS `8e211eaaa9923a0be7d57310696fb151` |
+| CSS phục vụ thật | có `data-theme=light` (1 khối) · `--color-cream-50:#16150f` · `--color-scrim:#0e0d09` · `--color-warn:#7a5000` |
+| HTML phục vụ | `data-theme="dark"` (mặc định cho khách) + script `FabrikAITheme` có mặt |
+| Trang | `/` `/dang-nhap` `/bang-gia` `/up` → **200** |
+| `PUT /api/theme` khi không có phiên | **419** (CSRF chặn trước — đúng như mọi route web khác). Luồng thật của người dùng gửi `X-XSRF-TOKEN` nên lưu được: đã kiểm bằng Chrome (bấm "Sáng" ⇒ áp ngay + toast "Đã đổi giao diện và lưu vào tài khoản", tải lại vẫn Sáng, xoá localStorage vẫn Sáng) |
+| Nhật ký | **0 ERROR mới** do app: dòng ERROR mới nhất là `2026-09-20 00:44` (`guiprobe.tmp.php`, file thăm dò tạm của phiên khác) — TRƯỚC deploy |
+| Hàng đợi | `failed_jobs` = **0** |
+
+### 5. Khoá bằng máy
+
+- `tests/Feature/ThemeSystemTest.php` (**11 test**): hai theme cùng bộ token và thật sự khác nhau ·
+  **tính tương phản WCAG bằng công thức** cho mọi bậc chữ/màu trạng thái ở cả hai theme · không còn chữ
+  dùng opacity · không còn sắc độ trạng thái thô · nền canvas + scrim cố định · mọi blade render
+  `data-theme` và có script theme · `PUT /api/theme` whitelist + lưu theo tài khoản · theme không bị
+  công tắc gói chặn · `/cai-dat/appearance` mở **đúng mục** (không chỉ "trả 200").
+- **Sửa 1 lỗi thật mà test "200" không bắt được:** `StudioController::SETTINGS_SECTIONS` thiếu
+  `'appearance'` ⇒ `/cai-dat/appearance` vẫn 200 nhưng app mở nhầm mục **Preset**. Test nay khẳng định
+  thẳng `data-section="appearance"`.
+- 2 test cũ sửa **có ý thức** (ghi lý do ngay trong test): `CanvasControlsTest` (nền canvas nay đọc token
+  cố định thay vì token bề mặt) · `ModuleRegistryTest` (`theme` là hạ tầng, không thuộc module nào).
+- Full suite: vẫn **đúng 6 test đỏ SẴN CÓ ở HEAD** (CollectionsHub · JobTemplates · MotionFoundation ·
+  ShotReview ×2 · StaticIntegrity) — không phát sinh lỗi mới. `npm run build`: exit 0.
+
+### 6. Hợp nhất tài liệu (cùng đợt)
+
+`docs/UX_PERSONA_STRATEGY.md` (1.465 dòng) đã gộp vào **`docs/DESIGN_SYSTEM.md`** (301 → 686 dòng):
+§11 persona/JTBD · §12 bảy nguyên tắc UX · §13 gói cước & credit trên giao diện · §14 **40 luật rút ra từ
+thực tế** · §15 khung Studio đã chốt · §16 lịch sử có số đo · §17 quyết định & việc còn nợ. File cũ còn
+23 dòng trỏ sang (bản đầy đủ vẫn trong lịch sử git). §1.1 nay là **bảng token hai theme + 7 quy tắc +
+bảng tương phản đo được**; thêm §1.4 "Theme hoạt động thế nào".
+
+### Còn lại (đề xuất)
+
+- [ ] **Nợ emoji toàn studio**: 23/65 file · 134 lần xuất hiện (ConceptCard 43 · store.js 18 · AdminApp 7…) —
+      sửa tới file nào dọn file đó.
+- [ ] **Mã chết của "Storefront Vue SPA"**: `.sf-shell · .sf-btn* · .glass · .card-surface · .sf-input` trong
+      `app.css` không còn ai dùng và vẫn viết theo lối nền sáng — nên xoá hẳn.
+- [ ] Chưa có trang "xem token" cho người thiết kế (liệt kê bậc màu + tỉ lệ tương phản của cả hai theme).
+- [ ] Dọn `guiprobe.tmp.php` còn sót ở thư mục gốc production (của phiên khác, không tự xoá).
+- [ ] Ba card còn **màu nhấn riêng** (emerald) và nền nút còn trộn `bg-ink-800`/`bg-white/5`/`bg-ink-900/90`.
