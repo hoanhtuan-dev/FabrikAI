@@ -47,10 +47,11 @@ const STEPS = [
   // Bước 0 — DNA: khai "shop tôi là ai" TRƯỚC khi đọc xu hướng. Trước đây DNA do hệ thống ĐOÁN
   // (đếm dự án + dò từ khoá trong prompt, không có gì thì dùng câu mặc định cứng) và chủ shop không
   // có chỗ nào để sửa — nay là bước đầu tiên, có thể sửa, và mọi brief sau đều dùng bản họ khai.
-  { id: 'dna', label: 'DNA shop', hint: 'Khai định vị, khách hàng, phong cách để agent viết đúng', icon: 'sparkles' },
-  { id: 'radar', label: 'Tín hiệu', hint: 'Đọc xu hướng và chọn hướng đi', icon: 'scan' },
-  { id: 'brief', label: 'Định hướng', hint: 'Dựng brief, mood board và cấu trúc', icon: 'briefcase' },
-  { id: 'canvas', label: 'Thực thi', hint: 'Chốt prompt và tạo ảnh', icon: 'wand' },
+  // hint nói rõ ĐẦU RA của bước + dùng vào việc gì (không chỉ tên thao tác) — người mới hiểu vì sao phải làm bước này.
+  { id: 'dna', label: 'DNA shop', hint: 'Khai shop bạn là ai → agent dùng nó để viết brief đúng chất shop', icon: 'sparkles' },
+  { id: 'radar', label: 'Tín hiệu', hint: 'Chọn hướng thời trang đang lên → những hướng này sẽ đi vào brief', icon: 'scan' },
+  { id: 'brief', label: 'Định hướng', hint: 'Dựng bản thiết kế bộ sưu tập + kế hoạch sản xuất & lãi gộp', icon: 'briefcase' },
+  { id: 'canvas', label: 'Thực thi', hint: 'Biến brief thành ảnh thật để đăng bán', icon: 'wand' },
 ];
 const BRIEF_TABS = [
   { id: 'overview', label: 'Tổng quan' },
@@ -128,12 +129,24 @@ const referenceNote = computed(() => {
   return row && row.used ? String(row.note || '') : '';
 });
 // ── Nguồn dữ liệu: nhãn TIẾNG NGƯỜI DÙNG (không để chữ kỹ thuật trong template) ──────────────
-/** Đang có tin thật để AI đọc? (máy chủ tự lấy, không phải model tự tìm kiếm) */
-const liveSources = computed(() => !!(store.webSources && store.webSources.mode === 'live'));
+/** Có tin thật để AI đọc? (máy chủ tự lấy, không phải model tự tìm kiếm).
+ *  [BUG ĐÃ SỬA] Trước đây chỉ đọc webSources.mode ⇒ radar ĐÃ chạy bằng tin thật (source_mode=live) mà
+ *  giao diện vẫn báo "Chưa có tin thật nào" — hai tầng lệch nhau. Nay ưu tiên trạng thái THẬT của radar. */
+const liveSources = computed(() => (store.trendRadar?.source_mode === 'live') || !!(store.webSources && store.webSources.mode === 'live'));
 /** Số hướng đang được ĐO từ tin thật (khác hướng của bộ có sẵn) — hiện trên chip lọc. */
 const liveTrendCount = computed(() => trends.value.filter((trend) => trend.evidence_mode === 'live').length);
-const newsItems = computed(() => (store.webSources?.items || []).slice(0, 6));
-const activeSourceCount = computed(() => ((store.webSources?.sources || []).filter((row) => row.ok)).length);
+/** Tin hiển thị ưu tiên lấy từ radar (thứ phân tích THẬT SỰ đã dùng), rơi về báo cáo nguồn khi radar chưa có. */
+const newsItems = computed(() => {
+  const items = (store.trendRadar?.external_evidence?.items?.length ? store.trendRadar.external_evidence.items : (store.webSources?.items || []));
+  return items.slice(0, 6);
+});
+const activeSourceCount = computed(() => {
+  const evidenceSources = store.trendRadar?.external_evidence?.sources;
+  if (Array.isArray(evidenceSources) && evidenceSources.length) {
+    return evidenceSources.filter((row) => (Number(row.count) || 0) > 0).length;
+  }
+  return ((store.webSources?.sources || []).filter((row) => row.ok)).length;
+});
 const fetchedAtLabel = computed(() => {
   const at = store.webSources?.fetched_at;
   if (!at) return '';
@@ -947,10 +960,14 @@ provide('copyText', copyText);
 
       <!-- Nội dung bước -->
       <main class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-        <!-- Đầu bước: nhắc nhẹ đang ở đâu + việc cần làm — giúp người mới không lạc -->
-        <header class="mb-4 flex items-baseline gap-2 sm:mb-5">
-          <p class="shrink-0 text-label font-semibold uppercase tracking-[0.14em] text-brand-300">Bước {{ stepIndex + 1 }}</p>
-          <p class="truncate text-body text-cream-400">{{ STEPS[stepIndex].hint }}</p>
+        <!-- Đầu bước: giải thích RÕ bước này làm gì + đầu ra dùng vào việc gì — đây là "bảng chỉ đường"
+             cho người mới, phải nổi bật chứ không phải chữ mờ góc. -->
+        <header class="mb-4 rounded-xl border border-ink-700 bg-ink-900/70 px-4 py-3 sm:mb-5">
+          <p class="flex items-center gap-2 text-label font-semibold uppercase tracking-[0.14em] text-brand-300">
+            <span class="grid h-6 w-6 place-items-center rounded-full bg-brand-600/20 text-brand-300 text-tiny font-bold">{{ stepIndex + 1 }}</span>
+            Bước {{ stepIndex + 1 }}/{{ STEPS.length }} · {{ STEPS[stepIndex].label }}
+          </p>
+          <p class="mt-1 text-sm leading-5 text-cream-100">{{ STEPS[stepIndex].hint }}</p>
         </header>
         <AgentDnaStep v-if="step === 'dna'" />
         <AgentRadarStep v-else-if="step === 'radar'" />
