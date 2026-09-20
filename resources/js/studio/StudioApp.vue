@@ -1280,7 +1280,7 @@ function onTouchEnd(e) {
         <!-- Ghim đáy; nhãn/icon/ẩn-hiện lấy từ CẤU HÌNH (không đổi được vị trí). -->
         <div v-if="settingsEntry" class="relative mt-auto">
           <div v-if="settingsOpen" class="fixed inset-0 z-40" @click="settingsOpen = false"></div>
-          <button @click="settingsOpen = !settingsOpen" class="activity-btn" :class="settingsOpen ? 'is-active' : ''" :title="settingsEntry.label + ' — preset, khuôn mặt, dáng pose, trợ lý thiết kế'" :aria-label="settingsEntry.label" aria-haspopup="menu" :aria-expanded="settingsOpen ? 'true' : 'false'">
+          <button @click="settingsOpen = !settingsOpen" class="activity-btn" :class="settingsOpen ? 'is-active' : ''" :title="settingsEntry.label + ' — giao diện, preset, khuôn mặt, dáng pose, trợ lý thiết kế'" :aria-label="settingsEntry.label" aria-haspopup="menu" :aria-expanded="settingsOpen ? 'true' : 'false'">
             <StudioIcon :name="settingsEntry.icon" size="h-5 w-5" />
           </button>
           <div v-if="settingsOpen" role="menu" class="motion-pop-in absolute bottom-0 left-full z-50 ml-2 w-64 overflow-hidden rounded-xl border border-ink-700 bg-ink-900 p-1.5 shadow-2xl">
@@ -1289,6 +1289,10 @@ function onTouchEnd(e) {
                  gộp còn một: người dùng đã quen bấm thẳng vào mục mình cần, và đích đến vẫn là khu hợp
                  nhất (có sidebar để đổi mục) nên không mất gì. Các URL cũ /presets, /stylist-data,
                  /model-settings vẫn chạy và mở đúng mục tương ứng. -->
+            <!-- [2026-09-23] Mục GIAO DIỆN phải nằm NGAY ĐÂY: tính năng đổi Sáng/Tối đã có từ trước
+                 nhưng đường vào duy nhất là trang /cai-dat/appearance, mà menu này chỉ có 4 mục ⇒
+                 người dùng không tìm thấy và tưởng tính năng không tồn tại. -->
+            <a href="/cai-dat/appearance" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="sun" size="h-4 w-4" class="text-brand-300" /> Giao diện (Sáng · Tối · Theo máy)</a>
             <a href="/cai-dat/presets" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="template" size="h-4 w-4" class="text-brand-300" /> Preset (mẫu prompt)</a>
             <a href="/cai-dat/model" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="user" size="h-4 w-4" class="text-brand-300" /> Khuôn mặt (model)</a>
             <a href="/cai-dat/pose" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="pose" size="h-4 w-4" class="text-brand-300" /> Dáng pose (người mẫu)</a>

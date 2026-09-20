@@ -51,34 +51,60 @@
        (khối [data-theme='light'] ngay sau @theme) nên mọi class sẵn có
        (bg-ink-800 · text-cream-200 · border-ink-700 …) đúng ở CẢ HAI theme mà không phải
        sửa markup. Mọi bậc nội dung đạt WCAG AA (≥ 4.5:1) trên mọi bề mặt. */
-    --color-cream-50: #faf9f6;
-    --color-cream-100: #f4f2ec;
-    --color-cream-200: #e9e5db;
-    --color-cream-300: #d5cfc0;
-    --color-cream-400: #b3ac99;
+    --color-cream-50: #f7fcff;
+    --color-cream-100: #ecf9ff;
+    --color-cream-200: #cdd9e4;
+    --color-cream-300: #a9b8c6;
+    --color-cream-400: #93a1b0;
 
-    --color-ink-900: #17150f;
-    --color-ink-700: #38342a;
-    --color-ink-500: #6b6657;
-    --color-ink-800: #2b2820;
+    --color-ink-900: #191e24;
+    --color-ink-700: #232a33;
+    --color-ink-500: #4d5866;
+    --color-ink-800: #1d232a;
     /* Studio workspace — bù các level studio SFC đang dùng mà theme thiếu
        (trước đây class không sinh CSS trên production). */
-    --color-ink-600: #4b483c;
-    --color-ink-950: #0e0d09;
+    --color-ink-600: #333c47;
+    --color-ink-950: #15191e;
 
     --color-clay-500: #b56a37;
     --color-clay-600: #9a5227;
     --color-gold-400: #d9b36c;
     --color-gold-500: #c9a45f;
 
-    /* ── MÀU TRẠNG THÁI (nội dung) — một token cho mỗi nghĩa, đổi giá trị theo theme ──
-       Thay cho text-red-300 / text-amber-200 / text-emerald-300 / text-sky-300 (các sắc
-       độ chỉ đủ tương phản trên nền TỐI). Trên nền nhạt dùng chính token này với alpha:
-       bg-danger/10 · border-danger/40 … */
-    --color-danger: #fca5a5;
-    --color-warn: #fcd34d;
-    --color-ok: #6ee7b7;
-    --color-info: #7dd3fc;
+    /* ── LỚP NGỮ NGHĨA THEO ĐÚNG BỘ TÊN CỦA daisyUI ──────────────────────────────────────
+       [2026-09-23] Người dùng đưa một theme daisyUI để tham chiếu. Bộ tên của nó nay là lớp
+       NGỮ NGHĨA CHÍNH của FabrikAI (dùng được ngay: bg-base-100 · text-base-content ·
+       bg-primary text-primary-content · text-success · bg-error/10 …), còn các tên cũ của app
+       (ink/cream/danger/warn/ok/info) trở thành BÍ DANH trỏ về đây — nhờ vậy 3.000+ chỗ đang
+       dùng tên cũ không phải sửa, mà vẫn chỉ có MỘT nguồn giá trị.
+       Vì lớp này trỏ vào dải ink/cream (đổi theo theme), nó tự đúng ở cả Sáng lẫn Tối. */
+    --color-base-100: var(--color-ink-800);      /* bề mặt CHÍNH (card) — nền sáng nhất của theme tối */
+    --color-base-200: var(--color-ink-900);      /* bề mặt panel, chìm hơn card */
+    --color-base-300: var(--color-ink-950);      /* nền trang, chìm nhất */
+    --color-base-content: var(--color-cream-100); /* chữ trên base-* */
+    --color-primary: var(--color-brand-600);     /* GIỮ NGUYÊN xanh lá thương hiệu */
+    --color-primary-content: #ffffff;
+    --color-secondary: var(--color-clay-500);
+    --color-secondary-content: #1a1204;
+    --color-accent: var(--color-gold-500);
+    --color-accent-content: #1a1204;
+    --color-neutral: #09090b;                    /* đúng giá trị neutral của theme tham chiếu */
+    --color-neutral-content: #e4e4e7;
+
+    /* ── MÀU TRẠNG THÁI — lấy ĐÚNG sắc độ của theme tham chiếu (tươi hơn bảng pastel cũ) ──
+       Trên nền nhạt dùng chính token này với alpha: bg-error/10 · border-warning/40 …
+       Bốn bí danh bên dưới giữ cho mã cũ (text-danger · text-ok · text-warn) chạy nguyên. */
+    --color-error: #ff627d;
+    --color-error-content: #4d0218;
+    --color-warning: #fcb700;
+    --color-warning-content: #793205;
+    --color-success: #00d390;
+    --color-success-content: #004c39;
+    --color-info: #00bafe;
+    --color-info-content: #042e49;
+    --color-danger: var(--color-error);
+    --color-warn: var(--color-warning);
+    --color-ok: var(--color-success);
 
     /* ── HAI TOKEN CỐ ĐỊNH (KHÔNG đổi theo theme) ────────────────────────────────────
        invert / invert-content: khối ĐẢO màu so với bề mặt (nút "đang bật" kiểu đảo,
@@ -162,20 +188,20 @@
 [data-theme='light'] {
     color-scheme: light;
 
-    /* Bề mặt */
-    --color-ink-950: #f1efe7;
-    --color-ink-900: #f8f7f2;
+    /* Bề mặt — trung tính NGUỘI, đồng bộ với dải base-* của theme tham chiếu */
+    --color-ink-950: #eef1f5;
+    --color-ink-900: #f7f9fb;
     --color-ink-800: #ffffff;
-    --color-ink-700: #eae7dc;
-    --color-ink-600: #d6d0c0;
-    --color-ink-500: #b3ab98;
+    --color-ink-700: #e7ebf0;
+    --color-ink-600: #cbd3dc;
+    --color-ink-500: #9aa5b1;
 
     /* Nội dung */
-    --color-cream-50: #16150f;
-    --color-cream-100: #211f18;
-    --color-cream-200: #33302a;
-    --color-cream-300: #4a463c;
-    --color-cream-400: #5f5a4d;
+    --color-cream-50: #0a0e13;
+    --color-cream-100: #121821;
+    --color-cream-200: #29323d;
+    --color-cream-300: #414c59;
+    --color-cream-400: #59646f;
 
     /* Thương hiệu: GIỮ NGUYÊN cây xanh lá (#2d6f4d là màu nhận diện), chỉ đổi sắc độ theo VAI TRÒ
        — vì ở theme tối cùng một bậc vừa dùng làm CHỮ vừa dùng làm NỀN TINT, mà hai vai đó cần
@@ -194,13 +220,20 @@
     --color-brand-900: #e2f0e7;
     --color-brand-950: #ecf5f0;
 
-    /* Trạng thái */
-    --color-danger: #b3261e;
-    /* #7a5000 (không phải #8a5a00): trên nền TINT của chính nó (bg-warn/15 ở theme sáng) mã cũ
-       chỉ đạt 4,38:1 — thiếu 0,12 so với ngưỡng AA. Đo bằng Chrome thật, không đoán. */
-    --color-warn: #7a5000;
-    --color-ok: #116b4c;
+    /* Trạng thái — ở theme SÁNG, bốn token này là CHỮ nên phải ĐẬM (bộ sắc độ tươi của theme
+       tham chiếu chỉ hợp làm NỀN ở đây; chữ trên nền trắng thì phải đạt AA).
+       #7a5000 (không phải #8a5a00): trên nền TINT của chính nó (bg-warning/15) mã cũ chỉ đạt
+       4,38:1 — thiếu 0,12 so với ngưỡng AA. Đo bằng Chrome thật, không đoán. */
+    --color-error: #b3261e;
+    --color-warning: #7a5000;
+    --color-success: #116b4c;
     --color-info: #0b5d8f;
+    --color-error-content: #ffffff;
+    --color-warning-content: #ffffff;
+    --color-success-content: #ffffff;
+    --color-info-content: #ffffff;
+    --color-secondary-content: #ffffff;
+    --color-accent-content: #241703;
 
     /* Khối đảo màu: ở theme sáng là khối TỐI */
     --color-invert: #211f18;

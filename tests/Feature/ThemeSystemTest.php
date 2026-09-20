@@ -42,7 +42,7 @@ class ThemeSystemTest extends TestCase
         return (string) file_get_contents(resource_path('css/app.css'));
     }
 
-    /** @return array<string,string> token của theme TỐI (khối @theme) */
+    /** @return array<string,string> token của theme TỐI, ĐÃ giải bí danh var() */
     private function darkTokens(): array
     {
         ThemePalette::flush();
@@ -52,7 +52,7 @@ class ThemeSystemTest extends TestCase
         return $tokens;
     }
 
-    /** @return array<string,string> token của theme SÁNG (khối [data-theme=\'light\']) */
+    /** @return array<string,string> token của theme SÁNG (đã trộn ghi đè + giải bí danh) */
     private function lightTokens(): array
     {
         ThemePalette::flush();

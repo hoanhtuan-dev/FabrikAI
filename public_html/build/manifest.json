@@ -101,7 +101,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-uZE6ViH6.css",
+    "file": "assets/app-BPWynqnA.css",
     "name": "app",
     "names": [
       "app.css"
@@ -138,7 +138,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-CaD8aYqt.js",
+    "file": "assets/main-Ba414MAr.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -154,7 +154,7 @@
     ]
   },
   "resources/js/studio/my-settings.js": {
-    "file": "assets/my-settings-z446McuU.js",
+    "file": "assets/my-settings-C18eNOCp.js",
     "name": "my-settings",
     "src": "resources/js/studio/my-settings.js",
     "isEntry": true,

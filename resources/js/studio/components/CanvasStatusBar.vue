@@ -115,15 +115,16 @@ const BG_OPTIONS = [
     <div class="h-4 w-px bg-ink-700" aria-hidden="true"></div>
     <button
       @click="toggleTheme"
-      :class="BTN"
+      class="motion-ui flex h-7 shrink-0 items-center gap-1 rounded-lg border border-ink-600 px-2 text-[10px] font-semibold text-cream-200 hover:border-brand-400 hover:bg-ink-700"
       :title="'Giao diện đang là ' + (themeResolved === 'light' ? 'Sáng' : 'Tối') + ' — bấm để đổi (muốn theo hệ điều hành: Cài đặt của tôi → Giao diện)'"
       :aria-label="'Đổi giao diện Sáng/Tối, đang là ' + (themeResolved === 'light' ? 'Sáng' : 'Tối')"
     >
       <!-- Hai thẻ <StudioIcon> tách bằng v-if/v-else (KHÔNG dùng tam phân trong :name): test
            quét mọi chuỗi trong thuộc tính name của <StudioIcon> và đòi chúng là icon có thật —
            'light' trong biểu thức tam phân sẽ bị coi là một icon không tồn tại. -->
-      <StudioIcon v-if="themeResolved === 'light'" name="sun" />
-      <StudioIcon v-else name="moon" />
+      <StudioIcon v-if="themeResolved === 'light'" name="sun" size="h-3.5 w-3.5" />
+      <StudioIcon v-else name="moon" size="h-3.5 w-3.5" />
+      <span>{{ themeResolved === 'light' ? 'Sáng' : 'Tối' }}</span>
     </button>
 
     <!-- 9. Lưu vật lý -->

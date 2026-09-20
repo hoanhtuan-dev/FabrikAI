@@ -30,24 +30,41 @@
 > ≥ 4,5:1 cho chữ thường). Độ mờ trộn với NỀN nên tương phản phụ thuộc chỗ đặt — không kiểm soát
 > được. Nay: **4 bậc nội dung ĐẶC**, mỗi bậc đạt AA trên mọi bề mặt của **cả hai** theme.
 
-| Dải / nhóm | Token | Vai trò |
+> **[2026-09-23 · bổ sung] Bảng màu lấy theo THEME daisyUI mà chủ dự án đưa làm tham chiếu.**
+> Học ở đây không phải "ý tưởng chung chung" mà là hai thứ ĐO ĐƯỢC: (a) **bộ tên token ngữ nghĩa** của
+> daisyUI, (b) **chính các giá trị màu** của theme đó cho nền và màu trạng thái. Màu **thương hiệu xanh
+> lá GIỮ NGUYÊN** và đóng vai `primary`. (Bài học của chính đợt này: đổi *cấu trúc* token mà giữ
+> *giá trị* cũ thì người dùng KHÔNG THẤY GÌ — xem §14 luật 41.)
+
+| Lớp | Token (dùng được ngay trong class) | Vai trò |
 |---|---|---|
-| **Bề mặt** | `ink-950 · ink-900 · ink-800 · ink-700 · ink-600 · ink-500` | nền trang → nền panel → nền card → nền nổi → viền → viền mờ |
-| **Nội dung** | `cream-100 · cream-200 · cream-300 · cream-400` (+ `cream-50` cho tiêu đề lớn) | 4 bậc chữ/icon: chính → phụ → ghi chú → ghi chú rất phụ |
-| **Thương hiệu** | `brand-50 … brand-950` (xanh lá) | nút chính · trạng thái đang chọn · nhấn mạnh |
-| **Trạng thái** | `danger · warn · ok · info` | chữ/viền/badge; nền tint dùng alpha (`bg-danger/10 · border-warn/40`) |
-| **Điểm nhấn phụ** | `clay-500/600` · `gold-400/500` | cảnh báo mềm (layer khoá) · nhãn phụ |
-| **CỐ ĐỊNH** (không theo theme) | `invert · invert-content · invert-hover · on-accent` | khối đảo màu (nút "đang bật" kiểu đảo, hover `.btn-outline`) · chữ trên nền màu |
+| **Bề mặt** (tên daisyUI) | `base-100 · base-200 · base-300` · `base-content` | nền card → panel → nền trang, và chữ trên chúng. Trỏ vào dải `ink-*`/`cream-*` nên tự đúng ở cả hai theme |
+| **Bề mặt** (tên cũ của app) | `ink-950 · 900 · 800 · 700 · 600 · 500` | y hệt `base-*`, chỉ khác tên (3.000+ chỗ đang dùng) |
+| **Nội dung** | `cream-100 · 200 · 300 · 400` (+ `cream-50`) | 4 bậc chữ/icon: chính → phụ → ghi chú → ghi chú rất phụ |
+| **Thương hiệu** | `brand-50 … brand-950` → `primary` (+ `primary-content`) | nút chính · đang chọn · nhấn mạnh |
+| **Điểm nhấn phụ** | `clay-500/600` → `secondary` · `gold-400/500` → `accent` · `neutral` | nhãn phụ · cảnh báo mềm (layer khoá) · nền chìm |
+| **Trạng thái** | `error · warning · success · info` (+ mỗi cái một `-content`) | chữ/viền/badge; tint bằng alpha (`bg-error/10 · border-warning/40`). Bí danh cũ `danger · warn · ok` trỏ về đây |
+| **CỐ ĐỊNH** (không theo theme) | `invert · invert-content · invert-hover · on-accent` · `canvas-*` · `scrim(-content)` | khối đảo màu · chữ trên nền màu · nền canvas · lớp phủ trên ảnh |
+
+**Giá trị nền/màu trạng thái lấy từ theme tham chiếu** (oklch → hex, tính bằng công thức):
+
+| Vai | Theme TỐI (đang chạy) | Theme SÁNG |
+|---|---|---|
+| Nền trang · panel · card | `#15191e · #191e24 · #1d232a` (xám nguội) | `#eef1f5 · #f7f9fb · #ffffff` |
+| Chữ chính | `#ecf9ff` (base-content của theme tham chiếu) | `#121821` |
+| Lỗi · cảnh báo · thành công · thông tin | `#ff627d · #fcb700 · #00d390 · #00bafe` | `#b3261e · #7a5000 · #116b4c · #0b5d8f` |
+| Thương hiệu (GIỮ NGUYÊN) | `#2d6f4d` (primary) | `#2d6f4d` |
 
 **Bảng tương phản đã đo** (độ chói tương đối theo WCAG 2.1, giữ bằng `tests/Feature/ThemeSystemTest.php`):
 
 | Bậc nội dung | Theme tối · trên card | Theme sáng · trên card | Ngưỡng |
 |---|---|---|---|
-| `cream-100` (chính) | 13,1 : 1 | 16,5 : 1 | ≥ 4,5 |
-| `cream-200` | 11,7 : 1 | 13,2 : 1 | ≥ 4,5 |
-| `cream-300` (phụ) | 9,5 : 1 | 9,4 : 1 | ≥ 4,5 |
-| `cream-400` (ghi chú) | 6,7 : 1 | 6,9 : 1 | ≥ 4,5 |
-| `brand-300` · `danger` · `warn` · `ok` · `info` | 6,4 – 10,2 : 1 | 4,8 – 6,5 : 1 | ≥ 4,5 |
+| `cream-100` (chính) | 14,8 : 1 | 17,8 : 1 | ≥ 4,5 |
+| `cream-200` | 11,0 : 1 | 13,0 : 1 | ≥ 4,5 |
+| `cream-300` (phụ) | 7,8 : 1 | 8,7 : 1 | ≥ 4,5 |
+| `cream-400` (ghi chú) | 6,0 : 1 | 6,0 : 1 | ≥ 4,5 |
+| `brand-300` · `error` · `warning` · `success` · `info` | 5,0 – 9,5 : 1 | 5,4 – 6,2 : 1 | ≥ 4,5 |
+| chữ trắng trên nút `primary` | 6,0 : 1 | 6,0 : 1 | ≥ 4,5 |
 
 **Bảy quy tắc:**
 
@@ -654,6 +671,19 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
     cho kết quả bất thường, nghi phép đo trước** — đúng vệt với các lần "test đỏ mà sản phẩm đúng"
     ở nhóm A.
 
+41. **Đổi CẤU TRÚC mà giữ nguyên GIÁ TRỊ thì người dùng không thấy gì — và họ nói đúng.** Đợt theme
+    đầu tiên đã làm đúng về kỹ thuật (hai dải token, đảo vai theo theme, tương phản AA, lưu theo tài
+    khoản) nhưng **bảng màu giữ nguyên tông nâu ấm cũ**, tên token cũng cũ. Khiếu nại: *"chưa thấy thay
+    đổi về giao diện, không thấy ảnh hưởng gì từ theme tham chiếu"*. Bài học: khi được đưa một **theme
+    tham chiếu**, phải tiếp nhận thứ ĐO ĐƯỢC từ nó — **bộ tên token** và **giá trị màu** — chứ không
+    phải chỉ "lấy tinh thần". Và phải trả lời được câu: *người dùng sẽ nhìn thấy gì khác?*
+42. **Tính năng mới phải có ĐƯỜNG VÀO ở chỗ người dùng đang đứng.** Mục "Giao diện" đã có thật, có test,
+    có trang riêng — nhưng menu Cài đặt (bánh răng) trong Studio chỉ có 4 mục cũ, còn nút đổi nhanh ở
+    thanh trạng thái là **icon trần giữa ~20 icon khác**. Kết quả: *"không thấy cài đặt theme"* — một
+    tính năng chết vì không có lối vào. Quy tắc: tính năng mới phải xuất hiện ở **nơi người dùng đã
+    quen bấm** (menu/thanh công cụ hiện có), và nếu là điều khiển quan trọng thì **có chữ**, không chỉ
+    icon.
+
 ### E. Quy trình và kiểm thử
 
 33. **Mỗi route mới phải khai vào `ModuleRegistry`** — nếu không, công tắc gói không chặn được nó, và
@@ -762,6 +792,8 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 | 23 | 2026-09-23 | **6 test đỏ tồn đọng** ở HEAD (Bộ sưu tập · Duyệt mẫu · a11y lớp phủ · chuyển động hover) + **5 món nợ** đã ghi trong DEPLOY_LOG | Sửa **SẢN PHẨM** ở chỗ là lỗi thật: 4 lớp phủ thiếu `role/aria-modal` · 2 bề mặt hover thiếu nhịp · state `reviewErrors` chết (nay hiện lỗi **từng ảnh kèm bước**) · trả lại nút **Xử lý ngay** (`processQueue`) đã mất khi card sidebar thu gọn · gom đường xuất gói về `store.exportProject()` (bỏ 2 bản fetch trùng 26 dòng) · 2 test cập nhật theo **bề mặt thật** | 6 → **0 test đỏ** · emoji **134 → 0** (23 file) · xoá ~115 dòng CSS chết + `.section-title` · `transition-all` 19 → **0** · nền nút 3 kiểu → **1 token** (51 thẻ) · thêm trang **`/he-thong-thiet-ke`** · 10 test mới/ cập nhật |
 
 | 24 | 2026-09-23 | **3 card còn MÀU NHẤN RIÊNG** (emerald: RefImageCard · ConceptCard · InpaintCard) + **12 nút chính bị khoá không nói vì sao** + 2 màn hình có **2 nút chính cùng lúc** | Thiết kế lại 3 card về đúng từ vựng: "đang chọn" = `border-brand-500 + bg-brand-600/20 + ring-brand-500/40` · "khối chứa" = `border-ink-700 + bg-ink-900` · "thành công" = token `ok` · nút chính của Inpaint về gradient thương hiệu · 12 nút khoá có dòng `↳` suy ra từ MỘT computed `blockReason` · hạ "Mở Agent Studio" xuống nút phụ · ẩn thanh CTA khi ở tab Hàng loạt | emerald trong 3 card **26 → 0** · **xoá hẳn danh sách miễn trừ emerald** trong `DesignSystemTest` · 2 test mới/bổ sung · `DesignSystemTest` **9/9 XANH** |
+
+| 25 | 2026-09-23 | Khiếu nại: **"chưa thấy thay đổi giao diện + không thấy cài đặt theme + không thấy ảnh hưởng gì từ theme daisyUI đã đưa"** | Lấy **đúng giá trị màu của theme tham chiếu** (nền xám nguội `#15191e/#191e24/#1d232a` · chữ `#ecf9ff` · trạng thái `#ff627d/#fcb700/#00d390/#00bafe`) + đưa **bộ tên token daisyUI** (`base-100/200/300 · base-content · primary · secondary · accent · neutral · info/success/warning/error + -content`) thành lớp ngữ nghĩa chính, giữ xanh lá làm `primary` · **mở đường vào**: thêm mục "Giao diện (Sáng · Tối · Theo máy)" vào menu Cài đặt trong Studio + đổi nút thanh trạng thái thành **chip có chữ** · khối chọn giao diện dùng chính `bg-base-100/base-200/base-300 text-base-content bg-primary` và nói rõ nguồn bảng màu | nền tối `#17150f → #191e24` · chữ `#f4f2ec → #ecf9ff` · menu bánh răng **4 → 5 mục** · chip trạng thái nay **có chữ "Sáng/Tối"** · Chrome thật: 5 màn hình × 2 theme **0 chỗ dưới AA** · 847 test XANH |
 
 ### 16.1 Số đo trước → sau của cả hành trình
 

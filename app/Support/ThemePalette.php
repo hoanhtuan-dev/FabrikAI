@@ -41,8 +41,17 @@ class ThemePalette
         self::$css = null;
     }
 
-    /** @return array<string,string> tên token => mã hex */
-    public static function tokens(string $theme): array
+    /**
+     * Khai báo THÔ của một khối: mã hex HOẶC một bí danh `var(--color-x)`.
+     *
+     * [2026-09-23] Vì sao phải hỗ trợ bí danh: lớp ngữ nghĩa nay theo đúng bộ tên của daisyUI
+     * (base-100 · base-content · primary · error …) và các tên cũ của app (danger · ok · warn …)
+     * trỏ VỀ nó bằng `var(…)` — một nguồn giá trị, nhiều tên gọi. Nếu lớp này chỉ đọc hex thì
+     * bảng token sẽ bỏ sót đúng những token quan trọng nhất.
+     *
+     * @return array<string,string>
+     */
+    public static function raw(string $theme): array
     {
         $css = self::css();
 
@@ -54,7 +63,7 @@ class ThemePalette
             $block = $m[1] ?? '';
         }
 
-        preg_match_all('/--color-([a-z0-9-]+):\s*(#[0-9a-fA-F]{6})\s*;/', $block, $rows, PREG_SET_ORDER);
+        preg_match_all('/--color-([a-z0-9-]+):\s*(#[0-9a-fA-F]{6}|var\(--color-[a-z0-9-]+\))\s*;/', $block, $rows, PREG_SET_ORDER);
 
         $out = [];
         foreach ($rows as $row) {
@@ -65,6 +74,43 @@ class ThemePalette
     }
 
     /**
+     * Bảng token của một theme ĐÃ GIẢI BÍ DANH: mọi giá trị trả về đều là mã hex.
+     *
+     * Giải theo chuỗi (tối đa 6 vòng): hôm nay chuỗi dài nhất là 1 bước (danger → error), nhưng để
+     * vòng lặp thì sau này thêm một tầng bí danh nữa cũng không phải sửa hàm này.
+     *
+     * @return array<string,string>
+     */
+    public static function tokens(string $theme): array
+    {
+        $map = self::resolvedRaw($theme);
+
+        for ($pass = 0; $pass < 6; $pass++) {
+            $changed = false;
+            foreach ($map as $name => $value) {
+                if (preg_match('/^var\(--color-([a-z0-9-]+)\)$/', $value, $m) && isset($map[$m[1]])) {
+                    $map[$name] = $map[$m[1]];
+                    $changed = true;
+                }
+            }
+            if (! $changed) {
+                break;
+            }
+        }
+
+        // Bỏ những token vẫn còn là bí danh chưa giải được (không đo được tương phản từ chúng).
+        return array_filter($map, fn (string $v) => str_starts_with($v, '#'));
+    }
+
+    /** Bảng thô đã trộn ghi đè của theme (chưa giải bí danh). @return array<string,string> */
+    private static function resolvedRaw(string $theme): array
+    {
+        return $theme === 'light'
+            ? array_merge(self::raw('dark'), self::raw('light'))
+            : self::raw('dark');
+    }
+
+    /**
      * Bảng token ĐẦY ĐỦ của một theme: giá trị riêng của theme đó, phần còn lại lấy từ theme TỐI
      * (vì theme sáng chỉ ghi đè những token đổi theo theme — đó chính là điều làm nên "một bảng token").
      *
@@ -72,9 +118,7 @@ class ThemePalette
      */
     public static function resolved(string $theme): array
     {
-        return $theme === 'light'
-            ? array_merge(self::tokens('dark'), self::tokens('light'))
-            : self::tokens('dark');
+        return self::tokens($theme);
     }
 
     /** Độ chói tương đối theo WCAG 2.1. */
