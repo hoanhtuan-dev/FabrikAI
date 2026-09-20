@@ -78,7 +78,7 @@ const copyText = inject('copyText');
                 <h2 class="font-display text-base font-semibold text-brand-300">Brief đầu vào</h2>
                 <p class="mt-0.5 text-xs text-cream-400">Mô tả khách hàng, dịp mặc, chất liệu, màu sắc hoặc định vị giá.</p>
                 <label for="collection-prompt" class="label mt-4">Prompt tiếng Việt <span class="font-normal text-cream-400">(bắt buộc)</span></label>
-                <textarea id="collection-prompt" ref="promptInput" v-model="prompt" rows="5" maxlength="2000" aria-describedby="collection-prompt-help" class="input w-full resize-none !text-sm" placeholder="Ví dụ: Bộ sưu tập công sở mùa hè cho nữ văn phòng, ưu tiên linen thoáng và màu pastel dịu…" @keydown.ctrl.enter="createBrief"></textarea>
+                <textarea id="collection-prompt" ref="promptInput" v-model="prompt" rows="5" maxlength="2000" aria-describedby="collection-prompt-help" class="input w-full resize-none !text-sm" placeholder="Ví dụ: Bộ sưu tập công sở mùa hè cho nữ văn phòng, ưu tiên linen thoáng và màu pastel dịu…" @keydown.ctrl.enter="createBrief" @keydown.meta.enter="createBrief"></textarea>
                 <div class="mt-1.5 flex items-start justify-between gap-3"><p id="collection-prompt-help" class="text-label leading-4 text-cream-400">Ctrl+Enter để tạo brief.</p><span class="shrink-0 text-label tabular-nums text-cream-400">{{ prompt.length }}/2000</span></div>
 
                 <!-- VAI ĐỌC ẢNH: chọn tối đa 3 ảnh mẫu để AI nhìn và bám phong cách thật của shop. -->

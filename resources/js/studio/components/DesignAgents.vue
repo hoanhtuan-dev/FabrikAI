@@ -14,7 +14,7 @@
  *   · trạng thái brief cũ, tìm/lọc trend, copy prompt/màu, bộ đếm ký tự, Ctrl+Enter,
  *   · không tự đổi resolution hay ghi đè negative prompt người dùng đã đặt.
  */
-import { computed, nextTick, provide, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 import StudioIcon from './StudioIcon.vue';
@@ -648,6 +648,33 @@ async function copyText(value, label) {
   catch (error) { store.toast('Không sao chép được — hãy chọn và sao chép thủ công.', 'error'); }
 }
 
+// ── PHÍM TẮT (2026-09-24) ──────────────────────────────────────────────────────────────
+// Agent Studio là workspace nhiều bước — phím tắt điều hướng nhanh, không phá a11y:
+//   · Ctrl/Cmd + → / ←   chuyển bước tới/lui (dùng modifier để KHÔNG đụng mũi tên điều hướng con trỏ)
+//   · phím 1–4            nhảy thẳng tới bước (chỉ khi KHÔNG đang gõ trong ô nhập)
+//   · Ctrl/Cmd + Enter    trong ô prompt = chốt/tiếp tục bước hiện tại (gọi advance)
+function isTypingTarget(target) {
+  if (!target) return false;
+  const tag = String(target.tagName || '').toUpperCase();
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
+}
+function agentKeydown(event) {
+  if (!store.designAgentOpen) return;
+  const mod = event.ctrlKey || event.metaKey;
+  const typing = isTypingTarget(event.target);
+  if (mod && event.key === 'ArrowRight') { event.preventDefault(); advance(); return; }
+  if (mod && event.key === 'ArrowLeft') { event.preventDefault(); back(); return; }
+  // Ctrl+Enter khi KHÔNG gõ trong ô prompt = tiếp tục bước (advance). Trong ô prompt, chính textarea
+  // đã có @keydown.ctrl.enter="createBrief" nên phím này tạo brief mà KHÔNG nhảy bước — có chủ đích.
+  if (mod && event.key === 'Enter' && !typing) { event.preventDefault(); advance(); return; }
+  if (!mod && !typing && /^[1-4]$/.test(event.key)) {
+    const id = STEPS[Number(event.key) - 1]?.id;
+    if (id) { event.preventDefault(); setStep(id); }
+  }
+}
+onMounted(() => window.addEventListener('keydown', agentKeydown));
+onBeforeUnmount(() => window.removeEventListener('keydown', agentKeydown));
+
 watch(prompt, () => { collectionError.value = ''; store.collectionBriefError = ''; });
 watch(collection, (value) => {
   const settings = value?.canvas || {};
@@ -943,11 +970,12 @@ provide('copyText', copyText);
             <span v-else-if="step === 'radar'">{{ selectedTrendCount ? selectedTrendCount + ' trend đã chọn' : 'Chưa chọn trend' }}</span>
             <span v-else-if="step === 'brief'">{{ collection ? (briefStale ? 'Brief cần cập nhật' : 'Brief đã sẵn sàng') : 'Chưa có brief' }}</span>
             <span v-else>~{{ estimatedCredits }} credit cho {{ canvas.variantCount }} biến thể</span>
+            <span class="hidden text-tiny text-cream-400 lg:inline"> · Ctrl+←/→ chuyển bước · 1–4 nhảy bước · Ctrl+Enter tiếp tục</span>
           </div>
           <div class="flex items-center gap-2">
             <!-- Bước DNA là bước ĐẦU nên không có bước trước: nút "Quay lại" ở đây từng bấm không có gì xảy ra. -->
-            <button v-if="stepIndex > 0" type="button" class="tool-btn !px-3 !py-2" @click="back"><StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Quay lại</button>
-            <button v-if="step !== 'canvas'" type="button" class="btn-brand btn-sm flex items-center gap-2" :disabled="(step === 'brief' && store.collectionBriefLoading)" @click="advance">
+            <button v-if="stepIndex > 0" type="button" class="tool-btn !px-3 !py-2" title="Quay lại (Ctrl+←)" @click="back"><StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Quay lại</button>
+            <button v-if="step !== 'canvas'" type="button" class="btn-brand btn-sm flex items-center gap-2" :disabled="(step === 'brief' && store.collectionBriefLoading)" title="Tiếp tục (Ctrl+→ hoặc Ctrl+Enter)" @click="advance">
               {{ step === 'dna' ? 'Đọc tín hiệu thị trường' : (step === 'radar' ? (selectedTrendCount ? 'Phân tích thành brief' : 'Tiếp tục với mặc định') : 'Chốt brief & sang Canvas') }}
               <StudioIcon name="arrowRight" size="h-3.5 w-3.5" />
             </button>
