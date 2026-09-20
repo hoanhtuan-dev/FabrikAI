@@ -1215,6 +1215,11 @@ class DesignAgentService
         }
 
         $directions = $this->normalizeDirections($call['json'], $trends, $ruleDirections);
+        // ĐỊNH HƯỚNG DO AI VIẾT PHẢI NÓI ĐƯỢC NÓ DỰA TRÊN GÌ: AI chỉ được nhắc tới id hướng có thật, nên
+        // nếu hướng được nhắc là hướng CÓ TIN THẬT thì định hướng đó cũng có bằng chứng thật — kèm link để
+        // người dùng tự kiểm. Trước đây nhãn này chỉ có ở hướng do engine tất định dựng, nên màn hình hiện
+        // "8 định hướng do AI viết · 0 dựa trên tin thật" dù AI đang bám đúng dữ liệu vừa đo.
+        $directions = $this->attachTrendEvidence($directions, $trends);
         if ($directions === []) {
             // Ghi lại ĐẦU ra thô (đã cắt) + lý do kết thúc để lần sau biết CHÍNH XÁC vì sao
             // không dùng được — đầu vào chỉ là catalog mẫu nên không có dữ liệu riêng của user.
@@ -1291,6 +1296,7 @@ class DesignAgentService
                 // Tin làm căn cứ (bấm ra bài gốc) — chỉ có khi hướng này thật sự có tin nhắc tới.
                 'evidence' => $live !== null ? array_slice((array) ($live['articles'] ?? []), 0, 2) : [],
                 'evidence_mode' => $live !== null ? 'live' : 'demo',
+                'live' => $live,
             ];
         }
 
@@ -1304,6 +1310,62 @@ class DesignAgentService
             'peak' => 'Đang ở đỉnh nên cạnh tranh giá cao — cần khác biệt ở chất liệu và chi tiết.',
             default => 'Chưa kiểm chứng ở quy mô lớn — nên sản xuất số lượng nhỏ rồi đo lại.',
         };
+    }
+
+    /**
+     * Gắn BẰNG CHỨNG ĐO ĐƯỢC vào từng định hướng, theo các id hướng mà nó nhắc tới.
+     *
+     * Một chỗ duy nhất để cả đường AI lẫn đường tất định nói cùng một cách: hướng nào bám vào hướng có tin
+     * thật thì mang nhãn "có tin thật" + số tin/nguồn + link bài viết.
+     *
+     * @param  list<array<string, mixed>>  $directions
+     * @param  list<array<string, mixed>>  $trends
+     * @return list<array<string, mixed>>
+     */
+    private function attachTrendEvidence(array $directions, array $trends): array
+    {
+        $byId = [];
+        foreach ($trends as $trend) {
+            $byId[(string) ($trend['id'] ?? '')] = $trend;
+        }
+
+        foreach ($directions as $index => $direction) {
+            $mentions = 0;
+            $sources = 0;
+            $articles = [];
+            $live = false;
+            foreach ((array) ($direction['trend_ids'] ?? []) as $id) {
+                $trend = $byId[(string) $id] ?? null;
+                $evidence = is_array($trend['live'] ?? null) ? $trend['live'] : null;
+                if ($evidence === null) {
+                    continue;
+                }
+                $live = true;
+                $mentions += (int) ($evidence['mentions'] ?? 0);
+                $sources = max($sources, (int) ($evidence['source_count'] ?? 0));
+                foreach ((array) ($evidence['articles'] ?? []) as $article) {
+                    if (count($articles) < 2 && ! in_array($article, $articles, true)) {
+                        $articles[] = $article;
+                    }
+                }
+            }
+
+            if (! $live) {
+                $directions[$index]['evidence_mode'] = 'demo';
+                $directions[$index]['evidence'] = [];
+                continue;
+            }
+
+            $directions[$index]['evidence_mode'] = 'live';
+            $directions[$index]['evidence'] = $articles;
+            $directions[$index]['live'] = [
+                'mentions' => $mentions,
+                'source_count' => $sources,
+                'articles' => $articles,
+            ];
+        }
+
+        return $directions;
     }
 
     /**

@@ -999,6 +999,13 @@ watch(() => store.designAgentOpen, (open) => {
                       <div v-if="row.action" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-brand-200">Việc làm:</dt><dd class="text-cream-300">{{ row.action }}</dd></div>
                       <div v-if="row.risk" class="flex gap-1.5"><dt class="shrink-0 font-semibold text-warn">Rủi ro:</dt><dd class="text-cream-300">{{ row.risk }}</dd></div>
                     </dl>
+                    <!-- Định hướng nói rõ nó dựa trên GÌ: tin thật (kèm số tin + link) hay bộ có sẵn. -->
+                    <p v-if="row.evidence_mode === 'live' && row.live" class="mt-2 text-label leading-4 text-ok">
+                      Dựa trên {{ row.live.mentions }} tin thật · {{ row.live.source_count }} nguồn
+                      <template v-if="(row.evidence || []).length">
+                        — <a v-for="item in row.evidence" :key="item.url" :href="item.url" target="_blank" rel="noopener" class="underline decoration-dotted hover:text-cream-100">{{ item.title }}</a>
+                      </template>
+                    </p>
                     <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
                       <span v-if="directionPriceLabel(row.price_band)" class="rounded bg-ink-700 px-1.5 py-0.5 text-tiny text-cream-200">{{ directionPriceLabel(row.price_band) }}</span>
                       <span v-if="directionConfidence(row.confidence) !== null" class="rounded bg-ink-700 px-1.5 py-0.5 text-tiny text-cream-200">Tin cậy {{ directionConfidence(row.confidence) }}%</span>
