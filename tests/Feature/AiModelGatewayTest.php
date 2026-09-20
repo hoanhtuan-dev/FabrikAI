@@ -87,6 +87,39 @@ class AiModelGatewayTest extends TestCase
         return '/storage/studio/'.$name;
     }
 
+
+    /**
+     * CUSTOM PROVIDER DÙNG LẠI SLOT KHOÁ ĐÃ CÓ phải chạy được.
+     *
+     * [LỖI THẬT — đo trên production 2026-09-21] Một route riêng của cùng nhà cung cấp (khác CÁCH GỌI, không
+     * khác khoá) khai `api_key_ref` trỏ vào slot sẵn có. `studio_candidate_key()` chỉ tra khoá theo SLUG
+     * của provider nên trả về rỗng ⇒ `AiModelGateway::candidates()` RỖNG ⇒ agent lặng lẽ rơi về nhóm khác
+     * dù Cài đặt hiện "đã gán model". Test khoá cả hai đầu: khoá phải tra được, và candidate phải có mặt.
+     */
+    public function test_a_custom_provider_can_reuse_an_existing_key_slot(): void
+    {
+        StudioApiKey::create([
+            'provider' => 'deepseek', 'label' => 'deepseek', 'value' => 'sk-goc',
+            'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+        ]);
+        StudioProvider::create([
+            'slug' => 'deepseek_search', 'name' => 'DeepSeek — có công cụ tìm kiếm', 'protocol' => 'openai',
+            'base_url' => 'https://api.deepseek.com', 'auth_style' => 'bearer',
+            'api_key_ref' => 'deepseek', 'search_mode' => 'responses_web_search', 'search_param' => 'web_search',
+            'priority' => 9, 'enabled' => true,
+        ]);
+        $this->model('agent_search', 'deepseek_search', 'deepseek-v4-pro');
+        set_setting('studio_task_agent_search_model', 'deepseek_search:deepseek-v4-pro');
+
+        $this->assertSame(['sk-goc'], studio_candidate_key(['provider' => 'deepseek_search', 'model' => 'deepseek-v4-pro'], 'agent_search'), 'Khoá phải tra được qua api_key_ref của Custom Provider.');
+
+        $candidates = app(AiModelGateway::class)->candidates('agent_search');
+        $this->assertCount(1, $candidates, 'Candidate phải CÓ MẶT — thiếu nó là agent rơi về nhóm khác trong im lặng.');
+        $this->assertSame('deepseek_search', $candidates[0]['provider']);
+        $this->assertSame('https://api.deepseek.com', $candidates[0]['base']);
+        $this->assertSame('responses_web_search', $candidates[0]['search_mode']);
+    }
+
     private function creativeJson(string $marker): string
     {
         return json_encode([

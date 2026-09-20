@@ -2157,6 +2157,20 @@ if (! function_exists('studio_candidate_key')) {
             ? ['qwen', 'dashscope', 'wan', 'qwen_edit']
             : [$provider];
 
+        // CUSTOM PROVIDER có thể DÙNG LẠI một slot khoá đã có (`api_key_ref`) — ví dụ một route riêng của
+        // cùng nhà cung cấp chỉ khác CÁCH GỌI (endpoint /responses) chứ không khác khoá.
+        //
+        // [LỖI THẬT — đo trên production 2026-09-21] Thiếu nhánh này thì candidate biến mất ÂM THẦM: Cài đặt
+        // hiện "đã gán model", `studio_task_group_models()` trả về đúng model, nhưng
+        // `AiModelGateway::candidates()` trả về RỖNG nên agent lặng lẽ rơi về nhóm khác — đúng loại lỗi
+        // "giao diện nói một đằng, agent chạy một nẻo" mà lớp gateway này sinh ra để chặn.
+        if (function_exists('studio_custom_provider')) {
+            $ref = trim((string) (studio_custom_provider($provider)['api_key_ref'] ?? ''));
+            if ($ref !== '' && ! in_array($ref, $families, true)) {
+                $families[] = $ref;
+            }
+        }
+
         $keys = [];
         foreach ($families as $fam) {
             foreach (studio_api_keys_for($fam, $model, $group) as $k) {
