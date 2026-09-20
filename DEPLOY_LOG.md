@@ -1262,3 +1262,69 @@ bảng tương phản đo được**; thêm §1.4 "Theme hoạt động thế n�
 - [ ] Chưa có trang "xem token" cho người thiết kế (liệt kê bậc màu + tỉ lệ tương phản của cả hai theme).
 - [ ] Dọn `guiprobe.tmp.php` còn sót ở thư mục gốc production (của phiên khác, không tự xoá).
 - [ ] Ba card còn **màu nhấn riêng** (emerald) và nền nút còn trộn `bg-ink-800`/`bg-white/5`/`bg-ink-900/90`.
+
+---
+
+## Phiên 2026-09-23 (Đợt 17 — 6 test đỏ tồn đọng + DỌN NỢ: emoji · mã chết · nền nút · trang token)
+
+**Deploy:** `92d6460 → c79e165` (2 commit: `9e13acc` sửa lỗi thật khu Bộ sưu tập · `c79e165` dọn nợ).
+**Không migration.** Có **1 lớp PHP mới** (`App\Support\ThemePalette`) + **1 route mới** `GET /he-thong-thiet-ke` (cấp OWNER).
+
+### 1. Sáu test đỏ sẵn có ở HEAD — đã sửa hết (6 → 0)
+
+| Test đỏ | Nguyên nhân thật | Cách xử lý |
+|---|---|---|
+| `StaticIntegrityTest::test_full_screen_overlays_declare_their_role` | 4 lớp phủ trang /bo-suu-tap (tạo · duyệt mẫu · chia sẻ · xuất gói) thiếu `role="dialog"`/`aria-modal`/`aria-label` — trình đọc màn hình vẫn đọc nội dung phía sau | **Sửa SẢN PHẨM**: thêm role + aria-modal + nhãn cho cả 4 |
+| `MotionFoundationTest::test_every_hover_surface_animates` | Tên bộ sưu tập đổi màu khi hover mà không có nhịp (2 chỗ) | **Sửa SẢN PHẨM**: dùng `.motion-ui` (token) |
+| `ShotReviewTest::test_ui_actually_drives_the_shot_lifecycle` | Card không nêu **bước** của ảnh hỏng ⇒ người dùng không biết ảnh kẹt ở đâu | **Sửa SẢN PHẨM**: hiện lỗi TỪNG ẢNH kèm `store.shotLabel(err.shot_state)` |
+| `ShotReviewTest::test_review_shortcuts_are_wired_and_safe` | Câu nhắc phím tắt mỗi màn hình một kiểu, card thiếu câu nhắc rõ nghĩa | **Sửa SẢN PHẨM**: MỘT câu cho cả hai bề mặt ("Phím tắt khi khối này đang mở: …") |
+| `CollectionsHubTest::test_hub_card_only_uses_existing_store_actions` | Card sidebar thu gọn có chủ đích nên không còn gọi `processQueue()` — và khả năng "Xử lý ngay" **MẤT HẲN khỏi giao diện** | **Sửa SẢN PHẨM**: chip "N ảnh đang tạo" ở trang Bộ sưu tập nay là NÚT gọi `store.processQueue()`; test đổi sang **quét dữ liệu-dẫn-xuất** mọi lời gọi `store.<action>(` trong card ⇒ thêm lời gọi mới mà store không có là ĐỎ |
+| `JobTemplatesTest::test_applying_a_factory_template_also_feeds_the_export_dialog` | Tên hàm thật là `openExport()` (test cũ ghi `toggleExport()`) và logic điền sẵn bị **chép hai lần** | **Sửa SẢN PHẨM**: gom về `store.exportProject()` + `store.applyPendingExport()`; test kiểm CẢ HAI bề mặt |
+
+**Bỏ luôn 2 bản fetch trùng** (~26 dòng): card và trang mỗi bên tự gọi `/api/projects/{id}/export` và tự dựng thẻ `<a download>` ⇒ nay **0 fetch trực tiếp** trong cả hai file (bất biến "panel không tự gọi API" nay ĐÚNG thật).
+
+### 2. Nợ đã ghi trong DEPLOY_LOG — đã dọn hết
+
+| Nợ | Trước | Sau |
+|---|---|---|
+| **Emoji trong chrome** | 23 file · **134** lần | **0** (chỗ là icon → `StudioIcon`; chỗ trang trí → bỏ; bỏ hẳn trường `emoji` trong bảng dữ liệu kiểu tóc). Giữ ký hiệu chữ ✓ ✕ ✗ ★. Khoá bằng `DesignSystemTest::test_no_pictographic_emoji_in_studio_chrome` |
+| **Mã chết "Storefront Vue SPA"** | ~115 dòng `.sf-* · .glass · .card-surface · .section-title/kicker · .sf-input · .pb-safe · .reveal-anim` (0 file dùng, không theo theme) | **Đã xoá** (+ `.section-title` ở tầng chính) — CSS gửi cho khách **155,33 → 145,72 kB** |
+| **Nền nút trộn 3 kiểu** | `bg-ink-800` · `bg-cream-50/5` · `bg-ink-900/90` | Một token mỗi trạng thái: nghỉ `bg-ink-800` · hover `bg-ink-700` · nút TRÊN ẢNH `bg-scrim/85` + `text-scrim-content`. Chuẩn hoá **51 thẻ nút / 16 file**. Khoá bằng `DesignSystemTest::test_button_backgrounds_use_one_token_per_state` |
+| **`transition-all`** (vi phạm luật §1.2, kéo theo width/height ⇒ giật bố cục) | 19 chỗ | **0** — nút/thẻ → `.motion-ui`; thanh tiến trình đổi WIDTH → `.motion-ui--size` |
+| **Chưa có trang xem token** | số liệu tương phản chỉ nằm trong test | **`GET /he-thong-thiet-ke`** (OWNER, server-render): bảng bậc chữ × bề mặt với tỉ lệ WCAG của CẢ HAI theme + màu trạng thái + token cố định. Số liệu lấy từ `App\Support\ThemePalette` — **cùng lớp mà `ThemeSystemTest` dùng** nên trang và test không thể lệch |
+| **File thăm dò lạ trên production** | `guiprobe.tmp.php` (của phiên khác) | Đã kiểm tra: **0 file .php** ở thư mục gốc production |
+
+### 3. Verify production (đã chạy thật)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | **c79e165** (trước pull: `92d6460`) |
+| Migration | **0 pending** (đợt này không có migration) |
+| Route mới | `GET|HEAD he-thong-thiet-ke → design-tokens.page › ThemeController@tokensPage` **có mặt** |
+| Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` → **exit=0** cả bốn |
+| Asset mới | `app-CDTA1bwx.css` **145.720 B** · `main-t0yeM8hV.js` **574.061 B** |
+| **Bản phục vụ = bản build ở máy** | `md5sum` **trùng**: CSS `b9e1f4912f79278f5f49dfed212911cf` · JS `aa506ab7f1dc29a607127f6ebdefa071` |
+| Token trong CSS phục vụ | `--color-scrim:#0e0d09` · `--color-canvas-cream:#f4f2ec` · `data-theme=light` **có mặt** |
+| Mã chết trong CSS phục vụ | `sf-shell` **0** · `card-surface` **0** |
+| Emoji trong bundle JS | **0** (grep `🎲\|🖼\|🤖`) |
+| Trang | `/` `/dang-nhap` `/bang-gia` `/up` → **200** · `/he-thong-thiet-ke` (khách) → **302** về đăng nhập (đúng: cấp OWNER) |
+| Nhật ký | **9 ERROR** — y như trước deploy, dòng mới nhất vẫn là `2026-09-20 00:44` ⇒ **0 lỗi mới** |
+
+### 4. Test
+
+- Full suite: **846 test / 6.240 assert — XANH toàn bộ** (trước đợt này: 827 test / **6 đỏ**).
+- Test mới: `test_no_pictographic_emoji_in_studio_chrome` · `test_button_backgrounds_use_one_token_per_state` ·
+  `test_the_designer_token_page_shows_the_same_numbers_as_the_test`; và `ThemeSystemTest` nay đọc token
+  qua `ThemePalette` (một nguồn cho cả test lẫn trang).
+- 2 test cũ cập nhật **có ý thức** (ghi lý do ngay trong test): `CanvasControlsTest` (câu hỏi popup dọn canvas
+  nay không còn emoji) · `CollectionsHubTest`/`JobTemplatesTest` (bề mặt thật + tên hàm thật).
+
+### Còn lại (đề xuất)
+
+- [ ] Ba card còn **màu nhấn riêng** (emerald: RefImageCard · ConceptCard · InpaintCard) — muốn về một mối thì
+      phải **thiết kế lại 3 card đó**, không phải việc đồng bộ token. Hiện là ngoại lệ CÓ LÝ DO, ghi ở §5.1.
+- [ ] Nhiều card khác vẫn còn **2 nút chính** hoặc **nút khoá không nêu lý do** — rà theo checklist §10.
+- [ ] Card «Gợi ý từ ảnh» chưa cho **chọn ảnh nguồn ngay trong card** (`SourceLibraryPicker` đã có sẵn).
+- [ ] **Mã tra cứu lỗi** cho người dùng đọc cho tổng đài (`L-8F3K`) — ghi ở cả giao diện và log (§6.5).
+- [ ] Preset **tên file ảnh theo kênh bán** · tự động chuyển trạng thái bộ sưu tập khi khách bấm "Duyệt"
+      (hiện CỐ Ý chỉ ghi phản hồi) · cron `studio:grant-plan-credits` trên hPanel · báo cáo chi phí **theo nhóm**.
