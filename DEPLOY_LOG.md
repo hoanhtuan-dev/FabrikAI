@@ -1924,7 +1924,7 @@ Kèm câu chốt: model không có tìm kiếm thì **vẫn chạy bình thườ
 
 ## Phiên 2026-09-23 (Đợt 26 — TRẢ LỜI "DeepSeek bật tìm kiếm web thế nào?" + KHÔNG hứa hộ khai báo)
 
-**Deploy:** `<prev> → <commit>`. Không migration mới.
+**Deploy:** `a36b4e4 → 5bd0fc7`. Không migration mới.
 
 ### 0. ĐO THẬT trước khi trả lời (đây là câu trả lời, không phải suy đoán)
 
