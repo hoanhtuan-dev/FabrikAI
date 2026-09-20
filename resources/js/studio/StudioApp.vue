@@ -982,10 +982,10 @@ function onTouchEnd(e) {
                 </div>
                 <p v-if="!store.projects.length" class="px-2 py-1 text-[10px] text-cream-300/40">Chưa có bộ sưu tập nào.</p>
               </div>
-              <button v-if="store.appliedProject" @click="store.unapplyProject(); applyOpen = false" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-red-500/30 bg-red-600/10 px-2 py-1.5 text-[10px] font-semibold text-red-200 transition hover:bg-red-600/20">
+              <button v-if="store.appliedProject" @click="store.unapplyProject(); applyOpen = false" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-red-500/40 bg-red-600/10 px-2 py-1.5 text-[10px] font-semibold text-red-200 transition hover:bg-red-600/20">
                 <StudioIcon name="pinOff" size="h-3 w-3" /> Ngắt dự án hiện tại
               </button>
-              <button @click="applyOpen = false; projectsOpen = true" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition hover:bg-ink-700">
+              <button @click="applyOpen = false; projectsOpen = true" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-600 bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition hover:bg-ink-700">
                 <StudioIcon name="kanban" size="h-3 w-3" /> Mở bảng thiết kế quản lý bộ sưu tập
               </button>
             </div>
@@ -1069,7 +1069,7 @@ function onTouchEnd(e) {
                       </button>
                     </li>
                   </ul>
-                  <button type="button" class="mt-1.5 w-full rounded border border-ink-700 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700" @click="store.toggleTeam()">
+                  <button type="button" class="mt-1.5 w-full rounded border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700" @click="store.toggleTeam()">
                     <StudioIcon name="plus" size="h-3 w-3" class="mr-1 inline" />{{ store.teamOpen ? 'Đóng form mời' : 'Mời thành viên' }}
                   </button>
                   <div v-if="store.teamOpen" class="mt-1.5 space-y-1.5 rounded border border-brand-500/30 bg-brand-600/10 p-2">
@@ -1100,7 +1100,7 @@ function onTouchEnd(e) {
                         <p class="mt-0.5 font-mono text-[12px] font-semibold text-cream-50">{{ store.teamResult.temp_password }}</p>
                       </div>
                       <p class="text-[10px] text-cream-300/85">Nhân viên vào <b class="text-cream-100">/dang-nhap</b> bằng email + mật khẩu tạm rồi đổi mật khẩu trong phần tài khoản.</p>
-                      <button type="button" class="w-full rounded border border-ink-700 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700" @click="store.teamResult = null; store.teamOpen = false">Xong</button>
+                      <button type="button" class="w-full rounded border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700" @click="store.teamResult = null; store.teamOpen = false">Xong</button>
                     </template>
                   </div>
                 </template>
@@ -1128,7 +1128,7 @@ function onTouchEnd(e) {
                 <p v-else class="mt-1 text-[10px] text-emerald-200">Gói của bạn đang có đủ mọi tính năng đang mở.</p>
               </div>
 
-              <button type="button" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition hover:bg-ink-700" @click="store.planCatalogOpen = !store.planCatalogOpen">
+              <button type="button" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-600 bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition hover:bg-ink-700" @click="store.planCatalogOpen = !store.planCatalogOpen">
                 <StudioIcon name="sparkles" size="h-3 w-3" /> {{ store.planCatalogOpen ? 'Thu gọn danh mục gói' : 'Xem gói khác / nâng cấp' }}
               </button>
               <div v-if="store.planCatalogOpen" class="mt-2 max-h-64 space-y-1.5 overflow-y-auto">
@@ -1202,7 +1202,7 @@ function onTouchEnd(e) {
                   <p v-if="store.planStatus.payment && store.planStatus.payment.support.phone" class="text-[10px] text-cream-300/85">
                     Cần gấp: {{ store.planStatus.payment.support.phone }}<span v-if="store.planStatus.payment.support.email"> · {{ store.planStatus.payment.support.email }}</span>
                   </p>
-                  <button type="button" class="w-full rounded border border-ink-700 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700" @click="store.closeUpgrade()">Đóng</button>
+                  <button type="button" class="w-full rounded border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700" @click="store.closeUpgrade()">Đóng</button>
                 </template>
               </div>
             </template>
@@ -1243,11 +1243,11 @@ function onTouchEnd(e) {
          để trình duyệt bật lời mời cài đặt (đã bỏ service worker lẫn manifest). -->
     <!-- Mobile top bar (chỉ ở view studio) -->
     <div v-if="store.studioView !== 'library'" class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
-      <button @click="menuOpen = true" class="icon-btn !h-9 !w-9 border border-ink-700 md:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>
+      <button @click="menuOpen = true" class="icon-btn !h-9 !w-9 border border-ink-600 md:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>
       <span class="flex items-center gap-1.5 font-display text-sm font-semibold"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span>
       <div class="flex items-center gap-1.5">
-        <button @click="projectsOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-700" :title="store.appliedProject ? 'Bộ sưu tập hiện tại: ' + store.appliedProject.name : 'Bộ sưu tập'" aria-label="Bộ sưu tập"><StudioIcon name="kanban" size="h-4 w-4" /><span v-if="store.appliedProject" class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand-400"></span></button>
-        <button @click="outputOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-700" title="Kết quả" aria-label="Kết quả"><StudioIcon name="grid" size="h-4 w-4" /><span v-if="store.generations.length" class="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[9px] font-bold leading-none text-white">{{ store.generations.length }}</span></button>
+        <button @click="projectsOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-600" :title="store.appliedProject ? 'Bộ sưu tập hiện tại: ' + store.appliedProject.name : 'Bộ sưu tập'" aria-label="Bộ sưu tập"><StudioIcon name="kanban" size="h-4 w-4" /><span v-if="store.appliedProject" class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand-400"></span></button>
+        <button @click="outputOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-600" title="Kết quả" aria-label="Kết quả"><StudioIcon name="grid" size="h-4 w-4" /><span v-if="store.generations.length" class="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[9px] font-bold leading-none text-white">{{ store.generations.length }}</span></button>
       </div>
     </div>
     <div v-if="store.studioView !== 'library'" class="flex flex-1 overflow-hidden">
@@ -1481,7 +1481,7 @@ function onTouchEnd(e) {
           <div v-if="store.showBatch && store.activeBatch.length > 1" class="batch-slider absolute bottom-14 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
             <div class="flex items-center gap-1.5">
               <span class="text-[10px] text-cream-300/60">{{ store.activeBatch.length }} biến thể</span>
-              <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2 transition-all duration-base" :class="store.previewId === v.id ? 'border-brand-500 scale-105' : 'border-ink-700 hover:border-brand-400'">
+              <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2 transition-all duration-base" :class="store.previewId === v.id ? 'border-brand-500 scale-105' : 'border-ink-600 hover:border-brand-400'">
                 <template v-if="v.status === 'completed' && v.media_url">
                   <img :src="v.media_url" class="batch-thumb h-full w-full bg-ink-900 object-cover" loading="lazy">
                 </template>

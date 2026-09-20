@@ -206,7 +206,7 @@ function saveSettings() {
     <div class="mt-3 grid grid-cols-3 gap-2">
       <button v-for="i in 3" :key="i" @click="openSlot(i - 1)" title="Bấm để tải/chọn ảnh"
               class="relative flex h-24 flex-col items-center justify-center overflow-hidden rounded-md border transition"
-              :class="selected[i-1] ? 'border-brand-500 bg-ink-900' : 'border-dashed border-ink-700 hover:border-brand-400 bg-ink-900/40'">
+              :class="selected[i-1] ? 'border-brand-500 bg-ink-900' : 'border-dashed border-ink-600 hover:border-brand-400 bg-ink-900/40'">
         <template v-if="selected[i-1]">
           <img :src="selected[i-1].url" class="h-full w-full object-cover" @error="onSlotImgError(i-1)">
           <span v-if="slotImgError[i-1]" class="absolute inset-0 grid place-items-center bg-ink-900 text-2xl" title="Ảnh không tải được — bấm × để bỏ">🖼️</span>

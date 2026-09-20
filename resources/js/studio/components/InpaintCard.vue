@@ -70,7 +70,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
               class="group flex w-full items-center justify-center gap-2.5 rounded-lg border px-4 py-3 text-sm font-semibold transition-all duration-base"
               :class="store.inpaintMaskMode === 'path'
                 ? 'border-emerald-400 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-900/30'
-                : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200 hover:border-emerald-400/80 hover:bg-emerald-500/20 hover:shadow-md hover:shadow-emerald-900/20 active:scale-[.98]'">
+                : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200 hover:border-emerald-400 hover:bg-emerald-500/20 hover:shadow-md hover:shadow-emerald-900/20 active:scale-[.98]'">
         <span class="grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors"
               :class="store.inpaintMaskMode === 'path' ? 'bg-white/20' : 'bg-emerald-500/20 group-hover:bg-emerald-500/30'">
           <StudioIcon name="penTool" size="h-4 w-4" />
@@ -108,17 +108,17 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     <!-- Chỉnh nhanh: 2 chip đặc biệt (đổi màu / thay nền) + preset từ Prompt Templates -->
     <p class="label mt-4"><StudioIcon name="zap" size="h-3.5 w-3.5" class="-mt-0.5 mr-1 inline text-brand-300" /> Chỉnh nhanh</p>
     <div class="mt-1 grid grid-cols-2 gap-1.5">
-      <button @click="colorPickerOpen = true" class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold transition-all" :class="store.inpaintPrompt.startsWith('đổi màu quần áo') ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
+      <button @click="colorPickerOpen = true" class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold transition-all" :class="store.inpaintPrompt.startsWith('đổi màu quần áo') ? 'border-brand-500 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400 hover:bg-ink-700'">
         <StudioIcon name="palette" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" /> <span class="truncate">Đổi màu…</span>
       </button>
-      <button @click="bgPromptOpen = true" class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold transition-all" :class="store.inpaintPrompt.startsWith('thay đổi phông nền') ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
+      <button @click="bgPromptOpen = true" class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold transition-all" :class="store.inpaintPrompt.startsWith('thay đổi phông nền') ? 'border-brand-500 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400 hover:bg-ink-700'">
         <StudioIcon name="wand" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" /> <span class="truncate">Thay nền…</span>
       </button>
     </div>
     <div v-if="store.inpaintEditPresets.length" class="mt-1.5 grid grid-cols-2 gap-1.5">
       <button v-for="p in store.inpaintEditPresets" :key="p.id" @click="applyPreset(p)" :title="p.prompt"
               class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
-              :class="store.inpaintPrompt === p.prompt ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
+              :class="store.inpaintPrompt === p.prompt ? 'border-brand-500 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400 hover:bg-ink-700'">
         <StudioIcon :name="chipIcon(p)" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
         <span class="truncate">{{ p.label }}</span>
       </button>
@@ -184,7 +184,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
       <div class="flex flex-col items-center gap-3 p-5">
         <div class="h-12 w-full rounded-md border border-white/20" :style="{ background: editColor }"></div>
         <div class="flex flex-wrap justify-center gap-1.5">
-          <button v-for="(name, hex) in colorNames" :key="hex" @click="editColor = hex" :title="'Màu ' + name" class="h-8 w-8 rounded-full border border-white/20 transition" :class="editColor === hex ? 'ring-2 ring-brand-400 ring-offset-2 ring-offset-ink-900' : 'hover:scale-110'" :style="{ background: hex }"></button>
+          <button v-for="(name, hex) in colorNames" :key="hex" @click="editColor = hex" :title="'Màu ' + name" class="h-8 w-8 rounded-full border border-ink-600 transition" :class="editColor === hex ? 'ring-2 ring-brand-400 ring-offset-2 ring-offset-ink-900' : 'hover:scale-110'" :style="{ background: hex }"></button>
         </div>
         <input type="color" v-model="editColor" class="h-9 w-full cursor-pointer rounded-lg border border-ink-700 bg-ink-800" title="Chọn màu tùy ý" />
         <button @click="store.inpaintPrompt = 'đổi màu quần áo trong vùng chọn sang màu ' + colorName(editColor) + ' (' + editColor + '), giữ nguyên chi tiết, chất liệu và phong cách.'; store.toast('Đã điền: Đổi màu → ' + colorName(editColor)); colorPickerOpen = false" class="btn-brand btn-sm w-full">Áp dụng màu</button>

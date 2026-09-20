@@ -344,7 +344,7 @@ onBeforeUnmount(() => {
         <!-- Thu gọn / mở thông tin ảnh -->
         <button @click="infoOpen = !infoOpen"
                 class="absolute right-3 top-14 z-20 grid h-7 w-7 place-items-center rounded-full border transition"
-                :class="infoOpen ? 'border-ink-700 bg-ink-900/90 text-cream-200 hover:bg-ink-700 hover:text-white' : 'border-brand-500/60 bg-brand-600/25 text-brand-200 hover:bg-brand-600/40'"
+                :class="infoOpen ? 'border-ink-600 bg-ink-900/90 text-cream-200 hover:bg-ink-700 hover:text-white' : 'border-brand-500 bg-brand-600/25 text-brand-200 hover:bg-brand-600/40'"
                 :title="infoOpen ? 'Thu gọn thông tin ảnh' : 'Mở thông tin ảnh'"
                 :aria-label="infoOpen ? 'Thu gọn thông tin ảnh' : 'Mở thông tin ảnh'">
           <StudioIcon name="columns" size="h-3.5 w-3.5"/>
@@ -364,7 +364,7 @@ onBeforeUnmount(() => {
           <button v-for="g in items" :key="g.id" @click="store.viewer = g"
                   :data-active="current?.id === g.id ? 'true' : 'false'"
                   class="relative h-11 w-11 shrink-0 snap-start overflow-hidden rounded-lg border-2 transition"
-                  :class="current?.id === g.id ? 'border-brand-500' : 'border-ink-700/60 hover:border-ink-500'">
+                  :class="current?.id === g.id ? 'border-brand-500' : 'border-ink-600 hover:border-ink-500'">
             <img :src="thumbUrl(g.media_url)" class="pointer-events-none h-full w-full select-none bg-ink-900 object-cover" loading="lazy" draggable="false" @error="onThumbError($event, g.media_url)" />
           </button>
         </div>
@@ -416,11 +416,11 @@ onBeforeUnmount(() => {
                 {{ projectLabel }}
               </span>
               <div class="flex items-center gap-1.5">
-                <button @click="toggleAttach" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-300 transition hover:border-brand-500/40 hover:bg-brand-600/10 hover:text-brand-200" title="Chuyển sang dự án khác (1 chạm)">
+                <button @click="toggleAttach" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-300 transition hover:border-brand-400 hover:bg-brand-600/10 hover:text-brand-200" title="Chuyển sang dự án khác (1 chạm)">
                   <StudioIcon name="link" size="h-3 w-3" />
                   Chuyển
                 </button>
-                <button @click="detachProject" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-300 transition hover:border-red-500/40 hover:bg-red-600/10 hover:text-red-300" title="Gỡ khỏi dự án">
+                <button @click="detachProject" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-300 transition hover:border-red-500 hover:bg-red-600/10 hover:text-red-300" title="Gỡ khỏi dự án">
                   <StudioIcon name="unlink" size="h-3 w-3" />
                   Gỡ
                 </button>
@@ -429,7 +429,7 @@ onBeforeUnmount(() => {
           </template>
           <!-- KHI KHÔNG có project_id: nút gắn -->
           <template v-else>
-            <button @click="toggleAttach" :disabled="attachBusy" class="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-ink-600 bg-transparent px-3 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-brand-500/40 hover:bg-brand-600/10 hover:text-brand-200">
+            <button @click="toggleAttach" :disabled="attachBusy" class="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-ink-600 bg-transparent px-3 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/10 hover:text-brand-200">
               <StudioIcon name="link" size="h-3.5 w-3.5" />
               Gắn vào dự án
             </button>

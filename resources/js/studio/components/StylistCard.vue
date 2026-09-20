@@ -84,11 +84,11 @@ function openSettings() { settingsOpen.value = true; }
 <template>
   <div v-if="!popup" class="card p-5" style="background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
     <div class="flex items-center gap-2">
-      <button @click="open=true; step='type'" class="flex min-w-0 flex-1 items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400">
+      <button @click="open=true; step='type'" class="flex min-w-0 flex-1 items-center justify-between rounded-lg border border-ink-600 bg-white/5 p-3 text-left transition hover:border-brand-400">
         <span class="min-w-0 flex-1"><span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="sparkles" /> Trợ lý thiết kế</span></span>
         <span class="ml-1 shrink-0 text-lg text-cream-200">›</span>
       </button>
-      <button @click="openSettings" title="Quản lý data Trợ lý thiết kế" class="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 text-brand-300 transition hover:border-brand-400 hover:text-brand-200"><StudioIcon name="gear" /></button>
+      <button @click="openSettings" title="Quản lý data Trợ lý thiết kế" class="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-ink-600 bg-white/5 text-brand-300 transition hover:border-brand-400 hover:text-brand-200"><StudioIcon name="gear" /></button>
     </div>
   </div>
 
@@ -99,7 +99,7 @@ function openSettings() { settingsOpen.value = true; }
         <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-cream-300/60">Chọn loại trang phục</p>
         <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
           <button v-for="t in types" :key="t.id" type="button" @click="pickType(t)"
-            class="group relative aspect-square overflow-hidden rounded-md border-2 border-ink-700 bg-ink-900 transition-all duration-fast hover:border-brand-400 hover:shadow-lg hover:shadow-brand-500/15 active:scale-[0.97]">
+            class="group relative aspect-square overflow-hidden rounded-md border-2 border-ink-600 bg-ink-900 transition-all duration-fast hover:border-brand-400 hover:shadow-lg hover:shadow-brand-500/15 active:scale-[0.97]">
             <img :src="t.thumb || t.img" :alt="t.name" loading="lazy" decoding="async" class="h-full w-full object-cover opacity-90 transition-transform duration-base group-hover:scale-105">
             <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-1.5 pb-1.5 pt-6 text-center text-[10px] font-medium leading-tight text-white">{{ t.name }}</span>
           </button>
@@ -117,7 +117,7 @@ function openSettings() { settingsOpen.value = true; }
           <div v-for="q in questions" :key="q.key" class="rounded-lg border border-ink-700 bg-ink-800/60 p-3">
             <p class="mb-2 text-xs font-semibold text-brand-200">{{ q.q }}</p>
             <div class="flex flex-wrap gap-1.5">
-              <button v-for="opt in q.opts" :key="opt" type="button" @click="toggleOpt(q.key, opt)" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="answers[q.key]?.includes(opt) ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-ink-600 text-cream-200 hover:border-brand-400'">{{ opt }}</button>
+              <button v-for="opt in q.opts" :key="opt" type="button" @click="toggleOpt(q.key, opt)" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="answers[q.key]?.includes(opt) ? 'border-brand-500 bg-brand-500/25 text-white' : 'border-ink-600 text-cream-200 hover:border-brand-400'">{{ opt }}</button>
             </div>
             <input v-model="customNotes[q.key]" placeholder="Hoặc nhập tùy chỉnh…" class="mt-2 w-full rounded-lg border border-ink-700 bg-ink-900/60 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-brand-400">
             <p v-if="selectedCount(q.key)" class="mt-1 text-[10px] text-cream-300/50">Đã chọn {{ selectedCount(q.key) }} mục</p>

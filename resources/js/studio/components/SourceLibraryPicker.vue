@@ -158,7 +158,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
         <button @click="close" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 transition-colors hover:bg-ink-700 hover:text-white" title="Đóng" :aria-label="'Đóng'"><StudioIcon name="x" size="h-4 w-4"/></button>
       </div>
 
-      <label class="mb-3 flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ink-600 bg-ink-800/40 text-xs font-medium text-cream-200 transition-colors hover:border-brand-500 hover:bg-brand-600/10 hover:text-brand-200">
+      <label class="mb-3 flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ink-600 bg-ink-800/40 text-xs font-medium text-cream-200 transition-colors hover:border-brand-400 hover:bg-brand-600/10 hover:text-brand-200">
         <StudioIcon name="imagePlus" size="h-4 w-4"/>
         {{ uploading ? 'Đang tải lên…' : 'Tải ảnh mới' }}<span class="text-cream-300/50">(chọn nhiều file được)</span>
         <input ref="fileRef" type="file" accept="image/*" multiple @change="onFile" class="hidden">

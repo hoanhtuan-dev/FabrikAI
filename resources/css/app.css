@@ -273,7 +273,10 @@
     .seg-btn { @apply flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[11px] font-semibold text-cream-300/70 transition hover:text-cream-100; }
     .seg-btn.is-active { @apply bg-brand-600 text-white hover:text-white; }
     /* Nút toolbar nhỏ trong card/panel (toggle lịch sử, templates, hành động phụ) */
-    .tool-btn { @apply inline-flex items-center gap-1.5 rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-ink-600 hover:bg-ink-700 disabled:opacity-40; }
+    /* Viền NGHỈ của mọi nút phụ = border-ink-600 (xem docs/DESIGN_SYSTEM.md §5 "Viền") —
+       trước đây .tool-btn dùng ink-700 còn nút viết tay dùng ink-600 nên hai nút cạnh nhau
+       lệch màu viền. Hover đi lên ink-500 (nút rất phụ) hoặc brand-400 (nút thường). */
+    .tool-btn { @apply inline-flex items-center gap-1.5 rounded-md border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-ink-500 hover:bg-ink-700 disabled:opacity-40; }
     .tool-btn.is-active { @apply border-brand-500/70 bg-brand-600/20 text-brand-200 hover:bg-brand-600/30; }
     /* Nút icon vuông chuẩn (mọi chrome studio) */
     .icon-btn { @apply grid h-7 w-7 shrink-0 place-items-center rounded text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-30; }

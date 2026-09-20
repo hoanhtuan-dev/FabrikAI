@@ -206,8 +206,8 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
     <div v-if="store.suggestLibManage" class="mb-4 space-y-2 rounded-lg border border-brand-600/40 bg-brand-900/30 p-3">
       <div class="flex flex-wrap items-center gap-2">
         <span class="text-sm font-semibold text-cream-100">Đã chọn <span class="text-brand-300">{{ selectedCount }}</span> prompt</span>
-        <button @click="toggleAll" class="rounded-lg border border-ink-700 bg-ink-800 px-2.5 py-1 text-xs text-cream-200 hover:bg-ink-700">{{ allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả' }}</button>
-        <button @click="store.suggestLibSelectNone" class="rounded-lg border border-ink-700 bg-ink-800 px-2.5 py-1 text-xs text-cream-200 hover:bg-ink-700">Bỏ chọn</button>
+        <button @click="toggleAll" class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1 text-xs text-cream-200 hover:bg-ink-700">{{ allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả' }}</button>
+        <button @click="store.suggestLibSelectNone" class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1 text-xs text-cream-200 hover:bg-ink-700">Bỏ chọn</button>
       </div>
       <div class="flex flex-wrap items-center gap-2 border-t border-ink-700/60 pt-2">
         <template v-if="!confirmBulk">
@@ -263,7 +263,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
         <!-- Checkbox chọn (chế độ quản lý) -->
         <button v-if="store.suggestLibManage" @click.stop="store.toggleSuggestLibSelect(item.id)"
                 class="absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-lg border text-sm"
-                :class="isSelected(item.id) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
+                :class="isSelected(item.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
           <StudioIcon name="check" size="h-3.5 w-3.5" />
         </button>
         <!-- Hành động nhanh (ngoài chế độ quản lý) -->
@@ -274,8 +274,8 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
             <button @click.stop="cancelDeleteSingle" class="rounded-lg border border-ink-600 bg-ink-900/95 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
           </template>
           <template v-else>
-            <button @click.stop="openEdit(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-brand-500/60 hover:bg-brand-600/30 hover:text-brand-100" title="Sửa prompt"><StudioIcon name="pencil" size="h-3.5 w-3.5" /></button>
-            <button @click.stop="askDeleteSingle(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500/60 hover:bg-red-600/30 hover:text-red-200" title="Xóa prompt"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+            <button @click.stop="openEdit(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-brand-400 hover:bg-brand-600/30 hover:text-brand-100" title="Sửa prompt"><StudioIcon name="pencil" size="h-3.5 w-3.5" /></button>
+            <button @click.stop="askDeleteSingle(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500 hover:bg-red-600/30 hover:text-red-200" title="Xóa prompt"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
           </template>
         </div>
       </div>
@@ -288,7 +288,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
            :class="isSelected(item.id) ? 'border-brand-400' : 'border-ink-700 hover:border-brand-500/50'">
         <button v-if="store.suggestLibManage" @click.stop="store.toggleSuggestLibSelect(item.id)"
                 class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border text-sm"
-                :class="isSelected(item.id) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
+                :class="isSelected(item.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
           <StudioIcon name="check" size="h-3.5 w-3.5" />
         </button>
         <div class="h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-md bg-ink-900" @click="store.suggestLibManage ? store.toggleSuggestLibSelect(item.id) : openDetail(item)">
@@ -310,8 +310,8 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
             <button @click.stop="cancelDeleteSingle" class="rounded-lg border border-ink-600 bg-ink-900/95 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
           </template>
           <template v-else>
-            <button @click.stop="openEdit(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-brand-500/60 hover:bg-brand-600/30 hover:text-brand-100" title="Sửa prompt"><StudioIcon name="pencil" size="h-3.5 w-3.5" /></button>
-            <button @click.stop="askDeleteSingle(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500/60 hover:bg-red-600/30 hover:text-red-200" title="Xóa prompt"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+            <button @click.stop="openEdit(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-brand-400 hover:bg-brand-600/30 hover:text-brand-100" title="Sửa prompt"><StudioIcon name="pencil" size="h-3.5 w-3.5" /></button>
+            <button @click.stop="askDeleteSingle(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500 hover:bg-red-600/30 hover:text-red-200" title="Xóa prompt"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
           </template>
         </div>
       </div>
@@ -320,7 +320,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
     <!-- ══ Xem thêm ══ -->
     <div v-if="store.suggestLibHasMore" class="mt-6 flex justify-center">
       <button @click="store.suggestLibNextPage()" :disabled="store.suggestLibLoading"
-              class="rounded-md border border-ink-700 bg-ink-800 px-5 py-2 text-sm font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-50">
+              class="rounded-md border border-ink-600 bg-ink-800 px-5 py-2 text-sm font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-50">
         {{ store.suggestLibLoading ? 'Đang tải…' : 'Xem thêm' }}
       </button>
     </div>

@@ -278,7 +278,7 @@ onMounted(async () => {
         <!-- Phải: hành động -->
         <div class="flex items-center gap-1.5">
           <button @click="refresh" :disabled="store.libraryLoading || store.uploadLoading"
-                  class="icon-btn !h-9 !w-9 rounded-md border border-ink-700 bg-ink-800 disabled:opacity-40"
+                  class="icon-btn !h-9 !w-9 rounded-md border border-ink-600 bg-ink-800 disabled:opacity-40"
                   title="Làm mới thư viện" aria-label="Làm mới thư viện">
             <StudioIcon name="refresh" size="h-4 w-4" />
           </button>
@@ -399,7 +399,7 @@ onMounted(async () => {
         <!-- Nút áp dụng nhanh / chip đã áp dụng -->
         <div v-if="activeProjectId && activeProjectId !== 'none' && filteredProject" class="flex items-center">
           <button v-if="canApplyFilteredProject" @click="applyFilteredProject"
-                  class="rounded-lg border border-brand-500/40 bg-brand-600/20 px-2.5 py-1.5 text-xs font-semibold text-brand-100 hover:bg-brand-500/30">
+                  class="rounded-lg border border-brand-500 bg-brand-600/20 px-2.5 py-1.5 text-xs font-semibold text-brand-100 hover:bg-brand-500/30">
             <StudioIcon name="pin" size="h-3.5 w-3.5" /> Áp dụng bộ sưu tập này
           </button>
           <div v-else-if="store.appliedProject?.id === Number(activeProjectId)" class="flex items-center gap-1.5 rounded-full border border-brand-500/50 bg-brand-600/20 px-3 py-1 text-xs text-brand-100">
@@ -421,7 +421,7 @@ onMounted(async () => {
       <div v-if="store.libraryManage" class="mb-4 space-y-2 rounded-lg border border-brand-600/40 bg-brand-900/30 p-3">
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-sm font-semibold text-cream-100">Đã chọn <span class="text-brand-300">{{ selectedCount }}</span> mục</span>
-          <button @click="toggleAll" class="rounded-lg border border-ink-700 bg-ink-800 px-2.5 py-1 text-xs text-cream-200 hover:bg-ink-700">{{ allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả' }}</button>
+          <button @click="toggleAll" class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1 text-xs text-cream-200 hover:bg-ink-700">{{ allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả' }}</button>
           <button @click="store.librarySelectJunk" class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-200 hover:bg-amber-500/20">Chọn ảnh rác</button>
           <button @click="store.librarySelectOld" class="rounded-lg border border-sky-500/40 bg-sky-500/10 px-2.5 py-1 text-xs text-sky-200 hover:bg-sky-500/20">Chọn ảnh cũ ({{ store.libraryFilters.old_days }} ngày)</button>
         </div>
@@ -505,7 +505,7 @@ onMounted(async () => {
           <!-- Checkbox chọn (luôn hiện ở chế độ quản lý) -->
           <button v-if="store.libraryManage" @click.stop="store.toggleLibrarySelect(g.id)"
                   class="absolute right-2 bottom-2 grid h-7 w-7 place-items-center rounded-lg border text-sm"
-                  :class="isSelected(g.id) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
+                  :class="isSelected(g.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
             <StudioIcon name="check" size="h-3.5 w-3.5" />
           </button>
         </div>
@@ -537,7 +537,7 @@ onMounted(async () => {
           </div>
           <button v-if="store.libraryManage" @click.stop="store.toggleLibrarySelect(g.id)"
                   class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border text-sm"
-                  :class="isSelected(g.id) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
+                  :class="isSelected(g.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
             <StudioIcon name="check" size="h-3.5 w-3.5" />
           </button>
         </div>
@@ -546,7 +546,7 @@ onMounted(async () => {
       <!-- ══ Xem thêm ══ -->
       <div v-if="store.libraryHasMore" class="mt-6 flex justify-center">
         <button @click="store.loadMoreLibrary()" :disabled="store.libraryLoading"
-                class="rounded-md border border-ink-700 bg-ink-800 px-5 py-2 text-sm font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-50">
+                class="rounded-md border border-ink-600 bg-ink-800 px-5 py-2 text-sm font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-50">
           {{ store.libraryLoading ? 'Đang tải…' : 'Xem thêm' }}
         </button>
       </div>
@@ -579,7 +579,7 @@ onMounted(async () => {
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-sm font-semibold text-cream-100">Đã chọn <span class="text-brand-300">{{ uploadSelectedCount }}</span> file</span>
             <button @click="store.uploadSelectUnused" class="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-xs text-red-200 hover:bg-red-500/20">Chọn file mồ côi</button>
-            <button @click="store.uploadSelectNone" class="rounded-lg border border-ink-700 bg-ink-800 px-2.5 py-1 text-xs text-cream-200 hover:bg-ink-700">Bỏ chọn</button>
+            <button @click="store.uploadSelectNone" class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1 text-xs text-cream-200 hover:bg-ink-700">Bỏ chọn</button>
           </div>
           <div class="flex flex-wrap items-center gap-2 border-t border-ink-700/60 pt-2">
             <template v-if="confirmAction === ''">
@@ -630,7 +630,7 @@ onMounted(async () => {
             </div>
             <button v-if="store.libraryManage && !f.used" @click.stop="store.toggleUploadSelect(f.rel)"
                     class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-lg border text-sm"
-                    :class="isUploadSelected(f.rel) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
+                    :class="isUploadSelected(f.rel) ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
               <StudioIcon name="check" size="h-3.5 w-3.5" />
             </button>
             <!-- Xóa nhanh (ngoài chế độ quản lý, chỉ file chưa dùng) -->
@@ -640,7 +640,7 @@ onMounted(async () => {
                 <button @click.stop="runUploadDelete" class="rounded-lg bg-red-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-red-500">Xóa</button>
                 <button @click.stop="cancelUploadDelete" class="rounded-lg border border-ink-600 bg-ink-900/95 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
               </template>
-              <button v-else @click.stop="askUploadDelete(f)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500/60 hover:bg-red-600/30 hover:text-red-200" title="Xóa file"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+              <button v-else @click.stop="askUploadDelete(f)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500 hover:bg-red-600/30 hover:text-red-200" title="Xóa file"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
             </div>
           </div>
         </div>
@@ -668,7 +668,7 @@ onMounted(async () => {
           </div>
           <button v-if="store.libraryManage && !f.used" @click.stop="store.toggleUploadSelect(f.rel)"
                   class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border text-sm"
-                  :class="isUploadSelected(f.rel) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
+                  :class="isUploadSelected(f.rel) ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
             <StudioIcon name="check" size="h-3.5 w-3.5" />
           </button>
           <!-- Xóa nhanh (ngoài chế độ quản lý, chỉ file chưa dùng) -->
@@ -678,7 +678,7 @@ onMounted(async () => {
               <button @click.stop="runUploadDelete" class="rounded-lg bg-red-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-red-500">Xóa</button>
               <button @click.stop="cancelUploadDelete" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
             </template>
-            <button v-else @click.stop="askUploadDelete(f)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500/60 hover:bg-red-600/30 hover:text-red-200" title="Xóa file"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+            <button v-else @click.stop="askUploadDelete(f)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500 hover:bg-red-600/30 hover:text-red-200" title="Xóa file"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
           </div>
         </div>
       </div>

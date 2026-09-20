@@ -110,7 +110,7 @@ async function copyColor(c) {
             <button @click="store.addBlankLayer(null, blankRatio); blankMenuOpen = false" class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-cream-100 hover:bg-ink-800"><span class="h-5 w-5 rounded border border-white/30" style="background: repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 8px 8px"></span>Trong suốt</button>
 
             <div class="grid grid-cols-6 gap-1.5">
-              <button v-for="c in ['#ffffff','#000000','#ff4d4f','#4f9dff','#4ade80','#fbbf24']" :key="c" @click="store.addBlankLayer(c, blankRatio); blankMenuOpen = false" class="h-7 w-7 rounded-full border border-white/20 transition hover:scale-110" :style="{ background: c }" :title="c" :aria-label="'Layer nền màu ' + c"></button>
+              <button v-for="c in ['#ffffff','#000000','#ff4d4f','#4f9dff','#4ade80','#fbbf24']" :key="c" @click="store.addBlankLayer(c, blankRatio); blankMenuOpen = false" class="h-7 w-7 rounded-full border border-ink-600 transition hover:scale-110" :style="{ background: c }" :title="c" :aria-label="'Layer nền màu ' + c"></button>
             </div>
 
             <!-- Bảng chọn màu tùy chỉnh: 1 hàng rõ ràng — bấm mở bảng màu, chọn xong tự thêm layer -->
@@ -280,7 +280,7 @@ async function copyColor(c) {
         <span>Palette ảnh</span>
       </p>
       <div class="grid grid-cols-4 gap-1.5">
-        <button v-for="c in store.palette.slice(0, 8)" :key="c" @click="copyColor(c)" class="h-7 w-full rounded-md border border-ink-700 transition hover:scale-105" :style="{ background: c }" :title="'Nhấn để copy ' + c" :aria-label="'Nhấn để copy ' + c"></button>
+        <button v-for="c in store.palette.slice(0, 8)" :key="c" @click="copyColor(c)" class="h-7 w-full rounded-md border border-ink-600 transition hover:scale-105" :style="{ background: c }" :title="'Nhấn để copy ' + c" :aria-label="'Nhấn để copy ' + c"></button>
       </div>
     </section>
 

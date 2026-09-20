@@ -246,8 +246,8 @@ watch(() => open.value, (v) => {
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button v-if="store.projectCanReview" @click="togglePending" class="rounded-full border px-3 py-1.5 text-xs font-semibold" :class="store.projectScope === 'pending' ? 'border-brand-500 bg-brand-600/30 text-brand-100' : 'border-ink-700 text-cream-200 hover:bg-ink-800'"><StudioIcon name="clock" size="h-3.5 w-3.5" class="mr-1 inline align-[-2px]" />Chờ duyệt</button>
-            <button @click="toggleArchived" class="rounded-full border px-3 py-1.5 text-xs font-semibold" :class="store.projectsArchived ? 'border-brand-500 bg-brand-600/30 text-brand-100' : 'border-ink-700 text-cream-200 hover:bg-ink-800'"><StudioIcon name="archive" size="h-3.5 w-3.5" class="mr-1 inline align-[-2px]" />Đã lưu trữ</button>
+            <button v-if="store.projectCanReview" @click="togglePending" class="rounded-full border px-3 py-1.5 text-xs font-semibold" :class="store.projectScope === 'pending' ? 'border-brand-500 bg-brand-600/30 text-brand-100' : 'border-ink-600 text-cream-200 hover:bg-ink-800'"><StudioIcon name="clock" size="h-3.5 w-3.5" class="mr-1 inline align-[-2px]" />Chờ duyệt</button>
+            <button @click="toggleArchived" class="rounded-full border px-3 py-1.5 text-xs font-semibold" :class="store.projectsArchived ? 'border-brand-500 bg-brand-600/30 text-brand-100' : 'border-ink-600 text-cream-200 hover:bg-ink-800'"><StudioIcon name="archive" size="h-3.5 w-3.5" class="mr-1 inline align-[-2px]" />Đã lưu trữ</button>
             <button @click="openCreate" class="rounded-full bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-500">+ Bộ sưu tập mới</button>
             <button @click="open = false" aria-label="Đóng bảng thiết kế" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600"><StudioIcon name="x" size="h-4 w-4" /></button>
           </div>
@@ -358,8 +358,8 @@ watch(() => open.value, (v) => {
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <button @click="openEdit(store.activeProject)" class="inline-flex items-center gap-1 rounded-full border border-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-200 hover:bg-ink-800"><StudioIcon name="pencil" size="h-3.5 w-3.5" />Sửa</button>
-                <button @click="removeProject(store.activeProject)" class="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold" :class="confirmDelete === store.activeProject.id ? 'border-red-600 bg-red-600 text-white' : 'border-ink-700 text-cream-200 hover:border-red-600 hover:text-red-300'"><StudioIcon name="trash" size="h-3.5 w-3.5" />{{ confirmDelete === store.activeProject.id ? 'Xác nhận xóa?' : 'Xóa' }}</button>
+                <button @click="openEdit(store.activeProject)" class="inline-flex items-center gap-1 rounded-full border border-ink-600 px-3 py-1.5 text-xs font-semibold text-cream-200 hover:bg-ink-800"><StudioIcon name="pencil" size="h-3.5 w-3.5" />Sửa</button>
+                <button @click="removeProject(store.activeProject)" class="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold" :class="confirmDelete === store.activeProject.id ? 'border-red-500 bg-red-600 text-white' : 'border-ink-600 text-cream-200 hover:border-red-500 hover:text-red-300'"><StudioIcon name="trash" size="h-3.5 w-3.5" />{{ confirmDelete === store.activeProject.id ? 'Xác nhận xóa?' : 'Xóa' }}</button>
               </div>
             </div>
 
@@ -484,7 +484,7 @@ watch(() => open.value, (v) => {
           </div>
         </div>
         <div class="mt-5 flex justify-end gap-2">
-          <button @click="closeForm" class="rounded-full border border-ink-700 px-4 py-2 text-xs font-semibold text-cream-200 hover:bg-ink-800">Hủy</button>
+          <button @click="closeForm" class="rounded-full border border-ink-600 px-4 py-2 text-xs font-semibold text-cream-200 hover:bg-ink-800">Hủy</button>
           <button @click="creating ? submitCreate() : submitEdit()" :disabled="busy" class="rounded-full bg-brand-600 px-5 py-2 text-xs font-semibold text-white hover:bg-brand-500 disabled:opacity-50">{{ busy ? 'Đang lưu…' : (creating ? 'Tạo bộ sưu tập' : 'Lưu thay đổi') }}</button>
         </div>
       </div>

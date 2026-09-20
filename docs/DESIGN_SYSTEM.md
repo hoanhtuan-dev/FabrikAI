@@ -127,7 +127,53 @@ Quy tắc:
 
 ---
 
-## 5. Bố cục & cuộn
+## 5. Viền — một nghĩa, MỘT token
+
+> Đo trước khi đồng bộ (2026-09-22): **30 biến thể viền** trên các phần tử bấm được. Cùng một nghĩa
+> bị viết bằng nhiều token — "nút nghỉ" có **hai** token (`border-ink-700` 58 chỗ và `border-ink-600`
+> 54 chỗ), "đang chọn" có **hai** (`border-brand-400` 21 chỗ và `border-brand-500` 18 chỗ), mỗi màu
+> ngữ nghĩa bị rải ra 3–4 mức alpha (`red-500/30 · /40 · /60`, `amber-500/40 · /50`,
+> `emerald-400 · /40 · /50 · /80`), và 10 nút dùng ngôn ngữ "kính trắng" `border-white/5–/20`.
+> Sau khi đồng bộ: **16 token**, mỗi nghĩa đúng một token (bớt luôn ~1,6 kB CSS phải gửi đi).
+
+### 5.1 Bảng từ vựng (ĐÓNG — thêm token mới là test ĐỎ)
+
+| Nghĩa | Token | Ghi chú |
+|---|---|---|
+| Nút nghỉ (mặc định) | `border-ink-600` | **mọi** nút/chip/ô bấm được |
+| Hover nút thường | `hover:border-brand-400` | |
+| Hover nút rất phụ | `hover:border-ink-500` | nút "êm" trong hàng dày |
+| **Đang chọn / đang bật** | `border-brand-500` | thường đi kèm `bg-brand-600 text-white` |
+| Nguy hiểm (viền nghỉ) | `border-red-500/40` | nút xoá |
+| Nguy hiểm (hover · xác nhận) | `hover:border-red-500` · `border-red-500` | |
+| Cảnh báo | `border-amber-500/40` | |
+| Thành công | `border-emerald-500/40` | |
+| Thông tin | `border-sky-500/40` | |
+| Giữ chỗ cho hover | `border-transparent` | hàng bảng đổi viền khi chọn |
+| **Khối CHỨA (không bấm được)** | `border-ink-700` | card con · `<details>` · hàng danh sách · biểu mẫu |
+| Ô nhập | `border-ink-700` → `focus:border-brand-400` | `.studio-dark .input` |
+| Bảng "tông chú ý" (badge) | `...-500/40` cho cả 4 tông | danger · warn · info · ok |
+
+**Ba ngoại lệ DUY NHẤT, phải kèm lý do trong mã:**
+
+1. **Checkbox chọn ảnh** đặt TRÊN ảnh: `border-cream-300/50` → `hover:border-cream-200`
+   (viền xám tan biến trên nền ảnh bất kỳ).
+2. **Màu nhấn riêng của card** (hiện có: `RefImageCard.vue` · `ConceptCard.vue` · `InpaintCard.vue`
+   dùng `emerald-400`): phải dùng **nhất quán cả viền + nền + icon** trong đúng card đó, và
+   **KHÔNG BAO GIỜ** dùng cho nút hành động chung (Chạy · Lưu · Xoá · Tạo ảnh).
+3. **Nút kiểu `.btn-outline` trên nền tối**: hover `border-cream-300` (đảo sáng), đúng như
+   `.studio-dark .btn-outline` trong `app.css`.
+
+### 5.2 Vì sao phải là từ vựng ĐÓNG
+
+`tests/Feature/DesignSystemTest.php` quét **mọi** `<button|a|label>` trong `resources/js/studio` và
+ĐỎ nếu gặp token ngoài bảng trên. Nhờ vậy "hai nút cạnh nhau lệch màu viền" trở thành lỗi bắt được
+bằng máy, không phải thứ chỉ lộ ra khi có người ngồi nhìn. Muốn thêm token: sửa bảng này + danh sách
+trong test **trong cùng một commit** — đó là chủ ý, không phải tai nạn.
+
+---
+
+## 6. Bố cục & cuộn
 
 - **Vùng dùng chung mà cao cố định ⇒ MỌI biến thể phải theo CÙNG một khuôn.** Ví dụ vùng toolbar
   phía trên canvas: rail cao cố định `h-12`, mỗi thanh ngữ cảnh dùng chung hằng số `bar`
@@ -142,7 +188,7 @@ Quy tắc:
 
 ---
 
-## 6. Trợ năng (không phải việc "làm sau")
+## 7. Trợ năng (không phải việc "làm sau")
 
 - Nút chỉ có icon **phải có** `aria-label`; nút có chữ thì thêm `title` giải thích kết quả.
 - Tiến trình: `role="status" aria-live="polite"`; lỗi: `role="alert"`.
@@ -154,7 +200,7 @@ Quy tắc:
 
 ---
 
-## 7. Icon & emoji
+## 8. Icon & emoji
 
 - Icon **chỉ** lấy từ `resources/js/studio/icons.json` qua `StudioIcon` — cùng nguồn với PHP
   (`App\Support\IconRegistry`) nên thêm icon là thêm một khoá JSON, không phải sửa hai nơi.
@@ -168,12 +214,14 @@ Quy tắc:
 
 ---
 
-## 8. Checklist trước khi merge một thay đổi giao diện
+## 9. Checklist trước khi merge một thay đổi giao diện
 
 - [ ] Không thêm mã màu mới trong `<style scoped>` (ngoại lệ: 1 dòng gradient nhận diện).
 - [ ] Thời lượng/đường cong chuyển động lấy từ token, không viết ms.
 - [ ] Không có `transition-all`; hiệu ứng vòng lặp tắt được khi bật "giảm chuyển động".
 - [ ] Dùng class/component dùng chung ở §2–§3 thay vì tự vẽ lại.
+- [ ] Viền nút theo ĐÚNG từ vựng §5.1 (nút nghỉ `border-ink-600` · đang chọn `border-brand-500` ·
+      hover `hover:border-brand-400`) — không thêm token mới, không dùng `border-white/*` cho nút.
 - [ ] Đúng 1 hành động chính; nút khoá có dòng lý do `↳`.
 - [ ] Thứ nâng cao nằm trong `<details>` đóng sẵn.
 - [ ] 0 emoji mới; icon lấy từ `StudioIcon`.
@@ -181,6 +229,7 @@ Quy tắc:
 - [ ] Đo lại bằng Chrome thật ở bề ngang hẹp nhất (260–300px) — không tràn ngang.
 - [ ] `npm run build` rồi commit asset (máy chủ không có node).
 
-**Test khoá bất biến:** `tests/Feature/DesignSystemTest.php` (card Gợi ý từ ảnh: không tự chế
-tiến trình, không emoji, không mã màu cứng, có nút chính + lý do khoá) và
+**Test khoá bất biến:** `tests/Feature/DesignSystemTest.php` — (a) card Gợi ý từ ảnh: không tự chế
+tiến trình, không emoji, không mã màu cứng, có nút chính + lý do khoá; (b) **từ vựng viền nút của
+toàn studio** (§5.2); (c) tài liệu phải tồn tại và không được nói sai. Và
 `tests/Feature/ToolbarAreaTest.php` (vùng toolbar cao cố định + cuộn trục X).

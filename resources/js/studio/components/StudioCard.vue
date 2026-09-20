@@ -250,7 +250,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
                   :class="chipActive(item.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"
                   @click="toggleChip(item.id)">{{ item.label }}</button>
           <button v-if="hiddenCount(group) && !expanded[group.id]" type="button"
-                  class="motion-ui rounded-full border border-ink-700 px-2 py-1 text-[10px] text-cream-300/60 transition hover:border-brand-400 hover:text-cream-100"
+                  class="motion-ui rounded-full border border-ink-600 px-2 py-1 text-[10px] text-cream-300/60 transition hover:border-brand-400 hover:text-cream-100"
                   @click="expanded = { ...expanded, [group.id]: true }">+{{ hiddenCount(group) }} nữa</button>
         </div>
       </div>

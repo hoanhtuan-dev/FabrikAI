@@ -213,11 +213,13 @@ const attention = computed(() => {
   return out;
 });
 
+// Bốn tông chú ý — CÙNG quy ước với viền nút: một nghĩa = ĐÚNG MỘT cặp màu + alpha (/40).
+// Xem docs/DESIGN_SYSTEM.md §5 "Viền".
 const attentionTone = (tone) => ({
-  danger: 'text-red-300 bg-red-500/10 border-red-500/30',
-  warn: 'text-amber-300 bg-amber-500/10 border-amber-500/30',
-  info: 'text-sky-300 bg-sky-500/10 border-sky-500/30',
-  ok: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30',
+  danger: 'text-red-300 bg-red-500/10 border-red-500/40',
+  warn: 'text-amber-300 bg-amber-500/10 border-amber-500/40',
+  info: 'text-sky-300 bg-sky-500/10 border-sky-500/40',
+  ok: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/40',
 }[tone] || 'text-cream-300 bg-ink-700 border-ink-700');
 
 // ─────────────────────────── Lọc & nhóm danh sách ───────────────────────────
@@ -681,7 +683,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
         <div class="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:hidden scrollbar-hide" role="tablist" aria-label="Mục cài đặt">
           <button v-for="s in SECTIONS" :key="s.id" role="tab" :aria-selected="section === s.id"
                   @click="goTo(s.id)"
-                  :class="section === s.id ? 'border-brand-500/50 bg-brand-600/20 text-cream-50' : 'border-ink-700 bg-ink-800 text-cream-300'"
+                  :class="section === s.id ? 'border-brand-500 bg-brand-600/20 text-cream-50' : 'border-ink-600 bg-ink-800 text-cream-300'"
                   class="flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold">
             <StudioIcon :name="s.icon" size="h-3.5 w-3.5" />
             {{ s.label }}
@@ -704,7 +706,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                         { id: 'tasks', label: 'Nhóm gán thủ công', value: stats.tasks.assigned + '/' + stats.tasks.total, icon: 'target',
                           note: (stats.tasks.total - stats.tasks.assigned) + ' nhóm đang dùng model tự động' },
                       ]" :key="card.id" @click="goTo(card.id)"
-                      class="card p-4 text-left transition-colors hover:border-brand-500/40">
+                      class="card p-4 text-left transition-colors hover:border-brand-400">
                 <div class="flex items-start justify-between gap-2">
                   <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/80">{{ card.label }}</p>
                   <StudioIcon :name="card.icon" size="h-4 w-4" class="text-brand-300/70" />

@@ -244,7 +244,7 @@ function confirmAdd() {
 
       <!-- ══ Thân popup ══ -->
       <div class="flex min-h-0 flex-1 flex-col">
-        <label class="mb-3 flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ink-600 bg-ink-800/40 text-xs font-medium text-cream-200 transition-colors hover:border-brand-500/70 hover:bg-ink-800">
+        <label class="mb-3 flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ink-600 bg-ink-800/40 text-xs font-medium text-cream-200 transition-colors hover:border-brand-400 hover:bg-ink-800">
           <StudioIcon name="imagePlus" size="h-4 w-4"/>
           {{ uploading ? 'Đang tải lên…' : 'Tải ảnh mới' }}<span class="text-cream-300/50">(chọn nhiều file được)</span>
           <input ref="fileRef" type="file" accept="image/*" multiple @change="onFile" class="hidden">
@@ -292,7 +292,7 @@ function confirmAdd() {
               <input type="range" min="2" max="8" step="1" v-model.number="gridCols" class="h-1.5 w-24 cursor-pointer accent-brand-500" aria-label="Kích thước ô ảnh">
             </div>
             <!-- [MỚI] Chọn tất cả ảnh ĐANG HIỆN (sau khi lọc) — 1 cú bấm thay vì tích từng ảnh -->
-            <button @click="selectAllVisible" :disabled="!visibleCount" class="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-ink-700 bg-ink-800/60 px-3 text-xs font-medium text-cream-200 transition-colors hover:border-brand-500/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40" :title="allVisibleSelected ? 'Bỏ chọn toàn bộ ảnh đang hiện' : 'Chọn toàn bộ ' + visibleCount + ' ảnh đang hiện'">
+            <button @click="selectAllVisible" :disabled="!visibleCount" class="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-ink-600 bg-ink-800/60 px-3 text-xs font-medium text-cream-200 transition-colors hover:border-brand-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-40" :title="allVisibleSelected ? 'Bỏ chọn toàn bộ ảnh đang hiện' : 'Chọn toàn bộ ' + visibleCount + ' ảnh đang hiện'">
               <StudioIcon :name="allVisibleSelected ? 'selectSubtract' : 'selectAll'" size="h-3.5 w-3.5"/>
               {{ allVisibleSelected ? 'Bỏ chọn' : 'Chọn tất cả' }}
             </button>
@@ -336,7 +336,7 @@ function confirmAdd() {
           {{ totalSel ? 'Đã chọn ' + totalSel + ' ảnh' : 'Nhấn chọn 1 hoặc nhiều ảnh để thêm vào canvas' }}
         </span>
         <div class="flex items-center gap-2">
-          <button v-if="totalSel" @click="selRefs = []; selOutput = []" class="rounded-md border border-ink-700 px-2.5 py-1.5 text-xs font-medium text-cream-300 transition-colors hover:border-ink-600 hover:text-cream-100" title="Bỏ chọn toàn bộ">Bỏ chọn</button>
+          <button v-if="totalSel" @click="selRefs = []; selOutput = []" class="rounded-md border border-ink-600 px-2.5 py-1.5 text-xs font-medium text-cream-300 transition-colors hover:border-ink-500 hover:text-cream-100" title="Bỏ chọn toàn bộ">Bỏ chọn</button>
           <button @click="confirmAdd" :disabled="!totalSel" class="flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-40" title="Thêm ảnh đã chọn vào canvas (không xóa ảnh cũ)">
             <StudioIcon name="plus" size="h-4 w-4"/>Thêm vào canvas ({{ totalSel }})
           </button>

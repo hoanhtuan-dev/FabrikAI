@@ -113,7 +113,7 @@ const progress = computed(() => {
         <button
           v-if="n.action"
           type="button"
-          class="shrink-0 rounded-md border border-white/20 px-2 py-0.5 text-[10px] font-semibold transition hover:bg-white/10"
+          class="shrink-0 rounded-md border border-ink-600 px-2 py-0.5 text-[10px] font-semibold transition hover:bg-white/10"
           @click="n.action.run(); store.dismissNotification(n.id)"
         >{{ n.action.label }}</button>
         <button

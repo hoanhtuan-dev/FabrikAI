@@ -510,7 +510,7 @@ onBeforeUnmount(() => {
 
               <!-- HÀNH ĐỘNG NHANH -->
               <div class="mt-4 flex flex-wrap gap-2">
-                <button class="tool-btn btn-sm" :class="awaiting.length ? '!border-amber-500/50 !bg-amber-500/10 !text-amber-200' : ''" @click="openReview()">
+                <button class="tool-btn btn-sm" :class="awaiting.length ? '!border-amber-500/40 !bg-amber-500/10 !text-amber-200' : ''" @click="openReview()">
                   <StudioIcon name="checkSquare" size="h-4 w-4" /> Duyệt mẫu<span v-if="awaiting.length"> · {{ awaiting.length }} chờ</span>
                 </button>
                 <button class="tool-btn btn-sm" @click="openShare()">
@@ -562,7 +562,7 @@ onBeforeUnmount(() => {
                   class="rounded-full border px-3 py-1 text-xs font-semibold transition"
                   :class="statusFilter === chip.key
                     ? 'border-brand-500 bg-brand-600/25 text-brand-100'
-                    : 'border-ink-700 text-cream-300 hover:border-ink-600 hover:text-cream-100'"
+                    : 'border-ink-600 text-cream-300 hover:border-ink-500 hover:text-cream-100'"
                   @click="statusFilter = chip.key"
                 >
                   {{ chip.label }} <span class="opacity-70">({{ chip.count }})</span>
@@ -619,13 +619,13 @@ onBeforeUnmount(() => {
                       class="flex-1 rounded-lg px-3 py-1.5 text-center text-xs font-semibold transition"
                       :class="store.appliedProject?.id === p.id
                         ? 'bg-brand-600 text-white'
-                        : 'border border-ink-700 text-cream-200 hover:border-brand-500 hover:text-brand-200'"
+                        : 'border border-ink-600 text-cream-200 hover:border-brand-400 hover:text-brand-200'"
                       :disabled="store.appliedProject?.id === p.id"
                       @click="pick(p)"
                     >
                       {{ store.appliedProject?.id === p.id ? 'Đang áp dụng' : 'Áp dụng' }}
                     </button>
-                    <button class="grid h-8 w-8 place-items-center rounded-lg border border-ink-700 text-cream-300 transition hover:border-brand-500 hover:text-brand-200" title="Mở trong Studio" @click="goToStudio(p)">
+                    <button class="grid h-8 w-8 place-items-center rounded-lg border border-ink-600 text-cream-300 transition hover:border-brand-400 hover:text-brand-200" title="Mở trong Studio" @click="goToStudio(p)">
                       <StudioIcon name="arrowRight" size="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -716,7 +716,7 @@ onBeforeUnmount(() => {
               <button
                 v-for="s in shots" :key="s.id"
                 class="relative overflow-hidden rounded-xl border transition"
-                :class="shotsSel.includes(s.id) ? 'border-brand-400 ring-2 ring-brand-400' : 'border-ink-700 hover:border-ink-600'"
+                :class="shotsSel.includes(s.id) ? 'border-brand-500 ring-2 ring-brand-400' : 'border-ink-600 hover:border-ink-500'"
                 :title="'Ảnh #' + s.id + ' — ' + s.shot_label + (s.prompt ? ': ' + s.prompt : '')"
                 @click="toggleShot(s.id)"
               >

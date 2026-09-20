@@ -39,10 +39,11 @@ class DesignSystemTest extends TestCase
             '## 2. Class dùng chung',
             '## 3. Component dùng chung',
             '## 4. Trình bày cho NGƯỜI MỚI',
-            '## 5. Bố cục & cuộn',
-            '## 6. Trợ năng',
-            '## 7. Icon & emoji',
-            '## 8. Checklist',
+            '## 5. Viền — một nghĩa, MỘT token',
+            '## 6. Bố cục & cuộn',
+            '## 7. Trợ năng',
+            '## 8. Icon & emoji',
+            '## 9. Checklist',
         ] as $section) {
             $this->assertStringContainsString($section, $this->guide(), 'Hướng dẫn thiết kế thiếu mục: '.$section);
         }
@@ -147,5 +148,83 @@ class DesignSystemTest extends TestCase
         // Quy tắc 1: có đánh số bước.
         $this->assertStringContainsString('Ảnh nguồn', $card);
         $this->assertStringContainsString('Kiểu gợi ý', $card);
+    }
+
+    /**
+     * VIỀN CỦA NÚT — một nghĩa chỉ có ĐÚNG MỘT token.
+     *
+     * Đo trước khi đồng bộ (2026-09-22): **30 biến thể viền** trên các phần tử bấm được, trong đó
+     * cùng một nghĩa "nút nghỉ" bị viết bằng HAI token (border-ink-700 và border-ink-600 — 58 vs 54
+     * chỗ), "đang chọn" bằng cả border-brand-400 lẫn border-brand-500 (21 vs 18 chỗ), và mỗi màu
+     * ngữ nghĩa bị rải ra 3–4 mức alpha (red-500 /30 /40 /60, amber-500/40 /50, emerald-400 /40 /50 /80…).
+     * Hệ quả: hai nút cạnh nhau lệch màu viền mà không ai cố ý; sửa "gu" viền phải đi tìm từng chỗ.
+     *
+     * Bài test này là bộ TỪ VỰNG đóng: thêm một token viền mới cho nút là ĐỎ ngay, buộc người viết
+     * chọn một token đã có (hoặc cập nhật bảng trong docs/DESIGN_SYSTEM.md §5 rồi mở rộng danh sách
+     * này một cách có ý thức).
+     */
+    public function test_button_borders_use_one_token_per_meaning(): void
+    {
+        // Từ vựng ĐÓNG của viền trên phần tử bấm được (khoá => nghĩa).
+        $allowed = [
+            // Trung tính
+            'border' => true, 'border-2' => true, 'border-4' => true, 'border-dashed' => true, 'border-transparent' => true,
+            'border-ink-600' => true,                                  // nút nghỉ
+            'hover:border-ink-500' => true,                            // hover "êm" cho nút rất phụ
+            // Nhấn / đang chọn
+            'border-brand-500' => true,                                // ĐANG CHỌN
+            'hover:border-brand-400' => true,                          // hover nút chưa chọn
+            // Ngữ nghĩa
+            'border-red-500/40' => true,   'hover:border-red-500' => true,   'border-red-500' => true,   // nguy hiểm
+            'border-amber-500/40' => true,                                                              // cảnh báo
+            'border-emerald-500/40' => true,                                                            // thành công
+            'border-sky-500/40' => true,                                                                // thông tin
+            // Ngoại lệ có lý do (đã ghi trong tài liệu)
+            'border-cream-300/50' => true, 'hover:border-cream-200' => true,   // checkbox chọn ảnh (nổi trên mọi ảnh)
+            'hover:border-cream-300' => true,                                  // nút kiểu btn-outline trên nền tối
+        ];
+
+        /* Màu NHẤN RIÊNG của card — ngoại lệ DUY NHẤT, và phải dùng nhất quán trong cả card
+           (viền + nền + icon cùng một họ màu), KHÔNG bao giờ dùng cho nút hành động chung:
+             · RefImageCard.vue — bộ chọn khuôn mặt/dáng/tư thế (49 token emerald: viền, nền, icon)
+             · ConceptCard.vue  — khối "Tư thế người mẫu (kế thừa từ chip Thử đồ)"
+             · InpaintCard.vue  — nút bật/tắt vùng chọn
+           Danh sách này ĐÓNG: card khác dùng emerald-400 làm viền nút là ĐỎ. */
+        $accentAllowed = ['RefImageCard.vue' => true, 'ConceptCard.vue' => true, 'InpaintCard.vue' => true];
+        $accentTokens = ['border-emerald-400', 'border-emerald-400/40', 'hover:border-emerald-400'];
+
+        $violations = [];
+        foreach (\Illuminate\Support\Facades\File::allFiles(resource_path('js/studio')) as $file) {
+            if ($file->getExtension() !== 'vue') continue;
+            $name = $file->getFilename();
+            $html = (string) file_get_contents($file->getPathname());
+
+            preg_match_all('/<(button|a|label)\b[^>]*>/s', $html, $tags);
+            foreach ($tags[0] as $tag) {
+                preg_match_all('/:?class="([^"]*)"/', $tag, $attrs);
+                foreach ($attrs[1] as $classStr) {
+                    // Bỏ tiền tố "!" (important) trước khi tra từ vựng.
+                    preg_match_all('/(?:[a-z-]+:)*!?border(?:-(?!dashed|solid)[a-z0-9\/\[\]#._-]+)?/', $classStr, $found);
+                    foreach ($found[0] as $token) {
+                        $token = str_replace('!', '', $token);
+                        if (isset($allowed[$token])) continue;
+                        if (in_array($token, $accentTokens, true) && isset($accentAllowed[$name])) continue;
+                        $violations[] = $name.': '.$token;
+                    }
+                }
+            }
+        }
+
+        $this->assertSame([], array_values(array_unique($violations)),
+            "Viền nút dùng token NGOÀI từ vựng chung. Xem docs/DESIGN_SYSTEM.md §5 \"Viền\" — "
+            .'nút nghỉ = border-ink-600 · đang chọn = border-brand-500 · hover = hover:border-brand-400 · '
+            .'nguy hiểm = border-red-500/40 (+ hover:border-red-500) · cảnh báo/thành công/thông tin = .../500/40.');
+
+        // Class DÙNG CHUNG cũng phải theo đúng từ vựng đó (nút dùng .tool-btn không được lệch với nút viết tay).
+        $css = $this->src('resources/css/app.css');
+        $this->assertStringContainsString('.tool-btn { @apply inline-flex items-center gap-1.5 rounded-md border border-ink-600',
+            $css, 'Nút nghỉ của .tool-btn phải là border-ink-600 — lệch với nút viết tay là hai nút cạnh nhau khác viền.');
+        $this->assertStringNotContainsString('rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1.5',
+            $css, 'Đã quay lại viền nghỉ border-ink-700 cho .tool-btn.');
     }
 }

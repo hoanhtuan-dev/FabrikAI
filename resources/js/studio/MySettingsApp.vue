@@ -124,11 +124,11 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
           </div>
           <div v-if="navOpen" class="mt-2 grid gap-1.5">
             <button v-for="s in SECTIONS" :key="s.id" @click="go(s.id)"
-                    :class="section === s.id ? 'border-brand-500/50 bg-brand-600/20 text-cream-50' : 'border-ink-700 bg-ink-800 text-cream-300'"
+                    :class="section === s.id ? 'border-brand-500 bg-brand-600/20 text-cream-50' : 'border-ink-600 bg-ink-800 text-cream-300'"
                     class="flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs font-medium">
               <StudioIcon :name="s.icon" size="h-3.5 w-3.5" /> {{ s.label }}
             </button>
-            <a href="/" class="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-xs font-medium text-cream-300">
+            <a href="/" class="flex items-center gap-2 rounded-lg border border-ink-600 bg-ink-800 px-3 py-2 text-xs font-medium text-cream-300">
               <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Về xưởng thiết kế
             </a>
           </div>

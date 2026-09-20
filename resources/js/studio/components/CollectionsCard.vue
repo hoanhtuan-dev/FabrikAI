@@ -384,7 +384,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <button
             v-for="s in shots" :key="s.id"
             class="flex items-center gap-2 rounded-lg border p-1.5 text-left transition"
-            :class="shotsSel.includes(s.id) ? 'border-brand-400 bg-brand-600/10' : 'border-ink-700 hover:border-ink-600'"
+            :class="shotsSel.includes(s.id) ? 'border-brand-500 bg-brand-600/10' : 'border-ink-600 hover:border-ink-500'"
             @click="toggleShot(s.id)"
           >
             <img v-if="s.thumb" :src="s.thumb" :alt="'Ảnh ' + s.id" class="h-10 w-10 shrink-0 rounded-md object-cover">

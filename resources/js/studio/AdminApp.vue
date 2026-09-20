@@ -425,11 +425,13 @@ const attention = computed(() => {
   }
   return out;
 });
+// Bốn tông chú ý — CÙNG quy ước với viền nút: một nghĩa = ĐÚNG MỘT cặp màu + alpha (/40).
+// Xem docs/DESIGN_SYSTEM.md §5 "Viền".
 const attentionTone = (tone) => ({
-  danger: 'text-red-300 bg-red-500/10 border-red-500/30',
-  warn: 'text-amber-300 bg-amber-500/10 border-amber-500/30',
-  info: 'text-sky-300 bg-sky-500/10 border-sky-500/30',
-  ok: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30',
+  danger: 'text-red-300 bg-red-500/10 border-red-500/40',
+  warn: 'text-amber-300 bg-amber-500/10 border-amber-500/40',
+  info: 'text-sky-300 bg-sky-500/10 border-sky-500/40',
+  ok: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/40',
 }[tone] || 'text-cream-300 bg-ink-700 border-ink-700');
 
 // ─────────────────────────── Hộp thoại: người dùng ───────────────────────────
@@ -794,7 +796,7 @@ onMounted(async () => {
         <div class="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:hidden scrollbar-hide" role="tablist" aria-label="Mục quản trị">
           <button v-for="s in navSections" :key="s.id" role="tab" :aria-selected="section === s.id"
                   @click="goTo(s.id)"
-                  :class="section === s.id ? 'border-brand-500/50 bg-brand-600/20 text-cream-50' : 'border-ink-700 bg-ink-800 text-cream-300'"
+                  :class="section === s.id ? 'border-brand-500 bg-brand-600/20 text-cream-50' : 'border-ink-600 bg-ink-800 text-cream-300'"
                   class="flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold">
             <StudioIcon :name="s.icon" size="h-3.5 w-3.5" />
             {{ s.label }}
@@ -815,7 +817,7 @@ onMounted(async () => {
 
             <template v-else>
               <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <button class="card p-4 text-left transition-colors hover:border-brand-500/40" @click="isSuper && goTo('users')">
+                <button class="card p-4 text-left transition-colors hover:border-brand-400" @click="isSuper && goTo('users')">
                   <div class="flex items-start justify-between gap-2">
                     <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Người dùng</p>
                     <StudioIcon name="users" size="h-4 w-4" class="text-brand-300/80" />
@@ -823,7 +825,7 @@ onMounted(async () => {
                   <p class="mt-1.5 font-display text-2xl font-semibold text-cream-50">{{ fmtNum(kpis.total_users) }}</p>
                   <p class="mt-0.5 text-[11px] text-emerald-300">+{{ fmtNum(kpis.new_users_7d) }} trong 7 ngày</p>
                 </button>
-                <button class="card p-4 text-left transition-colors hover:border-brand-500/40" @click="goTo('plans')">
+                <button class="card p-4 text-left transition-colors hover:border-brand-400" @click="goTo('plans')">
                   <div class="flex items-start justify-between gap-2">
                     <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Đang trả phí</p>
                     <StudioIcon name="coins" size="h-4 w-4" class="text-brand-300/80" />
@@ -839,7 +841,7 @@ onMounted(async () => {
                   <p class="mt-1.5 font-display text-2xl font-semibold text-cream-50">{{ fmtNum(kpis.generations_total) }}</p>
                   <p class="mt-0.5 text-[11px] text-cream-300/75">+{{ fmtNum(kpis.generations_today) }} hôm nay</p>
                 </div>
-                <button class="card p-4 text-left transition-colors hover:border-brand-500/40" @click="goTo('ledger')">
+                <button class="card p-4 text-left transition-colors hover:border-brand-400" @click="goTo('ledger')">
                   <div class="flex items-start justify-between gap-2">
                     <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300/75">Credit tiêu (30 ngày)</p>
                     <StudioIcon name="receipt" size="h-4 w-4" class="text-brand-300/80" />
@@ -1480,7 +1482,7 @@ onMounted(async () => {
                                 class="rounded border px-1.5 py-0.5 text-[10px] transition"
                                 :class="(planModules[p.slug] || []).includes(m.id)
                                   ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200'
-                                  : 'border-ink-700 bg-ink-800/60 text-cream-300/70 hover:border-ink-600'"
+                                  : 'border-ink-600 bg-ink-800/60 text-cream-300/70 hover:border-ink-500'"
                                 :title="m.summary"
                                 @click="toggleGrant(p.slug, m.id)">
                           <StudioIcon :name="(planModules[p.slug] || []).includes(m.id) ? 'check' : 'x'" size="h-3 w-3" class="mr-0.5 inline" />{{ m.name }}
@@ -1766,7 +1768,7 @@ onMounted(async () => {
                           class="rounded border px-1.5 py-0.5 text-[10px] transition"
                           :class="(planModal.form.modules || []).includes(m.id)
                             ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200'
-                            : 'border-ink-700 bg-ink-800/60 text-cream-300/70 hover:border-ink-600'"
+                            : 'border-ink-600 bg-ink-800/60 text-cream-300/70 hover:border-ink-500'"
                           :title="m.summary + (m.depends_on.length ? ' · cần: ' + m.depends_on.join(', ') : '')"
                           @click="togglePlanFormModule(m.id)">
                     <StudioIcon :name="(planModal.form.modules || []).includes(m.id) ? 'check' : 'x'" size="h-3 w-3" class="mr-0.5 inline" />{{ m.name }}

@@ -1347,3 +1347,62 @@ tự khai mã màu hex → ĐỎ · xoá dòng lý do khoá → ĐỎ.
       của tài liệu chuẩn khi có dịp sửa.
 - [ ] Card «Gợi ý từ ảnh» chưa cho **chọn ảnh nguồn ngay trong card** (phải chọn trên canvas/Thư viện);
       `SourceLibraryPicker` đã có sẵn nên việc này rẻ.
+
+---
+
+## 24. Đồng bộ VIỀN của nút toàn Studio — một nghĩa, một token (2026-09-22)
+
+### 24.1 Vấn đề — đo được
+
+Quét **mọi** `<button|a|label>` trong `resources/js/studio`: **30 biến thể viền** cho ~8 nghĩa.
+
+| Đo được | Con số | Hệ quả |
+|---|---|---|
+| "Nút nghỉ" viết bằng HAI token | `border-ink-700` **58** chỗ · `border-ink-600` **54** chỗ | hai nút cạnh nhau lệch màu viền mà không ai cố ý |
+| "Đang chọn" viết bằng HAI token | `border-brand-400` **21** · `border-brand-500` **18** | cùng một trạng thái, hai sắc khác nhau |
+| Mỗi màu ngữ nghĩa rải 3–4 mức alpha | red `/30 /40 /60` · amber `/40 /50` · emerald `/40 /50 /80` | sửa "gu" viền phải đi tìm từng chỗ |
+| Nút dùng ngôn ngữ "kính trắng" | 10 chỗ `border-white/5–/20` | ngôn ngữ viền thứ ba, không theo bảng màu |
+| `.tool-btn` (class dùng chung) lệch với nút viết tay | ink-700 vs ink-600 | nút dùng class chung và nút viết tay khác nhau |
+
+### 24.2 Đã làm — từ vựng ĐÓNG
+
+**30 → 16 token** (8 nghĩa + 3 ngoại lệ có lý do). Bảng đầy đủ ở `docs/DESIGN_SYSTEM.md` **§5**:
+
+```
+nút nghỉ            border-ink-600            (122 chỗ)
+đang chọn           border-brand-500          (39)
+hover nút thường    hover:border-brand-400    (47)
+hover nút rất phụ   hover:border-ink-500      (10)
+nguy hiểm           border-red-500/40  ·  hover:border-red-500 / đang xác nhận border-red-500
+cảnh báo            border-amber-500/40      thành công  border-emerald-500/40
+thông tin           border-sky-500/40
+khối CHỨA (không bấm) border-ink-700          ← vẫn là ink-700, nhưng KHÔNG bao giờ trên nút
+```
+
+Ba ngoại lệ, mỗi cái có lý do ghi trong mã: checkbox chọn ảnh đặt TRÊN ảnh (`border-cream-300/50`);
+màu nhấn riêng của 3 card (RefImageCard · ConceptCard · InpaintCard dùng emerald-400, phải nhất quán
+cả viền+nền+icon và **không** dùng cho nút hành động chung); nút kiểu `.btn-outline` trên nền tối.
+
+Đồng thời: `.tool-btn` và bảng "tông chú ý" của Admin/Settings nay dùng **cùng quy ước `/40`** với
+viền nút (trước là `/30`).
+
+**Đo lại:** 26 file · 134 chỗ thay thế · CSS gửi cho khách **giảm 1,64 kB** (166,25 → 164,61 kB) vì
+Tailwind không còn phải sinh hàng chục tiện ích viền chỉ dùng một lần.
+
+### 24.3 Khoá bằng test (đã thử đột biến)
+
+`tests/Feature/DesignSystemTest.php::test_button_borders_use_one_token_per_meaning` quét mọi
+`<button|a|label>` trong toàn `resources/js/studio` và **ĐỎ** nếu gặp token ngoài bảng.
+Đã thử đột biến: nút quay lại `border-ink-700` → ĐỎ · thêm `border-red-500/60` → ĐỎ ·
+card KHÁC dùng emerald làm viền nút → ĐỎ.
+
+> Ý nghĩa: "hai nút cạnh nhau lệch màu viền" từ nay là lỗi **máy bắt được**, không còn là thứ chỉ lộ
+> ra khi có người ngồi nhìn. Muốn thêm token mới thì phải sửa bảng §5.1 và danh sách trong test
+> **trong cùng một commit** — thêm là chủ ý, không phải tai nạn.
+
+### 24.4 Còn lại (đề xuất)
+
+- [ ] Ba card còn **màu nhấn riêng** (emerald) — muốn về một mối thì phải thiết kế lại 3 card đó, không
+      phải việc đồng bộ viền.
+- [ ] Nền của nút vẫn còn trộn `bg-ink-800` / `bg-white/5` / `bg-ink-900/90`; cùng cách đo, có thể
+      đồng bộ tiếp ở đợt sau.

@@ -579,7 +579,7 @@ watch(() => store.designAgentOpen, (open) => {
             :key="item.id"
             type="button"
             class="motion-ui flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition"
-            :class="step === item.id ? 'border-brand-500/60 bg-brand-600/15' : 'border-transparent hover:border-ink-600 hover:bg-ink-800'"
+            :class="step === item.id ? 'border-brand-500 bg-brand-600/15' : 'border-transparent hover:border-ink-500 hover:bg-ink-800'"
             :aria-current="step === item.id ? 'step' : undefined"
             :aria-controls="'agent-step-' + item.id"
             @click="setStep(item.id)"
@@ -686,7 +686,7 @@ watch(() => store.designAgentOpen, (open) => {
                         :key="id"
                         type="button"
                         class="motion-ui rounded border px-1.5 py-0.5 text-[9px] transition"
-                        :class="selectedTrendIds.includes(String(id)) ? 'border-brand-500/60 bg-brand-500/15 text-brand-100 hover:bg-brand-500/25' : 'border-ink-600 text-cream-300/70 hover:bg-ink-700'"
+                        :class="selectedTrendIds.includes(String(id)) ? 'border-brand-500 bg-brand-500/15 text-brand-100 hover:bg-brand-500/25' : 'border-ink-600 text-cream-300/70 hover:bg-ink-700'"
                         @click="toggleTrend(id)"
                       >{{ trendNameById(id) }}</button>
                     </div>
@@ -712,8 +712,8 @@ watch(() => store.designAgentOpen, (open) => {
                   v-for="trend in visibleTrends"
                   :key="trend.id"
                   type="button"
-                  class="group motion-ui relative overflow-hidden rounded-xl border bg-ink-900 p-4 text-left transition hover:border-brand-500/70 hover:bg-ink-800"
-                  :class="selectedTrendIds.includes(String(trend.id)) ? 'border-brand-500 ring-1 ring-brand-500/50' : 'border-ink-700'"
+                  class="group motion-ui relative overflow-hidden rounded-xl border bg-ink-900 p-4 text-left transition hover:border-brand-400 hover:bg-ink-800"
+                  :class="selectedTrendIds.includes(String(trend.id)) ? 'border-brand-500 ring-1 ring-brand-500/50' : 'border-ink-600'"
                   :aria-pressed="selectedTrendIds.includes(String(trend.id))"
                   @click="toggleTrend(trend.id)"
                 >
@@ -1106,7 +1106,7 @@ watch(() => store.designAgentOpen, (open) => {
                     </div>
                   </div>
                   <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    <button v-for="(color, index) in palette" :key="color.hex || index" type="button" class="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 p-2 text-left" :title="'Sao chép ' + color.hex" @click="copyText(color.hex, 'mã màu ' + color.hex)">
+                    <button v-for="(color, index) in palette" :key="color.hex || index" type="button" class="flex items-center gap-2 rounded-lg border border-ink-600 bg-ink-800 p-2 text-left" :title="'Sao chép ' + color.hex" @click="copyText(color.hex, 'mã màu ' + color.hex)">
                       <span class="h-6 w-6 shrink-0 rounded border border-white/15" :style="{ backgroundColor: color.hex }"></span><span class="min-w-0 flex-1"><span class="block truncate text-[11px] font-semibold text-cream-100">{{ color.name || 'Màu ' + (index + 1) }}</span><span class="block text-[10px] text-cream-300/55">{{ color.role || color.hex }}</span></span><code class="text-[10px] text-cream-300/60">{{ color.hex }}</code>
                     </button>
                   </div>
