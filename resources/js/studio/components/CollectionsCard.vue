@@ -213,40 +213,20 @@ function copyShare() {
 function openExport() {
   if (!applied.value) { store.toast('Chọn bộ sưu tập trước.', 'error'); return; }
   exportOpen.value = true;
-  const tpl = store.pendingExport;
-  if (!tpl) return;
-  if (!exportForm.value.sizes.trim() && tpl.sizes) exportForm.value.sizes = tpl.sizes;
-  if (!exportForm.value.note.trim() && tpl.note) exportForm.value.note = tpl.note;
+  // Điền sẵn từ mẫu việc đang chờ — logic nằm ở STORE (một nguồn cho cả card lẫn trang).
+  store.applyPendingExport(exportForm.value);
 }
 async function startExport() {
   if (!applied.value) return;
-  const q = new URLSearchParams();
-  if (exportForm.value.sizes.trim()) q.set('sizes', exportForm.value.sizes.trim());
-  if (exportForm.value.note.trim()) q.set('note', exportForm.value.note.trim());
   store.toast('Đang đóng gói — vui lòng đợi.', 'info');
   try {
-    const res = await fetch('/api/projects/' + applied.value.id + '/export' + (q.toString() ? '?' + q.toString() : ''), { headers: { Accept: 'application/zip' } });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || 'Không tạo được gói xuất (' + res.status + ').');
-    }
-    const blob = await res.blob();
-    const cd = res.headers.get('Content-Disposition') || '';
-    const m = cd.match(/filename="?([^"]+)"?/);
-    const name = m ? m[1] : ('fabrikai-' + applied.value.id + '.zip');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(a.href);
+    // MỘT đường dữ liệu: fetch + tải file nằm trong store, không chép lại ở mỗi màn hình.
+    await store.exportProject(applied.value.id, exportForm.value);
     store.toast('Đã tải gói ZIP về máy.', 'success');
   } catch (e) {
     store.toast(e.message || 'Lỗi khi tải gói xuất.', 'error');
   }
 }
-
 // ── Phím tắt trong khối duyệt (chỉ khi card đang mở khối duyệt) ──────────────
 const REVIEW_KEYS = { s: 'select', n: 'next', a: 'approved', r: 'rejected', Escape: 'close' };
 function typingIn(el) {
@@ -420,8 +400,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           </button>
         </div>
         <p class="mt-1.5 text-[9px] text-cream-400">
-          Phím tắt: S chọn · N bước tiếp · A duyệt · R loại · Esc đóng
+          Phím tắt khi khối này đang mở: S chọn ảnh chờ duyệt · N bước tiếp · A duyệt · R loại · Esc đóng
         </p>
+
+        <!-- Lỗi TỪNG ẢNH của lượt duyệt. Trước đây state reviewErrors được gán mà KHÔNG nơi nào render
+             (đúng loại lỗi "state chết"): bấm Duyệt 5 ảnh, 2 ảnh hỏng, người dùng không thấy vì sao.
+             Nêu cả BƯỚC đang ở (store.shotLabel) để biết ảnh kẹt ở đâu. -->
+        <ul v-if="reviewErrors.length" class="mt-2 space-y-1 rounded-lg border border-red-500/40 bg-danger/10 p-2 text-[10px] text-danger">
+          <li v-for="err in reviewErrors" :key="err.id">Ảnh #{{ err.id }} ({{ store.shotLabel(err.shot_state) }}): {{ err.error }}</li>
+        </ul>
       </template>
     </div>
 
@@ -510,7 +497,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
       <ul class="space-y-1.5">
         <li v-for="p in recent" :key="p.id" class="flex items-center justify-between gap-2">
           <button class="min-w-0 flex-1 text-left" @click="pick(p)" :title="'Áp dụng «' + p.name + '»'">
-            <span class="block truncate text-xs font-medium text-cream-100 hover:text-white">{{ p.name }}</span>
+            <span class="motion-ui block truncate text-xs font-medium text-cream-100 hover:text-white">{{ p.name }}</span>
             <span class="text-[10px] text-cream-400">{{ p.generations_count || 0 }} ảnh · {{ p.status_label || p.status }}</span>
           </button>
           <button class="icon-btn !h-6 !w-6 shrink-0" title="Mở trong Studio" @click="goToStudio(p)">

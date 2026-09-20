@@ -308,7 +308,7 @@ export const useStudioStore = defineStore('studio', {
     magicFeather: 0,             // độ mịn Magic Wand (blur px 0-20) — làm mềm mép vùng chọn
     _inpaintFreehandActive: false,
     inpaintFeather: 0,            // feather (px 0-50) — làm mềm mép vùng chọn
-    inpaintFillColor: '#ffffff',  // màu tô cho nút "🎨 Tô" của vùng chọn
+    inpaintFillColor: '#ffffff',  // màu tô cho nút " Tô" của vùng chọn
     inpaintSelectMode: 'new',   // lasso: 'new' | 'add' | 'subtract' — chế độ cộng/trừ vùng chọn
     inpaintMaskSource: 'inpaint',  // 'inpaint' (từ card Sửa ảnh) | 'canvas' (từ thanh công cụ vùng chọn trên canvas)
     // Canvas mask overlay (dùng chung cho Inpaint brush trên canvas chính)
@@ -320,7 +320,7 @@ export const useStudioStore = defineStore('studio', {
     _pollTimers: {},          // single-flight poll per generation id
     suggesting: false,
     suggestResult: null,
-    suggestEnabled: true,   // bật/tắt tính năng "💡 Gợi ý từ ảnh" (cấu hình Studio)
+    suggestEnabled: true,   // bật/tắt tính năng " Gợi ý từ ảnh" (cấu hình Studio)
     suggestLang: 'en',      // ngôn ngữ hiển thị mặc định (en | vi)
     suggestAdherence: 0,     // 0 = tự theo creative; 1..10 ép bám ảnh gốc (cao = tái tạo chính xác trang phục gốc)
     suggestDetailLevel: 8,
@@ -342,7 +342,7 @@ export const useStudioStore = defineStore('studio', {
     suggestLocalRecent: [],      // 10 phân tích gần nhất ở trình duyệt (chưa cần Lưu)
     suggestRecentTotal: 0,
     suggestRecentLoading: false,
-    // ── Thư viện Prompt phân tích (💡 Gợi ý từ ảnh) — kế thừa pattern từ libraryItems ──
+    // ── Thư viện Prompt phân tích ( Gợi ý từ ảnh) — kế thừa pattern từ libraryItems ──
     suggestLibItems: [],
     suggestLibTotal: 0,
     suggestLibStats: null,
@@ -461,7 +461,7 @@ export const useStudioStore = defineStore('studio', {
     projectsArchived: false,      // lọc dự án đã lưu trữ
     projectScope: 'own',          // 'own' (bộ sưu tập của mình) | 'pending' (hàng đợi duyệt — Super Admin)
     assignableUsers: [],           // [P1.2] Danh sách người CÓ THỂ giao việc (chủ + thành viên nhóm).
-    // [Đợt 2] Card trong sidebar render bằng <component :is> nên KHÔNG nhận prop/event; muốn mở
+    // [Đợt 2] Card trong sidebar render bằng <component:is> nên KHÔNG nhận prop/event; muốn mở
     // workspace Dự án từ card thì tăng bộ đếm này — StudioApp theo dõi và mở popup tương ứng.
     workspaceOpenRequest: 0,
     // [Trục 3 — 2026-09-20] Yêu cầu chuyển nhóm công cụ (activity) — xem requestActivity().
@@ -887,7 +887,7 @@ export const useStudioStore = defineStore('studio', {
       if (defaults.negative_prompt !== undefined) this.negativePromptEn = defaults.negative_prompt;
       if (defaults.prompt_prefix !== undefined) this.promptPrefix = defaults.prompt_prefix;
       if (defaults.prompt_suffix !== undefined) this.promptSuffix = defaults.prompt_suffix;
-      // 💡 Gợi ý từ ảnh — trạng thái + ngôn ngữ + độ bám/chi tiết mặc định.
+      //  Gợi ý từ ảnh — trạng thái + ngôn ngữ + độ bám/chi tiết mặc định.
       if (defaults.suggest_enabled !== undefined) this.suggestEnabled = !!defaults.suggest_enabled;
       if (defaults.suggest_default_lang) this.suggestLang = defaults.suggest_default_lang === 'vi' ? 'vi' : 'en';
       if (defaults.suggest_adherence != null) this.suggestAdherence = Number(defaults.suggest_adherence);
@@ -895,7 +895,7 @@ export const useStudioStore = defineStore('studio', {
       if (defaults.image_credits != null) this.imageCreditCost = Number(defaults.image_credits);
       // Card Sửa ảnh: danh sách model chỉnh sửa (mặc định đứng đầu).
       if (Array.isArray(defaults.inpaint_models)) this.inpaintModels = defaults.inpaint_models;
-      // Task groups: model theo nhóm công việc — selector trên từng card (Cài đặt → 🎯 Nhóm công việc).
+      // Task groups: model theo nhóm công việc — selector trên từng card (Cài đặt →  Nhóm công việc).
       if (defaults.task_groups && typeof defaults.task_groups === 'object') this.taskGroups = defaults.task_groups;
       // Card "Kịch bản quay": preset video_scene từ Prompt Templates (Cài đặt).
       if (Array.isArray(defaults.video_scenes)) this.videoScenes = defaults.video_scenes;
@@ -956,6 +956,51 @@ export const useStudioStore = defineStore('studio', {
       this.pushCanvasLayer(lid, 'gen', name || 'Ảnh #' + id, mediaUrl, id);
       if (setActive) this.setActiveLayer(lid);
     },
+    /**
+     * ĐIỀN SẴN KHỐI XUẤT GÓI từ MẪU VIỆC đang chờ (store.pendingExport).
+     *
+     * Mẫu việc "Mẫu kỹ thuật gửi xưởng" có kèm bảng size + ghi chú kỹ thuật; người dùng bấm mẫu rồi mở
+     * khối xuất gói thì KHÔNG phải gõ lại. Chỉ điền khi ô còn trống — không ghi đè thứ người dùng đã nhập.
+     */
+    applyPendingExport(form) {
+      const tpl = this.pendingExport;
+      if (!tpl || !form) return;
+      if (!String(form.sizes || '').trim() && tpl.sizes) form.sizes = tpl.sizes;
+      if (!String(form.note || '').trim() && tpl.note) form.note = tpl.note;
+    },
+
+    /**
+     * XUẤT GÓI CHO XƯỞNG — MỘT đường dữ liệu duy nhất.
+     *
+     * Trước đây hàm này bị CHÉP HAI LẦN (card trong sidebar và trang /bo-suu-tap), mỗi bản tự gọi
+     * fetch('/api/projects/{id}/export') và tự dựng thẻ <a download> — 26 dòng trùng nhau, sửa một bên
+     * là hai bên lệch. Nay cả hai gọi hàm này; lỗi được NÉM RA để lớp giao diện tự nói câu phù hợp.
+     *
+     * @returns {Promise<string>} tên file đã tải (đọc từ Content-Disposition của server).
+     */
+    async exportProject(id, { sizes = '', note = '' } = {}) {
+      const q = new URLSearchParams();
+      if (String(sizes).trim()) q.set('sizes', String(sizes).trim());
+      if (String(note).trim()) q.set('note', String(note).trim());
+      const res = await fetch('/api/projects/' + id + '/export' + (q.toString() ? '?' + q.toString() : ''), { headers: { Accept: 'application/zip' } });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Không tạo được gói xuất (' + res.status + ').');
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get('Content-Disposition') || '';
+      const m = cd.match(/filename="?([^"]+)"?/);
+      const name = m ? m[1] : ('fabrikai-' + id + '.zip');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+      return name;
+    },
+
     async processQueue() {
       try { await fetch('/api/process', { method: 'POST', headers: { 'X-XSRF-TOKEN': CSRF(), Accept: 'application/json' } }); } catch (e) { console.error('studio operation failed', e); }
       // refresh the generations so the processed images appear
@@ -1043,7 +1088,7 @@ export const useStudioStore = defineStore('studio', {
         prompt,
         creative_level: this.creativeLevel,
         texture: this.texture,
-        // Model do người dùng chọn trên card ('' = default nhóm image — Cài đặt → 🎯 Nhóm công việc).
+        // Model do người dùng chọn trên card ('' = default nhóm image — Cài đặt →  Nhóm công việc).
         ...(this.selectedTaskModel('image') ? { provider: this.selectedTaskModel('image').provider, model: this.selectedTaskModel('image').model } : {}),
         // Tôn trọng checkbox: tắt → gửi rỗng → backend bỏ qua prefix/suffix/negative.
         negative_prompt: this.promptUseNegative ? (this.negativePromptEn || '') : '',
@@ -1129,7 +1174,7 @@ export const useStudioStore = defineStore('studio', {
       if (!image) { this.toast('Chọn ảnh tham chiếu.', 'error'); return null; }
       try {
         const payload = { image, prompt: prompt || '', similarity: Number(similarity) || 70, variants: Number(variants) || 1, ...this.projectField() };
-        // Ưu tiên: model truyền từ card > default nhóm image (Cài đặt → 🎯 Nhóm công việc).
+        // Ưu tiên: model truyền từ card > default nhóm image (Cài đặt →  Nhóm công việc).
         const taskModel = this.selectedTaskModel('image');
         const eff = (model && model.provider && model.model) ? model : taskModel;
         if (eff) { payload.provider = eff.provider; payload.model = eff.model; }
@@ -1304,7 +1349,7 @@ export const useStudioStore = defineStore('studio', {
       if (done > 0) {
         this.composeStage = 'done';
         const warn = failed > 0 ? ' — ' + failed + ' bản thất bại.' : '';
-        this.toast('✅ Đã ghép xong ' + done + ' biến thể.' + warn);
+        this.toast('Đã ghép xong ' + done + ' biến thể.' + warn);
       } else {
         this.composeStage = 'error';
         this.composeError = safeMessage(gens.find((g) => g.error)?.error, 'Ghép ảnh thất bại. Vui lòng thử lại.');
@@ -1384,7 +1429,7 @@ export const useStudioStore = defineStore('studio', {
           prompt,
           camera: this.videoSceneCamera(),
           base_image: srcImage,
-          // Model do người dùng chọn trên card Kịch bản quay; '' = default nhóm video (Cài đặt → 🎯).
+          // Model do người dùng chọn trên card Kịch bản quay; '' = default nhóm video (Cài đặt →).
           ...(this.selectedTaskModel('video') ? { provider: this.selectedTaskModel('video').provider, model: this.selectedTaskModel('video').model } : {}),
           duration: this.videoDuration,
           resolution: this.videoRes,
@@ -1399,7 +1444,7 @@ export const useStudioStore = defineStore('studio', {
       const sc = this.videoScenes.find(s => String(s.id) === String(this.videoScene));
       return sc ? sc.prompt : '';
     },
-    // ── Task groups: model theo nhóm công việc (Cài đặt → 🎯 Nhóm công việc) ──
+    // ── Task groups: model theo nhóm công việc (Cài đặt →  Nhóm công việc) ──
     // Danh sách model của một nhóm + default đang dùng — selector trên từng card.
     taskGroupModels(group) { return (this.taskGroups[group] || {}).models || []; },
     taskGroupDefault(group) { return (this.taskGroups[group] || {}).default || ''; },
@@ -1973,7 +2018,7 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.toast(e.message || 'Lỗi dọn dẹp.', 'error'); return false; }
       finally { this.uploadCleaning = false; }
     },
-    // ── Thư viện Prompt phân tích (💡 Gợi ý từ ảnh) — kế thừa pattern từ libraryItems ──
+    // ── Thư viện Prompt phân tích ( Gợi ý từ ảnh) — kế thừa pattern từ libraryItems ──
     async loadSuggestLib(reset = true) {
       if (this.suggestLibLoading) return;
       this.suggestLibLoading = true;
@@ -2106,7 +2151,7 @@ export const useStudioStore = defineStore('studio', {
         });
         const d = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(d.message || 'Lỗi lưu.');
-        this.toast('💾 Đã lưu prompt vào Thư viện Prompt.');
+        this.toast('Đã lưu prompt vào Thư viện Prompt.');
         this.loadSuggestRecent();   // danh sách 'gần đây' trong card cập nhật ngay
       } catch (e) { this.toast(e.message || 'Lỗi lưu prompt.', 'error'); }
       finally { this.suggestSaving = false; }
@@ -2342,7 +2387,7 @@ export const useStudioStore = defineStore('studio', {
      * [Trục 3 — 2026-09-20] Yêu cầu StudioApp CHUYỂN sang một nhóm công cụ (activity).
      *
      * Vì sao cần: nút "Biến thể"/"Sửa ảnh" nằm ở dock Outputs (component riêng), mà activity lại do
-     * StudioApp quản lý — card render bằng <component :is> không nhận được event. Cùng cách đã dùng
+     * StudioApp quản lý — card render bằng <component:is> không nhận được event. Cùng cách đã dùng
      * cho requestWorkspace(): đếm yêu cầu, StudioApp theo dõi và đổi panel.
      */
     requestActivity(id) {
@@ -3085,7 +3130,7 @@ export const useStudioStore = defineStore('studio', {
       if (l.kind === 'gen' && l.genId) {
         const g = this.generations.find((x) => x.id === l.genId);
         if (g) { g.meta = Object.assign({}, g.meta || {}, { name: n }); }
-        // §5.2: trước đây .catch(() => {}) nuốt lỗi rồi VẪN toast "Đã đổi tên layer." — UI báo
+        // §5.2: trước đây.catch(() => {}) nuốt lỗi rồi VẪN toast "Đã đổi tên layer." — UI báo
         // thành công kể cả khi server không lưu (hết phiên / 500). Nay phản ánh đúng kết quả.
         fetch('/api/generations/' + l.genId + '/rename', { method: 'POST', headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ name: n }) })
           .then((r) => {
@@ -3288,7 +3333,7 @@ export const useStudioStore = defineStore('studio', {
         img.src = l.image;
       });
     },
-    // "🗑 Xóa": áp dụng nét đã vẽ vào layer rồi xoá canvas — GIỮ chế độ để vẽ tiếp (không tự thoát).
+    // " Xóa": áp dụng nét đã vẽ vào layer rồi xoá canvas — GIỮ chế độ để vẽ tiếp (không tự thoát).
     applyEraseNow() {
       this.applyErase().then(() => {
         if (this._eraseCtx && this._eraseCanvas) this._eraseCtx.clearRect(0, 0, this._eraseCanvas.width, this._eraseCanvas.height);
@@ -4288,7 +4333,7 @@ export const useStudioStore = defineStore('studio', {
             const isInpaint = String(id) === String(this.inpaintGenId);
             const isCompose = this.composeGenIds.length && this.composeGenIds.includes(Number(id));
             if (g.status === 'completed' && g.media_url) {
-              if (isInpaint) { this.inpaintStage = 'done'; this.toast('✅ Đã sửa xong ảnh.'); }
+              if (isInpaint) { this.inpaintStage = 'done'; this.toast('Đã sửa xong ảnh.'); }
               if (autoSelect) this.select({ id: g.id, media_url: g.media_url, type: 'image', status: 'completed' });
             } else if (g.status === 'failed') {
               if (isInpaint) { this.inpaintStage = 'error'; this.inpaintError = g.error || 'Sửa ảnh thất bại.'; this.toast(this.inpaintError, 'error'); }
@@ -4486,7 +4531,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintFreehandPaths.push(pts.map((p) => ({ nx: p.nx, ny: p.ny })));
       this.inpaintFreehandPoints = [];
       // Sau vòng lasso đầu tiên chuyển sang 'add' (giống path/magic) — vẽ tiếp sẽ CỘNG DỒN
-      // vùng thay vì vô tình XOÁ vùng vừa khoanh (bấm nút ➕ nếu muốn chủ động thêm).
+      // vùng thay vì vô tình XOÁ vùng vừa khoanh (bấm nút  nếu muốn chủ động thêm).
       if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
     },
     // ── Path (curve) select: click thêm điểm neo → đường cong mượt → đóng để tạo vùng chọn ──
@@ -4949,7 +4994,7 @@ export const useStudioStore = defineStore('studio', {
       const ny = this._clamp((e.clientY - m.crTop - m.vy) / m.vh, 0, 1);
       return { nx, ny };
     },
-    // Bắt đầu kéo 1 thao tác với KEY TƯỜNG MINH — gọi từ .stop trên chính box/handle
+    // Bắt đầu kéo 1 thao tác với KEY TƯỜNG MINH — gọi từ.stop trên chính box/handle
     // (giống hệt crop: mỗi vùng biết mình là gì, KHÔNG hit-test, không bao giờ nhầm
     // 'resize' ↔ 'move', và không vô tình tạo vùng mới khi bấm lệch ra ngoài).
     beginInpaintDrag(key, e) {
@@ -4991,7 +5036,7 @@ export const useStudioStore = defineStore('studio', {
       if (this.inpaintMaskMode === 'none') return;
       this.beginInpaintDrag(this.inpaintMaskMode === 'brush' ? 'brush' : 'draw', e);
     },
-    // Reset về chế độ vẽ vùng mới (gọi từ nút "🔄 Vẽ lại" hoặc double-click trên box)
+    // Reset về chế độ vẽ vùng mới (gọi từ nút " Vẽ lại" hoặc double-click trên box)
     resetInpaintMaskBox() {
       if (this._inpaintDrag) this._inpaintStopDrag();
       this.inpaintMaskBox = { x: 0, y: 0, w: 0, h: 0 };

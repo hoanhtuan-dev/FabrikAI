@@ -101,8 +101,18 @@ class JobTemplatesTest extends TestCase
         $store = (string) file_get_contents(resource_path('js/studio/store.js'));
         $this->assertStringContainsString('pendingExport', $store, 'Store phải giữ mẫu xuất đang chờ.');
 
-        $card = (string) file_get_contents(resource_path('js/studio/components/CollectionsCard.vue'));
-        $this->assertStringContainsString('store.pendingExport', $card, 'Khối xuất gói phải đọc mẫu xuất đang chờ.');
-        $this->assertStringContainsString('function toggleExport()', $card, 'Khối xuất gói phải điền sẵn khi mở.');
+        /* [2026-09-23] Khối xuất gói nay có ở HAI bề mặt (card sidebar + trang /bo-suu-tap) và logic
+           điền sẵn đã gom về store.applyPendingExport() — trước đây mỗi màn hình chép lại 5 dòng đọc
+           store.pendingExport nên sửa một bên là hai bên lệch. Bất biến không đổi: MỞ khối xuất gói thì
+           bảng size/ghi chú phải được điền sẵn từ mẫu việc, người dùng không phải gõ lại.
+           Tên hàm thật là openExport() (test cũ ghi toggleExport() — tên đã đổi từ lâu). */
+        $this->assertStringContainsString('applyPendingExport(', $store, 'Store phải có hàm điền sẵn khối xuất gói.');
+
+        foreach (['components/CollectionsCard.vue', 'pages/CollectionsPage.vue'] as $rel) {
+            $ui = (string) file_get_contents(resource_path('js/studio/'.$rel));
+            $this->assertStringContainsString('function openExport()', $ui, $rel.' thiếu hàm mở khối xuất gói.');
+            $this->assertStringContainsString('store.applyPendingExport(', $ui,
+                $rel.' mở khối xuất gói mà không điền sẵn bảng size/ghi chú từ mẫu việc.');
+        }
     }
 }

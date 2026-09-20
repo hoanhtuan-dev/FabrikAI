@@ -90,14 +90,37 @@ class CollectionsHubTest extends TestCase
         $card = (string) file_get_contents(resource_path('js/studio/components/CollectionsCard.vue'));
         $store = (string) file_get_contents(resource_path('js/studio/store.js'));
 
-        foreach (['store.createProject(', 'store.applyProject(', 'store.processQueue()', 'store.requestWorkspace()'] as $call) {
+        /* [2026-09-23] Bất biến này nay kiểm DỮ LIỆU-DẪN-XUẤT thay vì một danh sách viết cứng.
+           Lý do: card sidebar đã được thu gọn có chủ đích (việc chuyên sâu chuyển sang trang
+           /bo-suu-tap), nên danh sách cũ ('store.processQueue()' · 'store.requestWorkspace()') đã lệch
+           khỏi thực tế — nhưng LUẬT thì không đổi: card chỉ được gọi action CÓ THẬT trong store.
+           Quét thẳng mọi lời gọi store.<action>( trong card ⇒ thêm lời gọi mới mà store không có là ĐỎ,
+           kể cả khi không ai nhớ cập nhật danh sách này. */
+        preg_match_all('/store\.([a-zA-Z][a-zA-Z0-9]*)\s*\(/', $card, $calls);
+        $called = array_values(array_unique($calls[1]));
+        $this->assertGreaterThanOrEqual(4, count($called),
+            'Card Bộ sưu tập phải gọi các action của store (tạo · áp dụng · duyệt · chia sẻ/xuất gói).');
+
+        foreach ($called as $action) {
+            $this->assertMatchesRegularExpression('/\b'.preg_quote($action, '/').'\s*\(/', $store,
+                "Card gọi store.{$action}() nhưng store KHÔNG có action đó — API tự phát minh.");
+        }
+
+        // Hai action cốt lõi của panel (tạo bộ + áp dụng bộ) vẫn phải có mặt.
+        foreach (['store.createProject(', 'store.applyProject('] as $call) {
             $this->assertStringContainsString($call, $card, "Card phải dùng action có sẵn: {$call}");
         }
-        // Mọi action card gọi đều phải tồn tại trong store (không gọi API tự phát minh).
-        foreach (['createProject', 'applyProject', 'unapplyProject', 'processQueue', 'requestWorkspace'] as $action) {
-            $this->assertMatchesRegularExpression('/\b'.preg_quote($action, '/').'\s*\(/', $store, "Store thiếu action {$action}().");
-        }
-        // Không tự gọi endpoint ngoài hợp đồng đã có.
+
+        // Không tự gọi endpoint ngoài hợp đồng đã có (nay ĐÚNG với cả card lẫn trang: đường xuất gói
+        // đã gom về store.exportProject(), xem JobTemplatesTest).
         $this->assertStringNotContainsString("fetch('/api/", $card, 'Card không nên tự gọi API — đi qua store để giữ một đường dữ liệu.');
+
+        // Khả năng "thúc hàng đợi ngay" (store.processQueue) từng nằm ở card; khi card thu gọn nó MẤT HẲN
+        // khỏi giao diện ⇒ nay đặt ở chip "đang tạo" của trang Bộ sưu tập. Test khoá lại: phải có MỘT
+        // bề mặt gọi nó, nếu không hàng đợi chỉ còn chạy theo nhịp cron và người dùng không thúc được.
+        $page = (string) file_get_contents(resource_path('js/studio/pages/CollectionsPage.vue'));
+        $this->assertStringContainsString('store.processQueue()', $page,
+            'Không nơi nào gọi store.processQueue() — mất đường "Xử lý ngay" của người dùng.');
+        $this->assertMatchesRegularExpression('/\bprocessQueue\s*\(/', $store, 'Store thiếu action processQueue().');
     }
 }

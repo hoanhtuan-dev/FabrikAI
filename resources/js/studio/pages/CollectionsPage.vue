@@ -307,39 +307,20 @@ function copyShare() {
 function openExport() {
   if (!applied.value) { store.toast('Chọn bộ sưu tập trước khi xuất gói.', 'error'); return; }
   exportOpen.value = true;
-  const tpl = store.pendingExport;
-  if (!tpl) return;
-  if (!exportForm.value.sizes.trim() && tpl.sizes) exportForm.value.sizes = tpl.sizes;
-  if (!exportForm.value.note.trim() && tpl.note) exportForm.value.note = tpl.note;
+  // Điền sẵn từ mẫu việc đang chờ — logic nằm ở STORE (một nguồn cho cả card lẫn trang).
+  store.applyPendingExport(exportForm.value);
 }
 async function startExport() {
   if (!applied.value) return;
-  const q = new URLSearchParams();
-  if (exportForm.value.sizes.trim()) q.set('sizes', exportForm.value.sizes.trim());
-  if (exportForm.value.note.trim()) q.set('note', exportForm.value.note.trim());
   store.toast('Đang đóng gói — vui lòng đợi.', 'info');
   try {
-    const res = await fetch('/api/projects/' + applied.value.id + '/export' + (q.toString() ? '?' + q.toString() : ''), { headers: { Accept: 'application/zip' } });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || 'Không tạo được gói xuất (' + res.status + ').');
-    }
-    const blob = await res.blob();
-    const cd = res.headers.get('Content-Disposition') || '';
-    const m = cd.match(/filename="?([^"]+)"?/);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = m ? m[1] : ('fabrikai-' + applied.value.id + '.zip');
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(a.href);
+    // MỘT đường dữ liệu: fetch + tải file nằm trong store, không chép lại ở mỗi màn hình.
+    await store.exportProject(applied.value.id, exportForm.value);
     store.toast('Đã tải gói ZIP về máy.', 'success');
   } catch (e) {
     store.toast(e.message || 'Lỗi khi tải gói xuất.', 'error');
   }
 }
-
 // ══════════ PHÍM TẮT (chỉ khi khối duyệt mở) ══════════
 function onReviewKey(e) {
   if (!reviewOpen.value || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -394,10 +375,15 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <span v-if="runningCount" class="flex items-center gap-1.5 rounded-full bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-info">
+          <!-- Chip "đang tạo" nay là NÚT: card sidebar trước đây có "Xử lý ngay" (store.processQueue),
+               khi card thu gọn thì khả năng đó MẤT HẲN khỏi giao diện — hàng đợi chỉ còn chạy theo nhịp
+               cron, người dùng không có cách nào thúc tại chỗ. -->
+          <button v-if="runningCount" type="button" @click="store.processQueue()"
+                  class="motion-ui flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-info hover:bg-sky-500/25"
+                  title="Chạy ngay hàng đợi tạo ảnh — không phải chờ nhịp cron">
             <span class="h-3 w-3 animate-spin rounded-full border-2 border-sky-400/40 border-t-sky-300"></span>
-            {{ runningCount }} ảnh đang tạo
-          </span>
+            {{ runningCount }} ảnh đang tạo · Xử lý ngay
+          </button>
           <button class="btn-brand btn-sm" @click="createOpen = true">
             <StudioIcon name="plus" size="h-4 w-4" /> Tạo bộ sưu tập
           </button>
@@ -495,7 +481,7 @@ onBeforeUnmount(() => {
                 <ol v-if="totalShots" class="flex items-stretch gap-1.5">
                   <li v-for="(step, idx) in workflowProgress" :key="step.state" class="flex flex-1 flex-col gap-1" :title="step.label + ' — ' + step.hint + ': ' + step.count + ' ảnh'">
                     <div class="h-1.5 overflow-hidden rounded-full bg-ink-800">
-                      <div class="h-full rounded-full transition-all duration-base" :class="step.count > 0 ? 'opacity-100' : 'opacity-0'" :style="{ background: step.bar, width: '100%' }"></div>
+                      <div class="h-full rounded-full motion-ui motion-ui--size duration-base" :class="step.count > 0 ? 'opacity-100' : 'opacity-0'" :style="{ background: step.bar, width: '100%' }"></div>
                     </div>
                     <div class="flex items-baseline gap-1">
                       <span class="text-[10px] font-bold" :class="step.count > 0 ? 'text-cream-100' : 'text-cream-400'">{{ step.count }}</span>
@@ -602,7 +588,7 @@ onBeforeUnmount(() => {
                 <div class="flex flex-1 flex-col p-4">
                   <div class="flex items-start justify-between gap-2">
                     <button class="min-w-0 text-left" @click="pick(p)" :title="'Áp dụng «' + p.name + '» cho phiên tạo ảnh'">
-                      <p class="truncate text-sm font-semibold text-cream-50 group-hover:text-white">{{ p.name }}</p>
+                      <p class="motion-ui truncate text-sm font-semibold text-cream-50 group-hover:text-white">{{ p.name }}</p>
                       <p v-if="p.brief" class="mt-0.5 line-clamp-1 text-xs text-cream-400">{{ p.brief }}</p>
                     </button>
                     <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="statusToneClass(p.status)">{{ statusLabel(p.status) }}</span>
@@ -650,7 +636,7 @@ onBeforeUnmount(() => {
     </main>
 
     <!-- ══ MODAL: TẠO BỘ SƯU TẬP ══ -->
-    <div v-if="createOpen" class="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" @click.self="createOpen = false">
+    <div v-if="createOpen" role="dialog" aria-modal="true" aria-label="Bộ sưu tập mới" class="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" @click.self="createOpen = false">
       <div class="w-full max-w-lg rounded-2xl border border-ink-700 bg-ink-950 p-6 shadow-2xl">
         <div class="mb-5 flex items-center justify-between">
           <h3 class="font-display text-base font-semibold text-cream-50">Bộ sưu tập mới</h3>
@@ -688,7 +674,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- ══ MODAL: DUYỆT MẪU THEO LÔ ══ -->
-    <div v-if="reviewOpen && applied" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="reviewOpen = false">
+    <div v-if="reviewOpen && applied" role="dialog" aria-modal="true" aria-label="Duyệt mẫu theo lô" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="reviewOpen = false">
       <div class="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-2xl border border-ink-700 bg-ink-950 shadow-2xl">
         <div class="shrink-0 border-b border-ink-700 px-5 py-4">
           <div class="flex items-start justify-between gap-3">
@@ -756,7 +742,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
             <p class="mt-3 text-[11px] text-cream-400">
-              Phím tắt: <b class="text-cream-100">S</b> chọn chờ duyệt · <b class="text-cream-100">N</b> chuyển bước · <b class="text-cream-100">A</b> duyệt · <b class="text-cream-100">R</b> loại · <b class="text-cream-100">Esc</b> đóng
+              Phím tắt khi khối này đang mở: <b class="text-cream-100">S</b> chọn ảnh chờ duyệt · <b class="text-cream-100">N</b> chuyển bước · <b class="text-cream-100">A</b> duyệt · <b class="text-cream-100">R</b> loại · <b class="text-cream-100">Esc</b> đóng
             </p>
             <ul v-if="reviewErrors.length" class="mt-4 space-y-2">
               <li v-for="err in reviewErrors" :key="err.id" class="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs text-danger">
@@ -769,7 +755,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- ══ MODAL: CHIA SẺ ══ -->
-    <div v-if="shareOpen && applied" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="shareOpen = false">
+    <div v-if="shareOpen && applied" role="dialog" aria-modal="true" aria-label="Chia sẻ link cho khách duyệt" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="shareOpen = false">
       <div class="w-full max-w-lg rounded-2xl border border-ink-700 bg-ink-950 p-6 shadow-2xl">
         <div class="mb-5 flex items-center justify-between">
           <h3 class="font-display text-base font-semibold text-cream-50">Chia sẻ cho khách duyệt</h3>
@@ -825,7 +811,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- ══ MODAL: XUẤT GÓI ══ -->
-    <div v-if="exportOpen && applied" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="exportOpen = false">
+    <div v-if="exportOpen && applied" role="dialog" aria-modal="true" aria-label="Xuất gói cho xưởng" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="exportOpen = false">
       <div class="w-full max-w-lg rounded-2xl border border-ink-700 bg-ink-950 p-6 shadow-2xl">
         <div class="mb-5 flex items-center justify-between">
           <h3 class="font-display text-base font-semibold text-cream-50">Xuất gói cho xưởng</h3>
