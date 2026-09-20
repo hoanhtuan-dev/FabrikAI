@@ -1921,3 +1921,45 @@ Kèm câu chốt: model không có tìm kiếm thì **vẫn chạy bình thườ
 | Chrome thật | bộ đệm: `false → true(age=2) → false(force)` · khối hướng dẫn hiện đúng 3 bước · ô chọn Kiểu có đủ 4 lựa chọn |
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
+
+## Phiên 2026-09-23 (Đợt 26 — TRẢ LỜI "DeepSeek bật tìm kiếm web thế nào?" + KHÔNG hứa hộ khai báo)
+
+**Deploy:** `<prev> → <commit>`. Không migration mới.
+
+### 0. ĐO THẬT trước khi trả lời (đây là câu trả lời, không phải suy đoán)
+
+Gọi thẳng API DeepSeek trên production với tham số tìm kiếm:
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `POST https://api.deepseek.com/chat/completions` + `"enable_search": true` | **HTTP 200** (1.062 ms) — tham số lạ bị **BỎ QUA**, không lỗi |
+| Trường trả về | chỉ `role` · `content` — **KHÔNG có** annotations/citations |
+| Model tự nói | *"Xin lỗi, tôi không có quyền truy cập thông tin thời gian thực nên không biết hôm nay là ngày nào…"* |
+
+⇒ **API DeepSeek (`api.deepseek.com`) KHÔNG có tìm kiếm web và không có công tắc nào để bật.** Gửi tham số vào chỉ tốn thời gian, không có kết quả.
+
+### 1. Ba đường CÓ tìm kiếm thật — chọn theo mức chịu chi
+
+| Đường | Việc phải làm | Chi phí | Ghi chú |
+|---|---|---|---|
+| **A. Gateway định tuyến có tìm kiếm, vẫn dùng model DeepSeek** | Cài đặt → Custom Providers: thêm gateway (Base URL + protocol `openai` + Bearer + key ref), rồi khai **Kiểu**=`model_suffix` **Tham số**=`:online` (hoặc Kiểu=`plugins` Tham số=`web`); thêm model `deepseek/deepseek-chat` vào nhóm «Suy luận & viết nội dung» | ~**$0,007/lần tra** (Exa, tối đa 10 kết quả; +$0,001 mỗi kết quả thêm) **+** token như thường | ⚠️ **Không cần sửa mã** — đúng hai kiểu `model_suffix`/`plugins` đã làm ở Đợt 25. Provider sẽ trả **trích dẫn** kèm câu trả lời |
+| **B. Đổi model sang loại CÓ tìm kiếm tích hợp** (Qwen/DashScope `enable_search` · Gemini `google_search`) | thêm key + gán model vào nhóm «Suy luận & viết nội dung» | theo giá nhà cung cấp đó | Đây là đường đã có sẵn trong mã (giao thức tự bật), nhưng phải thêm key mới |
+| **C. Máy chủ TỰ lấy dữ liệu rồi đưa vào prompt** (không cần nhà cung cấp nào có tìm kiếm) | cần MỘT lần làm connector: danh sách nguồn (RSS/JSON/API) + lấy & lọc ở máy chủ + nhét vào prompt kèm URL và thời điểm | 0 đồng ngoài tiền token | Máy chủ **đã chứng minh ra được internet** (Đợt 22). Đây là đường duy nhất chạy được **ngay với DeepSeek hiện tại** — nhưng cần bạn chốt NGUỒN (sàn TMĐT chặn crawl; RSS/nguồn mở thì làm được) |
+
+### 2. Sửa lỗ hổng trung thực phát hiện khi trả lời
+
+Nếu người dùng khai `search_param=enable_search` cho một gateway **không** hỗ trợ, bản Đợt 25 sẽ hiển thị *"Model đang cấu hình CÓ tìm kiếm web"* — **hứa hộ** một năng lực không tồn tại (đúng ca DeepSeek vừa đo). Nay:
+
+- `planFor()` trả thêm `verified`: **true** khi cách bật đến từ **giao thức** (mã tự dựng request đúng chuẩn), **false** khi do người dùng **khai** trong Cài đặt.
+- Giao diện: *"CÓ tìm kiếm web (theo giao thức)"* vs *"CÓ tìm kiếm web — theo KHAI BÁO của bạn, chưa kiểm chứng"*; câu kết luận cũng đổi theo (`model_search.verified`).
+- Khối hướng dẫn thêm cảnh báo kèm **số đo thật**: *"DeepSeek nhận `enable_search` với HTTP 200 nhưng bỏ qua…"* và gợi ý hai kiểu khai cho gateway có tìm kiếm.
+
+### 3. Kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Test mới | `test_declared_search_is_unverified_while_protocol_search_is_verified` — giao thức ⇒ `verified=true` · khai báo ⇒ `verified=false` + câu kết luận có chữ *"KHAI"* và *"chưa kiểm chứng"* |
+| Full suite | **890 test / 6.558 assert XANH** |
+| Đo production | API DeepSeek `enable_search` ⇒ HTTP 200, không citation, model tự nói không có dữ liệu thời gian thực |
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).

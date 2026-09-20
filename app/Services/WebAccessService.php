@@ -70,6 +70,10 @@ class WebAccessService
                 'mode' => isset(self::SEARCH_MODES[$mode]) ? $mode : 'body_flag',
                 'param' => $declared,
                 'source' => 'khai trong Cài đặt (Custom Provider)',
+                // Khai báo KHÔNG phải bằng chứng: ta gửi tham số, còn gateway có hiểu hay không chỉ gateway
+                // biết. Đo thật 2026-09-23 với DeepSeek: gửi `enable_search` → HTTP 200 nhưng BỎ QUA, model
+                // vẫn trả lời "không có quyền truy cập thông tin thời gian thực" ⇒ giao diện phải nói rõ.
+                'verified' => false,
             ];
         }
 
@@ -78,7 +82,8 @@ class WebAccessService
             return null;
         }
 
-        return $dialect + ['source' => 'giao thức '.$candidate['transport']];
+        // Giao thức thì CHẮC CHẮN: chính mã này dựng request theo cách đã biết của giao thức đó.
+        return $dialect + ['source' => 'giao thức '.$candidate['transport'], 'verified' => true];
     }
 
     /** Giao thức này có tìm kiếm tích hợp không? (giữ cho nơi gọi cũ; mặc định KHÔNG) */
@@ -101,7 +106,8 @@ class WebAccessService
                 'plan' => $plan,
                 'label' => $plan === null
                     ? 'Không có tìm kiếm web (giao thức không khai tham số tìm kiếm)'
-                    : 'Bật tìm kiếm ('.($plan['mode'] ?? 'body_flag').') bằng `'.$plan['param'].'` — '.$plan['source'],
+                    : 'Bật tìm kiếm ('.($plan['mode'] ?? 'body_flag').') bằng `'.$plan['param'].'` — '.$plan['source']
+                        .(($plan['verified'] ?? false) ? '' : ' · CHƯA kiểm chứng: gateway không hỗ trợ thì tham số bị bỏ qua'),
             ];
         }
 
@@ -169,7 +175,11 @@ class WebAccessService
             $verdictLabel = 'Máy chủ có internet nhưng NHÓM SUY LUẬN chưa có model dùng được (thiếu key hoặc chưa gán model) — agent đang chạy bằng bộ quy tắc có sẵn. Vào Cài đặt → Nhóm công việc để cấu hình; khi đã có model thì khả năng tìm kiếm web phụ thuộc chính model đó.';
         } elseif ($active) {
             $verdict = 'internet_and_search';
-            $verdictLabel = 'Máy chủ có internet và model bạn đang cấu hình CÓ tìm kiếm web — kết quả phân tích có thể kèm nguồn thật.';
+            // Phân biệt "giao thức chắc chắn" với "bạn khai": khai báo chỉ là khai báo, và người dùng cần
+            // biết mức độ tin của chính câu kết luận này.
+            $verdictLabel = ($active['plan']['verified'] ?? false)
+                ? 'Máy chủ có internet và model bạn đang cấu hình CÓ tìm kiếm web — kết quả phân tích có thể kèm nguồn thật.'
+                : 'Máy chủ có internet và model bạn đang cấu hình được KHAI là có tìm kiếm web (chưa kiểm chứng được từ phía máy chủ) — nếu gateway không hỗ trợ thì tham số bị bỏ qua và câu trả lời vẫn chỉ dựa trên dữ liệu hệ thống gửi vào.';
         } else {
             $verdict = 'internet_no_search';
             // KHÔNG nêu tên nhà cung cấp nào và KHÔNG gợi ý mua key của ai: việc chọn model là ở Cài đặt.
@@ -188,6 +198,9 @@ class WebAccessService
                 // phân biệt "chưa cấu hình" với "đã cấu hình nhưng không có tìm kiếm".
                 'has_model' => $hasModel,
                 'supported' => $active !== null,
+                // verified = true chỉ khi cách bật đến từ GIAO THỨC (mã này tự dựng request đúng chuẩn);
+                // false = do người dùng khai trong Cài đặt ⇒ giao diện phải nói "chưa kiểm chứng".
+                'verified' => $active !== null && ($active['plan']['verified'] ?? false) === true,
                 'active' => $active ? ['provider' => $active['provider'], 'model' => $active['model']] : null,
                 'candidates' => $map,
                 'note' => 'Tìm kiếm tích hợp là tính năng của NHÀ CUNG CẤP model, không phải của FabrikAI.',

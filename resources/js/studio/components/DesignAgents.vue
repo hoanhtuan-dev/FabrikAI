@@ -915,7 +915,11 @@ watch(() => store.designAgentOpen, (open) => {
                         <b :class="store.webAccess.model_search.supported ? 'text-ok' : 'text-warn'">
                           {{ !store.webAccess.model_search.has_model
                             ? 'Chưa có model dùng được cho nhóm suy luận'
-                            : (store.webAccess.model_search.supported ? 'Model đang cấu hình CÓ tìm kiếm web' : 'Model đang cấu hình KHÔNG có tìm kiếm web') }}
+                            : (store.webAccess.model_search.supported
+                                ? (store.webAccess.model_search.verified
+                                    ? 'Model đang cấu hình CÓ tìm kiếm web (theo giao thức)'
+                                    : 'Model đang cấu hình CÓ tìm kiếm web — theo KHAI BÁO của bạn, chưa kiểm chứng')
+                                : 'Model đang cấu hình KHÔNG có tìm kiếm web') }}
                         </b>
                         <span v-if="store.webAccess.model_search.active" class="text-cream-400"> · {{ store.webAccess.model_search.active.model }}</span>
                       </li>
@@ -933,6 +937,7 @@ watch(() => store.designAgentOpen, (open) => {
                         <li>3. Quay lại đây bấm <b class="text-cream-200">Kiểm tra lại</b> — dòng “Model … CÓ tìm kiếm web” xuất hiện là xong; không cần sửa mã hay chờ deploy.</li>
                       </ol>
                       <p class="mt-1.5 text-label leading-5 text-cream-400">Model không có tìm kiếm thì vẫn chạy bình thường, chỉ là mọi câu trả lời dựa trên dữ liệu hệ thống gửi vào (dữ liệu mẫu + dữ liệu của bạn) — và agent sẽ không bao giờ nói như thể đã tự đọc sàn TMĐT.</p>
+                      <p class="mt-1.5 text-label leading-5 text-warn">Khai tham số KHÔNG làm gateway tự có tìm kiếm. Đo thật 23/09/2026: DeepSeek nhận <code class="rounded bg-ink-800 px-1">enable_search</code> với HTTP 200 nhưng <b>bỏ qua</b> — model vẫn trả lời “không có quyền truy cập thông tin thời gian thực”. Cách chắc chắn: dùng model/nhà cung cấp CÓ tìm kiếm (gateway định tuyến kiểu OpenRouter: khai <code class="rounded bg-ink-800 px-1">model_suffix</code> = <code class="rounded bg-ink-800 px-1">:online</code> hoặc <code class="rounded bg-ink-800 px-1">plugins</code> = <code class="rounded bg-ink-800 px-1">web</code>) — provider tự chạy tìm kiếm và trả về trích dẫn.</p>
                     </details>
                     <!-- Nhóm công việc CHƯA có model là trạng thái CẤU HÌNH, không phải lỗi: nói đúng
                          để người dùng biết việc cần làm là vào Cài đặt, chứ không đi tìm lỗi ở agent. -->

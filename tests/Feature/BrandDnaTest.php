@@ -627,4 +627,39 @@ class BrandDnaTest extends TestCase
     {
         Http::fake(['*' => Http::response(['choices' => [['message' => ['content' => $this->validBriefJson()]]]], 200)]);
     }
+
+    /**
+     * Khai báo trong Cài đặt KHÔNG phải bằng chứng: đo thật 23/09/2026 — DeepSeek nhận `enable_search`
+     * với HTTP 200 nhưng BỎ QUA, model vẫn nói "không có quyền truy cập thông tin thời gian thực". Giao diện
+     * phải phân biệt hai mức tin, nếu không nó hứa hộ người dùng một năng lực không tồn tại.
+     */
+    public function test_declared_search_is_unverified_while_protocol_search_is_verified(): void
+    {
+        // (a) Giao thức: chắc chắn — chính mã này dựng request đúng chuẩn của giao thức đó.
+        $dialect = WebAccessService::planFor(['transport' => 'qwen', 'provider' => 'qwen', 'model' => 'qwen3.8-flash']);
+        $this->assertTrue($dialect['verified']);
+        $this->assertStringContainsString('giao thức', $dialect['source']);
+
+        // (b) Do người dùng khai: vẫn ra kế hoạch, nhưng đánh dấu CHƯA kiểm chứng.
+        $declared = WebAccessService::planFor([
+            'transport' => 'openai', 'provider' => 'gateway-x', 'model' => 'm',
+            'search_param' => 'enable_search', 'search_mode' => 'body_flag',
+        ]);
+        $this->assertFalse($declared['verified']);
+        $this->assertStringContainsString('khai trong Cài đặt', $declared['source']);
+
+        // (c) Câu kết luận cũng phải khác nhau giữa hai mức tin.
+        $this->configurePromptGateway('gw-khai', 'model-khai');
+        \App\Models\StudioProvider::where('slug', 'gw-khai')->update([
+            'search_param' => 'enable_search', 'search_mode' => 'body_flag',
+        ]);
+        Cache::flush();
+        Http::fake(['*' => Http::response('', 204)]);
+
+        $probe = app(WebAccessService::class)->probe(true);
+        $this->assertTrue($probe['model_search']['supported']);
+        $this->assertFalse($probe['model_search']['verified'], 'Khai báo không phải bằng chứng.');
+        $this->assertStringContainsString('KHAI', $probe['verdict_label']);
+        $this->assertStringContainsString('chưa kiểm chứng', $probe['verdict_label']);
+    }
 }
