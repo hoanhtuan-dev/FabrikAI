@@ -2068,7 +2068,7 @@ Nếu người dùng khai `search_param=enable_search` cho một gateway **khôn
 
 ## Phiên 2026-09-23 (Đợt 29 — bỏ chữ "demo" khỏi giao diện + mã tra cứu `L-P7CR` nói được ĐÚNG chỗ hỏng)
 
-**Deploy:** `<prev> → <commit>`. Không migration mới.
+**Deploy:** `051af7d → 86d7752`. Không migration mới.
 
 ### 1. Bỏ chữ "demo" / "nguồn: demo" khỏi bề mặt người dùng
 
