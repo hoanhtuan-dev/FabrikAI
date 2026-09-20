@@ -462,6 +462,27 @@ class DesignAgentService
                     $this->seasonTag($prompt),
                     $region === 'all' ? 'TrendRadar' : $this->regionName($region),
                 ]), 0, 20)),
+                // [Lưu data Định hướng vào bộ sưu tập] Toàn bộ dữ liệu brief đi vào settings (JSON) để bộ
+                // sưu tập quản lý được đầy đủ (mood board · palette · cơ cấu · phối · size · giá · prompt),
+                // không chỉ tên + brief. Kế hoạch sản xuất tính riêng ở bước Sản xuất & lãi nên không nằm đây.
+                'settings' => [
+                    'agent_studio' => true,
+                    'palette' => $palette,
+                    'moodboard' => $moodboard,
+                    'structure' => [
+                        'total_skus' => array_sum(array_column($categoryMix, 'count')),
+                        'categories' => $categoryMix,
+                    ],
+                    'outfit_matching' => $outfits,
+                    'size_distribution' => $sizeDistribution,
+                    'price_bands' => $priceBands,
+                    'prompt_vi' => $promptVi,
+                    'prompt_en' => $promptEn,
+                    'selected_trends' => array_map(fn (array $trend) => [
+                        'id' => $trend['id'] ?? '',
+                        'title' => $trend['title'] ?? '',
+                    ], $selected),
+                ],
             ],
             'next_steps' => $nextSteps ?: [
                 'Duyệt mood board và bảng màu.',

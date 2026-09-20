@@ -338,6 +338,9 @@ class ProjectController extends Controller
             'tags.*' => ['string', 'max:40'],
             'color' => ['nullable', 'string', 'max:20'],
             'thumbnail_url' => ['nullable', 'string', 'max:2048'],
+            // [Lưu data Định hướng] settings = JSON đầy đủ của brief (palette · moodboard · cơ cấu · …)
+            // do Agent Studio gửi kèm khi "Tạo bộ sưu tập từ brief".
+            'settings' => ['nullable', 'array'],
             // [P1.2] Người phụ trách — giao việc ngay lúc tạo bộ sưu tập.
             'assignee_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
