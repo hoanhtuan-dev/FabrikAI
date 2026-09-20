@@ -104,6 +104,58 @@ Sửa kèm: lệnh `studio:web-access` in nhãn BA trạng thái (`[CÓ tìm ki�
 — nhãn cũ chỉ có "có/không" theo khả năng tích hợp nên in `[không tìm kiếm]` ngay cạnh dòng nói máy chủ
 chạy được công cụ.
 
+### 5ter. ĐƯỜNG THỨ NĂM — DÙNG CÔNG CỤ TÌM KIẾM CỦA CHÍNH DEEPSEEK QUA `/responses` (2026-09-21)
+
+**Câu hỏi của chủ dự án**: *"tại sao vẫn dùng «Nguồn dữ liệu ngoài cho agent» trong Cài đặt thay vì search tool từ
+model deepseek?"* — và chỉ đúng hướng: **"dùng endpoint responses là được"**.
+
+**ĐO THẬT trên production (`api.deepseek.com`, khoá thật):**
+
+| Phép đo | Kết quả |
+|---|---|
+| `/chat/completions` + `tools:[{"type":"web_search"}]` | **HTTP 422** `unknown variant web_search, expected function` |
+| `/responses` + cùng tham số, **deepseek-v4-pro** | **HTTP 200** + **1–9 mục `web_search_call` THẬT** (truy vấn tiếng Việt + trang đã mở: thanhnien.vn · cafef.vn · vnanet.vn) |
+| `/responses` + cùng tham số, **deepseek-flash** | HTTP 200 nhưng **0 lượt tìm** — model tự **BỊA tin + URL** (ngày 24/05/2024) |
+| ĐỐI CHỨNG: `tools:[{"type":"khong_ton_tai_xyz"}]` | HTTP 200 y hệt ⇒ endpoint **nhận rồi BỎ QUA** tool type lạ, KHÔNG validate |
+| `/responses` + `instructions` + `text.format=json_object` | JSON đọc được, 7,0 s · 5.316 token |
+
+⇒ Kết luận: **DeepSeek CÓ công cụ tìm kiếm thật, nhưng chỉ trên endpoint `/responses` và CHỈ với model hỗ trợ.**
+Vì endpoint nhận rồi bỏ qua tham số lạ, **không được tin theo lời khai** — phải đếm `web_search_call` trong phản hồi.
+
+**Đã làm**: kiểu bật tìm kiếm thứ năm `responses_web_search` (khai ở Cài đặt, không hard-code nhà cung cấp nào) ·
+`AiModelGateway::callResponsesWithSearch()` (instructions + input + tools + json format; đọc `output[]` đếm
+`web_search_call`; endpoint hỏng thì quay về `/chat/completions`) · khối `tool_search.mode='hosted'` ·
+`web_search` **chỉ true khi có lượt tìm thật**.
+
+**HAI LỖI THẬT phép đo bắt được (đã sửa cùng ngày):**
+1. **Model KHÔNG được nói là nó được phép hỏi** — đo lần đầu: `accepted=true` nhưng **`calls=0`**: prompt chỉ
+   *cho phép* gọi công cụ, mà khối DỮ LIỆU đã dày (14 tin + 8 hướng) nên model tự thấy đủ ⇒ vai tìm kiếm
+   không mang thêm gì. Sửa: khi vai tìm kiếm được khai thì việc tìm là **BẮT BUỘC** (ít nhất một lần).
+2. **Model không biết hôm nay là ngày nào** — nó đi tìm bằng từ khoá của **năm cũ**. Sửa: thêm *"Hôm nay là…"*
+   vào cả hai prompt ⇒ truy vấn thật sau đó đúng năm (`… thu đông 2026 …`).
+
+**LỖI THẬT thứ ba (ở tầng khoá):** route riêng của DeepSeek khai `api_key_ref=deepseek` (dùng lại slot khoá cũ,
+KHÔNG tạo khoá thứ hai) thì `studio_candidate_key()` tra khoá theo **slug provider** nên trả **rỗng** ⇒
+`AiModelGateway::candidates()` rỗng ⇒ agent **âm thầm** rơi về nhóm khác dù Cài đặt hiện "đã gán model".
+Đã sửa tại một nguồn (`studio_candidate_key` nhận thêm slot `api_key_ref` của Custom Provider).
+
+**ĐO LẠI SAU KHI SỬA — chạy thật trên production (`d610481`):**
+
+| Số đo | Kết quả |
+|---|---|
+| Radar thật | `engine=ai-v1` · `deepseek_search:deepseek-v4-pro` · **27,3 s** · 8 định hướng do AI viết |
+| `tool_search` | `mode=hosted` · **`calls=1`** · `web_search=true` |
+| Truy vấn model TỰ HỎI | *"xu hướng thời trang Việt Nam thu đông 2026 váy midi công sở pastel quần ống rộng"* · *"…màu pastel vàng bơ linen Việt Nam"* · *"Tuần lễ thời trang New York mùa thu 2026…"* |
+
+**CHI PHÍ — chủ dự án cần biết để quyết**: mỗi lượt chạy qua đường này tốn **~5.000–42.000 token** và **7–41 giây**
+(tuỳ model mở thêm bao nhiêu trang), so với ~17 s khi chạy model nhỏ. Bật/tắt bằng cách gán hay bỏ model ở vai
+«Agent Studio — Tìm kiếm nguồn ngoài» — không cần sửa mã.
+
+**Cách BẬT trên production** (đã làm): Cài đặt → Custom Providers → thêm route
+`deepseek_search` (base `https://api.deepseek.com`, khoá dùng lại slot `deepseek`, Kiểu = `responses_web_search`,
+Tham số = `web_search`) → Nhóm công việc → vai *Tìm kiếm nguồn ngoài* = `deepseek-v4-pro`.
+**KHÔNG gán `deepseek-flash` cho vai này**: model đó nhận yêu cầu rồi tự bịa tin và URL.
+
 ### 6. Việc chủ dự án cần làm để BẬT (không sửa mã)
 1. Cài đặt → **Nhóm công việc** → «Agent Studio — Tìm kiếm nguồn ngoài» → gán một model (production: `deepseek:deepseek-chat` hoặc `deepseek:deepseek-flash` — cả hai gọi hàm được).
 2. Agent Studio → bước **Tín hiệu** → nút **Kiểm tra lại**: dòng kết luận phải là *"…sẽ GỌI CÔNG CỤ tìm kiếm do máy chủ chạy"*.

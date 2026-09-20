@@ -147,6 +147,12 @@ class WebAccessService
                 'tool' => $tool,
                 'tool_ready' => $toolReady,
                 'label' => match (true) {
+                    // Đường /responses: KHÔNG phải "gửi tham số rồi cầu mong gateway hiểu" — nó gọi hẳn
+                    // một endpoint khác, và lượt chạy ĐẾM ĐƯỢC số lời gọi tìm kiếm thật trong phản hồi. Nhưng
+                    // chỉ model hỗ trợ mới tìm (model nhỏ nhận yêu cầu rồi tự bịa tin), nên lời khai ở đây
+                    // tuyệt đối không được viết như một lời bảo đảm.
+                    self::isHostedMode($plan) => 'Gọi endpoint /responses kèm công cụ tìm kiếm `'.$plan['param'].'` — '.$plan['source']
+                        .' · CHỈ model hỗ trợ mới tìm thật (model khác vẫn trả lời nhưng KHÔNG tìm); Agent Studio báo số lượt tìm thật của từng lượt chạy',
                     $plan !== null => 'Bật tìm kiếm ('.($plan['mode'] ?? 'body_flag').') bằng `'.$plan['param'].'` — '.$plan['source']
                         .(($plan['verified'] ?? false) ? '' : ' · CHƯA kiểm chứng: gateway không hỗ trợ thì tham số bị bỏ qua'),
                     $toolReady => 'Máy chủ chạy công cụ tìm kiếm (web_search) khi model gọi — không cần nhà cung cấp có tìm kiếm tích hợp',
@@ -224,9 +230,14 @@ class WebAccessService
             $verdict = 'internet_and_search';
             // Phân biệt "giao thức chắc chắn" với "bạn khai": khai báo chỉ là khai báo, và người dùng cần
             // biết mức độ tin của chính câu kết luận này.
-            $verdictLabel = ($active['plan']['verified'] ?? false)
-                ? 'Máy chủ có internet và model bạn đang cấu hình CÓ tìm kiếm web — kết quả phân tích có thể kèm nguồn thật.'
-                : 'Máy chủ có internet và model bạn đang cấu hình được KHAI là có tìm kiếm web (chưa kiểm chứng được từ phía máy chủ) — nếu gateway không hỗ trợ thì tham số bị bỏ qua và câu trả lời vẫn chỉ dựa trên dữ liệu hệ thống gửi vào.';
+            $verdictLabel = self::isHostedMode($active['plan'] ?? null)
+                // Nói ĐÚNG cơ chế của đường /responses: có tìm thật hay không là chuyện của TỪNG MODEL, và
+                // lượt chạy nào cũng trả về số lượt tìm thật — nên đừng hứa, hãy chỉ chỗ kiểm.
+                ? 'Máy chủ có internet và model bạn gán cho vai «Tìm kiếm nguồn ngoài» gọi endpoint /responses kèm công cụ tìm kiếm của nhà cung cấp. '
+                    .'CHỈ model hỗ trợ mới tìm thật — Agent Studio hiện số lượt tìm được của từng lượt chạy, nên hãy mở một lượt phân tích để đối chiếu.'
+                : (($active['plan']['verified'] ?? false)
+                    ? 'Máy chủ có internet và model bạn đang cấu hình CÓ tìm kiếm web — kết quả phân tích có thể kèm nguồn thật.'
+                    : 'Máy chủ có internet và model bạn đang cấu hình được KHAI là có tìm kiếm web (chưa kiểm chứng được từ phía máy chủ) — nếu gateway không hỗ trợ thì tham số bị bỏ qua và câu trả lời vẫn chỉ dựa trên dữ liệu hệ thống gửi vào.');
         } elseif ($toolReady) {
             // ĐƯỜNG THỨ HAI: nhà cung cấp không có tìm kiếm tích hợp, nhưng model biết gọi hàm ⇒ MÁY CHỦ đi
             // tìm thật rồi trả kết quả về prompt. Câu này nói đúng cơ chế, không hứa "model tự tìm".
