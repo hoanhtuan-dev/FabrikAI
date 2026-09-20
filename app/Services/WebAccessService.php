@@ -219,14 +219,26 @@ class WebAccessService
         $out = [];
         foreach ($labels as $group => $label) {
             $rows = function_exists('studio_task_group_models') ? studio_task_group_models($group) : [];
+            // PHÂN BIỆT hai chuyện rất khác nhau (đo trên production: nhóm image có 3 model ĐÃ GÁN nhưng
+            // 0 model DÙNG ĐƯỢC vì thiếu key):
+            //   configured — đã gán model cho nhóm trong Cài đặt;
+            //   usable     — có ít nhất một candidate thật sự chạy được (có key đang bật).
+            // Gộp hai thứ này lại là nói sai: người dùng tưởng đã xong, hoặc tưởng hệ thống hỏng.
+            $usable = app(AiModelGateway::class)->candidates($group);
             $out[] = [
                 'group' => $group,
                 'label' => $label,
                 'configured' => $rows !== [],
                 'candidates' => count($rows),
+                'usable' => count($usable),
+                'needs_key' => $rows !== [] && $usable === [],
                 'models' => array_values(array_map(
                     fn ($row) => trim((string) ($row['provider'] ?? '').':'.(string) ($row['model'] ?? '')),
                     $rows,
+                )),
+                'usable_models' => array_values(array_map(
+                    fn ($row) => trim((string) ($row['provider'] ?? '').':'.(string) ($row['model'] ?? '')),
+                    $usable,
                 )),
             ];
         }

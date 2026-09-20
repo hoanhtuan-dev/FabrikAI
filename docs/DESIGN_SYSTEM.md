@@ -1026,9 +1026,18 @@ Bốn câu kết luận (đừng gộp — mỗi câu là một việc cần là
 | `internet_no_search` | có model nhưng model đó không có tìm kiếm web | muốn nguồn thật thì chọn model/nhà cung cấp có tìm kiếm, hoặc khai `search_param` cho Custom Provider |
 | `internet_and_search` | có model VÀ có tìm kiếm | không cần làm gì |
 
-Kết quả đo còn có khối `task_groups`: trạng thái **cấu hình** của 5 nhóm công việc (`prompt` · `vision` ·
-`image` · `edit` · `video`) đọc thẳng từ `studio_task_group_models()` — nhóm rỗng hiển thị là *"chưa có
-model (chờ cài đặt)"*, KHÔNG phải lỗi. Nhóm rỗng không bao giờ bị coi là "model không có tìm kiếm".
+Kết quả đo còn có khối `task_groups` cho 5 nhóm công việc (`prompt` · `vision` · `image` · `edit` · `video`),
+đọc thẳng từ Cài đặt và tách **HAI** chuyện rất khác nhau:
+
+| Trường | Nghĩa | Ví dụ thật trên production |
+|---|---|---|
+| `configured` · `candidates` | đã gán model cho nhóm trong Cài đặt | nhóm `image`: **3 model đã gán** |
+| `usable` · `usable_models` | có candidate **chạy được** (key đang bật) | nhóm `image`: **0 dùng được** |
+| `needs_key` | đã gán nhưng thiếu key | `image` ⇒ true |
+
+Gộp hai thứ này là nói sai với người dùng: "đã gán model" khiến họ tưởng đã xong, còn "0 dùng được" mà
+không nói vì sao thì khiến họ tưởng hệ thống hỏng. Giao diện hiển thị đúng ba trạng thái: *chưa gán model* ·
+*đã gán nhưng chưa có key dùng được (chờ cài đặt key)* · *đang chạy*.
 
 **Không viết cứng tên nhà cung cấp ở bất kỳ đâu quyết định hành vi**: mã nguồn chỉ biết *giao thức*;
 việc chọn provider/model là của Cài đặt. Câu kết luận cũng không nêu tên nhà cung cấp nào (test khoá).

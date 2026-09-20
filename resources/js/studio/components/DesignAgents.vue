@@ -99,7 +99,14 @@ function setDnaList(key, value) {
 }
 const dnaDirty = computed(() => JSON.stringify(dnaDraft.value) !== JSON.stringify(dna.value?.dna || {}));
 /** Nhóm công việc CHƯA cấu hình model — đọc từ số đo (tức là từ Cài đặt), không phải danh sách cứng. */
-const missingGroups = computed(() => (store.webAccess?.task_groups || []).filter((row) => !row.configured));
+/** Nhóm công việc CHƯA chạy được — đọc từ số đo (tức từ Cài đặt), không phải danh sách cứng. */
+const blockedGroups = computed(() => (store.webAccess?.task_groups || []).filter((row) => !row.configured || row.needs_key));
+/** Câu nói ĐÚNG việc cần làm: chưa gán model khác với đã gán nhưng thiếu key. */
+function groupStatus(row) {
+  if (!row.configured) return 'chưa gán model';
+  if (row.needs_key) return 'đã gán model nhưng CHƯA có key dùng được — chờ cài đặt key';
+  return 'đang chạy';
+}
 /**
  * Vì sao nút "Lưu DNA" đang bị khoá — MỘT nguồn cho cả điều kiện khoá lẫn câu giải thích
  * (docs/DESIGN_SYSTEM.md §4 quy tắc 4): hai chỗ viết riêng thì sớm muộn lệch nhau.
@@ -909,8 +916,10 @@ watch(() => store.designAgentOpen, (open) => {
                     <p class="mt-1 text-label leading-5 text-cream-400">Nguồn ngoài vẫn là <b>dữ liệu mẫu</b> (chưa nối sàn TMĐT, chưa có scraping hay POS/ERP thật). Dữ liệu nội bộ là dự án/ảnh của chính tài khoản bạn.</p>
                     <!-- Nhóm công việc CHƯA có model là trạng thái CẤU HÌNH, không phải lỗi: nói đúng
                          để người dùng biết việc cần làm là vào Cài đặt, chứ không đi tìm lỗi ở agent. -->
-                    <ul v-if="missingGroups.length" class="mt-2 space-y-0.5 text-label leading-5 text-warn">
-                      <li v-for="row in missingGroups" :key="row.group">↳ Nhóm {{ row.label }} chưa có model — tính năng đó đang chờ bạn cài đặt key/model (Cài đặt → Nhóm công việc).</li>
+                    <ul v-if="blockedGroups.length" class="mt-2 space-y-0.5 text-label leading-5 text-warn">
+                      <li v-for="row in blockedGroups" :key="row.group">
+                        ↳ Nhóm {{ row.label }}: {{ groupStatus(row) }} (Cài đặt → Nhóm công việc / API key).
+                      </li>
                     </ul>
                     <details class="mt-2">
                       <summary class="cursor-pointer text-label text-cream-400">Chi tiết phép đo</summary>
@@ -918,7 +927,8 @@ watch(() => store.designAgentOpen, (open) => {
                         <li v-for="row in store.webAccess.outbound.results" :key="row.url">· {{ row.url }} — {{ row.status ? 'HTTP ' + row.status : (row.error || 'không kết nối được') }} ({{ row.ms }} ms)</li>
                         <li v-for="row in store.webAccess.model_search.candidates" :key="row.provider + row.model">· {{ row.provider }}:{{ row.model }} — {{ row.label }}</li>
                         <li v-for="row in (store.webAccess.task_groups || [])" :key="row.group">
-                          · Nhóm {{ row.label }}: {{ row.configured ? row.models.join(', ') : 'CHƯA cấu hình model (chờ cài đặt)' }}
+                          · Nhóm {{ row.label }}: gán {{ row.candidates }} model · dùng được {{ row.usable }} · {{ groupStatus(row) }}
+                          <span v-if="row.usable_models.length" class="text-cream-400">({{ row.usable_models.join(', ') }})</span>
                         </li>
                       </ul>
                     </details>

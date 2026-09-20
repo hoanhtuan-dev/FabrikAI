@@ -1800,6 +1800,7 @@ Kết quả đo có thêm khối `task_groups`: 5 nhóm công việc (`prompt` �
 | Chrome thật (local) | Panel Agent Studio: *"Máy chủ CÓ internet · đo 2 đích · 159 ms"* + *"Chưa có model dùng được cho nhóm suy luận"* + danh sách 5 nhóm công việc |
 | Chrome thật — Cài đặt | Tab **Custom Providers → Thêm provider** có ô **"Tham số bật TÌM KIẾM WEB (tuỳ chọn…)"**, placeholder `VD: enable_search · bỏ trống nếu không có` |
 | Production | `php artisan studio:web-access --force` → máy chủ **CÓ internet** (200/204) · nhóm suy luận: 3 model deepseek **không có tìm kiếm** · verdict `internet_no_search` |
+| **Configured ≠ usable trên production** | nhóm công việc đọc từ Cài đặt: `prompt=5` · `vision=3` · **`image=3` đã gán nhưng `0` dùng được** (thiếu key) · `edit=2` · `video=3`. Giao diện hiện đúng ba trạng thái: *chưa gán model* · *đã gán nhưng chưa có key dùng được (chờ cài đặt key)* · *đang chạy* — khớp đúng thực tế bạn nêu: **nhóm image chờ cài đặt key sau** |
 
 **Test:** full suite **884 test / 6.516 assert XANH** · `npm run build` exit 0.
 

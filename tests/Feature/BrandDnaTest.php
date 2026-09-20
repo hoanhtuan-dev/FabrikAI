@@ -335,9 +335,19 @@ class BrandDnaTest extends TestCase
                 'Trạng thái nhóm '.$row['group'].' không khớp Cài đặt.',
             );
             $this->assertSame(count(studio_task_group_models($row['group'])), $row['candidates']);
+            // configured (đã gán model) KHÁC usable (chạy được vì có key). Trên production nhóm image có
+            // 3 model đã gán nhưng 0 dùng được — gộp hai thứ này là nói sai với người dùng.
+            $usable = app(\App\Services\AiModelGateway::class)->candidates($row['group']);
+            $this->assertSame(count($usable), $row['usable']);
+            $this->assertSame($row['configured'] && count($usable) === 0, $row['needs_key']);
         }
 
         // Và nó phải ĐỔI THEO khi Cài đặt đổi: thêm model tạo ảnh cho một provider mới ⇒ báo cáo thấy ngay.
+        \App\Models\StudioProvider::create([
+            'slug' => 'provider-moi', 'name' => 'Gateway mới', 'protocol' => 'openai',
+            'base_url' => 'https://moi.example/v1', 'auth_style' => 'bearer',
+            'api_key_ref' => 'provider-moi', 'priority' => 9, 'enabled' => true,
+        ]);
         \App\Models\StudioApiKey::create([
             'provider' => 'provider-moi', 'label' => 'provider-moi', 'value' => 'sk-x',
             'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
@@ -351,6 +361,9 @@ class BrandDnaTest extends TestCase
         $this->assertTrue($again['image']['configured']);
         $this->assertContains('provider-moi:anh-moi', $again['image']['models'],
             'Model vừa thêm trong Cài đặt phải xuất hiện trong báo cáo — không có danh sách cứng nào chen vào.');
+        $this->assertGreaterThanOrEqual(1, $again['image']['usable'],
+            'Có key đang bật thì nhóm phải được coi là DÙNG ĐƯỢC, không chỉ "đã gán".');
+        $this->assertFalse($again['image']['needs_key']);
     }
 
     /** Endpoint chỉ mở cho tài khoản studio, và KHÔNG gọi model nào (chỉ đo + đọc cấu hình). */
