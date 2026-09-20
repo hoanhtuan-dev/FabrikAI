@@ -2179,9 +2179,15 @@ và ghi lại **nhóm thật đã dùng** vào khối `model` để giao diện 
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
 
-### 6. Ghi chú minh bạch: hai file LẠ không thuộc đợt này
+### 6. Ghi chú minh bạch: có MỘT TIẾN TRÌNH KHÁC đang viết song song trong cùng thư mục
 
-Trong lúc commit, `git status` cho thấy **hai file không do đợt này tạo** và **không được tham chiếu ở đâu**:
-`app/Models/MarketSignal.php` và `database/migrations/2026_09_23_000007_create_market_signals_table.php`.
-Đã **loại khỏi commit** (giữ nguyên trên đĩa, vẫn là file chưa theo dõi) — không đưa mã chết vào lịch sử.
-Cần người dùng quyết: xoá, hay hoàn thiện thành tính năng (khi đó phải có service + đường vào trên giao diện + test).
+Trong lúc commit, `git status` cho thấy các thay đổi **không do đợt này tạo**:
+
+| File | Tình trạng |
+|---|---|
+| `app/Models/MarketSignal.php` · `database/migrations/2026_09_23_000007_create_market_signals_table.php` · `app/Services/MarketSignalService.php` · `app/Support/VietnameseText.php` | **file mới**, đang được viết |
+| `app/Services/WebSourceService.php` · `app/Services/DesignAgentService.php` | **bị sửa** (thêm trạng thái nguồn, gọi theo lô, giữ bản lấy thành công gần nhất…) |
+
+Đây là một **tính năng KHÁC đang được viết song song** ("tín hiệu thị trường đo bằng thuật toán"), KHÔNG phải
+mã chết — nên KHÔNG xoá. Đã **loại khỏi commit của đợt này** để không trộn hai việc vào một commit và không
+commit khi việc kia còn viết dở. Bản chạy trên production là bản đã commit (không gồm các thay đổi đó).
