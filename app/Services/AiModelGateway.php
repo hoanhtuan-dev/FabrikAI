@@ -22,6 +22,9 @@ use Illuminate\Support\Facades\Http;
  */
 class AiModelGateway
 {
+    /** Nhật ký thử của lần gọi gần nhất (xem lastAttempts()) — để log nói ĐÚNG vì sao không dùng được model. */
+    protected array $lastAttempts = [];
+
     /** @return list<array{provider:string, model:string, transport:string, base:string, keys:list<string>, search_param?:?string}> */
     public function candidates(string $group): array
     {
@@ -126,27 +129,90 @@ class AiModelGateway
      */
     public function text(string $group, array $messages, array $options = []): ?array
     {
-        foreach ($this->candidates($group) as $candidate) {
+        $this->lastAttempts = [];
+
+        // NHÓM DỰ PHÒNG: nơi gọi có thể khai thêm các nhóm khác để thử khi nhóm chính không cho ra nội dung.
+        //
+        // Vì sao cần (lỗi thật trên production 2026-09-20): nhóm "tìm kiếm" được gán MỘT model suy luận
+        // (qwen3.8-flash) đốt hết ngân sách token vào phần thinking rồi bị cắt (finish_reason=length,
+        // reasoning_only=true) ⇒ chuỗi candidate của nhóm đó CHỈ có một model ⇒ agent mất phần suy luận
+        // của AI và rơi về engine tất định. Có nhóm dự phòng thì chỉ cần một model khác trong Cài đặt là
+        // agent chạy được ngay, không phải chờ ai đó phát hiện và đổi cấu hình.
+        $groups = [$group];
+        foreach ((array) ($options['fallback_groups'] ?? []) as $fallback) {
+            $fallback = trim((string) $fallback);
+            if ($fallback !== '' && $fallback !== $group) {
+                $groups[] = $fallback;
+            }
+        }
+
+        $candidates = [];
+        $seen = [];
+        foreach (array_values(array_unique($groups)) as $candidateGroup) {
+            foreach ($this->candidates($candidateGroup) as $candidate) {
+                $signature = $candidate['provider'].':'.$candidate['model'];
+                if (isset($seen[$signature])) {
+                    continue;
+                }
+                $seen[$signature] = true;
+                $candidates[] = $candidate + ['group' => $candidateGroup];
+            }
+        }
+
+        foreach ($candidates as $candidate) {
             foreach ($candidate['keys'] as $key) {
                 try {
                     $result = $this->callText($candidate, $key, $messages, $options);
                 } catch (\Throwable $e) {
                     logger()->warning('AiModelGateway text lỗi ('.$candidate['provider'].':'.$candidate['model'].'): '.$e->getMessage());
+                    $this->lastAttempts[] = [
+                        'group' => $candidate['group'], 'provider' => $candidate['provider'], 'model' => $candidate['model'],
+                        'ok' => false, 'note' => 'lỗi khi gọi: '.class_basename($e),
+                    ];
                     continue;
                 }
+
                 if ($result !== null && trim($result['text']) !== '') {
+                    $this->lastAttempts[] = [
+                        'group' => $candidate['group'], 'provider' => $candidate['provider'], 'model' => $candidate['model'],
+                        'ok' => true, 'finish_reason' => $result['finish_reason'], 'reasoning_only' => $result['reasoning_only'],
+                        'chars' => strlen($result['text']),
+                    ];
+
                     return [
                         'text' => trim($result['text']),
                         'provider' => $candidate['provider'],
                         'model' => $candidate['model'],
+                        'group' => $candidate['group'],
                         'finish_reason' => $result['finish_reason'],
                         'reasoning_only' => $result['reasoning_only'],
                     ];
                 }
+
+                // Ghi lại VÌ SAO model này không dùng được — nếu chỉ ghi "không trả về nội dung" thì lần sau
+                // vẫn phải đoán: hết ngân sách token (length) khác hẳn với "model trả lời rỗng".
+                $this->lastAttempts[] = [
+                    'group' => $candidate['group'], 'provider' => $candidate['provider'], 'model' => $candidate['model'],
+                    'ok' => false,
+                    'finish_reason' => $result['finish_reason'] ?? null,
+                    'reasoning_only' => (bool) ($result['reasoning_only'] ?? false),
+                    'chars' => strlen((string) ($result['text'] ?? '')),
+                    'note' => $result === null ? 'không gọi được' : 'không có nội dung dùng được',
+                ];
             }
         }
 
         return null;
+    }
+
+    /**
+     * Nhật ký những lần thử của lần gọi GẦN NHẤT: mỗi dòng nói rõ nhóm · model · vì sao không dùng được.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function lastAttempts(): array
+    {
+        return $this->lastAttempts;
     }
 
     /**
@@ -251,7 +317,14 @@ class AiModelGateway
             // (`WebAccessService::planFor`): giao thức biết cách bật, còn chọn nhà cung cấp/model nào là
             // việc của Cài đặt. Không bật bừa: provider không khai thì gửi tham số lạ có thể hỏng request.
             $this->applySearch($body, $options, $candidate);
+            $thinkingOff = $this->applyThinkingOff($body, $candidate, $options);
             $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
+            if ($thinkingOff && ! $resp->successful()) {
+                // Provider không hiểu cờ tắt suy luận ⇒ gọi lại KHÔNG có cờ đó. Một tham số tuỳ chọn không
+                // bao giờ được phép làm hỏng cả lời gọi.
+                unset($body['enable_thinking']);
+                $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
+            }
 
             return $resp->successful() ? $this->textResult($resp->json()) : null;
         }
@@ -293,9 +366,47 @@ class AiModelGateway
         // OpenAI-compatible KHÔNG có cờ tìm kiếm chuẩn — chỉ bật khi CHÍNH nhà cung cấp tự khai tham số
         // (`studio_providers.search_param`), tức là đến từ Cài đặt.
         $this->applySearch($body, $options, $candidate);
+        $thinkingOff = $this->applyThinkingOff($body, $candidate, $options);
         $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
+        if ($thinkingOff && ! $resp->successful()) {
+            unset($body['enable_thinking']);
+            $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
+        }
 
         return $resp->successful() ? $this->textResult($resp->json()) : null;
+    }
+
+    /**
+     * TẮT SUY LUẬN DÀI cho việc cần JSON — lỗi thật trên production 2026-09-20.
+     *
+     * Chuyện đã xảy ra: model "suy luận" (qwen3.8-flash · deepseek-flash) tính CẢ token suy luận vào
+     * `max_tokens`, nên nó viết gần 10.000 ký tự suy luận rồi bị cắt (`finish_reason=length`,
+     * `reasoning_only=true`) và **không bao giờ viết ra JSON**. Hệ quả: mọi lượt radar đều mất phần suy
+     * luận của AI, rơi về engine tất định, và người dùng thấy toàn hướng của BỘ CÓ SẴN dù đã nối nguồn thật.
+     *
+     * Cách sửa: khi nơi gọi khai `disable_thinking`, gửi `enable_thinking: false` cho các model họ Qwen3
+     * trên giao thức DashScope (đúng tham số của họ). An toàn: provider không hiểu tham số ⇒ nơi gọi
+     * (callText) tự gọi lại KHÔNG có tham số đó, nên một cờ tuỳ chọn không thể làm hỏng lời gọi.
+     *
+     * @param  array<string,mixed>  $body
+     * @return bool  đã gửi cờ hay chưa (để biết có cần gọi lại khi provider từ chối)
+     */
+    protected function applyThinkingOff(array &$body, array $candidate, array $options): bool
+    {
+        if (($options['disable_thinking'] ?? false) !== true) {
+            return false;
+        }
+
+        $transport = (string) ($candidate['transport'] ?? '');
+        $model = mb_strtolower((string) ($candidate['model'] ?? ''));
+        $hybrid = str_contains($model, 'qwen3') || str_contains($model, 'thinking') || str_contains($model, 'reasoner');
+        if (! in_array($transport, ['qwen', 'dashscope'], true) || ! $hybrid) {
+            return false;
+        }
+
+        $body['enable_thinking'] = false;
+
+        return true;
     }
 
     /**

@@ -565,7 +565,7 @@ class DesignAgentService
     {
         if ($this->market === null) {
             return [
-                'mode' => 'empty', 'signals' => [], 'signals_total' => 0, 'prices' => ['count' => 0],
+                'mode' => 'empty', 'signals' => [], 'topics' => [], 'signals_total' => 0, 'prices' => ['count' => 0],
                 'captured_at' => null, 'item_count' => 0, 'source_count' => 0, 'snapshots' => 0,
                 'window_days' => 0, 'history_days' => 0, 'note' => 'Chưa bật đo tín hiệu thị trường.', 'label' => 'Tín hiệu thị trường',
             ];
@@ -599,7 +599,10 @@ class DesignAgentService
      */
     private function withMarketSignals(array $trends, array $market): array
     {
-        $signals = (array) ($market['signals'] ?? []);
+        // CẢ HAI nguồn dữ liệu đo được: TÍN HIỆU (từ vựng ngành) và CHỦ ĐỀ (cụm từ đọc từ chính tin). Chỉ dùng
+        // từ vựng thì hướng sinh từ tin phụ thuộc vào việc tôi có khai đúng từ khoá hay không — tin nói về
+        // "tuần lễ thời trang" mà tôi chưa khai thì chủ đề đó không bao giờ thành hướng.
+        $signals = array_merge((array) ($market['signals'] ?? []), (array) ($market['topics'] ?? []));
         if (($market['mode'] ?? 'empty') !== 'live' || $signals === []) {
             return $trends;
         }
@@ -631,7 +634,18 @@ class DesignAgentService
             }
         }
 
-        $merged = array_merge($out, $extra);
+        // MỘT HƯỚNG CHỈ XUẤT HIỆN MỘT LẦN: cùng một cụm từ có thể đến từ hai đường (từ vựng ngành và chủ đề
+        // đọc từ tin) và sinh ra cùng một id — hiện hai thẻ giống hệt nhau là lỗi ai cũng thấy.
+        $seenIds = [];
+        $merged = [];
+        foreach (array_merge($out, $extra) as $trend) {
+            $id = (string) ($trend['id'] ?? '');
+            if ($id === '' || isset($seenIds[$id])) {
+                continue;
+            }
+            $seenIds[$id] = true;
+            $merged[] = $trend;
+        }
         // THỨ TỰ: hướng CÓ TIN THẬT lên trước, trong mỗi nhóm thì xếp theo "đà tăng".
         //
         // Vì sao không chỉ xếp theo đà tăng: đà tăng của bộ có sẵn là SỐ MẪU (74–91) nên nó luôn cao hơn
@@ -798,6 +812,7 @@ class DesignAgentService
             'fabric' => '#e5d7bd',
             'detail' => '#c8d1d5',
             'style' => '#a98f77',
+            'topic' => '#cbb7a0',
         ][$category] ?? '#b9c8c2';
     }
 
@@ -809,6 +824,9 @@ class DesignAgentService
             'silhouette' => 'Làm 1-2 mã chủ lực theo dáng này, giữ phom dễ mặc cho nhiều dáng người.',
             'fabric' => 'Đặt vải một đợt nhỏ, kiểm tra độ rũ và giá vải trước khi cam kết số lượng.',
             'detail' => 'Dùng làm điểm nhấn trên mẫu đang bán thay vì làm bộ mới.',
+            // Chủ đề đọc từ tin: việc nên làm là KIỂM CHỨNG xem chủ đề đó có bán được không, chứ không phải
+            // lao vào sản xuất — đây là thứ báo chí đang nói, không phải thứ khách đang mua.
+            'topic' => 'Đọc vài bài trong mục này để hiểu ngữ cảnh, rồi đối chiếu với dữ liệu bán của shop trước khi làm mẫu.',
             default => 'Chọn một nhóm khách cụ thể cho phong cách này rồi thử 1-2 mẫu.',
         };
     }
@@ -1148,7 +1166,10 @@ class DesignAgentService
                     : 'TUYỆT ĐỐI KHÔNG bịa số liệu thị trường và KHÔNG được nói như thể đã đọc Shopee, TikTok, Instagram, SHEIN, TEMU, ASOS hay Runway — các connector đó CHƯA được kết nối, dữ liệu là mẫu. Không tự nghĩ ra mã xu hướng mới ngoài danh mục. '))
             .'Nhiệm vụ: viết 5-10 ĐỊNH HƯỚNG hành động cho khu vực "'.$region.'", mỗi định hướng bám vào 1-3 id xu hướng CÓ THẬT trong dữ liệu. '
             .'Chỉ trả về JSON đúng dạng: {"directions":[{"title":"...","thesis":"...","why_now":"...","action":"...","risk":"...","price_band":"entry|mid|premium","confidence":0.8,"trend_ids":["id-co-that"]}]}. '
-            .'Viết tiếng Việt, ngắn gọn, cụ thể, có thể hành động ngay: MỖI trường tối đa 25 từ, KHÔNG xuống dòng trong giá trị, KHÔNG thêm chữ nào ngoài JSON.';
+            .'Viết tiếng Việt, ngắn gọn, cụ thể, có thể hành động ngay: MỖI trường tối đa 25 từ, KHÔNG xuống dòng trong giá trị, KHÔNG thêm chữ nào ngoài JSON. '
+            // Câu này không phải để "dặn cho vui": model suy luận tính CẢ token nghĩ vào ngân sách trả lời,
+            // nên nghĩ càng dài càng dễ bị cắt trước khi viết ra JSON (lỗi thật đã gặp trên production).
+            .'Trả JSON NGAY, không viết phần suy luận/giải thích dài dòng.';
 
         $started = microtime(true);
         $runner = $callCandidates !== [] ? $callCandidates : $candidates;
@@ -1177,7 +1198,9 @@ class DesignAgentService
                 'description' => $trend['description'],
                 'recommended_action' => $trend['recommended_action'],
             ], $trends),
-        ], 3000, 8000, 60, $webSearch ? ['search' => true] : [], $runner);
+            // Ngân sách token đủ cho CẢ phần model suy luận lẫn JSON trả lời (đo thật: một lượt đã viết
+            // ~9.700 ký tự suy luận rồi bị cắt ở 3.000 token). Lần hai rộng gấp đôi để cứu ca bị cắt.
+        ], 6000, 16000, 90, $webSearch ? ['search' => true] : [], $runner);
         $latency = (int) round((microtime(true) - $started) * 1000);
         // Model ĐÃ THỰC SỰ ĐƯỢC GỌI là model đầu của $runner (nhóm tìm kiếm có thể khác nhóm suy luận) —
         // lấy từ $candidates là báo sai model mỗi khi lỗi.
@@ -1390,7 +1413,7 @@ class DesignAgentService
         $runner = $webSearch ? $searchGroup : $candidates;
 
         $started = microtime(true);
-        $call = $this->callJson($instruction, $context, 4000, 8000, 75, $webSearch ? ['search' => true] : [], $runner);
+        $call = $this->callJson($instruction, $context, 6000, 16000, 90, $webSearch ? ['search' => true] : [], $runner);
         $latency = (int) round((microtime(true) - $started) * 1000);
         $attempted = ($runner[0]['provider'] ?? '?').':'.($runner[0]['model'] ?? '?');
         $answer = $call['answer'];
@@ -1455,13 +1478,34 @@ class DesignAgentService
         ];
         $group = (string) ($candidates[0]['group'] ?? self::AI_GROUP);
 
-        $answer = $this->gateway->text($group, $messages, $options + [
+        // HAI thứ dưới đây là bản sửa của một lỗi thật (production, 2026-09-20):
+        //   · disable_thinking: model suy luận đốt hết ngân sách token vào phần "nghĩ" rồi bị cắt
+        //     (finish_reason=length, reasoning_only=true) và KHÔNG BAO GIỜ viết JSON ⇒ mọi lượt radar mất
+        //     phần suy luận của AI và rơi về engine tất định (người dùng thấy toàn hướng bộ có sẵn).
+        //   · fallback_groups: nhóm vai trò có thể chỉ có MỘT model; model đó hỏng thì phải có đường lui
+        //     sang các nhóm khác trong Cài đặt, thay vì mất luôn phần phân tích.
+        $fallbacks = [];
+        foreach ([self::SEARCH_GROUP, self::REASON_GROUP, self::AI_GROUP] as $otherGroup) {
+            if ($otherGroup !== $group) {
+                $fallbacks[] = $otherGroup;
+            }
+        }
+
+        $shared = $options + [
             'response_format' => 'json_object',
-            'max_tokens' => $budget,
+            'disable_thinking' => true,
+            'fallback_groups' => $fallbacks,
             'timeout' => $timeout,
-        ]);
+        ];
+
+        $answer = $this->gateway->text($group, $messages, $shared + ['max_tokens' => $budget]);
 
         if ($answer === null) {
+            logger()->warning('Agent Studio: KHÔNG model nào trả về nội dung — dùng engine tất định', [
+                'group' => $group,
+                'attempts' => $this->gateway->lastAttempts(),
+            ]);
+
             return ['json' => null, 'answer' => null, 'attempts' => 1];
         }
 
@@ -1478,8 +1522,7 @@ class DesignAgentService
             'chars' => strlen($answer['text']),
         ]);
 
-        $retry = $this->gateway->text($group, $messages, $options + [
-            'response_format' => 'json_object',
+        $retry = $this->gateway->text($group, $messages, $shared + [
             'max_tokens' => $retryBudget,
             'timeout' => $timeout * 2,
         ]);

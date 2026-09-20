@@ -51,6 +51,18 @@ class WebSourceService
     /** Trần kích thước body đọc vào bộ nhớ (feed lớn bất thường = dấu hiệu bị chặn hoặc lỗi). */
     private const MAX_BYTES = 5 * 1024 * 1024;
 
+    /** Số tin ĐỌC ĐƯỢC giữ trong đệm mỗi nguồn (trước khi cắt theo trần của từng việc). */
+    private const STORED_ITEMS = 60;
+
+    /**
+     * Trần mỗi nguồn khi ĐO tín hiệu thị trường — rộng hơn trần đưa vào prompt (mặc định 5–8 tin).
+     *
+     * Vì sao phải rộng: đo trên 8 tin thì gần như không từ khoá nào lặp lại ≥2 lần ⇒ không có hướng nào
+     * sinh từ tin, và người dùng thấy toàn hướng của bộ có sẵn dù đã nối nguồn thật (đo trên production
+     * 2026-09-20: 3 nguồn trả về 210 tin, nhưng máy đo chỉ nhận 16 tin ⇒ 1 hướng từ tin).
+     */
+    public const MEASURE_PER_SOURCE = 30;
+
     /** Chờ kết nối (TCP/TLS) ngắn hơn chờ nội dung: host treo không được giữ request 12 giây. */
     private const CONNECT_TIMEOUT = 5;
 
@@ -64,7 +76,7 @@ class WebSourceService
      * @param  bool  $force  bỏ đệm (nút "Làm mới nguồn" / lệnh artisan)
      * @return array<string, mixed>
      */
-    public function evidence(string $region = 'all', int $limit = self::EVIDENCE_LIMIT, bool $force = false): array
+    public function evidence(string $region = 'all', int $limit = self::EVIDENCE_LIMIT, bool $force = false, ?int $perSourceCap = null): array
     {
         $sources = WebSource::query()->where('enabled', true)->orderBy('priority')->orderBy('id')->get();
         $usable = [];
@@ -82,7 +94,10 @@ class WebSourceService
             $usable[] = $source;
         }
 
-        $fetched = $this->fetchMany($usable, $force);
+        // TRẦN MỖI NGUỒN cho lần gọi này. Việc ĐO cần bản rộng hơn việc đưa vào prompt (đo trên 8 tin thì
+        // gần như không từ khoá nào đủ 2 tin để thành hướng); nơi gọi đo truyền trần riêng.
+        $cap = $perSourceCap !== null && $perSourceCap > 0 ? $perSourceCap : null;
+        $fetched = $this->fetchMany($usable, $force, $cap);
         $items = [];
         $seen = [];
         $seenTitles = [];
@@ -140,12 +155,12 @@ class WebSourceService
      *
      * @return array{ok:bool, http:?int, ms:int, items:list<array>, error:?string, parsed:int, dropped:int, stale:bool}
      */
-    public function fetch(WebSource $source, bool $force = false): array
+    public function fetch(WebSource $source, bool $force = false, ?int $perSourceCap = null): array
     {
         if (! $force) {
             $hit = $this->readCache($source);
             if ($hit !== null) {
-                return $hit;
+                return $this->withCap($hit, $source, $perSourceCap);
             }
         }
 
@@ -159,7 +174,26 @@ class WebSourceService
 
         $this->writeCache($source, $result);
 
-        return $result;
+        return $this->withCap($result, $source, $perSourceCap);
+    }
+
+    /**
+     * Áp TRẦN của lần gọi này lên kết quả đã có — cắt lại từ danh sách ĐÃ ĐỌC (parsed_items) chứ không
+     * phải đi mạng lần nữa.
+     *
+     * Vì sao: bộ đệm giữ bản ĐỌC ĐƯỢC (rộng), còn trần thì khác nhau theo việc — prompt chỉ cần 8 tin mỗi
+     * nguồn, nhưng máy ĐO cần bản rộng hơn nhiều mới thấy được từ khoá nào lặp lại. Đệm theo trần của
+     * người gọi đầu tiên là cách chắc chắn nhất để việc đo luôn chỉ có 8 tin.
+     */
+    private function withCap(array $row, WebSource $source, ?int $perSourceCap): array
+    {
+        if ($perSourceCap === null || $perSourceCap <= 0 || ! isset($row['parsed_items']) || ($row['items'] ?? []) === []) {
+            return $row;
+        }
+
+        $row['items'] = $this->filter((array) $row['parsed_items'], $source, $perSourceCap);
+
+        return $row;
     }
 
     /**
@@ -172,7 +206,7 @@ class WebSourceService
      * @param  list<WebSource>  $sources
      * @return array<int, array<string, mixed>>  khoá theo id nguồn
      */
-    private function fetchMany(array $sources, bool $force): array
+    private function fetchMany(array $sources, bool $force, ?int $perSourceCap = null): array
     {
         $out = [];
         $pending = [];
@@ -180,7 +214,7 @@ class WebSourceService
             if (! $force) {
                 $hit = $this->readCache($source);
                 if ($hit !== null) {
-                    $out[$source->id] = $hit;
+                    $out[$source->id] = $this->withCap($hit, $source, $perSourceCap);
                     continue;
                 }
             }
@@ -193,7 +227,7 @@ class WebSourceService
 
         if (count($pending) === 1) {
             $only = $pending[0];
-            $out[$only->id] = $this->fetch($only, true);
+            $out[$only->id] = $this->fetch($only, true, $perSourceCap);
 
             return $out;
         }
@@ -208,7 +242,7 @@ class WebSourceService
         } catch (\Throwable $e) {
             // Pool không dựng được (handler không hỗ trợ bất đồng bộ) ⇒ tuần tự, KHÔNG mất tin.
             foreach ($pending as $source) {
-                $out[$source->id] = $this->fetch($source, true);
+                $out[$source->id] = $this->fetch($source, true, $perSourceCap);
             }
 
             return $out;
@@ -223,7 +257,7 @@ class WebSourceService
                 : $this->failure($source, new \RuntimeException('không có phản hồi'), $started);
             $result = $this->finalise($source, $result);
             $this->writeCache($source, $result);
-            $out[$source->id] = $result;
+            $out[$source->id] = $this->withCap($result, $source, $perSourceCap);
         }
 
         return $out;
@@ -335,6 +369,9 @@ class WebSourceService
             $parsed = $source->kind === 'json' ? $this->parseJson($body, $source) : $this->parseRss($body);
             $result['parsed'] = count($parsed);
             $result['ok'] = true;
+            // GIỮ BẢN ĐỌC ĐƯỢC (rộng) trong đệm: việc cắt theo trần là rẻ, việc đi mạng là đắt. Nhờ vậy lần
+            // sau muốn đo trên bản rộng hơn (máy đo tín hiệu) thì cắt lại từ đây, không phải gọi lại nguồn.
+            $result['parsed_items'] = array_slice($parsed, 0, self::STORED_ITEMS);
             $filtered = $this->filter($parsed, $source);
             $result['dropped'] = max(0, count($parsed) - count($filtered));
             $result['items'] = $filtered;
@@ -508,7 +545,75 @@ class WebSourceService
             ];
         }
 
-        return $out;
+        return $this->stripPublisher($out);
+    }
+
+    /**
+     * BỎ TÊN TOÀ SOẠN khỏi tiêu đề và mô tả (nguồn tổng hợp như Google News trả "Bài viết - Kenh14.vn").
+     *
+     * Vì sao phải làm ở đây: tên toà soạn là RÁC ở mọi đường — nó vào prompt (model đọc thấy "Kenh14.vn"),
+     * vào máy đo tín hiệu (thành một "chủ đề thị trường" tên là "kenh14 vn"), và vào cả tiêu đề hiển thị.
+     * Nhận diện bằng DỮ LIỆU, không bằng danh sách cứng: phần đuôi sau dấu gạch mà LẶP LẠI ở ≥2 tin trong
+     * cùng lượt thì gần như chắc chắn là tên nguồn đăng, không phải nội dung bài.
+     *
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function stripPublisher(array $items): array
+    {
+        $tails = [];
+        foreach ($items as $item) {
+            $tail = $this->publisherTail((string) ($item['title'] ?? ''));
+            if ($tail !== null) {
+                $key = mb_strtolower($tail);
+                $tails[$key] = ($tails[$key] ?? 0) + 1;
+            }
+        }
+
+        $publishers = array_keys(array_filter($tails, fn (int $count) => $count >= 2));
+        if ($publishers === []) {
+            return $items;
+        }
+
+        foreach ($items as $index => $item) {
+            $title = (string) ($item['title'] ?? '');
+            $tail = $this->publisherTail($title);
+            if ($tail !== null && in_array(mb_strtolower($tail), $publishers, true)) {
+                $items[$index]['title'] = trim(mb_substr($title, 0, mb_strlen($title) - mb_strlen($tail) - 3));
+            }
+            // Mô tả của nguồn tổng hợp thường là TIÊU ĐỀ + tên toà soạn ⇒ bỏ luôn tên đó khỏi mô tả.
+            $summary = (string) ($item['summary'] ?? '');
+            foreach ($publishers as $publisher) {
+                $summary = (string) preg_replace(
+                    '/\s*[-–|]?\s*'.preg_quote($this->mixtureCase($publisher, $summary), '/').'\s*$/iu',
+                    '',
+                    $summary,
+                );
+            }
+            $items[$index]['summary'] = trim($summary);
+        }
+
+        return $items;
+    }
+
+    /** Trả về CHÍNH chuỗi xuất hiện trong văn bản (khác hoa/thường) để thay thế đúng chỗ. */
+    private function mixtureCase(string $needle, string $haystack): string
+    {
+        if ($needle === '' || $haystack === '') {
+            return $needle;
+        }
+
+        return preg_match('/'.preg_quote($needle, '/').'/iu', $haystack, $m) ? $m[0] : $needle;
+    }
+
+    /** Đuôi sau dấu gạch cuối của tiêu đề — nghi là tên toà soạn ("Bài viết - Kenh14.vn"). */
+    private function publisherTail(string $title): ?string
+    {
+        if (! preg_match('/\s[-–|]\s([^-–|]{3,40})$/u', trim($title), $m)) {
+            return null;
+        }
+
+        return trim($m[1]);
     }
 
     /**
@@ -597,7 +702,7 @@ class WebSourceService
      * @param  list<array{title:string, url:string, published_at:?string, summary:string}>  $items
      * @return list<array<string, mixed>>
      */
-    private function filter(array $items, WebSource $source): array
+    private function filter(array $items, WebSource $source, ?int $cap = null): array
     {
         $keywords = $source->keywordList();
         $cutoff = now()->subDays(self::MAX_AGE_DAYS)->getTimestamp();
@@ -626,7 +731,10 @@ class WebSourceService
 
         usort($out, fn (array $a, array $b) => strcmp((string) ($b['published_at'] ?? ''), (string) ($a['published_at'] ?? '')));
 
-        return array_slice($out, 0, max(1, min(50, (int) $source->max_items)));
+        // Trần của lần gọi này (việc ĐO xin bản rộng) — mặc định vẫn là trần của nguồn.
+        $limit = $cap !== null && $cap > 0 ? min(60, $cap) : max(1, min(50, (int) $source->max_items));
+
+        return array_slice($out, 0, max(1, $limit));
     }
 
     /**

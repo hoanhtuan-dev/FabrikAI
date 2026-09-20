@@ -99,12 +99,40 @@ class MarketSignalService
         'đỏ' => true, 'tím' => true, 'xám' => true,
     ];
 
+    /**
+     * TỪ DỪNG tiếng Việt — dùng khi trích CỤM TỪ từ chính tin ("thời trang bền vững", "nhà thiết kế"…).
+     * Không lọc thì cụm nổi nhất luôn là "của các", "trong một", "cho người" — vô nghĩa với chủ xưởng.
+     */
+    private const STOPWORDS = [
+        'và', 'của', 'cho', 'với', 'các', 'một', 'những', 'là', 'có', 'không', 'được', 'trong', 'trên',
+        'tại', 'từ', 'đến', 'về', 'khi', 'sẽ', 'đã', 'đang', 'này', 'đó', 'kia', 'ấy', 'như', 'để', 'mà',
+        'thì', 'nhưng', 'hoặc', 'hay', 'rất', 'quá', 'cũng', 'vẫn', 'còn', 'phải', 'nên', 'bị', 'do',
+        'vì', 'nếu', 'sau', 'trước', 'giữa', 'ngoài', 'mới', 'cũ', 'người', 'cái', 'chiếc', 'việc',
+        'điều', 'cách', 'ra', 'vào', 'lên', 'xuống', 'tới', 'theo', 'cùng', 'hơn', 'nhất', 'chỉ', 'đây',
+        'vài', 'mỗi', 'tất', 'cả', 'toàn', 'riêng', 'sự', 'bằng', 'qua', 'sang', 'ở', 'ạ', 'nhé', 'vậy',
+        'thế', 'nào', 'gì', 'ai', 'sao', 'bao', 'nhiêu', 'lại', 'đi', 'rồi', 'chưa', 'hết', 'thêm',
+    ];
+
+    /**
+     * CỤM TỪ KHÔNG DÙNG LÀM CHỦ ĐỀ: chúng có mặt trong gần như MỌI bài của nguồn tin ngành nên chúng là
+     * TÊN MIỀN, không phải xu hướng ("thời trang" xuất hiện 30/40 tin ⇒ vô nghĩa khi nói "đang lên").
+     */
+    private const GENERIC_TOPICS = ['thời trang', 'tin tức', 'việt nam', 'thế giới'];
+
+    /** Trần số CỤM TỪ lấy từ tin — đủ để có chuyện để nói, không đủ để màn hình rối. */
+    private const TOPIC_LIMIT = 10;
+
+    /** Cụm từ phải xuất hiện ở ít nhất bao nhiêu TIN mới được coi là chủ đề (1 tin = trùng hợp). */
+    private const TOPIC_MIN_ITEMS = 2;
+
     public const CATEGORY_LABELS = [
         'color' => 'Màu sắc',
         'silhouette' => 'Dáng',
         'fabric' => 'Chất liệu',
         'detail' => 'Chi tiết',
         'style' => 'Phong cách',
+        // Nhóm này KHÔNG do tôi khai từ khoá: nó là cụm từ lặp lại trong chính các tin đã lấy.
+        'topic' => 'Chủ đề trong tin',
     ];
 
     /** Giá một món đồ may mặc nằm trong khoảng nào thì mới tính là giá sản phẩm (chặn "1.200 tấn", năm 2026…). */
@@ -135,7 +163,8 @@ class MarketSignalService
         }
 
         try {
-            $evidence = $this->sources->evidence($region, self::MARKET_LIMIT, $force);
+            // $wide = true: đo trên BẢN RỘNG (trần riêng cho việc đo), không dùng trần 5–8 tin của prompt.
+            $evidence = $this->sources->evidence($region, self::MARKET_LIMIT, $force, WebSourceService::MEASURE_PER_SOURCE);
         } catch (\Throwable $e) {
             // Nguồn ngoài hỏng KHÔNG được làm hỏng lượt phân tích: dữ liệu cũ vẫn dùng được.
             $this->warn('không lấy được tin để đo', $e);
@@ -163,7 +192,9 @@ class MarketSignalService
                     'captured_at' => Carbon::now(),
                     'item_count' => $measured['item_count'],
                     'source_count' => $measured['source_count'],
-                    'signals' => $measured['signals'],
+                    // Một cột cho cả TÍN HIỆU (từ vựng ngành) và CHỦ ĐỀ (cụm từ đọc từ tin) — tách lại lúc đọc,
+                    // nhờ vậy không phải thêm cột mà vẫn giữ được hai trần riêng.
+                    'signals' => array_merge($measured['signals'], (array) ($measured['topics'] ?? [])),
                     'prices' => $measured['prices'],
                     'fingerprint' => $fingerprint,
                 ]);
@@ -298,6 +329,8 @@ class MarketSignalService
         $sources = [];
         $prices = [];
 
+        // Tên toà soạn đã được bỏ ở TẦNG ĐỌC TIN (WebSourceService::stripPublisher) — làm ở đó thì cả
+        // prompt lẫn máy đo đều sạch, thay vì mỗi nơi tự dọn một kiểu.
         foreach ($items as $item) {
             $title = trim((string) ($item['title'] ?? ''));
             $summary = trim((string) ($item['summary'] ?? ''));
@@ -355,6 +388,27 @@ class MarketSignalService
                 }
             }
 
+            // CỤM TỪ LẶP LẠI trong chính tin: đây là phần "phân tích nguồn ngoài" không phụ thuộc từ vựng
+            // tôi khai — tin nói về gì thì chủ đề hiện ra, kể cả khi tôi chưa từng khai từ khoá đó.
+            foreach ($this->topicPhrases($title.' '.$summary) as $phrase) {
+                $key = 'topic|'.$phrase;
+                $found[$key] ??= [
+                    'term' => $phrase, 'category' => 'topic', 'mentions' => 0, 'sources' => [], 'samples' => [],
+                ];
+                $found[$key]['mentions']++;
+                if ($sourceName !== '') {
+                    $found[$key]['sources'][$sourceName] = true;
+                }
+                if (count($found[$key]['samples']) < 3) {
+                    $found[$key]['samples'][] = [
+                        'title' => Str::limit($title, 160, ''),
+                        'url' => (string) ($item['url'] ?? ''),
+                        'source' => $sourceName,
+                        'published_at' => $item['published_at'] ?? null,
+                    ];
+                }
+            }
+
             foreach ($this->pricesIn($text) as $value) {
                 $prices[] = [
                     'value_vnd' => $value,
@@ -378,8 +432,23 @@ class MarketSignalService
         }
         usort($signals, fn (array $a, array $b) => [$b['mentions'], $b['source_count'], $a['term']] <=> [$a['mentions'], $a['source_count'], $b['term']]);
 
+        // Tách CHỦ ĐỀ (cụm từ đọc từ chính tin) ra khỏi TÍN HIỆU (từ vựng ngành): chủ đề đến từ ngôn ngữ của
+        // tin nên phải có trần riêng, nếu không chúng sẽ bị từ vựng (đếm nhiều hơn) đè mất khỏi danh sách.
+        $topics = [];
+        $vocab = [];
+        foreach ($signals as $row) {
+            if (($row['category'] ?? '') === 'topic') {
+                if ($row['mentions'] >= self::TOPIC_MIN_ITEMS) {
+                    $topics[] = $row;
+                }
+                continue;
+            }
+            $vocab[] = $row;
+        }
+
         return [
-            'signals' => $signals,
+            'signals' => $vocab,
+            'topics' => $this->pruneTopics($topics),
             'prices' => $this->summarisePrices($prices),
             'item_count' => count($items),
             'source_count' => count($sources),
@@ -399,6 +468,106 @@ class MarketSignalService
     // ─────────────────────────────────────────────────────────────────────────────
     // GIÁ GHI NHẬN TRONG TIN
     // ─────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * DỌN CỤM TỪ TRÙNG NHAU — giữ cụm DÀI NHẤT.
+     *
+     * Vì sao cần: sinh cụm 2–3 tiếng thì "tuần lễ thời trang" tự động sinh ra cả "tuần lễ", "lễ thời",
+     * "tuần lễ thời", "lễ thời trang" — năm dòng gần giống hệt nhau, đọc như lỗi. Quy tắc: cụm con bị bỏ
+     * khi cụm dài hơn đã được giữ và cụm dài KHÔNG xuất hiện ít hơn đáng kể (≥80% số tin).
+     *
+     * @param  list<array<string, mixed>>  $topics
+     * @return list<array<string, mixed>>
+     */
+    private function pruneTopics(array $topics): array
+    {
+        usort($topics, fn (array $a, array $b) => [$b['mentions'], mb_strlen((string) $b['term'])]
+            <=> [$a['mentions'], mb_strlen((string) $a['term'])]);
+
+        $kept = [];
+        foreach ($topics as $row) {
+            $term = (string) $row['term'];
+            if (in_array($term, self::GENERIC_TOPICS, true)) {
+                continue;
+            }
+            $covered = false;
+            // Cụm này bị coi là ĐÃ ĐƯỢC ĐẠI DIỆN khi:
+            //   (a) nó nằm trong một cụm dài hơn đã giữ ("lễ thời trang" ⊂ "tuần lễ thời trang");
+            //   (b) nó CHỨA một cụm đã giữ với số tin tương đương ("thời trang new york" ⊃ "new york");
+            //   (c) bỏ tiếng đầu hoặc tiếng cuối thì phần còn lại nằm trong cụm đã giữ
+            //       ("lễ thời trang new" → "lễ thời trang" ⊂ "tuần lễ thời trang").
+            // Bỏ tiếng đầu / tiếng cuối rồi xem phần còn lại có nằm trong cụm đã giữ không: bắt được các
+            // mảnh vụn như "trang new" (mảnh của "thời trang new york") hay "lễ thời trang new".
+            $tokens = explode(' ', $term);
+            $trims = array_filter([
+                count($tokens) >= 2 ? implode(' ', array_slice($tokens, 1)) : null,
+                count($tokens) >= 2 ? implode(' ', array_slice($tokens, 0, -1)) : null,
+            ]);
+            foreach ($kept as $existing) {
+                $existingTerm = (string) $existing['term'];
+                $similar = (int) $existing['mentions'] >= (int) $row['mentions'] * 0.8;
+                if (! $similar || $existingTerm === $term) {
+                    continue;
+                }
+                if (VietnameseText::phraseIn($term, $existingTerm)
+                    || VietnameseText::phraseIn($existingTerm, $term)) {
+                    $covered = true;
+                    break;
+                }
+                foreach ($trims as $trim) {
+                    if (VietnameseText::phraseIn($trim, $existingTerm)) {
+                        $covered = true;
+                        break 2;
+                    }
+                }
+            }
+            if (! $covered) {
+                $kept[] = $row;
+            }
+            if (count($kept) >= self::TOPIC_LIMIT) {
+                break;
+            }
+        }
+
+        return $kept;
+    }
+
+    /**
+     * CỤM TỪ (2–4 tiếng) đáng chú ý trong một tin: bỏ từ dừng, bỏ số, giữ cụm có nghĩa.
+     *
+     * Vì sao cần cơ chế này chứ không chỉ từ vựng khai sẵn: từ vựng chỉ bắt được thứ tôi NGHĨ TỚI. Tin thật
+     * nói về "văn hóa Việt", "tuần lễ thời trang", "chất liệu tái chế"… — nếu không đọc chính tin thì những
+     * chủ đề đó không bao giờ thành dữ liệu, và người dùng chỉ thấy bộ hướng có sẵn.
+     *
+     * @return list<string>
+     */
+    private function topicPhrases(string $text): array
+    {
+        $tokens = array_values(array_filter(
+            explode(' ', VietnameseText::flatten($text)),
+            fn (string $token) => mb_strlen($token) >= 2 && ! is_numeric($token),
+        ));
+
+        $out = [];
+        $count = count($tokens);
+        // 2 → 4 tiếng: "tuần lễ thời trang" là cụm BỐN tiếng; cắt ở 3 thì nó bị chẻ thành "tuần lễ thời" và
+        // "lễ thời trang" — hai dòng chồng nhau, đọc như lỗi (đã gặp thật khi chạy trên tin production).
+        for ($size = 2; $size <= 4; $size++) {
+            for ($i = 0; $i + $size <= $count; $i++) {
+                $slice = array_slice($tokens, $i, $size);
+                // KHÔNG chứa từ dừng ở BẤT KỲ vị trí nào: cụm thật của ngành không có từ nối ở giữa
+                // ("tuần lễ thời trang", "mùa thu", "bộ sưu tập"), còn cụm rác thì luôn có
+                // ("tinh tế của hoàng", "tại tuần lễ thời", "cho người mặc").
+                $stops = count(array_filter($slice, fn (string $token) => in_array($token, self::STOPWORDS, true)));
+                if ($stops > 0) {
+                    continue;
+                }
+                $out[] = implode(' ', $slice);
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
 
     /**
      * Giá VND đọc được trong một đoạn chữ. Chỉ nhận giá NẰM TRONG KHOẢNG hợp lý của một món đồ may mặc
@@ -556,6 +725,20 @@ class MarketSignalService
 
         usort($rows, fn (array $a, array $b) => [$b['mentions'], $b['source_count'] ?? 0, $a['term']] <=> [$a['mentions'], $a['source_count'] ?? 0, $b['term']]);
 
+        // HAI LOẠI DỮ LIỆU, HAI TRẦN: TÍN HIỆU (từ vựng ngành, đếm nhiều) và CHỦ ĐỀ (cụm từ đọc từ chính tin,
+        // thường chỉ 2–4 tin). Gộp một danh sách thì chủ đề luôn bị đè khỏi top và người dùng chỉ thấy từ vựng.
+        $topics = [];
+        $vocab = [];
+        foreach ($rows as $row) {
+            if (($row['category'] ?? '') === 'topic') {
+                if (($row['mentions'] ?? 0) >= self::TOPIC_MIN_ITEMS) {
+                    $topics[] = $row;
+                }
+                continue;
+            }
+            $vocab[] = $row;
+        }
+
         $snapshotCount = $snapshots->count();
         $ageMinutes = $capturedAt === null ? null : max(0, (int) $capturedAt->diffInMinutes(Carbon::now()));
 
@@ -571,16 +754,18 @@ class MarketSignalService
             'source_count' => $sourceCount,
             'snapshots' => $snapshotCount,
             'signals_total' => count($rows),
-            'signals' => array_slice($rows, 0, self::SIGNAL_LIMIT),
+            'signals' => array_slice($vocab, 0, self::SIGNAL_LIMIT),
+            'topics' => array_slice($topics, 0, self::TOPIC_LIMIT),
             'prices' => $prices,
             // Câu cho giao diện: nói ĐÚNG cái đã đo, không hứa gì thêm.
             'note' => $rows === []
                 ? 'Chưa đo được tín hiệu nào từ tin thị trường.'
                 : sprintf(
-                    'Đo từ %d tin của %d nguồn: %d từ khoá đang được nhắc tới%s.',
+                    'Đo từ %d tin của %d nguồn: %d từ khoá ngành và %d chủ đề trong tin%s.',
                     $itemCount,
                     $sourceCount,
-                    count($rows),
+                    count($vocab),
+                    count($topics),
                     $snapshotCount > 1 ? ' · so sánh với '.($snapshotCount - 1).' lần đo trước' : ' · lần đo đầu tiên',
                 ),
             'label' => 'Tín hiệu thị trường',
@@ -615,6 +800,7 @@ class MarketSignalService
             'snapshots' => 0,
             'signals_total' => 0,
             'signals' => [],
+            'topics' => [],
             'prices' => ['count' => 0, 'min_vnd' => null, 'median_vnd' => null, 'max_vnd' => null, 'samples' => []],
             'note' => 'Chưa có tin thật nào để đo tín hiệu thị trường.',
             'label' => 'Tín hiệu thị trường',
@@ -625,7 +811,7 @@ class MarketSignalService
     private function reportFrom(array $measured, Carbon $capturedAt, string $region): array
     {
         return $this->buildReport(
-            (array) $measured['signals'],
+            array_merge((array) $measured['signals'], (array) ($measured['topics'] ?? [])),
             (array) $measured['prices'],
             collect(),
             $region,

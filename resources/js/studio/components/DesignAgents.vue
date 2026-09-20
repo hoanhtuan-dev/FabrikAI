@@ -31,6 +31,8 @@ const collectionError = ref('');
 const creatingCollection = ref(false);
 const trendQuery = ref('');
 const trendCategory = ref('all');
+/** Chỉ hiện hướng có tin thật (mặc định TẮT: người mới vẫn thấy đủ bộ hướng để bắt đầu). */
+const liveOnly = ref(false);
 const lifecycleFilter = ref('all');
 const sizePreset = ref('standard');
 const briefTab = ref('overview');
@@ -124,6 +126,8 @@ const referenceNote = computed(() => {
 // ── Nguồn dữ liệu: nhãn TIẾNG NGƯỜI DÙNG (không để chữ kỹ thuật trong template) ──────────────
 /** Đang có tin thật để AI đọc? (máy chủ tự lấy, không phải model tự tìm kiếm) */
 const liveSources = computed(() => !!(store.webSources && store.webSources.mode === 'live'));
+/** Số hướng đang được ĐO từ tin thật (khác hướng của bộ có sẵn) — hiện trên chip lọc. */
+const liveTrendCount = computed(() => trends.value.filter((trend) => trend.evidence_mode === 'live').length);
 const newsItems = computed(() => (store.webSources?.items || []).slice(0, 6));
 const activeSourceCount = computed(() => ((store.webSources?.sources || []).filter((row) => row.ok)).length);
 const fetchedAtLabel = computed(() => {
@@ -148,6 +152,11 @@ const autoRefresh = computed(() => store.webSources?.auto_refresh || {
 const market = computed(() => radar.value?.market || store.webSources?.market || collection.value?.market || null);
 const marketLive = computed(() => (market.value?.mode || 'empty') === 'live');
 const marketSignals = computed(() => market.value?.signals || []);
+/**
+ * CHỦ ĐỀ đọc từ chính tin (cụm từ lặp lại trong tiêu đề/mô tả) — KHÁC từ khoá ngành: đây là thứ báo chí
+ * đang nói, không phải danh mục tôi khai sẵn. Hiện riêng để người dùng thấy phần "phân tích từ nguồn".
+ */
+const marketTopics = computed(() => market.value?.topics || []);
 const marketPrices = computed(() => market.value?.prices || null);
 const marketAgeLabel = computed(() => {
   const minutes = Number(market.value?.age_minutes);
@@ -268,6 +277,9 @@ const lifecycles = computed(() => ['emerging', 'peak', 'declining'].map((id) => 
 const visibleTrends = computed(() => {
   const query = trendQuery.value.trim().toLowerCase();
   return trends.value.filter((trend) => {
+    // Lọc "chỉ hướng có tin thật": người dùng nối nguồn xong vẫn thấy 8 thẻ bộ có sẵn là cảm giác
+    // "phân tích không dùng dữ liệu của tôi" — chip này cho họ nhìn đúng phần dữ liệu thật.
+    if (liveOnly.value && trend.evidence_mode !== 'live') return false;
     if (trendCategory.value !== 'all' && String(trend.category || '') !== trendCategory.value) return false;
     if (lifecycleFilter.value !== 'all' && String(trend.lifecycle || '') !== lifecycleFilter.value) return false;
     if (!query) return true;
@@ -934,6 +946,24 @@ watch(() => store.designAgentOpen, (open) => {
                   </li>
                 </ul>
 
+                <!-- CHỦ ĐỀ ĐỌC TỪ CHÍNH TIN: cụm từ lặp lại trong tiêu đề/mô tả, KHÔNG phải danh mục khai
+                     sẵn — đây là phần trả lời "phân tích từ nguồn ngoài" mà không cần model nào. -->
+                <div v-if="marketTopics.length" class="mt-4 border-t border-ink-700 pt-3">
+                  <p class="text-body font-semibold text-cream-100">Chủ đề đang được nói tới trong tin ({{ marketTopics.length }})</p>
+                  <p class="mt-0.5 text-label leading-4 text-cream-400">Đọc trực tiếp từ tiêu đề và mô tả của các bài vừa lấy — không phải danh mục có sẵn của FabrikAI.</p>
+                  <ul class="mt-2 space-y-1.5">
+                    <li v-for="topic in marketTopics.slice(0, 6)" :key="'topic-' + topic.term" class="text-label leading-5 text-cream-200">
+                      <span class="font-semibold text-cream-100">{{ topic.term }}</span>
+                      <span class="text-cream-400"> · {{ topic.mentions }} tin · {{ topic.source_count }} nguồn</span>
+                      <ul v-if="signalSamples(topic).length" class="mt-0.5 space-y-0.5 text-cream-300">
+                        <li v-for="sample in signalSamples(topic)" :key="sample.url">
+                          · <a :href="sample.url" target="_blank" rel="noopener" class="underline decoration-dotted hover:text-cream-100">{{ sample.title }}</a>
+                        </li>
+                      </ul>
+                    </li>
+                  </ul>
+                </div>
+
                 <p v-if="marketPrices && marketPrices.count" class="mt-3 text-body leading-5 text-cream-300">
                   Giá ghi nhận trong tin ({{ marketPrices.count }} lần): {{ formatVnd(marketPrices.min_vnd) }} – {{ formatVnd(marketPrices.median_vnd) }} – {{ formatVnd(marketPrices.max_vnd) }}
                   <span class="text-cream-400">(thấp · trung vị · cao — giá đọc được trong bài, không phải giá bán của bạn)</span>
@@ -991,12 +1021,29 @@ watch(() => store.designAgentOpen, (open) => {
                   <label for="trend-search" class="sr-only">Tìm xu hướng</label>
                   <input id="trend-search" v-model="trendQuery" type="search" class="input !py-2 !pl-8 !text-xs" placeholder="Tìm theo tên, mô tả, hành động…">
                 </div>
-                <button type="button" class="tool-btn" :class="{ 'is-active': trendCategory === 'all' }" @click="trendCategory = 'all'">Tất cả ({{ trends.length }})</button>
+                <!-- Nói NGAY trên đầu danh sách: bao nhiêu hướng có tin thật, bao nhiêu là bộ có sẵn. -->
+                <button
+                  type="button"
+                  class="tool-btn"
+                  :class="{ 'is-active': liveOnly }"
+                  :aria-pressed="liveOnly"
+                  :disabled="!liveTrendCount"
+                  :title="liveTrendCount ? 'Chỉ hiện các hướng máy chủ đo được từ tin thật' : 'Chưa có hướng nào gắn với tin thật — hãy cập nhật tin hoặc kiểm tra nguồn'"
+                  @click="liveOnly = !liveOnly"
+                >Có tin thật ({{ liveTrendCount }})</button>
+                <span v-if="!liveTrendCount" class="text-label text-cream-400">↳ Chưa có hướng nào từ tin thật — bấm «Cập nhật tin» ở khối nguồn bên dưới.</span>
+                <button type="button" class="tool-btn" :class="{ 'is-active': trendCategory === 'all' && !liveOnly }" :aria-pressed="trendCategory === 'all' && !liveOnly" @click="trendCategory = 'all'; liveOnly = false">Tất cả ({{ trends.length }})</button>
                 <button v-for="category in trendCategories" :key="category.id" type="button" class="tool-btn" :class="{ 'is-active': trendCategory === category.id }" @click="trendCategory = category.id">{{ category.label }} ({{ category.count }})</button>
                 <button v-for="row in lifecycles" :key="row.id" type="button" class="tool-btn" :class="{ 'is-active': lifecycleFilter === row.id }" @click="lifecycleFilter = lifecycleFilter === row.id ? 'all' : row.id">{{ row.label }} ({{ row.count }})</button>
                 <button type="button" class="tool-btn" title="Chọn nhanh 3 trend có đà tăng cao nhất" @click="selectSuggested"><StudioIcon name="zap" size="h-3 w-3" /> Gợi ý 3</button>
                 <button v-if="selectedTrendCount" type="button" class="tool-btn" @click="clearTrends"><StudioIcon name="trash" size="h-3 w-3" /> Bỏ chọn</button>
               </div>
+
+              <p class="mb-2 text-label leading-5 text-cream-400">
+                Đang hiện {{ visibleTrends.length }} / {{ trends.length }} hướng ·
+                <b class="text-ok">{{ liveTrendCount }} hướng có tin thật</b> ·
+                {{ trends.length - liveTrendCount }} hướng thuộc bộ có sẵn.
+              </p>
 
               <div v-if="visibleTrends.length" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <button
