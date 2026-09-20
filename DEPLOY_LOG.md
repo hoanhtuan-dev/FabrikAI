@@ -58,7 +58,7 @@ biết gọi hàm**, kể cả model không có tìm kiếm tích hợp.
 - `BrandDnaTest` +1 test: verdict `internet_and_tool_search` + `tool_search.available` chỉ bật khi model nằm ở ĐÚNG vai tìm kiếm.
 - `vite build` OK · **suite 978 test / 6.974 assert XANH** (trước 959/6.827 ở đầu phiên 2026-09-24, 975 trước đợt này).
 - Tài liệu: `docs/DESIGN_SYSTEM.md` §18.2 thêm tầng thứ ba + verdict mới + quy tắc "nguồn TÌM ĐƯỢC".
-- Commit: `299b0f4` (chưa deploy production — chờ chủ dự án gán model cho vai tìm kiếm rồi kiểm chứng).
+- Commit: `092c73f` (chưa deploy production — chờ chủ dự án gán model cho vai tìm kiếm rồi kiểm chứng).
 
 ### 6. Việc chủ dự án cần làm để BẬT (không sửa mã)
 1. Cài đặt → **Nhóm công việc** → «Agent Studio — Tìm kiếm nguồn ngoài» → gán một model (production: `deepseek:deepseek-chat` hoặc `deepseek:deepseek-flash` — cả hai gọi hàm được).
