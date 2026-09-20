@@ -95,18 +95,17 @@ const lastDuration = computed(() => {
   const ms = store.suggestLastMeta?.elapsed_ms;
   return ms ? (ms / 1000).toFixed(1) + 's' : '';
 });
-const providerLabel = computed(() => {
-  const p = store.suggestProvider;
-  if (!p) return '';
-  const names = { deepseek: 'DeepSeek', qwen: 'Qwen', qwen_edit: 'Qwen Edit', dashscope: 'DashScope', wan: 'Wan', gemini: 'Gemini', veo: 'Veo', fal: 'Fal.ai', replicate: 'Replicate', color: 'Phân tích màu (offline)' };
-  return (names[p] || p) + (store.suggestModel ? ' · ' + store.suggestModel : '');
-});
+// ── KHÔNG hiển thị AI nào / model nào (docs/DESIGN_SYSTEM.md §6) ──────────────────────────
+// Trước đây card có chip "DeepSeek · deepseek-chat" và nhét tên đó vào cả dòng tiến trình.
+// Người dùng không chọn được model ở đây, biết tên cũng không làm được gì — mà lại để lộ hạ tầng
+// phía sau. Tên provider/model vẫn nằm trong state (store.suggestProvider/suggestModel) và trong
+// log để lập trình viên chẩn đoán; giao diện chỉ nói ĐANG LÀM GÌ.
 const phaseLabel = computed(() => store.suggestPhaseLabel || 'AI đang đọc ảnh…');
 const stagePct = computed(() => Math.min(100, Math.round((stageIndex.value / STAGES.length) * 100)));
-/** Dòng phụ của tiến trình: AI nào · đang ở bước mấy · đã bao lâu. */
+/** Dòng phụ của tiến trình: đang ở bước mấy · đã bao lâu (KHÔNG nêu AI nào). */
 const progressSubtext = computed(() => {
   const i = Math.min(stageIndex.value, STAGES.length - 1);
-  return [providerLabel.value, 'bước ' + (i + 1) + '/' + STAGES.length + ' · ' + STAGES[i], elapsedText.value]
+  return ['bước ' + (i + 1) + '/' + STAGES.length + ' · ' + STAGES[i], elapsedText.value]
     .filter(Boolean).join(' · ');
 });
 
@@ -317,9 +316,8 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
             <StudioIcon name="check" size="h-3.5 w-3.5" /> Đã phân tích xong
           </p>
           <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] text-cream-300/55">
-            <span v-if="providerLabel">{{ providerLabel }}</span>
-            <span v-if="lastDuration">· {{ lastDuration }}</span>
-            <span>· bám: {{ adherenceLabel }}</span>
+            <span v-if="lastDuration">Xong trong {{ lastDuration }}</span>
+            <span>· mức bám: {{ adherenceLabel }}</span>
           </p>
         </div>
         <button class="motion-ui grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/10 text-cream-200 transition hover:bg-red-600 hover:text-white"

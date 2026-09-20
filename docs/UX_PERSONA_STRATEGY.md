@@ -1406,3 +1406,60 @@ card KHÁC dùng emerald làm viền nút → ĐỎ.
       phải việc đồng bộ viền.
 - [ ] Nền của nút vẫn còn trộn `bg-ink-800` / `bg-white/5` / `bg-ink-900/90`; cùng cách đo, có thể
       đồng bộ tiếp ở đợt sau.
+
+---
+
+## 25. Thông báo · chỉ báo · tiến trình KHÔNG rò rỉ chi tiết kỹ thuật (2026-09-22)
+
+### 25.1 Vấn đề — đo được, không suy đoán
+
+Giao diện đang nói chuyện với **lập trình viên** thay vì với khách hàng. Các câu ĐÃ LỌT RA THẬT:
+
+| Nơi hiển thị | Câu đã lọt ra |
+|---|---|
+| Card "Gợi ý từ ảnh" (khối lỗi) | `Qwen vision: HTTP 429: {"error":{"message":"Your token-plan 1-week quota has been exhausted…"}}` — **nguyên văn lỗi của nhà cung cấp AI** |
+| Card "Gợi ý từ ảnh" (chip + dòng tiến trình) | `AI đang đọc ảnh và suy luận… (deepseek · deepseek-flash)` + chip `DeepSeek · deepseek-chat` |
+| Nhãn tiến trình | `Provider này lỗi — đang thử provider kế tiếp…` · `Chưa có provider AI khả dụng — phân tích màu ngoại tuyến…` |
+| Cài đặt Ghép Trang Phục (lỗi 500) | `…(bảng dữ liệu chưa được tạo?). **Chạy lệnh: php artisan migrate --force**` — hướng dẫn CLI cho khách |
+| Thay vùng | `Tính năng Thay vùng cần key AI (Qwen Edit / DashScope)` |
+| Studio · Outputs · Agent Studio | `Chưa cấu hình model tạo/sửa ảnh (nhóm “edit”)` · `Chưa cấu hình API key…` · `Model không phản hồi — đã tự quay về engine tất định` · `Agent Studio sẽ dùng model AI của nhóm “prompt”` |
+
+Gốc rễ giống nhau ở mọi chỗ: **`this.xxxError = e.message`** và `$write(['message' => $e->getMessage()])` —
+đưa nguyên văn thông báo của tầng dưới lên màn hình người dùng.
+
+### 25.2 Đã làm — ba tầng, một luật (docs/DESIGN_SYSTEM.md §6)
+
+1. **Tầng PHP**: nhãn tiến trình viết lại theo câu hướng người dùng; luồng NDJSON ghi **log** rồi mới
+   gửi câu an toàn; các thông báo lộ CLI/tên nhà cung cấp/model đã viết lại; câu dự phòng của
+   `studio_generation_error()` bỏ "API/model".
+2. **Tầng BIÊN ở JS**: `store.toast()` và `store.notify()` thành **cửa chặn cuối** — mọi thông báo đi
+   qua đó; câu chứa dấu hiệu kỹ thuật thì **thay bằng câu chung** (lỗi) hoặc **bỏ** (thông tin), bản
+   gốc ghi ra `console` với tiền tố `[studio:…]`. Nhãn tiến trình do server gửi cũng lọc ở biên.
+3. **Tầng STATE**: thêm `userFacingError(e, fallback)` + `safeMessage(text, fallback)`; **14 chỗ** gán
+   lỗi thô vào state hiển thị đã chuyển sang dùng chúng (compose · scene · inpaint · suggest ·
+   plan · trendRadar · collectionBrief · batch…).
+
+Chip "DeepSeek · deepseek-chat" trên card Gợi ý từ ảnh **bị gỡ hẳn** (kèm cả dòng tiến trình): người
+dùng không chọn được model ở đó, biết tên không giúp gì mà lại lộ hạ tầng.
+
+**Ngoại lệ có lý do** (giữ nguyên, ghi rõ trong tài liệu): trang **Cài đặt/Quản trị** (khai báo model +
+nhà cung cấp CHÍNH LÀ tính năng), **ô CHỌN model** trong card, và **câu kiểm tra dữ liệu** của Laravel.
+
+### 25.3 Khoá bằng test — đã thử đột biến 6 phép
+
+`tests/Feature/UserFacingMessagesTest.php` (5 test): nhãn tiến trình PHP sạch · lỗi luồng stream đi
+đường an toàn · **5 câu đã gỡ không được quay lại** · JS còn đủ cửa chặn ở biên + không còn chỗ nào
+nhét lỗi thô vào state + card/chỉ báo không nêu tên AI. `SuggestStreamTest` đổi từ **khẳng định điều
+ngược lại** ("phase phải nói rõ provider/model") sang **cấm** — sửa TEST vì CHÍNH SÁCH sản phẩm đổi
+theo yêu cầu, không phải vì test sai.
+
+Đã thử đột biến (dùng **mã thoát** của phpunit, không grep output — chuỗi diff làm grep báo sai):
+nhãn tiến trình nêu model → ĐỎ · stream gửi lỗi thô → ĐỎ · gỡ cửa chặn toast → ĐỎ · card hiện tên AI →
+ĐỎ · chỉ báo Agent Studio nêu model → ĐỎ · nhãn lý do quay lại câu kỹ thuật → ĐỎ.
+
+### 25.4 Còn lại (đề xuất)
+
+- [ ] Vài câu lỗi còn dài dòng kiểu "hệ thống" (vd `Lỗi hệ thống, vui lòng thử lại.`) — nên nói rõ
+      người dùng làm gì tiếp, và luôn kèm mã tra cứu để hỗ trợ đối chiếu log.
+- [ ] **Không có mã lỗi** cho người dùng đọc cho tổng đài ⇒ hỗ trợ phải hỏi giờ + tài khoản mới tra
+      được log. Nên sinh mã ngắn (vd `L-8F3K`) ghi ở CẢ giao diện và log.

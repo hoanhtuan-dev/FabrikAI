@@ -113,9 +113,10 @@ class DesignAgentService
                 'fabric_recognition' => 'Trường chất liệu đã có; pipeline nhận diện ảnh chưa bật.',
                 'price_band_analysis' => 'Dải giá đề xuất theo brief; chưa đọc giá bán thực tế.',
                 'trend_lifecycle' => 'Nhãn demo: emerging → peak → declining.',
+                // Câu này HIỂN THỊ cho người dùng ⇒ không nêu provider/model/nhóm công việc.
                 'ai_reasoning' => $model['mode'] === 'ai'
-                    ? 'Định hướng do model “'.$model['provider'].':'.$model['model'].'” (nhóm prompt) viết trên đúng dữ liệu mẫu ở trên; số liệu không do AI tạo.'
-                    : 'Chưa có model khả dụng cho nhóm “prompt” nên định hướng do engine tất định dựng từ catalog mẫu.',
+                    ? 'Phần định hướng do AI viết trên đúng dữ liệu mẫu ở trên; các số liệu thì không do AI tạo.'
+                    : 'Phần định hướng được dựng tự động từ bộ dữ liệu mẫu (AI chưa tham gia bước này).',
             ],
         ];
     }

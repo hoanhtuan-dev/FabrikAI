@@ -285,7 +285,7 @@ class PhotoStudioService
             $out[] = ['level' => 'error', 'message' => 'Nhập prompt hoặc chọn ít nhất một chip nhanh để AI biết cần làm gì.'];
         }
         if (! $imageReady) {
-            $out[] = ['level' => 'warning', 'message' => 'Chưa cấu hình model tạo/sửa ảnh (nhóm “edit”) — kết quả sẽ là ẢNH MẪU (chế độ demo), không phải ảnh do AI tạo.'];
+            $out[] = ['level' => 'warning', 'message' => 'Tính năng tạo ảnh chưa được bật — kết quả sẽ là ẢNH MẪU (chế độ demo), không phải ảnh do AI tạo. Vui lòng báo cho quản trị viên.'];
         }
         if ($overCap) {
             $out[] = ['level' => 'warning', 'message' => 'Chỉ dùng tối đa '.self::MAX_CHIPS.' chip một lần — các chip thừa đã bị bỏ qua.'];

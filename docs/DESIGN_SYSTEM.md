@@ -173,7 +173,71 @@ trong test **trong cùng một commit** — đó là chủ ý, không phải tai
 
 ---
 
-## 6. Bố cục & cuộn
+## 6. Thông báo · chỉ báo · tiến trình — nói với NGƯỜI DÙNG, không nói với lập trình viên
+
+> **[Yêu cầu 2026-09-22]** Giao diện **KHÔNG rò rỉ chi tiết kỹ thuật phía backend**: tên **model AI**,
+> tên **nhà cung cấp (provider)**, mã HTTP, JSON, lệnh CLI, đường dẫn file, tên bảng/cột, tên lớp
+> ngoại lệ. Những thứ đó là việc của lập trình viên — chúng thuộc về log, không thuộc về màn hình
+> của khách hàng.
+
+### 6.1 Sáu luật
+
+1. **Câu hiển thị phải trả lời đúng hai câu hỏi**: *chuyện gì đã xảy ra* và *giờ tôi làm gì*.
+   Không mô tả cơ chế bên trong. ("Không phân tích được ảnh này. Bạn thử lại sau ít phút, hoặc đổi
+   sang ảnh rõ hơn." — đạt. "Model trả về JSON không đọc được." — không đạt.)
+2. **Không nêu tên model AI hay nhà cung cấp** trong thông báo · chỉ báo · tiến trình. Ở luồng công
+   việc người dùng **không chọn được** model, nên biết tên không giúp gì — chỉ để lộ hạ tầng phía sau.
+3. **Tiến trình nói ĐANG LÀM GÌ, không nói AI NÀO**: "AI đang đọc ảnh và suy luận…", "Đang thử cách
+   phân tích khác…" — không kèm "(deepseek · deepseek-flash)".
+4. **Lỗi không bao giờ là `$e->getMessage()` hay `e.message` thô.** Dùng đúng hàm có sẵn:
+   · PHP: `studio_fail()` · `studio_generation_error()` (đã log chi tiết, trả câu an toàn);
+   · JS: `userFacingError(e, fallback)` cho state lỗi, `safeMessage(text, fallback)` cho chuỗi từ server.
+5. **Chi tiết kỹ thuật KHÔNG bị mất** — nó đi đúng chỗ của nó: PHP → **`storage/logs/laravel.log`**;
+   JS → **`console`** với tiền tố `[studio:…]`. Nhờ vậy vẫn chẩn đoán được mà khách không phải đọc.
+6. **Ngoại lệ (có lý do, phải giữ đúng):**
+   · **Cài đặt / Quản trị** — ở đó việc khai báo model + nhà cung cấp CHÍNH LÀ tính năng;
+   · **ô CHỌN model** trong card (người dùng đang tự chọn thì phải biết mình đang chọn gì);
+   · **câu kiểm tra dữ liệu của Laravel** ("Chưa chọn ảnh ①…") — do người viết sản phẩm đặt, hướng người dùng.
+
+### 6.2 Bảng dịch — những câu ĐÃ GỠ và câu thay thế thật
+
+| Đã gỡ khỏi giao diện | Câu nói với người dùng |
+|---|---|
+| `Qwen vision: HTTP 429: {"error":…quota has been exhausted…}` (nguyên văn lỗi nhà cung cấp) | "Không phân tích được ảnh này. Bạn thử lại sau ít phút, hoặc đổi sang ảnh rõ hơn." |
+| "AI đang đọc ảnh và suy luận… (deepseek · deepseek-flash)" | "AI đang đọc ảnh và suy luận…" |
+| "Provider này lỗi — đang thử provider kế tiếp…" | "Đang thử cách phân tích khác…" |
+| "Chưa có provider AI khả dụng — phân tích màu ngoại tuyến…" | "Đang phân tích màu trực tiếp trên ảnh…" |
+| "Không đọc được cài đặt… **Chạy lệnh: php artisan migrate --force**" | "Không mở được cài đặt… Vui lòng thử lại, nếu vẫn lỗi hãy báo cho quản trị viên." |
+| "Tính năng Thay vùng cần **key AI (Qwen Edit / DashScope)**." | "Tính năng Thay vùng chưa được bật. Vui lòng báo cho quản trị viên…" |
+| "Chưa cấu hình **model** tạo/sửa ảnh (**nhóm “edit”**)…" | "Tính năng tạo ảnh chưa được bật — kết quả sẽ là ẢNH MẪU (chế độ demo)…" |
+| "Chưa cấu hình **API key** — kết quả là ẢNH GỐC…" | "Tính năng sửa ảnh chưa được bật — kết quả là ẢNH GỐC…" |
+| Chip "DeepSeek · deepseek-chat" trên card | "Đã phân tích xong · Xong trong 8,8s · mức bám: Cao" |
+| "Agent Studio sẽ dùng **model AI của nhóm “prompt”**." | "Đã bật AI — phần phân tích sẽ do AI thực hiện." |
+| "**Model** không phản hồi — đã tự quay về **engine tất định**." | "AI không phản hồi — đã tự chuyển sang bộ quy tắc có sẵn (kết quả vẫn đầy đủ)." |
+
+### 6.3 Ba tầng chặn (để không phải sửa lại từ đầu)
+
+1. **Tầng PHP** — nhãn tiến trình và thông báo lỗi viết sẵn theo câu hướng người dùng; lỗi hệ thống
+   đi qua `studio_fail()`/`studio_generation_error()`; luồng NDJSON ghi log rồi mới gửi câu an toàn.
+2. **Tầng BIÊN ở JS** — `store.toast()` và `store.notify()` là **cửa chặn cuối**: mọi thông báo đều
+   đi qua đó, nên chỉ cần một chỗ kiểm tra là không câu nào lọt ra kèm chi tiết kỹ thuật (kể cả câu
+   từ nơi khác chưa kịp sửa). Nhãn tiến trình do server gửi cũng lọc ở biên khi nhận.
+3. **Tầng STATE ở JS** — mọi state lỗi hiển thị trong template (`*Error`) gán bằng
+   `userFacingError()`, không bao giờ bằng `e.message`.
+
+### 6.4 Khoá bằng test
+
+`tests/Feature/UserFacingMessagesTest.php` giữ bốn tầng trên: nhãn tiến trình phía PHP sạch · lỗi
+luồng stream đi đường an toàn · **những câu đã gỡ không quay lại** · JS còn đủ cửa chặn ở biên và
+không còn chỗ nào nhét lỗi thô vào state. `SuggestStreamTest` khẳng định thẳng: nhãn tiến trình và
+thông báo lỗi **không được** chứa tên model/provider.
+
+> **Quy tắc rút ra:** người dùng chỉ cần biết *chuyện gì* và *làm gì tiếp*. Mọi thứ giải thích
+> *tại sao hỏng ở tầng nào* là để trong log — nơi lập trình viên đọc, không phải nơi khách hàng đọc.
+
+---
+
+## 7. Bố cục & cuộn
 
 - **Vùng dùng chung mà cao cố định ⇒ MỌI biến thể phải theo CÙNG một khuôn.** Ví dụ vùng toolbar
   phía trên canvas: rail cao cố định `h-12`, mỗi thanh ngữ cảnh dùng chung hằng số `bar`
@@ -188,7 +252,7 @@ trong test **trong cùng một commit** — đó là chủ ý, không phải tai
 
 ---
 
-## 7. Trợ năng (không phải việc "làm sau")
+## 8. Trợ năng (không phải việc "làm sau")
 
 - Nút chỉ có icon **phải có** `aria-label`; nút có chữ thì thêm `title` giải thích kết quả.
 - Tiến trình: `role="status" aria-live="polite"`; lỗi: `role="alert"`.
@@ -200,7 +264,7 @@ trong test **trong cùng một commit** — đó là chủ ý, không phải tai
 
 ---
 
-## 8. Icon & emoji
+## 9. Icon & emoji
 
 - Icon **chỉ** lấy từ `resources/js/studio/icons.json` qua `StudioIcon` — cùng nguồn với PHP
   (`App\Support\IconRegistry`) nên thêm icon là thêm một khoá JSON, không phải sửa hai nơi.
@@ -214,7 +278,7 @@ trong test **trong cùng một commit** — đó là chủ ý, không phải tai
 
 ---
 
-## 9. Checklist trước khi merge một thay đổi giao diện
+## 10. Checklist trước khi merge một thay đổi giao diện
 
 - [ ] Không thêm mã màu mới trong `<style scoped>` (ngoại lệ: 1 dòng gradient nhận diện).
 - [ ] Thời lượng/đường cong chuyển động lấy từ token, không viết ms.
@@ -225,6 +289,8 @@ trong test **trong cùng một commit** — đó là chủ ý, không phải tai
 - [ ] Đúng 1 hành động chính; nút khoá có dòng lý do `↳`.
 - [ ] Thứ nâng cao nằm trong `<details>` đóng sẵn.
 - [ ] 0 emoji mới; icon lấy từ `StudioIcon`.
+- [ ] **Thông báo/tiến trình không rò rỉ chi tiết kỹ thuật** (§6): không tên model/nhà cung cấp,
+      không `e.message` thô — dùng `userFacingError()` / `studio_fail()`.
 - [ ] Nút chỉ-icon có `aria-label`; tiến trình `role="status"`, lỗi `role="alert"`.
 - [ ] Đo lại bằng Chrome thật ở bề ngang hẹp nhất (260–300px) — không tràn ngang.
 - [ ] `npm run build` rồi commit asset (máy chủ không có node).

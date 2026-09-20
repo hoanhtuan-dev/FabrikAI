@@ -59,7 +59,7 @@ function download(g) {
     </div>
     <!-- [Đợt 0.3] Banner nói thật khi lô hiện tại có ảnh DEMO -->
     <p v-if="store.generations.some(g => g.is_demo)" class="mx-2 mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug text-amber-200">
-      <span class="font-semibold">Ảnh DEMO:</span> chưa cấu hình API key cho model này nên kết quả là ảnh mẫu (hoặc chính ảnh gốc), <span class="font-semibold">không phải do AI tạo</span>. Vào Cài đặt để thêm API key.
+      <span class="font-semibold">Ảnh DEMO:</span> tính năng tạo ảnh chưa được bật nên kết quả là ảnh mẫu (hoặc chính ảnh gốc), <span class="font-semibold">không phải do AI tạo</span>. Vui lòng báo cho quản trị viên để bật tính năng.
     </p>
     <div class="scrollbar-hide mt-2 grid flex-1 auto-rows-min grid-cols-1 gap-1.5 overflow-y-auto p-2">
       <div v-for="g in store.visibleGenerations" :key="g.id" class="group relative aspect-square overflow-hidden rounded-lg border-2" :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700'">

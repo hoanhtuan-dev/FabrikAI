@@ -197,8 +197,8 @@ class ImageAIService
         // [Đợt 0.3] Ghi rõ LÝ DO để job hoàn tất đánh dấu is_demo + nói thật với người dùng, thay vì
         // trả ảnh mẫu/ảnh gốc rồi báo 'completed' im lặng.
         $this->lastStubReason = $baseImage
-            ? 'Chưa cấu hình API key — kết quả là ẢNH GỐC được trả lại, KHÔNG phải ảnh do AI sửa.'
-            : 'Chưa cấu hình API key — kết quả là ẢNH MẪU có sẵn, KHÔNG phải ảnh do AI tạo.';
+            ? 'Tính năng sửa ảnh chưa được bật — kết quả là ẢNH GỐC được trả lại, KHÔNG phải ảnh do AI sửa.'
+            : 'Tính năng tạo ảnh chưa được bật — kết quả là ẢNH MẪU có sẵn, KHÔNG phải ảnh do AI tạo.';
 
         return $this->copySample($prompt, $baseImage);
     }

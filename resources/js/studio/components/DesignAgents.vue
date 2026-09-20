@@ -161,33 +161,35 @@ const readiness = computed(() => ({
 // ── NHẬN BIẾT MODEL: hai agent chạy bằng AI hay bằng engine tất định? ──────────
 // Backend trả khối `model` (mode/provider/model/candidates/latency/reason) để giao diện nói
 // THẬT đang dùng gì — trước đây Agent Studio chạy thuần rule-based và không hề cho biết điều đó.
+// Câu hiển thị cho NGƯỜI DÙNG: nói TRẠNG THÁI, không nêu model/khoá/nhóm công việc
+// (docs/DESIGN_SYSTEM.md §6). Chi tiết kỹ thuật vẫn nằm trong payload trả về và trong log.
 const MODEL_REASON_LABELS = {
-  no_model_key: 'Chưa có model/khoá nào dùng được cho nhóm “prompt” nên hai agent đang chạy engine tất định.',
-  model_error: 'Model không phản hồi — đã tự quay về engine tất định (kết quả vẫn đầy đủ).',
-  invalid_output: 'Model trả về dữ liệu không dùng được — đã tự quay về engine tất định.',
-  ai_disabled: 'Bạn đang tắt suy luận AI nên hai agent chạy engine tất định.',
+  no_model_key: 'Phần suy luận AI chưa được bật nên hai agent đang chạy bằng bộ quy tắc có sẵn.',
+  model_error: 'AI không phản hồi — đã tự chuyển sang bộ quy tắc có sẵn (kết quả vẫn đầy đủ).',
+  invalid_output: 'AI trả về dữ liệu không dùng được — đã tự chuyển sang bộ quy tắc có sẵn.',
+  ai_disabled: 'Bạn đang tắt suy luận AI nên hai agent chạy bằng bộ quy tắc có sẵn.',
 };
 const activeModel = computed(() => collection.value?.model || radar.value?.model || null);
 const modelReady = computed(() => activeModel.value?.mode === 'ai');
 const modelShort = computed(() => {
   const m = activeModel.value;
   if (!m) return 'AI: đang kiểm tra…';
-  if (m.mode === 'ai') return 'AI · ' + (m.provider || '') + (m.model ? ' · ' + m.model : '');
-  return 'Engine tất định';
+  if (m.mode === 'ai') return 'Có suy luận AI';
+  return 'Bộ quy tắc có sẵn';
 });
 const modelTitle = computed(() => {
   const m = activeModel.value;
-  if (!m) return 'Chưa có thông tin model — mở bước Tín hiệu để đọc radar.';
+  if (!m) return 'Chưa có thông tin — mở bước Tín hiệu để đọc radar.';
   if (m.mode === 'ai') {
-    return 'Suy luận do ' + m.provider + ':' + m.model + ' (nhóm công việc “' + (m.group || 'prompt') + '”)'
-      + (m.cached ? ' · lấy từ cache 10 phút' : (m.latency_ms != null ? ' · ' + m.latency_ms + ' ms' : ''));
+    return 'Phần định hướng do AI viết trên dữ liệu mẫu ở trên'
+      + (m.cached ? ' · kết quả lấy từ lần phân tích gần nhất' : '');
   }
-  return MODEL_REASON_LABELS[m.reason] || 'Đang chạy engine tất định.';
+  return MODEL_REASON_LABELS[m.reason] || 'Đang chạy bằng bộ quy tắc có sẵn.';
 });
 const modelCandidates = computed(() => activeModel.value?.available || []);
 const aiToggleTitle = computed(() => (store.designAgentAi
-  ? 'Đang BẬT: mỗi lần đọc radar/tạo brief sẽ gọi model của nhóm “prompt”.'
-  : 'Đang TẮT: chỉ dùng engine tất định, không gọi model.'));
+  ? 'Đang BẬT: mỗi lần đọc radar/tạo brief sẽ nhờ AI phân tích.'
+  : 'Đang TẮT: chỉ dùng bộ quy tắc có sẵn, không gọi AI.'));
 const directions = computed(() => radar.value?.directions || []);
 const appliedAi = computed(() => {
   const a = collection.value?.ai_applied;
@@ -550,7 +552,7 @@ watch(() => store.designAgentOpen, (open) => {
         >
           <StudioIcon name="info" size="h-3.5 w-3.5" class="shrink-0" />
           <span>{{ modelTitle }}</span>
-          <span v-if="!store.designAgentAi" class="text-amber-200/80">Bật «Suy luận AI» ở trên để dùng model đã cấu hình.</span>
+          <span v-if="!store.designAgentAi" class="text-amber-200/80">Bật «Suy luận AI» ở trên để phần phân tích do AI thực hiện.</span>
           <span v-else-if="modelCandidates.length === 0" class="text-amber-200/80">Cấu hình tại Cài đặt → Nhóm công việc → “Suy luận prompt (Giám đốc sáng tạo / Thuật sỹ ảo)” và thêm khoá trong Quản lý API.</span>
         </p>
         <nav class="mt-3 grid grid-cols-3 gap-1.5 lg:hidden" role="tablist" aria-label="Tiến trình thiết kế">

@@ -40,10 +40,11 @@ class DesignSystemTest extends TestCase
             '## 3. Component dùng chung',
             '## 4. Trình bày cho NGƯỜI MỚI',
             '## 5. Viền — một nghĩa, MỘT token',
-            '## 6. Bố cục & cuộn',
-            '## 7. Trợ năng',
-            '## 8. Icon & emoji',
-            '## 9. Checklist',
+            '## 6. Thông báo · chỉ báo · tiến trình',
+            '## 7. Bố cục & cuộn',
+            '## 8. Trợ năng',
+            '## 9. Icon & emoji',
+            '## 10. Checklist',
         ] as $section) {
             $this->assertStringContainsString($section, $this->guide(), 'Hướng dẫn thiết kế thiếu mục: '.$section);
         }

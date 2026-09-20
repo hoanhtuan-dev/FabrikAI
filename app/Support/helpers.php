@@ -321,7 +321,7 @@ if (! function_exists('studio_generation_error')) {
 
         return $prefix !== ''
             ? $prefix.'Vui lòng thử lại.'
-            : 'Xử lý thất bại. Vui lòng thử lại hoặc kiểm tra cài đặt API/model.';
+            : 'Xử lý thất bại. Vui lòng thử lại, nếu vẫn lỗi hãy báo cho quản trị viên.';
     }
 }
 

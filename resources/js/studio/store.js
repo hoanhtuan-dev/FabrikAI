@@ -18,6 +18,61 @@ function bootProjectStatuses() {
   return (readBoot() && readBoot().project_statuses) || null;
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   CHẶN RÒ RỈ CHI TIẾT KỸ THUẬT RA GIAO DIỆN — luật đầy đủ ở docs/DESIGN_SYSTEM.md §6.
+
+   Vì sao có khối này: mọi chỗ bắt lỗi trước đây đều làm `this.xxxError = e.message`, mà `e.message`
+   là thông báo THÔ của backend (thường là chuỗi exception của nhà cung cấp AI). Người dùng thật đã
+   nhìn thấy những câu như:
+     · "Qwen vision: HTTP 429: {"error":{"message":"Your token-plan 1-week quota has been exhausted…"}}"
+     · "Model trả về JSON không đọc được."
+   Đó là thông tin của LẬP TRÌNH VIÊN: nó không nói người dùng phải làm gì, lại để lộ tên nhà cung
+   cấp/model và tình trạng hạ tầng.
+
+   Luật: giao diện chỉ nói NGƯỜI DÙNG cần biết (chuyện gì xảy ra + làm gì tiếp). Chi tiết kỹ thuật
+   đi vào `console` (ở đây) và `storage/logs/laravel.log` (phía PHP) — nơi lập trình viên đọc.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/** Dấu hiệu một chuỗi là thông báo KỸ THUẬT, không phải câu nói với người dùng. */
+const TECH_LEAK = new RegExp([
+  'deepseek|qwen|dashscope|gemini|replicate|fal\\.ai|\\bveo\\b|\\bwan\\b|\\bflux\\b',
+  '\\bprovider\\b|\\bmodel\\b|\\btransport\\b|\\bendpoint\\b',
+  'HTTP\\s*\\d{3}|\\bJSON\\b|SQLSTATE|exception|stack trace',
+  '\\/api\\/|\\/home\\/|\\/var\\/www|\\.php\\b',
+  'API key|api_key|quota|rate limit|timeout|ECONN|ETIMEDOUT',
+  '\\bundefined\\b|\\bnull\\b|\\bNaN\\b',
+].join('|'), 'i');
+
+/** Ghi chi tiết kỹ thuật ra console (chỉ lập trình viên thấy) kèm ngữ cảnh. */
+function logTechnical(scope, detail) {
+  try {
+    // eslint-disable-next-line no-console
+    console.warn('[studio:' + scope + '] chi tiết kỹ thuật (không hiển thị cho người dùng):', detail);
+  } catch { /* console có thể bị chặn — không được làm hỏng luồng chính */ }
+}
+
+/**
+ * Đổi một thông báo (thường là từ server/exception) thành câu NÓI VỚI NGƯỜI DÙNG.
+ * · Câu sạch ⇒ giữ nguyên (nhờ vậy thông báo kiểm tra dữ liệu của Laravel vẫn tới được người dùng).
+ * · Câu chứa dấu hiệu kỹ thuật ⇒ thay bằng `fallback`, và bản gốc được ghi ra console.
+ */
+export function safeMessage(text, fallback = '') {
+  const raw = String(text == null ? '' : text).trim();
+  if (!raw) return fallback;
+  if (TECH_LEAK.test(raw)) { logTechnical('leak-blocked', raw); return fallback; }
+  return raw;
+}
+
+/** Bắt lỗi ở mọi action: trả câu hướng người dùng, KHÔNG bao giờ trả `e.message` thô. */
+export function userFacingError(e, fallback) {
+  const raw = (e && (e.message || e.error || e.statusText)) || '';
+  const clean = safeMessage(raw, '');
+  if (clean) return clean;
+  if (raw) logTechnical('error-blocked', raw);
+  return fallback;
+}
+
 /**
  * Đơn giá/định mức MẶC ĐỊNH của kế hoạch sản xuất — PHẢI khớp CollectionPlanService::DEFAULTS.
  * Chủ xưởng sửa được toàn bộ; đây chỉ là điểm khởi đầu để họ thấy ngay con số mà sửa.
@@ -763,6 +818,20 @@ export const useStudioStore = defineStore('studio', {
       return { allowed, total };
     },
     toast(msg, type = 'info', opts = {}) {
+      // ── CỬA CHẶN CUỐI CÙNG (docs/DESIGN_SYSTEM.md §6) ────────────────────────────────────
+      // Mọi thông báo đều đi qua đây, nên đây là chỗ DUY NHẤT bảo đảm không có câu nào lọt ra
+      // giao diện kèm chi tiết kỹ thuật — kể cả câu từ nơi khác chưa được sửa, hay từ server.
+      // Câu chứa dấu hiệu kỹ thuật bị THAY bằng câu chung (lỗi) hoặc BỎ (thông tin), và bản gốc
+      // được ghi ra console cho lập trình viên.
+      const msg2 = safeMessage(msg, '');
+      if (!msg2) {
+        if (type === 'error') { this._pushToast('Có lỗi xảy ra. Vui lòng thử lại.', type, opts); }
+        return;
+      }
+      this._pushToast(msg2, type, opts);
+    },
+    /** Phần hiển thị thật của toast (tách ra để cửa chặn ở trên luôn là nơi duy nhất kiểm tra nội dung). */
+    _pushToast(msg, type = 'info', opts = {}) {
       // Use the Vue studio's own toast (works standalone); fall back to Alpine if present.
       this.flashMsg = msg; this.flashType = type;
       if (this._flashTimer) clearTimeout(this._flashTimer);
@@ -776,7 +845,8 @@ export const useStudioStore = defineStore('studio', {
      * đóng tay được. Giữ tối đa 4 mục để không che canvas.
      */
     notify(msg, type = 'info', opts = {}) {
-      const text = String(msg == null ? '' : msg);
+      // Lọc lại lần nữa: notify() cũng được gọi TRỰC TIẾP (không qua toast) ở vài nơi.
+      const text = safeMessage(msg, '');
       if (!text) return null;
       const id = ++this._notifSeq;
       const ttl = opts.sticky ? 0 : (opts.ttl != null ? opts.ttl : (type === 'error' ? 8000 : 4200));
@@ -942,7 +1012,7 @@ export const useStudioStore = defineStore('studio', {
             if (d.credits_left != null) this.creditsLeft = d.credits_left;
           } catch (e) {
             failed++;
-            entry.error = e.message || 'không rõ nguyên nhân';
+            entry.error = userFacingError(e, 'Không rõ nguyên nhân.');
             this.batchFailed.push(list[i]);
             this.toast('Mục ' + (i + 1) + ' lỗi: ' + entry.error, 'error');
           }
@@ -1101,7 +1171,7 @@ export const useStudioStore = defineStore('studio', {
         this.sceneCatalog = await this.api('/api/studio/shoot/catalog', {});
         this.sceneError = '';
       } catch (e) {
-        this.sceneError = e.message || 'Không tải được chip nhanh từ Cài đặt của tôi.';
+        this.sceneError = userFacingError(e, 'Không tải được chip nhanh từ Cài đặt của tôi.');
       }
       return this.sceneCatalog;
     },
@@ -1133,7 +1203,7 @@ export const useStudioStore = defineStore('studio', {
         this.sceneEditedPrompt = '';   // bản sửa tay của lần trước không áp sang prompt mới
         return data;
       } catch (e) {
-        this.sceneError = e.message || 'Không dựng được prompt.';
+        this.sceneError = userFacingError(e, 'Không dựng được prompt.');
         this.scenePlan = null;
         throw e;
       } finally {
@@ -1189,7 +1259,7 @@ export const useStudioStore = defineStore('studio', {
         ids.forEach((id) => this.pollGeneration(id));
         return ids;
       } catch (e) {
-        this.composeError = e.message || 'Studio không chạy được.';
+        this.composeError = userFacingError(e, 'Studio không chạy được.');
         this.composeStage = 'error';
         this.toast(this.composeError, 'error');
         return null;
@@ -1217,7 +1287,7 @@ export const useStudioStore = defineStore('studio', {
         ids.forEach((id) => this.pollGeneration(id));
         return items;
       } catch (e) {
-        this.composeError = e.message || 'Lỗi ghép ảnh.';
+        this.composeError = userFacingError(e, 'Không ghép được ảnh. Vui lòng thử lại.');
         this.composeStage = 'error';
         this.toast(this.composeError, 'error');
         return null;
@@ -1237,7 +1307,7 @@ export const useStudioStore = defineStore('studio', {
         this.toast('✅ Đã ghép xong ' + done + ' biến thể.' + warn);
       } else {
         this.composeStage = 'error';
-        this.composeError = gens.find(g => g.error)?.error || 'Ghép ảnh thất bại.';
+        this.composeError = safeMessage(gens.find((g) => g.error)?.error, 'Ghép ảnh thất bại. Vui lòng thử lại.');
         this.toast(this.composeError, 'error');
       }
     },
@@ -2308,7 +2378,7 @@ export const useStudioStore = defineStore('studio', {
         this.planBasis = data?.brief_basis || null;
         return data;
       } catch (error) {
-        this.planError = error.message || 'Không tính được kế hoạch sản xuất.';
+        this.planError = userFacingError(error, 'Không tính được kế hoạch sản xuất.');
         this.plan = null;
         throw error;
       } finally {
@@ -2359,8 +2429,8 @@ export const useStudioStore = defineStore('studio', {
       if (next === this.designAgentAi) return;
       this.designAgentAi = next;
       this.trendRadarCache = {};
-      if (this.designAgentAi) this.toast('Agent Studio sẽ dùng model AI của nhóm “prompt”.');
-      else this.toast('Agent Studio chuyển sang engine tất định (không gọi model).');
+      if (this.designAgentAi) this.toast('Đã bật AI — phần phân tích sẽ do AI thực hiện.');
+      else this.toast('Đã tắt AI — phần phân tích được dựng tự động từ dữ liệu mẫu.');
     },
     /**
      * Nạp TrendRadar cho một khu vực. Có cache theo vùng + chế độ AI + chống race:
@@ -2394,7 +2464,7 @@ export const useStudioStore = defineStore('studio', {
         return data;
       } catch (error) {
         if (requestId === this.trendRadarRequest) {
-          this.trendRadarError = error.message || 'Không tải được TrendRadar.';
+          this.trendRadarError = userFacingError(error, 'Không tải được TrendRadar.');
           this.trendRadar = null;
           this.toast(this.trendRadarError, 'error');
         }
@@ -2429,7 +2499,7 @@ export const useStudioStore = defineStore('studio', {
         this.toast('CollectionBot đã xây dựng brief bộ sưu tập.');
         return data;
       } catch (error) {
-        this.collectionBriefError = error.message || 'Không tạo được brief bộ sưu tập.';
+        this.collectionBriefError = userFacingError(error, 'Không tạo được brief bộ sưu tập.');
         this.collectionBrief = null;
         this.toast(this.collectionBriefError, 'error');
         throw error;
@@ -4045,7 +4115,7 @@ export const useStudioStore = defineStore('studio', {
           this.toast(extras ? 'Đã gợi ý: ' + extras : 'Đã gợi ý.');
         }
       } catch (e) {
-        this.suggestError = e.message || 'Lỗi gợi ý.';
+        this.suggestError = userFacingError(e, 'Không gợi ý được. Vui lòng thử lại.');
         this.toast(this.suggestError, 'error');
       } finally {
         this.suggesting = false;
@@ -4061,7 +4131,8 @@ export const useStudioStore = defineStore('studio', {
 
       if (ev.type === 'phase') {
         this.suggestPhase = ev.key || this.suggestPhase;
-        this.suggestPhaseLabel = ev.label || this.suggestPhaseLabel;
+        // Nhãn này HIỂN THỊ cho người dùng ⇒ lọc ở biên, không tin nội dung server gửi.
+        this.suggestPhaseLabel = safeMessage(ev.label, '') || this.suggestPhaseLabel;
       } else if (ev.type === 'provider') {
         this.suggestProvider = ev.provider || '';
         this.suggestModel = ev.model || '';
@@ -4071,7 +4142,7 @@ export const useStudioStore = defineStore('studio', {
         this.suggestPhase = 'done';
         this.suggestPhaseLabel = 'Hoàn tất';
       } else if (ev.type === 'error') {
-        this.suggestError = ev.message || 'Không phân tích được ảnh.';
+        this.suggestError = safeMessage(ev.message, 'Không phân tích được ảnh này. Bạn thử lại sau ít phút, hoặc đổi sang ảnh rõ hơn.');
         this.toast(this.suggestError, 'error');
       }
     },
@@ -4263,7 +4334,7 @@ export const useStudioStore = defineStore('studio', {
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
         this.pollGeneration(d.generation_id);
       } catch (e) {
-        this.inpaintError = e.message || 'Lỗi sửa ảnh.';
+        this.inpaintError = userFacingError(e, 'Không sửa được ảnh. Vui lòng thử lại.');
         this.inpaintStage = 'error';
         this.toast(this.inpaintError, 'error');
       } finally { this.inpainting = false; }

@@ -17,6 +17,14 @@ use Tests\TestCase;
  * POST /api/suggest/stream  → NDJSON: phase → provider → result (card hiện tiến trình)
  * GET  /api/suggest/recent  → 10 kết quả mới nhất của CHÍNH người dùng
  * POST /api/suggest         → giữ nguyên JSON, nay kèm _meta (provider/model/thời gian)
+ *
+ * [Đổi chính sách 2026-09-22 — Yêu cầu: "thông báo/chỉ báo/tiến trình không rò rỉ chi tiết kỹ thuật
+ *  phía backend, tên model AI, nhà cung cấp". Trước đây bài test này KHẲNG ĐỊNH ĐIỀU NGƯỢC LẠI
+ *  ("Phase 'vision' phải nói rõ provider/model để UI hiển thị trung thực"): nhãn tiến trình và
+ *  thông báo lỗi đều nhét thẳng 'deepseek · deepseek-flash' ra giao diện. Nay:
+ *    · NHÃN TIẾN TRÌNH + THÔNG BÁO LỖI = câu nói với NGƯỜI DÙNG (không provider/model/lỗi thô);
+ *    · chi tiết kỹ thuật vẫn còn nguyên trong sự kiện 'provider'/_meta và trong log.
+ *  Luật đầy đủ: docs/DESIGN_SYSTEM.md §6.]
  */
 class SuggestStreamTest extends TestCase
 {
@@ -109,10 +117,23 @@ class SuggestStreamTest extends TestCase
         $this->assertSame('deepseek', $result['data']['_meta']['provider']);
         $this->assertGreaterThanOrEqual(0, $result['data']['_meta']['elapsed_ms']);
 
-        // Phase 'vision' phải nói rõ provider/model để UI hiển thị trung thực.
+        // Phase 'vision' là câu NÓI VỚI NGƯỜI DÙNG ⇒ KHÔNG được nêu provider/model.
         $vision = collect($events)->first(fn ($e) => ($e['type'] ?? '') === 'phase' && ($e['key'] ?? '') === 'vision');
         $this->assertNotNull($vision);
-        $this->assertStringContainsString('deepseek-flash', $vision['label']);
+        foreach (['deepseek', 'deepseek-flash', 'provider', 'model'] as $leak) {
+            $this->assertStringNotContainsString($leak, mb_strtolower($vision['label']),
+                'Nhãn tiến trình để lộ chi tiết kỹ thuật ('.$leak.') — xem docs/DESIGN_SYSTEM.md §6.');
+        }
+        $this->assertStringContainsString('đọc ảnh', $vision['label'], 'Nhãn tiến trình phải nói người dùng đang chờ việc gì.');
+
+        // MỌI nhãn phase trong lượt này đều phải sạch — không chỉ riêng 'vision'.
+        foreach (collect($events)->where('type', 'phase') as $phase) {
+            $this->assertDoesNotMatchRegularExpression(
+                '/(deepseek|qwen|gemini|dashscope|replicate|fal|veo|wan|flux|provider|model|http\s*\d{3}|json)/i',
+                (string) ($phase['label'] ?? ''),
+                'Nhãn tiến trình còn chi tiết kỹ thuật: '.($phase['label'] ?? '')
+            );
+        }
     }
 
     public function test_stream_reports_error_event_when_provider_fails(): void
@@ -127,7 +148,15 @@ class SuggestStreamTest extends TestCase
 
         $error = collect($events)->firstWhere('type', 'error');
         $this->assertNotNull($error, 'Provider lỗi phải phát sự kiện error');
-        $this->assertStringContainsString('deepseek-flash', $error['message']);
+
+        // Thông báo lỗi hiển thị cho NGƯỜI DÙNG: câu hướng dẫn, KHÔNG có tên model/provider và
+        // cũng KHÔNG có nội dung lỗi thô của nhà cung cấp (ở đây là 'boom' từ Http::fake).
+        foreach (['deepseek', 'deepseek-flash', 'provider', 'model', 'boom'] as $leak) {
+            $this->assertStringNotContainsString($leak, mb_strtolower($error['message']),
+                'Thông báo lỗi để lộ chi tiết kỹ thuật ('.$leak.') — xem docs/DESIGN_SYSTEM.md §6.');
+        }
+        $this->assertStringContainsString('thử lại', mb_strtolower($error['message']),
+            'Thông báo lỗi phải nói người dùng nên làm gì tiếp.');
     }
 
     // ── 2. JSON cũ vẫn chạy + có _meta ──────────────────────────────────────

@@ -896,10 +896,10 @@ class StudioController extends Controller
                 'presets' => $s->presets ?? [],
             ]);
         } catch (\Throwable $e) {
-            logger()->error('outfitSettings failed', ['error' => $e->getMessage()]);
+            logger()->error('outfitSettings failed', ['error' => $e->getMessage(), 'at' => $e->getFile().':'.$e->getLine()]);
 
             return response()->json([
-                'message' => 'Không đọc được cài đặt Ghép Trang Phục (bảng dữ liệu chưa được tạo?). Chạy lệnh: php artisan migrate --force',
+                'message' => 'Không mở được cài đặt Ghép Trang Phục. Vui lòng thử lại, nếu vẫn lỗi hãy báo cho quản trị viên.',
             ], 500);
         }
     }
@@ -940,10 +940,10 @@ class StudioController extends Controller
                 ],
             );
         } catch (\Throwable $e) {
-            logger()->error('saveOutfitSettings failed', ['error' => $e->getMessage()]);
+            logger()->error('saveOutfitSettings failed', ['error' => $e->getMessage(), 'at' => $e->getFile().':'.$e->getLine()]);
 
             return response()->json([
-                'message' => 'Không lưu được cài đặt Ghép Trang Phục (bảng dữ liệu chưa được tạo?). Chạy lệnh: php artisan migrate --force',
+                'message' => 'Không lưu được cài đặt Ghép Trang Phục. Vui lòng thử lại, nếu vẫn lỗi hãy báo cho quản trị viên.',
             ], 500);
         }
 
@@ -1269,7 +1269,7 @@ class StudioController extends Controller
         // Chưa có key AI → erase: tái tạo nền cục bộ; replace: trả 422 (tránh P1: thay vùng thành xóa vùng).
         if ($op === 'replace') {
             imagedestroy($src);
-            return response()->json(['message' => 'Tính năng Thay vùng cần key AI (Qwen Edit / DashScope). Vui lòng cấu hình API key.'], 422);
+            return response()->json(['message' => 'Tính năng Thay vùng chưa được bật. Vui lòng báo cho quản trị viên để bật tính năng này.'], 422);
         }
         $this->localEraseFill($src, $px, $py, $pw, $ph);
         $name = 'studio/erase-'.Str::uuid().'.png';
@@ -2234,7 +2234,14 @@ RULES:
 
                 $write(['type' => 'result', 'data' => $result]);
             } catch (\Throwable $e) {
-                $write(['type' => 'error', 'message' => $e->getMessage() ?: 'Không phân tích được ảnh.']);
+                // Chi tiết kỹ thuật (thường là chuỗi lỗi của nhà cung cấp AI) chỉ vào log — gửi
+                // thẳng $e->getMessage() cho trình duyệt là để lộ provider/model/quota ra giao diện.
+                logger()->error('suggestStream failed', [
+                    'exception' => get_class($e),
+                    'message' => $e->getMessage(),
+                    'at' => $e->getFile().':'.$e->getLine(),
+                ]);
+                $write(['type' => 'error', 'message' => 'Không phân tích được ảnh này. Bạn thử lại sau ít phút, hoặc đổi sang ảnh rõ hơn.']);
             }
         }, 200, [
             'Content-Type' => 'application/x-ndjson; charset=utf-8',

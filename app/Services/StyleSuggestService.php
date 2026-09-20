@@ -62,14 +62,17 @@ class StyleSuggestService
                     'transport' => $cand['transport'],
                     'keys' => count($cand['keys']),
                 ]);
-                $emit('phase', ['key' => 'vision', 'label' => 'AI đang đọc ảnh và suy luận… ('.$cand['provider'].' · '.$cand['model'].')']);
+                // Nhãn tiến trình là câu NÓI VỚI NGƯỜI DÙNG: không nêu provider/model (xem
+                // docs/DESIGN_SYSTEM.md §6). Tên provider/model vẫn nằm trong sự kiện 'provider'
+                // và trong log — chỗ của lập trình viên, không phải chỗ của người dùng.
+                $emit('phase', ['key' => 'vision', 'label' => 'AI đang đọc ảnh và suy luận…']);
 
                 try {
                     return $this->withMeta($this->runCandidate($cand, $imagePath, $creativeLevel, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground), $cand['provider'], $cand['model'], $started);
                 } catch (\Throwable $e) {
                     $lastError = $e->getMessage();
                     logger()->error($cand['provider'].':'.$cand['model'].' vision suggest failed: '.$lastError);
-                    $emit('phase', ['key' => 'fallback', 'label' => 'Provider này lỗi — đang thử provider kế tiếp…']);
+                    $emit('phase', ['key' => 'fallback', 'label' => 'Đang thử cách phân tích khác…']);
                 }
             }
 
@@ -95,7 +98,7 @@ class StyleSuggestService
         foreach ($attempts as $attempt) {
             $model = $attempt === 'qwen' ? (string) (studio_suggest_qwen_models()[0] ?? 'qwen') : studio_suggest_gemini_model();
             $emit('provider', ['provider' => $attempt, 'model' => $model, 'transport' => $attempt, 'keys' => 1]);
-            $emit('phase', ['key' => 'vision', 'label' => 'AI đang đọc ảnh và suy luận… ('.$attempt.' · '.$model.')']);
+            $emit('phase', ['key' => 'vision', 'label' => 'AI đang đọc ảnh và suy luận…']);
 
             try {
                 $out = $attempt === 'qwen'
@@ -111,15 +114,18 @@ class StyleSuggestService
 
         // Không có key + đã bật fallback màu -> phân tích màu GD để vẫn gợi ý offline.
         if (studio_suggest_fallback()) {
-            $emit('phase', ['key' => 'color', 'label' => 'Chưa có provider AI khả dụng — phân tích màu ngoại tuyến…']);
+            $emit('phase', ['key' => 'color', 'label' => 'Đang phân tích màu trực tiếp trên ảnh…']);
             return $this->withMeta($this->suggestViaColor($imagePath, $creativeLevel, $adherence, $detailLevel), 'color', 'GD', $started);
         }
 
         if ($lastError) {
-            throw new \RuntimeException('Không provider AI nào phân tích được ảnh. Lỗi cuối: '.$lastError);
+            // Lỗi thật đã được ghi log ở từng lần thử ở trên; câu này là câu NÓI VỚI NGƯỜI DÙNG.
+            logger()->error('suggest: mọi provider vision đều lỗi', ['last_error' => $lastError]);
+            throw new \RuntimeException('Không phân tích được ảnh này. Bạn thử lại sau ít phút, hoặc đổi sang ảnh rõ hơn.');
         }
 
-        throw new \RuntimeException('Chưa cấu hình API key vision cho "Gợi ý từ ảnh" và fallback màu đang tắt.');
+        // Tính năng chưa được bật ở phía hệ thống — người dùng không cần biết "API key" là gì.
+        throw new \RuntimeException('Tính năng "Gợi ý từ ảnh" chưa được bật cho tài khoản này. Vui lòng báo cho quản trị viên.');
     }
 
 
