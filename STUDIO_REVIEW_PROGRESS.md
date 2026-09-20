@@ -528,6 +528,7 @@ JS/Vue studio **51 file (38 .vue) / 14.239 dòng** · `public_html` **21 MB** ·
 - **Test khoá luật thích nghi**: thêm TestCase::studioStoreSource() + TestCase::designAgentsSource() (nối module/component con) để test quét source vẫn đọc đủ mọi mảnh; 2 test khoá import eager đổi sang dạng async (luật "card vẫn một nguồn" giữ nguyên).
 - **Kiểm chứng**: vite build OK · **suite 954 test / 6.844 assert XANH** · commit bbf837e + 082c6c9.
 - **Nối tiếp (cùng phiên)**: tách tiếp layers/selection → 7 module con (6b79e6a) · phím tắt điều hướng Agent Studio (9511da6) · **đã deploy production** HEAD 9511da6 (2 lần pull, 0 migration, homepage + chunk mới 200). Skeleton + empty state đã có sẵn từ đợt trước, không làm lại.
+- **Vai Tìm kiếm internet cho Agent Studio** (c210731): nhóm agent_search ĐÃ có từ Đợt 30 nhưng aiBrief/radarDirections kiểm nhóm suy luận trước nhóm tìm kiếm ⇒ chỉ khai nhóm tìm kiếm thì agent rơi về rule. Đã sửa (chạy độc lập + báo đúng model) + 3 test khoá (AgentRolesTest 7→10) · suite 957 test XANH · đã deploy HEAD c210731.
 
 ### 3.6 Sửa lỗi / đồng bộ khác
 - `900f547` `studio_config()` bỏ qua empty string từ DB → fallback config default · `565c1a8` preview-enrich nhận body/hair từ tab Phom dáng · `6e16472` fix 500 image-thumb + popup GalleryModal/SourcePickerPopup không hiển thị trong StudioApp · `d6572a1` render ProjectWorkspace popup + gọn prompt `StylistService` · `d674560` fix **cross-world SW resource mismatch** cho modulepreload.
