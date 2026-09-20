@@ -149,6 +149,8 @@ class ProjectShareController extends Controller
             'images' => $images,
             'feedback' => $feedback,
             'sent' => $request->query('sent') === '1',
+            // Khách bấm Duyệt và bộ sưu tập đã tự chuyển sang "Đã duyệt" ⇒ nói rõ cho khách biết.
+            'autoApproved' => $request->query('auto') === '1',
             'error' => $request->query('error'),
         ]);
     }
@@ -169,7 +171,7 @@ class ProjectShareController extends Controller
             'message.max' => 'Ghi chú tối đa 1000 ký tự.',
         ]);
 
-        ProjectFeedback::create([
+        $feedback = ProjectFeedback::create([
             'project_id' => $share->project_id,
             'share_id' => $share->id,
             'author_name' => trim((string) $data['author_name']),
@@ -177,7 +179,40 @@ class ProjectShareController extends Controller
             'message' => isset($data['message']) ? trim((string) $data['message']) : null,
         ]);
 
-        return redirect('/chia-se/'.$token.'?sent=1#phan-hoi');
+        /* [2026-09-23] KHÁCH BẤM DUYỆT ⇒ tự chuyển bộ sưu tập sang "Đã duyệt".
+           Ba chốt an toàn, để việc này KHÔNG phá quy trình của chủ bộ sưu tập:
+             1. Chỉ chạy khi quyết định là "approved" ("yêu cầu sửa" thì không đổi gì).
+             2. Đi qua ĐÚNG luật chuyển trạng thái (canTransition + transition) — whitelist và cổng
+                người duyệt vẫn là của ProjectWorkflowService, không có luật thứ hai ở đây.
+             3. Không đủ điều kiện thì GHI LOG lý do và vẫn ghi phản hồi như thường (khách không
+                thấy lỗi; chủ bộ sưu tập chốt tay như trước).
+           Actor là CHỦ bộ sưu tập: khách duyệt không có tài khoản, nên hệ thống ghi vết như việc
+           chủ bộ sưu tập tự chốt theo phản hồi của khách (có kèm tên người phản hồi). */
+        $autoStatus = false;
+        if ($data['decision'] === 'approved') {
+            $project = $share->project;
+            $owner = $project?->user;
+            if ($project && $owner) {
+                $workflow = app(\App\Services\ProjectWorkflowService::class);
+                [$ok, $reason] = $workflow->canTransition($project, \App\Models\Project::STATUS_APPROVED, $owner);
+                if ($ok) {
+                    $workflow->transition(
+                        $project,
+                        \App\Models\Project::STATUS_APPROVED,
+                        $owner,
+                        'Khách duyệt qua link chia sẻ — '.$feedback->author_name
+                    );
+                    $autoStatus = true;
+                } else {
+                    \Illuminate\Support\Facades\Log::info('share feedback: giữ nguyên trạng thái — '.$reason, [
+                        'project_id' => $project->id,
+                        'from' => $project->status,
+                    ]);
+                }
+            }
+        }
+
+        return redirect('/chia-se/'.$token.'?sent=1'.($autoStatus ? '&auto=1' : '').'#phan-hoi');
     }
 
     /**

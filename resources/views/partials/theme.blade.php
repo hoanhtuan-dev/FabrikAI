@@ -29,8 +29,11 @@
 (function () {
   'use strict';
   var KEY = 'fabrikai.theme';
+  var FONT_KEY = 'fabrikai.fontScale';
   var VALID = ['light', 'dark', 'system'];
+  var FONT_VALID = @json(font_scale_options());
   var SERVER_PREF = @json($themePref);
+  var SERVER_FONT = @json(font_scale());
   var CAN_SAVE = @json(auth()->check());
   var root = document.documentElement;
   var media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
@@ -48,26 +51,43 @@
     return pref === 'light' ? 'light' : 'dark';
   }
 
+  // Cỡ chữ: ghi vào biến CSS --font-scale trên <html>. Mọi token --text-* nhân với biến này nên
+  // cả giao diện to/nhỏ theo, không phải sửa từng chỗ.
+  function paintFont(scale) {
+    var s = FONT_VALID.indexOf(Number(scale)) >= 0 ? Number(scale) : 100;
+    root.style.setProperty('--font-scale', String(s / 100));
+    return s;
+  }
+
+  function readFontLocal() {
+    try {
+      var v = Number(window.localStorage.getItem(FONT_KEY));
+      return FONT_VALID.indexOf(v) >= 0 ? v : null;
+    } catch (e) { return null; }
+  }
+
   function paint(theme) {
     root.setAttribute('data-theme', theme);
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', theme === 'light' ? '#f1efe7' : '#0e0d09');
+    // Màu thanh trình duyệt theo ĐÚNG dải base của theme (nền trang của từng theme).
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#eef1f5' : '#15191e');
   }
 
   var pref = readLocal() || SERVER_PREF || 'dark';
   if (VALID.indexOf(pref) < 0) pref = 'dark';
   var resolved = resolve(pref);
   paint(resolved);
+  var fontScale = paintFont(readFontLocal() || SERVER_FONT || 100);
 
   function announce() {
     for (var i = 0; i < listeners.length; i++) {
-      try { listeners[i]({ pref: pref, resolved: resolved }); } catch (e) { /* UI hỏng không được làm hỏng theme */ }
+      try { listeners[i]({ pref: pref, resolved: resolved, fontScale: fontScale }); } catch (e) { /* UI hỏng không được làm hỏng theme */ }
     }
   }
 
   function saveRemote() {
     if (!CAN_SAVE) return Promise.resolve({ saved: false });
-    return fetch('/api/theme', {
+    return fetch('/api/appearance', {
       method: 'PUT',
       credentials: 'same-origin',
       headers: {
@@ -76,7 +96,7 @@
         'X-XSRF-TOKEN': (document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/) || [])[1]
           ? decodeURIComponent(document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/)[1]) : '',
       },
-      body: JSON.stringify({ theme: pref }),
+      body: JSON.stringify({ theme: pref, font_scale: fontScale }),
     }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return { saved: true };
@@ -97,6 +117,15 @@
       try { window.localStorage.setItem(KEY, pref); } catch (e) { /* chế độ riêng tư: vẫn đổi được trong phiên */ }
       resolved = resolve(pref);
       paint(resolved);
+      announce();
+      return saveRemote();
+    },
+    get fontScale() { return fontScale; },
+    setFontScale: function (next) {
+      var applied = paintFont(next);
+      if (applied !== Number(next)) return Promise.resolve({ saved: false, error: 'Mức cỡ chữ không hợp lệ.' });
+      fontScale = applied;
+      try { window.localStorage.setItem(FONT_KEY, String(applied)); } catch (e) { /* chế độ riêng tư */ }
       announce();
       return saveRemote();
     },

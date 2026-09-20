@@ -7,6 +7,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 /**
  * TÙY CHỌN GIAO DIỆN (theme) CỦA CHÍNH NGƯỜI ĐANG ĐĂNG NHẬP (2026-09-23).
@@ -36,15 +37,32 @@ class ThemeController extends Controller
 
     public function update(Request $request): JsonResponse
     {
-        $data = Validator::make($request->only('theme'), [
-            'theme' => ['required', 'string', 'in:'.implode(',', self::THEMES)],
+        $data = Validator::make($request->only(['theme', 'font_scale']), [
+            'theme' => ['sometimes', 'string', 'in:'.implode(',', self::THEMES)],
+            // Cỡ chữ cũng là tùy chọn hiển thị, lưu cùng chỗ: phần trăm, whitelist cứng.
+            'font_scale' => ['sometimes', 'integer', 'in:'.implode(',', array_map('strval', font_scale_options()))],
         ])->validate();
 
+        if ($data === []) {
+            // Gửi lên mà không có trường nào hợp lệ ⇒ 422, không âm thầm trả 200 như đã lưu.
+            throw ValidationException::withMessages([
+                'theme' => 'Thiếu tùy chọn hiển thị (theme hoặc font_scale).',
+            ]);
+        }
+
         $user = $request->user();
-        $user->theme = $data['theme'];
+        if (array_key_exists('theme', $data)) {
+            $user->theme = $data['theme'];
+        }
+        if (array_key_exists('font_scale', $data)) {
+            $user->font_scale = (int) $data['font_scale'];
+        }
         $user->save();
 
-        return response()->json(['theme' => $user->theme]);
+        return response()->json([
+            'theme' => $user->theme,
+            'font_scale' => (int) ($user->font_scale ?: 100),
+        ]);
     }
 
     /**

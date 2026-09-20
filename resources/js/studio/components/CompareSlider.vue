@@ -36,7 +36,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
         <button @click="close" aria-label="Đóng" title="Đóng (Esc)" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white">✕</button>
       </div>
 
-      <div class="relative mx-auto aspect-square max-h-[70vh] w-full select-none overflow-hidden rounded-lg border border-white/10 bg-ink-900">
+      <div class="relative mx-auto aspect-square max-h-[70vh] w-full select-none overflow-hidden rounded-lg border border-ink-700 bg-ink-900">
         <!-- Ảnh Trước (nền) -->
         <img :src="before" class="absolute inset-0 h-full w-full object-contain" draggable="false">
         <!-- Ảnh Sau (phủ, cắt theo vị trí slider) -->
@@ -47,8 +47,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
         <div class="pointer-events-none absolute inset-y-0 w-0.5 bg-invert shadow" :style="{ left: pos + '%' }"></div>
         <div class="pointer-events-none absolute top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-invert text-invert-content shadow" :style="{ left: 'calc(' + pos + '% - 16px)' }">⇄</div>
         <!-- Nhãn -->
-        <span class="pointer-events-none absolute left-2 top-2 rounded-full bg-scrim/60 px-2 py-0.5 text-[10px] font-semibold text-scrim-content">Trước</span>
-        <span class="pointer-events-none absolute right-2 top-2 rounded-full bg-scrim/60 px-2 py-0.5 text-[10px] font-semibold text-scrim-content">Sau</span>
+        <span class="pointer-events-none absolute left-2 top-2 rounded-full bg-scrim/60 px-2 py-0.5 text-label font-semibold text-scrim-content">Trước</span>
+        <span class="pointer-events-none absolute right-2 top-2 rounded-full bg-scrim/60 px-2 py-0.5 text-label font-semibold text-scrim-content">Sau</span>
       </div>
 
       <input type="range" min="0" max="100" step="1" v-model.number="pos" class="mt-4 h-2 w-full cursor-pointer accent-brand-500">

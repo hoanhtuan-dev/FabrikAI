@@ -68,7 +68,7 @@ const BG_OPTIONS = [
 
     <!-- 3. Zoom -->
     <button @click="store.zoomOut()" :class="BTN" title="Thu nhỏ" aria-label="Thu nhỏ"><StudioIcon name="zoomOut" /></button>
-    <button @click="store.zoomFit()" class="min-w-12 rounded-lg px-1 py-1 text-center text-[11px] tabular-nums text-cream-200 hover:bg-ink-700">{{ Math.round(store.zoom * 100) }}%</button>
+    <button @click="store.zoomFit()" class="min-w-12 rounded-lg px-1 py-1 text-center text-body tabular-nums text-cream-200 hover:bg-ink-700">{{ Math.round(store.zoom * 100) }}%</button>
     <button @click="store.zoomIn()" :class="BTN" title="Phóng to" aria-label="Phóng to"><StudioIcon name="zoomIn" /></button>
     <button @click="store.zoomFit()" :class="BTN" title="Vừa khung hình" aria-label="Vừa khung hình"><StudioIcon name="maximize" /></button>
 
@@ -90,19 +90,19 @@ const BG_OPTIONS = [
     <!-- 6. Snap (bắt điểm) — mặc định BẬT 8px -->
     <div class="h-4 w-px bg-ink-700" aria-hidden="true"></div>
     <button @click="store.snapGrid = store.snapGrid ? 0 : 8" :class="[BTN, store.snapGrid ? 'text-brand-200' : '']" title="Bật/tắt bắt điểm (snap)" aria-label="Bật/tắt bắt điểm (snap)"><StudioIcon name="target" /></button>
-    <select v-if="store.snapGrid" :value="store.snapGrid" @change="store.snapGrid = Number($event.target.value)" class="h-6 rounded-md border border-ink-700 bg-ink-800 px-1 text-[10px] tabular-nums text-cream-100 focus:outline-none" title="Khoảng cách bắt điểm (px)">
+    <select v-if="store.snapGrid" :value="store.snapGrid" @change="store.snapGrid = Number($event.target.value)" class="h-6 rounded-md border border-ink-700 bg-ink-800 px-1 text-label tabular-nums text-cream-100 focus:outline-none" title="Khoảng cách bắt điểm (px)">
       <option :value="8">8</option><option :value="16">16</option><option :value="24">24</option><option :value="32">32</option>
     </select>
 
     <!-- 7. Spacer + Gợi ý công cụ (Krita-style) -->
     <div class="flex-1"></div>
-    <div v-if="toolHint" class="flex min-w-0 items-center gap-1.5 overflow-hidden px-1 text-[10px] text-cream-400" title="Hướng dẫn công cụ">
+    <div v-if="toolHint" class="flex min-w-0 items-center gap-1.5 overflow-hidden px-1 text-label text-cream-400" title="Hướng dẫn công cụ">
       <StudioIcon name="info" size="h-3.5 w-3.5" class="shrink-0" />
       <span class="truncate">{{ toolHint }}</span>
     </div>
 
     <!-- 7. Trạng thái (md+) -->
-    <div class="hidden items-center gap-1.5 text-[10px] text-cream-400 md:flex">
+    <div class="hidden items-center gap-1.5 text-label text-cream-400 md:flex">
       <StudioIcon name="layers" size="h-3.5 w-3.5" />
       <span>{{ store.canvasLayers.length }} lớp</span>
       <template v-if="store.activeLayer">
@@ -115,7 +115,7 @@ const BG_OPTIONS = [
     <div class="h-4 w-px bg-ink-700" aria-hidden="true"></div>
     <button
       @click="toggleTheme"
-      class="motion-ui flex h-7 shrink-0 items-center gap-1 rounded-lg border border-ink-600 px-2 text-[10px] font-semibold text-cream-200 hover:border-brand-400 hover:bg-ink-700"
+      class="motion-ui flex h-7 shrink-0 items-center gap-1 rounded-lg border border-ink-600 px-2 text-label font-semibold text-cream-200 hover:border-brand-400 hover:bg-ink-700"
       :title="'Giao diện đang là ' + (themeResolved === 'light' ? 'Sáng' : 'Tối') + ' — bấm để đổi (muốn theo hệ điều hành: Cài đặt của tôi → Giao diện)'"
       :aria-label="'Đổi giao diện Sáng/Tối, đang là ' + (themeResolved === 'light' ? 'Sáng' : 'Tối')"
     >

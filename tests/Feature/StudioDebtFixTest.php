@@ -107,4 +107,105 @@ class StudioDebtFixTest extends TestCase
         $this->assertStringContainsString('SQLSTATE[...]', $out, 'SQLSTATE bị gom gọn nhưng vẫn báo là lỗi SQL.');
         $this->assertStringContainsString('[RuntimeException]', $out, 'Giữ tên class lỗi cho dev.');
     }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════
+    // [2026-09-23] BỐN VIỆC CÒN NỢ trong DEPLOY_LOG — mỗi việc một bất biến máy giữ hộ.
+    // ══════════════════════════════════════════════════════════════════════════════════════════════
+
+    /** Khách bấm "Duyệt" ở link chia sẻ ⇒ bộ sưu tập tự sang "Đã duyệt" — nhưng CHỈ khi luật cho phép. */
+    public function test_client_approval_auto_advances_the_collection_status(): void
+    {
+        $owner = User::where('email', 'user@fabrikai.shop')->firstOrFail();
+        $workflow = app(\App\Services\ProjectWorkflowService::class);
+
+        // Bộ sưu tập phải đi qua đúng đường trạng thái: draft → in_progress → review (chưa thể nhảy thẳng).
+        $project = $owner->projects()->create(['name' => 'BST tự duyệt']);
+        $project = $workflow->transition($project, \App\Models\Project::STATUS_IN_PROGRESS, $owner);
+        $project = $workflow->transition($project, \App\Models\Project::STATUS_REVIEW, $owner);
+
+        $share = \App\Models\ProjectShare::create([
+            'project_id' => $project->id,
+            'created_by' => $owner->id,
+            'token' => 'tok-'.uniqid(),
+            'expires_at' => now()->addDays(30),
+        ]);
+
+        $this->post('/chia-se/'.$share->token.'/phan-hoi', [
+            'author_name' => 'Khách A',
+            'decision' => 'approved',
+            'message' => 'Đẹp, chốt.',
+        ])->assertRedirect();
+
+        $this->assertSame(\App\Models\Project::STATUS_APPROVED, $project->fresh()->status,
+            'Khách duyệt mà bộ sưu tập KHÔNG tự chuyển sang Đã duyệt (việc còn nợ chưa làm).');
+        $this->assertDatabaseHas('project_feedback', ['project_id' => $project->id, 'decision' => 'approved']);
+
+        // "Yêu cầu sửa" thì KHÔNG được đổi trạng thái (khách góp ý không phải là chốt).
+        $project2 = $owner->projects()->create(['name' => 'BST xin sửa']);
+        $project2 = $workflow->transition($project2, \App\Models\Project::STATUS_IN_PROGRESS, $owner);
+        $share2 = \App\Models\ProjectShare::create([
+            'project_id' => $project2->id, 'created_by' => $owner->id,
+            'token' => 'tok2-'.uniqid(), 'expires_at' => now()->addDays(30),
+        ]);
+        $this->post('/chia-se/'.$share2->token.'/phan-hoi', ['author_name' => 'Khách B', 'decision' => 'changes'])
+            ->assertRedirect();
+        $this->assertSame(\App\Models\Project::STATUS_IN_PROGRESS, $project2->fresh()->status,
+            'Yêu cầu sửa KHÔNG được tự đổi trạng thái.');
+    }
+
+    /** Tên file trong gói xuất mang TIỀN TỐ KÊNH BÁN, và kênh lạ bị 422. */
+    public function test_export_filename_carries_the_channel_prefix(): void
+    {
+        $owner = User::where('email', 'user@fabrikai.shop')->firstOrFail();
+        $project = $owner->projects()->create(['name' => 'BST kênh bán']);
+
+        $ok = $this->actingAs($owner)->get('/api/projects/'.$project->id.'/export?channel=shopee');
+        $ok->assertOk();
+        $this->assertStringContainsString('shopee', (string) $ok->headers->get('content-disposition'),
+            'Tên file gói xuất không mang tiền tố kênh bán.');
+
+        $this->actingAs($owner)->get('/api/projects/'.$project->id.'/export?channel=../../etc')
+            ->assertStatus(422);
+        $this->assertSame('shopee', export_channel_prefix('shopee'));
+        $this->assertSame('', export_channel_prefix('khong-ton-tai'), 'Kênh lạ phải rơi về mặc định, không vào tên file.');
+    }
+
+    /** Lỗi hệ thống có MÃ TRA CỨU, ghi ở cả payload (cho khách đọc) lẫn log (cho hỗ trợ grep). */
+    public function test_system_errors_carry_a_lookup_code(): void
+    {
+        \Illuminate\Support\Facades\Log::spy();
+        $response = studio_fail(new \RuntimeException('DB exploded at /var/www/secret'), 'Tạo ảnh');
+        $payload = $response->getData(true);
+
+        $this->assertMatchesRegularExpression('/^L-[A-Z0-9]{4}$/', (string) ($payload['error_code'] ?? ''),
+            'Lỗi hệ thống phải có mã tra cứu dạng L-XXXX để khách đọc cho tổng đài.');
+        $this->assertStringNotContainsString('/var/www/secret', (string) ($payload['message'] ?? ''),
+            'Mã tra cứu KHÔNG được kéo theo chi tiết kỹ thuật vào câu hiển thị.');
+
+        $code = $payload['error_code'];
+        \Illuminate\Support\Facades\Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message) => str_contains($message, $code))
+            ->once();
+    }
+
+    /** Báo cáo chi phí theo nhóm: cấp Owner, số liệu lấy từ chính bảng generations. */
+    public function test_team_cost_report_is_owner_only_and_counts_from_generations(): void
+    {
+        $admin = $this->admin();
+        $customer = User::where('email', 'user@fabrikai.shop')->firstOrFail();
+
+        $this->actingAs($customer)->get('/bao-cao-nhom')->assertForbidden();
+
+        $project = $customer->projects()->create(['name' => 'BST chi phí']);
+        \App\Models\Generation::create([
+            'user_id' => $customer->id, 'project_id' => $project->id, 'prompt' => 'ảnh 1',
+            'status' => 'completed', 'credits_cost' => 7, 'media_url' => 'https://example.test/a.jpg',
+        ]);
+
+        $this->actingAs($admin)->get('/bao-cao-nhom')
+            ->assertOk()
+            ->assertSee('Chi phí theo nhóm', false)
+            ->assertSee($customer->name, false)
+            ->assertSee('7', false);
+    }
 }

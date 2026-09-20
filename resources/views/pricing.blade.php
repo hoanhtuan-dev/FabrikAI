@@ -69,7 +69,7 @@
         </div>
         <div class="mt-6 flex flex-wrap gap-2">
             @foreach(['Ảnh tới 2K', 'Tiếng Việt', 'Giá VNĐ', 'Không cần biết về AI'] as $chip)
-                <span class="rounded-full border border-ink-700 bg-ink-900 px-3 py-1 text-[11px] font-semibold text-cream-200">{{ $chip }}</span>
+                <span class="rounded-full border border-ink-700 bg-ink-900 px-3 py-1 text-body font-semibold text-cream-200">{{ $chip }}</span>
             @endforeach
         </div>
     </section>
@@ -106,7 +106,7 @@
                             @endforeach
                         </ul>
                         @if($startPlan)
-                            <p class="mt-4 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5 text-[11px] text-cream-300">
+                            <p class="mt-4 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5 text-body text-cream-300">
                                 Bắt đầu ở <a href="#goi" class="font-semibold text-brand-200 hover:underline">{{ $startPlan->name }}</a>
                                 @if($growPlan && $growPlan->id !== $startPlan->id)
                                     · lớn lên ở <span class="font-semibold text-cream-100">{{ $growPlan->name }}</span>
@@ -135,9 +135,9 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <h3 class="font-display text-lg font-semibold text-cream-50">{{ $plan->name }}</h3>
                         @if($plan->isFree())
-                            <span class="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold text-info">Bắt đầu</span>
+                            <span class="rounded-full bg-sky-500/15 px-2 py-0.5 text-label font-semibold text-info">Bắt đầu</span>
                         @elseif($plan->is_default)
-                            <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-warn">Mặc định</span>
+                            <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-label font-semibold text-warn">Mặc định</span>
                         @endif
                     </div>
                     @if($plan->tagline)
@@ -145,7 +145,7 @@
                     @endif
                     <p class="mt-3 font-display text-3xl font-semibold text-cream-50">{{ $plan->priceLabel() }}</p>
                     {{-- [Q3] Gói xưởng bán theo VỤ (3 tháng), không phải theo tháng: nhãn phải nói đúng. --}}
-                    <p class="text-[11px] text-cream-300">
+                    <p class="text-body text-cream-300">
                         {{ $plan->isFree() ? 'không giới hạn thời gian' : ('mỗi '.$plan->unitLabel().($plan->isSeasonal() ? ' ('.$plan->unitMonths().' tháng)' : '')) }}
                     </p>
 
@@ -182,18 +182,18 @@
                     {{-- [Modules] PHẦN 1 — TÍNH NĂNG CÓ TRONG GÓI: suy TỪ quyền thật (plans.modules),
                          nên gói cước luôn khớp với gói cấp tính năng nào. --}}
                     <div class="mt-4 flex-1 border-t border-ink-700 pt-3">
-                        <p class="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300">
+                        <p class="flex items-center gap-2 text-label font-semibold uppercase tracking-wide text-cream-300">
                             <span>Có trong gói</span>
-                            <span class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200">{{ $plan->modulesCount() }}/{{ count($modules) }} tính năng</span>
+                            <span class="rounded-full bg-ink-700 px-2 py-0.5 text-label text-cream-200">{{ $plan->modulesCount() }}/{{ count($modules) }} tính năng</span>
                         </p>
                         <details class="group mt-1.5">
-                            <summary class="cursor-pointer list-none text-[11px] font-semibold text-brand-200 hover:text-brand-300">
+                            <summary class="cursor-pointer list-none text-body font-semibold text-brand-200 hover:text-brand-300">
                                 <span class="group-open:hidden">Xem {{ $plan->modulesCount() }} tính năng ▾</span>
                                 <span class="hidden group-open:inline">Thu gọn ▴</span>
                             </summary>
                             <div class="mt-2 space-y-1.5">
                                 @foreach($plan->modulesByGroup() as $group => $names)
-                                    <p class="text-[10px] text-cream-300">
+                                    <p class="text-label text-cream-300">
                                         <span class="font-semibold text-cream-200">{{ $group }}:</span> {{ implode(' · ', $names) }}
                                     </p>
                                 @endforeach
@@ -205,10 +205,10 @@
                          KHÔNG phải công tắc (không cấp quyền gì). --}}
                     @if(! empty($plan->manualFeatures()))
                         <div class="mt-3 border-t border-ink-800 pt-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Thông tin thêm</p>
+                            <p class="text-label font-semibold uppercase tracking-wide text-cream-300">Thông tin thêm</p>
                             <ul class="mt-1.5 space-y-1.5">
                                 @foreach($plan->manualFeatures() as $feature)
-                                    <li class="flex items-start gap-2 text-[11px] text-cream-200">
+                                    <li class="flex items-start gap-2 text-body text-cream-200">
                                         <svg class="mt-0.5 h-3 w-3 shrink-0 text-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-9 11-5-5"/></svg>
                                         {{ $feature }}
                                     </li>
@@ -218,7 +218,7 @@
                     @endif
 
                     @if(! empty($badges))
-                        <p class="mt-3 rounded-lg border border-brand-500/25 bg-brand-600/10 p-2 text-[10px] text-brand-200">
+                        <p class="mt-3 rounded-lg border border-brand-500/25 bg-brand-600/10 p-2 text-label text-brand-200">
                             Hợp với: {{ implode(' · ', $badges) }}
                         </p>
                     @endif
@@ -230,7 +230,7 @@
             @endforeach
         </div>
 
-        <div class="mt-4 rounded-lg border border-ink-700 bg-ink-900/60 p-3 text-[11px] leading-relaxed text-cream-300">
+        <div class="mt-4 rounded-lg border border-ink-700 bg-ink-900/60 p-3 text-body leading-relaxed text-cream-300">
             <p>
                 <b class="text-cream-100">Thanh toán &amp; kích hoạt gói trả phí — 3 bước, không cần thẻ:</b>
             </p>
@@ -320,7 +320,7 @@
                     </tbody>
                 </table>
             </div>
-            <p class="mt-3 text-[11px] text-cream-300">
+            <p class="mt-3 text-body text-cream-300">
                 Ví dụ dễ hình dung: gói {{ $cheapestPaid ? $cheapestPaid->name : 'trả phí' }} với
                 {{ $cheapestPaid ? $vn((int) $cheapestPaid->credits_per_month + (int) $cheapestPaid->bonus_credits) : '' }} credit
                 ≈ {{ $cheapestPaid && (int) $cheapestPaid->image_credit_cost > 0 ? $vn((int) floor(((int) $cheapestPaid->credits_per_month + (int) $cheapestPaid->bonus_credits) / (int) $cheapestPaid->image_credit_cost)) : '' }} ảnh
@@ -351,7 +351,7 @@
                     <tbody class="text-cream-200">
                         @foreach($moduleGroups as $group => $moduleIds)
                             <tr class="border-b border-ink-800/60">
-                                <td colspan="{{ $plans->count() + 1 }}" class="py-2 text-[10px] font-semibold uppercase tracking-wide text-cream-300">{{ $group }}</td>
+                                <td colspan="{{ $plans->count() + 1 }}" class="py-2 text-label font-semibold uppercase tracking-wide text-cream-300">{{ $group }}</td>
                             </tr>
                             @foreach($moduleIds as $moduleId)
                                 @php($module = collect($modules)->firstWhere('id', $moduleId))
@@ -359,7 +359,7 @@
                                     <td class="py-2.5 pr-4">
                                         <span class="font-semibold text-cream-50">{{ $module['name'] ?? $moduleId }}</span>
                                         @if(! empty($module['summary']))
-                                            <span class="block text-[10px] text-cream-300">{{ $module['summary'] }}</span>
+                                            <span class="block text-label text-cream-300">{{ $module['summary'] }}</span>
                                         @endif
                                     </td>
                                     @foreach($plans as $plan)
@@ -378,7 +378,7 @@
                     </tbody>
                 </table>
             </div>
-            <p class="mt-3 text-[11px] text-cream-300">
+            <p class="mt-3 text-body text-cream-300">
                 Đang dùng gói nào thì Studio chỉ mở đúng các tính năng của gói đó; tính năng chưa có sẽ hiện ổ khoá kèm gợi ý nâng cấp.
             </p>
         </div>
@@ -443,7 +443,7 @@
     </section>
 
     <footer class="border-t border-ink-800 py-8">
-        <div class="container-x flex flex-wrap items-center gap-3 text-[11px] text-cream-300">
+        <div class="container-x flex flex-wrap items-center gap-3 text-body text-cream-300">
             <span>© {{ date('Y') }} FabrikAI — studio thiết kế thời trang AI.</span>
             <a href="{{ url('/') }}" class="ml-auto hover:text-cream-100">Studio</a>
             <a href="{{ route('login') }}" class="hover:text-cream-100">Đăng nhập</a>

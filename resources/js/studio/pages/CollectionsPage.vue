@@ -18,6 +18,7 @@
  */
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useStudioStore } from '../store.js';
+import { EXPORT_CHANNELS } from '../exportChannels.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import StudioIcon from '../components/StudioIcon.vue';
 
@@ -37,7 +38,7 @@ const reviewErrors = ref([]);
 const form = ref({ name: '', season: '', deadline: '', brief: '' });
 const shareDays = ref(30);
 const shareInfo = ref(null);
-const exportForm = ref({ sizes: '', note: '' });
+const exportForm = ref({ sizes: '', note: '', channel: '' });
 const statusFilter = ref('all');
 let refreshTimer = null;
 
@@ -421,7 +422,7 @@ onBeforeUnmount(() => {
                 </span>
                 <div>
                   <p class="flex items-center gap-2 font-semibold text-cream-100">
-                    <span class="rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-bold text-white">{{ idx + 1 }}</span>
+                    <span class="rounded-full bg-brand-600 px-2 py-0.5 text-label font-bold text-white">{{ idx + 1 }}</span>
                     {{ step.title }}
                   </p>
                   <p class="mt-1.5 text-xs leading-relaxed text-cream-300">{{ step.desc }}</p>
@@ -444,7 +445,7 @@ onBeforeUnmount(() => {
             <div class="p-5 sm:p-6">
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-brand-200">
+                  <p class="flex items-center gap-1.5 text-label font-bold uppercase tracking-wide text-brand-200">
                     <span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> Bộ đang làm
                   </p>
                   <h2 class="mt-1 truncate font-display text-xl font-semibold text-cream-50">{{ applied.name }}</h2>
@@ -474,7 +475,7 @@ onBeforeUnmount(() => {
 
               <!-- THANH TIẾN TRÌNH 6 BƯỚC DUYỆT MẪU -->
               <div class="mt-5">
-                <div class="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-cream-400">
+                <div class="mb-2 flex items-center justify-between text-label font-semibold uppercase tracking-wide text-cream-400">
                   <span>Tiến trình duyệt mẫu ({{ totalShots }} ảnh)</span>
                   <span class="text-ok">{{ progressPct }}% đã duyệt</span>
                 </div>
@@ -484,10 +485,10 @@ onBeforeUnmount(() => {
                       <div class="h-full rounded-full motion-ui motion-ui--size duration-base" :class="step.count > 0 ? 'opacity-100' : 'opacity-0'" :style="{ background: step.bar, width: '100%' }"></div>
                     </div>
                     <div class="flex items-baseline gap-1">
-                      <span class="text-[10px] font-bold" :class="step.count > 0 ? 'text-cream-100' : 'text-cream-400'">{{ step.count }}</span>
-                      <span class="truncate text-[10px]" :class="step.count > 0 ? 'text-cream-300' : 'text-cream-400'">{{ step.label }}</span>
+                      <span class="text-label font-bold" :class="step.count > 0 ? 'text-cream-100' : 'text-cream-400'">{{ step.count }}</span>
+                      <span class="truncate text-label" :class="step.count > 0 ? 'text-cream-300' : 'text-cream-400'">{{ step.label }}</span>
                     </div>
-                    <span v-if="idx < workflowProgress.length - 1 && idx === furthestStep" class="text-[10px] text-brand-300">↓ đang ở đây</span>
+                    <span v-if="idx < workflowProgress.length - 1 && idx === furthestStep" class="text-label text-brand-300">↓ đang ở đây</span>
                   </li>
                 </ol>
                 <div v-else class="rounded-xl border border-dashed border-ink-600 px-4 py-3 text-center text-xs text-cream-400">
@@ -522,19 +523,19 @@ onBeforeUnmount(() => {
               <!-- SỐ LIỆU (chi phí · phản hồi khách) -->
               <div v-if="stats" class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <div class="rounded-xl border border-ink-700/60 bg-ink-900/50 p-3">
-                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Ảnh xong</p>
+                  <p class="text-label font-semibold uppercase tracking-wide text-cream-400">Ảnh xong</p>
                   <p class="mt-0.5 text-lg font-semibold text-ok">{{ stats.images.completed }}</p>
                 </div>
                 <div class="rounded-xl border border-ink-700/60 bg-ink-900/50 p-3">
-                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Credit đã dùng</p>
+                  <p class="text-label font-semibold uppercase tracking-wide text-cream-400">Credit đã dùng</p>
                   <p class="mt-0.5 text-lg font-semibold text-cream-100">{{ stats.credits.used }}</p>
                 </div>
                 <div class="rounded-xl border border-ink-700/60 bg-ink-900/50 p-3">
-                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Phản hồi khách</p>
+                  <p class="text-label font-semibold uppercase tracking-wide text-cream-400">Phản hồi khách</p>
                   <p class="mt-0.5 text-lg font-semibold" :class="stats.feedback.count ? 'text-brand-300' : 'text-cream-400'">{{ stats.feedback.count || 0 }}</p>
                 </div>
                 <div class="rounded-xl border border-ink-700/60 bg-ink-900/50 p-3">
-                  <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Ảnh lỗi</p>
+                  <p class="text-label font-semibold uppercase tracking-wide text-cream-400">Ảnh lỗi</p>
                   <p class="mt-0.5 text-lg font-semibold" :class="stats.images.failed ? 'text-danger' : 'text-cream-400'">{{ stats.images.failed || 0 }}</p>
                 </div>
               </div>
@@ -591,7 +592,7 @@ onBeforeUnmount(() => {
                       <p class="motion-ui truncate text-sm font-semibold text-cream-50 group-hover:text-white">{{ p.name }}</p>
                       <p v-if="p.brief" class="mt-0.5 line-clamp-1 text-xs text-cream-400">{{ p.brief }}</p>
                     </button>
-                    <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="statusToneClass(p.status)">{{ statusLabel(p.status) }}</span>
+                    <span class="shrink-0 rounded-full px-2 py-0.5 text-label font-semibold" :class="statusToneClass(p.status)">{{ statusLabel(p.status) }}</span>
                   </div>
 
                   <div v-if="p.thumbnail" class="mt-3 h-28 w-full overflow-hidden rounded-xl bg-ink-800">
@@ -609,7 +610,7 @@ onBeforeUnmount(() => {
                   </div>
 
                   <div v-if="p.tags && p.tags.length" class="mt-2 flex flex-wrap gap-1">
-                    <span v-for="t in p.tags.slice(0, 3)" :key="t" class="rounded-full bg-ink-800 px-2 py-0.5 text-[10px] text-cream-300">{{ t }}</span>
+                    <span v-for="t in p.tags.slice(0, 3)" :key="t" class="rounded-full bg-ink-800 px-2 py-0.5 text-label text-cream-300">{{ t }}</span>
                   </div>
 
                   <div class="mt-auto flex items-center gap-2 pt-3">
@@ -691,7 +692,7 @@ onBeforeUnmount(() => {
             </button>
           </div>
           <!-- giải thích luồng cho người mới, đặt ngay trong khối duyệt -->
-          <p class="mt-2 rounded-lg bg-ink-900 px-3 py-2 text-[11px] leading-relaxed text-cream-300">
+          <p class="mt-2 rounded-lg bg-ink-900 px-3 py-2 text-body leading-relaxed text-cream-300">
             Ảnh đi theo từng bước: <b class="text-cream-100">Ý tưởng → Phác thảo → Đã chọn → Đã chỉnh → Chờ duyệt → Đã duyệt</b>.
             Chọn ảnh rồi bấm <b class="text-cream-100">Chuyển bước tiếp</b> để đẩy lên bậc kế (không nhảy cóc) — máy chủ chặn bước không hợp lệ và nói rõ lý do.
           </p>
@@ -720,7 +721,7 @@ onBeforeUnmount(() => {
               >
                 <img v-if="s.thumb" :src="s.thumb" :alt="'Ảnh ' + s.id" class="h-24 w-full object-cover" loading="lazy">
                 <span v-else class="flex h-24 w-full items-center justify-center bg-ink-800 text-cream-300"><StudioIcon name="image" size="h-5 w-5" /></span>
-                <span class="absolute left-2 top-2 rounded-lg px-1.5 py-0.5 text-[9px] font-bold" :class="stateTone(s.shot_state)">{{ s.shot_label }}</span>
+                <span class="absolute left-2 top-2 rounded-lg px-1.5 py-0.5 text-tiny font-bold" :class="stateTone(s.shot_state)">{{ s.shot_label }}</span>
                 <span v-if="shotsSel.includes(s.id)" class="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-brand-500 text-on-accent">
                   <StudioIcon name="check" size="h-3 w-3" />
                 </span>
@@ -740,9 +741,9 @@ onBeforeUnmount(() => {
               <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" title="Loại các ảnh đã chọn (phím R)" @click="reviewBatch('rejected')">
                 <StudioIcon name="ban" size="h-4 w-4" /> Loại {{ selectedCount }} ảnh
               </button>
-              <p v-if="!reviewBusy && !selectedCount" class="mt-1.5 text-[10px] leading-4 text-warn">↳ Chưa chọn ảnh nào — bấm vào ảnh trong danh sách để chọn trước khi duyệt.</p>
+              <p v-if="!reviewBusy && !selectedCount" class="mt-1.5 text-label leading-4 text-warn">↳ Chưa chọn ảnh nào — bấm vào ảnh trong danh sách để chọn trước khi duyệt.</p>
             </div>
-            <p class="mt-3 text-[11px] text-cream-400">
+            <p class="mt-3 text-body text-cream-400">
               Phím tắt khi khối này đang mở: <b class="text-cream-100">S</b> chọn ảnh chờ duyệt · <b class="text-cream-100">N</b> chuyển bước · <b class="text-cream-100">A</b> duyệt · <b class="text-cream-100">R</b> loại · <b class="text-cream-100">Esc</b> đóng
             </p>
             <ul v-if="reviewErrors.length" class="mt-4 space-y-2">
@@ -797,11 +798,11 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div v-if="shareInfo.feedback && shareInfo.feedback.length" class="mt-4 rounded-xl border border-brand-500/25 bg-brand-600/10 p-4">
-            <p class="text-[10px] font-bold uppercase tracking-wide text-brand-200">Phản hồi của khách</p>
+            <p class="text-label font-bold uppercase tracking-wide text-brand-200">Phản hồi của khách</p>
             <ul class="mt-2 space-y-2">
               <li v-for="fb in shareInfo.feedback.slice(0, 5)" :key="fb.id" class="text-xs">
                 <span class="font-semibold text-cream-100">{{ fb.author_name }}</span>
-                <span class="ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'">{{ fb.decision_label }}</span>
+                <span class="ml-1.5 rounded-full px-1.5 py-0.5 text-tiny font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'">{{ fb.decision_label }}</span>
                 <span class="ml-1.5 text-cream-400">{{ fb.created_at }}</span>
                 <p v-if="fb.message" class="mt-0.5 whitespace-pre-line text-cream-200">{{ fb.message }}</p>
               </li>
@@ -827,6 +828,12 @@ onBeforeUnmount(() => {
         <div class="mt-4 space-y-4">
           <div>
             <label class="label" for="ex-sizes">Bảng size — mỗi dòng một size (size, ngực, eo, hông, dài áo, dài tay)</label>
+            <label class="block">
+              <span class="label">Kênh bán (đặt tên file trong gói)</span>
+              <select v-model="exportForm.channel" class="input" title="Tên ảnh trong gói sẽ có tiền tố theo kênh — sàn TMĐT sắp xếp theo tên file">
+                <option v-for="c in EXPORT_CHANNELS" :key="c.id" :value="c.id">{{ c.label }}</option>
+              </select>
+            </label>
             <textarea id="ex-sizes" v-model="exportForm.sizes" rows="3" class="input" placeholder="S, 84, 68, 92, 58, 56&#10;M, 88, 72, 96, 59, 57"></textarea>
           </div>
           <div>

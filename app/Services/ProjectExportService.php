@@ -78,7 +78,9 @@ class ProjectExportService
             $n = count($images) + 1;
             $ext = $this->extensionFor($bytes);
             $base = Str::slug(Str::limit((string) ($g->prompt ?: 'anh'), 40, '')) ?: 'anh';
-            $file = 'anh/'.sprintf('%02d', $n).'-'.$base.'.'.$ext;
+            // Tiền tố theo KÊNH BÁN (rỗng = mặc định) — sàn/catalogue sắp xếp theo tên file.
+            $prefix = export_channel_prefix($options['channel'] ?? null);
+            $file = 'anh/'.($prefix !== '' ? $prefix.'-' : '').sprintf('%02d', $n).'-'.$base.'.'.$ext;
 
             $zip->addFromString($file, $bytes);
             $images[] = [
@@ -107,6 +109,8 @@ class ProjectExportService
                 'tags' => $this->tags($project),
             ],
             'note' => $note !== '' ? $note : null,
+            // Kênh bán đã chọn — hệ thống của xưởng đọc manifest là biết gói này đóng cho kênh nào.
+            'channel' => ($options['channel'] ?? '') !== '' ? (string) $options['channel'] : null,
             // Số ảnh THẬT của bộ sưu tập so với số ảnh có trong gói — để hệ thống của xưởng (và
             // người đọc manifest) biết gói này có bị cắt hay không, thay vì đoán.
             'images_total_in_collection' => $totalWithMedia,
@@ -141,7 +145,7 @@ class ProjectExportService
 
         return [
             'path' => $zipPath,
-            'name' => 'fabrikai-'.(Str::slug(Str::limit($project->name, 40, '')) ?: 'bo-suu-tap').'-'.now()->format('Ymd').'.zip',
+            'name' => 'fabrikai-'.(Str::slug(Str::limit($project->name, 40, '')) ?: 'bo-suu-tap').'-'.export_channel_prefix($options['channel'] ?? null).(export_channel_prefix($options['channel'] ?? null) !== '' ? '-' : '').now()->format('Ymd').'.zip',
             'manifest' => $manifest,
         ];
     }

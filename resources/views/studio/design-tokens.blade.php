@@ -31,7 +31,7 @@
         @foreach ($themes as $name => $matrix)
             <section class="mb-8">
                 <h2 class="font-display text-lg font-semibold text-cream-50">Theme {{ $name }}</h2>
-                <p class="mt-1 text-[11px] text-cream-300">
+                <p class="mt-1 text-body text-cream-300">
                     Nền trang <span class="font-semibold text-cream-100">{{ $matrix['tokens']['ink-950'] }}</span> ·
                     nền card <span class="font-semibold text-cream-100">{{ $matrix['tokens']['ink-800'] }}</span> ·
                     chữ chính <span class="font-semibold text-cream-100">{{ $matrix['tokens']['cream-100'] }}</span>
@@ -40,7 +40,7 @@
                 <div class="mt-3 overflow-x-auto">
                     <table class="w-full min-w-[46rem] border-collapse text-left text-xs">
                         <thead>
-                            <tr class="border-b border-ink-700 text-[10px] uppercase tracking-wide text-cream-300">
+                            <tr class="border-b border-ink-700 text-label uppercase tracking-wide text-cream-300">
                                 <th class="py-2 pr-3">Bậc nội dung</th>
                                 <th class="py-2 pr-3">Màu</th>
                                 <th class="py-2 pr-3">Chữ</th>
@@ -54,7 +54,7 @@
                             @foreach ($matrix['rows'] as $row)
                                 <tr class="border-b border-ink-700/60">
                                     <td class="py-2 pr-3 font-semibold text-cream-100">{{ $row['token'] }}</td>
-                                    <td class="py-2 pr-3 font-mono text-[11px] text-cream-300">{{ $row['hex'] }}</td>
+                                    <td class="py-2 pr-3 font-mono text-body text-cream-300">{{ $row['hex'] }}</td>
                                     <td class="py-2 pr-3">
                                         <span class="rounded px-2 py-1 text-xs" style="background: {{ $matrix['tokens']['ink-800'] }}; color: {{ $row['hex'] }}">Aa</span>
                                     </td>
@@ -63,9 +63,9 @@
                                     @endforeach
                                     <td class="py-2">
                                         @if ($row['pass'])
-                                            <span class="rounded-full bg-ok/15 px-2 py-0.5 text-[10px] font-semibold text-ok">ĐẠT</span>
+                                            <span class="rounded-full bg-ok/15 px-2 py-0.5 text-label font-semibold text-ok">ĐẠT</span>
                                         @else
-                                            <span class="rounded-full bg-danger/15 px-2 py-0.5 text-[10px] font-semibold text-danger">KHÔNG ĐẠT</span>
+                                            <span class="rounded-full bg-danger/15 px-2 py-0.5 text-label font-semibold text-danger">KHÔNG ĐẠT</span>
                                         @endif
                                     </td>
                                 </tr>
@@ -77,7 +77,7 @@
                 <h3 class="mt-5 text-sm font-semibold text-cream-100">Màu nhấn &amp; màu trạng thái (cũng là CHỮ ⇒ cũng phải đạt AA)</h3>
                 <div class="mt-2 flex flex-wrap gap-2">
                     @foreach ($accents[$name] as $accent)
-                        <span class="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-[11px]">
+                        <span class="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-body">
                             <span class="h-3 w-3 rounded-full" style="background: {{ $accent['hex'] }}"></span>
                             <span class="font-semibold text-cream-100">{{ $accent['token'] }}</span>
                             <span class="font-mono text-cream-300">{{ $accent['hex'] }}</span>
@@ -90,7 +90,7 @@
 
         <section class="mb-8">
             <h2 class="font-display text-lg font-semibold text-cream-50">Token CỐ ĐỊNH (không đổi theo theme)</h2>
-            <p class="mt-1 max-w-3xl text-[11px] leading-relaxed text-cream-300">
+            <p class="mt-1 max-w-3xl text-body leading-relaxed text-cream-300">
                 Đây là môi trường ẢNH và các khối đảo màu: nền canvas người dùng tự chọn, lớp phủ đặt trên ảnh,
                 nút đảo màu. Nếu chúng theo theme thì ở theme Sáng, "nền Kem" sẽ thành nền ĐEN và chữ trên lớp phủ
                 ảnh sẽ thành chữ đen trên nền tối (đo được 2,9:1 trước khi tách token).
@@ -98,7 +98,7 @@
             <div class="mt-2 flex flex-wrap gap-2">
                 @foreach ($fixed as $token)
                     @isset($fixedValues[$token])
-                        <span class="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-[11px]">
+                        <span class="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-body">
                             <span class="h-3 w-3 rounded-full border border-ink-600" style="background: {{ $fixedValues[$token] }}"></span>
                             <span class="font-semibold text-cream-100">--color-{{ $token }}</span>
                             <span class="font-mono text-cream-300">{{ $fixedValues[$token] }}</span>
@@ -108,7 +108,7 @@
             </div>
         </section>
 
-        <footer class="rounded-lg border border-ink-700 bg-ink-900 p-4 text-[11px] leading-relaxed text-cream-300">
+        <footer class="rounded-lg border border-ink-700 bg-ink-900 p-4 text-body leading-relaxed text-cream-300">
             Luật đầy đủ nằm ở <b class="text-cream-100">docs/DESIGN_SYSTEM.md §1.1</b> (màu) và <b class="text-cream-100">§1.4</b> (cách theme hoạt động).
             Đổi giao diện: <b class="text-cream-100">Cài đặt của tôi → Giao diện</b> hoặc nút ở thanh trạng thái Studio.
             Bảng này chỉ ĐỌC — không có ô nhập nào ở đây, vì token là việc của mã nguồn, không phải của người dùng cuối.

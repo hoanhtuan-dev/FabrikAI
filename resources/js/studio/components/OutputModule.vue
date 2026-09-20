@@ -58,7 +58,7 @@ function download(g) {
       </button>
     </div>
     <!-- [Đợt 0.3] Banner nói thật khi lô hiện tại có ảnh DEMO -->
-    <p v-if="store.generations.some(g => g.is_demo)" class="mx-2 mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug text-warn">
+    <p v-if="store.generations.some(g => g.is_demo)" class="mx-2 mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-label leading-snug text-warn">
       <span class="font-semibold">Ảnh DEMO:</span> tính năng tạo ảnh chưa được bật nên kết quả là ảnh mẫu (hoặc chính ảnh gốc), <span class="font-semibold">không phải do AI tạo</span>. Vui lòng báo cho quản trị viên để bật tính năng.
     </p>
     <div class="scrollbar-hide mt-2 grid flex-1 auto-rows-min grid-cols-1 gap-1.5 overflow-y-auto p-2">
@@ -67,23 +67,23 @@ function download(g) {
         <span v-if="g.project_id" class="absolute top-1 left-1 z-10 h-2.5 w-2.5 rounded-full ring-1 ring-black/40" :style="{ background: projectColor(g.project_id) }" :title="'Dự án: ' + projectName(g.project_id, g.project)"></span>
         <!-- [Đợt 0.3] Nhãn DEMO: ảnh này KHÔNG do AI tạo (chưa có API key) — ảnh mẫu hoặc chính ảnh gốc.
              Trước đây những ảnh này được báo Hoàn tất im lặng, người dùng tưởng AI đã xử lý. -->
-        <span v-if="g.is_demo" class="absolute right-1 top-1 z-10 rounded-full bg-amber-500 px-1.5 py-0.5 text-[8px] font-bold uppercase leading-none text-black" :title="g.demo_reason || 'Ảnh mẫu — tính năng tạo ảnh chưa được bật'">DEMO</span>
+        <span v-if="g.is_demo" class="absolute right-1 top-1 z-10 rounded-full bg-amber-500 px-1.5 py-0.5 text-micro font-bold uppercase leading-none text-black" :title="g.demo_reason || 'Ảnh mẫu — tính năng tạo ảnh chưa được bật'">DEMO</span>
         <!-- Ảnh hoàn tất -->
         <template v-if="g.status === 'completed' && g.media_url">
           <button @click="store.openViewer(g)" draggable="true" @dragstart="onThumbDrag($event, g)" class="absolute inset-0 cursor-grab active:cursor-grabbing" :title="'Kéo thả vào canvas để thêm · nhấn để xem lớn'"><img :src="thumbUrl(g.media_url)" class="pointer-events-none h-full w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)"></button>
-          <span class="pointer-events-none absolute left-1/2 top-1 z-10 hidden -translate-x-1/2 items-center gap-1 rounded-full bg-scrim/70 px-1.5 py-0.5 text-[9px] font-semibold text-scrim-content transition group-hover:flex"><StudioIcon name="download" size="h-2.5 w-2.5" class="text-brand-300"/>Kéo thả</span>
+          <span class="pointer-events-none absolute left-1/2 top-1 z-10 hidden -translate-x-1/2 items-center gap-1 rounded-full bg-scrim/70 px-1.5 py-0.5 text-tiny font-semibold text-scrim-content transition group-hover:flex"><StudioIcon name="download" size="h-2.5 w-2.5" class="text-brand-300"/>Kéo thả</span>
           <!-- [Trục 3] Thanh hành động: hiện khi rê chuột HOẶC khi có nút được focus (bàn phím dùng được). -->
           <div class="pointer-events-none absolute inset-x-0 bottom-0 z-20 grid grid-cols-2 gap-0.5 bg-black/80 p-0.5 opacity-0 backdrop-blur-sm transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-scrim/85 text-[9px] font-semibold text-scrim-content transition hover:bg-brand-600 hover:text-white" title="Thêm vào canvas (thành layer để ghép/sửa)" :aria-label="'Thêm ' + store.genName(g) + ' vào canvas'" @click.stop="toCanvas(g)">
+            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-scrim/85 text-tiny font-semibold text-scrim-content transition hover:bg-brand-600 hover:text-white" title="Thêm vào canvas (thành layer để ghép/sửa)" :aria-label="'Thêm ' + store.genName(g) + ' vào canvas'" @click.stop="toCanvas(g)">
               <StudioIcon name="plus" size="h-3 w-3" /> Canvas
             </button>
-            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-scrim/85 text-[9px] font-semibold text-scrim-content transition hover:bg-brand-600 hover:text-white" title="Tải ảnh gốc về máy" :aria-label="'Tải ' + store.genName(g)" @click.stop="download(g)">
+            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-scrim/85 text-tiny font-semibold text-scrim-content transition hover:bg-brand-600 hover:text-white" title="Tải ảnh gốc về máy" :aria-label="'Tải ' + store.genName(g)" @click.stop="download(g)">
               <StudioIcon name="download" size="h-3 w-3" /> Tải
             </button>
-            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-scrim/85 text-[9px] font-semibold text-scrim-content transition hover:bg-brand-600 hover:text-white" title="Tạo biến thể từ ảnh này (mở công cụ Biến thể)" :aria-label="'Tạo biến thể từ ' + store.genName(g)" @click.stop="useIn(g, 'variation')">
+            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-scrim/85 text-tiny font-semibold text-scrim-content transition hover:bg-brand-600 hover:text-white" title="Tạo biến thể từ ảnh này (mở công cụ Biến thể)" :aria-label="'Tạo biến thể từ ' + store.genName(g)" @click.stop="useIn(g, 'variation')">
               <StudioIcon name="variations" size="h-3 w-3" /> Biến thể
             </button>
-            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-scrim/85 text-[9px] font-semibold text-scrim-content transition hover:bg-brand-600 hover:text-white" title="Sửa ảnh này (mở công cụ Sửa ảnh)" :aria-label="'Sửa ' + store.genName(g)" @click.stop="useIn(g, 'inpaint')">
+            <button type="button" class="flex h-6 items-center justify-center gap-1 rounded bg-scrim/85 text-tiny font-semibold text-scrim-content transition hover:bg-brand-600 hover:text-white" title="Sửa ảnh này (mở công cụ Sửa ảnh)" :aria-label="'Sửa ' + store.genName(g)" @click.stop="useIn(g, 'inpaint')">
               <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
             </button>
           </div>
@@ -91,7 +91,7 @@ function download(g) {
         <!-- Đang xử lý / chờ: skeleton shimmer + overlay tiến độ -->
         <template v-else>
           <div class="skeleton-shimmer absolute inset-0"></div>
-          <div class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-scrim/40 text-[10px] text-scrim-content">
+          <div class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-scrim/40 text-label text-scrim-content">
             <span v-if="['pending','processing'].includes(g.status)" class="h-5 w-5 animate-spin rounded-full border-2 border-brand-300 border-t-transparent"></span>
             <span v-else-if="g.status === 'failed'" class="text-base"><StudioIcon name="alertTriangle" size="h-5 w-5" /></span>
             <span v-else-if="g.status === 'cancelled'" class="text-base"><StudioIcon name="x" size="h-5 w-5" /></span>
@@ -101,17 +101,17 @@ function download(g) {
             </span>
           </div>
         </template>
-        <span v-if="g.media_url" class="absolute bottom-1 left-1 max-w-[92%] truncate rounded-full bg-scrim/60 px-1.5 py-0.5 text-[9px] text-scrim-content transition group-hover:opacity-0">{{ store.genName(g) }}</span>
+        <span v-if="g.media_url" class="absolute bottom-1 left-1 max-w-[92%] truncate rounded-full bg-scrim/60 px-1.5 py-0.5 text-tiny text-scrim-content transition group-hover:opacity-0">{{ store.genName(g) }}</span>
       </div>
     </div>
-    <p v-if="store.appliedProject && store.outputFilterProject && !store.visibleGenerations.length" class="mt-2 text-center text-[10px] text-cream-400">Chưa có output nào thuộc dự án này.</p>
+    <p v-if="store.appliedProject && store.outputFilterProject && !store.visibleGenerations.length" class="mt-2 text-center text-label text-cream-400">Chưa có output nào thuộc dự án này.</p>
   </div>
 </template>
 
 <style scoped>
 /* Skeleton shimmer — hiệu ứng quét sáng chạy ngang ảnh slot đang chờ/xử lý */
 .skeleton-shimmer {
-  background: linear-gradient(100deg, #1c2333 20%, #2a3347 40%, #3a4560 60%, #2a3347 80%, #1c2333 100%);
+  background: linear-gradient(100deg, var(--color-ink-800) 20%, var(--color-ink-700) 40%, var(--color-ink-600) 60%, var(--color-ink-700) 80%, var(--color-ink-800) 100%);
   background-size: 200% 100%;
   animation: shimmerSweep 1.8s linear infinite;
 }

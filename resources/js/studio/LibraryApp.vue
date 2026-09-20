@@ -261,7 +261,7 @@ onMounted(async () => {
           </div>
           <h1 class="font-display text-lg font-semibold leading-tight sm:text-xl">
             Thư viện
-            <span class="ml-1.5 rounded-full border border-ink-700 bg-ink-800 px-2 py-0.5 text-[11px] font-semibold text-cream-300">{{ fmtNum(store.libraryTab === 'uploads' ? (uploadStats.total ?? store.uploadItems.length) : store.libraryTab === 'suggest' ? (suggestLibStats.total ?? 0) : store.libraryTotal) }}</span>
+            <span class="ml-1.5 rounded-full border border-ink-700 bg-ink-800 px-2 py-0.5 text-body font-semibold text-cream-300">{{ fmtNum(store.libraryTab === 'uploads' ? (uploadStats.total ?? store.uploadItems.length) : store.libraryTab === 'suggest' ? (suggestLibStats.total ?? 0) : store.libraryTotal) }}</span>
           </h1>
           <button type="button" @click="goBack" class="tool-btn !px-3 !py-1.5" title="Quay lại studio thiết kế">
             <span class="rotate-180"><StudioIcon name="arrowRight" size="h-3.5 w-3.5" /></span> Về Studio
@@ -299,31 +299,31 @@ onMounted(async () => {
         </button>
         <button @click="switchTab('uploads')" class="seg-btn !py-2" :class="store.libraryTab === 'uploads' ? 'is-active' : ''" title="File đã tải lên">
           <StudioIcon name="folderOpen" size="h-4 w-4"/> File tải lên
-          <span v-if="uploadStats.unused_count" class="ml-1 rounded-full bg-red-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-danger">{{ uploadStats.unused_count }}</span>
+          <span v-if="uploadStats.unused_count" class="ml-1 rounded-full bg-red-500/30 px-1.5 py-0.5 text-label font-semibold text-danger">{{ uploadStats.unused_count }}</span>
         </button>
         <button @click="switchTab('suggest')" class="seg-btn !py-2" :class="store.libraryTab === 'suggest' ? 'is-active' : ''" title="Prompt phân tích từ Gợi ý từ ảnh">
           <StudioIcon name="lightbulb" size="h-4 w-4"/> Prompt
-          <span v-if="suggestLibStats.total" class="ml-1 rounded-full bg-brand-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-brand-200">{{ fmtNum(suggestLibStats.total) }}</span>
+          <span v-if="suggestLibStats.total" class="ml-1 rounded-full bg-brand-500/30 px-1.5 py-0.5 text-label font-semibold text-brand-200">{{ fmtNum(suggestLibStats.total) }}</span>
         </button>
       </div>
 
       <!-- ══ Thanh sắp xếp / hiển thị / cỡ lưới (dùng chung cho cả 3 tab) ══ -->
       <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-ink-700 bg-ink-800 p-3">
         <div class="flex items-center gap-1.5">
-          <label class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Sắp xếp theo</label>
+          <label class="text-label font-semibold uppercase tracking-wide text-cream-300">Sắp xếp theo</label>
           <select v-model="activeSort" class="rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-cream-100 focus:border-brand-400 focus:outline-none">
             <option v-for="o in sortOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
         </div>
         <div class="flex items-center gap-1.5">
-          <label class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Hiển thị theo</label>
+          <label class="text-label font-semibold uppercase tracking-wide text-cream-300">Hiển thị theo</label>
           <div class="seg !p-0.5">
             <button @click="store.libraryView = 'grid'" class="seg-btn !py-1" :class="store.libraryView === 'grid' ? 'is-active' : ''" title="Hiển thị dạng lưới"><StudioIcon name="grid" size="h-3.5 w-3.5" /> Lưới</button>
             <button @click="store.libraryView = 'list'" class="seg-btn !py-1" :class="store.libraryView === 'list' ? 'is-active' : ''" title="Hiển thị dạng danh sách"><StudioIcon name="list" size="h-3.5 w-3.5" /> Danh sách</button>
           </div>
         </div>
         <div class="flex items-center gap-1.5">
-          <label class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Cỡ lưới ảnh</label>
+          <label class="text-label font-semibold uppercase tracking-wide text-cream-300">Cỡ lưới ảnh</label>
           <div class="seg !p-0.5">
             <button @click="store.libraryGrid = 's'" class="seg-btn !px-2.5 !py-1" :class="store.libraryGrid === 's' ? 'is-active' : ''" title="Lưới nhỏ (nhiều cột)">S</button>
             <button @click="store.libraryGrid = 'm'" class="seg-btn !px-2.5 !py-1" :class="store.libraryGrid === 'm' ? 'is-active' : ''" title="Lưới vừa">M</button>
@@ -336,34 +336,34 @@ onMounted(async () => {
       <!-- ══ Thống kê ══ -->
       <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-          <p class="text-[10px] uppercase tracking-wide text-cream-400">Tổng mục</p>
+          <p class="text-label uppercase tracking-wide text-cream-400">Tổng mục</p>
           <p class="text-lg font-semibold text-cream-100">{{ fmtNum(stats.total ?? store.libraryTotal) }}</p>
         </div>
         <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-          <p class="text-[10px] uppercase tracking-wide text-cream-400">Hoàn tất</p>
+          <p class="text-label uppercase tracking-wide text-cream-400">Hoàn tất</p>
           <p class="text-lg font-semibold text-ok">{{ fmtNum(stats.completed ?? 0) }}</p>
         </div>
         <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-          <p class="text-[10px] uppercase tracking-wide text-cream-400">Đã gắn dự án</p>
+          <p class="text-label uppercase tracking-wide text-cream-400">Đã gắn dự án</p>
           <p class="text-lg font-semibold text-brand-300">{{ fmtNum(stats.project_linked_count ?? 0) }}</p>
         </div>
         <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-          <p class="text-[10px] uppercase tracking-wide text-cream-400">Ảnh rác</p>
+          <p class="text-label uppercase tracking-wide text-cream-400">Ảnh rác</p>
           <p class="text-lg font-semibold text-warn">{{ fmtNum(stats.junk_count ?? 0) }}</p>
-          <p v-if="stats.junk_bytes" class="text-[10px] text-cream-400">{{ fmtBytes(stats.junk_bytes) }}</p>
+          <p v-if="stats.junk_bytes" class="text-label text-cream-400">{{ fmtBytes(stats.junk_bytes) }}</p>
         </div>
         <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-          <p class="text-[10px] uppercase tracking-wide text-cream-400">Ảnh cũ</p>
+          <p class="text-label uppercase tracking-wide text-cream-400">Ảnh cũ</p>
           <p class="text-lg font-semibold text-info">{{ fmtNum(stats.old_count ?? 0) }}</p>
-          <p v-if="stats.old_bytes" class="text-[10px] text-cream-400">{{ fmtBytes(stats.old_bytes) }}</p>
+          <p v-if="stats.old_bytes" class="text-label text-cream-400">{{ fmtBytes(stats.old_bytes) }}</p>
         </div>
         <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-          <p class="text-[10px] uppercase tracking-wide text-cream-400">File mồ côi</p>
+          <p class="text-label uppercase tracking-wide text-cream-400">File mồ côi</p>
           <p class="text-lg font-semibold text-danger">{{ fmtNum(stats.orphan_count ?? 0) }}</p>
-          <p v-if="stats.orphan_bytes" class="text-[10px] text-cream-400">{{ fmtBytes(stats.orphan_bytes) }}</p>
+          <p v-if="stats.orphan_bytes" class="text-label text-cream-400">{{ fmtBytes(stats.orphan_bytes) }}</p>
         </div>
         <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-          <p class="text-[10px] uppercase tracking-wide text-cream-400">Ngưỡng ảnh cũ</p>
+          <p class="text-label uppercase tracking-wide text-cream-400">Ngưỡng ảnh cũ</p>
           <div class="mt-1 flex items-center gap-1">
             <input v-model.number="store.libraryFilters.old_days" type="number" min="1" max="365" @change="onChangeOldDays"
                    class="w-16 rounded-lg border border-ink-700 bg-ink-900 px-2 py-1 text-sm text-cream-100 focus:border-brand-400 focus:outline-none" />
@@ -375,19 +375,19 @@ onMounted(async () => {
       <!-- ══ Bộ lọc ══ -->
       <div class="mb-4 flex flex-wrap items-end gap-2 rounded-lg border border-ink-700 bg-ink-800 p-3">
         <div class="w-36">
-          <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-cream-300">Loại</label>
+          <label class="mb-1 block text-label font-semibold uppercase tracking-wide text-cream-300">Loại</label>
           <select @change="onChangeType" class="w-full rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-cream-100 focus:border-brand-400 focus:outline-none">
             <option v-for="t in types" :key="t.value" :value="t.value" :selected="store.libraryFilters.type === t.value">{{ t.label }}</option>
           </select>
         </div>
         <div class="w-44">
-          <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-cream-300">Trạng thái</label>
+          <label class="mb-1 block text-label font-semibold uppercase tracking-wide text-cream-300">Trạng thái</label>
           <select @change="onChangeStatus" class="w-full rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-cream-100 focus:border-brand-400 focus:outline-none">
             <option v-for="s in statuses" :key="s.value" :value="s.value" :selected="store.libraryFilters.status === s.value">{{ s.label }}</option>
           </select>
         </div>
         <div class="w-44">
-          <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-cream-300">Bộ sưu tập</label>
+          <label class="mb-1 block text-label font-semibold uppercase tracking-wide text-cream-300">Bộ sưu tập</label>
           <select @change="onChangeProject" class="w-full rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-cream-100 focus:border-brand-400 focus:outline-none">
             <option value="" :selected="!store.libraryFilters.project_id">Tất cả bộ sưu tập</option>
             <option value="none" :selected="store.libraryFilters.project_id === 'none'">Chưa gắn bộ sưu tập</option>
@@ -411,7 +411,7 @@ onMounted(async () => {
           </div>
         </div>
         <div class="min-w-[200px] flex-1">
-          <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-cream-300">Tìm prompt / model</label>
+          <label class="mb-1 block text-label font-semibold uppercase tracking-wide text-cream-300">Tìm prompt / model</label>
           <input :value="store.libraryFilters.q" @input="onSearchInput" type="text" placeholder="Nhập từ khóa…"
                  class="w-full rounded-lg border border-ink-700 bg-ink-900 px-3 py-1.5 text-sm text-cream-100 placeholder:text-cream-400 focus:border-brand-400 focus:outline-none" />
         </div>
@@ -477,7 +477,7 @@ onMounted(async () => {
             </div>
 
             <!-- Badge trạng thái -->
-            <span class="absolute left-2 top-2 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+            <span class="absolute left-2 top-2 rounded-full border px-2 py-0.5 text-tiny font-semibold uppercase tracking-wide"
                   :class="{
                     'border-emerald-500/40 bg-emerald-500/15 text-ok': g.status === 'completed',
                     'border-red-500/40 bg-red-500/15 text-danger': g.status === 'failed',
@@ -490,14 +490,14 @@ onMounted(async () => {
 
             <!-- Overlay hover -->
             <div class="absolute inset-0 bg-black/40 opacity-0 transition group-hover:opacity-100"></div>
-            <div class="absolute inset-x-0 bottom-0 p-2 text-[10px] text-cream-100 opacity-0 transition group-hover:opacity-100">
+            <div class="absolute inset-x-0 bottom-0 p-2 text-label text-cream-100 opacity-0 transition group-hover:opacity-100">
               {{ store.genName(g) }} <span v-if="g.created_at" class="text-cream-300">· {{ g.created_at }}</span>
-              <span v-if="seedLabel(g)" class="ml-1 rounded bg-ink-900/80 px-1 py-0.5 text-[9px] text-brand-200">{{ seedLabel(g) }}</span>
+              <span v-if="seedLabel(g)" class="ml-1 rounded bg-ink-900/80 px-1 py-0.5 text-tiny text-brand-200">{{ seedLabel(g) }}</span>
             </div>
           </div>
 
           <!-- Badge dự án -->
-          <div v-if="g.project" @click.stop="clickProjectChip(g)" class="absolute left-2 top-8 flex cursor-pointer items-center gap-1 rounded-full border border-ink-600/60 bg-ink-900/80 px-1.5 py-0.5 text-[9px] font-semibold text-cream-300 hover:border-brand-500/60 hover:bg-brand-600/30 hover:text-brand-200 transition">
+          <div v-if="g.project" @click.stop="clickProjectChip(g)" class="absolute left-2 top-8 flex cursor-pointer items-center gap-1 rounded-full border border-ink-600/60 bg-ink-900/80 px-1.5 py-0.5 text-tiny font-semibold text-cream-300 hover:border-brand-500/60 hover:bg-brand-600/30 hover:text-brand-200 transition">
             <span class="inline-block h-1.5 w-1.5 rounded-full flex-shrink-0" :style="{ backgroundColor: getProjectColor(g) }"></span>
             <span class="max-w-[80px] truncate">{{ g.project }}</span>
           </div>
@@ -518,22 +518,22 @@ onMounted(async () => {
              :class="isSelected(g.id) ? 'border-brand-400' : 'border-ink-700 hover:border-brand-500/50'">
           <div class="h-16 w-12 shrink-0 cursor-pointer overflow-hidden rounded-md bg-ink-900" @click="openViewer(g)">
             <img v-if="g.media_url" :src="thumbUrl(g.media_url, 320)" class="h-full w-full object-cover" loading="lazy" @error="onThumbError($event, g.media_url)">
-            <div v-else class="grid h-full w-full place-items-center text-[10px] text-cream-400">{{ g.status === 'failed' ? 'Lỗi' : (g.type === 'video' ? '▶' : '—') }}</div>
+            <div v-else class="grid h-full w-full place-items-center text-label text-cream-400">{{ g.status === 'failed' ? 'Lỗi' : (g.type === 'video' ? '▶' : '—') }}</div>
           </div>
           <div class="min-w-0 flex-1 cursor-pointer" @click="openViewer(g)">
             <div class="flex flex-wrap items-center gap-1.5">
               <span class="truncate text-xs font-semibold text-cream-100">{{ store.genName(g) }}</span>
-              <span class="rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+              <span class="rounded-full border px-1.5 py-0.5 text-tiny font-semibold uppercase tracking-wide"
                     :class="{
                       'border-emerald-500/40 bg-emerald-500/15 text-ok': g.status === 'completed',
                       'border-red-500/40 bg-red-500/15 text-danger': g.status === 'failed',
                       'border-ink-600 bg-ink-800 text-cream-300': g.status === 'cancelled',
                       'border-amber-500/40 bg-amber-500/15 text-warn': ['pending','processing'].includes(g.status),
                     }">{{ statusLabel(g.status) }}</span>
-              <span v-if="g.type === 'video'" class="rounded-full bg-ink-700 px-1.5 py-0.5 text-[9px] text-cream-300">Video</span>
-              <span v-if="seedLabel(g)" class="rounded-full bg-brand-600/20 px-1.5 py-0.5 text-[9px] text-brand-200">{{ seedLabel(g) }}</span>
+              <span v-if="g.type === 'video'" class="rounded-full bg-ink-700 px-1.5 py-0.5 text-tiny text-cream-300">Video</span>
+              <span v-if="seedLabel(g)" class="rounded-full bg-brand-600/20 px-1.5 py-0.5 text-tiny text-brand-200">{{ seedLabel(g) }}</span>
             </div>
-            <p class="mt-0.5 truncate text-[10px] text-cream-400">{{ g.model || '—' }} · {{ g.created_at }}</p>
+            <p class="mt-0.5 truncate text-label text-cream-400">{{ g.model || '—' }} · {{ g.created_at }}</p>
           </div>
           <button v-if="store.libraryManage" @click.stop="store.toggleLibrarySelect(g.id)"
                   class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border text-sm"
@@ -556,20 +556,20 @@ onMounted(async () => {
       <template v-else-if="store.libraryTab === 'uploads'">
         <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-            <p class="text-[10px] uppercase tracking-wide text-cream-400">Tổng file</p>
+            <p class="text-label uppercase tracking-wide text-cream-400">Tổng file</p>
             <p class="text-lg font-semibold text-cream-100">{{ fmtNum(uploadStats.total ?? store.uploadItems.length) }}</p>
           </div>
           <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-            <p class="text-[10px] uppercase tracking-wide text-cream-400">Dung lượng</p>
+            <p class="text-label uppercase tracking-wide text-cream-400">Dung lượng</p>
             <p class="text-lg font-semibold text-cream-100">{{ fmtBytes(uploadStats.total_bytes ?? 0) }}</p>
           </div>
           <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-            <p class="text-[10px] uppercase tracking-wide text-cream-400">File mồ côi (chưa dùng)</p>
+            <p class="text-label uppercase tracking-wide text-cream-400">File mồ côi (chưa dùng)</p>
             <p class="text-lg font-semibold text-danger">{{ fmtNum(uploadUnusedCount) }}</p>
-            <p v-if="uploadStats.unused_bytes" class="text-[10px] text-cream-400">{{ fmtBytes(uploadStats.unused_bytes) }}</p>
+            <p v-if="uploadStats.unused_bytes" class="text-label text-cream-400">{{ fmtBytes(uploadStats.unused_bytes) }}</p>
           </div>
           <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-            <p class="text-[10px] uppercase tracking-wide text-cream-400">Đang dùng</p>
+            <p class="text-label uppercase tracking-wide text-cream-400">Đang dùng</p>
             <p class="text-lg font-semibold text-ok">{{ fmtNum((uploadStats.total ?? 0) - (uploadStats.unused_count ?? 0)) }}</p>
           </div>
         </div>
@@ -613,16 +613,16 @@ onMounted(async () => {
                :class="isUploadSelected(f.rel) ? 'border-brand-400' : (f.used ? 'border-ink-700' : 'border-red-500/40')">
             <div class="relative cursor-pointer">
               <img :src="thumbUrl(f.url, 480)" class="aspect-square w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, f.url)">
-              <span v-if="f.used" class="absolute left-2 top-2 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-semibold text-ok">đang dùng</span>
-              <span v-else class="absolute left-2 top-2 rounded-full border border-red-500/40 bg-red-500/15 px-2 py-0.5 text-[9px] font-semibold text-danger">chưa dùng</span>
+              <span v-if="f.used" class="absolute left-2 top-2 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-tiny font-semibold text-ok">đang dùng</span>
+              <span v-else class="absolute left-2 top-2 rounded-full border border-red-500/40 bg-red-500/15 px-2 py-0.5 text-tiny font-semibold text-danger">chưa dùng</span>
               <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-2 pb-1.5 pt-6">
-                <p class="truncate text-[10px] font-medium text-cream-100">{{ f.name }}</p>
-                <p class="truncate text-[9px] text-cream-300">{{ f.width }}×{{ f.height }} · {{ fmtBytes(f.size) }} · {{ f.kind === 'asset' ? 'tài nguyên' : 'ảnh nguồn' }}</p>
+                <p class="truncate text-label font-medium text-cream-100">{{ f.name }}</p>
+                <p class="truncate text-tiny text-cream-300">{{ f.width }}×{{ f.height }} · {{ fmtBytes(f.size) }} · {{ f.kind === 'asset' ? 'tài nguyên' : 'ảnh nguồn' }}</p>
               </div>
             </div>
             <div class="border-t border-ink-700/60 bg-ink-800/80 px-2 py-1.5">
               <select :value="f.project_id || ''" @change="onUploadProject(f, $event.target.value)"
-                      class="w-full rounded-md border border-ink-700 bg-ink-900 px-1.5 py-1 text-[10px] text-cream-200 outline-none focus:border-brand-500"
+                      class="w-full rounded-md border border-ink-700 bg-ink-900 px-1.5 py-1 text-label text-cream-200 outline-none focus:border-brand-500"
                       :title="f.project_id ? 'Đang thuộc một bộ sưu tập — đổi hoặc bỏ gắn' : 'Gắn ảnh này vào một bộ sưu tập'">
                 <option value="">— Chưa gắn bộ sưu tập —</option>
                 <option v-for="p in projectOptions" :key="p.id" :value="p.id">{{ p.name }}</option>
@@ -637,8 +637,8 @@ onMounted(async () => {
             <div v-else-if="!f.used" class="absolute right-2 top-2 flex gap-1 transition"
                  :class="confirmUploadDelete === f.rel ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
               <template v-if="confirmUploadDelete === f.rel">
-                <button @click.stop="runUploadDelete" class="rounded-lg bg-red-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-red-500">Xóa</button>
-                <button @click.stop="cancelUploadDelete" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
+                <button @click.stop="runUploadDelete" class="rounded-lg bg-red-600 px-2 py-1 text-label font-semibold text-white hover:bg-red-500">Xóa</button>
+                <button @click.stop="cancelUploadDelete" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-label font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
               </template>
               <button v-else @click.stop="askUploadDelete(f)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-red-500 hover:bg-red-600/30 hover:text-danger" title="Xóa file"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
             </div>
@@ -655,12 +655,12 @@ onMounted(async () => {
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5">
               <p class="truncate text-xs font-medium text-cream-100">{{ f.name }}</p>
-              <span v-if="f.used" class="shrink-0 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-ok">đang dùng</span>
-              <span v-else class="shrink-0 rounded-full border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-danger">chưa dùng</span>
+              <span v-if="f.used" class="shrink-0 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-tiny font-semibold text-ok">đang dùng</span>
+              <span v-else class="shrink-0 rounded-full border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-tiny font-semibold text-danger">chưa dùng</span>
             </div>
-            <p class="truncate text-[10px] text-cream-400">{{ f.width }}×{{ f.height }} · {{ fmtBytes(f.size) }} · {{ f.kind === 'asset' ? 'tài nguyên' : 'ảnh nguồn' }}</p>
+            <p class="truncate text-label text-cream-400">{{ f.width }}×{{ f.height }} · {{ fmtBytes(f.size) }} · {{ f.kind === 'asset' ? 'tài nguyên' : 'ảnh nguồn' }}</p>
             <select :value="f.project_id || ''" @change="onUploadProject(f, $event.target.value)"
-                    class="mt-1 w-full max-w-[220px] rounded-md border border-ink-700 bg-ink-900 px-1.5 py-0.5 text-[10px] text-cream-200 outline-none focus:border-brand-500"
+                    class="mt-1 w-full max-w-[220px] rounded-md border border-ink-700 bg-ink-900 px-1.5 py-0.5 text-label text-cream-200 outline-none focus:border-brand-500"
                     :title="f.project_id ? 'Đang thuộc một bộ sưu tập — đổi hoặc bỏ gắn' : 'Gắn ảnh này vào một bộ sưu tập'">
               <option value="">— Chưa gắn bộ sưu tập —</option>
               <option v-for="p in projectOptions" :key="p.id" :value="p.id">{{ p.name }}</option>
@@ -675,8 +675,8 @@ onMounted(async () => {
           <div v-else-if="!f.used" class="flex shrink-0 gap-1 transition"
                :class="confirmUploadDelete === f.rel ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
             <template v-if="confirmUploadDelete === f.rel">
-              <button @click.stop="runUploadDelete" class="rounded-lg bg-red-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-red-500">Xóa</button>
-              <button @click.stop="cancelUploadDelete" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
+              <button @click.stop="runUploadDelete" class="rounded-lg bg-red-600 px-2 py-1 text-label font-semibold text-white hover:bg-red-500">Xóa</button>
+              <button @click.stop="cancelUploadDelete" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-label font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
             </template>
             <button v-else @click.stop="askUploadDelete(f)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-red-500 hover:bg-red-600/30 hover:text-danger" title="Xóa file"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
           </div>

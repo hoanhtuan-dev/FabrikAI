@@ -152,7 +152,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
           <div class="grid h-9 w-9 place-items-center rounded-md bg-brand-600/15 text-brand-300"><StudioIcon name="image" size="h-4.5 w-4.5"/></div>
           <div>
             <p class="text-sm font-semibold text-cream-100">{{ title }}</p>
-            <p class="text-[11px] text-cream-400">{{ refs.length + output.length }} ảnh<template v-if="query"> · “{{ query }}”</template></p>
+            <p class="text-body text-cream-400">{{ refs.length + output.length }} ảnh<template v-if="query"> · “{{ query }}”</template></p>
           </div>
         </div>
         <button @click="close" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 transition-colors hover:bg-ink-700 hover:text-white" title="Đóng" :aria-label="'Đóng'"><StudioIcon name="x" size="h-4 w-4"/></button>
@@ -171,7 +171,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
           <div class="mb-3 grid gap-2" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
             <div v-for="g in output" :key="g.key" class="group relative cursor-pointer overflow-hidden rounded-md border transition-colors" :class="isSel({ ...g, kind: 'output' }) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" style="padding-bottom: 100%" @click="clickItem({ ...g, kind: 'output' })">
               <img :src="thumbUrl(g.url)" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt="" @error="onThumbError($event, g.url)">
-              <span class="absolute inset-x-0 bottom-0 truncate bg-scrim/60 px-1 py-0.5 text-[9px] text-scrim-content">{{ g.name }}</span>
+              <span class="absolute inset-x-0 bottom-0 truncate bg-scrim/60 px-1 py-0.5 text-tiny text-scrim-content">{{ g.name }}</span>
             </div>
           </div>
         </template>
@@ -197,11 +197,11 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
         <div class="grid content-start gap-2.5" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
           <div v-for="it in sortedRefs" :key="it.name" class="group relative cursor-pointer overflow-hidden rounded-md border transition-colors" :class="isSel({ ...it, key: 'ref-' + it.name, kind: 'ref' }) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" :title="it.name" style="padding-bottom: 100%" @click="clickItem({ key: 'ref-' + it.name, url: it.url, name: it.name, kind: 'ref' })">
             <img :src="thumbUrl(it.url)" class="absolute inset-0 h-full w-full object-cover" loading="lazy" alt="" @error="onThumbError($event, it.url)">
-            <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-ok"><StudioIcon name="check" size="h-3 w-3"/>đang dùng</span>
+            <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-tiny font-medium text-ok"><StudioIcon name="check" size="h-3 w-3"/>đang dùng</span>
             <button v-if="!it.used" @click.stop="delRef(it)" class="absolute right-1.5 top-1.5 hidden h-6 w-6 place-items-center rounded-full bg-red-600/90 text-white transition-colors hover:bg-red-500 group-hover:grid" title="Xóa ảnh" :aria-label="'Xóa ảnh'"><StudioIcon name="trash" size="h-3.5 w-3.5"/></button>
             <div class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-1.5 pb-1 pt-5">
-              <p class="truncate text-[10px] font-medium text-cream-100">{{ it.name }}</p>
-              <p class="truncate text-[9px] text-cream-300">{{ it.width }}×{{ it.height }} · {{ fmtSize(it.size) }}</p>
+              <p class="truncate text-label font-medium text-cream-100">{{ it.name }}</p>
+              <p class="truncate text-tiny text-cream-300">{{ it.width }}×{{ it.height }} · {{ fmtSize(it.size) }}</p>
             </div>
           </div>
           <div v-if="!sortedRefs.length" class="col-span-full flex flex-col items-center justify-center gap-2 py-8 text-center">
@@ -211,7 +211,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
       </div>
 
       <div class="mt-3 flex shrink-0 items-center justify-between gap-2">
-        <span class="text-[11px] text-cream-300">
+        <span class="text-body text-cream-300">
           <template v-if="isPick">Nhấn 1 ảnh để chọn vào slot.</template>
           <template v-else>{{ totalSel ? 'Đã chọn ' + totalSel + ' ảnh' : 'Chọn 1 hoặc nhiều ảnh để thêm vào canvas' }}</template>
         </span>

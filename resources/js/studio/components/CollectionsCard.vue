@@ -10,6 +10,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useStudioStore } from '../store.js';
+import { EXPORT_CHANNELS } from '../exportChannels.js';
 import StudioIcon from './StudioIcon.vue';
 
 const store = useStudioStore();
@@ -49,7 +50,7 @@ const shareInfo = ref(null);
 const shareDays = ref(30);
 
 const exportOpen = ref(false);
-const exportForm = ref({ sizes: '', note: '' });
+const exportForm = ref({ sizes: '', note: '', channel: '' });
 
 const createOpen = ref(false);
 const saving = ref(false);
@@ -255,7 +256,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 </script>
 
 <template>
-  <div class="card overflow-hidden" style="background: linear-gradient(160deg, rgba(56,129,90,.08), rgba(74,122,144,.04));">
+  <div class="card overflow-hidden">
     <!-- ══ HEADER: gọn, có link sang trang đầy đủ ══ -->
     <div class="flex items-center gap-2 px-4 py-3">
       <span class="grid h-7 w-7 place-items-center rounded-lg bg-brand-500/15 text-brand-300">
@@ -274,9 +275,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
     <div v-if="applied" class="mx-3 mb-3 rounded-xl border border-brand-500/25 bg-brand-600/8 p-3">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0 flex-1">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-200">Đang làm</p>
+          <p class="text-label font-semibold uppercase tracking-wide text-brand-200">Đang làm</p>
           <p class="mt-0.5 truncate text-sm font-semibold text-cream-50">{{ applied.name }}</p>
-          <div class="mt-1.5 flex flex-wrap items-center gap-1 text-[10px]">
+          <div class="mt-1.5 flex flex-wrap items-center gap-1 text-label">
             <span class="rounded-full px-2 py-0.5 font-semibold" :class="statusClass(applied)">{{ applied.status_label || applied.status }}</span>
             <span class="rounded-full bg-ink-800 px-2 py-0.5 text-cream-200">{{ applied.generations_count || 0 }} ảnh</span>
             <span v-if="applied.deadline" class="rounded-full px-2 py-0.5 font-semibold" :class="deadlineClass(applied.deadline)">{{ deadlineLabel(applied.deadline) }}</span>
@@ -289,11 +290,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 
       <!-- [R3] Tiến độ duyệt 6 bước — dạng CHIP NGANG, ngắn gọn cho sidebar -->
       <div class="mt-2.5">
-        <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cream-400">Tiến trình duyệt</p>
+        <p class="mb-1 text-label font-semibold uppercase tracking-wide text-cream-400">Tiến trình duyệt</p>
         <div class="flex items-center gap-1 overflow-x-auto scrollbar-hide">
           <span
             v-for="step in workflowProgress" :key="step.state"
-            class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold transition"
+            class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-label font-semibold transition"
             :class="step.count
               ? 'border-brand-500/40 bg-brand-600/15 text-brand-200'
               : 'border-ink-700/60 bg-ink-900/50 text-cream-400'"
@@ -301,7 +302,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           >
             <span class="h-1.5 w-1.5 shrink-0 rounded-full" :class="step.count ? 'bg-brand-400' : 'bg-ink-700'"></span>
             {{ step.label }}
-            <span v-if="step.count" class="rounded-full bg-brand-600/25 px-1 py-0.5 text-[9px]">{{ step.count }}</span>
+            <span v-if="step.count" class="rounded-full bg-brand-600/25 px-1 py-0.5 text-tiny">{{ step.count }}</span>
           </span>
         </div>
       </div>
@@ -309,12 +310,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
       <!-- Chi phí & tiến độ thật (từ máy chủ) -->
       <div v-if="stats" class="mt-2.5 rounded-lg border border-ink-700/60 bg-ink-900/50 p-2">
         <div class="flex items-center justify-between">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Chi phí &amp; tiến độ</p>
+          <p class="text-label font-semibold uppercase tracking-wide text-cream-400">Chi phí &amp; tiến độ</p>
           <button class="icon-btn !h-4 !w-4" title="Nạp lại" @click="store.loadProjectStats(applied.id, true)">
             <StudioIcon name="refresh" size="h-3 w-3" />
           </button>
         </div>
-        <div class="mt-1.5 flex flex-wrap gap-1 text-[10px]">
+        <div class="mt-1.5 flex flex-wrap gap-1 text-label">
           <span class="rounded-full bg-emerald-500/12 px-2 py-0.5 font-semibold text-ok">{{ stats.images.completed }} xong</span>
           <span v-if="stats.images.running" class="rounded-full bg-sky-500/12 px-2 py-0.5 font-semibold text-info">{{ stats.images.running }} chạy</span>
           <span v-if="stats.images.failed" class="rounded-full bg-red-500/12 px-2 py-0.5 font-semibold text-danger">{{ stats.images.failed }} lỗi</span>
@@ -323,7 +324,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
             {{ stats.deadline.days_left < 0 ? 'Quá hạn ' + Math.abs(stats.deadline.days_left) : (stats.deadline.days_left === 0 ? 'Hạn hôm nay' : 'Còn ' + stats.deadline.days_left) }}
           </span>
         </div>
-        <p v-if="stats.feedback.latest && stats.feedback.latest.message" class="mt-1 text-[10px] leading-relaxed text-cream-300">
+        <p v-if="stats.feedback.latest && stats.feedback.latest.message" class="mt-1 text-label leading-relaxed text-cream-300">
           <b class="text-brand-200">Khách ({{ stats.feedback.latest.decision_label }}):</b> «{{ stats.feedback.latest.message }}»
         </p>
       </div>
@@ -348,22 +349,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
     <!-- ══ CHƯA CHỌN BỘ NÀO ══ -->
     <div v-else class="mx-3 mb-3 rounded-xl border border-dashed border-ink-600 bg-ink-900/30 p-3 text-center">
       <p class="text-xs text-cream-300">Chưa chọn bộ sưu tập.</p>
-      <p class="mt-0.5 text-[10px] text-cream-400">Ảnh tạo ra không tự gắn vào đâu — chọn bộ bên dưới hoặc tạo mới.</p>
+      <p class="mt-0.5 text-label text-cream-400">Ảnh tạo ra không tự gắn vào đâu — chọn bộ bên dưới hoặc tạo mới.</p>
     </div>
 
     <!-- ══ DUYỆT MẪU (khối inline gọn) ══ -->
     <div v-if="reviewOpen && applied" class="mx-3 mb-3 rounded-xl border border-ink-700 bg-ink-900/70 p-2.5">
       <div class="flex items-center justify-between gap-2">
-        <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Duyệt mẫu</p>
+        <p class="text-label font-semibold uppercase tracking-wide text-cream-300">Duyệt mẫu</p>
         <button class="icon-btn !h-5 !w-5" title="Đóng" @click="reviewOpen = false">
           <StudioIcon name="x" size="h-3 w-3" />
         </button>
       </div>
-      <p class="mt-1 text-[10px] text-cream-300">
+      <p class="mt-1 text-label text-cream-300">
         {{ shots.length }} ảnh · <span class="text-warn">{{ awaiting.length }} chờ</span> ·
         <span class="text-ok">{{ approvedCount }} duyệt</span> · <span class="text-danger">{{ rejectedCount }} loại</span>
       </p>
-      <div v-if="!shots.length" class="mt-2 rounded-lg border border-dashed border-ink-700 p-3 text-center text-[10px] text-cream-400">
+      <div v-if="!shots.length" class="mt-2 rounded-lg border border-dashed border-ink-700 p-3 text-center text-label text-cream-400">
         Chưa có ảnh tạo xong — duyệt được ngay khi ảnh render xong.
       </div>
       <template v-else>
@@ -379,10 +380,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
               <StudioIcon name="image" size="h-4 w-4" />
             </span>
             <span class="min-w-0 flex-1">
-              <span class="block truncate text-[11px] font-semibold text-cream-100">#{{ s.id }}</span>
-              <span class="block truncate text-[10px] text-cream-300">{{ s.shot_label }}</span>
+              <span class="block truncate text-body font-semibold text-cream-100">#{{ s.id }}</span>
+              <span class="block truncate text-label text-cream-300">{{ s.shot_label }}</span>
             </span>
-            <span class="rounded-full px-1.5 py-0.5 text-[9px] font-bold" :class="stateTone(s.shot_state)">{{ s.shot_label }}</span>
+            <span class="rounded-full px-1.5 py-0.5 text-tiny font-bold" :class="stateTone(s.shot_state)">{{ s.shot_label }}</span>
             <span v-if="shotsSel.includes(s.id)" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500 text-on-accent">
               <StudioIcon name="check" size="h-3 w-3" />
             </span>
@@ -398,16 +399,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('rejected')">
             <StudioIcon name="ban" size="h-3.5 w-3.5" /> Loại {{ selectedCount }}
           </button>
-        <p v-if="!reviewBusy && !selectedCount" class="mt-1.5 text-[10px] leading-4 text-warn">↳ Chưa chọn ảnh nào — bấm vào ảnh trong danh sách trên để chọn trước khi duyệt.</p>
+        <p v-if="!reviewBusy && !selectedCount" class="mt-1.5 text-label leading-4 text-warn">↳ Chưa chọn ảnh nào — bấm vào ảnh trong danh sách trên để chọn trước khi duyệt.</p>
         </div>
-        <p class="mt-1.5 text-[9px] text-cream-400">
+        <p class="mt-1.5 text-tiny text-cream-400">
           Phím tắt khi khối này đang mở: S chọn ảnh chờ duyệt · N bước tiếp · A duyệt · R loại · Esc đóng
         </p>
 
         <!-- Lỗi TỪNG ẢNH của lượt duyệt. Trước đây state reviewErrors được gán mà KHÔNG nơi nào render
              (đúng loại lỗi "state chết"): bấm Duyệt 5 ảnh, 2 ảnh hỏng, người dùng không thấy vì sao.
              Nêu cả BƯỚC đang ở (store.shotLabel) để biết ảnh kẹt ở đâu. -->
-        <ul v-if="reviewErrors.length" class="mt-2 space-y-1 rounded-lg border border-red-500/40 bg-danger/10 p-2 text-[10px] text-danger">
+        <ul v-if="reviewErrors.length" class="mt-2 space-y-1 rounded-lg border border-red-500/40 bg-danger/10 p-2 text-label text-danger">
           <li v-for="err in reviewErrors" :key="err.id">Ảnh #{{ err.id }} ({{ store.shotLabel(err.shot_state) }}): {{ err.error }}</li>
         </ul>
       </template>
@@ -416,22 +417,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
     <!-- ══ CHIA SẺ ══ -->
     <div v-if="shareOpen && applied" class="mx-3 mb-3 rounded-xl border border-ink-700 bg-ink-900/70 p-2.5">
       <div class="flex items-center justify-between">
-        <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Chia sẻ cho khách</p>
+        <p class="text-label font-semibold uppercase tracking-wide text-cream-300">Chia sẻ cho khách</p>
         <button class="icon-btn !h-5 !w-5" @click="shareOpen = false"><StudioIcon name="x" size="h-3 w-3" /></button>
       </div>
-      <div v-if="!shareInfo" class="py-3 text-center text-[10px] text-cream-400">Đang tải…</div>
+      <div v-if="!shareInfo" class="py-3 text-center text-label text-cream-400">Đang tải…</div>
       <template v-else>
         <div v-if="shareInfo.share" class="space-y-1.5">
-          <input :value="shareInfo.share.url" readonly class="input !py-1.5 text-[10px]" @focus="$event.target.select()">
+          <input :value="shareInfo.share.url" readonly class="input !py-1.5 text-label" @focus="$event.target.select()">
           <div class="flex gap-1.5">
             <button class="btn-brand btn-sm flex-1" @click="copyShare()"><StudioIcon name="copy" size="h-3.5 w-3.5" /> Copy</button>
             <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="shareBusy" @click="revokeShare()"><StudioIcon name="ban" size="h-3.5 w-3.5" /> Thu hồi</button>
           </div>
         </div>
         <div v-else class="space-y-2">
-          <p class="text-[10px] leading-relaxed text-cream-300">Tạo link công khai (không cần tài khoản) — khách xem ảnh + gửi phản hồi Duyệt / Yêu cầu sửa.</p>
+          <p class="text-label leading-relaxed text-cream-300">Tạo link công khai (không cần tài khoản) — khách xem ảnh + gửi phản hồi Duyệt / Yêu cầu sửa.</p>
           <div class="flex items-end gap-2">
-            <select v-model.number="shareDays" class="input !py-1.5 text-[10px]">
+            <select v-model.number="shareDays" class="input !py-1.5 text-label">
               <option :value="7">7 ngày</option>
               <option :value="30">30 ngày</option>
               <option :value="90">90 ngày</option>
@@ -440,11 +441,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           </div>
         </div>
         <div v-if="shareInfo.feedback?.length" class="mt-2 rounded-lg border border-brand-500/20 bg-brand-600/8 p-2">
-          <p class="text-[9px] font-bold uppercase tracking-wide text-brand-200">Phản hồi gần nhất</p>
+          <p class="text-tiny font-bold uppercase tracking-wide text-brand-200">Phản hồi gần nhất</p>
           <ul class="mt-1 space-y-1">
-            <li v-for="fb in shareInfo.feedback.slice(0, 2)" :key="fb.id" class="text-[10px]">
+            <li v-for="fb in shareInfo.feedback.slice(0, 2)" :key="fb.id" class="text-label">
               <span class="font-semibold text-cream-100">{{ fb.author_name }}</span>
-              <span class="ml-1 rounded-full px-1 py-0.5 text-[8px] font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'">{{ fb.decision_label }}</span>
+              <span class="ml-1 rounded-full px-1 py-0.5 text-micro font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'">{{ fb.decision_label }}</span>
               <span v-if="fb.message" class="ml-1 text-cream-300">{{ fb.message }}</span>
             </li>
           </ul>
@@ -455,18 +456,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
     <!-- ══ XUẤT GÓI ══ -->
     <div v-if="exportOpen && applied" class="mx-3 mb-3 rounded-xl border border-ink-700 bg-ink-900/70 p-2.5">
       <div class="flex items-center justify-between">
-        <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Xuất gói cho xưởng</p>
+        <p class="text-label font-semibold uppercase tracking-wide text-cream-300">Xuất gói cho xưởng</p>
         <button class="icon-btn !h-5 !w-5" @click="exportOpen = false"><StudioIcon name="x" size="h-3 w-3" /></button>
       </div>
-      <p class="mt-1 text-[10px] leading-relaxed text-cream-300">Gói ZIP gồm: ảnh + phiếu kỹ thuật + bảng size + manifest.</p>
+      <p class="mt-1 text-label leading-relaxed text-cream-300">Gói ZIP gồm: ảnh + phiếu kỹ thuật + bảng size + manifest.</p>
       <div class="mt-2 space-y-2">
         <div>
-          <label class="label mb-1 block text-[10px] uppercase tracking-wide text-cream-400" for="ex-sizes">Bảng size</label>
-          <textarea id="ex-sizes" v-model="exportForm.sizes" rows="2" class="input !py-1.5 text-[10px]" placeholder="S, 84, 68, 92, 58, 56&#10;M, 88, 72, 96, 59, 57"></textarea>
+          <label class="label mb-1 block text-label uppercase tracking-wide text-cream-400" for="ex-sizes">Bảng size</label>
+          <label class="block">
+            <span class="label">Kênh bán (đặt tên file trong gói)</span>
+            <select v-model="exportForm.channel" class="input !py-1.5 text-label" title="Tên ảnh trong gói sẽ có tiền tố theo kênh — sàn TMĐT sắp xếp theo tên file">
+              <option v-for="c in EXPORT_CHANNELS" :key="c.id" :value="c.id">{{ c.label }}</option>
+            </select>
+          </label>
+          <textarea id="ex-sizes" v-model="exportForm.sizes" rows="2" class="input !py-1.5 text-label" placeholder="S, 84, 68, 92, 58, 56&#10;M, 88, 72, 96, 59, 57"></textarea>
         </div>
         <div>
-          <label class="label mb-1 block text-[10px] uppercase tracking-wide text-cream-400" for="ex-note">Ghi chú kỹ thuật</label>
-          <textarea id="ex-note" v-model="exportForm.note" rows="1" class="input !py-1.5 text-[10px]" placeholder="Vải linen 100%, màu trắng ngà, đường may 1cm"></textarea>
+          <label class="label mb-1 block text-label uppercase tracking-wide text-cream-400" for="ex-note">Ghi chú kỹ thuật</label>
+          <textarea id="ex-note" v-model="exportForm.note" rows="1" class="input !py-1.5 text-label" placeholder="Vải linen 100%, màu trắng ngà, đường may 1cm"></textarea>
         </div>
         <div class="flex justify-end gap-2">
           <button class="tool-btn btn-sm" @click="exportOpen = false">Đóng</button>
@@ -481,10 +488,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
       <form class="mt-2 space-y-2" @submit.prevent="submit">
         <input v-model="form.name" class="input !py-1.5 text-xs" placeholder="Tên bộ (VD: Thu Đông 2026)" :disabled="saving">
         <div class="grid grid-cols-2 gap-2">
-          <input v-model="form.season" class="input !py-1.5 text-[10px]" placeholder="Mùa / vụ" :disabled="saving">
-          <input v-model="form.deadline" type="date" class="input !py-1.5 text-[10px]" :disabled="saving">
+          <input v-model="form.season" class="input !py-1.5 text-label" placeholder="Mùa / vụ" :disabled="saving">
+          <input v-model="form.deadline" type="date" class="input !py-1.5 text-label" :disabled="saving">
         </div>
-        <textarea v-model="form.brief" rows="2" class="input !py-1.5 text-[10px]" placeholder="Brief ngắn (tuỳ chọn)" :disabled="saving"></textarea>
+        <textarea v-model="form.brief" rows="2" class="input !py-1.5 text-label" placeholder="Brief ngắn (tuỳ chọn)" :disabled="saving"></textarea>
         <div class="flex justify-end gap-2">
           <button type="button" class="tool-btn btn-sm" :disabled="saving" @click="createOpen = false">Huỷ</button>
           <button type="submit" class="btn-brand btn-sm" :disabled="saving">{{ saving ? 'Đang tạo…' : 'Tạo & áp dụng' }}</button>
@@ -494,12 +501,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 
     <!-- ══ BỘ GẦN ĐÂY (RÚT GỌN) ══ -->
     <div v-if="recent.length" class="border-t border-ink-700/60 px-4 py-3">
-      <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-cream-400">Gần đây</p>
+      <p class="mb-2 text-label font-semibold uppercase tracking-wide text-cream-400">Gần đây</p>
       <ul class="space-y-1.5">
         <li v-for="p in recent" :key="p.id" class="flex items-center justify-between gap-2">
           <button class="min-w-0 flex-1 text-left" @click="pick(p)" :title="'Áp dụng «' + p.name + '»'">
             <span class="motion-ui block truncate text-xs font-medium text-cream-100 hover:text-white">{{ p.name }}</span>
-            <span class="text-[10px] text-cream-400">{{ p.generations_count || 0 }} ảnh · {{ p.status_label || p.status }}</span>
+            <span class="text-label text-cream-400">{{ p.generations_count || 0 }} ảnh · {{ p.status_label || p.status }}</span>
           </button>
           <button class="icon-btn !h-6 !w-6 shrink-0" title="Mở trong Studio" @click="goToStudio(p)">
             <StudioIcon name="arrowRight" size="h-3 w-3" />
@@ -510,11 +517,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 
     <!-- ══ ONBOARDING (khi chưa có bộ nào) ══ -->
     <div v-if="!store.projects.length && !store.projectLoading" class="border-t border-ink-700/60 px-4 py-3">
-      <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Bắt đầu</p>
-      <p class="mt-1 text-[10px] leading-relaxed text-cream-300">
+      <p class="text-label font-semibold uppercase tracking-wide text-cream-400">Bắt đầu</p>
+      <p class="mt-1 text-label leading-relaxed text-cream-300">
         Chưa có bộ sưu tập nào. Tạo bộ đầu tiên để ảnh tạo sau này tự gắn vào đúng chỗ.
       </p>
-      <a href="/bo-suu-tap" class="mt-2 block text-center text-[11px] font-semibold text-brand-300 underline decoration-dotted hover:text-brand-200">
+      <a href="/bo-suu-tap" class="mt-2 block text-center text-body font-semibold text-brand-300 underline decoration-dotted hover:text-brand-200">
         Mở trang Bộ sưu tập đầy đủ →
       </a>
     </div>

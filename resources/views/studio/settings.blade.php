@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi" class="h-full" data-theme="{{ theme_resolved() }}">
+<html lang="vi" class="h-full" data-theme="{{ theme_resolved() }}" style="--font-scale: {{ font_scale_ratio() }}">
 <head>
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">

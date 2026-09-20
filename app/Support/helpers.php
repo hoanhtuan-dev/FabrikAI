@@ -105,17 +105,43 @@ if (! function_exists('studio_fail')) {
      */
     function studio_fail(\Throwable $e, string $context = '', int $status = 500, ?string $safeMessage = null): \Illuminate\Http\JsonResponse
     {
-        \Illuminate\Support\Facades\Log::warning('studio_fail: '.$context, [
+        // Mã tra cứu: khách đọc cho tổng đài, hỗ trợ grep thẳng trong storage/logs/laravel.log.
+        $code = studio_error_code($e);
+        \Illuminate\Support\Facades\Log::warning('studio_fail['.$code.']: '.$context, [
             'exception' => get_class($e),
             'message' => $e->getMessage(),
             'file' => $e->getFile().':'.$e->getLine(),
         ]);
         $msg = $safeMessage ?? ($context !== '' ? $context.' thất bại.' : 'Lỗi hệ thống, vui lòng thử lại.');
-        $payload = ['ok' => false, 'message' => $msg];
+        $payload = ['ok' => false, 'message' => $msg, 'error_code' => $code];
         if (config('app.debug')) {
             $payload['debug'] = $e->getMessage();
         }
         return response()->json($payload, $status);
+    }
+}
+
+if (! function_exists('studio_error_code')) {
+    /**
+     * MÃ TRA CỨU LỖI cho người dùng đọc cho tổng đài (2026-09-23) — ví dụ L-8F3K.
+     *
+     * Vì sao cần: trước đây hỗ trợ phải hỏi khách "lỗi lúc mấy giờ, tài khoản nào" rồi tự dò
+     * storage/logs/laravel.log. Nay mã này có mặt ở CẢ HAI phía — trên màn hình và trong log — nên
+     * chỉ cần khách đọc 6 ký tự là tra được đúng dòng lỗi.
+     *
+     * Sinh từ nội dung + vị trí + thời điểm ⇒ mỗi LẦN lỗi có mã riêng (không lẫn các lần khác nhau).
+     * Bảng chữ CỐ Ý bỏ các ký tự dễ đọc nhầm khi đọc qua điện thoại (0/O, 1/I).
+     */
+    function studio_error_code(\Throwable $e): string
+    {
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        $hash = md5($e->getMessage().'|'.$e->getFile().':'.$e->getLine().'|'.microtime(true));
+        $code = '';
+        for ($i = 0; $i < 4; $i++) {
+            $code .= $alphabet[hexdec(substr($hash, $i * 2, 2)) % strlen($alphabet)];
+        }
+
+        return 'L-'.$code;
     }
 }
 
@@ -309,7 +335,8 @@ if (! function_exists('studio_generation_error')) {
      */
     function studio_generation_error(\Throwable $e, string $prefix = ''): string
     {
-        \Illuminate\Support\Facades\Log::error('Generation failed'.($prefix !== '' ? ' — '.trim($prefix) : ''), [
+        $code = studio_error_code($e);
+        \Illuminate\Support\Facades\Log::error('Generation failed ['.$code.']'.($prefix !== '' ? ' — '.trim($prefix) : ''), [
             'exception' => get_class($e),
             'message' => $e->getMessage(),
             'at' => $e->getFile().':'.$e->getLine(),
@@ -2557,6 +2584,80 @@ if (! function_exists('theme_resolved')) {
     function theme_resolved(): string
     {
         return theme_pref() === 'light' ? 'light' : 'dark';
+    }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   CỠ CHỮ TOÀN CỤC (2026-09-23) — cùng chỗ với theme, cùng cách xử lý.
+   Thang cỡ chữ trong app.css là các token --text-* nhân với --font-scale, nên chỉ cần một con số
+   phần trăm là cả giao diện to/nhỏ theo, không phải sửa từng chỗ.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+if (! function_exists('font_scale_options')) {
+    /** Bốn mức cho người dùng chọn — NGUỒN DUY NHẤT cho cả PHP (whitelist) lẫn giao diện. */
+    function font_scale_options(): array
+    {
+        return [90, 100, 115, 130];
+    }
+}
+
+if (! function_exists('font_scale')) {
+    /**
+     * Mức cỡ chữ của người ĐANG đăng nhập (phần trăm). Chưa chọn ⇒ 100.
+     */
+    function font_scale(): int
+    {
+        $value = (int) (auth()->user()?->font_scale ?? 0);
+
+        return in_array($value, font_scale_options(), true) ? $value : 100;
+    }
+}
+
+if (! function_exists('font_scale_ratio')) {
+    /**
+     * Hệ số để render vào style của thẻ <html>: 1 · 1.15 · 1.3 …
+     *
+     * Render NGAY Ở SERVER (không chờ JS) để trang không nháy cỡ chữ khi tải — cùng lý do với data-theme.
+     */
+    function font_scale_ratio(): string
+    {
+        return rtrim(rtrim(number_format(font_scale() / 100, 2, '.', ''), '0'), '.') ?: '1';
+    }
+}
+
+
+if (! function_exists('export_channels')) {
+    /**
+     * KÊNH BÁN cho tên file trong gói xuất xưởng — NGUỒN DUY NHẤT ở phía server (whitelist).
+     *
+     * ⚠️ Phải khớp danh sách ở resources/js/studio/exportChannels.js (giao diện đọc từ đó). Server
+     * kiểm lại giá trị nhận được, nên hai bên lệch nhau thì request trả 422 — không âm thầm bỏ qua.
+     *
+     * @return array<string,string> khoá = mã kênh ('' = mặc định), giá trị = tiền tố tên file
+     */
+    function export_channels(): array
+    {
+        return [
+            '' => '',
+            'shopee' => 'shopee',
+            'lazada' => 'lazada',
+            'tiktok' => 'tiktok',
+            'catalogue' => 'catalogue',
+            'xuong' => 'xuong',
+        ];
+    }
+}
+
+if (! function_exists('export_channel_prefix')) {
+    /**
+     * Tiền tố tên file của kênh; giá trị lạ ⇒ chuỗi rỗng (mặc định), KHÔNG bao giờ đưa thẳng vào tên file.
+     */
+    function export_channel_prefix(?string $channel): string
+    {
+        $channels = export_channels();
+
+        return $channels[$channel ?? ''] ?? '';
     }
 }
 

@@ -61,15 +61,15 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
         <button
           v-if="store.suggestLibManage"
           @click="store.suggestLibManage = false"
-          class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-[10px] font-semibold text-cream-300 transition hover:bg-ink-700"
+          class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-label font-semibold text-cream-300 transition hover:bg-ink-700"
         >Xong</button>
         <button
           v-else
           @click="store.suggestLibManage = true"
-          class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-[10px] font-semibold text-cream-300 transition hover:bg-ink-700"
+          class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-label font-semibold text-cream-300 transition hover:bg-ink-700"
         >Chọn</button>
       </div>
-      <div class="flex items-center gap-3 text-[10px] text-cream-400">
+      <div class="flex items-center gap-3 text-label text-cream-400">
         <span>{{ fmtNum(stats.total || 0) }} prompt</span>
         <span v-if="stats.applied" class="text-brand-300/70">{{ stats.applied }} đã dùng</span>
         <span v-if="stats.unused" class="text-warn">{{ stats.unused }} chưa dùng</span>
@@ -83,7 +83,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
       </div>
       <div v-else-if="!store.suggestLibItems.length" class="py-16 text-center">
         <p class="text-xs text-cream-400">Chưa có prompt nào được lưu.</p>
-        <p class="mt-1 text-[10px] text-cream-400">Dùng card "Gợi ý từ ảnh" → nhấn "Lưu vào Thư viện Prompt".</p>
+        <p class="mt-1 text-label text-cream-400">Dùng card "Gợi ý từ ảnh" → nhấn "Lưu vào Thư viện Prompt".</p>
       </div>
       <div v-else class="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <div
@@ -115,12 +115,12 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
               <span
                 v-for="s in (item.styles || []).slice(0, 2)"
                 :key="s"
-                class="truncate rounded-full bg-brand-600/20 px-1.5 py-0.5 text-[9px] text-brand-200"
+                class="truncate rounded-full bg-brand-600/20 px-1.5 py-0.5 text-tiny text-brand-200"
               >{{ s }}</span>
-              <span v-if="item.garment_type" class="truncate rounded-full bg-ink-700 px-1.5 py-0.5 text-[9px] text-cream-400">{{ item.garment_type }}</span>
+              <span v-if="item.garment_type" class="truncate rounded-full bg-ink-700 px-1.5 py-0.5 text-tiny text-cream-400">{{ item.garment_type }}</span>
             </div>
-            <p class="mt-1 line-clamp-2 text-[10px] leading-relaxed text-cream-400">{{ item.image_prompt_en || '—' }}</p>
-            <div class="mt-1.5 flex items-center justify-between text-[9px]">
+            <p class="mt-1 line-clamp-2 text-label leading-relaxed text-cream-400">{{ item.image_prompt_en || '—' }}</p>
+            <div class="mt-1.5 flex items-center justify-between text-tiny">
               <span class="text-cream-400">{{ item.created_at }}</span>
               <span v-if="item.apply_count" class="rounded-full bg-emerald-800/40 px-1.5 py-0.5 text-ok">Đã dùng {{ item.apply_count }}x</span>
             </div>
@@ -142,22 +142,22 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
     <div v-if="store.suggestLibManage && selectedCount" class="shrink-0 border-t border-ink-700 bg-ink-900/90 px-4 py-2.5">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <button @click="toggleAll" class="text-[11px] text-brand-300 hover:text-brand-200">
+          <button @click="toggleAll" class="text-body text-brand-300 hover:text-brand-200">
             {{ allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả' }}
           </button>
-          <span class="text-[10px] text-cream-400">Đã chọn {{ selectedCount }}</span>
+          <span class="text-label text-cream-400">Đã chọn {{ selectedCount }}</span>
         </div>
         <div class="flex items-center gap-2">
           <template v-if="!confirmDelete">
             <button
               @click="askBulkDelete"
-              class="rounded-lg border border-red-500/40 bg-red-900/30 px-3 py-1.5 text-[11px] font-semibold text-danger transition hover:bg-red-900/60"
+              class="rounded-lg border border-red-500/40 bg-red-900/30 px-3 py-1.5 text-body font-semibold text-danger transition hover:bg-red-900/60"
             >Xóa {{ selectedCount }} prompt</button>
           </template>
           <template v-else>
-            <span class="text-[10px] text-danger">Xác nhận xóa?</span>
-            <button @click="runConfirm" class="rounded-lg bg-red-600 px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:bg-red-500">Xóa</button>
-            <button @click="cancelConfirm" class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-[11px] text-cream-300 transition hover:bg-ink-700">Hủy</button>
+            <span class="text-label text-danger">Xác nhận xóa?</span>
+            <button @click="runConfirm" class="rounded-lg bg-red-600 px-2.5 py-1.5 text-body font-semibold text-white transition hover:bg-red-500">Xóa</button>
+            <button @click="cancelConfirm" class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-body text-cream-300 transition hover:bg-ink-700">Hủy</button>
           </template>
         </div>
       </div>
@@ -173,16 +173,16 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
           </div>
           <div class="space-y-3 p-4 text-xs">
             <!-- Ảnh nguồn -->
-            <div v-if="item.reference_url" class="flex items-center gap-3 rounded-lg border border-white/10 bg-cream-50/5 p-2">
+            <div v-if="item.reference_url" class="flex items-center gap-3 rounded-lg border border-ink-700 bg-cream-50/5 p-2">
               <img :src="item.reference_thumb || item.reference_url" class="h-16 w-16 rounded-md bg-ink-900 object-cover" @error="onThumbError" />
               <span class="text-cream-400">Ảnh nguồn phân tích</span>
             </div>
 
             <!-- Tags -->
             <div class="flex flex-wrap gap-1.5">
-              <span v-for="s in (item.styles || [])" :key="s" class="rounded-full bg-brand-600/20 px-2 py-0.5 text-[10px] text-brand-200">{{ s }}</span>
-              <span v-if="item.garment_type" class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200"><StudioIcon name="shirt" size="h-3 w-3" /> {{ item.garment_type }}</span>
-              <span v-if="item.embellishment" class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200"><StudioIcon name="sparkles" size="h-3 w-3" /> {{ item.embellishment }}</span>
+              <span v-for="s in (item.styles || [])" :key="s" class="rounded-full bg-brand-600/20 px-2 py-0.5 text-label text-brand-200">{{ s }}</span>
+              <span v-if="item.garment_type" class="rounded-full bg-ink-700 px-2 py-0.5 text-label text-cream-200"><StudioIcon name="shirt" size="h-3 w-3" /> {{ item.garment_type }}</span>
+              <span v-if="item.embellishment" class="rounded-full bg-ink-700 px-2 py-0.5 text-label text-cream-200"><StudioIcon name="sparkles" size="h-3 w-3" /> {{ item.embellishment }}</span>
             </div>
 
             <!-- Chi tiết phân tích -->
@@ -198,34 +198,34 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
             <div v-if="(item.color_palette || []).length">
               <span class="text-cream-400">Bảng màu:</span>
               <div class="mt-1 flex flex-wrap gap-1">
-                <span v-for="c in item.color_palette" :key="c" class="rounded-full bg-ink-700/70 px-2 py-0.5 text-[10px] text-cream-200">{{ c }}</span>
+                <span v-for="c in item.color_palette" :key="c" class="rounded-full bg-ink-700/70 px-2 py-0.5 text-label text-cream-200">{{ c }}</span>
               </div>
             </div>
 
             <!-- Detail notes -->
-            <div v-if="item.detail_notes" class="rounded-md border border-white/10 bg-cream-50/5 p-2 leading-relaxed text-cream-100">
+            <div v-if="item.detail_notes" class="rounded-md border border-ink-700 bg-cream-50/5 p-2 leading-relaxed text-cream-100">
               <span class="text-cream-400">Chi tiết gốc:</span> {{ item.detail_notes }}
             </div>
 
             <!-- Prompt EN -->
             <div>
               <p class="mb-1 font-semibold text-cream-400">Prompt tiếng Anh</p>
-              <div class="max-h-32 overflow-y-auto rounded-md border border-white/10 bg-cream-50/5 p-2 leading-relaxed text-cream-100">{{ item.image_prompt_en || '—' }}</div>
+              <div class="max-h-32 overflow-y-auto rounded-md border border-ink-700 bg-cream-50/5 p-2 leading-relaxed text-cream-100">{{ item.image_prompt_en || '—' }}</div>
             </div>
 
             <!-- Prompt VI -->
             <div v-if="item.prompt_vi">
               <p class="mb-1 font-semibold text-cream-400">Prompt tiếng Việt</p>
-              <div class="max-h-32 overflow-y-auto rounded-md border border-white/10 bg-cream-50/5 p-2 leading-relaxed text-cream-100">{{ item.prompt_vi }}</div>
+              <div class="max-h-32 overflow-y-auto rounded-md border border-ink-700 bg-cream-50/5 p-2 leading-relaxed text-cream-100">{{ item.prompt_vi }}</div>
             </div>
 
             <!-- Keywords -->
             <div v-if="(item.keywords || []).length" class="flex flex-wrap gap-1">
-              <span v-for="k in item.keywords" :key="k" class="rounded-full bg-emerald-800/40 px-2 py-0.5 text-[10px] text-ok">#{{ k }}</span>
+              <span v-for="k in item.keywords" :key="k" class="rounded-full bg-emerald-800/40 px-2 py-0.5 text-label text-ok">#{{ k }}</span>
             </div>
 
             <!-- Stats -->
-            <div class="flex items-center gap-3 text-[10px] text-cream-400">
+            <div class="flex items-center gap-3 text-label text-cream-400">
               <span>Lưu: {{ item.created_at }}</span>
               <span v-if="item.applied_at">Áp dụng: {{ item.applied_at }}</span>
               <span v-if="item.apply_count" class="text-brand-300/70">Dùng {{ item.apply_count }} lần</span>

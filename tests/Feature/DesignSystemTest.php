@@ -118,8 +118,10 @@ class DesignSystemTest extends TestCase
 
         $this->assertLessThanOrEqual(35, $lines,
             'Khối <style scoped> phình to ('.$lines.' dòng): giao diện phải dựng bằng class dùng chung + token, không phải CSS riêng.');
-        $this->assertSame(1, substr_count($style, 'linear-gradient'),
-            'Card chỉ được có ĐÚNG MỘT gradient nhận diện — thêm nữa là tự tạo bảng màu riêng.');
+        /* [2026-09-23] KHÔNG còn gradient nhận diện: mọi card dùng CHUNG bề mặt của theme
+           (.card → base-100). Trước đây mỗi card có một gradient riêng nên 9 card là 9 sắc thái. */
+        $this->assertSame(0, substr_count($style, 'linear-gradient'),
+            'Card không được tự khai gradient/nền riêng — bề mặt do lớp .card và token của theme quyết định.');
 
         // Màu phải lấy từ token, không phải mã màu hex tự nghĩ.
         $this->assertSame(0, preg_match('/#[0-9a-fA-F]{6}\b/', $style),
@@ -227,6 +229,44 @@ class DesignSystemTest extends TestCase
             $css, 'Nút nghỉ của .tool-btn phải là border-ink-600 — lệch với nút viết tay là hai nút cạnh nhau khác viền.');
         $this->assertStringNotContainsString('rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1.5',
             $css, 'Đã quay lại viền nghỉ border-ink-700 cho .tool-btn.');
+    }
+
+    /**
+     * MỌI CARD DÙNG CHUNG MỘT BỀ MẶT (yêu cầu 2026-09-23).
+     *
+     * Trước: mỗi card tự khai một gradient nhận diện RIÊNG bằng style inline — 9 card là 9 sắc thái
+     * (xanh · tím · cam · xanh dương…), màu nằm ngoài bảng màu, và người dùng phải "học" lại từng card.
+     * Nay: chỉ lớp `.card` + token của theme quyết định bề mặt; không card nào tự khai nền.
+     */
+    public function test_every_card_uses_the_one_shared_surface(): void
+    {
+        $violations = [];
+
+        foreach (\Illuminate\Support\Facades\File::allFiles(resource_path('js/studio/components')) as $file) {
+            if ($file->getExtension() !== 'vue') continue;
+            $src = (string) file_get_contents($file->getPathname());
+
+            // (a) Không tự khai nền bằng style inline (gradient nhận diện của card).
+            //     Miễn trừ: ô bàn cờ "trong suốt" của layer — đó là CHỈ BÁO TRONG SUỐT (môi trường ảnh,
+            //     cùng nhóm với .canvas-bg-*), không phải bề mặt card.
+            if (preg_match_all('/style="background:(?!\s*repeating-conic-gradient)[^"]*"/', $src, $m)) {
+                foreach ($m[0] as $hit) {
+                    $violations[] = $file->getFilename().': '.substr($hit, 0, 44);
+                }
+            }
+
+            // (b) Không có gradient nhận diện trong <style scoped>.
+            //     Miễn trừ: gradient của hiệu ứng TẢI (skeleton) — đó là chuyển động, không phải bề mặt card.
+            if (preg_match('/<style scoped>(.*?)<\/style>/s', $src, $sm) && str_contains($sm[1], 'linear-gradient')) {
+                if (! str_contains($sm[1], 'skeleton') && ! str_contains($src, 'skeleton')) {
+                    $violations[] = $file->getFilename().': gradient trong <style scoped>';
+                }
+            }
+        }
+
+        $this->assertSame([], array_values(array_unique($violations)),
+            "Card tự khai nền/màu riêng. Mọi card dùng CHUNG lớp .card (bề mặt base-100 của theme) — "
+            .'xem docs/DESIGN_SYSTEM.md §2 (một bề mặt) và §4 (trình bày cho người mới).');
     }
 
     /**

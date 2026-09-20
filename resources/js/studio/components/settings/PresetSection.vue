@@ -196,14 +196,14 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
     <!-- Admin: chuyển giữa bản của mình và bản dùng chung -->
     <div v-if="isAdmin" class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
       <StudioIcon name="lock" size="h-3.5 w-3.5 text-warn" />
-      <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-warn">
+      <p class="min-w-0 flex-1 text-body leading-relaxed text-warn">
         Bạn là owner. <b>Bản của tôi</b> chỉ ảnh hưởng bạn; <b>Dùng chung</b> sửa preset cho MỌI người.
       </p>
       <div class="flex overflow-hidden rounded-md border border-ink-600">
         <button @click="mode = 'mine'" :class="mode === 'mine' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-                class="px-2.5 py-1 text-[11px] font-medium transition">Bản của tôi</button>
+                class="px-2.5 py-1 text-body font-medium transition">Bản của tôi</button>
         <button @click="mode = 'global'" :class="mode === 'global' ? 'bg-amber-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-                class="px-2.5 py-1 text-[11px] font-medium transition">Dùng chung</button>
+                class="px-2.5 py-1 text-body font-medium transition">Dùng chung</button>
       </div>
     </div>
 
@@ -211,20 +211,20 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
     <div v-if="!loading && !error" class="mb-4 flex flex-wrap gap-1.5">
       <button @click="catFilter = 'all'"
               :class="catFilter === 'all' ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-300 hover:border-ink-500'"
-              class="rounded-full border px-2.5 py-1 text-[11px] font-medium transition">
+              class="rounded-full border px-2.5 py-1 text-body font-medium transition">
         Tất cả <span class="text-cream-400">{{ merged.length }}</span>
       </button>
       <button v-for="cat in allCategories" :key="cat" @click="catFilter = cat"
               :title="STUDIO_CATEGORIES.includes(cat) ? 'Danh mục này là CHIP NHANH trong card Studio' : ''"
               :class="catFilter === cat ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-300 hover:border-ink-500'"
-              class="rounded-full border px-2.5 py-1 text-[11px] font-medium transition">
+              class="rounded-full border px-2.5 py-1 text-body font-medium transition">
         {{ CAT_LABELS[cat] || cat }} <span class="text-cream-400">{{ countFor(cat) }}</span>
-        <span v-if="STUDIO_CATEGORIES.includes(cat)" class="ml-1 rounded bg-brand-600/25 px-1 py-0.5 text-[9px] font-bold text-brand-200">Studio</span>
+        <span v-if="STUDIO_CATEGORIES.includes(cat)" class="ml-1 rounded bg-brand-600/25 px-1 py-0.5 text-tiny font-bold text-brand-200">Studio</span>
       </button>
     </div>
 
-    <p class="mb-4 -mt-2 text-[11px] leading-5 text-cream-400">
-      Danh mục có nhãn <span class="rounded bg-brand-600/25 px-1 py-0.5 text-[9px] font-bold text-brand-200">Studio</span>
+    <p class="mb-4 -mt-2 text-body leading-5 text-cream-400">
+      Danh mục có nhãn <span class="rounded bg-brand-600/25 px-1 py-0.5 text-tiny font-bold text-brand-200">Studio</span>
       (Bối cảnh · Góc máy · Ống kính) trở thành <strong class="text-cream-200">chip nhanh</strong> trong card Studio.
     </p>
 
@@ -245,7 +245,7 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
     </SettingsEmpty>
 
     <template v-else>
-      <p class="mb-3 text-[11px] text-cream-400">
+      <p class="mb-3 text-body text-cream-400">
         Hiện {{ visible.length }} / {{ merged.length }} preset.
         <span v-if="mode === 'mine'">Bản của bạn được lưu theo tài khoản — mở máy khác vẫn còn.</span>
       </p>
@@ -254,7 +254,7 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
         <template v-if="grouped[cat] && grouped[cat].length">
           <div class="mb-2.5 mt-6 flex items-center gap-2 first:mt-0">
             <h3 class="text-xs font-semibold uppercase tracking-wide text-cream-200">{{ CAT_LABELS[cat] || cat }}</h3>
-            <span class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-300">{{ grouped[cat].length }}</span>
+            <span class="rounded-full bg-ink-700 px-2 py-0.5 text-label text-cream-300">{{ grouped[cat].length }}</span>
           </div>
           <div class="grid gap-3 md:grid-cols-2">
             <div v-for="p in grouped[cat]" :key="p.id" class="card p-4">
@@ -275,11 +275,11 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
               <template v-else>
                 <div class="flex items-start gap-2">
                   <span class="min-w-0 flex-1 text-sm font-semibold text-cream-50">{{ p.ui_label }}</span>
-                  <span v-if="p._local" class="shrink-0 rounded bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">của bạn</span>
-                  <span class="shrink-0 font-mono text-[10px] text-cream-400">#{{ p.id }}</span>
+                  <span v-if="p._local" class="shrink-0 rounded bg-brand-600/30 px-1.5 py-0.5 text-tiny font-semibold text-brand-200">của bạn</span>
+                  <span class="shrink-0 font-mono text-label text-cream-400">#{{ p.id }}</span>
                 </div>
                 <p class="mt-1.5 line-clamp-2 text-xs leading-relaxed text-cream-300">{{ p.prompt_injection }}</p>
-                <p v-if="p.note" class="mt-1 text-[10px] italic text-cream-400">{{ p.note }}</p>
+                <p v-if="p.note" class="mt-1 text-label italic text-cream-400">{{ p.note }}</p>
                 <div class="mt-3 flex items-center justify-end gap-2">
                   <button @click="beginEdit(p)" class="tool-btn" title="Sửa preset">
                     <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
@@ -312,7 +312,7 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
                 {{ CAT_LABELS[cat] || cat }}{{ STUDIO_CATEGORIES.includes(cat) ? ' · chip Studio' : '' }}
               </option>
             </select>
-            <p v-if="STUDIO_CATEGORIES.includes(form.category)" class="mt-1 text-[10px] leading-4 text-brand-200">
+            <p v-if="STUDIO_CATEGORIES.includes(form.category)" class="mt-1 text-label leading-4 text-brand-200">
               Preset này sẽ hiện thành chip nhanh trong card Studio.
             </p>
           </div>

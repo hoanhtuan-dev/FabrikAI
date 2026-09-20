@@ -158,19 +158,19 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
     <!-- ══ Thống kê ══ -->
     <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
       <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-        <p class="text-[10px] uppercase tracking-wide text-cream-400">Tổng prompt</p>
+        <p class="text-label uppercase tracking-wide text-cream-400">Tổng prompt</p>
         <p class="text-lg font-semibold text-cream-100">{{ fmtNum(stats.total ?? store.suggestLibTotal) }}</p>
       </div>
       <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-        <p class="text-[10px] uppercase tracking-wide text-cream-400">Đã dùng</p>
+        <p class="text-label uppercase tracking-wide text-cream-400">Đã dùng</p>
         <p class="text-lg font-semibold text-ok">{{ fmtNum(stats.applied ?? 0) }}</p>
       </div>
       <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-        <p class="text-[10px] uppercase tracking-wide text-cream-400">Chưa dùng</p>
+        <p class="text-label uppercase tracking-wide text-cream-400">Chưa dùng</p>
         <p class="text-lg font-semibold text-warn">{{ fmtNum(stats.unused ?? 0) }}</p>
       </div>
       <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
-        <p class="text-[10px] uppercase tracking-wide text-cream-400">Có ảnh nguồn</p>
+        <p class="text-label uppercase tracking-wide text-cream-400">Có ảnh nguồn</p>
         <p class="text-lg font-semibold text-brand-300">{{ fmtNum(stats.with_image ?? 0) }}</p>
       </div>
     </div>
@@ -178,12 +178,12 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
     <!-- ══ Bộ lọc ══ -->
     <div class="mb-4 flex flex-wrap items-end gap-2 rounded-lg border border-ink-700 bg-ink-800 p-3">
       <div class="w-40">
-        <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-cream-300">Loại trang phục</label>
+        <label class="mb-1 block text-label font-semibold uppercase tracking-wide text-cream-300">Loại trang phục</label>
         <input :value="store.suggestLibFilters.garment_type" @input="onGarmentInput" type="text" placeholder="Váy, áo…"
                class="w-full rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-cream-100 placeholder:text-cream-400 focus:border-brand-400 focus:outline-none" />
       </div>
       <div class="w-44">
-        <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-cream-300">Dự án</label>
+        <label class="mb-1 block text-label font-semibold uppercase tracking-wide text-cream-300">Dự án</label>
         <select @change="onProjectChange" class="w-full rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-cream-100 focus:border-brand-400 focus:outline-none">
           <option value="" :selected="!store.suggestLibFilters.project_id">Tất cả dự án</option>
           <option value="none" :selected="store.suggestLibFilters.project_id === 'none'">Chưa gắn dự án</option>
@@ -193,7 +193,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
         </select>
       </div>
       <div class="min-w-[220px] flex-1">
-        <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-cream-300">Tìm prompt</label>
+        <label class="mb-1 block text-label font-semibold uppercase tracking-wide text-cream-300">Tìm prompt</label>
         <input :value="store.suggestLibFilters.q" @input="onSearchInput" type="text" placeholder="Tìm prompt / từ khóa…"
                class="w-full rounded-lg border border-ink-700 bg-ink-900 px-3 py-1.5 text-sm text-cream-100 placeholder:text-cream-400 focus:border-brand-400 focus:outline-none" />
       </div>
@@ -245,18 +245,18 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
             <div v-else class="grid h-full w-full place-items-center text-cream-400"><StudioIcon name="lightbulb" size="h-9 w-9" /></div>
           </div>
           <!-- Badge loại + dùng -->
-          <span v-if="item.garment_type" class="absolute left-2 top-2 max-w-[70%] truncate rounded-full border border-brand-500/40 bg-brand-600/20 px-2 py-0.5 text-[9px] font-semibold text-brand-200">{{ item.garment_type }}</span>
-          <span v-if="item.apply_count" class="absolute right-2 top-2 rounded-full bg-emerald-800/50 px-1.5 py-0.5 text-[9px] font-semibold text-ok">✓{{ item.apply_count }}x</span>
+          <span v-if="item.garment_type" class="absolute left-2 top-2 max-w-[70%] truncate rounded-full border border-brand-500/40 bg-brand-600/20 px-2 py-0.5 text-tiny font-semibold text-brand-200">{{ item.garment_type }}</span>
+          <span v-if="item.apply_count" class="absolute right-2 top-2 rounded-full bg-emerald-800/50 px-1.5 py-0.5 text-tiny font-semibold text-ok">✓{{ item.apply_count }}x</span>
           <!-- Overlay hover -->
           <div class="absolute inset-0 bg-black/40 opacity-0 transition group-hover:opacity-100"></div>
         </div>
         <!-- Nội dung -->
         <div class="p-2">
           <div class="flex flex-wrap gap-1">
-            <span v-for="s in (item.styles || []).slice(0, 2)" :key="s" class="truncate rounded-full bg-ink-700/80 px-1.5 py-0.5 text-[9px] text-cream-300">{{ s }}</span>
+            <span v-for="s in (item.styles || []).slice(0, 2)" :key="s" class="truncate rounded-full bg-ink-700/80 px-1.5 py-0.5 text-tiny text-cream-300">{{ s }}</span>
           </div>
-          <p class="mt-1 line-clamp-2 text-[10px] leading-relaxed text-cream-400">{{ item.image_prompt_en || item.prompt_vi || '—' }}</p>
-          <div class="mt-1.5 flex items-center justify-between text-[9px] text-cream-400">
+          <p class="mt-1 line-clamp-2 text-label leading-relaxed text-cream-400">{{ item.image_prompt_en || item.prompt_vi || '—' }}</p>
+          <div class="mt-1.5 flex items-center justify-between text-tiny text-cream-400">
             <span>{{ item.created_at }}</span>
           </div>
         </div>
@@ -270,8 +270,8 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
         <div v-else class="absolute right-1.5 top-1.5 flex gap-1 transition"
              :class="confirmDeleteId === item.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
           <template v-if="confirmDeleteId === item.id">
-            <button @click.stop="runDeleteSingle" class="rounded-lg bg-red-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-red-500">Xóa</button>
-            <button @click.stop="cancelDeleteSingle" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
+            <button @click.stop="runDeleteSingle" class="rounded-lg bg-red-600 px-2 py-1 text-label font-semibold text-white hover:bg-red-500">Xóa</button>
+            <button @click.stop="cancelDeleteSingle" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-label font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
           </template>
           <template v-else>
             <button @click.stop="openEdit(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400 hover:bg-brand-600/30 hover:text-brand-200" title="Sửa prompt"><StudioIcon name="pencil" size="h-3.5 w-3.5" /></button>
@@ -297,17 +297,17 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
         </div>
         <div class="min-w-0 flex-1 cursor-pointer" @click="store.suggestLibManage ? store.toggleSuggestLibSelect(item.id) : openDetail(item)">
           <div class="flex flex-wrap items-center gap-1.5">
-            <span v-if="item.garment_type" class="truncate rounded-full bg-brand-600/20 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">{{ item.garment_type }}</span>
-            <span v-for="s in (item.styles || []).slice(0, 3)" :key="s" class="truncate rounded-full bg-ink-700 px-1.5 py-0.5 text-[9px] text-cream-400">{{ s }}</span>
+            <span v-if="item.garment_type" class="truncate rounded-full bg-brand-600/20 px-1.5 py-0.5 text-tiny font-semibold text-brand-200">{{ item.garment_type }}</span>
+            <span v-for="s in (item.styles || []).slice(0, 3)" :key="s" class="truncate rounded-full bg-ink-700 px-1.5 py-0.5 text-tiny text-cream-400">{{ s }}</span>
           </div>
           <p class="mt-0.5 truncate text-xs text-cream-100">{{ item.image_prompt_en || item.prompt_vi || '—' }}</p>
-          <p class="truncate text-[10px] text-cream-400">{{ item.created_at }}<span v-if="item.apply_count"> · Đã dùng {{ item.apply_count }}x</span></p>
+          <p class="truncate text-label text-cream-400">{{ item.created_at }}<span v-if="item.apply_count"> · Đã dùng {{ item.apply_count }}x</span></p>
         </div>
         <div v-if="!store.suggestLibManage" class="flex shrink-0 gap-1 transition"
              :class="confirmDeleteId === item.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
           <template v-if="confirmDeleteId === item.id">
-            <button @click.stop="runDeleteSingle" class="rounded-lg bg-red-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-red-500">Xóa</button>
-            <button @click.stop="cancelDeleteSingle" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
+            <button @click.stop="runDeleteSingle" class="rounded-lg bg-red-600 px-2 py-1 text-label font-semibold text-white hover:bg-red-500">Xóa</button>
+            <button @click.stop="cancelDeleteSingle" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-label font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
           </template>
           <template v-else>
             <button @click.stop="openEdit(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400 hover:bg-brand-600/30 hover:text-brand-200" title="Sửa prompt"><StudioIcon name="pencil" size="h-3.5 w-3.5" /></button>
@@ -334,15 +334,15 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
             <button @click="closeDetail" class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
           </div>
           <div class="space-y-3 p-4 text-xs">
-            <div v-if="item.reference_url" class="flex items-center gap-3 rounded-lg border border-white/10 bg-cream-50/5 p-2">
+            <div v-if="item.reference_url" class="flex items-center gap-3 rounded-lg border border-ink-700 bg-cream-50/5 p-2">
               <img :src="item.reference_thumb || item.reference_url" class="h-16 w-16 rounded-md bg-ink-900 object-cover" @error="onThumbError" />
               <span class="text-cream-400">Ảnh nguồn phân tích</span>
             </div>
 
             <div class="flex flex-wrap gap-1.5">
-              <span v-for="s in (item.styles || [])" :key="s" class="rounded-full bg-brand-600/20 px-2 py-0.5 text-[10px] text-brand-200">{{ s }}</span>
-              <span v-if="item.garment_type" class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200"><StudioIcon name="shirt" size="h-3 w-3" /> {{ item.garment_type }}</span>
-              <span v-if="item.embellishment" class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200"><StudioIcon name="sparkles" size="h-3 w-3" /> {{ item.embellishment }}</span>
+              <span v-for="s in (item.styles || [])" :key="s" class="rounded-full bg-brand-600/20 px-2 py-0.5 text-label text-brand-200">{{ s }}</span>
+              <span v-if="item.garment_type" class="rounded-full bg-ink-700 px-2 py-0.5 text-label text-cream-200"><StudioIcon name="shirt" size="h-3 w-3" /> {{ item.garment_type }}</span>
+              <span v-if="item.embellishment" class="rounded-full bg-ink-700 px-2 py-0.5 text-label text-cream-200"><StudioIcon name="sparkles" size="h-3 w-3" /> {{ item.embellishment }}</span>
             </div>
 
             <div class="space-y-1.5 text-cream-200">
@@ -356,31 +356,31 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
             <div v-if="(item.color_palette || []).length">
               <span class="text-cream-400">Bảng màu:</span>
               <div class="mt-1 flex flex-wrap gap-1">
-                <span v-for="c in item.color_palette" :key="c" class="rounded-full bg-ink-700/70 px-2 py-0.5 text-[10px] text-cream-200">{{ c }}</span>
+                <span v-for="c in item.color_palette" :key="c" class="rounded-full bg-ink-700/70 px-2 py-0.5 text-label text-cream-200">{{ c }}</span>
               </div>
             </div>
 
-            <div v-if="item.detail_notes" class="rounded-md border border-white/10 bg-cream-50/5 p-2 leading-relaxed text-cream-100">
+            <div v-if="item.detail_notes" class="rounded-md border border-ink-700 bg-cream-50/5 p-2 leading-relaxed text-cream-100">
               <span class="text-cream-400">Chi tiết gốc:</span> {{ item.detail_notes }}
             </div>
 
             <div>
               <p class="mb-1 font-semibold text-cream-400">Prompt tiếng Anh</p>
-              <div class="max-h-32 overflow-y-auto rounded-md border border-white/10 bg-cream-50/5 p-2 leading-relaxed text-cream-100">{{ item.image_prompt_en || '—' }}</div>
+              <div class="max-h-32 overflow-y-auto rounded-md border border-ink-700 bg-cream-50/5 p-2 leading-relaxed text-cream-100">{{ item.image_prompt_en || '—' }}</div>
             </div>
             <div v-if="item.prompt_vi">
               <p class="mb-1 font-semibold text-cream-400">Prompt tiếng Việt</p>
-              <div class="max-h-32 overflow-y-auto rounded-md border border-white/10 bg-cream-50/5 p-2 leading-relaxed text-cream-100">{{ item.prompt_vi }}</div>
+              <div class="max-h-32 overflow-y-auto rounded-md border border-ink-700 bg-cream-50/5 p-2 leading-relaxed text-cream-100">{{ item.prompt_vi }}</div>
             </div>
             <div v-if="item.negative_prompt">
               <p class="mb-1 font-semibold text-cream-400">Negative prompt</p>
-              <div class="max-h-24 overflow-y-auto rounded-md border border-white/10 bg-cream-50/5 p-2 leading-relaxed text-cream-100">{{ item.negative_prompt }}</div>
+              <div class="max-h-24 overflow-y-auto rounded-md border border-ink-700 bg-cream-50/5 p-2 leading-relaxed text-cream-100">{{ item.negative_prompt }}</div>
             </div>
             <div v-if="(item.keywords || []).length" class="flex flex-wrap gap-1">
-              <span v-for="k in item.keywords" :key="k" class="rounded-full bg-emerald-800/40 px-2 py-0.5 text-[10px] text-ok">#{{ k }}</span>
+              <span v-for="k in item.keywords" :key="k" class="rounded-full bg-emerald-800/40 px-2 py-0.5 text-label text-ok">#{{ k }}</span>
             </div>
 
-            <div class="flex items-center gap-3 text-[10px] text-cream-400">
+            <div class="flex items-center gap-3 text-label text-cream-400">
               <span>Lưu: {{ item.created_at }}</span>
               <span v-if="item.applied_at">Áp dụng: {{ item.applied_at }}</span>
               <span v-if="item.apply_count" class="text-brand-300/70">Dùng {{ item.apply_count }} lần</span>

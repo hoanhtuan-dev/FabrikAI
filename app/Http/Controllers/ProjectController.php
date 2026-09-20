@@ -299,12 +299,15 @@ class ProjectController extends Controller
         $data = $request->validate([
             'sizes' => ['nullable', 'string', 'max:2000'],
             'note' => ['nullable', 'string', 'max:2000'],
+            // Kênh bán: whitelist cứng — giá trị lạ KHÔNG được đi vào tên file trong gói.
+            'channel' => ['nullable', 'string', 'in:'.implode(',', array_keys(export_channels()))],
         ]);
 
         try {
             $bundle = app(\App\Services\ProjectExportService::class)->build($project, [
                 'sizes' => $data['sizes'] ?? null,
                 'note' => $data['note'] ?? null,
+                'channel' => $data['channel'] ?? null,
             ]);
         } catch (\Throwable $e) {
             return response()->json(['message' => 'Không đóng gói được: '.$e->getMessage()], 500);

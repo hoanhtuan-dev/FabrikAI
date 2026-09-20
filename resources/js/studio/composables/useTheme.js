@@ -22,6 +22,15 @@ export const THEME_OPTIONS = [
 
 export const themePref = ref(bridge() ? bridge().pref : 'dark');
 export const themeResolved = ref(bridge() ? bridge().resolved : 'dark');
+/** Mức cỡ chữ toàn cục (phần trăm) — cùng bộ điều khiển, cùng kho lưu theo tài khoản. */
+export const fontScale = ref(bridge() ? bridge().fontScale : 100);
+
+export const FONT_OPTIONS = [
+  { id: 90, label: 'Nhỏ gọn', desc: 'Nhiều nội dung trên một màn hình — hợp khi màn hình nhỏ.' },
+  { id: 100, label: 'Vừa', desc: 'Mặc định của FabrikAI — đã nhích to hơn bản trước một bậc.' },
+  { id: 115, label: 'Lớn', desc: 'Chữ rõ hơn cho màn hình lớn hoặc khi đọc lâu.' },
+  { id: 130, label: 'Rất lớn', desc: 'Dễ đọc nhất; bố cục sẽ thoáng hơn, ít nội dung hơn mỗi màn hình.' },
+];
 
 let wired = false;
 
@@ -34,6 +43,7 @@ function wire() {
   api.onChange((state) => {
     themePref.value = state.pref;
     themeResolved.value = state.resolved;
+    fontScale.value = state.fontScale;
   });
 }
 
@@ -54,7 +64,19 @@ export async function setTheme(pref) {
   return res;
 }
 
+/** Đổi cỡ chữ toàn cục. Trả { saved, error } y như setTheme. */
+export async function setFontScale(pct) {
+  wire();
+  const api = bridge();
+  if (!api || typeof api.setFontScale !== 'function') {
+    return { saved: false, error: 'Không đổi được cỡ chữ trên trang này.' };
+  }
+  const res = await api.setFontScale(pct);
+  fontScale.value = api.fontScale;
+  return res;
+}
+
 export function useTheme() {
   wire();
-  return { pref: themePref, resolved: themeResolved, options: THEME_OPTIONS, setTheme };
+  return { pref: themePref, resolved: themeResolved, fontScale, options: THEME_OPTIONS, setTheme, setFontScale };
 }

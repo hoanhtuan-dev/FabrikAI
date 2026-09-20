@@ -82,7 +82,7 @@ function applyToGenerate() {
 function openSettings() { settingsOpen.value = true; }
 </script>
 <template>
-  <div v-if="!popup" class="card p-5" style="background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
+  <div v-if="!popup" class="card p-5">
     <div class="flex items-center gap-2">
       <button @click="open=true; step='type'" class="flex min-w-0 flex-1 items-center justify-between rounded-lg border border-ink-600 bg-ink-800 p-3 text-left transition hover:border-brand-400">
         <span class="min-w-0 flex-1"><span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="sparkles" /> Trợ lý thiết kế</span></span>
@@ -96,12 +96,12 @@ function openSettings() { settingsOpen.value = true; }
       <div class="p-5">
       <!-- step: type -->
       <template v-if="step === 'type'">
-        <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-cream-400">Chọn loại trang phục</p>
+        <p class="mb-3 text-body font-semibold uppercase tracking-wide text-cream-400">Chọn loại trang phục</p>
         <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
           <button v-for="t in types" :key="t.id" type="button" @click="pickType(t)"
             class="group relative aspect-square overflow-hidden rounded-md border-2 border-ink-600 bg-ink-900 motion-ui motion-ui--size duration-fast hover:border-brand-400 hover:shadow-lg hover:shadow-brand-500/15 active:scale-[0.97]">
             <img :src="t.thumb || t.img" :alt="t.name" loading="lazy" decoding="async" class="h-full w-full object-cover opacity-90 transition-transform duration-base group-hover:scale-105">
-            <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-1.5 pb-1.5 pt-6 text-center text-[10px] font-medium leading-tight text-white">{{ t.name }}</span>
+            <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-1.5 pb-1.5 pt-6 text-center text-label font-medium leading-tight text-white">{{ t.name }}</span>
           </button>
         </div>
       </template>
@@ -120,7 +120,7 @@ function openSettings() { settingsOpen.value = true; }
               <button v-for="opt in q.opts" :key="opt" type="button" @click="toggleOpt(q.key, opt)" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="answers[q.key]?.includes(opt) ? 'border-brand-500 bg-brand-500/25 text-white' : 'border-ink-600 text-cream-200 hover:border-brand-400'">{{ opt }}</button>
             </div>
             <input v-model="customNotes[q.key]" placeholder="Hoặc nhập tùy chỉnh…" class="mt-2 w-full rounded-lg border border-ink-700 bg-ink-900/60 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-brand-400">
-            <p v-if="selectedCount(q.key)" class="mt-1 text-[10px] text-cream-400">Đã chọn {{ selectedCount(q.key) }} mục</p>
+            <p v-if="selectedCount(q.key)" class="mt-1 text-label text-cream-400">Đã chọn {{ selectedCount(q.key) }} mục</p>
           </div>
         </div>
         <button @click="submitPrompt" :disabled="loading" title="Tạo prompt thiết kế từ câu trả lời" class="btn-brand mt-3 w-full">{{ loading ? 'Đang tạo…' : 'Tạo prompt thiết kế' }}</button>

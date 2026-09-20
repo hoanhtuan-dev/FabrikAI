@@ -85,23 +85,23 @@
     "file": "assets/pageBoot-JJzG-QoH.js",
     "name": "pageBoot"
   },
-  "_useStudioThumb-CEUyBvt1.js": {
-    "file": "assets/useStudioThumb-CEUyBvt1.js",
+  "_useStudioThumb-DcSone9p.js": {
+    "file": "assets/useStudioThumb-DcSone9p.js",
     "name": "useStudioThumb",
     "imports": [
       "_pageBoot-JJzG-QoH.js",
       "__plugin-vue_export-helper-D14J8epx.js"
     ]
   },
-  "_useTheme-mNUCLvJz.js": {
-    "file": "assets/useTheme-mNUCLvJz.js",
+  "_useTheme-BhVigILK.js": {
+    "file": "assets/useTheme-BhVigILK.js",
     "name": "useTheme",
     "imports": [
       "_pageBoot-JJzG-QoH.js"
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-BPWynqnA.css",
+    "file": "assets/app-D2xkPapV.css",
     "name": "app",
     "names": [
       "app.css"
@@ -110,7 +110,7 @@
     "isEntry": true
   },
   "resources/js/studio/admin.js": {
-    "file": "assets/admin-BTrx1MyJ.js",
+    "file": "assets/admin-BPDj_EWL.js",
     "name": "admin",
     "src": "resources/js/studio/admin.js",
     "isEntry": true,
@@ -120,52 +120,52 @@
       "_BaseModal-BUQwEqWH.js"
     ],
     "css": [
-      "assets/admin-C0RGt4er.css"
+      "assets/admin-gxWTUGGH.css"
     ]
   },
   "resources/js/studio/collections.js": {
-    "file": "assets/collections-CGEWISuT.js",
+    "file": "assets/collections-CnOUHK84.js",
     "name": "collections",
     "src": "resources/js/studio/collections.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-JJzG-QoH.js",
       "__plugin-vue_export-helper-D14J8epx.js",
-      "_useStudioThumb-CEUyBvt1.js"
+      "_useStudioThumb-DcSone9p.js"
     ],
     "css": [
-      "assets/collections-DdFGwJGq.css"
+      "assets/collections-BQr6yDD5.css"
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-Ba414MAr.js",
+    "file": "assets/main-DWaw49h2.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-JJzG-QoH.js",
       "__plugin-vue_export-helper-D14J8epx.js",
-      "_useStudioThumb-CEUyBvt1.js",
+      "_useStudioThumb-DcSone9p.js",
       "_BaseModal-BUQwEqWH.js",
-      "_useTheme-mNUCLvJz.js"
+      "_useTheme-BhVigILK.js"
     ],
     "css": [
-      "assets/main-DCvjaDb0.css"
+      "assets/main-DSc9FaCF.css"
     ]
   },
   "resources/js/studio/my-settings.js": {
-    "file": "assets/my-settings-C18eNOCp.js",
+    "file": "assets/my-settings-UkDa0Ut3.js",
     "name": "my-settings",
     "src": "resources/js/studio/my-settings.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-JJzG-QoH.js",
       "_BaseModal-BUQwEqWH.js",
-      "_useTheme-mNUCLvJz.js"
+      "_useTheme-BhVigILK.js"
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-CHy0LYPS.js",
+    "file": "assets/settings-_wthNp16.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
@@ -175,7 +175,7 @@
       "_BaseModal-BUQwEqWH.js"
     ],
     "css": [
-      "assets/settings-CxdE_pkQ.css"
+      "assets/settings-Cq-UI7_2.css"
     ]
   }
 }

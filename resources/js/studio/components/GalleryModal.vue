@@ -335,12 +335,12 @@ onBeforeUnmount(() => {
         </div>
         <p v-else class="absolute inset-0 grid place-items-center text-sm text-cream-400">{{ imgError ? 'Không tải được nội dung.' : 'Không có nội dung.' }}</p>
         <!-- Badge trạng thái -->
-        <span v-if="current" class="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold" :class="statusMeta.cls">
+        <span v-if="current" class="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-label font-semibold" :class="statusMeta.cls">
           <span v-if="['pending','processing'].includes(current.status)" class="h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent"></span>
           {{ statusMeta.label }}
         </span>
         <!-- Bộ đếm x / y -->
-        <span v-if="items.length > 1" class="absolute right-3 top-3 rounded-full border border-ink-700 bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-cream-200">{{ idx + 1 }} / {{ items.length }}</span>
+        <span v-if="items.length > 1" class="absolute right-3 top-3 rounded-full border border-ink-700 bg-ink-900/90 px-2 py-0.5 text-label font-semibold text-cream-200">{{ idx + 1 }} / {{ items.length }}</span>
         <!-- Thu gọn / mở thông tin ảnh -->
         <button @click="infoOpen = !infoOpen"
                 class="absolute right-3 top-14 z-20 grid h-7 w-7 place-items-center rounded-full border transition"
@@ -352,7 +352,7 @@ onBeforeUnmount(() => {
         <!-- Zoom toolbar (chỉ khi có ảnh) -->
         <div v-if="current?.media_url && !isVideo" class="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-ink-700 bg-ink-900/95 px-1.5 py-1 shadow-lg">
           <button @click="zoomOut" class="grid h-7 w-7 place-items-center rounded-full text-cream-200 transition hover:bg-ink-700" title="Thu nhỏ" aria-label="Thu nhỏ"><StudioIcon name="minus" size="h-4 w-4" /></button>
-          <button @click="resetZoom" class="min-w-12 rounded-full px-2 py-0.5 text-[11px] font-semibold text-cream-100 transition hover:bg-ink-700" title="Về 100%">{{ Math.round(viewerZoom * 100) }}%</button>
+          <button @click="resetZoom" class="min-w-12 rounded-full px-2 py-0.5 text-body font-semibold text-cream-100 transition hover:bg-ink-700" title="Về 100%">{{ Math.round(viewerZoom * 100) }}%</button>
           <button @click="zoomIn" class="grid h-7 w-7 place-items-center rounded-full text-cream-200 transition hover:bg-ink-700" title="Phóng to" aria-label="Phóng to"><StudioIcon name="plus" size="h-4 w-4" /></button>
         </div>
         <!-- Dải thumbnail: cuộn ngang bằng wheel (vertical scroll → horizontal) + kéo chuột/touch -->
@@ -383,7 +383,7 @@ onBeforeUnmount(() => {
 
         <!-- Thông tin ảnh (thu gọn được): Dự án · Model · Provider · Tỷ lệ · Độ phân giải · Thời lượng · Ngày -->
         <div class="flex items-center justify-between">
-          <p class="text-[9px] font-semibold uppercase tracking-wide text-cream-400">Thông tin ảnh</p>
+          <p class="text-tiny font-semibold uppercase tracking-wide text-cream-400">Thông tin ảnh</p>
           <button @click="fieldsOpen = !fieldsOpen"
                   class="icon-btn !h-5 !w-5"
                   :title="fieldsOpen ? 'Thu gọn thông tin ảnh' : 'Mở rộng thông tin ảnh'"
@@ -394,7 +394,7 @@ onBeforeUnmount(() => {
         <Transition name="cf">
           <div v-if="fieldsOpen" key="fields" class="grid grid-cols-2 gap-1.5">
             <div v-for="f in fields" :key="f.k" class="rounded-md bg-ink-800/70 px-2.5 py-1.5">
-              <p class="text-[9px] uppercase tracking-wide text-cream-400">{{ f.l }}</p>
+              <p class="text-tiny uppercase tracking-wide text-cream-400">{{ f.l }}</p>
               <p class="truncate text-xs font-medium text-cream-100">{{ f.k === 'project' ? projectLabel : (current?.[f.k] ?? '—') }}</p>
             </div>
           </div>
@@ -402,7 +402,7 @@ onBeforeUnmount(() => {
 
         <!-- Seed (gieo quẻ) — hiện khi ảnh đã tạo có lưu seed -->
         <div v-if="seedValue" class="flex items-center justify-between rounded-md border border-brand-500/30 bg-brand-600/10 px-2.5 py-1.5">
-          <span class="text-[9px] font-semibold uppercase tracking-wide text-brand-300/80">Seed</span>
+          <span class="text-tiny font-semibold uppercase tracking-wide text-brand-300/80">Seed</span>
           <span class="text-xs font-semibold text-brand-100">{{ seedValue }}</span>
         </div>
 
@@ -411,16 +411,16 @@ onBeforeUnmount(() => {
           <!-- KHI đã có project_id: chip dự án + nút chuyển + nút gỡ -->
           <template v-if="current?.project_id">
             <div class="flex items-center justify-between gap-2">
-              <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-500/40 bg-brand-500/15 px-2.5 py-1 text-[11px] font-semibold text-brand-200">
+              <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-500/40 bg-brand-500/15 px-2.5 py-1 text-body font-semibold text-brand-200">
                 <StudioIcon name="pin" size="h-3 w-3" />
                 {{ projectLabel }}
               </span>
               <div class="flex items-center gap-1.5">
-                <button @click="toggleAttach" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-300 transition hover:border-brand-400 hover:bg-brand-600/10 hover:text-brand-200" title="Chuyển sang dự án khác (1 chạm)">
+                <button @click="toggleAttach" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-label font-semibold text-cream-300 transition hover:border-brand-400 hover:bg-brand-600/10 hover:text-brand-200" title="Chuyển sang dự án khác (1 chạm)">
                   <StudioIcon name="link" size="h-3 w-3" />
                   Chuyển
                 </button>
-                <button @click="detachProject" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-300 transition hover:border-red-500 hover:bg-red-600/10 hover:text-danger" title="Gỡ khỏi dự án">
+                <button @click="detachProject" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-label font-semibold text-cream-300 transition hover:border-red-500 hover:bg-red-600/10 hover:text-danger" title="Gỡ khỏi dự án">
                   <StudioIcon name="unlink" size="h-3 w-3" />
                   Gỡ
                 </button>
@@ -429,7 +429,7 @@ onBeforeUnmount(() => {
           </template>
           <!-- KHI KHÔNG có project_id: nút gắn -->
           <template v-else>
-            <button @click="toggleAttach" :disabled="attachBusy" class="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-ink-600 bg-transparent px-3 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/10 hover:text-brand-200">
+            <button @click="toggleAttach" :disabled="attachBusy" class="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-ink-600 bg-transparent px-3 py-1.5 text-body font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/10 hover:text-brand-200">
               <StudioIcon name="link" size="h-3.5 w-3.5" />
               Gắn vào dự án
             </button>
@@ -437,32 +437,32 @@ onBeforeUnmount(() => {
           <!-- Panel chọn dự án (dùng chung cho gắn mới + chuyển 1-chạm) -->
           <div v-if="attachOpen && !attachBusy" class="mt-2 space-y-1">
               <!-- Nút nhanh: gắn vào dự án đang áp dụng -->
-              <button v-if="store.appliedProject && store.appliedProject.id !== current?.project_id" @click="attachToProject(store.appliedProject)" class="flex w-full items-center gap-2 rounded-lg bg-brand-600/15 px-2.5 py-1.5 text-[11px] font-semibold text-brand-200 transition hover:bg-brand-600/25">
+              <button v-if="store.appliedProject && store.appliedProject.id !== current?.project_id" @click="attachToProject(store.appliedProject)" class="flex w-full items-center gap-2 rounded-lg bg-brand-600/15 px-2.5 py-1.5 text-body font-semibold text-brand-200 transition hover:bg-brand-600/25">
                 <StudioIcon name="pin" size="h-3.5 w-3.5" />
                 Gắn vào "{{ store.appliedProject.name }}" (dự án hiện tại)
               </button>
               <!-- Danh sách dự án -->
               <template v-if="filteredProjects.length">
-                <button v-for="p in filteredProjects" :key="p.id" @click="attachToProject(p)" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] transition hover:bg-ink-700">
+                <button v-for="p in filteredProjects" :key="p.id" @click="attachToProject(p)" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-body transition hover:bg-ink-700">
                   <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ backgroundColor: p.color || '#7aa2f7' }"></span>
                   <span class="flex-1 truncate text-left text-cream-200">{{ p.name }}</span>
-                  <span class="shrink-0 text-[10px] text-cream-400">{{ p.generations_count ?? 0 }}</span>
+                  <span class="shrink-0 text-label text-cream-400">{{ p.generations_count ?? 0 }}</span>
                 </button>
               </template>
-              <p v-else class="py-1 text-center text-[10px] text-cream-400">Chưa có dự án nào — tạo dự án ở Studio.</p>
+              <p v-else class="py-1 text-center text-label text-cream-400">Chưa có dự án nào — tạo dự án ở Studio.</p>
             </div>
         </div>
 
         <!-- Prompt + copy -->
         <div class="rounded-md border border-ink-700/60 bg-ink-800/70 p-2.5">
           <div class="mb-1 flex items-center justify-between">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-400">Prompt</p>
-            <button @click="copyPrompt" class="inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-0.5 text-[10px] font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-white" title="Sao chép prompt">
+            <p class="text-label font-semibold uppercase tracking-wide text-cream-400">Prompt</p>
+            <button @click="copyPrompt" class="inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-0.5 text-label font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-white" title="Sao chép prompt">
               <StudioIcon name="copy" size="h-3 w-3" />
               Sao chép
             </button>
           </div>
-          <p class="max-h-24 overflow-y-auto whitespace-pre-wrap text-[11px] leading-relaxed text-cream-100">{{ current?.prompt || '—' }}</p>
+          <p class="max-h-24 overflow-y-auto whitespace-pre-wrap text-body leading-relaxed text-cream-100">{{ current?.prompt || '—' }}</p>
         </div>
 
         <!-- Nhóm secondary: Tải xuống · Tạo video -->
@@ -501,7 +501,7 @@ onBeforeUnmount(() => {
             </button>
           </template>
           <template v-else>
-            <p class="mb-1.5 flex items-center justify-center gap-1 text-center text-[11px] font-medium text-danger"><StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> Xóa vĩnh viễn? Hành động này không thể hoàn tác.</p>
+            <p class="mb-1.5 flex items-center justify-center gap-1 text-center text-body font-medium text-danger"><StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> Xóa vĩnh viễn? Hành động này không thể hoàn tác.</p>
             <div class="flex gap-1.5">
               <button @click="resetConfirm" class="flex-1 rounded-md border border-ink-600 bg-ink-800 py-2 text-xs font-semibold text-cream-200 transition hover:bg-ink-700">Hủy</button>
               <button @click="doDelete" :disabled="deleting" class="inline-flex items-center justify-center gap-1 flex-1 rounded-md bg-red-600 py-2 text-xs font-semibold text-white transition hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed">
@@ -510,7 +510,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </template>
-          <p class="mt-1.5 text-center text-[10px] text-cream-400">Nhấn Esc để đóng · dùng ← → để xem ảnh khác</p>
+          <p class="mt-1.5 text-center text-label text-cream-400">Nhấn Esc để đóng · dùng ← → để xem ảnh khác</p>
         </div>
       </aside>
       </Transition>

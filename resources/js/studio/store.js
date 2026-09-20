@@ -68,9 +68,13 @@ export function safeMessage(text, fallback = '') {
 export function userFacingError(e, fallback) {
   const raw = (e && (e.message || e.error || e.statusText)) || '';
   const clean = safeMessage(raw, '');
-  if (clean) return clean;
+  // Mã tra cứu do server trả về (studio_fail → error_code): gắn vào câu hiển thị để khách đọc cho
+  // tổng đài, và hỗ trợ grep được trong storage/logs/laravel.log. Vẫn KHÔNG lộ chi tiết kỹ thuật.
+  const code = (e && (e.error_code || (e.response && e.response.error_code))) || '';
+  const withCode = (text) => (code && text ? text + ' (mã tra cứu: ' + code + ')' : text);
+  if (clean) return withCode(clean);
   if (raw) logTechnical('error-blocked', raw);
-  return fallback;
+  return withCode(fallback);
 }
 
 /**
@@ -978,10 +982,11 @@ export const useStudioStore = defineStore('studio', {
      *
      * @returns {Promise<string>} tên file đã tải (đọc từ Content-Disposition của server).
      */
-    async exportProject(id, { sizes = '', note = '' } = {}) {
+    async exportProject(id, { sizes = '', note = '', channel = '' } = {}) {
       const q = new URLSearchParams();
       if (String(sizes).trim()) q.set('sizes', String(sizes).trim());
       if (String(note).trim()) q.set('note', String(note).trim());
+      if (String(channel).trim()) q.set('channel', String(channel).trim());
       const res = await fetch('/api/projects/' + id + '/export' + (q.toString() ? '?' + q.toString() : ''), { headers: { Accept: 'application/zip' } });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

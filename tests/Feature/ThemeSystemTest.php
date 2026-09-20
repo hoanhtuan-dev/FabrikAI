@@ -25,7 +25,7 @@ use Tests\TestCase;
  *   (c) KỶ LUẬT VIẾT: không còn chữ dùng opacity, không còn sắc độ trạng thái viết thẳng
  *       (text-red-300 …) — hai thứ vừa bị dọn;
  *   (d) ĐƯỜNG ĐI: partial theme phải có mặt ở MỌI blade, tùy chọn lưu theo tài khoản qua
- *       PUT /api/theme (whitelist cứng), và endpoint này KHÔNG bị công tắc gói chặn.
+ *       PUT /api/appearance (whitelist cứng), và endpoint này KHÔNG bị công tắc gói chặn.
  */
 class ThemeSystemTest extends TestCase
 {
@@ -206,7 +206,7 @@ class ThemeSystemTest extends TestCase
         $partial = (string) file_get_contents(base_path('resources/views/partials/theme.blade.php'));
         $this->assertStringContainsString('localStorage', $partial, 'Thiếu cache localStorage ⇒ mở trang phải chờ mạng mới biết theme.');
         $this->assertStringContainsString('prefers-color-scheme', $partial, 'Thiếu nhánh "theo hệ điều hành".');
-        $this->assertStringContainsString('/api/theme', $partial, 'Thiếu đường lưu tùy chọn lên tài khoản.');
+        $this->assertStringContainsString('/api/appearance', $partial, 'Thiếu đường lưu tùy chọn lên tài khoản.');
     }
 
     public function test_canvas_backgrounds_do_not_follow_the_theme(): void
@@ -274,7 +274,7 @@ class ThemeSystemTest extends TestCase
         $this->assertSame('dark', theme_resolved());
 
         // Lưu được và ĐỌC LẠI từ DB (không phải chỉ trong phiên).
-        $this->actingAs($user)->putJson('/api/theme', ['theme' => 'light'])
+        $this->actingAs($user)->putJson('/api/appearance', ['theme' => 'light'])
             ->assertOk()
             ->assertJson(['theme' => 'light']);
         $this->assertSame('light', $user->fresh()->theme);
@@ -282,32 +282,93 @@ class ThemeSystemTest extends TestCase
 
         // 'system' render 'dark' ở server (máy chủ không biết ý hệ điều hành) và script sửa lại
         // trước khi vẽ — đây là hành vi CỐ Ý, khoá lại để người sau không "sửa" thành light.
-        $this->actingAs($user)->putJson('/api/theme', ['theme' => 'system'])->assertOk();
+        $this->actingAs($user)->putJson('/api/appearance', ['theme' => 'system'])->assertOk();
         $this->assertSame('system', theme_pref());
         $this->assertSame('dark', theme_resolved());
 
         // Giá trị lạ bị 422: cột này được render thẳng vào thuộc tính data-theme của thẻ <html>
         // ở mọi blade ⇒ nhận chuỗi tự do ở đây là một lỗ XSS tiềm năng.
         foreach (['" onload="alert(1)', 'LIGHT', 'blue', '', 'light;dark', 'systemx'] as $bad) {
-            $this->actingAs($user)->putJson('/api/theme', ['theme' => $bad])->assertStatus(422);
+            $this->actingAs($user)->putJson('/api/appearance', ['theme' => $bad])->assertStatus(422);
         }
         $this->assertSame('system', $user->fresh()->theme, 'Giá trị sai không được ghi vào DB.');
 
         // Khoảng trắng thừa: middleware TrimStrings của Laravel cắt trước khi kiểm tra, nên
         // 'dark ' được nhận NHƯ 'dark' — và thứ ghi xuống DB phải là giá trị CHUẨN (không có
         // khoảng trắng), vì giá trị đó đi thẳng vào thuộc tính data-theme của thẻ <html>.
-        $this->actingAs($user)->putJson('/api/theme', ['theme' => 'dark '])->assertOk();
+        $this->actingAs($user)->putJson('/api/appearance', ['theme' => 'dark '])->assertOk();
         $this->assertSame('dark', $user->fresh()->theme);
 
         // Khách chưa đăng nhập: không đổi được theme của ai cả.
         auth()->logout();
-        $this->putJson('/api/theme', ['theme' => 'light'])->assertUnauthorized();
+        $this->putJson('/api/appearance', ['theme' => 'light'])->assertUnauthorized();
+    }
+
+    public function test_font_scale_is_stored_per_account_and_validated(): void
+    {
+        $this->seed();
+        $user = User::where('email', 'user@fabrikai.shop')->firstOrFail();
+        $this->actingAs($user);
+
+        // Chưa từng chọn ⇒ 100%. NULL (chưa chọn) KHÁC 100 (đã chọn "Vừa").
+        $this->assertNull($user->font_scale);
+        $this->assertSame(100, font_scale());
+        $this->assertSame('1', font_scale_ratio());
+
+        $this->actingAs($user)->putJson('/api/appearance', ['font_scale' => 115])
+            ->assertOk()
+            ->assertJson(['font_scale' => 115]);
+        $this->assertSame(115, $user->fresh()->font_scale);
+        $this->assertSame('1.15', font_scale_ratio());
+
+        // Ngoài whitelist ⇒ 422 (cỡ chữ là biến CSS nhân vào MỌI bậc chữ: nhận số tự do là nhận
+        // một giá trị có thể làm vỡ bố cục toàn app).
+        foreach ([0, 12, 99, 101, 200, 99999] as $bad) {
+            $this->actingAs($user)->putJson('/api/appearance', ['font_scale' => $bad])->assertStatus(422);
+        }
+        $this->assertSame(115, $user->fresh()->font_scale, 'Giá trị sai không được ghi vào DB.');
+
+        // Không gửi trường nào ⇒ 422, KHÔNG trả 200 như đã lưu.
+        $this->actingAs($user)->putJson('/api/appearance', [])->assertStatus(422);
+
+        // CÙNG một endpoint cho cả hai tùy chọn hiển thị — và chúng không ghi đè nhau.
+        $this->actingAs($user)->putJson('/api/appearance', ['theme' => 'light'])->assertOk();
+        $this->assertSame('light', $user->fresh()->theme);
+        $this->assertSame(115, $user->fresh()->font_scale, 'Đổi giao diện KHÔNG được ghi đè cỡ chữ.');
+    }
+
+    public function test_font_scale_is_a_token_scale_not_a_hard_coded_number(): void
+    {
+        $css = $this->css();
+
+        // Mọi bậc chữ phải là token theo VAI và nhân với --font-scale ⇒ cùng một công tắc chỉnh cả app.
+        foreach (['micro' => 9, 'tiny' => 10, 'label' => 11, 'body' => 12.5, 'body-lg' => 13, 'title' => 14] as $role => $px) {
+            $this->assertStringContainsString('--text-'.$role.': calc('.$px.'px * var(--font-scale, 1));', $css,
+                'Thiếu token cỡ chữ theo vai: --text-'.$role.' (đã nhích lên '.$px.'px).');
+        }
+        $this->assertStringContainsString('--font-scale: 1;', $css, 'Thiếu giá trị mặc định --font-scale.');
+
+        // Bậc rem mặc định của Tailwind cũng phải theo công tắc (nếu không, nửa app to nửa app đứng yên).
+        foreach (['xs', 'sm', 'base', 'lg'] as $step) {
+            $this->assertMatchesRegularExpression('/--text-'.$step.': calc\([0-9.]+rem \* var\(--font-scale, 1\)\)/', $css,
+                'Bậc text-'.$step.' chưa theo công tắc cỡ chữ.');
+        }
+
+        // Mọi shell render sẵn hệ số ⇒ không nháy cỡ chữ khi tải trang.
+        foreach ([
+            'resources/views/studio/index.blade.php',
+            'resources/views/studio/my-settings.blade.php',
+            'resources/views/layouts/app.blade.php',
+        ] as $rel) {
+            $this->assertStringContainsString('--font-scale: {{ font_scale_ratio() }}', (string) file_get_contents(base_path($rel)),
+                $rel.' chưa render --font-scale ⇒ cỡ chữ sẽ nháy khi tải.');
+        }
     }
 
     public function test_theme_endpoint_is_not_gated_by_plans_or_modules(): void
     {
-        $route = RouteFacade::getRoutes()->getByName('api.theme.update');
-        $this->assertNotNull($route, 'Thiếu route PUT /api/theme.');
+        $route = RouteFacade::getRoutes()->getByName('api.appearance.update');
+        $this->assertNotNull($route, 'Thiếu route PUT /api/appearance.');
 
         $middleware = $route->gatherMiddleware();
         $this->assertContains('auth', $middleware);

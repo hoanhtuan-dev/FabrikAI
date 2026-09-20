@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi" data-theme="{{ theme_resolved() }}">
+<html lang="vi" data-theme="{{ theme_resolved() }}" style="--font-scale: {{ font_scale_ratio() }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">

@@ -97,7 +97,7 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
       <aside class="hidden w-64 shrink-0 lg:block">
         <div class="sticky top-6 flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-xl border border-ink-700 bg-ink-800/70">
           <div class="border-b border-ink-700 px-4 py-4">
-            <p class="text-[10px] font-semibold uppercase tracking-wider text-cream-400">FabrikAI</p>
+            <p class="text-label font-semibold uppercase tracking-wider text-cream-400">FabrikAI</p>
             <h1 class="mt-1 font-display text-base font-semibold text-cream-50">Cài đặt của tôi</h1>
           </div>
           <nav class="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Các mục cài đặt">
@@ -108,15 +108,15 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
               <StudioIcon :name="s.icon" size="mt-0.5 h-4 w-4 shrink-0" />
               <span class="min-w-0 flex-1">
                 <span class="block text-xs font-semibold">{{ s.label }}</span>
-                <span class="mt-0.5 block text-[10px] leading-snug text-cream-400">{{ s.desc }}</span>
+                <span class="mt-0.5 block text-label leading-snug text-cream-400">{{ s.desc }}</span>
               </span>
             </button>
           </nav>
           <div class="border-t border-ink-700 p-3">
-            <a href="/" class="flex items-center justify-center gap-1.5 rounded-lg border border-ink-600 px-3 py-2 text-[11px] font-medium text-cream-200 transition hover:border-cream-300 hover:bg-invert hover:text-invert-content">
+            <a href="/" class="flex items-center justify-center gap-1.5 rounded-lg border border-ink-600 px-3 py-2 text-body font-medium text-cream-200 transition hover:border-cream-300 hover:bg-invert hover:text-invert-content">
               <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Về xưởng thiết kế
             </a>
-            <p v-if="USER.admin" class="mt-2 text-center text-[10px] text-warn">Tài khoản owner</p>
+            <p v-if="USER.admin" class="mt-2 text-center text-label text-warn">Tài khoản owner</p>
           </div>
         </div>
       </aside>
@@ -151,7 +151,7 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
               </span>
               <div class="min-w-0">
                 <h2 class="font-display text-lg font-semibold text-cream-50">{{ active.label }}</h2>
-                <p class="mt-0.5 text-[11px] leading-snug text-cream-400">{{ active.hint }}</p>
+                <p class="mt-0.5 text-body leading-snug text-cream-400">{{ active.hint }}</p>
               </div>
             </div>
           </header>

@@ -133,6 +133,31 @@
 
     --radius-4xl: 2rem;
 
+    /* ── THANG CỠ CHỮ THEO VAI (2026-09-23) ─────────────────────────────────────────────
+       Trước đây chrome studio dùng 941 chỗ cỡ chữ viết thẳng bằng px (text-tiny, text-label,
+       text-body…) ⇒ KHÔNG thể có cài đặt cỡ chữ toàn cục: px là số cứng. Nay mỗi cỡ là một
+       TOKEN THEO VAI, nhân với --font-scale (người dùng chỉnh ở Cài đặt của tôi → Giao diện).
+       Đồng thời NHÍCH +1px so với trước (phản hồi thật: chữ hơi nhỏ):
+         8px → micro 9px · 9px → tiny 10px · 10px → label 11px ·
+         11px → body 12,5px · 12px → body-lg 13px · 13px → title 14px
+       Quy tắc: KHÔNG viết text-[Npx] trong mã nữa (DesignSystemTest giữ luật này). */
+    --text-micro: calc(9px * var(--font-scale, 1));
+    --text-tiny: calc(10px * var(--font-scale, 1));
+    --text-label: calc(11px * var(--font-scale, 1));
+    --text-body: calc(12.5px * var(--font-scale, 1));
+    --text-body-lg: calc(13px * var(--font-scale, 1));
+    --text-title: calc(14px * var(--font-scale, 1));
+
+    /* Các bậc rem mặc định của Tailwind cũng phải theo công tắc cỡ chữ — nếu không thì chữ ở
+       khối dùng text-xs/text-sm/text-base đứng yên trong khi phần còn lại to lên. */
+    --text-xs: calc(0.75rem * var(--font-scale, 1));
+    --text-sm: calc(0.875rem * var(--font-scale, 1));
+    --text-base: calc(1rem * var(--font-scale, 1));
+    --text-lg: calc(1.125rem * var(--font-scale, 1));
+    --text-xl: calc(1.25rem * var(--font-scale, 1));
+    --text-2xl: calc(1.5rem * var(--font-scale, 1));
+    --text-3xl: calc(1.875rem * var(--font-scale, 1));
+
     /* ─ [2026-09-20] CHUYỂN ĐỘNG — nối bộ tiện ích `transition*` của Tailwind vào CÙNG một nguồn ─
        Tailwind v4 phát ra:
          .transition{transition-duration:var(--tw-duration,var(--default-transition-duration));
@@ -245,6 +270,13 @@
 }
 
 @layer base {
+    :root {
+        /* Cỡ chữ toàn cục: 1 = 100%. Server render sẵn giá trị đã lưu của tài khoản vào style của
+           thẻ <html> (không nháy cỡ chữ khi tải trang); script trong partials/theme.blade.php đổi
+           tức thì khi người dùng chọn mức khác. */
+        --font-scale: 1;
+    }
+
     * {
         @apply border-ink-600;
     }
@@ -353,7 +385,7 @@
         transition-duration: var(--motion-dur-base);
     }
 
-    .badge { @apply inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide;
+    .badge { @apply inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-body font-semibold uppercase tracking-wide;
     }
 
     .chip { @apply inline-flex items-center gap-2 rounded-2xl border border-ink-600 bg-ink-900 px-4 py-2 text-sm font-medium text-cream-200 transition-colors hover:border-brand-400 hover:text-brand-200;
@@ -382,7 +414,7 @@
         @apply bg-brand-600 font-semibold text-white hover:bg-brand-600;
     }
     .studio-nav-head {
-        @apply mt-4 px-3 text-[11px] font-semibold uppercase tracking-wide text-cream-300;
+        @apply mt-4 px-3 text-body font-semibold uppercase tracking-wide text-cream-300;
     }
 }
 
@@ -407,19 +439,19 @@
 @layer components {
     /* Segmented control (tabs / chế độ / ngôn ngữ) — thay mọi chip lồng nhau */
     .seg { @apply flex gap-1 rounded-lg bg-ink-800 p-1; }
-    .seg-btn { @apply flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[11px] font-semibold text-cream-300 transition-colors hover:text-cream-100; }
+    .seg-btn { @apply flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-body font-semibold text-cream-300 transition-colors hover:text-cream-100; }
     .seg-btn.is-active { @apply bg-brand-600 text-white hover:text-white; }
     /* Nút toolbar nhỏ trong card/panel (toggle lịch sử, templates, hành động phụ) */
     /* Viền NGHỈ của mọi nút phụ = border-ink-600 (xem docs/DESIGN_SYSTEM.md §5 "Viền") —
        trước đây .tool-btn dùng ink-700 còn nút viết tay dùng ink-600 nên hai nút cạnh nhau
        lệch màu viền. Hover đi lên ink-500 (nút rất phụ) hoặc brand-400 (nút thường). */
-    .tool-btn { @apply inline-flex items-center gap-1.5 rounded-md border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-ink-500 hover:bg-ink-700 disabled:opacity-40; }
+    .tool-btn { @apply inline-flex items-center gap-1.5 rounded-md border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-body font-semibold text-cream-200 transition hover:border-ink-500 hover:bg-ink-700 disabled:opacity-40; }
     .tool-btn.is-active { @apply border-brand-500/70 bg-brand-600/20 text-brand-200 hover:bg-brand-600/30; }
     /* Nút icon vuông chuẩn (mọi chrome studio) */
     .icon-btn { @apply grid h-7 w-7 shrink-0 place-items-center rounded text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-30; }
     /* Header chuẩn của panel/card trong workspace */
     .panel-head { @apply flex shrink-0 items-center justify-between gap-2 px-2.5 py-2; }
-    .panel-title { @apply flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-cream-100; }
+    .panel-title { @apply flex min-w-0 items-center gap-1.5 text-body font-semibold text-cream-100; }
     /* Activity bar (VSCode-style) — thanh icon cố định bên trái, mỗi icon mở 1 card */
     .activity-bar { @apply flex w-14 shrink-0 flex-col items-center gap-2 border-r border-ink-700 bg-ink-900 py-2.5; }
     .activity-bar.right { @apply border-l border-r-0; }

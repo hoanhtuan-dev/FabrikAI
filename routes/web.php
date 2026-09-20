@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectShareController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\StudioController;
 use App\Http\Controllers\StudioSettingsController;
 use App\Http\Controllers\DesignAgentController;
@@ -97,6 +98,10 @@ Route::middleware(['auth', 'admin', 'nostore'])->get('/admin', [AdminController:
 // trang cho khách (khách đã có "Cài đặt của tôi → Giao diện" để chọn Sáng/Tối).
 Route::middleware(['auth', 'admin', 'nostore'])->get('/he-thong-thiet-ke', [ThemeController::class, 'tokensPage'])->name('design-tokens.page');
 
+// [2026-09-23] BÁO CÁO CHI PHÍ THEO NHÓM cho chủ doanh nghiệp (nợ đã ghi trong DEPLOY_LOG):
+// gói cước đã có ghế, nhưng chủ nhóm không có chỗ nào nhìn ra "nhóm tôi tiêu bao nhiêu".
+Route::middleware(['auth', 'admin', 'nostore'])->get('/bao-cao-nhom', [ReportController::class, 'teamCosts'])->name('team-costs.page');
+
 // ══════════════════════════════════════════════════════════════════════════════
 // TÙY CHỌN GIAO DIỆN — theme Sáng/Tối (2026-09-23)
 //
@@ -106,7 +111,7 @@ Route::middleware(['auth', 'admin', 'nostore'])->get('/he-thong-thiet-ke', [Them
 // gói tắt được (đã khai 'theme' vào INFRA_PREFIXES của ModuleRegistryTest).
 // ══════════════════════════════════════════════════════════════════════════════
 Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
-    Route::put('/theme', [ThemeController::class, 'update'])->name('theme.update');
+    Route::put('/appearance', [ThemeController::class, 'update'])->name('appearance.update');
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

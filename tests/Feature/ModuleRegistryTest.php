@@ -38,13 +38,13 @@ class ModuleRegistryTest extends TestCase
     /**
      * Route hạ tầng: không thuộc tính năng nào để bật/tắt theo gói.
      *
-     * 'theme' (2026-09-23): tùy chọn giao diện Sáng/Tối của CHÍNH người dùng. Không phải
+     * 'appearance' (2026-09-23): tùy chọn HIỂN THỊ của chính người dùng (giao diện Sáng/Tối + cỡ chữ). Không phải
      * tính năng bán theo gói ⇒ cố ý KHÔNG khai vào ModuleRegistry, nếu không thì một gói
      * thiếu module sẽ làm người dùng không đổi được giao diện của chính mình.
      */
     protected const INFRA_PREFIXES = [
         'admin', 'boot', 'defaults', 'gui', 'plan/status', 'billing', 'settings', 'settings-vue',
-        'image', 'image-thumb', 'process', 'theme',
+        'image', 'image-thumb', 'process', 'appearance',
     ];
 
     protected function setUp(): void

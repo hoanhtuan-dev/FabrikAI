@@ -17,7 +17,7 @@ const show = computed(() => items.value.slice(-4));
 <template>
   <div class="pointer-events-none fixed bottom-4 right-4 z-[95] flex w-[min(92vw,22rem)] flex-col gap-2" role="region" aria-label="Thông báo" aria-live="polite">
     <button v-if="items.length >= 2" @click="clearAll"
-            class="pointer-events-auto self-end rounded-md border border-ink-600 bg-ink-800/95 px-2.5 py-1 text-[11px] font-medium text-cream-300 transition hover:text-cream-50">
+            class="pointer-events-auto self-end rounded-md border border-ink-600 bg-ink-800/95 px-2.5 py-1 text-body font-medium text-cream-300 transition hover:text-cream-50">
       Xoá hết ({{ items.length }})
     </button>
     <div v-for="t in show" :key="t.id" role="status"

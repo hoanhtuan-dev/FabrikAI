@@ -90,9 +90,11 @@
      `text-scrim-content`; nếu chữ theo theme thì ở theme sáng nó thành chữ đen trên scrim tối
      (đo được **2,9:1** trước khi sửa);
    · viền trắng vẽ trên ảnh — `border-white/*` ở tay cầm crop, con trỏ cọ, ô màu trong suốt.
-6. **Không viết mã màu mới trong `<style scoped>`.** Ngoại lệ duy nhất: lớp nền gradient nhận diện của
-   MỘT card — đúng **một dòng**, alpha thấp (≤ 0.15), lấy từ bảng trên. Ví dụ đang dùng:
-   `background: linear-gradient(160deg, rgba(85,155,120,.13), transparent 62%)` (card Gợi ý từ ảnh).
+6. **Không viết mã màu mới trong `<style scoped>` — và KHÔNG card nào có màu/bề mặt riêng.**
+   [2026-09-23] Ngoại lệ "lớp nền gradient nhận diện của MỘT card" đã **GỠ HẲN**: 9 card từng có 9 gradient
+   khác nhau (xanh · tím · cam · xanh dương…) bằng style inline ⇒ người dùng phải "học" lại từng card và
+   bảng màu có thêm những sắc thái không thuộc hệ. Nay **mọi card dùng chung lớp `.card`** (bề mặt
+   `base-100` của theme) — khoá bằng `DesignSystemTest::test_every_card_uses_the_one_shared_surface`.
 7. **Sao chép màu là tạo nguồn lệch thứ hai.** Ô swatch tự vẽ màu bằng inline style chỉ cần một lần đổi
    token là lệch ngay (đã xảy ra với 4 ô nền canvas). Cách sửa rẻ và bền: cho cả hai chỗ dùng **cùng một
    class** (`.canvas-bg-grid/dark/white/cream`).
@@ -151,8 +153,27 @@ Ba quyết định đáng nhớ:
 ### 1.3 Chữ
 
 - Tiêu đề card: `font-display` (Fraunces) + `text-base font-semibold text-brand-300` + icon 16px.
-- Thang cỡ chữ trong chrome studio: **9px** (nhãn rất phụ) · **10px** (nhãn, ghi chú) ·
-  **11px** (chữ thường trong card) · **13–14px** (nội dung cần đọc kỹ, ô nhập). **Không nhỏ hơn 9px.**
+
+**[2026-09-23] Cỡ chữ là TOKEN THEO VAI, nhân với một công tắc toàn cục.** Trước đây chrome studio dùng
+**941 chỗ** cỡ chữ viết thẳng bằng px (`text-[10px]` · `text-[11px]` · `text-[9px]`…) — px là số cứng nên
+**không thể** có cài đặt cỡ chữ cho người dùng. Nay mỗi bậc là một token, và mọi token nhân với
+`--font-scale` (người dùng chỉnh ở **Cài đặt của tôi → Giao diện → Cỡ chữ**: 90% · 100% · 115% · 130%):
+
+| Vai | Token | Cỡ (ở 100%) | Thay cho |
+|---|---|---|---|
+| Nhãn rất phụ | `text-micro` | 9px | `text-[8px]` |
+| Nhãn / ghi chú | `text-tiny` | 10px | `text-[9px]` |
+| Nhãn trong card | `text-label` | 11px | `text-[10px]` |
+| Chữ thường trong card | `text-body` | 12,5px | `text-[11px]` |
+| Chữ đọc kỹ | `text-body-lg` | 13px | `text-[12px]` |
+| Tiêu đề nhỏ | `text-title` | 14px | `text-[13px]` |
+
+- **Đã nhích +1px mọi bậc** so với trước (phản hồi thật: "tỷ lệ chữ vẫn hơi nhỏ"), và **mọi bậc rem
+  mặc định của Tailwind** (`text-xs/sm/base/lg/xl/2xl/3xl`) cũng nhân theo cùng công tắc — nếu không thì
+  nửa app to lên còn nửa kia đứng yên.
+- **Không viết `text-[Npx]` trong mã** (`DesignSystemTest` khoá luật này). **Không nhỏ hơn 9px.**
+- Cỡ chữ áp NGAY khi bấm (không có nút Lưu), **lưu theo tài khoản** (`users.font_scale`) + cache ở máy, và
+  **server render sẵn** `style="--font-scale: …"` trên thẻ `<html>` nên không nháy cỡ chữ khi tải trang.
 - Viết hoa nhỏ (`uppercase tracking-wide`) chỉ cho **tên nhóm**, không cho câu.
 
 ---
@@ -684,6 +705,14 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
     quen bấm** (menu/thanh công cụ hiện có), và nếu là điều khiển quan trọng thì **có chữ**, không chỉ
     icon.
 
+43. **Số cứng thì không có cài đặt.** 941 chỗ cỡ chữ viết bằng px nghĩa là "không thể cho người dùng chỉnh
+    cỡ chữ" — muốn có công tắc thì TRƯỚC HẾT phải biến số cứng thành token theo vai. Cùng bài học với
+    màu (token) và chuyển động (token). Khi một yêu cầu nghe như "thêm một tùy chọn", hãy hỏi: *dữ liệu
+    đó đang là hằng số ở bao nhiêu chỗ?*
+44. **Mỗi card một màu = người dùng phải học lại từng card.** 9 gradient nhận diện riêng (xanh · tím ·
+    cam · xanh dương…) trông "có cá tính" nhưng phá đúng mục tiêu của tài liệu này: học MỘT lần, dùng mọi
+    card. Sắc thái riêng chỉ nên đến từ DỮ LIỆU (ảnh, màu trạng thái), không từ khung của card.
+
 ### E. Quy trình và kiểm thử
 
 33. **Mỗi route mới phải khai vào `ModuleRegistry`** — nếu không, công tắc gói không chặn được nó, và
@@ -794,6 +823,8 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 | 24 | 2026-09-23 | **3 card còn MÀU NHẤN RIÊNG** (emerald: RefImageCard · ConceptCard · InpaintCard) + **12 nút chính bị khoá không nói vì sao** + 2 màn hình có **2 nút chính cùng lúc** | Thiết kế lại 3 card về đúng từ vựng: "đang chọn" = `border-brand-500 + bg-brand-600/20 + ring-brand-500/40` · "khối chứa" = `border-ink-700 + bg-ink-900` · "thành công" = token `ok` · nút chính của Inpaint về gradient thương hiệu · 12 nút khoá có dòng `↳` suy ra từ MỘT computed `blockReason` · hạ "Mở Agent Studio" xuống nút phụ · ẩn thanh CTA khi ở tab Hàng loạt | emerald trong 3 card **26 → 0** · **xoá hẳn danh sách miễn trừ emerald** trong `DesignSystemTest` · 2 test mới/bổ sung · `DesignSystemTest` **9/9 XANH** |
 
 | 25 | 2026-09-23 | Khiếu nại: **"chưa thấy thay đổi giao diện + không thấy cài đặt theme + không thấy ảnh hưởng gì từ theme daisyUI đã đưa"** | Lấy **đúng giá trị màu của theme tham chiếu** (nền xám nguội `#15191e/#191e24/#1d232a` · chữ `#ecf9ff` · trạng thái `#ff627d/#fcb700/#00d390/#00bafe`) + đưa **bộ tên token daisyUI** (`base-100/200/300 · base-content · primary · secondary · accent · neutral · info/success/warning/error + -content`) thành lớp ngữ nghĩa chính, giữ xanh lá làm `primary` · **mở đường vào**: thêm mục "Giao diện (Sáng · Tối · Theo máy)" vào menu Cài đặt trong Studio + đổi nút thanh trạng thái thành **chip có chữ** · khối chọn giao diện dùng chính `bg-base-100/base-200/base-300 text-base-content bg-primary` và nói rõ nguồn bảng màu | nền tối `#17150f → #191e24` · chữ `#f4f2ec → #ecf9ff` · menu bánh răng **4 → 5 mục** · chip trạng thái nay **có chữ "Sáng/Tối"** · Chrome thật: 5 màn hình × 2 theme **0 chỗ dưới AA** · 847 test XANH |
+
+| 26 | 2026-09-23 | Yêu cầu: **mọi card chung một màu** · **chữ hơi nhỏ, thêm cài đặt cỡ chữ** · làm nốt 6 việc còn nợ | Bỏ 9 gradient nhận diện riêng của card · thang cỡ chữ thành **6 token theo vai** (+1px mỗi bậc) + công tắc `--font-scale` (90/100/115/130%, lưu theo tài khoản, render sẵn ở server) · chọn ảnh nguồn NGAY trong card Gợi ý từ ảnh (`SourceLibraryPicker`) · **mã tra cứu lỗi L-XXXX** ở payload + log · **tên file theo kênh bán** (Shopee/Lazada/TikTok/catalogue/xưởng) · **tự chuyển trạng thái** khi khách bấm Duyệt (đi qua đúng whitelist) · trang **/bao-cao-nhom** (chi phí theo nhóm từ bảng generations) · 14 file bỏ viền trắng trên bề mặt | 941 `text-[Npx]` → **0** · 9 → **0** gradient nhận diện · `border-white/*` trên bề mặt **→ 0** · 4 test mới · full suite **XANH** |
 
 ### 16.1 Số đo trước → sau của cả hành trình
 

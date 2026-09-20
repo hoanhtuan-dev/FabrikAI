@@ -206,13 +206,13 @@ const visibleQuestions = computed(() => {
     <!-- Phạm vi + khôi phục -->
     <div class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-ink-700 bg-ink-800/60 px-3 py-2">
       <StudioIcon name="info" size="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-300" />
-      <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-cream-300">
+      <p class="min-w-0 flex-1 text-body leading-relaxed text-cream-300">
         <b class="text-cream-100">Bản của bạn</b> lưu theo <b>tài khoản</b> — mở máy khác vẫn còn.
         <span v-if="isAdmin" class="text-warn">Bạn là owner: <b>Dùng chung</b> sửa dữ liệu cho MỌI người.</span>
       </p>
       <div v-if="isAdmin" class="flex overflow-hidden rounded-md border border-ink-600">
-        <button @click="mode='mine'" :class="mode==='mine' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="px-2.5 py-1 text-[11px] font-medium transition">Bản của tôi</button>
-        <button @click="mode='global'" :class="mode==='global' ? 'bg-amber-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="px-2.5 py-1 text-[11px] font-medium transition">Dùng chung</button>
+        <button @click="mode='mine'" :class="mode==='mine' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="px-2.5 py-1 text-body font-medium transition">Bản của tôi</button>
+        <button @click="mode='global'" :class="mode==='global' ? 'bg-amber-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="px-2.5 py-1 text-body font-medium transition">Dùng chung</button>
       </div>
       <button v-if="hasOverrides" @click="resetMine" class="btn-outline btn-sm whitespace-nowrap" title="Xoá mọi tùy chỉnh của bạn, quay về bản mặc định">
         <StudioIcon name="rotateCcw" size="h-3.5 w-3.5" /> Khôi phục mặc định
@@ -222,10 +222,10 @@ const visibleQuestions = computed(() => {
     <!-- Tab trong mục (khác sidebar: đây là 2 bảng dữ liệu của cùng một mục) -->
     <div class="mb-4 flex flex-wrap items-center gap-2">
       <div class="flex overflow-hidden rounded-lg border border-ink-600">
-        <button @click="tab='types'" :class="tab==='types' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition">
+        <button @click="tab='types'" :class="tab==='types' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="flex items-center gap-1.5 px-3 py-1.5 text-body font-medium transition">
           <StudioIcon name="shirt" size="h-3.5 w-3.5" /> Loại trang phục ({{ types.length }})
         </button>
-        <button @click="tab='questions'" :class="tab==='questions' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition">
+        <button @click="tab='questions'" :class="tab==='questions' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="flex items-center gap-1.5 px-3 py-1.5 text-body font-medium transition">
           <StudioIcon name="search" size="h-3.5 w-3.5" /> Câu hỏi ({{ questions.length }})
         </button>
       </div>
@@ -251,7 +251,7 @@ const visibleQuestions = computed(() => {
     </div>
 
     <template v-else-if="tab==='types'">
-      <p class="mb-3 text-[11px] text-cream-400">
+      <p class="mb-3 text-body text-cream-400">
         Ảnh đại diện phục vụ tự động theo slug: <span class="text-brand-300">/garment/{slug}</span>
       </p>
       <SettingsEmpty v-if="!visibleTypes.length" :filtered="!!typeQuery.trim()" icon="shirt"
@@ -268,11 +268,11 @@ const visibleQuestions = computed(() => {
           </span>
           <div class="min-w-0 flex-1">
             <p class="truncate text-xs font-semibold text-cream-100">{{ t.name }}
-              <span v-if="t._local" class="ml-1 rounded bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">của bạn</span>
+              <span v-if="t._local" class="ml-1 rounded bg-brand-600/30 px-1.5 py-0.5 text-tiny font-semibold text-brand-200">của bạn</span>
             </p>
-            <p class="truncate text-[10px] text-cream-400">slug: {{ t.slug }}</p>
+            <p class="truncate text-label text-cream-400">slug: {{ t.slug }}</p>
           </div>
-          <span class="h-5 w-5 shrink-0 rounded-full border border-white/20" :style="{ background: t.color || '#4a7a90' }"></span>
+          <span class="h-5 w-5 shrink-0 rounded-full border border-ink-600" :style="{ background: t.color || '#4a7a90' }"></span>
           <button @click="editType(t)" class="tool-btn" :title="'Sửa ' + t.name">
             <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
           </button>
@@ -284,7 +284,7 @@ const visibleQuestions = computed(() => {
     </template>
 
     <template v-else>
-      <p class="mb-3 text-[11px] text-cream-400">
+      <p class="mb-3 text-body text-cream-400">
         Câu hỏi hiển thị theo thứ tự; dùng <span class="text-brand-300">{name}</span> để chèn tên loại trang phục.
       </p>
       <SettingsEmpty v-if="!visibleQuestions.length" :filtered="!!questionQuery.trim()" icon="search"
@@ -296,9 +296,9 @@ const visibleQuestions = computed(() => {
       <div v-else class="space-y-2">
         <div v-for="q in visibleQuestions" :key="q.id || q.key" class="rounded-md border border-ink-700 bg-ink-900/60 p-3">
           <div class="flex items-start gap-3">
-            <span class="mt-0.5 shrink-0 rounded bg-ink-900 px-1.5 py-0.5 font-mono text-[10px] text-brand-300">{{ q.key }}</span>
+            <span class="mt-0.5 shrink-0 rounded bg-ink-900 px-1.5 py-0.5 font-mono text-label text-brand-300">{{ q.key }}</span>
             <p class="min-w-0 flex-1 text-xs font-semibold text-cream-100">{{ q.q }}
-              <span v-if="q._local" class="ml-1 rounded bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">của bạn</span>
+              <span v-if="q._local" class="ml-1 rounded bg-brand-600/30 px-1.5 py-0.5 text-tiny font-semibold text-brand-200">của bạn</span>
             </p>
             <button @click="editQuestion(q)" class="tool-btn shrink-0" :title="'Sửa ' + q.key">
               <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
@@ -307,7 +307,7 @@ const visibleQuestions = computed(() => {
               <StudioIcon name="trash" size="h-3 w-3" /> Xoá
             </button>
           </div>
-          <p class="mt-1.5 text-[10px] text-cream-400">{{ (q.opts || []).length }} lựa chọn</p>
+          <p class="mt-1.5 text-label text-cream-400">{{ (q.opts || []).length }} lựa chọn</p>
         </div>
       </div>
     </template>

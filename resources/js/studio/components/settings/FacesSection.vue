@@ -145,7 +145,7 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
         <button v-for="s in [{ id: 'all', label: 'Tất cả' }, { id: 'mine', label: 'Của tôi' }, { id: 'shared', label: 'Dùng chung' }]"
                 :key="s.id" @click="scope = s.id"
                 :class="scope === s.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-                class="px-2.5 py-1.5 text-[11px] font-medium transition">{{ s.label }}</button>
+                class="px-2.5 py-1.5 text-body font-medium transition">{{ s.label }}</button>
       </div>
       <button @click="addOpen = true" class="btn-brand btn-sm whitespace-nowrap">
         <StudioIcon name="plus" size="h-3.5 w-3.5" /> Thêm {{ NOUN }}
@@ -155,7 +155,7 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
     <!-- Ai thấy gì -->
     <div class="card mb-4 flex flex-wrap items-center gap-2 p-3">
       <StudioIcon :name="isModel ? 'user' : 'pose'" size="h-4 w-4 text-brand-300" />
-      <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-cream-300">
+      <p class="min-w-0 flex-1 text-body leading-relaxed text-cream-300">
         Bạn đang có <b class="text-cream-100">{{ myCount }}</b> mục riêng.
         Mục bạn thêm là <b>của riêng bạn</b> — người khác không thấy; mục <b>dùng chung</b> là catalog sẵn có.
         <span v-if="isAdmin" class="text-warn">Là owner, bạn thấy và xoá được mục của mọi người.</span>
@@ -179,7 +179,7 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
     </SettingsEmpty>
 
     <template v-else>
-      <p class="mb-3 text-[11px] text-cream-400">Hiện {{ list.length }} / {{ total }} mục.</p>
+      <p class="mb-3 text-body text-cream-400">Hiện {{ list.length }} / {{ total }} mục.</p>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div v-for="it in list" :key="it.id" class="card flex items-center gap-3 p-3">
           <img v-if="it.thumb || it.image" :src="it.thumb || it.image" loading="lazy" alt="" class="h-14 w-14 shrink-0 rounded-lg object-cover ring-1 ring-white/15">
@@ -189,10 +189,10 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
           <div class="min-w-0 flex-1">
             <p class="truncate text-xs font-semibold text-cream-100">
               {{ it.name }}
-              <span v-if="it.mine" class="ml-1 rounded bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">của bạn</span>
-              <span v-else class="ml-1 rounded bg-ink-700 px-1.5 py-0.5 text-[9px] font-semibold text-cream-400">dùng chung</span>
+              <span v-if="it.mine" class="ml-1 rounded bg-brand-600/30 px-1.5 py-0.5 text-tiny font-semibold text-brand-200">của bạn</span>
+              <span v-else class="ml-1 rounded bg-ink-700 px-1.5 py-0.5 text-tiny font-semibold text-cream-400">dùng chung</span>
             </p>
-            <p class="truncate text-[10px] text-cream-400">#{{ it.id }}<span v-if="it.ethnicity"> · {{ it.ethnicity }}</span><span v-else-if="it.skeleton"> · {{ it.skeleton }}</span></p>
+            <p class="truncate text-label text-cream-400">#{{ it.id }}<span v-if="it.ethnicity"> · {{ it.ethnicity }}</span><span v-else-if="it.skeleton"> · {{ it.skeleton }}</span></p>
           </div>
           <button v-if="it.mine || isAdmin" @click="pendingDelete = it"
                   class="tool-btn shrink-0 !text-danger hover:!bg-red-600/25" :title="'Xoá ' + it.name">
@@ -211,7 +211,7 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
             <StudioIcon name="x" size="h-4 w-4" />
           </button>
         </div>
-        <p class="mb-4 text-[11px] leading-relaxed text-cream-400">
+        <p class="mb-4 text-body leading-relaxed text-cream-400">
           {{ isModel ? 'Ảnh khuôn mặt rõ, chính diện, không bị che — dùng cho Thay người mẫu và Ghép ảnh.' : 'Ảnh toàn thân thể hiện rõ dáng đứng — dùng khi tạo ảnh người mẫu.' }}
         </p>
         <div>

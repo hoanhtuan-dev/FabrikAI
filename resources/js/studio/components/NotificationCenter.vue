@@ -82,8 +82,8 @@ const progress = computed(() => {
     <div v-if="progress" class="pointer-events-auto overflow-hidden rounded-xl border border-brand-500/40 bg-ink-900/95 shadow-2xl backdrop-blur">
       <div class="flex items-center gap-2 px-3 py-2.5">
         <span class="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-brand-400"></span>
-        <span class="min-w-0 flex-1 truncate text-[11px] font-semibold text-cream-100">{{ progress.label }}</span>
-        <span class="shrink-0 text-[11px] font-semibold tabular-nums text-brand-300">{{ progress.pct }}%</span>
+        <span class="min-w-0 flex-1 truncate text-body font-semibold text-cream-100">{{ progress.label }}</span>
+        <span class="shrink-0 text-body font-semibold tabular-nums text-brand-300">{{ progress.pct }}%</span>
       </div>
       <div class="h-1 w-full bg-ink-800">
         <div class="h-full bg-gradient-to-r from-brand-500 to-brand-300 motion-ui motion-ui--size duration-slow ease-emphasized" :style="{ width: progress.pct + '%' }"></div>
@@ -109,11 +109,11 @@ const progress = computed(() => {
         role="status"
       >
         <StudioIcon :name="iconOf(n)" size="h-4 w-4 shrink-0 mt-0.5" :class="iconToneOf(n)" />
-        <p class="min-w-0 flex-1 whitespace-pre-line break-words text-[11px] leading-snug">{{ n.msg }}</p>
+        <p class="min-w-0 flex-1 whitespace-pre-line break-words text-body leading-snug">{{ n.msg }}</p>
         <button
           v-if="n.action"
           type="button"
-          class="shrink-0 rounded-md border border-ink-600 px-2 py-0.5 text-[10px] font-semibold transition hover:bg-ink-800"
+          class="shrink-0 rounded-md border border-ink-600 px-2 py-0.5 text-label font-semibold transition hover:bg-ink-800"
           @click="n.action.run(); store.dismissNotification(n.id)"
         >{{ n.action.label }}</button>
         <button
@@ -130,7 +130,7 @@ const progress = computed(() => {
     <button
       v-if="store.notifications.length > 1"
       type="button"
-      class="pointer-events-auto self-end rounded-full border border-ink-600 bg-ink-900/95 px-2.5 py-1 text-[10px] font-semibold text-cream-300 transition hover:bg-ink-800 hover:text-cream-100"
+      class="pointer-events-auto self-end rounded-full border border-ink-600 bg-ink-900/95 px-2.5 py-1 text-label font-semibold text-cream-300 transition hover:bg-ink-800 hover:text-cream-100"
       @click="store.clearNotifications()"
     >Xoá hết ({{ store.notifications.length }})</button>
   </div>

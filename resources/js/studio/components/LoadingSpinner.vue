@@ -10,10 +10,10 @@ const props = defineProps({
 });
 
 const sizeClasses = computed(() => ({
-  sm: { wrapper: 'gap-2', dot: 'h-2 w-2', text: 'text-[11px]', sub: 'text-[9px]', bar: 'h-0.5' },
-  md: { wrapper: 'gap-3', dot: 'h-2.5 w-2.5', text: 'text-xs', sub: 'text-[10px]', bar: 'h-1' },
-  lg: { wrapper: 'gap-4', dot: 'h-3 w-3', text: 'text-sm', sub: 'text-[11px]', bar: 'h-1.5' },
-}[props.size] || { wrapper: 'gap-3', dot: 'h-2.5 w-2.5', text: 'text-xs', sub: 'text-[10px]', bar: 'h-1' }));
+  sm: { wrapper: 'gap-2', dot: 'h-2 w-2', text: 'text-body', sub: 'text-tiny', bar: 'h-0.5' },
+  md: { wrapper: 'gap-3', dot: 'h-2.5 w-2.5', text: 'text-xs', sub: 'text-label', bar: 'h-1' },
+  lg: { wrapper: 'gap-4', dot: 'h-3 w-3', text: 'text-sm', sub: 'text-body', bar: 'h-1.5' },
+}[props.size] || { wrapper: 'gap-3', dot: 'h-2.5 w-2.5', text: 'text-xs', sub: 'text-label', bar: 'h-1' }));
 
 const hasProgress = computed(() => props.progress != null);
 </script>

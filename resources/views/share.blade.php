@@ -13,9 +13,9 @@
                 <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">F</span>
                 <span class="font-display text-base font-semibold text-cream-50">FabrikAI</span>
             </span>
-            <span class="rounded-full border border-ink-700 bg-ink-800 px-3 py-1 text-[11px] font-semibold text-cream-200">Trang duyệt bộ sưu tập</span>
+            <span class="rounded-full border border-ink-700 bg-ink-800 px-3 py-1 text-body font-semibold text-cream-200">Trang duyệt bộ sưu tập</span>
             @if($share->expires_at)
-                <span class="ml-auto text-[11px] text-cream-300">Link có hiệu lực đến {{ $share->expires_at->format('d/m/Y') }}</span>
+                <span class="ml-auto text-body text-cream-300">Link có hiệu lực đến {{ $share->expires_at->format('d/m/Y') }}</span>
             @endif
         </div>
     </header>
@@ -24,7 +24,7 @@
         {{-- ── Thông tin bộ sưu tập ── --}}
         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">Bộ sưu tập</p>
         <h1 class="mt-1 font-display text-3xl font-semibold text-cream-50">{{ $project->name }}</h1>
-        <div class="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+        <div class="mt-3 flex flex-wrap items-center gap-2 text-body">
             {{-- [P0.5] Nhãn trạng thái lấy từ ProjectWorkflowService (nguồn duy nhất sinh nhãn tiếng
                  Việt). Bản trước đọc $project->status_label / $project->status_color — hai thuộc tính
                  KHÔNG tồn tại trên model ⇒ khách luôn thấy slug tiếng Anh ("draft"/"review"). --}}
@@ -47,7 +47,7 @@
 
         @if(trim((string) $project->brief) !== '')
             <div class="card mt-5 p-4">
-                <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300">Yêu cầu của khách</p>
+                <p class="text-body font-semibold uppercase tracking-wide text-cream-300">Yêu cầu của khách</p>
                 <p class="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-cream-100">{{ $project->brief }}</p>
             </div>
         @endif
@@ -58,14 +58,14 @@
              để đối chiếu với ảnh AI. --}}
         @if(!empty($referenceImages))
             <h2 class="mt-8 font-display text-xl font-semibold text-cream-50">Ảnh gốc của bộ sưu tập</h2>
-            <p class="mt-1 text-[11px] text-cream-300">Ảnh do người thiết kế tải lên — dùng làm chuẩn đối chiếu (chất liệu, màu, chi tiết).</p>
+            <p class="mt-1 text-body text-cream-300">Ảnh do người thiết kế tải lên — dùng làm chuẩn đối chiếu (chất liệu, màu, chi tiết).</p>
             <div class="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 @foreach($referenceImages as $ref)
                     <figure class="card overflow-hidden">
                         <a href="{{ $ref['url'] }}" target="_blank" rel="noopener" class="block bg-ink-900">
                             <img src="{{ $ref['url'] }}" alt="{{ $ref['name'] }}" loading="lazy" class="h-40 w-full object-cover">
                         </a>
-                        <figcaption class="truncate p-2 text-[10px] text-cream-300">{{ $ref['name'] }}</figcaption>
+                        <figcaption class="truncate p-2 text-label text-cream-300">{{ $ref['name'] }}</figcaption>
                     </figure>
                 @endforeach
             </div>
@@ -83,21 +83,26 @@
                             <img src="{{ $g->media_url }}" alt="Ảnh {{ $i + 1 }} của bộ sưu tập {{ $project->name }}" loading="lazy" class="h-64 w-full object-cover">
                         </a>
                         <figcaption class="p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Ảnh {{ sprintf('%02d', $i + 1) }}</p>
+                            <p class="text-label font-semibold uppercase tracking-wide text-cream-300">Ảnh {{ sprintf('%02d', $i + 1) }}</p>
                             @if($g->prompt)
-                                <p class="mt-1 line-clamp-3 text-[11px] leading-relaxed text-cream-200">{{ \Illuminate\Support\Str::limit($g->prompt, 220) }}</p>
+                                <p class="mt-1 line-clamp-3 text-body leading-relaxed text-cream-200">{{ \Illuminate\Support\Str::limit($g->prompt, 220) }}</p>
                             @endif
                         </figcaption>
                     </figure>
                 @endforeach
             </div>
-            <p class="mt-2 text-[11px] text-cream-300">Bấm vào ảnh để xem kích thước đầy đủ.</p>
+            <p class="mt-2 text-body text-cream-300">Bấm vào ảnh để xem kích thước đầy đủ.</p>
         @endif
 
         {{-- ── Phản hồi ── --}}
         <section id="phan-hoi" class="mt-10">
             <h2 class="font-display text-xl font-semibold text-cream-50">Phản hồi của bạn</h2>
 
+            @if($sent && ($autoApproved ?? false))
+                <p role="status" class="mt-2 rounded-lg border border-ok/40 bg-ok/10 px-3 py-2 text-xs text-ok">
+                    Cảm ơn bạn — bộ sưu tập đã được chuyển sang trạng thái <b>Đã duyệt</b>.
+                </p>
+            @endif
             @if($sent)
                 <div class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-ok">
                     Đã gửi phản hồi — cảm ơn bạn. Người phụ trách bộ sưu tập sẽ nhận được ngay trong FabrikAI.
@@ -128,16 +133,16 @@
                     <textarea id="fb-message" name="message" rows="3" maxlength="1000" class="input !py-2" placeholder="VD: Ảnh 03 đổi nền sáng hơn, ảnh 05 giữ nguyên tay áo">{{ old('message') }}</textarea>
                 </div>
                 <button type="submit" class="btn-brand mt-3">Gửi phản hồi</button>
-                <p class="mt-2 text-[11px] text-cream-300">Phản hồi được lưu vào bộ sưu tập trong FabrikAI (kèm tên bạn và thời điểm) — không cần tài khoản.</p>
+                <p class="mt-2 text-body text-cream-300">Phản hồi được lưu vào bộ sưu tập trong FabrikAI (kèm tên bạn và thời điểm) — không cần tài khoản.</p>
             </form>
 
             @if($feedback->isNotEmpty())
                 <div class="mt-5">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-cream-300">Phản hồi trước đó</p>
+                    <p class="text-body font-semibold uppercase tracking-wide text-cream-300">Phản hồi trước đó</p>
                     <ul class="mt-2 space-y-2">
                         @foreach($feedback as $fb)
                             <li class="card p-3">
-                                <div class="flex flex-wrap items-center gap-2 text-[11px]">
+                                <div class="flex flex-wrap items-center gap-2 text-body">
                                     <span class="font-semibold text-cream-100">{{ $fb->author_name }}</span>
                                     <span class="rounded-full px-2 py-0.5 font-semibold {{ $fb->decision === 'approved' ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn' }}">{{ $fb->decisionLabel() }}</span>
                                     <span class="text-cream-300">{{ $fb->created_at?->format('d/m/Y H:i') }}</span>
@@ -153,7 +158,7 @@
         </section>
 
         <footer class="mt-10 border-t border-ink-800 pt-6">
-            <p class="text-[11px] leading-relaxed text-cream-300">
+            <p class="text-body leading-relaxed text-cream-300">
                 <b class="text-cream-100">Lưu ý:</b> ảnh trong bộ sưu tập do AI tạo, dùng làm ảnh <b class="text-cream-100">tham chiếu</b> để duyệt ý tưởng —
                 không dùng để in hoặc sản xuất hàng loạt khi chưa đối chiếu mẫu thật.
                 Trang này chỉ dành cho người nhận link; vui lòng không chia sẻ công khai.
