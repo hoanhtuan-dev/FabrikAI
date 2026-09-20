@@ -1752,7 +1752,7 @@ Trước đây: đếm project/generation + dò từ khoá trong `generations.pr
 
 ## Phiên 2026-09-23 (Đợt 23 — BỎ GIẢ ĐỊNH CỨNG VỀ NHÀ CUNG CẤP: tìm kiếm web & khả năng truy cập theo CÀI ĐẶT)
 
-**Deploy:** `<prev> → <commit>`. **Migration mới:** `2026_09_23_000004_add_search_param_to_studio_providers` (thêm cột `studio_providers.search_param`).
+**Deploy:** `d1f5d02 → 1d963b2`. **Migration mới:** `2026_09_23_000004_add_search_param_to_studio_providers` (thêm cột `studio_providers.search_param`).
 
 ### 0. Phản hồi dẫn tới đợt này
 
