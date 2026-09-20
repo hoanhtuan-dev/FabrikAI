@@ -237,4 +237,21 @@ class ClientErrorReportTest extends TestCase
         $this->assertSame([], $missing,
             'Shell gọi store.toast() mà không render <NotificationCenter /> ⇒ thông báo (kèm mã tra cứu) vô hình.');
     }
+
+    /**
+     * MA TRA CUU chi tra duoc khi log noi DUNG cho hong. Lan khach bao L-P7CR, log chi co cau loi ma
+     * KHONG co endpoint => ho tro phai doan mo. Nay moi loi tu loi goi API mang theo ngu canh
+     * "api <duong dan> -> <tinh huong>" va ngu canh do di thang vao log.
+     */
+    public function test_api_errors_carry_their_endpoint_into_the_log_context(): void
+    {
+        $store = $this->code($this->js('store.js'));
+
+        $this->assertStringContainsString('err.api_context =', $store, 'Loi tu API phai mang ngu canh endpoint.');
+        $this->assertStringContainsString('(e && e.api_context)', $store, 'userFacingError phai dung ngu canh do khi bao loi.');
+        // Hai tình huống nói KHÁC nhau: hết phiên (tải lại là xong) và máy chủ trả dữ liệu hỏng.
+        $this->assertStringContainsString('Phiên làm việc đã hết. Hãy tải lại trang để đăng nhập lại.', $store);
+        $this->assertStringContainsString('Không tải được dữ liệu. Hãy tải lại trang và thử lại.', $store);
+        $this->assertStringNotContainsString('máy chủ trả dữ liệu không hợp lệ', $store);
+    }
 }

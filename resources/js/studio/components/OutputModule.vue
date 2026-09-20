@@ -67,7 +67,7 @@ function download(g) {
         <span v-if="g.project_id" class="absolute top-1 left-1 z-10 h-2.5 w-2.5 rounded-full ring-1 ring-black/40" :style="{ background: projectColor(g.project_id) }" :title="'Dự án: ' + projectName(g.project_id, g.project)"></span>
         <!-- [Đợt 0.3] Nhãn DEMO: ảnh này KHÔNG do AI tạo (chưa có API key) — ảnh mẫu hoặc chính ảnh gốc.
              Trước đây những ảnh này được báo Hoàn tất im lặng, người dùng tưởng AI đã xử lý. -->
-        <span v-if="g.is_demo" class="absolute right-1 top-1 z-10 rounded-full bg-amber-500 px-1.5 py-0.5 text-micro font-bold uppercase leading-none text-black" :title="g.demo_reason || 'Ảnh mẫu — tính năng tạo ảnh chưa được bật'">DEMO</span>
+        <span v-if="g.is_demo" class="absolute right-1 top-1 z-10 rounded-full bg-amber-500 px-1.5 py-0.5 text-micro font-bold uppercase leading-none text-black" :title="g.demo_reason || 'Ảnh mẫu — tính năng tạo ảnh AI chưa được bật'">ẢNH MẪU</span>
         <!-- Ảnh hoàn tất -->
         <template v-if="g.status === 'completed' && g.media_url">
           <button @click="store.openViewer(g)" draggable="true" @dragstart="onThumbDrag($event, g)" class="absolute inset-0 cursor-grab active:cursor-grabbing" :title="'Kéo thả vào canvas để thêm · nhấn để xem lớn'"><img :src="thumbUrl(g.media_url)" class="pointer-events-none h-full w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)"></button>

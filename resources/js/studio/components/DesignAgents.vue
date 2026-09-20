@@ -10,7 +10,7 @@
  * Nguyên tắc:
  *   · một workspace lớn thay vì popup chật, rail tiến trình + vùng nội dung + action bar,
  *   · tab/step theo .seg/.seg-btn, a11y đầy đủ (tablist/tabpanel/aria-live/role=alert),
- *   · nhãn tiếng Việt thống nhất; dữ liệu demo/local nói thẳng,
+ *   · nhãn tiếng Việt thống nhất; gắn nhãn rõ cái nào là tin thật, cái nào là bộ có sẵn,
  *   · trạng thái brief cũ, tìm/lọc trend, copy prompt/màu, bộ đếm ký tự, Ctrl+Enter,
  *   · không tự đổi resolution hay ghi đè negative prompt người dùng đã đặt.
  */
@@ -899,7 +899,7 @@ watch(() => store.designAgentOpen, (open) => {
                       <span class="flex flex-wrap items-center gap-1.5 text-label font-semibold uppercase tracking-wide text-cream-400">
                         {{ categoryLabel(trend.category) }}
                         <span class="rounded bg-ink-800 px-1.5 py-0.5 normal-case tracking-normal" :class="lifecycleClass(trend.lifecycle)">{{ lifecycleLabel(trend.lifecycle) }}</span>
-                        <span v-if="trend.evidence_mode === 'demo'" class="rounded bg-amber-500/15 px-1.5 py-0.5 normal-case tracking-normal text-warn">mẫu</span>
+                        <span v-if="trend.evidence_mode === 'demo'" class="rounded bg-amber-500/15 px-1.5 py-0.5 normal-case tracking-normal text-warn" title="Hướng này lấy từ bộ xu hướng có sẵn của FabrikAI, chưa gắn với tin thị trường vừa lấy">bộ có sẵn</span>
                       </span>
                       <span class="mt-1.5 block text-sm font-semibold text-cream-100">{{ trendTitle(trend) }}</span>
                       <span class="mt-1 block text-body leading-4 text-cream-400">{{ trend.description }}</span>

@@ -2063,3 +2063,51 @@ Nếu người dùng khai `search_param=enable_search` cho một gateway **khôn
 | Test | full suite **903 test / 6.606 assert XANH** (sửa 1 test cũ khoá bảng nguồn tĩnh) |
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
+
+---
+
+## Phiên 2026-09-23 (Đợt 29 — bỏ chữ "demo" khỏi giao diện + mã tra cứu `L-P7CR` nói được ĐÚNG chỗ hỏng)
+
+**Deploy:** `<prev> → <commit>`. Không migration mới.
+
+### 1. Bỏ chữ "demo" / "nguồn: demo" khỏi bề mặt người dùng
+
+Người dùng yêu cầu thẳng: *"bỏ chữ nguồn: demo dùm tao cái"*. Đã thay bằng câu nói đúng việc:
+
+| Trước | Nay |
+|---|---|
+| Nhãn trên thẻ xu hướng: **mẫu** | **bộ có sẵn** + tooltip *"Hướng này lấy từ bộ xu hướng có sẵn của FabrikAI, chưa gắn với tin thị trường vừa lấy"* |
+| Huy hiệu ảnh: **DEMO** | **ẢNH MẪU** |
+| "Tính năng tạo ảnh chưa được bật — kết quả sẽ là ẢNH MẪU (chế độ demo), không phải ảnh do AI tạo" | "Tính năng tạo ảnh AI chưa được bật — ảnh hiện ra chỉ là ảnh mẫu, không phải ảnh do AI tạo" |
+| Ghi chú trong mã/tài liệu: "dữ liệu demo/local nói thẳng" | "gắn nhãn rõ cái nào là tin thật, cái nào là bộ có sẵn" |
+
+Kiểm lại: `grep` toàn bộ `resources/views` + `resources/js` **không còn** chuỗi `demo` nào hiển thị cho người dùng (chỉ còn tên biến nội bộ như `evidence_mode`).
+
+### 2. Mã tra cứu `L-P7CR` — khách gặp câu *"Phiên đăng nhập đã hết hoặc máy chủ trả dữ liệu không hợp lệ"*
+
+Tra trong `storage/logs/laravel.log` của production:
+
+```
+[2026-09-20 18:31:03] production.WARNING: client_error[L-P7CR]: userFacingError
+  {"message":"Error: Phiên đăng nhập đã hết hoặc máy chủ trả dữ liệu không hợp lệ — hãy tải lại trang. | at Proxy.api",
+   "user_message":"…", "page":"/", "user_id":1, "ip":171.229.15.8}
+```
+
+**Hai vấn đề lộ ra, cả hai đã sửa:**
+
+1. **Log không nói endpoint nào hỏng** ⇒ hỗ trợ phải đoán mò. Nay mọi lỗi từ lời gọi API mang theo ngữ cảnh
+   `api <đường dẫn> → <tình huống>` và ngữ cảnh đó đi thẳng vào dòng log cạnh mã tra cứu.
+2. **Một câu gộp hai tình huống rất khác nhau** — khách đọc xong vẫn không biết phải làm gì:
+   · hết phiên đăng nhập (máy chủ đá về trang đăng nhập) ⇒ *"Phiên làm việc đã hết. Hãy tải lại trang để đăng nhập lại."*
+   · máy chủ trả dữ liệu không dùng được ⇒ *"Không tải được dữ liệu. Hãy tải lại trang và thử lại."*
+   Kèm mã tra cứu như mọi câu lỗi khác.
+
+### 3. Kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Test mới | `test_api_errors_carry_their_endpoint_into_the_log_context` — lỗi API phải mang `api_context`, `userFacingError` phải dùng nó, và hai câu lỗi phải KHÁC nhau; câu cũ "máy chủ trả dữ liệu không hợp lệ" không được quay lại |
+| Full suite | **904 test / 6.612 assert XANH** |
+| Production | log có dòng `client_error[L-P7CR]` — mã tra cứu hoạt động đúng thiết kế (khách đọc mã, hỗ trợ tra ra dòng log) |
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).

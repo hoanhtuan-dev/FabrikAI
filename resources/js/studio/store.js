@@ -110,7 +110,9 @@ export function userFacingError(e, fallback, opts) {
   if (!clean && raw) logTechnical('error-blocked', raw);
   if (LOOKUP_SUFFIX.test(body)) return body;
   const serverCode = (e && (e.error_code || (e.response && e.response.error_code))) || '';
-  const code = serverCode || reportClientError(e || new Error(body || 'unknown'), options.context || 'userFacingError', { userMessage: body, silent: true });
+  // Ngữ cảnh ưu tiên: nơi gọi truyền vào → ngữ cảnh của lời gọi API (endpoint + mã) → mặc định.
+  const context = options.context || (e && e.api_context) || 'userFacingError';
+  const code = serverCode || reportClientError(e || new Error(body || 'unknown'), context, { userMessage: body, silent: true });
   return code && body ? body + ' (mã tra cứu: ' + code + ')' : body;
 }
 
@@ -659,10 +661,20 @@ export const useStudioStore = defineStore('studio', {
           this.upgradeOpen = false;
           this.loadPlanStatus(true);
         }
-        const err = new Error(data.message || 'Phiên đăng nhập đã hết hoặc máy chủ trả dữ liệu không hợp lệ — hãy tải lại trang.');
+        // PHÂN BIỆT hai tình huống rất khác nhau — trước đây gộp làm một câu nên khách đọc xong vẫn không
+        // biết phải làm gì, còn hỗ trợ thì không biết lỗi ở đâu:
+        //   · phiên đăng nhập đã hết (máy chủ đá về trang đăng nhập) ⇒ chỉ cần tải lại trang;
+        //   · máy chủ trả về thứ không dùng được (lỗi/không phải JSON) ⇒ tải lại, nếu vẫn lỗi thì đọc mã tra cứu.
+        const expired = res.redirected || (res.url && res.url.includes('/dang-nhap'));
+        const err = new Error(data.message || (expired
+          ? 'Phiên làm việc đã hết. Hãy tải lại trang để đăng nhập lại.'
+          : 'Không tải được dữ liệu. Hãy tải lại trang và thử lại.'));
         err.status = res.status;
         err.code = data && data.code;
         err.data = data;
+        // Ngữ cảnh cho MÃ TRA CỨU: nhờ nó mà log nói được ĐÚNG endpoint nào hỏng, thay vì chỉ có câu lỗi
+        // (lần khách báo mã L-P7CR, log không có đường dẫn nên phải đoán mò).
+        err.api_context = 'api ' + url + ' → ' + (expired ? 'hết phiên' : 'HTTP ' + res.status);
         throw err;
       }
       return data;

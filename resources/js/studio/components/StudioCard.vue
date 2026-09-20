@@ -171,7 +171,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
 
     <p v-if="plan && plan.image_ready === false" role="status"
        class="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-label leading-4 text-warn">
-      Tính năng tạo ảnh chưa được bật — kết quả sẽ là ẢNH MẪU (chế độ demo), không phải ảnh do AI tạo. Vui lòng báo cho quản trị viên.
+      Tính năng tạo ảnh AI chưa được bật — ảnh hiện ra chỉ là ảnh mẫu, không phải ảnh do AI tạo. Vui lòng báo cho quản trị viên.
     </p>
 
     <!-- ① ẢNH NGƯỜI MẪU (bắt buộc) -->
