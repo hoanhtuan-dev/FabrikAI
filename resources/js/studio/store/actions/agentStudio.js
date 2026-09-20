@@ -2,8 +2,12 @@
 // Action dùng this.* trỏ cùng store instance ⇒ gọi chéo giữa các miền hoạt động y hệt file gốc.
 import { apiError, userFacingError, PLAN_ASSUMPTION_DEFAULTS, CSRF } from '../helpers.js';
 export const agentStudioActions = {
-    async loadPlan(payload = {}) {
-      this.planLoading = true;
+    async loadPlan(payload = {}, opts = {}) {
+      // silent = tự tính lại khi gõ (không bật planLoading để nút không nhảy "Đang tính…",
+      // không xoá kết quả cũ khi lỗi để bố cục không bị nhảy).
+      const silent = !!opts.silent;
+      if (!silent) this.planLoading = true;
+      else this.planRecalculating = true;
       this.planError = '';
       try {
         const data = await this.api('/api/design-agent/plan', {
@@ -15,10 +19,12 @@ export const agentStudioActions = {
         return data;
       } catch (error) {
         this.planError = userFacingError(error, 'Không tính được kế hoạch sản xuất.');
-        this.plan = null;
+        // silent: giữ nguyên kết quả cũ để màn hình không "nhảy" mất nội dung khi đang gõ.
+        if (!silent) this.plan = null;
         throw error;
       } finally {
-        this.planLoading = false;
+        if (!silent) this.planLoading = false;
+        else this.planRecalculating = false;
       }
     },
     setPlanAssumption(key, value) {

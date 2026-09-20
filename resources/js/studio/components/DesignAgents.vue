@@ -427,17 +427,23 @@ const planInput = computed(() => ({
   size_distribution: sizeDistribution.value,
 }));
 let planTimer = null;
-/** Tính lại kế hoạch (gộp nhiều lần gõ số liên tiếp thành 1 lượt gọi — backend tất định, rất nhanh). */
+/** Tự tính lại khi GÕ số liệu — gộp nhiều lần gõ thành 1 lượt, chạy IM LẶNG để không nhảy nút "Đang tính…". */
 function schedulePlan() {
   if (planTimer) clearTimeout(planTimer);
-  planTimer = setTimeout(() => { loadPlanNow(); }, 500);
+  planTimer = setTimeout(() => { loadPlanSilently(); }, 500);
 }
+/** Nút "Tính lại kế hoạch" (bấm tay) — CÓ trạng thái loading để người dùng biết đang chạy. */
 async function loadPlanNow() {
   if (prompt.value.trim().length < 3) {
     store.planError = 'Nhập prompt bộ sưu tập (tối thiểu 3 ký tự) trước khi lập kế hoạch sản xuất.';
     return;
   }
   try { await store.loadPlan(planInput.value); } catch (error) { /* store giữ lỗi */ }
+}
+/** Tự tính lại khi gõ — IM LẶNG: không bật planLoading, không xoá kết quả cũ khi lỗi ⇒ không nhảy layout. */
+async function loadPlanSilently() {
+  if (prompt.value.trim().length < 3) return;
+  try { await store.loadPlan(planInput.value, { silent: true }); } catch (error) { /* store giữ lỗi */ }
 }
 function planFieldValue(key) { return store.planAssumptions[key]; }
 

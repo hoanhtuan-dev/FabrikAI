@@ -92,6 +92,11 @@ const copyText = inject('copyText');
                     <button type="button" class="tool-btn mt-4 w-full justify-center !py-2.5" @click="applyCanvas">
                       <StudioIcon name="zap" size="h-3.5 w-3.5" /> Áp dụng &amp; mở Tạo ảnh
                     </button>
+                    <!-- Gợi ý nhẹ (không ép): chưa gắn bộ sưu tập thì nhắc tạo để ảnh nằm gọn, dễ quản lý/chia sẻ. -->
+                    <div v-if="!store.appliedProject" class="mt-2 rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-2 text-tiny leading-4 text-brand-200">
+                      <StudioIcon name="info" size="h-3 w-3" class="mr-1 inline-block align-[-2px]" />
+                      Gợi ý: tạo bộ sưu tập từ brief để ảnh tạo ra nằm gọn trong một bộ — dễ quản lý, duyệt mẫu và chia sẻ với khách.
+                    </div>
                     <!-- Cờ đang-chạy: không có nó thì bấm hai lần tạo HAI dự án trùng nhau. -->
                     <button type="button" class="tool-btn mt-2 w-full justify-center !py-2.5" :disabled="creatingCollection" @click="createCollection">
                       <StudioIcon name="briefcase" size="h-3.5 w-3.5" /> {{ creatingCollection ? 'Đang tạo…' : 'Tạo bộ sưu tập từ brief' }}

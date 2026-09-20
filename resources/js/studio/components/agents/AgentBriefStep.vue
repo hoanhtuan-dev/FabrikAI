@@ -7,6 +7,12 @@ import { useStudioStore } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
 import SourceLibraryPicker from '../SourceLibraryPicker.vue';
 const store = useStudioStore();
+// Nhãn ô mood board (backend trả tiếng Anh) — dịch để người dùng hiểu mỗi ô đại diện cho thứ gì.
+const MOOD_LABELS = {
+  'Silhouette': 'Dáng', 'Color story': 'Câu chuyện màu', 'Fabric': 'Chất liệu', 'Detail': 'Chi tiết',
+  'Styling': 'Phối đồ', 'Runway cue': 'Gợi ý sàn diễn', 'Office wear': 'Đồ công sở', 'Texture': 'Bề mặt chất liệu',
+};
+const moodLabel = (label) => MOOD_LABELS[label] || label;
 const prompt = inject('prompt');
 const promptInput = inject('promptInput');
 const collectionError = inject('collectionError');
@@ -301,7 +307,7 @@ const copyText = inject('copyText');
                   <div class="card p-5">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                       <div class="min-w-0">
-                        <h3 class="font-display text-base font-semibold text-brand-300">Đơn giá &amp; định mức của xưởng bạn</h3>
+                        <h3 class="font-display text-base font-semibold text-brand-300">Đơn giá &amp; định mức của xưởng bạn<span v-if="store.planRecalculating" class="ml-2 inline-flex items-center gap-1 align-middle text-tiny font-normal text-cream-400"><span class="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-400"></span>đang tính lại…</span></h3>
                         <p class="mt-0.5 text-body leading-5 text-cream-400">
                           Con số tiền do BẠN quyết định: sửa ô nào là kế hoạch tính lại ngay. Giá thành và lợi nhuận do hệ thống tính từ đúng những ô này — không dùng model AI cho con số.
                         </p>
@@ -485,10 +491,11 @@ const copyText = inject('copyText');
                 </div>
 
                 <div v-else-if="briefTab === 'moodboard'" class="mt-4 card p-5">
-                  <div class="mb-3 flex items-center justify-between"><h3 class="font-display text-base font-semibold text-brand-300">Bảng mood</h3><span class="text-label text-cream-400">{{ moodboardItems.length }} ô</span></div>
+                  <div class="mb-1 flex items-center justify-between"><h3 class="font-display text-base font-semibold text-brand-300">Bảng mood</h3><span class="text-label text-cream-400">{{ moodboardItems.length }} ô</span></div>
+                  <p class="mb-3 text-body leading-5 text-cream-400">Bảng màu + "tâm trạng" tổng thể của bộ sưu tập: mỗi ô là một sắc màu trong palette kết hợp với một hướng thời trang đã chọn — dùng để hình dung bộ sưu tập sẽ trông như thế nào trước khi tạo ảnh. Rê chuột lên ô để xem hướng gắn với ô đó.</p>
                   <div class="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
                     <div v-for="(item, index) in moodboardItems" :key="item.id || index" class="group relative aspect-square overflow-hidden rounded-lg border border-ink-700" :style="{ backgroundColor: item.color || palette[index % Math.max(1, palette.length)]?.hex || '#b9c8c2' }" role="img" :aria-label="(item.label || 'Mood ' + (index + 1)) + ': ' + (item.caption || '')" :title="item.caption || item.label || 'Mood board'">
-                      <span class="absolute inset-x-0 bottom-0 p-1.5 text-tiny font-semibold leading-3 text-white shadow-[0_-12px_16px_-8px_rgba(0,0,0,0.8)]">{{ item.label || 'Mood ' + (index + 1) }}</span>
+                      <span class="absolute inset-x-0 bottom-0 p-1.5 text-tiny font-semibold leading-3 text-white shadow-[0_-12px_16px_-8px_rgba(0,0,0,0.8)]">{{ moodLabel(item.label) || 'Mood ' + (index + 1) }}</span>
                     </div>
                   </div>
                   <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

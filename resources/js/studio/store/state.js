@@ -271,6 +271,9 @@ export function studioState() {
     plan: null,
     planBasis: null,
     planLoading: false,
+    // Tự tính lại (debounce khi gõ đơn giá) KHÔNG bật planLoading để nút không nhảy "Đang tính…" —
+    // chỉ bật cờ này cho một chỉ báo mờ không đẩy layout.
+    planRecalculating: false,
     planError: '',
     planAssumptions: { ...PLAN_ASSUMPTION_DEFAULTS },
     // Dữ liệu bán hàng THẬT của shop (nhập tay / dán Excel).

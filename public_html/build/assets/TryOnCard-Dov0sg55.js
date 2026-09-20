@@ -1,0 +1,1 @@
+import{F as e,S as t}from"./pageBoot-Cex3dFjo.js";import{t as n}from"./RefImageCard-s3ONLcUe.js";var r={__name:`TryOnCard`,setup(r){return(r,i)=>(e(),t(n,{variant:`tryon`}))}};export{r as default};
