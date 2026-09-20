@@ -2127,7 +2127,7 @@ và bản cũ rơi vào nhánh chung nên khách chỉ nhận một câu mơ h�
 
 ## Phiên 2026-09-23 (Đợt 30 — BA VAI RIÊNG của Agent Studio: Suy luận · Đọc ảnh · Tìm kiếm)
 
-**Deploy:** `26d61b1 → <commit>`. Không migration mới.
+**Deploy:** `26d61b1 → 7a918b5`. Không migration mới.
 
 ### 1. Ba nhóm công việc mới (khai trong Cài đặt → Nhóm công việc)
 
@@ -2178,3 +2178,10 @@ và ghi lại **nhóm thật đã dùng** vào khối `model` để giao diện 
 | `npm run build` | exit 0 |
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
+
+### 6. Ghi chú minh bạch: hai file LẠ không thuộc đợt này
+
+Trong lúc commit, `git status` cho thấy **hai file không do đợt này tạo** và **không được tham chiếu ở đâu**:
+`app/Models/MarketSignal.php` và `database/migrations/2026_09_23_000007_create_market_signals_table.php`.
+Đã **loại khỏi commit** (giữ nguyên trên đĩa, vẫn là file chưa theo dõi) — không đưa mã chết vào lịch sử.
+Cần người dùng quyết: xoá, hay hoàn thiện thành tính năng (khi đó phải có service + đường vào trên giao diện + test).
