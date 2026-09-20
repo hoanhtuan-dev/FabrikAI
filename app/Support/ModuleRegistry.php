@@ -157,7 +157,7 @@ class ModuleRegistry
             'id' => 'trend_radar', 'name' => 'TrendRadar', 'group' => 'Nội dung',
             'kind' => self::KIND_FEATURE, 'gui' => false, 'icon' => 'scan',
             'summary' => 'Radar xu hướng theo khu vực: màu sắc, dáng, chất liệu, giá và vòng đời.',
-            'endpoints' => ['design-agent/radar', 'design-agent/web-access'], 'depends_on' => [],
+            'endpoints' => ['design-agent/radar', 'design-agent/web-access', 'design-agent/sources'], 'depends_on' => [],
             'plans' => ['pro', 'studio', 'factory_season'],
         ],
         [

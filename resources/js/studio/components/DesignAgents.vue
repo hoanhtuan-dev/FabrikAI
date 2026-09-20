@@ -574,6 +574,7 @@ watch(() => store.designAgentOpen, (open) => {
   // phải nhìn thấy trước khi tin vào phần phân tích phía sau.
   if (!store.brandDna) store.loadBrandDna();
   if (!store.webAccess) store.loadWebAccess();
+  if (!store.webSources) store.loadWebSources(false, selectedRegion.value);
   if (!store.trendRadar) loadRadar(selectedRegion.value);
 });
 </script>
@@ -959,6 +960,45 @@ watch(() => store.designAgentOpen, (open) => {
                     </details>
                   </template>
                 </div>
+                <!-- NGUỒN THẬT ĐANG ĐƯỢC ĐƯA VÀO PROMPT (máy chủ tự lấy) — hiển thị nguyên trạng. -->
+                <div class="mt-3 rounded-xl border border-ink-700 bg-ink-900 p-3">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-label font-semibold uppercase tracking-wide text-cream-300">Nguồn thật đang dùng cho agent</p>
+                    <button type="button" class="tool-btn" :disabled="store.webSourcesLoading" @click="store.loadWebSources(true, selectedRegion)">
+                      <StudioIcon name="refresh" size="h-3 w-3" /> {{ store.webSourcesLoading ? 'Đang lấy…' : 'Làm mới nguồn' }}
+                    </button>
+                  </div>
+                  <p v-if="store.webSourcesError" role="alert" class="mt-2 text-body text-danger">{{ store.webSourcesError }}</p>
+                  <p v-else-if="!store.webSources" class="mt-2 text-body text-cream-400">Đang tải…</p>
+                  <template v-else>
+                    <p class="mt-2 text-body leading-5 text-cream-200">
+                      <b :class="store.webSources.mode === 'live' ? 'text-ok' : 'text-warn'">
+                        {{ store.webSources.mode === 'live' ? ('Đang dùng ' + store.webSources.items.length + ' tin THẬT') : 'Chưa có tin thật nào' }}
+                      </b>
+                      <span class="text-cream-400"> · lấy lúc {{ new Date(store.webSources.fetched_at).toLocaleTimeString('vi-VN') }} · tối đa {{ store.webSources.limits.limit }} tin vào prompt (cũ hơn {{ store.webSources.limits.max_age_days }} ngày bị bỏ)</span>
+                    </p>
+                    <div class="mt-2 overflow-x-auto">
+                      <table class="w-full min-w-[32rem] text-left text-label">
+                        <thead><tr class="border-b border-ink-700 text-cream-400"><th class="pb-1.5 pr-2 font-semibold">Nguồn</th><th class="pb-1.5 pr-2 font-semibold">Kiểu</th><th class="pb-1.5 pr-2 font-semibold">Kết quả</th><th class="pb-1.5 font-semibold">Tin</th></tr></thead>
+                        <tbody class="divide-y divide-ink-800">
+                          <tr v-for="row in store.webSources.sources" :key="row.slug">
+                            <td class="py-1.5 pr-2"><a :href="row.url" target="_blank" rel="noopener" class="font-semibold text-cream-100 underline decoration-dotted">{{ row.name }}</a></td>
+                            <td class="py-1.5 pr-2 text-cream-400">{{ row.kind }}</td>
+                            <td class="py-1.5 pr-2"><span :class="row.ok ? 'text-ok' : 'text-warn'">{{ row.ok ? ('HTTP ' + row.http + ' · ' + row.ms + ' ms') : (row.error || 'không lấy được') }}</span></td>
+                            <td class="py-1.5 tabular-nums text-cream-300">{{ row.count }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <ul v-if="store.webSources.items.length" class="mt-2 space-y-1 text-label leading-5 text-cream-300">
+                      <li v-for="item in store.webSources.items.slice(0, 6)" :key="item.url">
+                        · <a :href="item.url" target="_blank" rel="noopener" class="underline decoration-dotted">{{ item.title }}</a>
+                        <span class="text-cream-400"> — {{ item.source_name }}{{ item.published_at ? ' · ' + new Date(item.published_at).toLocaleDateString('vi-VN') : '' }}</span>
+                      </li>
+                    </ul>
+                  </template>
+                </div>
+
                 <p class="mt-3 text-body leading-5 text-cream-400">Dữ liệu nội bộ là project/generation của chính tài khoản.hay POS/ERP thật trong bản này.</p>
                 <div class="mt-3 overflow-x-auto">
                   <table class="w-full min-w-[30rem] text-left text-body">

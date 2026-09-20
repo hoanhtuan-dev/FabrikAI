@@ -1,0 +1,55 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Một NGUỒN dữ liệu ngoài (RSS/JSON/API) mà máy chủ sẽ tự đi lấy rồi đưa vào lời nhắc của agent.
+ *
+ * Xem WebSourceService để biết cách lấy/lọc/đệm, và docs/DESIGN_SYSTEM.md §18.5.
+ * Đây là cấu hình TOÀN CỤC (quản trị viên khai), không phải dữ liệu của từng người dùng.
+ */
+class WebSource extends Model
+{
+    protected $table = 'web_sources';
+
+    public const KINDS = ['rss', 'json'];
+
+    protected $fillable = [
+        'slug', 'name', 'url', 'kind', 'enabled', 'priority', 'keywords', 'region', 'max_items',
+        'items_path', 'title_field', 'link_field', 'date_field', 'summary_field', 'note',
+    ];
+
+    protected $casts = [
+        'enabled' => 'boolean',
+        'priority' => 'integer',
+        'max_items' => 'integer',
+    ];
+
+    /**
+     * Bind route theo SLUG (không phải id số): slug là khoá người dùng thấy trên giao diện và trong log,
+     * nên URL cấu hình đọc được bằng mắt (/api/admin/web-sources/tuoi-tre-thoi-trang).
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
+    /** Danh sách từ khoá đã tách (rỗng = không lọc). */
+    public function keywordList(): array
+    {
+        return array_values(array_filter(array_map(
+            fn (string $word) => trim(mb_strtolower($word)),
+            explode(',', (string) $this->keywords),
+        ), 'strlen'));
+    }
+
+    /** Nguồn này có dùng cho vùng đang xét không? (rỗng = mọi vùng) */
+    public function matchesRegion(string $region): bool
+    {
+        $own = trim((string) $this->region);
+
+        return $own === '' || $own === $region;
+    }
+}

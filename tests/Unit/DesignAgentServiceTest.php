@@ -17,7 +17,9 @@ class DesignAgentServiceTest extends TestCase
         // cho ra contract y hệt để hai agent không bao giờ trả về rỗng khi chưa cấu hình model.
         // Tham số thứ hai là DNA thương hiệu — truyền service THẬT: nhiều test dưới đây kiểm tra cả
         // nhánh "hồ sơ do chủ shop khai" nên để null là bỏ mất một nửa đường.
-        $this->agents = new DesignAgentService(null, new BrandDnaService());
+        // Tham số 3 = trình kết nối nguồn ngoài. Test đơn vị thuần PHPUnit không có DB/HTTP ⇒ truyền null
+        // tường minh; nhánh "không có nguồn ngoài" vẫn phải cho ra contract y hệt.
+        $this->agents = new DesignAgentService(null, new BrandDnaService(), null);
     }
 
     public function test_catalog_has_stable_data_backed_directions(): void

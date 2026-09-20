@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\CollectionPlanService;
 use App\Services\DesignAgentService;
 use App\Services\WebAccessService;
+use App\Services\WebSourceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -40,6 +41,27 @@ class DesignAgentController extends Controller
         $data = $request->validate(['force' => ['nullable', 'boolean']]);
 
         return response()->json($web->probe((bool) ($data['force'] ?? false)));
+    }
+
+    /**
+     * NGUỒN DỮ LIỆU NGOÀI đang được đưa vào prompt (Đợt 27 — 2026-09-23).
+     *
+     * Máy chủ tự đi lấy tin (RSS/JSON) rồi nhét vào prompt kèm URL + thời điểm; endpoint này để giao diện
+     * hiển thị ĐÚNG thứ đang dùng (nguồn nào chết, nguồn nào bị lọc hết tin) — không phải câu văn tĩnh.
+     * `?force=1` = lấy lại ngay (nút "Làm mới nguồn").
+     */
+    public function sources(Request $request, WebSourceService $sources): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'force' => ['nullable', 'boolean'],
+            'region' => ['nullable', 'string', 'in:all,hcm,hanoi,danang'],
+        ]);
+
+        return response()->json($sources->evidence(
+            (string) ($data['region'] ?? 'all'),
+            WebSourceService::EVIDENCE_LIMIT,
+            (bool) ($data['force'] ?? false),
+        ));
     }
 
     public function collection(Request $request): \Illuminate\Http\JsonResponse

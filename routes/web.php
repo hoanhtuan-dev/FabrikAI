@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminWebSourceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\BrandDnaController;
@@ -196,6 +197,10 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     // Throttle chặt hơn vì mỗi lần đo là một request ra ngoài; kết quả được cache 10 phút.
     Route::get('/design-agent/web-access', [DesignAgentController::class, 'webAccess'])
         ->middleware('throttle:10,1')->name('design-agent.web-access');
+    // NGUỒN DỮ LIỆU NGOÀI đang được đưa vào prompt (máy chủ tự lấy RSS/JSON). `?force=1` lấy lại ngay;
+    // throttle rộng hơn web-access vì đường này KHÔNG gọi model, chỉ đọc/đệm lại nguồn.
+    Route::get('/design-agent/sources', [DesignAgentController::class, 'sources'])
+        ->middleware('throttle:20,1')->name('design-agent.sources');
     Route::post('/upscale', [StudioController::class, 'upscale'])->name('upscale');
     Route::post('/look', [StudioController::class, 'look'])->name('look');
     Route::post('/reframe', [StudioController::class, 'reframe'])->name('reframe');
@@ -397,6 +402,17 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->gr
 // Thao tác trên TÀI KHOẢN người dùng: chỉ super_admin (đúng UserPolicy).
 // ══════════════════════════════════════════════════════════════════════════════
 Route::middleware(['auth', 'admin', 'nostore'])->prefix('api/admin')->name('api.admin.')->group(function () {
+    // ── TRÌNH KẾT NỐI NGUỒN NGOÀI (Đợt 27) — danh sách nguồn RSS/JSON cho agent ──
+    // Cấu hình TOÀN CỤC (mọi tài khoản dùng chung nguồn), nên chỉ quản trị viên sửa được.
+    Route::get('/web-sources', [AdminWebSourceController::class, 'index'])->name('web-sources.index');
+    Route::post('/web-sources', [AdminWebSourceController::class, 'store'])->name('web-sources.store');
+    Route::post('/web-sources/seed', [AdminWebSourceController::class, 'seed'])->name('web-sources.seed');
+    Route::put('/web-sources/{source}', [AdminWebSourceController::class, 'update'])->name('web-sources.update');
+    Route::delete('/web-sources/{source}', [AdminWebSourceController::class, 'destroy'])->name('web-sources.destroy');
+    // Lấy thử ngay (bỏ đệm) — nguồn ra ngoài internet nên throttle riêng cho khỏi thành công cụ dò mạng.
+    Route::post('/web-sources/{source}/test', [AdminWebSourceController::class, 'test'])
+        ->middleware('throttle:20,1')->name('web-sources.test');
+
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
     Route::get('/plans', [AdminController::class, 'plans'])->name('plans');
     Route::post('/plans', [AdminController::class, 'storePlan'])->name('plans.store');

@@ -106,7 +106,108 @@ const loading = ref(true);
 const error = ref('');
 const toast = ref(null);
 const section = ref('overview');
-const q = reactive({ keys: '', providers: '', models: '' });
+// Vào mục "Nguồn dữ liệu ngoài" thì nạp danh sách (kèm trạng thái lấy tin thật của từng nguồn).
+watch(section, (value) => { if (value === 'sources') loadSources(); });
+const q = reactive({ keys: '', providers: '', models: '', sources: '' });
+
+// ── NGUỒN DỮ LIỆU NGOÀI (Đợt 27) — TRÌNH KẾT NỐI cho agent ───────────────────────────────────
+// Máy chủ tự GET danh sách nguồn (RSS/JSON/API), lọc theo từ khoá/độ mới, rồi đưa vào prompt kèm URL +
+// thời điểm. Khai ở đây nghĩa là thêm nguồn mới KHÔNG phải sửa mã và không phải chờ deploy.
+const ws = reactive({
+  rows: [], kinds: [], loading: false, error: '', saving: false, testing: 0,
+  draft: blankSource(), editing: null,
+});
+const wsOpen = ref(false);
+
+function blankSource() {
+  return {
+    slug: '', name: '', url: '', kind: 'rss', enabled: true, priority: 5, keywords: '', region: '',
+    max_items: 8, items_path: '', title_field: '', link_field: '', date_field: '', summary_field: '', note: '',
+  };
+}
+
+async function loadSources() {
+  ws.loading = true;
+  ws.error = '';
+  try {
+    const d = await api('/admin/web-sources');
+    ws.rows = d.sources || [];
+    ws.kinds = d.kinds || ['rss', 'json'];
+  } catch (e) {
+    ws.error = userFacingError(e, 'Không tải được danh sách nguồn ngoài.');
+  } finally {
+    ws.loading = false;
+  }
+}
+
+function openSource(row) {
+  ws.editing = row ? row.slug : null;
+  ws.draft = row
+    ? { ...blankSource(), ...row, keywords: row.keywords || '', region: row.region || '' }
+    : blankSource();
+  wsOpen.value = true;
+}
+
+async function saveSource() {
+  ws.saving = true;
+  try {
+    const body = { ...ws.draft };
+    delete body.status;
+    delete body.id;
+    if (ws.editing) {
+      delete body.slug;
+      await api('/admin/web-sources/' + ws.editing, 'PUT', body);
+      flash('Đã lưu nguồn « ' + ws.draft.name + ' ».');
+    } else {
+      await api('/admin/web-sources', 'POST', body);
+      flash('Đã thêm nguồn « ' + ws.draft.name + ' ».');
+    }
+    wsOpen.value = false;
+    await loadSources();
+  } catch (e) {
+    flash(userFacingError(e, 'Không lưu được nguồn.'), false);
+  } finally {
+    ws.saving = false;
+  }
+}
+
+async function removeSource(row) {
+  try {
+    await api('/admin/web-sources/' + row.slug, 'DELETE');
+    flash('Đã xoá nguồn « ' + row.name + ' ».');
+    await loadSources();
+  } catch (e) {
+    flash(userFacingError(e, 'Không xoá được nguồn.'), false);
+  }
+}
+
+async function testSource(row) {
+  ws.testing = row.slug;
+  try {
+    const d = await api('/admin/web-sources/' + row.slug + '/test', 'POST', {});
+    flash(
+      d.ok
+        ? ('Nguồn « ' + row.name + ' »: HTTP ' + d.http + ' · ' + d.count + ' tin sau lọc.')
+        : ('Nguồn « ' + row.name + ' » lỗi: ' + (d.error || 'không rõ')),
+      d.ok,
+    );
+    await loadSources();
+  } catch (e) {
+    flash(userFacingError(e, 'Không lấy thử được nguồn.'), false);
+  } finally {
+    ws.testing = 0;
+  }
+}
+
+async function seedSources() {
+  try {
+    const d = await api('/admin/web-sources/seed', 'POST', {});
+    flash(d.created ? ('Đã tạo ' + d.created + ' nguồn mặc định.') : 'Các nguồn mặc định đã có đủ.');
+    await loadSources();
+  } catch (e) {
+    flash(userFacingError(e, 'Không tạo được nguồn mặc định.'), false);
+  }
+}
 const roleFilter = ref('');
 const showLegacyModels = ref(false);
 
@@ -1204,6 +1305,143 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           </section>
 
           <!-- ───── CẤU HÌNH CHUNG ───── -->
+          <!-- ── NGUỒN DỮ LIỆU NGOÀI (Đợt 27) ────────────────────────────────────────────
+               Trình kết nối: máy chủ tự GET danh sách nguồn → lọc → đưa vào prompt kèm URL + thời điểm. -->
+          <section v-show="section === 'sources'" class="space-y-5">
+            <div class="card p-5">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="text-sm font-semibold text-cream-100">Nguồn dữ liệu ngoài cho agent</h2>
+                  <p class="mt-1 text-body leading-5 text-cream-300">
+                    Máy chủ tự đi lấy tin từ danh sách dưới đây (RSS/JSON/API), lọc theo từ khoá + độ mới, rồi đưa vào lời nhắc của TrendRadar và CollectionBot <b class="text-cream-100">kèm URL và thời điểm</b> — model chỉ việc đọc và dẫn nguồn.
+                  </p>
+                  <p class="mt-1 text-body leading-5 text-cream-400">
+                    Đây là đường bù cho việc model không tự ra internet được: đo thật với DeepSeek, gửi tham số tìm kiếm vào thì API trả 200 nhưng bỏ qua.
+                  </p>
+                </div>
+                <div class="flex gap-2">
+                  <button class="btn-outline btn-sm" @click="seedSources()"><StudioIcon name="plus" size="h-3.5 w-3.5" /> Thêm nguồn mẫu</button>
+                  <button class="btn-brand btn-sm" @click="openSource(null)"><StudioIcon name="plus" size="h-3.5 w-3.5" /> Thêm nguồn</button>
+                </div>
+              </div>
+
+              <p v-if="ws.error" role="alert" class="mt-3 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-body text-danger">{{ ws.error }}</p>
+              <p v-else-if="ws.loading" class="mt-3 text-body text-cream-400">Đang tải…</p>
+              <p v-else-if="!ws.rows.length" class="mt-3 rounded-lg border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center text-body text-cream-400">
+                Chưa có nguồn nào. Bấm <b class="text-cream-200">Thêm nguồn mẫu</b> để bắt đầu với 3 nguồn đã đo chạy được.
+              </p>
+
+              <div v-else class="mt-3 overflow-x-auto">
+                <table class="w-full min-w-[46rem] text-left text-body">
+                  <thead><tr class="border-b border-ink-700 text-cream-400">
+                    <th class="pb-2 pr-2 font-semibold">Nguồn</th>
+                    <th class="pb-2 pr-2 font-semibold">Kiểu</th>
+                    <th class="pb-2 pr-2 font-semibold">Lọc / giới hạn</th>
+                    <th class="pb-2 pr-2 font-semibold">Lấy tin gần nhất</th>
+                    <th class="pb-2 font-semibold"></th>
+                  </tr></thead>
+                  <tbody class="divide-y divide-ink-800">
+                    <tr v-for="row in ws.rows" :key="row.slug">
+                      <td class="py-2 pr-2 align-top">
+                        <span class="block font-semibold text-cream-100">{{ row.name }}</span>
+                        <a :href="row.url" target="_blank" rel="noopener" class="block break-all text-label text-cream-400 underline decoration-dotted">{{ row.url }}</a>
+                        <span v-if="!row.enabled" class="mt-0.5 inline-block rounded bg-ink-800 px-1.5 py-0.5 text-label text-cream-400">đang tắt</span>
+                      </td>
+                      <td class="py-2 pr-2 align-top text-cream-300">{{ row.kind }}</td>
+                      <td class="py-2 pr-2 align-top text-label text-cream-400">
+                        <span class="block">{{ row.keywords ? ('từ khoá: ' + row.keywords) : 'không lọc từ khoá' }}</span>
+                        <span class="block">tối đa {{ row.max_items }} tin · {{ row.region ? ('vùng ' + row.region) : 'mọi vùng' }}</span>
+                      </td>
+                      <td class="py-2 pr-2 align-top">
+                        <span v-if="row.status" :class="row.status.ok ? 'text-ok' : 'text-warn'">
+                          {{ row.status.ok ? ('HTTP ' + row.status.http + ' · ' + row.status.ms + ' ms · ' + row.status.count + ' tin') : (row.status.error || 'không lấy được') }}
+                        </span>
+                        <span v-else class="text-cream-400">chưa đo</span>
+                      </td>
+                      <td class="py-2 align-top">
+                        <div class="flex gap-1.5">
+                          <button class="tool-btn" :disabled="ws.testing === row.slug" @click="testSource(row)">
+                            <StudioIcon name="refresh" size="h-3 w-3" /> {{ ws.testing === row.slug ? 'Đang lấy…' : 'Lấy thử' }}
+                          </button>
+                          <button class="tool-btn" @click="openSource(row)">Sửa</button>
+                          <button class="tool-btn" @click="removeSource(row)">Xoá</button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card p-5">
+              <h3 class="text-sm font-semibold text-cream-100">Nguồn JSON/API khai thế nào?</h3>
+              <p class="mt-1.5 text-body leading-5 text-cream-300">
+                Chọn kiểu <b class="text-cream-100">json</b> rồi khai đường dẫn tới mảng dữ liệu và tên từng trường — nguồn tự nói hình dạng của nó, nên thêm API mới không phải sửa mã:
+              </p>
+              <ul class="mt-1.5 space-y-1 text-label leading-5 text-cream-400">
+                <li>· <code class="rounded bg-ink-800 px-1">items_path</code>: vị trí mảng, vd <code class="rounded bg-ink-800 px-1">data.items</code>.</li>
+                <li>· <code class="rounded bg-ink-800 px-1">title_field</code> · <code class="rounded bg-ink-800 px-1">link_field</code> · <code class="rounded bg-ink-800 px-1">date_field</code> · <code class="rounded bg-ink-800 px-1">summary_field</code>: tên trường trong mỗi mục (hỗ trợ đường dẫn lồng nhau).</li>
+                <li>· Chỉ nhận <b>http/https</b> — không đọc được file nội bộ (chống SSRF).</li>
+              </ul>
+            </div>
+
+            <BaseModal v-model="wsOpen" wide :title="ws.editing ? ('Sửa nguồn — ' + ws.draft.name) : 'Thêm nguồn dữ liệu ngoài'">
+              <div class="grid gap-3">
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <label class="block"><span class="label">Slug (chỉ chữ thường, số, gạch ngang)</span>
+                    <input v-model="ws.draft.slug" :disabled="!!ws.editing" class="input !py-2 font-mono text-xs disabled:opacity-60" placeholder="vd: google-news-thoi-trang">
+                  </label>
+                  <label class="block"><span class="label">Tên hiển thị</span>
+                    <input v-model="ws.draft.name" class="input !py-2" placeholder="vd: Google News — thời trang">
+                  </label>
+                </div>
+                <label class="block"><span class="label">URL (http/https)</span>
+                  <input v-model="ws.draft.url" class="input !py-2 font-mono text-xs" placeholder="https://tuoitre.vn/rss/thoi-trang.rss">
+                </label>
+                <div class="grid gap-3 sm:grid-cols-3">
+                  <label class="block"><span class="label">Kiểu</span>
+                    <select v-model="ws.draft.kind" class="input !py-2"><option v-for="k in ws.kinds" :key="k" :value="k">{{ k }}</option></select>
+                  </label>
+                  <label class="block"><span class="label">Ưu tiên (nhỏ = trước)</span>
+                    <input v-model.number="ws.draft.priority" type="number" min="0" max="100" class="input !py-2">
+                  </label>
+                  <label class="block"><span class="label">Tối đa tin mỗi lần</span>
+                    <input v-model.number="ws.draft.max_items" type="number" min="1" max="50" class="input !py-2">
+                  </label>
+                </div>
+                <label class="block"><span class="label">Lọc theo từ khoá (cách nhau bằng dấu phẩy, bỏ trống = giữ hết)</span>
+                  <input v-model="ws.draft.keywords" class="input !py-2" placeholder="thời trang, dệt may, bán lẻ">
+                </label>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <label class="block"><span class="label">Chỉ dùng cho vùng (bỏ trống = mọi vùng)</span>
+                    <select v-model="ws.draft.region" class="input !py-2">
+                      <option value="">Mọi vùng</option><option value="hcm">TP.HCM</option><option value="hanoi">Hà Nội</option><option value="danang">Đà Nẵng</option>
+                    </select>
+                  </label>
+                  <label class="flex items-center gap-2 self-end text-body text-cream-200">
+                    <input type="checkbox" v-model="ws.draft.enabled" class="h-4 w-4 accent-brand-600"> Bật nguồn này
+                  </label>
+                </div>
+                <template v-if="ws.draft.kind === 'json'">
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="block"><span class="label">items_path</span><input v-model="ws.draft.items_path" class="input !py-2 font-mono text-xs" placeholder="data.items"></label>
+                    <label class="block"><span class="label">title_field</span><input v-model="ws.draft.title_field" class="input !py-2 font-mono text-xs" placeholder="title"></label>
+                    <label class="block"><span class="label">link_field</span><input v-model="ws.draft.link_field" class="input !py-2 font-mono text-xs" placeholder="url"></label>
+                    <label class="block"><span class="label">date_field</span><input v-model="ws.draft.date_field" class="input !py-2 font-mono text-xs" placeholder="published_at"></label>
+                    <label class="block"><span class="label">summary_field</span><input v-model="ws.draft.summary_field" class="input !py-2 font-mono text-xs" placeholder="summary"></label>
+                  </div>
+                </template>
+                <label class="block"><span class="label">Ghi chú</span><input v-model="ws.draft.note" class="input !py-2" placeholder="Tuỳ chọn"></label>
+              </div>
+              <!-- BaseModal chỉ có slot mặc định (không có #footer) ⇒ hàng nút nằm TRONG nội dung. -->
+              <div class="mt-4 flex justify-end gap-2 border-t border-ink-700 pt-3">
+                <button class="btn-ghost btn-sm" @click="wsOpen = false">Đóng</button>
+                <button class="btn-brand btn-sm" :disabled="ws.saving || !ws.draft.name || !ws.draft.url || (!ws.editing && !ws.draft.slug)" @click="saveSource()">
+                  {{ ws.saving ? 'Đang lưu…' : 'Lưu nguồn' }}
+                </button>
+              </div>
+            </BaseModal>
+          </section>
           <section v-show="section === 'general'" class="space-y-5">
             <div v-if="cfgForm" class="card p-5">
               <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">

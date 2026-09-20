@@ -442,6 +442,12 @@ export const useStudioStore = defineStore('studio', {
     webAccess: null,
     webAccessLoading: false,
     webAccessError: '',
+    // ── NGUỒN DỮ LIỆU NGOÀI (Đợt 27) ──────────────────────────────────────────────────────
+    // Máy chủ tự đi lấy tin RSS/JSON rồi đưa vào prompt kèm URL + thời điểm. Giao diện hiển thị NGUYÊN
+    // TRẠNG thứ đang được dùng (nguồn nào chết, tin nào sắp vào prompt), không phải câu văn mô tả.
+    webSources: null,
+    webSourcesLoading: false,
+    webSourcesError: '',
     viewer: null,
     flashMsg: '',
     flashType: 'info',
@@ -2607,6 +2613,28 @@ export const useStudioStore = defineStore('studio', {
     /** Bỏ thay đổi chưa lưu: quay về đúng bản đang có trên máy chủ. */
     discardBrandDnaDraft() {
       this.brandDnaDraft = JSON.parse(JSON.stringify(this.brandDna?.dna || {}));
+    },
+    /**
+     * Nạp DANH SÁCH NGUỒN NGOÀI + tin đang được đưa vào prompt. `force = true` khi bấm "Làm mới nguồn".
+     *
+     * Không cache ở client: bấm làm mới mà vẫn thấy bản cũ là nói dối người dùng.
+     */
+    async loadWebSources(force = false, region = 'all') {
+      this.webSourcesLoading = true;
+      this.webSourcesError = '';
+      try {
+        const q = new URLSearchParams({ region });
+        if (force) q.set('force', '1');
+        const res = await fetch('/api/design-agent/sources?' + q.toString(), { headers: { Accept: 'application/json' } });
+        if (!res.ok) throw apiError(await res.json().catch(() => ({})), 'Không tải được danh sách nguồn ngoài.');
+        this.webSources = await res.json();
+        return this.webSources;
+      } catch (e) {
+        this.webSourcesError = userFacingError(e, 'Không tải được danh sách nguồn ngoài.');
+        return null;
+      } finally {
+        this.webSourcesLoading = false;
+      }
     },
     /**
      * ĐO khả năng truy cập internet của agent (máy chủ + model). `force = true` khi người dùng bấm
