@@ -48,6 +48,8 @@ helpers.js · state.js · getters.js + 10 module actions (account · generation 
 | 8 | Hint phím tắt ở action bar | DesignAgents.vue | chuỗi gợi ý nhỏ + title trên nút Quay lại/Tiếp tục |
 | 9 | Sửa lỗi vai Tìm kiếm không chạy độc lập | DesignAgentService.php | nhóm agent_search đã có từ Đợt 30 nhưng aiBrief/radarDirections kiểm nhóm suy luận TRƯỚC nhóm tìm kiếm ⇒ chỉ khai nhóm tìm kiếm thì agent rơi về rule; nay chạy độc lập + báo đúng model |
 | 10 | Test khoá vai tìm kiếm | AgentRolesTest.php | 7 → 10 test (brief dùng model tìm kiếm + gửi enable_search · trống thì không bật · radar chạy độc lập) |
+| 11 | Thêm 3 vai Agent Studio vào Model Registry | SettingsApp.vue + StudioSettingsController.php + helpers.php | dropdown "Vai trò" và validation backend đều thiếu agent_reason/agent_vision/agent_search; thêm studio_model_group_slugs() làm một nguồn + sửa 4 chỗ đọc api_key_ref nullable |
+| 12 | Test Model Registry nhận vai Agent Studio | AgentRolesTest.php | 11 test / 48 assert (POST group=agent_search → 201 + UI scan ROLE_ORDER) · suite 958 XANH |
 
 > Ghi chú: skeleton loading (radar 6 ô · brief 6 ô) và empty state (trend/brief/kế hoạch) đã có sẵn từ các đợt trước — đợt này chỉ bổ sung phím tắt, không làm lại. Vai "Tìm kiếm nguồn ngoài" (nhóm công việc agent_search) ĐÃ tồn tại từ Đợt 30 (Ba vai riêng: suy luận · đọc ảnh · tìm kiếm); đợt này sửa lỗi nó không chạy được khi chỉ khai mình nó.
 
