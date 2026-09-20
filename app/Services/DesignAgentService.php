@@ -499,9 +499,9 @@ class DesignAgentService
                 'method' => $source['kind'] === 'json'
                     ? 'Nguồn dữ liệu JSON theo cấu hình'
                     : 'Tin RSS/Atom',
-                // Chu kỳ THẬT: máy chủ lấy lại tin theo lịch 30 phút (routes/console.php) và mỗi lần
-                // người dùng bấm "Cập nhật tin". Không hứa "hằng ngày" như bản cũ.
-                'frequency' => 'Mỗi 30 phút',
+                // Chu kỳ THẬT — đọc từ NHỊP TIM của lịch chạy nền, không phải câu viết cứng: host này từng
+                // không có cron nào gọi schedule:run mà giao diện vẫn ghi "tự động mỗi 30 phút".
+                'frequency' => studio_scheduler_alive() ? 'Tự động mỗi 30 phút' : 'Khi mở màn hình',
                 'status' => $state,
                 'status_label' => (string) ($source['state_label'] ?? (($source['ok'] ?? false) ? 'Đang dùng' : 'Không lấy được')),
                 'count' => (int) ($source['count'] ?? 0),

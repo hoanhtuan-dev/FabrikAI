@@ -2675,3 +2675,26 @@ if (! function_exists('export_channel_prefix')) {
     }
 }
 
+if (! function_exists('studio_scheduler_alive')) {
+    /**
+     * LỊCH CHẠY NỀN CÓ THẬT ĐANG CHẠY KHÔNG? — ĐO, không hứa (2026-09-23).
+     *
+     * Vì sao cần: giao diện từng ghi "FabrikAI tự lấy tin mỗi 30 phút" trong khi host KHÔNG có cron nào gọi
+     * `schedule:run` — câu đó là câu SAI, và người dùng tin rằng dữ liệu luôn tươi. Nay lịch chạy nền tự ghi
+     * một NHỊP TIM mỗi 5 phút (routes/console.php); còn nhịp thì câu "tự động mỗi 30 phút" mới được nói ra,
+     * hết nhịp thì nói đúng sự thật: tin chỉ mới khi mở màn hình hoặc bấm «Cập nhật tin».
+     *
+     * Nhịp tim để TTL 30 phút nên chỉ cần cron chạy là nó luôn còn; không có cron thì nó tự hết hạn.
+     */
+    function studio_scheduler_alive(): bool
+    {
+        try {
+            return Cache::get('studio:scheduler:heartbeat') !== null;
+        } catch (\Throwable) {
+            // Không đọc được cache ⇒ KHÔNG được nói là có lịch chạy nền.
+            return false;
+        }
+    }
+}
+
+

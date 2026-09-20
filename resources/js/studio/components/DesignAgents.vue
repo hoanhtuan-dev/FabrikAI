@@ -136,6 +136,11 @@ const shortDate = (iso) => {
   try { return new Date(iso).toLocaleDateString('vi-VN'); } catch (e) { return ''; }
 };
 const refreshLabel = computed(() => (store.webSourcesLoading ? 'Đang lấy…' : 'Cập nhật tin'));
+/** Lịch chạy nền của máy chủ có thật đang chạy không — server ĐO rồi trả về, giao diện không hứa hộ. */
+const autoRefresh = computed(() => store.webSources?.auto_refresh || {
+  alive: false,
+  label: 'Chưa xác định được lịch làm mới tin của máy chủ.',
+});
 
 // ── TÍN HIỆU THỊ TRƯỜNG ĐO TỪ TIN THẬT (2026-09-23) ─────────────────────────────
 // Đây là phần trả lời "model không có tìm kiếm web thì lấy đâu ra dữ liệu": máy chủ lấy tin, rồi ĐO bằng
@@ -1076,9 +1081,11 @@ watch(() => store.designAgentOpen, (open) => {
                         </tbody>
                       </table>
                     </div>
-                    <p class="mt-1.5 text-label leading-5 text-cream-400">
-                      FabrikAI tự lấy tin mỗi 30 phút, chỉ giữ tin trong {{ store.webSources.limits.max_age_days }} ngày và tối đa
-                      {{ store.webSources.limits.limit }} tin cho mỗi lần phân tích.
+                    <!-- Số ĐO, không phải lời hứa: câu này đổi theo nhịp tim của lịch chạy nền trên máy chủ.
+                         Bản trước viết cứng "tự lấy tin mỗi 30 phút" trong khi host KHÔNG có cron nào. -->
+                    <p class="mt-1.5 text-label leading-5" :class="autoRefresh.alive ? 'text-cream-400' : 'text-warn'">
+                      {{ autoRefresh.label }}
+                      Chỉ giữ tin trong {{ store.webSources.limits.max_age_days }} ngày và tối đa {{ store.webSources.limits.limit }} tin cho mỗi lần phân tích.
                     </p>
                     <p class="mt-1 text-label leading-5 text-cream-400">
                       AI đọc tin qua máy chủ FabrikAI, không phải model tự tìm kiếm.

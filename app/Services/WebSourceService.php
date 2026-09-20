@@ -121,6 +121,11 @@ class WebSourceService
             'items' => $items,
             'sources' => $statuses,
             'limits' => ['max_age_days' => self::MAX_AGE_DAYS, 'limit' => $this->effectiveLimit($limit)],
+            // LỊCH CHẠY NỀN: số ĐO, không phải lời hứa. Giao diện đọc khối này để nói đúng việc máy chủ
+            // đang làm — có cron thì "tự động mỗi 30 phút", không có thì "khi mở màn hình / bấm làm mới".
+            'auto_refresh' => studio_scheduler_alive()
+                ? ['alive' => true, 'label' => 'Máy chủ tự làm mới tin mỗi 30 phút, kể cả khi bạn không mở trang.']
+                : ['alive' => false, 'label' => 'Máy chủ chưa bật lịch chạy nền — tin được làm mới khi bạn mở màn hình hoặc bấm «Cập nhật tin».'],
         ];
     }
 
