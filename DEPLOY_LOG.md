@@ -1870,7 +1870,7 @@ Cờ `web_search` của đường **brief** là khoá **RỜI** trong `aiBrief()
 
 ## Phiên 2026-09-23 (Đợt 25 — BỘ ĐỆM BRIEF theo input_signature + BỐN KIỂU BẬT TÌM KIẾM khai trong Cài đặt)
 
-**Deploy:** `9e54228 → <commit>`. **Migration mới:** `2026_09_23_000005_add_search_mode_to_studio_providers`.
+**Deploy:** `9e54228 → 9246b26`. **Migration mới:** `2026_09_23_000005_add_search_mode_to_studio_providers`.
 
 ### 1. Bộ đệm brief — bấm lại KHÔNG tốn thêm ~28 giây và token
 
