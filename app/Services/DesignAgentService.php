@@ -2561,8 +2561,18 @@ class DesignAgentService
      * @param  list<array<string,mixed>>  $candidates
      * @return array{block:string, tool_search:array<string,mixed>}|null  null = không phải chế độ này
      */
-    private function splitHostedSearch(string $instruction, string $region, array $candidates): ?array
+    private function splitHostedSearch(string $instruction, string $region, array $candidates, float $deadline = 0.0): ?array
     {
+        // LƯỢT DÒ NẰM TRONG CÙNG HẠN CHÓT CỦA CẢ LƯỢT. [ĐO THẬT 2026-09-22] Đặt hạn chót SAU lượt dò thì
+        // tổng = 30 s (dò) + 55 s (lượt gọi cũ) = 85 s ⇒ vượt trần proxy, khách vẫn nhận 504 — đúng 75,3 s
+        // đo được. Không còn đủ chỗ cho một lượt dò tử tế thì đừng bắt đầu nó.
+        $remaining = $deadline > 0 ? (int) floor($deadline - microtime(true)) : 60;
+        if ($remaining < 10) {
+            logger()->info('Agent Studio: bỏ lượt DÒ TÌM KIẾM vì không còn đủ thời gian trong trần', ['remaining_s' => $remaining]);
+
+            return null;
+        }
+
         $hosted = WebAccessService::planFor($candidates[0] ?? []);
         if (! WebAccessService::isHostedMode($hosted)) {
             return null;
@@ -2585,9 +2595,11 @@ class DesignAgentService
             'search' => true,
             'response_format' => 'json_object',
             'max_tokens' => 400,          // chỉ cần từ khoá, không cần bài viết
-            'timeout' => 30,              // trần riêng, nhỏ: lượt này phải xong nhanh
+            // Trần riêng, nhỏ — VÀ không được vượt phần thời gian còn lại của cả lượt.
+            'timeout' => min(30, $remaining),
             'max_tool_calls' => 1,        // MỘT lượt tra là đủ để có từ khoá + nguồn
             'fallback_groups' => [self::REASON_GROUP, self::AI_GROUP],
+            'deadline_ts' => $deadline > 0 ? $deadline : microtime(true) + 30,
         ]);
         $ms = (int) round((microtime(true) - $started) * 1000);
 
@@ -2664,9 +2676,12 @@ class DesignAgentService
         // TÁCH LƯỢT TRA KHỎI LƯỢT VIẾT (2026-09-22): model nặng không xong khi vừa tra vừa viết JSON trong
         // một lời gọi — xem chú thích ở splitHostedSearch(). Đặt ở ĐÂY để cả radar lẫn brief dùng chung
         // MỘT cơ chế; hai bản sao sẽ lệch nhau (bài học của cả dự án này).
+        // HẠN CHÓT CỦA CẢ LƯỢT — tính TRƯỚC lượt dò để lượt dò cũng nằm trong đó (xem splitHostedSearch).
+        $deadline = microtime(true) + self::AI_CALL_CEILING_MS / 1000;
+
         $splitSearch = null;
         if (! empty($options['search']) && ! empty($options['split_search'])) {
-            $splitSearch = $this->splitHostedSearch($instruction, (string) ($payload['region'] ?? 'all'), $candidates);
+            $splitSearch = $this->splitHostedSearch($instruction, (string) ($payload['region'] ?? 'all'), $candidates, $deadline);
             if ($splitSearch !== null) {
                 $instruction .= $splitSearch['block'];
                 // Lượt viết JSON chạy KHÔNG công cụ: nhẹ, nhanh, và bằng chứng đã nằm trong prompt.
@@ -2684,7 +2699,7 @@ class DesignAgentService
             // đường /responses hỏng — phải nằm trong hạn này, nếu không thì "trần" chỉ là trang trí:
             // đo thật 2026-09-22 00:16 — /responses hết 55 s rồi rơi về /chat/completions thêm 55 s nữa
             // ⇒ vượt trần proxy ⇒ khách nhận **HTTP 504** (mã L-G8YM) và mất cả phần đã tính được.
-            'deadline_ts' => microtime(true) + self::AI_CALL_CEILING_MS / 1000,
+            'deadline_ts' => $deadline,
         ];
 
         // Bấm giờ cho RIÊNG lần gọi đầu: quyết định "có thử lại không" dựa trên thời gian nó đã tốn.

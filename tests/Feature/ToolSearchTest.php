@@ -679,8 +679,15 @@ class ToolSearchTest extends TestCase
         $src = (string) file_get_contents(app_path('Services/AiModelGateway.php'));
         $this->assertStringContainsString('KHÔNG rơi về /chat/completions (tránh 504)', $src);
         $svc = (string) file_get_contents(app_path('Services/DesignAgentService.php'));
-        $this->assertStringContainsString("'deadline_ts' => microtime(true) + self::AI_CALL_CEILING_MS / 1000,", $svc,
-            'Thiếu hạn chót thì "trần" chỉ là trang trí: hai lần gọi cộng lại vẫn vượt trần proxy.');
+        // Hạn chót tính MỘT lần, TRƯỚC cả lượt dò, rồi dùng chung cho mọi lần gọi con. [ĐO THẬT 2026-09-22]
+        // Bản trước tính SAU lượt dò nên tổng = 30 s (dò) + 55 s (gọi cũ) = 85 s — khách vẫn nhận 504.
+        $this->assertStringContainsString('$deadline = microtime(true) + self::AI_CALL_CEILING_MS / 1000;', $svc,
+            'Thiếu hạn chót thì "trần" chỉ là trang trí: các lần gọi cộng lại vẫn vượt trần proxy.');
+        $this->assertStringContainsString('=> $deadline,', $svc, 'Mọi lần gọi con phải dùng CHUNG hạn chót đó.');
+        $this->assertStringContainsString('min(30, $remaining)', $svc,
+            'Lượt dò phải bị cắt theo phần thời gian CÒN LẠI của cả lượt, không có trần riêng rời rạc.');
+        $this->assertStringContainsString('bỏ lượt DÒ TÌM KIẾM vì không còn đủ thời gian', $svc,
+            'Không còn đủ chỗ cho lượt dò thì phải bỏ nó, không được bắt đầu rồi để cả lượt vượt trần.');
     }
 
     /**
