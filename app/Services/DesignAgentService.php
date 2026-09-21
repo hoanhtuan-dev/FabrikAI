@@ -1988,7 +1988,7 @@ class DesignAgentService
         // TỪ INTERNET" — trong khi khối đó KHÔNG hề được thêm vào prompt (vì lượt dò đã trả null).
         // Model phân vân giữa hai mệnh lệnh trái nhau nên KHÔNG tìm gì: đo thật một lượt radar =
         // 33,8 s · web_search_call = 0 · 0 nguồn · 0 hướng "AI tìm thấy".
-        $splitSearchMode = self::hostedSplitApplies($search['hosted'] ?? null, (array) ($search['rows'] ?? []));
+        $splitSearchMode = self::hostedSplitApplies($search['hosted'] ?? null);
 
         $instruction = 'Bạn là TrendRadar — chuyên gia phân tích xu hướng thời trang Việt Nam cho xưởng may và thương hiệu nhỏ. '
             .'Bạn CHỈ được suy luận từ đúng khối DỮ LIỆU bên dưới (danh mục xu hướng mẫu + tín hiệu nội bộ của shop). '
@@ -2168,14 +2168,21 @@ class DesignAgentService
             $aiEvidence = $this->collectAiEvidence((array) $toolSearch['queries'], $region);
             // Số đo của bước này thuộc về khối tool_search: giao diện đọc nó để nói "AI tìm được N tin".
             $toolSearch['server_queries'] = $aiEvidence['queries'];
-            $toolSearch['items'] = $aiEvidence['items'];
             $toolSearch['server_hits'] = $aiEvidence['count'];
             if ($aiEvidence['error'] !== null) {
                 $toolSearch['error'] = $aiEvidence['error'];
             }
 
-            if ($aiEvidence['items'] !== []) {
-                $trends = $this->withAiSignals($trends, $market, $aiEvidence['items']);
+            // FINDINGS của lượt tra THẬT là nguồn CHÍNH — GỘP thêm kết quả máy chủ chạy lại trên RSS,
+            // KHÔNG ghi đè. Đường cũ ghi đè bằng RSS (rỗng khi chưa khai nguồn kind=search) nên xoá sạch
+            // đúng những tin vừa tìm được: "AI tìm được N hướng" luôn hiện 0 dù lượt chạy ĐÃ tra thật.
+            $hostedItems = (array) ($toolSearch['items'] ?? []);
+            $mergedItems = array_merge($hostedItems, (array) $aiEvidence['items']);
+            $toolSearch['items'] = $mergedItems;
+            $toolSearch['hosted_hits'] = count($hostedItems);
+
+            if ($mergedItems !== []) {
+                $trends = $this->withAiSignals($trends, $market, $mergedItems);
                 // Gắn lại bằng chứng cho định hướng: hướng nhắc tới trend VỪA thành "có tin thật" cũng phải
                 // mang link — nếu không, thẻ hướng nói "có tin thật" mà không có gì để bấm vào.
                 $directions = $this->attachTrendEvidence($directions, $trends);
@@ -2183,7 +2190,7 @@ class DesignAgentService
 
             // LỜI PHÁN CỦA MODEL VỀ TỪNG HƯỚNG CÒN THIẾU — chỉ nhận khi URL có thật trong kết quả tra được.
             $knownUrls = array_merge(
-                array_column((array) $aiEvidence['items'], 'url'),
+                array_column($mergedItems, 'url'),
                 array_column((array) ($evidence['items'] ?? []), 'url'),
                 // URL mà NHÀ CUNG CẤP thật sự MỞ trong lượt tra (hosted_sources): /responses trả về danh
                 // sách nguồn này, và đó CHÍNH LÀ nguồn model được phép dẫn. Thiếu dòng này thì mọi lời
@@ -2191,7 +2198,7 @@ class DesignAgentService
                 // chưa khai nguồn tìm kiếm) — đúng cái bẫy "tìm thật rồi mà vẫn nói không có bằng chứng".
                 array_values(array_filter(array_map('strval', (array) ($toolSearch['sources'] ?? [])), 'strlen')),
             );
-            $trends = $this->applyTrendChecks($trends, (array) ($call['json']['trend_checks'] ?? []), $knownUrls, (array) $aiEvidence['items']);
+            $trends = $this->applyTrendChecks($trends, (array) ($call['json']['trend_checks'] ?? []), $knownUrls, $mergedItems);
 
             // HƯỚNG NÀO AI ĐÃ TRA MÀ KHÔNG RA TIN ⇒ trạng thái THỨ BA, không gộp vào "bộ có sẵn".
             //
@@ -2477,7 +2484,9 @@ class DesignAgentService
         $tool = $this->makeSearchTool((bool) ($search['tool'] ?? false));
         // `search => true` là cờ chung: /chat/completions đọc nó để gắn tham số, /responses đọc nó để đổi
         // hẳn endpoint sang công cụ của nhà cung cấp (mỗi đường tự dựng request theo cách của nó).
-        $options = $webSearch ? ['search' => true] : [];
+        // TÁCH LƯỢT TRA khỏi lượt viết JSON cho MỌI model hosted — xem splitHostedSearch(): lượt
+        // /responses đầy đủ (tra + JSON) treo 55 s với 0 byte, còn lượt tra nhỏ xong trong 15,6 s.
+        $options = $webSearch ? ['search' => true, 'split_search' => self::hostedSplitApplies($search['hosted'] ?? null)] : [];
         if ($tool !== null) {
             $options['tools'] = [$tool->definition()];
             $options['tool_handler'] = fn (string $name, array $args): array => $tool->handle($args, 'all');
@@ -2593,19 +2602,26 @@ class DesignAgentService
      * TRA ĐƯỢC TỪ INTERNET" — trong khi khối đó KHÔNG hề được thêm vào. Đo thật: 33,8 s, web_search_call
      * = 0, 0 nguồn, 0 hướng "AI tìm thấy".
      *
-     * CHỈ model nặng (omni) mới tách lượt: đo trên cùng endpoint/máy chủ, qwen3.8-flash xong lượt tra
-     * trong 17,9 s (đường một-lời-gọi là đủ tốt), còn qwen3.8-omni-flash không trả về byte nào trong 55 s.
+     * ÁP CHO **MỌI** MODEL HOSTED, không riêng omni.
+     *
+     * [ĐO THẠT TRÊN PRODUCTION 2026-09-22 02:35–02:41] Lượt /responses ĐẦY ĐỦ (prompt radar dài + JSON
+     * 6.000 token + tools web_search) của qwen3.8-flash **treo: 0 byte nhận được trong 55 s**, lặp lại 3
+     * lần liên tiếp; trong khi CÙNG endpoint, CÙNG model, một lượt tra NHỎ (chỉ xin từ khoá + findings,
+     * ~500 token) trả về trong 15,6 s với 1 web_search_call THẬT và 20 URL nguồn.
+     * Nghĩa là vấn đề không nằm ở model mà ở VIỆC GỘP: tra + viết JSON trong một lời gọi.
+     *
+     * Vì vậy mọi lượt hosted đều tách: TRA trước bằng một lời gọi nhỏ, rồi VIẾT JSON bằng một lời gọi
+     * KHÔNG công cụ (dữ liệu đã nằm trong prompt). Cờ chỉ dẫn và cổng thật dùng CHUNG hàm này nên không
+     * thể lệch nhau.
      *
      * @param  array<string,mixed>|null  $hosted  kết quả của WebAccessService::planFor()
-     * @param  list<array<string,mixed>>  $rows  candidate của vai tìm kiếm
      */
-    private static function hostedSplitApplies(?array $hosted, array $rows): bool
+    private static function hostedSplitApplies(?array $hosted): bool
     {
-        return WebAccessService::isHostedMode($hosted)
-            && str_contains(mb_strtolower((string) ($rows[0]['model'] ?? '')), 'omni');
+        return WebAccessService::isHostedMode($hosted);
     }
 
-    private function splitHostedSearch(string $instruction, string $region, array $candidates, float $deadline = 0.0): ?array
+    private function splitHostedSearch(string $instruction, array $payload, string $region, array $candidates, float $deadline = 0.0): ?array
     {
         // LƯỢT DÒ NẰM TRONG CÙNG HẠN CHÓT CỦA CẢ LƯỢT. [ĐO THẬT 2026-09-22] Đặt hạn chót SAU lượt dò thì
         // tổng = 30 s (dò) + 55 s (lượt gọi cũ) = 85 s ⇒ vượt trần proxy, khách vẫn nhận 504 — đúng 75,3 s
@@ -2624,24 +2640,48 @@ class DesignAgentService
 
         // CÙNG MỘT LUẬT với cờ chỉ dẫn của đường radar (hostedSplitApplies) — hai chỗ BẮT BUỘC khớp,
         // nếu không thì prompt dặn model một đằng mà luồng chạy một nẻo (đúng lỗi đã đo 2026-09-22).
-        if (! self::hostedSplitApplies($hosted, $candidates)) {
+        if (! self::hostedSplitApplies($hosted)) {
             return null;
         }
 
-        $probe = 'Bạn tra cứu tin MỚI NHẤT trên internet cho yêu cầu dưới đây, rồi trả về JSON đúng dạng '
-            .'{"queries":["..."]} gồm tối đa 4 từ khoá bạn đã dùng (tiếng Việt, và tiếng Anh nếu cần). '
-            .'KHÔNG thêm chữ nào ngoài JSON. Yêu cầu: '.mb_substr($instruction, 0, 500);
+        // CHỦ ĐỀ CẦN TRA lấy từ chính DỮ LIỆU của lượt chạy (trends_without_evidence) — không để model
+        // tự đoán chủ đề. Lượt trước bỏ sót phần này nên model tra những gì nó thích, còn chỗ trống thì
+        // vẫn trống; và quan trọng hơn: cờ chỉ dẫn nói "tra HẾT các hướng còn thiếu" trong khi lượt dò
+        // KHÔNG hề được đưa danh sách đó.
+        $topics = [];
+        foreach ((array) ($payload['trends_without_evidence'] ?? []) as $row) {
+            $title = trim((string) (is_array($row) ? ($row['title'] ?? '') : $row));
+            if ($title !== '') {
+                $topics[] = $title;
+            }
+        }
+        $topicLine = $topics !== []
+            ? 'Các hướng CẦN TRA (dùng ĐÚNG tên hướng làm từ khoá, thêm năm nếu cần): '.implode(' | ', array_slice($topics, 0, 6)).'. '
+            : '';
+
+        $probe = 'Bạn tra cứu tin MỚI NHẤT trên internet cho một bộ sưu tập thời trang Việt Nam, dùng công cụ tìm kiếm web của bạn. '
+            .$topicLine
+            .'Hãy tra 2-3 chủ đề cụ thể rồi trả về JSON đúng dạng '
+            .'{"queries":["từ khoá bạn đã dùng"],"findings":[{"title":"tiêu đề bài báo","url":"URL bài báo","snippet":"tóm tắt 1 câu"}]}. '
+            .'Mỗi finding PHẢI là bài báo bạn THẬT SỰ tìm thấy: url chép NGUYÊN VĂN từ kết quả tìm kiếm, TUYỆT ĐỐI không bịa url hay tiêu đề. '
+            .'Hôm nay là '.now()->format('d/m/Y').'. KHÔNG thêm chữ nào ngoài JSON.';
 
         $started = microtime(true);
-        $answer = $this->gateway->text(self::SEARCH_GROUP, [['role' => 'user', 'content' => $probe]], [
+        // HAI PHẦN TÁCH BẠCH: /responses nhận phần CHỈ DẪN qua instructions và phần ĐẦU VÀO qua input
+        // — gửi mỗi một message user thì instructions RỖNG, và ranh giới "luật của hệ thống" với
+        // "dữ liệu người dùng" biến mất (đúng ranh giới mà lớp chống prompt-injection dựa vào).
+        $answer = $this->gateway->text(self::SEARCH_GROUP, [
+            ['role' => 'system', 'content' => 'Bạn là trợ lý tra cứu tin thời trang cho xưởng may Việt Nam. Dùng công cụ tìm kiếm web, rồi trả về ĐÚNG JSON được yêu cầu — không thêm chữ nào ngoài JSON.'],
+            ['role' => 'user', 'content' => $probe],
+        ], [
             'search' => true,
             'response_format' => 'json_object',
-            'max_tokens' => 400,          // chỉ cần từ khoá, không cần bài viết
-            // Trần riêng, nhỏ — VÀ không được vượt phần thời gian còn lại của cả lượt.
-            'timeout' => min(30, $remaining),
-            'max_tool_calls' => 1,        // MỘT lượt tra là đủ để có từ khoá + nguồn
+            'max_tokens' => 1200,         // đủ cho 2-3 findings kèm snippet
+            // Trần riêng — VÀ không được vượt phần thời gian còn lại của cả lượt.
+            'timeout' => min(40, $remaining),
+            'max_tool_calls' => 2,        // 2 lượt tra đủ để có findings, chừa chỗ cho lượt viết JSON
             'fallback_groups' => [self::REASON_GROUP, self::AI_GROUP],
-            'deadline_ts' => $deadline > 0 ? $deadline : microtime(true) + 30,
+            'deadline_ts' => $deadline > 0 ? $deadline : microtime(true) + 40,
         ]);
         $ms = (int) round((microtime(true) - $started) * 1000);
 
@@ -2655,42 +2695,72 @@ class DesignAgentService
 
         // Từ khoá: ƯU TIÊN từ khoá THẬT model đã hỏi (hosted_queries lấy từ web_search_call), rồi mới tới
         // phần nó tự khai trong JSON — khai báo là thứ dễ nói khác thực tế.
+        $json = $this->decodeJson($answer['text']) ?? [];
         $queries = array_values(array_filter(array_map('strval', (array) ($answer['hosted_queries'] ?? [])), 'strlen'));
         if ($queries === []) {
-            $json = $this->decodeJson($answer['text']);
             $queries = array_values(array_filter(array_map(
                 fn ($q) => is_string($q) ? trim($q) : '',
                 (array) ($json['queries'] ?? []),
             ), 'strlen'));
         }
 
-        $evidence = $queries !== [] ? $this->collectAiEvidence($queries, $region) : ['items' => [], 'count' => 0];
-        $lines = [];
-        foreach (array_slice((array) ($evidence['items'] ?? []), 0, 8) as $row) {
-            $url = trim((string) ($row['url'] ?? ''));
-            if ($url === '') {
+        // FINDINGS = chính tin model ĐỌC ĐƯỢC trong lượt tra (title + url + snippet) — DỮ LIỆU THẬT để
+        // dẫn nguồn. KHÔNG chạy lại trên nguồn RSS của máy chủ: máy chủ chỉ có RSS (chưa khai nguồn
+        // kind=search nào) nên chạy lại là làm MẤT đúng những gì vừa tìm được.
+        $findings = [];
+        $seenUrl = [];
+        foreach ((array) ($json['findings'] ?? []) as $row) {
+            if (! is_array($row)) {
                 continue;
             }
+            $url = trim((string) ($row['url'] ?? ''));
+            if ($url === '' || isset($seenUrl[$url])) {
+                continue;
+            }
+            $seenUrl[$url] = true;
+            $findings[] = [
+                'title' => trim((string) ($row['title'] ?? '')),
+                'url' => $url,
+                'summary' => trim((string) ($row['snippet'] ?? '')),
+                'source_name' => '',
+                'published_at' => null,
+            ];
+        }
+        // Bổ sung URL mà provider báo đã MỞ (hosted_sources) nếu model không liệt kê hết — vẫn là nguồn
+        // thật do chính nhà cung cấp trả về, không phải bịa.
+        foreach ((array) ($answer['hosted_sources'] ?? []) as $src) {
+            $url = trim((string) (is_array($src) ? ($src['url'] ?? '') : $src));
+            if ($url === '' || isset($seenUrl[$url])) {
+                continue;
+            }
+            $seenUrl[$url] = true;
+            $findings[] = ['title' => '', 'url' => $url, 'summary' => '', 'source_name' => '', 'published_at' => null];
+        }
+
+        $lines = [];
+        foreach (array_slice($findings, 0, 8) as $row) {
             $title = trim((string) ($row['title'] ?? ''));
-            $lines[] = '- '.($title !== '' ? $title.' — ' : '').$url;
+            $lines[] = '- '.($title !== '' ? $title.' — ' : '').$row['url'];
         }
 
         $block = "\n\nTIN MỚI TRA ĐƯỢC TỪ INTERNET"
             .($queries !== [] ? ' (từ khoá: '.implode('; ', array_slice($queries, 0, 4)).')' : '')
             .":\n".($lines !== []
-                ? implode("\n", $lines)."\nChỉ được dẫn nguồn CÓ trong danh sách trên; TUYỆT ĐỐI không bịa thêm tin hoặc URL."
+                ? implode("\n", $lines)."\nĐÂY LÀ NGUỒN CHÍNH: ưu tiên bám vào các tin này khi viết nội dung và dẫn nguồn ĐÚNG URL. Chỉ được dẫn nguồn CÓ trong danh sách trên; TUYỆT ĐỐI không bịa thêm tin hoặc URL."
                 : 'Không tra được tin mới. Trả lời bằng dữ liệu đã có và TUYỆT ĐỐI không bịa nguồn.')."\n";
 
         logger()->info('Agent Studio: đã tách lượt tra ra khỏi lượt viết JSON', [
             'probe_ms' => $ms,
             'calls' => (int) ($answer['hosted_calls'] ?? 0),
             'queries' => count($queries),
-            'evidence_items' => (int) ($evidence['count'] ?? count($lines)),
+            'findings' => count($findings),
         ]);
 
         return [
             'block' => $block,
-            'tool_search' => $this->toolSearchBlock(null, $answer, ['hosted' => $hosted]),
+            // items = findings THẬT để đường sau (attachTrendEvidence / applyTrendChecks) dùng làm bằng
+            // chứng + link có thật.
+            'tool_search' => $this->toolSearchBlock(null, $answer, ['hosted' => $hosted]) + ['items' => $findings],
         ];
     }
 
@@ -2723,7 +2793,7 @@ class DesignAgentService
 
         $splitSearch = null;
         if (! empty($options['search']) && ! empty($options['split_search'])) {
-            $splitSearch = $this->splitHostedSearch($instruction, (string) ($payload['region'] ?? 'all'), $candidates, $deadline);
+            $splitSearch = $this->splitHostedSearch($instruction, $payload, (string) ($payload['region'] ?? 'all'), $candidates, $deadline);
             if ($splitSearch !== null) {
                 $instruction .= $splitSearch['block'];
                 // Lượt viết JSON chạy KHÔNG công cụ: nhẹ, nhanh, và bằng chứng đã nằm trong prompt.
@@ -2754,7 +2824,9 @@ class DesignAgentService
                 'attempts' => $this->gateway->lastAttempts(),
             ]);
 
-            return ['json' => null, 'answer' => null, 'attempts' => 1];
+            // GIỮ số đo của lượt DÒ: nó ĐÃ chạy thật (tốn thời gian + tiền). Vứt đi là giao diện nói
+        // "lượt này không tìm kiếm" trong khi thực tế đã tìm được nguồn — và người dùng mất luôn link.
+        return ['json' => null, 'answer' => null, 'attempts' => 1, 'tool_search' => $splitSearch['tool_search'] ?? null];
         }
 
         $json = $this->decodeJson($answer['text']);
@@ -2774,7 +2846,7 @@ class DesignAgentService
                 'chars' => strlen($answer['text']),
             ]);
 
-            return ['json' => null, 'answer' => $answer, 'attempts' => 1];
+            return ['json' => null, 'answer' => $answer, 'attempts' => 1, 'tool_search' => $splitSearch['tool_search'] ?? null];
         }
 
         logger()->info('Agent Studio: lần gọi đầu chưa đọc được JSON, thử lại với ngân sách token lớn hơn', [
@@ -2806,7 +2878,7 @@ class DesignAgentService
                 'retry_window_s' => $retrySeconds,
             ]);
 
-            return ['json' => null, 'answer' => $answer, 'attempts' => 1];
+            return ['json' => null, 'answer' => $answer, 'attempts' => 1, 'tool_search' => $splitSearch['tool_search'] ?? null];
         }
 
         $retry = $this->gateway->text($group, $messages, $retryOptions + [
@@ -2817,10 +2889,10 @@ class DesignAgentService
         if ($retry !== null) {
             $retryJson = $this->decodeJson($retry['text']);
             if ($retryJson !== null) {
-                return ['json' => $retryJson, 'answer' => $retry, 'attempts' => 2];
+                return ['json' => $retryJson, 'answer' => $retry, 'attempts' => 2, 'tool_search' => $splitSearch['tool_search'] ?? null];
             }
 
-            return ['json' => null, 'answer' => $retry, 'attempts' => 2];
+            return ['json' => null, 'answer' => $retry, 'attempts' => 2, 'tool_search' => $splitSearch['tool_search'] ?? null];
         }
 
         return ['json' => null, 'answer' => $answer, 'attempts' => 2, 'tool_search' => $splitSearch['tool_search'] ?? null];

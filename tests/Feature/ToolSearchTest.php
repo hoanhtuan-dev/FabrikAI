@@ -487,11 +487,11 @@ class ToolSearchTest extends TestCase
 
         $sent = [];
         Http::fake([
-            'dashscope-intl.aliyuncs.com/*' => function ($request) use (&$sent) {
-                $sent[] = ['url' => $request->url(), 'body' => json_decode($request->body(), true)];
-
-                return Http::response($this->responsesBody($this->briefJson(), 1, ['xu hướng linen 2026']), 200);
-            },
+            'dashscope-intl.aliyuncs.com/*' => $this->hostedSplitFake(
+                fn () => Http::response($this->responsesBody($this->findingsJson(), 1, ['xu hướng linen 2026']), 200),
+                fn () => Http::response($this->answerResponse($this->briefJson()), 200),
+                $sent,
+            ),
             'news.example/*' => Http::response($this->rss('Không dùng tới', 'https://bao.example/0'), 200),
         ]);
 
@@ -588,7 +588,41 @@ class ToolSearchTest extends TestCase
         ], $extra));
     }
 
-    /** Phản hồi /responses: `$searches` mục web_search_call + một message chứa JSON. */
+    /**
+     * THÂN JSON CỦA LƯỢT DÒ (probe) — model khai từ khoá và NHỮNG GÌ NÓ THẬT SỰ TÌM ĐƯỢC.
+     *
+     * Từ 2026-09-22 lượt hosted được TÁCH làm hai: /responses là LƯỢT DÒ (nhỏ, có công cụ) trả về
+     * queries + findings; /chat/completions là LƯỢT VIẾT JSON (không công cụ). Fake cũ trả CÙNG một thân
+     * cho mọi URL nên lượt viết nhận thân dạng /responses (không có choices) ⇒ coi như model câm.
+     *
+     * @param  list<array{title?:string,url:string,snippet?:string}>  $findings
+     * @param  list<string>  $queries
+     */
+    private function findingsJson(array $findings = [], array $queries = []): string
+    {
+        return (string) json_encode([
+            'queries' => $queries !== [] ? $queries : ['xu hướng thu đông 2026'],
+            'findings' => $findings,
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * FAKE CHO MỘT LƯỢT HOSTED ĐÃ TÁCH: /responses trả lượt DÒ, mọi URL khác trả lượt VIẾT.
+     *
+     * @param  callable  $onProbe  phản hồi cho /responses
+     * @param  callable  $onWrite  phản hồi cho /chat/completions
+     * @param  list<array<string,mixed>>  $sent  (tham chiếu) nhật ký lời gọi
+     */
+    private function hostedSplitFake(callable $onProbe, callable $onWrite, array &$sent): callable
+    {
+        return function ($request) use ($onProbe, $onWrite, &$sent) {
+            $sent[] = ['url' => $request->url(), 'body' => json_decode((string) $request->body(), true)];
+
+            return str_contains($request->url(), '/responses') ? $onProbe() : $onWrite();
+        };
+    }
+
+    /** Phản hồi /responses: số mục web_search_call + một message chứa JSON. */
     private function responsesBody(string $text, int $searches = 1, array $queries = []): array
     {
         $output = [['type' => 'reasoning', 'id' => 'rs_1']];
@@ -618,17 +652,17 @@ class ToolSearchTest extends TestCase
 
         $sent = [];
         Http::fake([
-            'gw-hosted.example/*' => function ($request) use (&$sent) {
-                $sent[] = ['url' => $request->url(), 'body' => json_decode($request->body(), true)];
-
-                return Http::response($this->responsesBody($this->briefJson(), 2), 200);
-            },
+            'gw-hosted.example/*' => $this->hostedSplitFake(
+                fn () => Http::response($this->responsesBody($this->findingsJson(), 2), 200),
+                fn () => Http::response($this->answerResponse($this->briefJson()), 200),
+                $sent,
+            ),
             'news.example/*' => Http::response($this->rss('Không dùng tới', 'https://bao.example/0'), 200),
         ]);
 
         $brief = app(DesignAgentService::class)->collectionBrief(['prompt' => 'đầm linen'], $this->customer(), true, true);
 
-        // (1) Đi ĐÚNG endpoint /responses, không phải /chat/completions.
+        // (1) Lượt DÒ đi ĐÚNG endpoint /responses (lượt viết JSON sau đó đi /chat/completions, không công cụ).
         $this->assertStringEndsWith('/responses', (string) $sent[0]['url']);
         // (2) Khai ĐÚNG công cụ của nhà cung cấp + tách phần chỉ dẫn khỏi phần đầu vào.
         $this->assertSame('web_search', data_get($sent[0]['body'], 'tools.0.type'));
@@ -684,7 +718,7 @@ class ToolSearchTest extends TestCase
         $this->assertStringContainsString('$deadline = microtime(true) + self::AI_CALL_CEILING_MS / 1000;', $svc,
             'Thiếu hạn chót thì "trần" chỉ là trang trí: các lần gọi cộng lại vẫn vượt trần proxy.');
         $this->assertStringContainsString('=> $deadline,', $svc, 'Mọi lần gọi con phải dùng CHUNG hạn chót đó.');
-        $this->assertStringContainsString('min(30, $remaining)', $svc,
+        $this->assertStringContainsString('min(40, $remaining)', $svc,
             'Lượt dò phải bị cắt theo phần thời gian CÒN LẠI của cả lượt, không có trần riêng rời rạc.');
         $this->assertStringContainsString('bỏ lượt DÒ TÌM KIẾM vì không còn đủ thời gian', $svc,
             'Không còn đủ chỗ cho lượt dò thì phải bỏ nó, không được bắt đầu rồi để cả lượt vượt trần.');
@@ -700,9 +734,15 @@ class ToolSearchTest extends TestCase
     {
         $this->hostedProvider('gw-hosted', 'model-nho');
         $this->searchSource();
+        $neverSearched = [];
 
         Http::fake([
-            'gw-hosted.example/*' => Http::response($this->responsesBody($this->briefJson(), 0), 200),
+            'gw-hosted.example/*' => $this->hostedSplitFake(
+                // Lượt DÒ: model nhận công cụ nhưng KHÔNG gọi lần nào (0 mục web_search_call).
+                fn () => Http::response($this->responsesBody($this->findingsJson(), 0), 200),
+                fn () => Http::response($this->answerResponse($this->briefJson()), 200),
+                $neverSearched,
+            ),
             'news.example/*' => Http::response($this->rss('Không dùng tới', 'https://bao.example/0'), 200),
         ]);
 
@@ -754,9 +794,15 @@ class ToolSearchTest extends TestCase
         $this->hostedProvider('gw-hosted', 'v4-pro');
         $this->searchSource();
 
+        $log = [];
         Http::fake([
-            // Model trả lời + khai nó đã hỏi gì (đúng thứ /responses trả về: chỉ có queries).
-            'gw-hosted.example/*' => Http::response($this->responsesBody($this->directionsJson(), 1, ['xu hướng pastel 2026']), 200),
+            // LƯỢT DÒ (/responses): model tra thật, khai từ khoá ĐÃ DÙNG (web_search_call).
+            'gw-hosted.example/*' => $this->hostedSplitFake(
+                fn () => Http::response($this->responsesBody($this->directionsJson(), 1, ['xu hướng pastel 2026']), 200),
+                // LƯỢT VIẾT JSON (/chat/completions): KHÔNG công cụ, chỉ viết dựa trên dữ liệu đã có.
+                fn () => Http::response($this->answerResponse($this->directionsJson()), 200),
+                $log,
+            ),
             'news.example/*' => function ($request) {
                 // Tin của FEED (máy chủ lấy sẵn) KHÔNG nhắc pastel; chỉ tin do CÂU HỎI CỦA MODEL mang về mới có.
                 return str_contains(urldecode($request->url()), 'pastel')
@@ -797,8 +843,13 @@ class ToolSearchTest extends TestCase
         $this->hostedProvider('gw-hosted', 'v4-pro');
         $this->searchSource();
 
+        $log = [];
         Http::fake([
-            'gw-hosted.example/*' => Http::response($this->responsesBody($this->directionsJson(), 1, ['xu hướng pastel 2026']), 200),
+            'gw-hosted.example/*' => $this->hostedSplitFake(
+                fn () => Http::response($this->responsesBody($this->directionsJson(), 1, ['xu hướng pastel 2026']), 200),
+                fn () => Http::response($this->answerResponse($this->directionsJson()), 200),
+                $log,
+            ),
             'news.example/*' => function ($request) {
                 return str_contains(urldecode($request->url()), 'pastel')
                     ? Http::response($this->rss('Màu pastel lên ngôi mùa thu 2026', 'https://bao.example/pastel'), 200)
@@ -1034,12 +1085,12 @@ class ToolSearchTest extends TestCase
 
         $sent = [];
         Http::fake([
-            // Model tra ĐÚNG một hướng còn thiếu ("Pastel dịu") và không tra hướng nào khác.
-            'gw-hosted.example/*' => function ($request) use (&$sent) {
-                $sent[] = json_decode($request->body(), true);
-
-                return Http::response($this->responsesBody($this->directionsJson(), 1, ['pastel dịu xu hướng 2026']), 200);
-            },
+            // LƯỢT DÒ: model tra ĐÚNG một hướng còn thiếu ("Pastel dịu"). LƯỢT VIẾT: viết JSON.
+            'gw-hosted.example/*' => $this->hostedSplitFake(
+                fn () => Http::response($this->responsesBody($this->findingsJson(), 1, ['pastel dịu xu hướng 2026']), 200),
+                fn () => Http::response($this->answerResponse($this->directionsJson()), 200),
+                $sent,
+            ),
             'news.example/*' => function ($request) {
                 // Tin của FEED không nhắc pastel; chỉ tin do CÂU HỎI CỦA MODEL mang về mới có.
                 return str_contains(urldecode($request->url()), 'pastel')
@@ -1052,9 +1103,21 @@ class ToolSearchTest extends TestCase
 
         // (1) Danh sách "bộ còn thiếu" có mặt trong DỮ LIỆU gửi model — không để nó tự đoán chủ đề.
         //
-        // `input` của /responses là CHUỖI có tiền tố ("DỮ LIỆU:" rồi mới tới JSON), không phải JSON thuần —
-        // phải cắt từ dấu ngoặc nhọn đầu tiên rồi mới giải mã (bài học từ readableBody ở AgentRolesTest).
-        $rawInput = (string) data_get($sent[0], 'input', '');
+        // TỪ 2026-09-22 lượt hosted TÁCH LÀM HAI, nên danh sách này đi ở LƯỢT VIẾT JSON
+        // (/chat/completions, tham số `messages`) chứ không phải lượt DÒ (/responses, `input`). Lượt dò
+        // chỉ nhận tên các hướng cần tra; toàn bộ payload nằm ở lượt viết.
+        // Phần nội dung là CHUỖI có tiền tố ("DỮ LIỆU:" rồi mới tới JSON) — phải cắt từ dấu ngoặc nhọn đầu
+        // tiên rồi mới giải mã (bài học từ readableBody ở AgentRolesTest).
+        $write = collect($sent)->first(fn ($row) => str_contains((string) ($row['url'] ?? ''), '/chat/completions'));
+        $this->assertNotNull($write, 'Phải có LƯỢT VIẾT JSON ở /chat/completions.');
+        // Đọc ĐÚNG message của vai "user": phần CHỈ DẪN (system) cũng chứa vài object JSON mẫu, nên cắt
+        // từ dấu ngoặc nhọn ĐẦU TIÊN của cả mảng messages là bắt nhầm object trong chỉ dẫn.
+        $rawInput = '';
+        foreach ((array) data_get($write, 'body.messages', []) as $message) {
+            if (($message['role'] ?? '') === 'user') {
+                $rawInput = (string) ($message['content'] ?? '');
+            }
+        }
         $start = strpos($rawInput, '{');
         $payload = $start === false ? [] : (array) json_decode(substr($rawInput, $start), true);
         $missing = (array) data_get($payload, 'trends_without_evidence', []);
@@ -1089,8 +1152,11 @@ class ToolSearchTest extends TestCase
         $this->hostedProvider('gw-hosted', 'v4-pro');
         $this->searchSource();
 
+        $log = [];
         Http::fake([
-            'gw-hosted.example/*' => Http::response($this->responsesBody($this->directionsJson([
+            'gw-hosted.example/*' => $this->hostedSplitFake(
+                fn () => Http::response($this->responsesBody($this->findingsJson(), 1, ['tông màu đất 2026', 'quần ống rộng 2026']), 200),
+                fn () => Http::response($this->answerResponse($this->directionsJson([
                 'trend_checks' => [
                     // (a) dẫn ĐÚNG url có trong kết quả tra được ⇒ được tính
                     ['id' => 'earth-neutral', 'status' => 'confirmed', 'url' => 'https://bao.example/dat'],
@@ -1099,7 +1165,9 @@ class ToolSearchTest extends TestCase
                     // (c) tra mà không thấy ⇒ "đã tra, chưa có tin"
                     ['id' => 'wide-leg', 'status' => 'not_found'],
                 ],
-            ]), 1, ['tông màu đất 2026', 'quần ống rộng 2026']), 200),
+                ])), 200),
+                $log,
+            ),
             'news.example/*' => function ($request) {
                 // So trên chuỗi ĐÃ GIẢI MÃ: 'đất' mã hoá thành %C4%91... nên tìm 'dat' trên URL thô là
                 // không bao giờ khớp — đúng cái bẫy vừa làm bài test này đỏ.
