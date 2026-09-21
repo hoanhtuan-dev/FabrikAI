@@ -176,6 +176,104 @@ export function useAgentStudio() {
     });
   }
 
+  /**
+   * BẢNG CƠ CẤU NHÓM HÀNG do người dùng tự đặt — cùng họ với bảng size ở trên.
+   *
+   * Vì sao cần: chọn TỔNG số mã hàng mới chỉ nói quy mô. Chia cho nhóm nào là quyết định của người bỏ
+   * vốn, mà trước đây chỗ chia là của thuật toán (theo đúng tỉ lệ cũ) — muốn dồn 8 mã cho nhóm áo cũng
+   * không có cách nào nói ra. Nay bảng sửa được y như bảng size: thêm/bớt nhóm, đặt số mã từng nhóm.
+   *
+   * `structureEdited` là thứ quyết định bảng này có được GỬI LÊN hay không. Không có nó thì bảng vừa
+   * được đổ từ đề xuất của hệ thống sẽ bị gửi lên như thể người dùng tự đặt, và nhãn "do bạn đặt" thành
+   * lời nói dối ngay ở lượt đầu tiên.
+   */
+  const structureRowsInput = ref([]);
+  const structureEdited = ref(false);
+  /** Số mã hàng của TỪNG nhóm theo bảng đang hiện — tổng của nó là con số đi vào lệnh cắt. */
+  const structureCountTotal = computed(() => structureRowsInput.value
+    .filter((row) => String(row.category || '').trim() !== '')
+    .reduce((sum, row) => sum + Math.max(0, Number(row.count) || 0), 0));
+  /** Bảng sửa rồi mà chưa áp vào brief? (so với chính bảng đang nằm trong brief) */
+  const structureDirty = computed(() => {
+    if (!structureEdited.value) return false;
+    const rows = structureSignature(structureRowsInput.value);
+    return rows !== structureSignature(categoryRows.value);
+  });
+  /** Bảng gửi lên máy chủ: chỉ gửi khi người dùng THẬT SỰ đặt, để nhãn nguồn nói đúng sự thật. */
+  const structureInput = computed(() => (structureEdited.value
+    ? structureRowsInput.value
+      .filter((row) => String(row.category || '').trim() !== '')
+      .map((row) => ({ category: String(row.category).trim(), count: Math.max(0, Number(row.count) || 0) }))
+    : []));
+  function structureSignature(rows) {
+    return (rows || [])
+      .map((row) => String(row?.category || '').trim() + ':' + (Math.max(0, Number(row?.count) || 0)))
+      .join('|');
+  }
+  /** Đổ bảng từ cơ cấu đang có trong brief — đây là ĐIỂM BẮT ĐẦU để sửa tiếp, như preset của bảng size. */
+  function seedStructureRows(rows) {
+    const next = (rows || []).map((row) => ({
+      category: String(row?.category || ''),
+      count: Math.max(0, Number(row?.count) || 0),
+      rationale: String(row?.rationale || ''),
+    }));
+    // Gán lại một mảng y hệt là thay đổi GIẢ: watcher ghi phiên bắn lên và một lượt ghi vô nghĩa được
+    // xếp hàng ngay lúc trang vừa dựng — đúng cái bẫy đã xoá mất bản brief của người dùng.
+    if (structureSignature(next) === structureSignature(structureRowsInput.value)) return;
+    structureRowsInput.value = next;
+  }
+  function setStructureRow(index, patch) {
+    structureEdited.value = true;
+    structureRowsInput.value = structureRowsInput.value.map((row, i) => (i === index ? { ...row, ...patch } : row));
+  }
+  function addStructureRow() {
+    if (structureRowsInput.value.length >= 12) return;
+    structureEdited.value = true;
+    structureRowsInput.value = [...structureRowsInput.value, { category: '', count: 0, rationale: '' }];
+  }
+  function removeStructureRow(index) {
+    if (structureRowsInput.value.length <= 1) return;   // bảng rỗng thì lệnh cắt không có gì để chia
+    structureEdited.value = true;
+    structureRowsInput.value = structureRowsInput.value.filter((_, i) => i !== index);
+  }
+  /** Chia đều tổng đang chọn cho các nhóm đang có — phần dư dồn vào nhóm đầu (largest remainder). */
+  function evenStructureRows() {
+    const rows = structureRowsInput.value;
+    if (!rows.length) return;
+    const target = Math.max(rows.length, Number(skuTotal.value) || structureCountTotal.value || rows.length);
+    structureEdited.value = true;
+    const base = Math.floor(target / rows.length);
+    let rest = target - base * rows.length;
+    structureRowsInput.value = rows.map((row) => {
+      const count = base + (rest > 0 ? 1 : 0);
+      if (rest > 0) rest--;
+      return { ...row, count };
+    });
+  }
+  /**
+   * KHỚP TỔNG: dồn phần lệch vào nhóm ĐANG NHIỀU NHẤT.
+   *
+   * Không chia đều phần lệch: chia đều làm xáo trộn cả bảng vừa nhập, còn dồn vào nhóm lớn nhất thì hình
+   * dạng bảng giữ nguyên. Cùng luật với nút "Cân về 100%" của bảng size.
+   */
+  function normalizeStructureRows() {
+    const rows = structureRowsInput.value;
+    if (!rows.length) return;
+    const target = Number(skuTotal.value) || structureCountTotal.value;
+    const diff = target - structureCountTotal.value;
+    if (diff === 0) return;
+    const biggest = rows.reduce((best, row, i) => (Number(row.count) > Number(rows[best].count) ? i : best), 0);
+    structureEdited.value = true;
+    structureRowsInput.value = rows.map((row, i) => (i === biggest
+      ? { ...row, count: Math.max(0, Math.min(400, Number(row.count) + diff)) }
+      : row));
+  }
+  /** Bỏ bảng của người dùng, quay về đề xuất của hệ thống cho lượt dựng brief kế tiếp. */
+  function useAutoStructure() {
+    structureEdited.value = false;
+    structureRowsInput.value = [];
+  }
+
   // ── BẢNG MÀU & BẢNG MOOD do người dùng sửa (rỗng = dùng bản hệ thống dựng) ──────────────
   const paletteRows = ref([]);
   const moodRows = ref([]);
@@ -517,6 +615,9 @@ export function useAgentStudio() {
     // coi là "đã cũ" (bảng size được ghi vào brief khi tạo, nhưng chỗ kiểm tra lại không đưa vào so sánh)
     // ⇒ người dùng chưa đổi gì vẫn thấy "Prompt/trend đã đổi. Bấm «Tạo lại brief»".
     size_distribution: sizeDistribution.value,
+    // Bảng cơ cấu sửa rồi cũng làm brief cũ sai: nhóm hàng nào bao nhiêu mã là thứ đi vào lệnh cắt,
+    // và khoá bộ đệm của MÁY CHỦ có phần này.
+    structure: structureInput.value,
   }));
   const briefStale = computed(() => store.collectionBriefStale(currentBriefInput.value));
   const canvasPrompt = computed(() => {
@@ -862,6 +963,9 @@ export function useAgentStudio() {
       trend_ids: selectedTrendIds.value,
       size_distribution: sizeDistribution.value,
       sku_total: skuTotal.value || undefined,
+      // Bảng cơ cấu CHỈ gửi khi người dùng tự đặt (xem `structureEdited`) — gửi bảng vừa đổ từ đề xuất
+      // của hệ thống thì nhãn nguồn sẽ nói "do bạn đặt" ngay ở lượt đầu, sai sự thật.
+      structure: structureInput.value.length ? structureInput.value : undefined,
       palette: paletteRows.value.length ? paletteRows.value : undefined,
       moodboard: moodRows.value.length ? moodRows.value : undefined,
     };
@@ -1067,6 +1171,8 @@ export function useAgentStudio() {
         sizeRows: sizeRowsInput.value,
         paletteRows: paletteRows.value,
         moodRows: moodRows.value,
+        structureRows: structureRowsInput.value,
+        structureEdited: structureEdited.value,
         samples: samples.value,
         selectedTrendIds: (store.selectedTrendIds || []).slice(),
       }));
@@ -1081,6 +1187,10 @@ export function useAgentStudio() {
       if (d.subSteps && typeof d.subSteps === 'object') subSteps.value = { ...subSteps.value, ...d.subSteps };
       if (Number(d.skuTotal) > 0) skuTotal.value = Number(d.skuTotal);
       if (Array.isArray(d.sizeRows) && d.sizeRows.length) sizeRowsInput.value = d.sizeRows;
+      if (Array.isArray(d.structureRows) && d.structureRows.length) {
+        structureEdited.value = !!d.structureEdited;
+        seedStructureRows(d.structureRows);
+      }
       if (Array.isArray(d.paletteRows)) paletteRows.value = d.paletteRows;
       if (Array.isArray(d.moodRows)) moodRows.value = d.moodRows;
       if (Array.isArray(d.samples)) samples.value = d.samples;
@@ -1089,7 +1199,8 @@ export function useAgentStudio() {
   }
   restoreAgentDraft();
   watch([
-    prompt, () => store.designAgentStep, subSteps, skuTotal, sizeRowsInput,
+    prompt, () => store.designAgentStep, subSteps, skuTotal, sizeRowsInput, structureRowsInput,
+    structureEdited,
     paletteRows, moodRows, samples, () => store.selectedTrendIds,
     // Bản brief cũng là TRẠNG THÁI PHIÊN: thiếu nó thì mọi thay đổi chỉ nằm trong bộ nhớ trang và mất
     // khi tải lại. Đây là bất biến, không phải đường đi — nên nó thuộc về danh sách này.
@@ -1105,6 +1216,9 @@ export function useAgentStudio() {
       useNegative: !!settings.negative_prompt,
       negativePrompt: String(settings.negative_prompt || ''),
     };
+    // Bảng cơ cấu luôn ĐỔ TỪ bản brief đang có, trừ khi người dùng đã tự sửa (lúc đó bảng của họ là
+    // thứ đang chờ áp dụng, ghi đè lên là mất công họ vừa nhập).
+    if (!structureEdited.value) seedStructureRows(value?.structure?.categories || []);
   }, { immediate: true });
   /**
    * NẠP LẦN ĐẦU — gọi MỘT lần khi trang Agent Studio dựng xong.
@@ -1142,6 +1256,18 @@ export function useAgentStudio() {
   const sessionName = ref('');
   let sessionTimer = null;
   let sessionHydrating = false;
+  /**
+   * ĐÃ ĐỌC XONG phiên của tài khoản chưa?
+   *
+   * [LỖI THẬT — đo được 2026-09-21] Trang vừa dựng đã có thứ làm bộ theo dõi ghi phiên bắn lên (bản nháp
+   * trên máy, hoặc chính bảng cơ cấu được đổ từ brief). Nếu lượt GHI đó chạy TRƯỚC khi lượt ĐỌC xong thì
+   * nó ghi đè phiên cũ bằng trạng thái rỗng: `collection` còn null nên `brief_snapshot` thành null, và
+   * người dùng mở lại trang thấy "Chưa có brief" — mất cả bộ sưu tập đang dựng. Đúng loại lỗi im lặng:
+   * không có thông báo nào, chỉ có bài làm biến mất.
+   *
+   * Nên: cấm ghi cho tới khi biết mình đang ghi lên cái gì.
+   */
+  let sessionReady = false;
 
   /** Rút gọn brief trước khi lưu: chỉ giữ phần giao diện CẦN để vẽ lại màn hình đang làm dở. */
   function briefSnapshot(value) {
@@ -1180,6 +1306,10 @@ export function useAgentStudio() {
       trend_ids: selectedTrendIds.value,
       sku_total: skuTotal.value || undefined,
       size_distribution: sizeDistribution.value,
+      // Bảng cơ cấu + cờ "do người dùng đặt": mở lại phiên là bảng còn nguyên và vẫn được gửi lên,
+      // không phải nhập lại từ đầu.
+      structure_rows: structureRowsInput.value,
+      structure_edited: structureEdited.value,
       palette: paletteRows.value,
       moodboard: moodRows.value,
       plan_assumptions: { ...store.planAssumptions },
@@ -1193,6 +1323,8 @@ export function useAgentStudio() {
   /** Lưu NGAY (không gộp). Trả về true khi ghi được. */
   async function saveSession() {
     if (sessionHydrating) return false;
+    // Chưa đọc xong phiên thì MỌI lượt ghi đều là ghi đè mù — xem chú thích ở `sessionReady`.
+    if (!sessionReady) return false;
     sessionSaving.value = true;
     sessionError.value = '';
     try {
@@ -1239,6 +1371,10 @@ export function useAgentStudio() {
           : Object.entries(session.size_distribution).map(([size, pct]) => ({ size, pct: Number(pct) }));
         if (rows.length) sizeRowsInput.value = rows;
       }
+      if (Array.isArray(session.structure_rows) && session.structure_rows.length) {
+        structureEdited.value = !!session.structure_edited;
+        seedStructureRows(session.structure_rows);
+      }
       if (Array.isArray(session.palette)) paletteRows.value = session.palette;
       if (Array.isArray(session.moodboard)) moodRows.value = session.moodboard;
       if (Array.isArray(session.samples)) samples.value = session.samples;
@@ -1278,6 +1414,9 @@ export function useAgentStudio() {
       return false;
     } catch (e) {
       return false;
+    } finally {
+      // Mở cờ ở CẢ hai nhánh: người CHƯA có phiên nào cũng phải ghi được phiên đầu tiên của họ.
+      sessionReady = true;
     }
   }
 
@@ -1554,6 +1693,16 @@ export function useAgentStudio() {
     provide('subPrev', subPrev);
     provide('skuTotal', skuTotal);
     provide('skuTotalSource', skuTotalSource);
+    provide('structureRowsInput', structureRowsInput);
+    provide('structureEdited', structureEdited);
+    provide('structureCountTotal', structureCountTotal);
+    provide('structureDirty', structureDirty);
+    provide('setStructureRow', setStructureRow);
+    provide('addStructureRow', addStructureRow);
+    provide('removeStructureRow', removeStructureRow);
+    provide('evenStructureRows', evenStructureRows);
+    provide('normalizeStructureRows', normalizeStructureRows);
+    provide('useAutoStructure', useAutoStructure);
     provide('sizeRowsInput', sizeRowsInput);
     provide('sizePctTotal', sizePctTotal);
     provide('sizeTotalOk', sizeTotalOk);
@@ -1656,6 +1805,16 @@ export function useAgentStudio() {
     subPrev,
     skuTotal,
     skuTotalSource,
+    structureRowsInput,
+    structureEdited,
+    structureCountTotal,
+    structureDirty,
+    setStructureRow,
+    addStructureRow,
+    removeStructureRow,
+    evenStructureRows,
+    normalizeStructureRows,
+    useAutoStructure,
     sizeRowsInput,
     sizePctTotal,
     sizeTotalOk,

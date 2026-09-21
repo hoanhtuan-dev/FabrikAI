@@ -206,6 +206,9 @@ class DesignAgentController extends Controller
             // quyết nên người dùng chỉ đọc được: tổng SKU, bảng màu, bảng mood.
 
             'sku_total', 'palette', 'moodboard', 'refresh',
+            // Bảng CƠ CẤU nhóm hàng người dùng tự đặt: [{category, count}]. Cùng họ với bảng size —
+            // danh sách gửi lên CHÍNH LÀ bảng, không phải một tỉ lệ để máy chủ suy ra.
+            'structure',
         ]);
         $payload['prompt'] = trim((string) ($payload['prompt'] ?? ''));
         $payload['brief'] = trim((string) ($payload['brief'] ?? ''));
@@ -215,6 +218,7 @@ class DesignAgentController extends Controller
         ));
         $payload['size_distribution'] = is_array($payload['size_distribution'] ?? null)
             ? $payload['size_distribution'] : [];
+        $payload['structure'] = is_array($payload['structure'] ?? null) ? $payload['structure'] : [];
         // Ảnh mẫu cho VAI ĐỌC ẢNH: tối đa 3, mỗi cái là đường dẫn trong site ('/…') hoặc URL http(s).
         // Không nhận giá trị khác ⇒ không có đường lách để máy chủ đi lấy tài nguyên nội bộ.
         $payload['reference_images'] = array_values(array_filter(
@@ -242,6 +246,11 @@ class DesignAgentController extends Controller
             // còn tốn một lượt gọi model ở bước Thực thi.
 
             'sku_total' => ['nullable', 'integer', 'min:1', 'max:400'],
+            // Trần 12 nhóm và 400 mã: bảng cơ cấu dài hơn thì lệnh cắt không ai đọc, và mỗi nhóm còn
+            // tốn một lượt gọi model ở bước Thực thi. 0 mã là hợp lệ ("để tham chiếu, chưa sản xuất").
+            'structure' => ['nullable', 'array', 'max:12'],
+            'structure.*.category' => ['nullable', 'string', 'max:60'],
+            'structure.*.count' => ['nullable', 'integer', 'min:0', 'max:400'],
             'palette' => ['nullable', 'array', 'max:12'],
             'palette.*.name' => ['nullable', 'string', 'max:40'],
 

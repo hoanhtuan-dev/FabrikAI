@@ -314,6 +314,12 @@ export const agentStudioActions = {
         // bộ đệm của MÁY CHỦ. Thiếu ở đây thì sửa bảng mood xong giao diện vẫn nói "brief khớp" trong
         // khi phần chữ của brief đang mô tả bảng mood cũ.
         sku_total: Number(payload.sku_total) || 0,
+        // BẢNG CƠ CẤU nhóm hàng người dùng tự đặt: nhóm nào bao nhiêu mã là thứ đi vào lệnh cắt, nên
+        // đổi nó là brief cũ sai y như đổi bảng size. Giữ ĐÚNG THỨ TỰ người dùng đặt (máy chủ cũng giữ
+        // thứ tự đó) — sắp xếp lại ở đây là tự tay xoá mất một thay đổi có thật.
+        structure: (payload.structure || [])
+          .map((row) => String((row && row.category) || '').trim() + ':' + (Number(row && row.count) || 0)),
+
         palette: (payload.palette || []).map((row) => String(row && row.hex || '')).join(','),
         moodboard: (payload.moodboard || [])
           .map((row) => String((row && row.label) || '') + '~' + String((row && row.caption) || ''))

@@ -1,0 +1,1 @@
+import{F as e,G as t,X as n}from"./pageBoot-_PeaugPp.js";function r(r){let i=n(Date.now()),a=null;function o(){a&&=(clearInterval(a),null)}return t(r,e=>{e?(i.value=Date.now(),a||=setInterval(()=>{i.value=Date.now()},1e3)):o()},{immediate:!0}),e(o),{now:i}}export{r as t};

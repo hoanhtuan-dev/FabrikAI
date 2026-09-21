@@ -235,7 +235,10 @@ class DesignAgentService
         // nghĩ ra: bảng màu + bảng mood họ sửa, và TỔNG số SKU họ chọn. Trước đây cả ba đều cố
         // định theo thuật toán nên người dùng chỉ đọc được, không quyết được.
         $palette = $this->paletteOverride($data['palette'] ?? null) ?? $this->paletteFor($prompt, $selected);
-        $categoryMix = $this->applySkuTotal($this->categoryMix($prompt, $brand), $data['sku_total'] ?? null);
+        // Người dùng tự đặt CƠ CẤU thì bảng của họ thắng cả tổng lẫn cách chia theo tỉ lệ: họ đã nói rõ
+        // từng nhóm bao nhiêu mã, không còn gì để thuật toán chia lại.
+        $ownerMix = $this->structureOverride($this->categoryMix($prompt, $brand), $data['structure'] ?? null);
+        $categoryMix = $ownerMix ?? $this->applySkuTotal($this->categoryMix($prompt, $brand), $data['sku_total'] ?? null);
         $moodboard = $this->moodboardOverride($data['moodboard'] ?? null, $palette) ?? $this->moodboard($prompt, $selected, $palette);
         $outfits = $this->outfitMatching($palette);
         $priceBands = $this->priceBands($prompt, $brand);
@@ -263,6 +266,12 @@ class DesignAgentService
             // Ba thứ người dùng TỰ ĐẶT cũng phải nằm trong khoá đệm: đổi bảng mood mà vẫn nhận bản
             // đệm cũ là giao diện hiện bảng mood mới bên cạnh phần chữ của bảng mood cũ.
             'sku:'.(int) ($data['sku_total'] ?? 0),
+            // BẢNG CƠ CẤU người dùng tự đặt: cùng tổng 18 mã nhưng chia 8/4/4/2 khác hẳn 4/4/5/5.
+            // Thiếu ở đây thì hai bảng khác nhau dùng chung một bản đệm và người dùng nhận lại y bảng cũ.
+            'structure:'.implode('|', array_map(
+                fn (array $row) => ($row['category'] ?? '').':'.(int) ($row['count'] ?? 0),
+                $ownerMix ?? [],
+            )),
             // Cờ `refresh` ĐỔI KẾT QUẢ (nó đổi lý do trong khối `model`: rules_refresh thay vì
             // ai_disabled) nên phải nằm trong khoá đệm — thiếu nó thì lượt "cập nhật số liệu" nhận lại
             // bản đệm của lượt chạy tất định trước đó và câu sai quay lại y nguyên. Đúng kiểu lỗi mà
@@ -512,7 +521,7 @@ class DesignAgentService
 
                 // và con số "do bạn chọn" phải nhìn thấy được ngay cạnh bảng cơ cấu.
 
-                'total_skus_source' => ((int) ($data['sku_total'] ?? 0)) > 0 ? 'owner' : 'system',
+                'total_skus_source' => ($ownerMix !== null || ((int) ($data['sku_total'] ?? 0)) > 0) ? 'owner' : 'system',
                 'basis' => ($brand['shop']['row_count'] ?? 0) > 0 ? 'shop_data' : 'heuristic',
                 'rationale' => ($brand['shop']['row_count'] ?? 0) > 0
                     ? 'Số lượng SKU bám theo DỮ LIỆU BÁN HÀNG THẬT của shop ('.number_format((int) $brand['shop']['units_sold']).' cái đã bán, tồn '.number_format((int) $brand['shop']['stock_on_hand']).'), có đối chiếu xu hướng đang lên.'
@@ -600,7 +609,10 @@ class DesignAgentService
         $palette = $this->paletteOverride($data['palette'] ?? null) ?? $this->paletteFor($prompt, $selected);
         $moodboard = $this->moodboardOverride($data['moodboard'] ?? null, $palette) ?? [];
         $sizeDistribution = $this->sizeDistribution($data);
-        $categoryMix = $this->applySkuTotal($this->categoryMix($prompt, $brand), $data['sku_total'] ?? null);
+        // CÙNG đường với brief: mẫu phải rơi vào đúng nhóm hàng mà người dùng đã đặt, không phải bảng
+        // thuật toán tự chia — hai bảng khác nhau thì prompt ảnh nói một đằng, lệnh cắt một nẻo.
+        $categoryMix = $this->structureOverride($this->categoryMix($prompt, $brand), $data['structure'] ?? null)
+            ?? $this->applySkuTotal($this->categoryMix($prompt, $brand), $data['sku_total'] ?? null);
 
         $seed = $this->normalizeSample($sample, $categoryMix, $sizeDistribution);
         $base = $this->samplePromptBase($seed, $prompt, $brief, $palette, $moodboard, $brand, $selected);
@@ -3662,6 +3674,67 @@ class DesignAgentService
         return $mix;
 
     }
+
+    /**
+     * CƠ CẤU NHÓM HÀNG do NGƯỜI DÙNG đặt — danh sách gửi lên CHÍNH LÀ bảng cơ cấu.
+     *
+     * Vì sao cần, khi đã có `sku_total`: tổng số mã hàng chỉ nói QUY MÔ. Chia cho nhóm nào lại là quyết
+     * định của người bỏ vốn (xưởng mạnh gì, kho còn gì, nhóm nào đang bán chạy) — mà trước đây chỗ chia
+     * là của thuật toán: chọn 18 mã thì hệ thống chia lại theo ĐÚNG tỉ lệ cũ, muốn dồn 8 mã cho nhóm áo
+     * cũng không có cách nào nói ra.
+     *
+     * Luật, giống hệt bảng size (danh sách gửi lên THẮNG):
+     *   · hệ thống KHÔNG tự thêm nhóm người dùng đã bỏ;
+     *   · giữ `rationale` của nhóm CÙNG TÊN — phần chữ đó nói về nhóm hàng, không phải về con số;
+     *   · thứ tự do người dùng quyết (họ xếp theo mức ưu tiên của mình);
+     *   · trần 400 mã, mỗi nhóm 0..400 (nhóm 0 mã là "để tham chiếu, chưa sản xuất" — hợp lệ).
+     */
+    private function structureOverride(array $mix, $raw): ?array
+    {
+        if (! is_array($raw) || $raw === []) {
+            return null;
+        }
+
+        $known = [];
+        foreach ($mix as $row) {
+            $known[mb_strtolower(trim((string) ($row['category'] ?? '')))] = (string) ($row['rationale'] ?? '');
+        }
+
+        $rows = [];
+        $seen = [];
+        $total = 0;
+        foreach ($raw as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $name = trim((string) preg_replace('/\s+/u', ' ', (string) ($row['category'] ?? '')));
+            $name = mb_substr($name, 0, 60);
+            if ($name === '') {
+                continue;
+            }
+            $key = mb_strtolower($name);
+            if (isset($seen[$key])) {
+                continue;   // hai nhóm trùng tên thì giữ nhóm đứng trước, không cộng dồn con số
+            }
+            $seen[$key] = true;
+
+            $count = max(0, min(400, (int) ($row['count'] ?? 0)));
+            if ($total + $count > 400) {
+                $count = max(0, 400 - $total);   // trần CỨNG cho cả bảng: lệnh cắt 400+ mã là bảng không ai đọc
+            }
+            $total += $count;
+
+            $rows[] = [
+                'category' => $name,
+                'count' => $count,
+                'source' => 'owner',
+                'rationale' => $known[$key] ?? '',
+            ];
+        }
+
+        return $rows === [] ? null : array_slice($rows, 0, 12);
+    }
+
 
 
     /**

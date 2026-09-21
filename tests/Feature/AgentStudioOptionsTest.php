@@ -278,6 +278,185 @@ class AgentStudioOptionsTest extends TestCase
         $this->assertSame(90, array_sum(array_column($lines, 'qty')));
     }
 
+// ── (a2) BẢNG CƠ CẤU NHÓM HÀNG do người dùng tự đặt (việc 2 của bước Định hướng) ──
+    //
+    // Tổng số mã hàng chỉ nói QUY MÔ; chia cho nhóm nào cũng là quyết định của người bỏ vốn. Trước đây
+    // chỗ chia là của thuật toán (theo đúng tỉ lệ cũ) nên muốn dồn 8 mã cho nhóm áo cũng không có cách
+    // nào nói ra. Bảng này nay sửa được y như bảng size, và nó đi thẳng vào lệnh cắt.
+
+    /** Danh sách gửi lên CHÍNH LÀ bảng: giữ nguyên thứ tự người dùng đặt và từng con số. */
+    public function test_the_owner_can_set_the_category_mix_group_by_group(): void
+    {
+        $brief = $this->brief(['structure' => [
+            ['category' => 'Áo sơ mi', 'count' => 8],
+            ['category' => 'Quần tây', 'count' => 4],
+            ['category' => 'Chân váy', 'count' => 4],
+            ['category' => 'Phụ kiện', 'count' => 2],
+        ]]);
+
+        $this->assertSame(['Áo sơ mi', 'Quần tây', 'Chân váy', 'Phụ kiện'],
+            array_column($brief['structure']['categories'], 'category'));
+        $this->assertSame([8, 4, 4, 2], array_column($brief['structure']['categories'], 'count'));
+        $this->assertSame(18, $brief['structure']['total_skus']);
+        $this->assertSame('owner', $brief['structure']['total_skus_source'],
+            'Bảng do người dùng tự đặt thì nguồn phải nói là "do bạn chọn".');
+        $this->assertSame('owner', $brief['structure']['categories'][0]['source']);
+    }
+
+    /** Bảng THẮNG cả tổng: lệnh cắt đọc tổng CỦA BẢNG, không đọc con số quy mô. */
+    public function test_the_owner_mix_wins_over_the_chosen_total(): void
+    {
+        $brief = $this->brief([
+            'sku_total' => 12,
+            'structure' => [['category' => 'Áo', 'count' => 15], ['category' => 'Quần', 'count' => 6]],
+        ]);
+
+        $this->assertSame([15, 6], array_column($brief['structure']['categories'], 'count'));
+        $this->assertSame(21, $brief['structure']['total_skus']);
+    }
+
+    /** Bảng lộn xộn thì được DỌN, không làm sập lượt: tên rỗng bỏ, trùng tên gộp, khoảng trắng gọn lại. */
+    public function test_a_messy_mix_table_is_cleaned_instead_of_breaking_the_run(): void
+    {
+        $brief = $this->brief(['structure' => [
+            ['category' => '   ', 'count' => 5],
+            ['category' => 'Quần', 'count' => 4],
+            ['category' => 'quần', 'count' => 9],
+            ['category' => '  Áo   dài  ', 'count' => 2],
+        ]]);
+
+        $this->assertSame(['Quần', 'Áo dài'], array_column($brief['structure']['categories'], 'category'));
+        $this->assertSame([4, 2], array_column($brief['structure']['categories'], 'count'));
+        $this->assertSame(6, $brief['structure']['total_skus']);
+    }
+
+    /** Số âm là dữ liệu rác: chặn ngay ở cửa, KHÔNG âm thầm sửa thành 0. */
+    public function test_a_negative_sku_count_is_rejected(): void
+    {
+        $this->actingAs($this->customer())
+            ->postJson('/api/design-agent/collection', [
+                'prompt' => 'Bộ sưu tập linen pastel cho nữ công sở',
+                'region' => 'all',
+                'ai' => false,
+                'structure' => [['category' => 'Áo', 'count' => -3]],
+            ])
+            ->assertStatus(422);
+    }
+
+    /** Trần của bảng cũng là trần của tổng: cả bảng không vượt 400 mã. */
+    public function test_the_mix_table_is_capped_at_the_same_ceiling_as_the_total(): void
+    {
+        $brief = $this->brief(['structure' => [
+            ['category' => 'Áo', 'count' => 400],
+            ['category' => 'Quần', 'count' => 400],
+        ]]);
+
+        $this->assertSame(400, $brief['structure']['total_skus']);
+        $this->assertSame([400, 0], array_column($brief['structure']['categories'], 'count'));
+    }
+
+    /** Lệnh cắt đọc ĐÚNG bảng người dùng đặt: đúng nhóm, đúng số mã, và ghi rõ nguồn. */
+    public function test_the_owner_mix_reaches_the_cut_order(): void
+    {
+        $plan = $this->actingAs($this->customer())
+            ->postJson('/api/design-agent/plan', [
+                'prompt' => 'Bộ sưu tập linen pastel cho nữ công sở',
+                'region' => 'all',
+                'structure' => [['category' => 'Áo sơ mi', 'count' => 6], ['category' => 'Quần tây', 'count' => 3]],
+                'assumptions' => ['units_per_sku' => 10],
+            ])
+            ->assertOk();
+
+        $lines = collect($plan->json('plan.cut_lines'));
+        $this->assertSame(90, (int) $lines->sum('qty'), 'Lệnh cắt phải cộng ra ĐÚNG số mã của bảng × số cái mỗi mã.');
+        $this->assertSame(['Áo sơ mi', 'Quần tây'], $lines->pluck('category')->unique()->values()->all());
+        $this->assertSame('owner', $lines->first()['source'] ?? null, 'Mỗi dòng cắt phải ghi rõ nhóm này do người dùng đặt.');
+        // Nhóm do hệ thống tự nghĩ ra phải BIẾN MẤT khỏi lệnh cắt, không nằm lẫn bên cạnh.
+        $this->assertNotContains('Váy', $lines->pluck('category')->all());
+    }
+
+    /** Bảng cơ cấu nằm trong khoá bộ đệm: hai bảng khác nhau không được dùng chung bản đệm. */
+    public function test_a_different_mix_is_not_served_from_the_other_mix_cache(): void
+    {
+        $a = $this->brief(['structure' => [['category' => 'Áo', 'count' => 5], ['category' => 'Quần', 'count' => 5]]]);
+        $b = $this->brief(['structure' => [['category' => 'Áo', 'count' => 9], ['category' => 'Quần', 'count' => 1]]]);
+
+        $this->assertNotSame($a['input_signature'], $b['input_signature']);
+        $this->assertSame([9, 1], array_column($b['structure']['categories'], 'count'));
+    }
+
+    /** Lượt "cập nhật số liệu" (tất định) phải GIỮ bảng cơ cấu người dùng đặt. */
+    public function test_a_refresh_keeps_the_owner_mix(): void
+    {
+        $brief = $this->brief([
+            'refresh' => 1,
+            'structure' => [['category' => 'Áo', 'count' => 7], ['category' => 'Quần', 'count' => 5]],
+        ]);
+
+        $this->assertSame([7, 5], array_column($brief['structure']['categories'], 'count'));
+        $this->assertSame(12, $brief['structure']['total_skus']);
+    }
+
+
+/**
+     * GIAO DIỆN của bảng cơ cấu: phải SỬA ĐƯỢC, và chỉ gửi lên khi người dùng THẬT SỰ đặt.
+     *
+     * Hai nửa của cùng một yêu cầu: sửa được (nếu không thì lại là bảng chỉ-đọc như trước), và không gửi
+     * bảng vừa đổ từ đề xuất của hệ thống (nếu gửi thì nhãn "Do bạn đặt" là nói dối ngay lượt đầu).
+     */
+    public function test_the_mix_table_is_editable_in_the_interface(): void
+    {
+        $core = $this->src('resources/js/studio/composables/useAgentStudio.js');
+        $step = $this->src('resources/js/studio/components/agents/AgentSkuStep.vue');
+
+        foreach (['setStructureRow', 'addStructureRow', 'removeStructureRow', 'evenStructureRows', 'normalizeStructureRows'] as $fn) {
+            $this->assertStringContainsString($fn, $step,
+                'Bảng cơ cấu ở việc 2 thiếu phép sửa '.$fn.' — thiếu là nó quay về bảng chỉ-đọc.');
+        }
+        $this->assertStringContainsString('structure: structureInput.value.length ? structureInput.value : undefined,', $core,
+            'Chỉ được gửi bảng cơ cấu khi người dùng tự đặt.');
+        $this->assertStringContainsString('if (!structureEdited.value) seedStructureRows', $core,
+            'Bảng phải tự đổ từ đề xuất của hệ thống khi người dùng CHƯA tự sửa (điểm bắt đầu để sửa tiếp).');
+        $this->assertStringContainsString('totalMismatch', $step,
+            'Tổng của bảng lệch quy mô đang chọn thì phải nói ra — lệnh cắt đọc tổng của bảng.');
+
+        // Phiên làm việc phải mang theo cả bảng lẫn cờ, kẻo mở lại trang là mất công vừa nhập.
+        foreach (['structure_rows', 'structure_edited'] as $key) {
+            $this->assertStringContainsString($key, $core, 'Phiên làm việc thiếu '.$key.'.');
+        }
+        // Đổi bảng cơ cấu cũng làm brief cũ sai — dấu vân đầu vào ở kho dữ liệu phải có nó.
+        $this->assertStringContainsString('structure: (payload.structure || [])',
+            $this->src('resources/js/studio/store/actions/agentStudio.js'));
+    }
+
+
+/**
+     * KHÔNG GHI PHIÊN TRƯỚC KHI ĐỌC XONG PHIÊN.
+     *
+     * [LỖI THẬT — đo được 2026-09-21] Trang vừa dựng đã có thứ làm bộ theo dõi ghi phiên bắn lên (bản
+     * nháp trên máy, hoặc bảng cơ cấu được đổ từ brief). Khi lượt GHI đó chạy trước lượt ĐỌC thì nó ghi
+     * đè phiên cũ bằng trạng thái rỗng: `collection` còn null nên `brief_snapshot` thành null, và người
+     * dùng mở lại trang thấy "Chưa có brief" — mất cả bộ sưu tập đang dựng, không một thông báo.
+     */
+    public function test_the_session_is_never_written_before_it_is_read(): void
+    {
+        $core = $this->src('resources/js/studio/composables/useAgentStudio.js');
+
+        $this->assertStringContainsString('if (!sessionReady) return false;', $core,
+            'Thiếu cổng chặn: lượt ghi chạy trước lượt đọc sẽ xoá trắng phiên của người dùng.');
+        $this->assertStringContainsString('sessionReady = true;', $core,
+            'Cổng chặn phải được MỞ sau khi đọc xong, nếu không thì không gì ghi được nữa.');
+        // Người CHƯA có phiên nào cũng phải ghi được phiên đầu tiên ⇒ mở cờ ở nhánh finally.
+        $this->assertMatchesRegularExpression('/\} finally \{\s*\/\/[^\n]*\n\s*sessionReady = true;\s*\}/', $core,
+            'Cờ phải mở ở finally — mở trong nhánh thành công thì người mới không lưu được gì.');
+        // Và lượt nạp phiên phải THẬT SỰ chạy, nếu không cờ không bao giờ mở.
+        $this->assertStringContainsString('agent.bootstrap();', $this->src('resources/js/studio/AgentStudioApp.vue'));
+        // Đổ bảng cơ cấu mà bảng không đổi thì không được coi là một thay đổi (nguồn của lượt ghi giả).
+        $this->assertStringContainsString(
+            'if (structureSignature(next) === structureSignature(structureRowsInput.value)) return;', $core);
+    }
+
+
     // ── (b) BẢNG SIZE ───────────────────────────────────────────────────────────────
 
     public function test_the_owner_can_set_a_full_size_chart_and_the_order_is_kept(): void
