@@ -47,7 +47,14 @@ class StudioLibraryDeleteSafetyTest extends TestCase
         file_put_contents($sentinel, 'must survive');
 
         $this->assertFileExists($sentinel);
-        $this->assertTrue(is_file(Storage::disk('public')->path('studio/ref/../../../'.basename($sentinel))),
+        // TIỀN ĐỀ: đường dẫn traversal PHẢI resolve được ra file sentinel — nếu không thì test vô nghĩa
+        // (nó sẽ pass vì thư mục thiếu, chứ không phải vì guard hoạt động).
+        //
+        // [Nâng Laravel 13.26.1 → 13.32.0, 2026-09-22] KHÔNG dùng Storage::disk()->path() để kiểm tiền đề
+        // nữa: Flysystem mới NÉM PathTraversalDetected khi đường dẫn chứa '..', nên chính phép kiểm tiền
+        // đề lại là thứ ném lỗi (stack trace chỉ đúng dòng này) trong khi GUARD CỦA ỨNG DỤNG vẫn đúng.
+        // Dùng hàm hệ thống tập tin thuần: nó chỉ resolve đường dẫn, không diễn giải an toàn hộ ta.
+        $this->assertTrue(is_file($root.'/studio/ref/../../../'.basename($sentinel)),
             'Tiền đề của test: đường dẫn traversal PHẢI resolve được ra file sentinel (nếu không thì test vô nghĩa).');
 
         try {
