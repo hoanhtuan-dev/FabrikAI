@@ -91,8 +91,72 @@ asset phải commit (máy chủ không có node).
 > 🔁 Nợ cũ của host (không do bản này): `storage/logs/` vẫn **không có `worker.log`/`scheduler.log`**
 > ⇒ hai cron ở hPanel chưa được thêm, lịch nền không chạy và render rơi về đường inline (§9.1undecies).
 
----
+## Phiên 2026-09-25 (đợt 2) — BƯỚC CON CHO MOBILE · 4 QUYỀN TUỲ CHỌN · PHIÊN LÀM VIỆC BỀN VỮNG
 
+### Mục tiêu (yêu cầu chủ dự án)
+"Thiết kế lại UX|UI theo dạng từng bước để phù hợp hơn với mobile mode. Làm cho người dùng có thể tuỳ chọn nhiều hơn: tuỳ chọn số lượng SKU · đơn giá & định mức của xưởng bạn · tuỳ chỉnh Bảng mood → hoạt động thật · tuỳ chọn đầy đủ Bảng size dự kiến → tạo prompt từng bước theo danh sách cho trước → người dùng quyết định từng mẫu prompt đã hoàn thành → lưu trạng thái phiên làm việc dai dẳng chờ người dùng hoàn thành → lưu trữ."
+
+### 1. Năm quyết định đã chốt với chủ dự án TRƯỚC khi viết mã
+| Câu hỏi | Chốt |
+|---|---|
+| Dạng bước con cho mobile | Mỗi bước chính = nhiều bước con, mobile hiện MỘT việc/màn; desktop cùng thứ tự nhưng bày rộng |
+| "Danh sách cho trước" để sinh prompt | Brief sinh danh sách SKU, NGƯỜI DÙNG sửa lại được |
+| Lưu phiên ở đâu | Dùng bảng `projects` có sẵn — một bản nháp = một phiên (0 migration) |
+| "Bảng mood hoạt động thật" | Sửa được ô và nó ĐI VÀO prompt sinh ảnh |
+| "Bảng size đầy đủ" | Chọn size + % từng size, khoá tổng 100% |
+
+### 2. Bốn quyền mới — và cái nào ĐI ĐẾN ĐÂU
+| Quyền | Đi vào đâu (không phải chỉ để nhìn) |
+|---|---|
+| **Tổng SKU** | `structure.categories[].count` chia lại theo tỉ lệ + làm tròn phần dư ⇒ lệnh cắt, giá vốn, số vải, ba mức giá đổi theo |
+| **Bảng size** | `CollectionPlanService` đọc CHÍNH bảng này để ra lệnh cắt |
+| **Bảng màu + bảng mood** | nhãn + chú thích từng ô vào `prompt_vi`/`prompt_en` (`moodPhrase`) ⇒ prompt của mọi mẫu chưa chốt đổi theo |
+| **Đơn giá & định mức** | không đổi (đã có) nhưng nay là việc RIÊNG, nhóm theo việc chủ xưởng thật sự làm |
+
+### 3. Thực thi: mỗi mã một prompt, người dùng chốt từng mẫu
+1. **Việc 1 — Danh sách mẫu**: dựng từ cơ cấu SKU × bảng size; dựng lại KHÔNG xoá prompt đã sinh.
+2. **Việc 2 — Sinh prompt từng mẫu**: mỗi lần một mẫu; prompt khác nhau theo nhóm hàng · size · và **bối cảnh chụp luân phiên (6 bối cảnh)** — nếu không thì lookbook chỉ có một kiểu ảnh.
+3. **Việc 3 — Áp dụng & lưu**: đưa prompt của từng mẫu sang Canvas · lưu phiên · chốt phiên.
+
+### 4. Phiên làm việc — hai tầng, cố ý
+| Tầng | Cứu được | Không cứu được |
+|---|---|---|
+| Bản nháp `localStorage` | F5 · máy tự tải lại · mất mạng | đổi máy, đổi trình duyệt, xoá cache |
+| **Phiên theo TÀI KHOẢN** (mới) | tất cả những cái trên | — |
+
+Phiên lưu ở `projects.settings.agent_session` (JSON), gồm cả `brief_snapshot` để mở lại **không phải chạy lại model**. Ba luật: lưu theo nhịp gộp 1,5s · mốc thời gian do MÁY CHỦ đặt và `status` không nhận từ client · **URL thắng phiên** (link `?buoc=brief` không bị phiên ghi đè).
+
+### 5. Hai lỗi thật bắt được
+1. **Bảng màu dưới 5 màu làm NỔ cả lượt tạo brief** — `outfitMatching` viết cứng `$palette[0]`…`$palette[4]`, ngầm giả định bảng màu hệ thống 6 màu. Từ khi người dùng sửa được bảng màu, bảng 2 màu ⇒ HTTP 500 "Undefined array key 2". Nay màu lấy theo vòng.
+2. **`(array) $arrayObject` không đọc được cột cast `AsArrayObject`** — phải đọc JSON gốc (`getRawOriginal`) mới đúng trên cả MySQL lẫn SQLite.
+
+### 6. Đổi CƠ CHẾ có ý thức, giữ nguyên LUẬT
+`DesignAgentControllerTest` từng khoá "gửi bảng size một phần = ghi đè một phần, còn lại lấy mặc định". Từ khi người dùng BỎ được một size, cơ chế đó sai: bỏ XL xong máy chủ tự thêm lại XL. Nay danh sách gửi lên LÀ bảng size; test đã cập nhật kèm lý do trong mã.
+
+### 7. Kiểm chứng
+**1039 test XANH** (15 test mới: `AgentStudioOptionsTest` 8 · `AgentSessionTest` 7) · `npm run build` tất định.
+
+Chrome thật ở 390px: đi hết 7 việc con, **0px tràn ngang** · chọn 24 SKU ⇒ cơ cấu chia lại · bỏ size ⇒ bảng ngắn lại + cảnh báo "Cân về 100%" + dòng "~5 cái/mã" cập nhật · sửa chú thích một ô mood ⇒ câu "sẽ vào prompt" đổi **và prompt của mẫu chứa câu đó** · dựng được 24 mẫu · sinh prompt mẫu 1 rồi chốt ⇒ tiến trình 0/24 → 1/24 và tự sang mẫu 2 · F5 ⇒ khôi phục đúng **bước 4 · việc 2/3**; API phiên có `sku_total=24` `samples=24` `done=1` `brief_snapshot`.
+
+### 8. Deploy lên production `d275d60` → `6cf5cf5` (2026-09-21 11:34 giờ máy chủ)
+
+Không migration (phiên dùng bảng `projects` sẵn có — chọn thiết kế đó CHÍNH VÌ không phải migrate production) · có 5 route mới + bundle đổi.
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Sao lưu DB | `fabrikai-db-backup-before-steps-20260921-113427.sql` · **1.874.720 bytes · 40 bảng** |
+| `git pull --ff-only` | `d275d60..6cf5cf5` · HEAD máy chủ = HEAD local |
+| Route mới | `design-agent/session` (GET+PUT) · `/session/close` · `/session/reopen` · `design-agent/sample-prompt` |
+| Asset | `agent-studio-CleJP-CC.js` **171.143 B** (trước 120.739 B) · `app-C1KFRAf-.css` 138.476 B |
+| Blade render trên máy chủ | 10.612 ký tự, `@vite` phân giải đúng cặp asset mới |
+| HTTP | `/` `/up` `/bang-gia` **200** · `/agent-studio` **302 → /dang-nhap** |
+| API bảo vệ | `GET session` **401** · `POST sample-prompt` **419** (CSRF) |
+| **Trùng khớp bản đã đo** | md5 `ce558aca…` (JS) · `2a5b3bf6…` (CSS) — giống hệt bản đã kiểm bằng Chrome thật |
+| Log | **0** ERROR/CRITICAL sau 11:30 |
+
+> ⚠️ Vẫn cần chủ dự án bấm qua trên production một lần bằng tài khoản thật.
+
+---
 ## Phiên 2026-09-24 (Tool search — vai «Tìm kiếm nguồn ngoài» của Agent Studio chạy được thật)
 
 ### Mục tiêu (yêu cầu chủ dự án)
