@@ -1979,7 +1979,16 @@ class DesignAgentService
         // yêu cầu viết JSON: nhà cung cấp không trả về byte nào trong 55 s ⇒ rơi về đường thường thêm 55 s
         // ⇒ 504, khách mất trắng. Nay việc tra là một lượt gọi RIÊNG, nhỏ (1 lượt tra, prompt ngắn), rồi
         // máy chủ chạy từ khoá đó trên nguồn của mình và đưa tin thật vào prompt — lượt viết JSON chạy nhẹ.
-        $splitSearchMode = WebAccessService::isHostedMode($search['hosted'] ?? null);
+        // CỜ NÀY PHẢI KHỚP VỚI VIỆC LƯỢT DÒ CÓ THẬT SỰ CHẠY HAY KHÔNG — xem splitHostedSearch().
+        //
+        // [LỖI THẬT ĐO ĐƯỢC TRÊN PRODUCTION 2026-09-22] Trước đây cờ = isHostedMode, nên với
+        // qwen3.8-flash (model KHÔNG tách lượt) chỉ dẫn tự MÂU THUẪN: một câu "BẮT BUỘC: hãy GỌI công
+        // cụ đó 2-4 LƯỢT trước khi viết JSON", rồi ngay sau đó một câu "lượt này bạn KHÔNG có công cụ
+        // tìm kiếm. Hệ thống ĐÃ tra internet TRƯỚC lượt này và đưa kết quả vào khối TIN MỚI TRA ĐƯỢC
+        // TỪ INTERNET" — trong khi khối đó KHÔNG hề được thêm vào prompt (vì lượt dò đã trả null).
+        // Model phân vân giữa hai mệnh lệnh trái nhau nên KHÔNG tìm gì: đo thật một lượt radar =
+        // 33,8 s · web_search_call = 0 · 0 nguồn · 0 hướng "AI tìm thấy".
+        $splitSearchMode = self::hostedSplitApplies($search['hosted'] ?? null, (array) ($search['rows'] ?? []));
 
         $instruction = 'Bạn là TrendRadar — chuyên gia phân tích xu hướng thời trang Việt Nam cho xưởng may và thương hiệu nhỏ. '
             .'Bạn CHỈ được suy luận từ đúng khối DỮ LIỆU bên dưới (danh mục xu hướng mẫu + tín hiệu nội bộ của shop). '
@@ -2566,6 +2575,31 @@ class DesignAgentService
      * @param  list<array<string,mixed>>  $candidates
      * @return array{block:string, tool_search:array<string,mixed>}|null  null = không phải chế độ này
      */
+    /**
+     * LƯỢT NÀY CÓ TÁCH LƯỢT TRA RA KHỎI LƯỢT VIẾT JSON KHÔNG — MỘT nguồn cho cả hai nơi đọc.
+     *
+     * Vì sao phải là một hàm chứ không phải hai điều kiện chép tay: cờ chỉ dẫn trong prompt
+     * (radarDirections) và cổng thật trong splitHostedSearch() BẮT BUỘC phải giống nhau. Khi chúng lệch
+     * thì model nhận chỉ dẫn trái ngược với thực tế và chọn cách an toàn nhất là KHÔNG LÀM GÌ.
+     *
+     * [LỖI THẬT ĐO ĐƯỢC TRÊN PRODUCTION 2026-09-22] Cờ chỉ dẫn từng bằng đúng isHostedMode, nên với
+     * qwen3.8-flash (model KHÔNG tách lượt) prompt vừa dặn "BẮT BUỘC: hãy GỌI công cụ đó 2-4 LƯỢT trước
+     * khi viết JSON" vừa dặn "lượt này bạn KHÔNG có công cụ tìm kiếm, kết quả đã nằm trong khối TIN MỚI
+     * TRA ĐƯỢC TỪ INTERNET" — trong khi khối đó KHÔNG hề được thêm vào. Đo thật: 33,8 s, web_search_call
+     * = 0, 0 nguồn, 0 hướng "AI tìm thấy".
+     *
+     * CHỈ model nặng (omni) mới tách lượt: đo trên cùng endpoint/máy chủ, qwen3.8-flash xong lượt tra
+     * trong 17,9 s (đường một-lời-gọi là đủ tốt), còn qwen3.8-omni-flash không trả về byte nào trong 55 s.
+     *
+     * @param  array<string,mixed>|null  $hosted  kết quả của WebAccessService::planFor()
+     * @param  list<array<string,mixed>>  $rows  candidate của vai tìm kiếm
+     */
+    private static function hostedSplitApplies(?array $hosted, array $rows): bool
+    {
+        return WebAccessService::isHostedMode($hosted)
+            && str_contains(mb_strtolower((string) ($rows[0]['model'] ?? '')), 'omni');
+    }
+
     private function splitHostedSearch(string $instruction, string $region, array $candidates, float $deadline = 0.0): ?array
     {
         // LƯỢT DÒ NẰM TRONG CÙNG HẠN CHÓT CỦA CẢ LƯỢT. [ĐO THẬT 2026-09-22] Đặt hạn chót SAU lượt dò thì
@@ -2583,11 +2617,9 @@ class DesignAgentService
             return null;
         }
 
-        // CHỈ ÁP CHO MODEL NẶNG. Đo thật trên cùng endpoint/máy chủ: qwen3.8-flash xong lượt tra trong
-        // 17,9 s (tốt, giữ nguyên đường một-lời-gọi), còn qwen3.8-omni-flash KHÔNG trả về byte nào trong
-        // 55 s ⇒ 504. Tách lượt tra là thuốc cho ca nặng; áp cho cả ca nhẹ chỉ làm thêm một vòng gọi.
-        $model = mb_strtolower((string) ($candidates[0]['model'] ?? ''));
-        if (! str_contains($model, 'omni')) {
+        // CÙNG MỘT LUẬT với cờ chỉ dẫn của đường radar (hostedSplitApplies) — hai chỗ BẮT BUỘC khớp,
+        // nếu không thì prompt dặn model một đằng mà luồng chạy một nẻo (đúng lỗi đã đo 2026-09-22).
+        if (! self::hostedSplitApplies($hosted, $candidates)) {
             return null;
         }
 
