@@ -200,6 +200,43 @@ bundle `agent-studio-DMy_ukyo.js` 172.185 B, md5 `d2954ecb…` trùng khớp loc
 > **Bài học lần này:** lần 1 tôi vá mà không biết CHÍNH XÁC kiểu hỏng (log chỉ có 800 ký tự đầu, mà JSON hỏng
 > ở giữa). Lần 2 mới có `agent-json-fail-*.txt` giữ nguyên văn — vậy là đủ bằng chứng để sửa ĐÚNG một lần.
 
+### 11. THẺ TIẾN TRÌNH GẠT ĐƯỢC + HẾT LẶP CÂU CHỮ (deploy `b2d3147` → `19b3e45`, 12:43 giờ máy chủ)
+
+| # | Người dùng báo | Nguyên nhân THẬT | Đã sửa |
+|---|---|---|---|
+| 1 | "3 ảnh đang tạo 0%" không tự tắt, không có nút tắt | Thẻ chỉ tắt khi `progress` thành null, mà `progress` đọc trạng thái các bản ghi sinh ảnh — **host không có cron queue** nên bản ghi kẹt `pending` là thẻ kẹt vĩnh viễn | Nút tắt 24×24 + **tự tắt sau 2 phút không có tiến triển**; thẻ hiện lại khi nhãn/% đổi (việc thật sự nhúc nhích) |
+| 2 | "…bộ quy tắc có sẵn. Bộ quy tắc có sẵn." | Cùng một câu xuất hiện ở **BA** chỗ: cuối câu lý do · chip thanh trên · chip trong card brief | Nhãn lý do chỉ nói NGUYÊN NHÂN; bỏ chip trùng trong card brief. **Đo lại: 1 lần** (trước: 3) |
+
+### 11.1 TẦNG GỐC — production thật sự có 3 ảnh kẹt (không phải lỗi hiển thị)
+
+```
+#58 | pending    | tạo lúc 18:54 (44 phút trước)
+#59 | processing | tạo lúc 19:03 (35 phút trước)   ← quá xa timeout 600s của job
+#60 | processing | tạo lúc 19:03 (35 phút trước)
+bảng jobs: 4 dòng, attempts=0 — không ai chạy
+```
+
+Đã chạy `php artisan studio:process` (đúng lệnh ở §5):
+
+| Việc | Kết quả |
+|---|---|
+| `--stuck-only` (KHÔNG tốn lượt gọi AI) | #59 · #60 → `failed` + **hoàn credit** (−72 → −68) |
+| `studio:process` | #58 → **completed, có ảnh** |
+| Tồn đọng sau khi chữa | **0** ảnh `pending`/`processing` ⇒ thẻ "3 ảnh đang tạo" tự biến mất |
+
+Verify trên byte phục vụ qua Internet: chunk `NotificationCenter-DPRX0edC.js` (5.622 B, md5 `3fa31a6a…` trùng local)
+có `Ẩn thẻ tiến trình` và hằng thời gian `12e4` (= 120000 ms); bundle `agent-studio-zeWaD15t.js` không còn đoạn lặp.
+HTTP `/` `/up` **200** · `/agent-studio` **302** · **1046 test XANH**.
+
+> 🔁 **ĐÂY LÀ LẦN THỨ BA** cùng một nợ host gây ra triệu chứng người dùng: **không có cron queue** (đã ghi ở
+> §9.1undecies). Chữa tay bằng `studio:process` chỉ dọn được tồn đọng — nó sẽ còn tái diễn cho tới khi thêm hai cron
+> trong hPanel. Việc cần làm (một lần, phía chủ dự án):
+>
+> ```
+> cd /home/u310846799/domains/fabrikai.shop && /usr/bin/php artisan queue:work --stop-when-empty --max-time=55 --tries=1 --timeout=900 >> storage/logs/worker.log 2>&1
+> cd /home/u310846799/domains/fabrikai.shop && /usr/bin/php artisan schedule:run >> storage/logs/scheduler.log 2>&1
+> ```
+
 ---
 ## Phiên 2026-09-24 (Tool search — vai «Tìm kiếm nguồn ngoài» của Agent Studio chạy được thật)
 
