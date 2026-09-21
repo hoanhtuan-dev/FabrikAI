@@ -2687,3 +2687,57 @@ Trích định hướng thật lấy từ production sau khi sửa:
 
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
 
+
+
+---
+
+## Deploy 2026-09-25 — Áp dụng triệt để chuẩn theme (bảng màu sinh từ daisyUI)
+
+**Commit**: `0b175ad → bdd70b8` (`Ap dung triet de chuan theme daisyUI: 0 mau ngoai he token`)
+· push → SSH `git pull --ff-only` → `migrate` = *Nothing to migrate* (bảng `themes` đã chạy từ deploy trước)
+→ `config:cache` · `route:cache` · `view:cache` (bootstrap/cache làm mới lúc 00:26 UTC).
+
+### Đã sửa
+
+Đo TRƯỚC: **282 chỗ** dùng bảng màu thô của Tailwind (`bg-red-600` · `bg-emerald-500/15` ·
+`border-amber-500/40` · `bg-sky-500/15` …) + **198 chỗ** trắng/đen cứng (`text-white` ×143 ·
+`bg-black/70` làm lớp phủ ảnh ×15 · `ring-white/*`). Sau: **0** ở mọi tệp giao diện.
+
+Bốn lỗi THẬT tìm được khi rà:
+
+| Lỗi | Đo được | Cách sửa |
+|---|---|---|
+| `text-white` trên nền tint sáng (chip đang chọn · checkbox · toast) | **1,3:1** — mất chữ ở chế độ Sáng | dùng cặp `-content`: `bg-ok text-ok-content` (ThemeRamp sinh + kiểm AA cả hai chế độ) |
+| `bg-ink-800 text-white` (nút/nhãn trên bề mặt theme) | chữ trắng trên nền trắng ở chế độ Sáng | `text-cream-100` (đảo theo theme) |
+| ConceptCard còn **2 khối màu riêng của card** (tím · hồng) | trái §5.2 (đã gỡ ở 3 card khác) | bề mặt chung `border-ink-700` + `bg-ink-800`, slider `accent-brand-500` |
+| Màu lớp mặt nạ viết ở **3 tệp** + 17 mã màu SVG trên canvas | ba chuỗi `rgba(220,38,38,.6)` giống nhau | token CỐ ĐỊNH `--color-mask-*` · `--color-select*`; canvas 2D đọc qua `overlayTokens.js` |
+
+Thêm: 12 chỗ màu mặc định của **DỮ LIỆU** (dự án · trạng thái ảnh · ô mood · loại trợ lý) về một tệp
+`resources/js/studio/dataColors.js`; nút "gói đang dùng" bỏ 3 mã hex tối cứng trong `:style`;
+trang lỗi tối giản đọc `var(--color-canvas-*, #fallback)`.
+
+### Khoá bằng test (không thể tái phát)
+
+- `DesignSystemTest::test_no_component_paints_with_colours_outside_the_theme` — 4 luật quét toàn bộ
+  Vue + Blade: không bảng màu thô · không trắng/đen cứng · không mã màu trong `class/style/@apply` ·
+  bộ màu lớp phủ phải là token. Chỉ còn **2 ngoại lệ có ghi lý do**: `border-white/*` (tay cầm vẽ
+  trên ảnh) và `shadow-black/NN` (bóng đổ là độ sâu, không phải màu).
+- `ThemeImportTest::test_every_role_colour_pair_is_readable_in_both_schemes` — mọi cặp
+  (màu vai trò + màu chữ của nó) ≥ 4,5:1 ở cả hai chế độ.
+
+**1011 test XANH** · `npm run build` XANH · `theme:sync --check` OK (app.css khớp theme gốc).
+
+### Kiểm chứng trên production sau deploy
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `/` | **200** |
+| `/he-thong-thiet-ke` (ẩn danh) | 302 → đăng nhập (route sống) |
+| Asset mới | `app-Bd49hI7B.css` · `main-CEim8EhE.js` · `dataColors-DfTfVSdy.js` đều **200** |
+| Token mới có trong CSS bán cho khách | `--color-mask-veil` · `--color-select` · `--color-ok-content` · `.ovl-path` · `.checkerboard` · `border-select` · `text-ok-content` — **có** |
+| Màu CŨ còn sót trong CSS | `#2d6f4d` (xanh thương hiệu cũ) · `bg-red-600` · `bg-emerald-500` — **0** |
+| `<meta name="theme-color">` | `#15191e` (nền trang của theme đang bật, do PHP render) |
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
+> Lần này bắt buộc: hash CSS/JS đã đổi, và bảng màu đổi ở gần như mọi thành phần.
+
