@@ -122,7 +122,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
             <p class="mt-1 line-clamp-2 text-label leading-relaxed text-cream-400">{{ item.image_prompt_en || '—' }}</p>
             <div class="mt-1.5 flex items-center justify-between text-tiny">
               <span class="text-cream-400">{{ item.created_at }}</span>
-              <span v-if="item.apply_count" class="rounded-full bg-emerald-800/40 px-1.5 py-0.5 text-ok">Đã dùng {{ item.apply_count }}x</span>
+              <span v-if="item.apply_count" class="rounded-full bg-ok/25 px-1.5 py-0.5 text-ok">Đã dùng {{ item.apply_count }}x</span>
             </div>
           </div>
         </div>
@@ -151,12 +151,12 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
           <template v-if="!confirmDelete">
             <button
               @click="askBulkDelete"
-              class="rounded-lg border border-red-500/40 bg-red-900/30 px-3 py-1.5 text-body font-semibold text-danger transition hover:bg-red-900/60"
+              class="rounded-lg border border-danger/40 bg-danger/30 px-3 py-1.5 text-body font-semibold text-danger transition hover:bg-danger/60"
             >Xóa {{ selectedCount }} prompt</button>
           </template>
           <template v-else>
             <span class="text-label text-danger">Xác nhận xóa?</span>
-            <button @click="runConfirm" class="rounded-lg bg-red-600 px-2.5 py-1.5 text-body font-semibold text-white transition hover:bg-red-500">Xóa</button>
+            <button @click="runConfirm" class="rounded-lg bg-danger px-2.5 py-1.5 text-body font-semibold text-danger-content transition hover:bg-danger">Xóa</button>
             <button @click="cancelConfirm" class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-body text-cream-300 transition hover:bg-ink-700">Hủy</button>
           </template>
         </div>
@@ -164,12 +164,12 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
     </div>
 
     <!-- Detail modal -->
-    <div v-if="showDetail" role="dialog" aria-modal="true" aria-label="Chi tiết prompt" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="closeDetail">
+    <div v-if="showDetail" role="dialog" aria-modal="true" aria-label="Chi tiết prompt" class="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/70 p-4" @click.self="closeDetail">
       <div class="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-lg border border-brand-500/40 bg-ink-900 shadow-2xl" @click.stop>
         <template v-for="item in store.suggestLibItems.filter(x => x.id === showDetail)" :key="item.id">
           <div class="flex items-center justify-between border-b border-ink-700 px-4 py-3">
             <h3 class="text-sm font-semibold text-brand-300">Chi tiết Prompt</h3>
-            <button @click="closeDetail" class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
+            <button @click="closeDetail" class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-danger" title="Đóng"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
           </div>
           <div class="space-y-3 p-4 text-xs">
             <!-- Ảnh nguồn -->
@@ -221,7 +221,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
 
             <!-- Keywords -->
             <div v-if="(item.keywords || []).length" class="flex flex-wrap gap-1">
-              <span v-for="k in item.keywords" :key="k" class="rounded-full bg-emerald-800/40 px-2 py-0.5 text-label text-ok">#{{ k }}</span>
+              <span v-for="k in item.keywords" :key="k" class="rounded-full bg-ok/25 px-2 py-0.5 text-label text-ok">#{{ k }}</span>
             </div>
 
             <!-- Stats -->

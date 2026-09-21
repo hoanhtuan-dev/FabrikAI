@@ -12,12 +12,12 @@ const looks = [['studio','Studio'],['warm','Ấm'],['cool','Lạnh'],['cinematic
 const I = 'h-3.5 w-3.5';
 const primary = 'bg-invert text-invert-content hover:bg-invert-hover';
 // Nút "Hoàn thành" (chỉnh sửa vùng) — màu KHÁC hẳn (xanh lục) để phân biệt với nút "Xong" thoát (kem).
-const confirm = 'bg-emerald-600 text-white hover:bg-emerald-500';
+const confirm = 'bg-ok text-ok-content hover:bg-ok';
 const btn = 'bg-ink-800 text-cream-200 hover:bg-ink-700';
 // Nút ĐANG ĐƯỢC CHỌN (toggle/mode): nền sáng + vòng brand + bóng → rõ là đang active.
 const on = '!bg-invert !text-invert-content ring-2 ring-brand-300 shadow';
 const iconBtn = 'grid h-6 w-6 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700';
-const iconBtnDanger = 'grid h-6 w-6 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-red-600 hover:text-white';
+const iconBtnDanger = 'grid h-6 w-6 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-danger hover:text-cream-50';
 const lbl = 'flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors';
 const chip = 'rounded-full border px-2 py-0.5 text-body font-medium transition-colors';
 const chipOn = 'border-brand-500 bg-invert font-semibold text-invert-content';
@@ -76,7 +76,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
       <button @click="store.floatSelectedRegion()" :class="[lbl, btn]" title="Nâng (cắt) vùng chọn thành layer mới"><StudioIcon name="scissors" :size="I"/>Nâng</button>
       <button @click="store.duplicateSelectedRegion()" :class="[lbl, btn]" title="Nhân đôi vùng chọn"><StudioIcon name="copy" :size="I"/>Nhân đôi</button>
       <button @click="store.deleteSelectedRegion()" :class="[lbl, btn]" title="Xóa nội dung trong vùng chọn"><StudioIcon name="trash" :size="I"/>Xóa</button>
-      <label class="relative inline-flex h-7 w-7 cursor-pointer overflow-hidden rounded-full ring-1 ring-white/20" title="Chọn màu tô"><span class="absolute inset-0" :style="{ background: store.inpaintFillColor }"></span><input type="color" :value="store.inpaintFillColor" @input="store.inpaintFillColor = $event.target.value" class="absolute inset-0 cursor-pointer opacity-0"></label>
+      <label class="relative inline-flex h-7 w-7 cursor-pointer overflow-hidden rounded-full ring-1 ring-ink-600" title="Chọn màu tô"><span class="absolute inset-0" :style="{ background: store.inpaintFillColor }"></span><input type="color" :value="store.inpaintFillColor" @input="store.inpaintFillColor = $event.target.value" class="absolute inset-0 cursor-pointer opacity-0"></label>
       <button @click="store.fillSelectedRegion()" :class="[lbl, btn]" title="Tô màu vào vùng chọn"><StudioIcon name="paintBucket" :size="I"/>Tô</button>
     </template>
     <button @click="store.clearInpaintMask()" :class="iconBtnDanger" title="Bỏ mask hiện tại" aria-label="Bỏ mask hiện tại"><StudioIcon name="x" :size="I"/></button>
@@ -109,7 +109,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
     <label class="flex items-center gap-1.5 rounded-lg bg-ink-800 px-1.5 py-1"><StudioIcon name="betweenDots" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-tiny text-cream-400">Khoảng</span><input type="range" min="0.05" max="1" step="0.05" :value="store.drawSpacing" @input="store.drawSpacing = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-7 shrink-0 text-right text-micro tabular-nums text-cream-100">{{ Math.round(store.drawSpacing * 100) }}%</span></label>
     <label class="flex items-center gap-1.5 rounded-lg bg-ink-800 px-1.5 py-1"><StudioIcon name="waves" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-tiny text-cream-400">Mượt</span><input type="range" min="0" max="100" step="1" :value="store.drawSmoothing" @input="store.drawSmoothing = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-5 shrink-0 text-right text-micro tabular-nums text-cream-100">{{ store.drawSmoothing }}</span></label>
     <label class="flex items-center gap-1.5 rounded-lg bg-ink-800 px-1.5 py-1"><StudioIcon name="blend" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-tiny text-cream-400">Chế độ</span><select :value="store.drawBlend" @change="store.drawBlend = $event.target.value" class="h-7 rounded-lg border border-ink-700 bg-ink-800 px-1 text-label text-cream-100 focus:outline-none"><option value="normal">Thường</option><option value="multiply">Nhân</option><option value="screen">Màn hình</option><option value="overlay">Phủ</option><option value="darken">Tối</option><option value="lighten">Sáng</option></select></label>
-    <label class="relative inline-flex h-7 w-7 shrink-0 cursor-pointer overflow-hidden rounded-full ring-1 ring-white/20" title="Chọn màu vẽ"><span class="absolute inset-0" :style="{ background: store.inpaintFillColor }"></span><input type="color" :value="store.inpaintFillColor" @input="store.inpaintFillColor = $event.target.value" class="absolute inset-0 cursor-pointer opacity-0"></label>
+    <label class="relative inline-flex h-7 w-7 shrink-0 cursor-pointer overflow-hidden rounded-full ring-1 ring-ink-600" title="Chọn màu vẽ"><span class="absolute inset-0" :style="{ background: store.inpaintFillColor }"></span><input type="color" :value="store.inpaintFillColor" @input="store.inpaintFillColor = $event.target.value" class="absolute inset-0 cursor-pointer opacity-0"></label>
     <button @click="store.applyDrawNow()" :class="[lbl, btn]" title="Áp dụng nét vẽ và vẽ tiếp"><StudioIcon name="brush" :size="I"/>Vẽ</button>
     <button @click="store.finishDraw()" :class="[lbl, primary]"><StudioIcon name="check" :size="I"/>Xong</button>
     <button @click="store.cancelDraw()" :class="iconBtn" title="Hủy" aria-label="Hủy"><StudioIcon name="x" :size="I"/></button>
@@ -152,10 +152,10 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
       <span :class="sep"></span>
       <button @click="store.distributeSelection('x')" :class="iconBtn" :disabled="store.selectionUnitCount < 3" title="Chia đều theo chiều ngang"><StudioIcon name="distributeHorizontal" :size="I"/></button>
       <button @click="store.distributeSelection('y')" :class="iconBtn" :disabled="store.selectionUnitCount < 3" title="Chia đều theo chiều dọc"><StudioIcon name="distributeVertical" :size="I"/></button>
-      <button @click="store.groupSelection()" :class="[lbl, '!bg-brand-600/20 !text-brand-200 hover:!bg-brand-600 hover:!text-white']" title="Tạo nhóm từ các layer đang chọn"><StudioIcon name="group" :size="I"/>Nhóm</button>
+      <button @click="store.groupSelection()" :class="[lbl, '!bg-brand-600/20 !text-brand-200 hover:!bg-brand-600 hover:!text-primary-content']" title="Tạo nhóm từ các layer đang chọn"><StudioIcon name="group" :size="I"/>Nhóm</button>
     </template>
     <!-- Nút Tách nhóm: luôn hiện nếu ít nhất 1 layer thuộc group (kể cả chọn 1 layer trong group) -->
-    <button v-if="store.selection.some(l => l.groupId)" @click="store.ungroupSelection()" :class="[lbl, 'text-warn hover:bg-amber-600/25 hover:text-warn']" title="Tách nhóm — trả các layer về độc lập"><StudioIcon name="unlink" :size="I"/>Tách</button>
+    <button v-if="store.selection.some(l => l.groupId)" @click="store.ungroupSelection()" :class="[lbl, 'text-warn hover:bg-warn/25 hover:text-warn']" title="Tách nhóm — trả các layer về độc lập"><StudioIcon name="unlink" :size="I"/>Tách</button>
     <span :class="sep"></span>
     <button @click="store.duplicateActiveUnit()" :class="iconBtn" title="Nhân đôi (Ctrl+D)"><StudioIcon name="copy" :size="I"/></button>
     <button @click="store.deleteSelection()" :class="iconBtnDanger" title="Xóa layer đang chọn (Delete)"><StudioIcon name="trash" :size="I"/></button>
@@ -184,9 +184,9 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
       <span :class="sep"></span>
       <button @click="store.distributeSelection('x')" :class="iconBtn" :disabled="store.selectionUnitCount < 3" title="Chia đều theo chiều ngang"><StudioIcon name="distributeHorizontal" :size="I"/></button>
       <button @click="store.distributeSelection('y')" :class="iconBtn" :disabled="store.selectionUnitCount < 3" title="Chia đều theo chiều dọc"><StudioIcon name="distributeVertical" :size="I"/></button>
-      <button @click="store.groupSelection()" :class="[lbl, '!bg-brand-600/20 !text-brand-200 hover:!bg-brand-600 hover:!text-white']" title="Tạo nhóm"><StudioIcon name="group" :size="I"/>Nhóm</button>
+      <button @click="store.groupSelection()" :class="[lbl, '!bg-brand-600/20 !text-brand-200 hover:!bg-brand-600 hover:!text-primary-content']" title="Tạo nhóm"><StudioIcon name="group" :size="I"/>Nhóm</button>
     </template>
-    <button v-if="store.selection.some(l => l.groupId)" @click="store.ungroupSelection()" :class="[lbl, 'text-warn hover:bg-amber-600/25 hover:text-warn']" title="Tách nhóm"><StudioIcon name="unlink" :size="I"/>Tách</button>
+    <button v-if="store.selection.some(l => l.groupId)" @click="store.ungroupSelection()" :class="[lbl, 'text-warn hover:bg-warn/25 hover:text-warn']" title="Tách nhóm"><StudioIcon name="unlink" :size="I"/>Tách</button>
     <template v-if="store.selectionUnitCount">
       <button @click="store.duplicateActiveUnit()" :class="iconBtn" title="Nhân đôi (Ctrl+D)"><StudioIcon name="copy" :size="I"/></button>
       <button @click="store.deleteSelection()" :class="iconBtnDanger" title="Xóa (Delete)"><StudioIcon name="trash" :size="I"/></button>

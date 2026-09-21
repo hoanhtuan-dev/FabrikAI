@@ -74,7 +74,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
       <button @click="store.toggleInpaintMask('path')"
               class="group flex w-full items-center justify-center gap-2.5 rounded-lg border px-4 py-3 text-sm font-semibold motion-ui motion-ui--size duration-base"
               :class="store.inpaintMaskMode === 'path'
-                ? 'border-brand-500 bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-lg shadow-brand-900/30'
+                ? 'border-brand-500 bg-gradient-to-r from-brand-600 to-brand-500 text-primary-content shadow-lg shadow-brand-900/30'
                 : 'border-ink-600 bg-brand-600/10 text-brand-200 hover:border-brand-400 hover:bg-brand-600/20 hover:shadow-md hover:shadow-brand-900/20 active:scale-[.98]'">
         <span class="grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors"
               :class="store.inpaintMaskMode === 'path' ? 'bg-cream-50/20' : 'bg-brand-600/25 group-hover:bg-brand-600/35'">
@@ -91,14 +91,14 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
         <button @click="store.inpaintPathRedo()" class="flex items-center gap-1 rounded-full border border-ink-600 px-2.5 py-1 text-label font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-ink-800" title="Làm lại (Ctrl+Y)"><StudioIcon name="redo" size="h-3 w-3" /> Làm lại</button>
       </div>
       <div v-if="maskActive || store.inpaintMaskDone" class="flex justify-center">
-        <button @click="store.clearInpaintMask()" class="rounded-full bg-red-600/25 px-3 py-1 text-label font-semibold text-danger transition-colors hover:bg-red-600 hover:text-white">Bỏ mask</button>
+        <button @click="store.clearInpaintMask()" class="rounded-full bg-danger/25 px-3 py-1 text-label font-semibold text-danger transition-colors hover:bg-danger hover:text-cream-50">Bỏ mask</button>
       </div>
     </div>
     <div v-if="maskActive" class="mt-1.5 rounded-md border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-label text-brand-200">Vẽ đường cong quanh vùng cần sửa — quay lại điểm đầu để đóng kín, vùng chọn tự thành mask.</div>
     <!-- Trạng thái mask đã lưu: lưới mini preview -->
     <div v-else-if="store.inpaintMaskDone" class="mt-1.5 rounded-md border border-ok/40 bg-ok/10 px-2.5 py-2 text-label text-ok">
       <div class="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-        <div class="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-md border border-ink-600 bg-[repeating-conic-gradient(#d8d2c4_0_25%,#fff_0_50%)] bg-[length:16px_16px]">
+        <div class="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-md border border-ink-600 checkerboard">
           <img v-if="store.inpaintBrushData" :src="'data:image/png;base64,' + store.inpaintBrushData" class="h-full w-full object-contain" alt="Mask" />
           <span v-else class="text-tiny text-cream-400">Xóa hộp chọn</span>
         </div>
@@ -157,7 +157,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     <!-- Tiến độ -->
     <div v-if="running" class="mt-3 rounded-lg border border-brand-500/30 bg-brand-900/30 p-3">
       <LoadingSpinner :text="store.inpaintStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang chỉnh sửa ảnh…'" :subtext="fmt(elapsedSec) + ' · Nhiệm vụ #' + store.inpaintGenId + (activeGen?.model ? ' · Model: ' + activeGen.model : '')" />
-      <div class="mt-2 flex justify-end"><button @click="store.cancelInpaint()" class="rounded-full bg-red-600/25 px-2.5 py-1 text-label font-semibold text-danger hover:bg-red-600">Hủy</button></div>
+      <div class="mt-2 flex justify-end"><button @click="store.cancelInpaint()" class="rounded-full bg-danger/25 px-2.5 py-1 text-label font-semibold text-danger hover:bg-danger">Hủy</button></div>
     </div>
 
     <!-- Thành công -->
@@ -168,7 +168,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     </div>
 
     <!-- Lỗi -->
-    <div v-if="store.inpaintStage === 'error' && store.inpaintError" class="mt-3 rounded-lg border border-red-500/40 bg-red-900/25 p-3 text-xs text-danger">
+    <div v-if="store.inpaintStage === 'error' && store.inpaintError" class="mt-3 rounded-lg border border-danger/40 bg-danger/25 p-3 text-xs text-danger">
       <p class="font-semibold">Sửa ảnh thất bại</p>
       <p class="mt-1 whitespace-pre-line leading-relaxed">{{ store.inpaintError }}</p>
       <div class="mt-2 flex gap-2">

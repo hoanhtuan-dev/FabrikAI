@@ -85,9 +85,9 @@ const workflowProgress = computed(() => SHOT_STATES.map(state => ({
 })));
 
 function stateTone(state) {
-  if (state === 'approved') return 'bg-emerald-500/80 text-on-accent';
-  if (state === 'rejected') return 'bg-red-500/80 text-on-accent';
-  if (state === 'campaign_ready') return 'bg-amber-500/85 text-on-accent';
+  if (state === 'approved') return 'bg-ok text-ok-content';
+  if (state === 'rejected') return 'bg-danger text-danger-content';
+  if (state === 'campaign_ready') return 'bg-warn text-warn-content';
   return 'bg-ink-800/85 text-cream-100';
 }
 function statusClass(p) { return statusToneClass(p && p.status); }
@@ -98,9 +98,9 @@ function deadlineClass(iso) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const target = new Date(d.getTime()); target.setHours(0, 0, 0, 0);
   const days = Math.ceil((target.getTime() - today.getTime()) / 86400000);
-  if (days < 0) return 'bg-red-500/15 text-danger';
-  if (days <= 3) return 'bg-amber-500/15 text-warn';
-  return 'bg-emerald-500/15 text-ok';
+  if (days < 0) return 'bg-danger/15 text-danger';
+  if (days <= 3) return 'bg-warn/15 text-warn';
+  return 'bg-ok/15 text-ok';
 }
 function deadlineLabel(iso) {
   if (!iso) return '';
@@ -316,9 +316,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           </button>
         </div>
         <div class="mt-1.5 flex flex-wrap gap-1 text-label">
-          <span class="rounded-full bg-emerald-500/12 px-2 py-0.5 font-semibold text-ok">{{ stats.images.completed }} xong</span>
-          <span v-if="stats.images.running" class="rounded-full bg-sky-500/12 px-2 py-0.5 font-semibold text-info">{{ stats.images.running }} chạy</span>
-          <span v-if="stats.images.failed" class="rounded-full bg-red-500/12 px-2 py-0.5 font-semibold text-danger">{{ stats.images.failed }} lỗi</span>
+          <span class="rounded-full bg-ok/12 px-2 py-0.5 font-semibold text-ok">{{ stats.images.completed }} xong</span>
+          <span v-if="stats.images.running" class="rounded-full bg-info/12 px-2 py-0.5 font-semibold text-info">{{ stats.images.running }} chạy</span>
+          <span v-if="stats.images.failed" class="rounded-full bg-danger/12 px-2 py-0.5 font-semibold text-danger">{{ stats.images.failed }} lỗi</span>
           <span class="rounded-full bg-ink-800 px-2 py-0.5 text-cream-200">{{ stats.credits.used }} credit</span>
           <span v-if="stats.deadline" class="rounded-full px-2 py-0.5 font-semibold" :class="deadlineClass(stats.deadline.days_left)">
             {{ stats.deadline.days_left < 0 ? 'Quá hạn ' + Math.abs(stats.deadline.days_left) : (stats.deadline.days_left === 0 ? 'Hạn hôm nay' : 'Còn ' + stats.deadline.days_left) }}
@@ -331,7 +331,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 
       <!-- Hành động chuyên sâu -->
       <div class="mt-2.5 flex flex-wrap gap-1.5">
-        <button class="tool-btn btn-sm flex-1" :class="awaiting.length ? '!border-amber-500/40 !bg-amber-500/8 !text-warn' : ''" @click="openReview()">
+        <button class="tool-btn btn-sm flex-1" :class="awaiting.length ? '!border-warn/40 !bg-warn/8 !text-warn' : ''" @click="openReview()">
           <StudioIcon name="checkSquare" size="h-3.5 w-3.5" /> Duyệt<span v-if="awaiting.length"> · {{ awaiting.length }}</span>
         </button>
         <button class="tool-btn btn-sm" @click="openShare()">
@@ -384,7 +384,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
               <span class="block truncate text-label text-cream-300">{{ s.shot_label }}</span>
             </span>
             <span class="rounded-full px-1.5 py-0.5 text-tiny font-bold" :class="stateTone(s.shot_state)">{{ s.shot_label }}</span>
-            <span v-if="shotsSel.includes(s.id)" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500 text-on-accent">
+            <span v-if="shotsSel.includes(s.id)" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600 text-primary-content">
               <StudioIcon name="check" size="h-3 w-3" />
             </span>
           </button>
@@ -396,7 +396,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <button class="btn-brand btn-sm flex-1" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('approved')">
             <StudioIcon name="check" size="h-3.5 w-3.5" /> Duyệt {{ selectedCount }}
           </button>
-          <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('rejected')">
+          <button class="tool-btn btn-sm !text-danger hover:!bg-danger/15" :disabled="reviewBusy || !selectedCount" @click="reviewBatch('rejected')">
             <StudioIcon name="ban" size="h-3.5 w-3.5" /> Loại {{ selectedCount }}
           </button>
         <p v-if="!reviewBusy && !selectedCount" class="mt-1.5 text-label leading-4 text-warn">↳ Chưa chọn ảnh nào — bấm vào ảnh trong danh sách trên để chọn trước khi duyệt.</p>
@@ -408,7 +408,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
         <!-- Lỗi TỪNG ẢNH của lượt duyệt. Trước đây state reviewErrors được gán mà KHÔNG nơi nào render
              (đúng loại lỗi "state chết"): bấm Duyệt 5 ảnh, 2 ảnh hỏng, người dùng không thấy vì sao.
              Nêu cả BƯỚC đang ở (store.shotLabel) để biết ảnh kẹt ở đâu. -->
-        <ul v-if="reviewErrors.length" class="mt-2 space-y-1 rounded-lg border border-red-500/40 bg-danger/10 p-2 text-label text-danger">
+        <ul v-if="reviewErrors.length" class="mt-2 space-y-1 rounded-lg border border-danger/40 bg-danger/10 p-2 text-label text-danger">
           <li v-for="err in reviewErrors" :key="err.id">Ảnh #{{ err.id }} ({{ store.shotLabel(err.shot_state) }}): {{ err.error }}</li>
         </ul>
       </template>
@@ -426,7 +426,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <input :value="shareInfo.share.url" readonly class="input !py-1.5 text-label" @focus="$event.target.select()">
           <div class="flex gap-1.5">
             <button class="btn-brand btn-sm flex-1" @click="copyShare()"><StudioIcon name="copy" size="h-3.5 w-3.5" /> Copy</button>
-            <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="shareBusy" @click="revokeShare()"><StudioIcon name="ban" size="h-3.5 w-3.5" /> Thu hồi</button>
+            <button class="tool-btn btn-sm !text-danger hover:!bg-danger/15" :disabled="shareBusy" @click="revokeShare()"><StudioIcon name="ban" size="h-3.5 w-3.5" /> Thu hồi</button>
           </div>
         </div>
         <div v-else class="space-y-2">
@@ -445,7 +445,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <ul class="mt-1 space-y-1">
             <li v-for="fb in shareInfo.feedback.slice(0, 2)" :key="fb.id" class="text-label">
               <span class="font-semibold text-cream-100">{{ fb.author_name }}</span>
-              <span class="ml-1 rounded-full px-1 py-0.5 text-micro font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'">{{ fb.decision_label }}</span>
+              <span class="ml-1 rounded-full px-1 py-0.5 text-micro font-semibold" :class="fb.decision === 'approved' ? 'bg-ok/15 text-ok' : 'bg-warn/15 text-warn'">{{ fb.decision_label }}</span>
               <span v-if="fb.message" class="ml-1 text-cream-300">{{ fb.message }}</span>
             </li>
           </ul>
@@ -505,7 +505,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
       <ul class="space-y-1.5">
         <li v-for="p in recent" :key="p.id" class="flex items-center justify-between gap-2">
           <button class="min-w-0 flex-1 text-left" @click="pick(p)" :title="'Áp dụng «' + p.name + '»'">
-            <span class="motion-ui block truncate text-xs font-medium text-cream-100 hover:text-white">{{ p.name }}</span>
+            <span class="motion-ui block truncate text-xs font-medium text-cream-100 hover:text-cream-50">{{ p.name }}</span>
             <span class="text-label text-cream-400">{{ p.generations_count || 0 }} ảnh · {{ p.status_label || p.status }}</span>
           </button>
           <button class="icon-btn !h-6 !w-6 shrink-0" title="Mở trong Studio" @click="goToStudio(p)">

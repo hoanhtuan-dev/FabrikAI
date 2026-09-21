@@ -145,7 +145,7 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
       <div class="flex overflow-hidden rounded-lg border border-ink-600">
         <button v-for="s in [{ id: 'all', label: 'Tất cả' }, { id: 'mine', label: 'Của tôi' }, { id: 'shared', label: 'Dùng chung' }]"
                 :key="s.id" @click="scope = s.id"
-                :class="scope === s.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+                :class="scope === s.id ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
                 class="px-2.5 py-1.5 text-body font-medium transition">{{ s.label }}</button>
       </div>
       <button @click="addOpen = true" class="btn-brand btn-sm whitespace-nowrap">
@@ -166,7 +166,7 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
     <!-- Thân -->
     <SettingsSkeleton v-if="loading" :rows="3" />
 
-    <div v-else-if="error" class="card border-red-500/40 p-5">
+    <div v-else-if="error" class="card border-danger/40 p-5">
       <p class="flex items-center gap-2 text-sm text-danger"><StudioIcon name="alertTriangle" size="h-4 w-4" /> {{ error }}</p>
       <button @click="load" class="btn-outline btn-sm mt-3">Thử lại</button>
     </div>
@@ -183,7 +183,7 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
       <p class="mb-3 text-body text-cream-400">Hiện {{ list.length }} / {{ total }} mục.</p>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div v-for="it in list" :key="it.id" class="card flex items-center gap-3 p-3">
-          <img v-if="it.thumb || it.image" :src="it.thumb || it.image" loading="lazy" alt="" class="h-14 w-14 shrink-0 rounded-lg object-cover ring-1 ring-white/15">
+          <img v-if="it.thumb || it.image" :src="it.thumb || it.image" loading="lazy" alt="" class="h-14 w-14 shrink-0 rounded-lg object-cover ring-1 ring-ink-600">
           <span v-else class="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-ink-700 text-cream-400">
             <StudioIcon :name="isModel ? 'user' : 'pose'" size="h-5 w-5" />
           </span>
@@ -196,7 +196,7 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
             <p class="truncate text-label text-cream-400">#{{ it.id }}<span v-if="it.ethnicity"> · {{ it.ethnicity }}</span><span v-else-if="it.skeleton"> · {{ it.skeleton }}</span></p>
           </div>
           <button v-if="it.mine || isAdmin" @click="pendingDelete = it"
-                  class="tool-btn shrink-0 !text-danger hover:!bg-red-600/25" :title="'Xoá ' + it.name">
+                  class="tool-btn shrink-0 !text-danger hover:!bg-danger/25" :title="'Xoá ' + it.name">
             <StudioIcon name="trash" size="h-3 w-3" />
           </button>
         </div>
@@ -204,11 +204,11 @@ const deleteMessage = computed(() => (pendingDelete.value ? 'Xoá "' + pendingDe
     </template>
 
     <!-- Thêm mới -->
-    <div v-if="addOpen" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" :aria-label="'Thêm ' + NOUN" @click.self="addOpen = false">
+    <div v-if="addOpen" class="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/70 p-4" role="dialog" aria-modal="true" :aria-label="'Thêm ' + NOUN" @click.self="addOpen = false">
       <div class="w-full max-w-lg rounded-lg border border-ink-700 bg-ink-900 p-5 shadow-2xl">
         <div class="mb-4 flex items-center justify-between">
           <h3 class="text-sm font-semibold text-cream-50">Thêm {{ NOUN }}</h3>
-          <button @click="addOpen = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 hover:bg-ink-700 hover:text-white" aria-label="Đóng">
+          <button @click="addOpen = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 hover:bg-ink-700 hover:text-cream-50" aria-label="Đóng">
             <StudioIcon name="x" size="h-4 w-4" />
           </button>
         </div>

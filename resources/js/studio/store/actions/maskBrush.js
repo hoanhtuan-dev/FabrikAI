@@ -1,6 +1,7 @@
 // TÁCH TIẾP từ selection.js (đợt tối ưu 2026-09-24) — miền: magic wand · đảo vùng · drag/brush mask inpaint.
 // Action dùng this.* trỏ cùng store instance ⇒ gọi chéo giữa các miền hoạt động y hệt bản gộp.
 import { markRaw } from 'vue';
+import { maskVeil } from '../overlayTokens.js';
 export const maskBrushActions = {
     // ── Magic Wand: click chọn vùng theo màu tương tự (flood-fill theo ngưỡng) ──
     async magicWand(e) {
@@ -90,7 +91,7 @@ export const maskBrushActions = {
         if (!c || !ctx) return;
         const w = c.width, h = c.height;
         ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = 'rgba(220,38,38,0.6)';
+        ctx.fillStyle = maskVeil();
         ctx.fillRect(b.x * w, b.y * h, b.w * w, b.h * h);
         this._finalizeInpaintBrush();
         this._inpaintMaskKind = 'brush'; // rect → mask để đảo
@@ -333,7 +334,7 @@ export const maskBrushActions = {
       // Tẩy: destination-out xoá hẳn pixel (cả nét vẽ lẫn mask) — sửa khi vẽ lỡ.
       const erase = !!this.inpaintErase;
       c.globalCompositeOperation = erase ? 'destination-out' : 'source-over';
-      c.fillStyle = erase ? 'rgba(0,0,0,1)' : 'rgba(220,38,38,0.6)'; // đỏ 60% — rõ mà không che ảnh
+      c.fillStyle = erase ? 'rgba(0,0,0,1)' : maskVeil(); // đỏ 60% — rõ mà không che ảnh
       c.beginPath(); c.arc(p.nx * w, p.ny * h, this._inpaintBrushRadius(), 0, Math.PI * 2); c.fill();
       c.globalCompositeOperation = 'source-over';
     },
@@ -342,7 +343,7 @@ export const maskBrushActions = {
       const w = this._inpaintMaskCanvas.width, h = this._inpaintMaskCanvas.height;
       const erase = !!this.inpaintErase;
       c.globalCompositeOperation = erase ? 'destination-out' : 'source-over';
-      c.strokeStyle = erase ? 'rgba(0,0,0,1)' : 'rgba(220,38,38,0.6)';
+      c.strokeStyle = erase ? 'rgba(0,0,0,1)' : maskVeil();
       c.lineWidth = this._inpaintBrushWidth(); c.lineCap = 'round'; c.lineJoin = 'round';
       c.beginPath(); c.moveTo(from.nx * w, from.ny * h); c.lineTo(to.nx * w, to.ny * h); c.stroke();
       c.globalCompositeOperation = 'source-over';

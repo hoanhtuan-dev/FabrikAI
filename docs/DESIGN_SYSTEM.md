@@ -85,6 +85,29 @@
 > phía nền **xa nhất mà vẫn còn đạt tỉ lệ mục tiêu** (8,5 : 1 · 6,0 : 1 · 4,7 : 1). Nhờ vậy thang bậc
 > dùng hết dải tương phản cho phép, thay vì bậc mờ nhất rơi xuống dưới AA khi ai đó đổi theme.
 
+> **[2026-09-25] Không còn mã màu nào ngoài hệ token.** Đo được và đã sửa: **282 chỗ** dùng bảng màu thô
+> của Tailwind (bg-red-600 · bg-emerald-500/15 · border-amber-500/40 …) và **198 chỗ** trắng/đen cứng
+> (143 text-white · 15 bg-black/70 làm lớp phủ ảnh …). Quy tắc nay là **tuyệt đối**, chỉ còn HAI ngoại lệ
+> có lý do (khoá bằng `DesignSystemTest::test_no_component_paints_with_colours_outside_the_theme`):
+>
+> | Ngoại lệ | Vì sao |
+> |---|---|
+> | `border-white/*` | Tay cầm crop/mặt nạ vẽ **TRÊN ẢNH** — môi trường ảnh, không theo theme |
+> | `shadow-black/NN` | **Bóng đổ là ĐỘ SÂU**, không phải màu: bóng đen ở cả hai chế độ; bóng theo theme thì chế độ Sáng sẽ đổ bóng trắng (vô hình trên nền trắng) |
+>
+> Bốn quy tắc con, kèm chỗ đã sửa thật:
+> · **Màu trạng thái** → token: `bg-danger/10` · `border-warn/40` · `text-ok` · `bg-info/15` (trước là red/amber/emerald/sky).
+> · **Chữ trên nền màu** → cặp của chính nó: `bg-ok text-ok-content` (thêm bí danh `--color-{danger,warn,ok}-content`),
+>   chữ trên ẢNH → `text-scrim-content`, lớp phủ ảnh → `bg-scrim/NN` (trước là `bg-black/NN`).
+> · **Màu vẽ trên ảnh** (viền đang chọn · đường bao nhóm · mặt nạ) → token CỐ ĐỊNH mới
+>   `--color-select*` · `--color-mask-*` · `--color-canvas-dim`; mã canvas đọc lại qua
+>   `resources/js/studio/store/overlayTokens.js` thay vì ba tệp mỗi tệp một chuỗi `rgba(220,38,38,.6)`.
+> · **Màu DỮ LIỆU** (màu tóc · nền studio · nhãn dự án · ô mood · loại trợ lý) là màu của dữ liệu chứ
+>   không phải của giao diện — nay nằm ở MỘT tệp hằng số `resources/js/studio/dataColors.js`.
+>
+> Riêng ConceptCard còn sót **hai khối màu riêng của card** (tím cho phom dáng · hồng cho tóc) — đúng thứ
+> §5.2 đã gỡ ở ba card khác; nay chúng dùng chung bề mặt `border-ink-700` + `bg-ink-800`.
+>
 **Bảy quy tắc:**
 
 1. **`ink-*` = BỀ MẶT, `cream-*` = NỘI DUNG.** Không dùng lẫn vai (`text-ink-700` để viết chữ
@@ -96,11 +119,16 @@
    Test **ĐỎ** nếu thấy `text-cream-*/NN` trong mã.
 3. **Màu trạng thái dùng token ngữ nghĩa**, không viết sắc độ thô: `text-danger` (không `text-red-300`),
    `text-warn`, `text-ok`, `text-info`. Sắc độ 100–400 chỉ đủ tương phản trên nền TỐI; ở
-   theme sáng chúng thành chữ vàng nhạt trên nền trắng. Test cũng **ĐỎ** nếu thấy `text-red-*/amber/emerald/sky-NN`.
-4. **Chữ/icon đặt TRÊN nền màu thì dùng token CỐ ĐỊNH**: `text-on-accent` (trên `bg-amber-500` ·
-   `bg-emerald-500/80` · `bg-brand-500` · `bg-white`), và `bg-invert text-invert-content` cho khối
-   đảo màu. Nền đó không theo theme nên chữ cũng không được theo — nếu dùng `text-ink-900` thì theme
-   sáng sẽ ra chữ sáng trên nền sáng.
+   theme sáng chúng thành chữ vàng nhạt trên nền trắng.
+   **[2026-09-25] Nay áp cho MỌI dạng, không chỉ chữ:** `bg-danger/10` · `border-warn/40` ·
+   `bg-info/15` — bảng màu thô của Tailwind (đỏ/lục/hổ phách/xanh) bị CẤM ở mọi tệp giao diện.
+4. **Chữ/icon đặt TRÊN nền màu thì đi THEO CẶP với nền đó**, không dùng màu chữ cứng:
+   `bg-ok text-ok-content` · `bg-warn text-warn-content` · `bg-brand-600 text-primary-content` ·
+   `bg-danger text-danger-content`. Chữ trên nền màu CỐ ĐỊNH (nền canvas · lớp phủ ảnh · ảnh) thì
+   dùng token cố định: `text-on-accent` · `text-scrim-content`; khối đảo màu: `bg-invert text-invert-content`.
+   **[2026-09-25] Vì sao không dùng `text-white`:** ở chế độ Sáng, token trạng thái là màu ĐẬM nên chữ
+   trắng cứng mất chữ (đo được 3,0:1 trên `bg-secondary`), còn chữ trắng trên nền tint sáng thì 1,3:1.
+   Cặp `-content` được sinh và kiểm bởi ThemeRamp nên LUÔN đạt AA ở cả hai chế độ.
 5. **Môi trường ẢNH là cố định, không theo theme.** Ba nhóm, cả ba đều dùng token CỐ ĐỊNH (khai
    MỘT lần trong `@theme`, **không** định nghĩa lại ở theme sáng):
    · nền canvas — `.canvas-bg-dark/white/cream` đọc `--color-canvas-*` (người dùng chọn "nền Kem"
@@ -352,16 +380,16 @@ npm run build                 # 4. CSS bán cho khách
 | Nút nghỉ (mặc định) | `border-ink-600` | **mọi** nút/chip/ô bấm được |
 | Hover nút thường | `hover:border-brand-400` | |
 | Hover nút rất phụ | `hover:border-ink-500` | nút "êm" trong hàng dày |
-| **Đang chọn / đang bật** | `border-brand-500` | thường đi kèm `bg-brand-600 text-white` |
-| Nguy hiểm (viền nghỉ) | `border-red-500/40` | nút xoá |
-| Nguy hiểm (hover · xác nhận) | `hover:border-red-500` · `border-red-500` | |
-| Cảnh báo | `border-amber-500/40` | |
-| Thành công | `border-emerald-500/40` | |
-| Thông tin | `border-sky-500/40` | |
+| **Đang chọn / đang bật** | `border-brand-500` | thường đi kèm `bg-brand-600 text-primary-content` |
+| Nguy hiểm (viền nghỉ) | `border-danger/40` | nút xoá |
+| Nguy hiểm (hover · xác nhận) | `hover:border-danger` · `border-danger` | |
+| Cảnh báo | `border-warn/40` | |
+| Thành công | `border-ok/40` | |
+| Thông tin | `border-info/40` | |
 | Giữ chỗ cho hover | `border-transparent` | hàng bảng đổi viền khi chọn |
 | **Khối CHỨA (không bấm được)** | `border-ink-700` | card con · `<details>` · hàng danh sách · biểu mẫu |
 | Ô nhập | `border-ink-700` → `focus:border-brand-400` | `.studio-shell .input` |
-| Bảng "tông chú ý" (badge) | `...-500/40` cho cả 4 tông | danger · warn · info · ok |
+| Bảng "tông chú ý" (badge) | `border-{danger,warn,ok,info}/40` | 4 tông, mỗi tông MỘT token (trước 2026-09-25 là red/amber/emerald/sky) |
 
 **HAI ngoại lệ DUY NHẤT, phải kèm lý do trong mã:**
 
@@ -396,7 +424,7 @@ trong test **trong cùng một commit** — đó là chủ ý, không phải tai
 |---|---|---|
 | Nút nghỉ | `bg-ink-800` | **mọi** nút/chip/ô bấm được |
 | Hover | `hover:bg-ink-700` | |
-| Đang chọn / nhấn mạnh | `bg-brand-600` (+ `text-white`) · tint `bg-brand-600/20` | |
+| Đang chọn / nhấn mạnh | `bg-brand-600` (+ `text-primary-content`) · tint `bg-brand-600/20` | chữ đi THEO CẶP với nền |
 | Ngữ nghĩa | `bg-danger/10` · `bg-warn/15` · `bg-ok/15` · `bg-info/15` | tint theo màu trạng thái |
 | **Nút đặt TRÊN ẢNH** | `bg-scrim/85` + `text-scrim-content` | môi trường ảnh ⇒ CỐ ĐỊNH (§1.1 quy tắc 5) |
 | Khối CHỨA (không bấm được) | `bg-ink-900` · `bg-ink-900/95` | panel/thanh dính — KHÔNG dùng cho nút |

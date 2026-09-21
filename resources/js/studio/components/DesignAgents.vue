@@ -998,8 +998,8 @@ provide('copyText', copyText);
             </div>
           </div>
           <div class="flex shrink-0 items-center gap-2">
-            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label font-semibold" :class="modelReady ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'" :title="modelTitle">
-              <span class="h-1.5 w-1.5 rounded-full" :class="modelReady ? 'bg-emerald-300' : 'bg-amber-300'"></span>
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label font-semibold" :class="modelReady ? 'bg-ok/15 text-ok' : 'bg-warn/15 text-warn'" :title="modelTitle">
+              <span class="h-1.5 w-1.5 rounded-full" :class="modelReady ? 'bg-ok' : 'bg-warn'"></span>
               <span class="hidden md:inline">{{ modelShort }}</span>
               <span class="md:hidden">{{ modelReady ? 'Có AI' : 'Chưa bật AI' }}</span>
             </span>
@@ -1009,7 +1009,7 @@ provide('copyText', copyText);
           </div>
         </div>
         <!-- Vì sao đang chạy tất định? Nói thẳng lý do + nơi cấu hình. -->
-        <p v-if="activeModel && !modelReady" role="status" class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-body leading-5 text-warn">
+        <p v-if="activeModel && !modelReady" role="status" class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-body leading-5 text-warn">
           <StudioIcon name="info" size="h-3.5 w-3.5" class="shrink-0" />
           <span>{{ modelTitle }}</span>
           <span v-if="!store.designAgentAi" class="text-warn">Bật «Suy luận AI» ở trên để phần phân tích do AI thực hiện.</span>
@@ -1030,7 +1030,7 @@ provide('copyText', copyText);
             >
               <span
                 class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-label font-bold transition"
-                :class="readiness[item.id] === 'done' ? 'bg-emerald-500/20 text-ok' : step === item.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-400 group-hover:text-cream-200'"
+                :class="readiness[item.id] === 'done' ? 'bg-ok/20 text-ok' : step === item.id ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-400 group-hover:text-cream-200'"
               >
                 <StudioIcon v-if="readiness[item.id] === 'done'" name="check" size="h-3.5 w-3.5" />
                 <span v-else>{{ index + 1 }}</span>

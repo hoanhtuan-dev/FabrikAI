@@ -598,7 +598,7 @@ const bodyHipsLabel = computed(() => {
         <span class="font-semibold text-brand-300">{{ Math.round(store.generateProgress) }}%</span>
       </div>
       <div class="h-2 w-full overflow-hidden rounded-full bg-ink-800">
-        <div class="h-full rounded-full bg-gradient-to-r from-brand-500 to-purple-400 motion-ui motion-ui--size duration-slow ease-emphasized" :style="{ width: store.generateProgress + '%' }"></div>
+        <div class="h-full rounded-full bg-gradient-to-r from-brand-600 to-brand-400 motion-ui motion-ui--size duration-slow ease-emphasized" :style="{ width: store.generateProgress + '%' }"></div>
       </div>
       <p v-if="store.generateStage === 'done'" class="mt-1.5 flex items-center gap-1 text-label text-ok"><StudioIcon name="check" size="h-3 w-3" /> Đã tạo {{ store.generatedCount }} ảnh</p>
       <p v-if="store.generateStage === 'failed'" class="mt-1.5 text-label text-danger">Không ảnh nào tạo thành công — bấm "Tạo lại" hoặc kiểm tra cấu hình model/API key.</p>
@@ -663,11 +663,11 @@ const bodyHipsLabel = computed(() => {
           </div>
 
           <!-- Templates popup -->
-          <div v-if="showTemplates" role="dialog" aria-modal="true" aria-label="Mẫu phom dáng" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showTemplates = false">
+          <div v-if="showTemplates" role="dialog" aria-modal="true" aria-label="Mẫu phom dáng" class="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/70 p-4" @click.self="showTemplates = false">
             <div class="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-lg border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
               <div class="mb-3 flex items-center justify-between">
                 <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="template" /> Prompt Templates</span>
-                <button @click="showTemplates = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
+                <button @click="showTemplates = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-cream-50" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
               </div>
               <!-- Chế độ chèn -->
               <div class="mb-3 flex items-center gap-1.5 text-label">
@@ -722,7 +722,7 @@ const bodyHipsLabel = computed(() => {
               <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="wand" size="h-3.5 w-3.5" /> Gieo quẻ</span></p>
               <div class="flex gap-1">
                 <input v-model="store.imageSeed" type="text" inputmode="numeric" class="input !text-xs !py-1.5 !rounded-lg flex-1" placeholder="Seed..." title="Nhập số seed để tạo ảnh nhất quán">
-                <button @click="store.imageSeed = String(Math.floor(Math.random() * 2147483647) + 1)" class="shrink-0 rounded-lg bg-brand-600 px-2 py-1 text-xs text-white hover:bg-brand-500 transition" title="Tạo seed ngẫu nhiên"><StudioIcon name="wand" size="h-3.5 w-3.5" /></button>
+                <button @click="store.imageSeed = String(Math.floor(Math.random() * 2147483647) + 1)" class="shrink-0 rounded-lg bg-brand-600 px-2 py-1 text-xs text-primary-content hover:bg-brand-500 transition" title="Tạo seed ngẫu nhiên"><StudioIcon name="wand" size="h-3.5 w-3.5" /></button>
               </div>
             </div>
           </div>
@@ -735,52 +735,52 @@ const bodyHipsLabel = computed(() => {
 
         <!-- ===== TAB: PHOM DÁNG ===== -->
         <div v-show="activeTab === 'body'" class="space-y-3">
-          <div class="rounded-lg border border-purple-500/20 bg-purple-900/10 p-3">
-            <p class="flex items-center gap-1.5 text-xs font-semibold text-purple-200"><StudioIcon name="body" size="h-3.5 w-3.5" /> Điều chỉnh phom dáng người mẫu</p>
-            <p class="mt-0.5 text-label text-purple-300/50">Để ở mức 5 (trung bình) nếu không muốn ép phom dáng cụ thể.</p>
+          <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-3">
+            <p class="flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="body" size="h-3.5 w-3.5" /> Điều chỉnh phom dáng người mẫu</p>
+            <p class="mt-0.5 text-label text-cream-400">Để ở mức 5 (trung bình) nếu không muốn ép phom dáng cụ thể.</p>
           </div>
 
           <!-- Chiều cao -->
           <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Điều chỉnh chiều cao người mẫu từ rất thấp đến siêu cao">
             <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="height" size="h-3.5 w-3.5" /> Chiều cao</span><span class="font-semibold text-brand-300">{{ bodyHeightLabel }}</span></p>
-            <input type="range" min="1" max="10" step="1" v-model.number="localBodyHeight" class="w-full cursor-pointer accent-purple-400">
+            <input type="range" min="1" max="10" step="1" v-model.number="localBodyHeight" class="w-full cursor-pointer accent-brand-500">
             <div class="mt-1 flex justify-between text-tiny text-cream-400"><span>1.5m</span><span>1.65m</span><span>1.80m+</span></div>
           </div>
 
           <!-- Độ gầy/béo -->
           <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Điều chỉnh vóc dáng từ siêu gầy đến đầy đặn/curvy">
             <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="body" size="h-3.5 w-3.5" /> Vóc dáng</span><span class="font-semibold text-brand-300">{{ bodyBuildLabel }}</span></p>
-            <input type="range" min="1" max="10" step="1" v-model.number="localBodyBuild" class="w-full cursor-pointer accent-purple-400">
+            <input type="range" min="1" max="10" step="1" v-model.number="localBodyBuild" class="w-full cursor-pointer accent-brand-500">
             <div class="mt-1 flex justify-between text-tiny text-cream-400"><span>Siêu gầy</span><span>Cân đối</span><span>Curvy</span></div>
           </div>
 
           <!-- Eo -->
           <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Điều chỉnh vòng eo từ thẳng đến đồng hồ cát thon gọn">
             <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="waist" size="h-3.5 w-3.5" /> Eo</span><span class="font-semibold text-brand-300">{{ bodyWaistLabel }}</span></p>
-            <input type="range" min="1" max="10" step="1" v-model.number="localBodyWaist" class="w-full cursor-pointer accent-purple-400">
+            <input type="range" min="1" max="10" step="1" v-model.number="localBodyWaist" class="w-full cursor-pointer accent-brand-500">
             <div class="mt-1 flex justify-between text-tiny text-cream-400"><span>Thẳng</span><span>Cân đối</span><span>Đồng hồ cát</span></div>
           </div>
 
           <!-- Vai -->
           <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Điều chỉnh độ rộng vai từ hẹp đến rộng">
             <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="shoulder" size="h-3.5 w-3.5" /> Vai</span><span class="font-semibold text-brand-300">{{ bodyShouldersLabel }}</span></p>
-            <input type="range" min="1" max="10" step="1" v-model.number="localBodyShoulders" class="w-full cursor-pointer accent-purple-400">
+            <input type="range" min="1" max="10" step="1" v-model.number="localBodyShoulders" class="w-full cursor-pointer accent-brand-500">
             <div class="mt-1 flex justify-between text-tiny text-cream-400"><span>Hẹp</span><span>Cân đối</span><span>Rộng</span></div>
           </div>
 
           <!-- Hông -->
           <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Điều chỉnh độ nở hông từ hẹp đến rất nở">
             <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="hip" size="h-3.5 w-3.5" /> Hông</span><span class="font-semibold text-brand-300">{{ bodyHipsLabel }}</span></p>
-            <input type="range" min="1" max="10" step="1" v-model.number="localBodyHips" class="w-full cursor-pointer accent-purple-400">
+            <input type="range" min="1" max="10" step="1" v-model.number="localBodyHips" class="w-full cursor-pointer accent-brand-500">
             <div class="mt-1 flex justify-between text-tiny text-cream-400"><span>Hẹp</span><span>Cân đối</span><span>Nở</span></div>
           </div>
         </div>
 
         <!-- ===== TAB: KIỂU TÓC ===== -->
         <div v-show="activeTab === 'hair'" class="space-y-3">
-          <div class="rounded-lg border border-pink-500/20 bg-pink-900/10 p-3">
-            <p class="flex items-center gap-1.5 text-xs font-semibold text-pink-200"><StudioIcon name="hair" size="h-3.5 w-3.5" /> Kiểu tóc & Màu tóc</p>
-            <p class="mt-0.5 text-label text-pink-300/50">Chọn kiểu tóc thời thượng và màu tóc. Để trống nếu không muốn ép.</p>
+          <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-3">
+            <p class="flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="hair" size="h-3.5 w-3.5" /> Kiểu tóc & Màu tóc</p>
+            <p class="mt-0.5 text-label text-cream-400">Chọn kiểu tóc thời thượng và màu tóc. Để trống nếu không muốn ép.</p>
           </div>
 
           <!-- Kiểu tóc grid -->
@@ -789,7 +789,7 @@ const bodyHipsLabel = computed(() => {
               <p class="mb-1.5 text-label font-semibold text-cream-400">{{ groupName }}</p>
               <div class="flex flex-wrap gap-1.5">
                 <button v-for="h in styles" :key="h.id" @click="store.hairStyle = store.hairStyle === h.id ? '' : h.id" :title="'Chọn kiểu tóc ' + h.name + (store.hairStyle === h.id ? ' (đang chọn — nhấn để bỏ)' : '')" class="rounded-lg px-3 py-1.5 text-body font-semibold transition"
-                  :class="store.hairStyle === h.id ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-ink-800 text-cream-200 hover:bg-ink-700 border border-ink-600'">
+                  :class="store.hairStyle === h.id ? 'bg-brand-600 text-primary-content shadow-lg shadow-brand-600/30' : 'bg-ink-800 text-cream-200 hover:bg-ink-700 border border-ink-600'">
                   {{ h.name }}
                 </button>
               </div>
@@ -801,7 +801,7 @@ const bodyHipsLabel = computed(() => {
             <p class="mb-2 text-label font-semibold text-cream-400">Màu tóc</p>
             <div class="flex flex-wrap gap-2">
               <button v-for="c in hairColors" :key="c.id" @click="store.hairColor = store.hairColor === c.id ? '' : c.id" :title="'Chọn màu tóc ' + c.name + (store.hairColor === c.id ? ' (đang chọn — nhấn để bỏ)' : '')" class="flex items-center gap-1.5 rounded-lg px-3 py-2 text-body font-semibold transition"
-                :class="store.hairColor === c.id ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-ink-800 text-cream-200 hover:bg-ink-700 border border-ink-600'">
+                :class="store.hairColor === c.id ? 'bg-brand-600 text-primary-content shadow-lg shadow-brand-600/30' : 'bg-ink-800 text-cream-200 hover:bg-ink-700 border border-ink-600'">
                 <span v-if="c.hex !== 'transparent'" class="inline-block h-3.5 w-3.5 rounded-full border border-ink-600" :style="{ background: c.hex }"></span>
                 {{ c.name }}
               </button>
@@ -820,7 +820,7 @@ const bodyHipsLabel = computed(() => {
             <button v-for="p in imagePoses" :key="p.id" @click="store.imagePoseId = (String(store.imagePoseId) === String(p.id)) ? '' : String(p.id)"
                     :class="String(store.imagePoseId) === String(p.id) ? 'border-brand-500 bg-brand-600/20 ring-1 ring-brand-500/40' : 'border-ink-600 bg-ink-800 hover:border-brand-400'"
                     class="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-label font-semibold text-cream-200 transition">
-              <img v-if="p.thumb || p.image" :src="p.thumb || p.image" loading="lazy" class="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
+              <img v-if="p.thumb || p.image" :src="p.thumb || p.image" loading="lazy" class="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-ink-600">
               <span v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-700"><StudioIcon name="user" size="h-4 w-4" /></span>
               <span class="truncate">{{ p.name }}</span>
             </button>
@@ -833,7 +833,7 @@ const bodyHipsLabel = computed(() => {
           <!-- Prompt Prefix (đồng bộ từ Settings) -->
           <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4" :class="!store.promptUsePrefix ? 'opacity-60' : ''">
             <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200">
-              <button type="button" @click="store.promptUsePrefix = !store.promptUsePrefix" class="grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors" :class="store.promptUsePrefix ? 'border-brand-500 bg-brand-500/40 text-white' : 'border-ink-600 text-transparent'" :title="store.promptUsePrefix ? 'Đang dùng Prompt Prefix — bấm để tắt' : 'Không dùng Prompt Prefix — bấm để bật'" :aria-label="store.promptUsePrefix ? 'Tắt dùng Prompt Prefix' : 'Bật dùng Prompt Prefix'"><StudioIcon name="check" size="h-3 w-3" :class="store.promptUsePrefix ? '' : 'opacity-0'" /></button>
+              <button type="button" @click="store.promptUsePrefix = !store.promptUsePrefix" class="grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors" :class="store.promptUsePrefix ? 'border-brand-500 border-brand-500 bg-brand-600 text-primary-content' : 'border-ink-600 text-transparent'" :title="store.promptUsePrefix ? 'Đang dùng Prompt Prefix — bấm để tắt' : 'Không dùng Prompt Prefix — bấm để bật'" :aria-label="store.promptUsePrefix ? 'Tắt dùng Prompt Prefix' : 'Bật dùng Prompt Prefix'"><StudioIcon name="check" size="h-3 w-3" :class="store.promptUsePrefix ? '' : 'opacity-0'" /></button>
               <StudioIcon name="arrowRight" size="h-3.5 w-3.5" /> Prompt Prefix (tự động thêm vào đầu)
             </label>
             <p class="mb-2 text-label text-cream-400">Đồng bộ 2 chiều với <a v-if="store.user && store.user.is_admin" href="/settings" target="_blank" class="text-brand-300 underline">Cài đặt Studio</a><span v-else class="text-cream-400">Cài đặt Studio</span>. Để trống = dùng mặc định.</p>
@@ -842,7 +842,7 @@ const bodyHipsLabel = computed(() => {
           <!-- Prompt Suffix (đồng bộ từ Settings) -->
           <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4" :class="!store.promptUseSuffix ? 'opacity-60' : ''">
             <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200">
-              <button type="button" @click="store.promptUseSuffix = !store.promptUseSuffix" class="grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors" :class="store.promptUseSuffix ? 'border-brand-500 bg-brand-500/40 text-white' : 'border-ink-600 text-transparent'" :title="store.promptUseSuffix ? 'Đang dùng Prompt Suffix — bấm để tắt' : 'Không dùng Prompt Suffix — bấm để bật'" :aria-label="store.promptUseSuffix ? 'Tắt dùng Prompt Suffix' : 'Bật dùng Prompt Suffix'"><StudioIcon name="check" size="h-3 w-3" :class="store.promptUseSuffix ? '' : 'opacity-0'" /></button>
+              <button type="button" @click="store.promptUseSuffix = !store.promptUseSuffix" class="grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors" :class="store.promptUseSuffix ? 'border-brand-500 border-brand-500 bg-brand-600 text-primary-content' : 'border-ink-600 text-transparent'" :title="store.promptUseSuffix ? 'Đang dùng Prompt Suffix — bấm để tắt' : 'Không dùng Prompt Suffix — bấm để bật'" :aria-label="store.promptUseSuffix ? 'Tắt dùng Prompt Suffix' : 'Bật dùng Prompt Suffix'"><StudioIcon name="check" size="h-3 w-3" :class="store.promptUseSuffix ? '' : 'opacity-0'" /></button>
               <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Prompt Suffix (tự động thêm vào cuối)
             </label>
             <p class="mb-2 text-label text-cream-400">Đồng bộ 2 chiều với <a v-if="store.user && store.user.is_admin" href="/settings" target="_blank" class="text-brand-300 underline">Cài đặt Studio</a><span v-else class="text-cream-400">Cài đặt Studio</span>. Để trống = dùng mặc định.</p>
@@ -851,7 +851,7 @@ const bodyHipsLabel = computed(() => {
           <!-- Negative prompt -->
           <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4" :class="!store.promptUseNegative ? 'opacity-60' : ''">
             <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200">
-              <button type="button" @click="store.promptUseNegative = !store.promptUseNegative" class="grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors" :class="store.promptUseNegative ? 'border-brand-500 bg-brand-500/40 text-white' : 'border-ink-600 text-transparent'" :title="store.promptUseNegative ? 'Đang dùng Negative Prompt — bấm để tắt' : 'Không dùng Negative Prompt — bấm để bật'" :aria-label="store.promptUseNegative ? 'Tắt dùng Negative Prompt' : 'Bật dùng Negative Prompt'"><StudioIcon name="check" size="h-3 w-3" :class="store.promptUseNegative ? '' : 'opacity-0'" /></button>
+              <button type="button" @click="store.promptUseNegative = !store.promptUseNegative" class="grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors" :class="store.promptUseNegative ? 'border-brand-500 border-brand-500 bg-brand-600 text-primary-content' : 'border-ink-600 text-transparent'" :title="store.promptUseNegative ? 'Đang dùng Negative Prompt — bấm để tắt' : 'Không dùng Negative Prompt — bấm để bật'" :aria-label="store.promptUseNegative ? 'Tắt dùng Negative Prompt' : 'Bật dùng Negative Prompt'"><StudioIcon name="check" size="h-3 w-3" :class="store.promptUseNegative ? '' : 'opacity-0'" /></button>
               <StudioIcon name="x" size="h-3.5 w-3.5" /> Negative Prompt
             </label>
             <p class="mb-2 text-label text-cream-400">Điều model KHÔNG nên tạo. Để trống sẽ dùng mặc định từ Cài đặt.</p>
@@ -866,13 +866,13 @@ const bodyHipsLabel = computed(() => {
         </div>
 
         <!-- Enrich Preview popup -->
-        <div v-if="showEnrich" role="dialog" aria-modal="true" aria-label="Xem trước prompt đã làm giàu" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showEnrich = false">
+        <div v-if="showEnrich" role="dialog" aria-modal="true" aria-label="Xem trước prompt đã làm giàu" class="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/70 p-4" @click.self="showEnrich = false">
           <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-ink-700 bg-ink-900 p-5 shadow-2xl" @click.stop>
             <div class="mb-3 flex items-center justify-between">
               <span class="flex items-center gap-2 text-sm font-semibold text-cream-100"><StudioIcon name="wand" /> Prompt Enrich Preview</span>
               <div class="flex items-center gap-2">
                 <button @click="doEnrichPreview" :disabled="enrichLoading" class="rounded-full bg-ink-700 px-3 py-1 text-label text-cream-200 hover:bg-brand-600" title="Tải lại bản xem trước prompt đã làm giàu">{{ enrichLoading ? 'Đang xử lý…' : 'Làm mới' }}</button>
-                <button @click="showEnrich = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
+                <button @click="showEnrich = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-cream-50" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
               </div>
             </div>
             <div class="mb-3 rounded-md border border-ink-600 bg-ink-800 p-3">
@@ -894,11 +894,11 @@ const bodyHipsLabel = computed(() => {
         </div>
 
         <!-- Preset popup -->
-        <div v-if="showPresets" role="dialog" aria-modal="true" aria-label="Preset — Prompt đã lưu" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showPresets = false">
+        <div v-if="showPresets" role="dialog" aria-modal="true" aria-label="Preset — Prompt đã lưu" class="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/70 p-4" @click.self="showPresets = false">
           <div class="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-lg border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
             <div class="mb-3 flex items-center justify-between">
               <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="sparkles" /> Preset — Prompt đã lưu</span>
-              <button @click="showPresets = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
+              <button @click="showPresets = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-cream-50" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
             </div>
             <!-- Chế độ chèn cho preset -->
             <div class="mb-3 flex items-center gap-1.5 text-label">
@@ -994,7 +994,7 @@ const bodyHipsLabel = computed(() => {
           </div>
 
           <!-- Chạy lại CHỈ mục lỗi (không phải làm lại cả lượt) -->
-          <div v-if="!store.generating && store.batchFailed && store.batchFailed.length" class="flex flex-wrap items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-2.5">
+          <div v-if="!store.generating && store.batchFailed && store.batchFailed.length" class="flex flex-wrap items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 p-2.5">
             <StudioIcon name="alertTriangle" size="h-3.5 w-3.5 text-danger" />
             <p class="min-w-0 flex-1 text-body text-danger">{{ store.batchFailed.length }} mục lỗi ở lượt vừa rồi — có thể do hạn mức provider hoặc ảnh nguồn. Chạy lại chỉ những mục đó.</p>
             <button class="tool-btn shrink-0" @click="retryFailed()"><StudioIcon name="refresh" size="h-3.5 w-3.5" /> Chạy lại {{ store.batchFailed.length }} mục lỗi</button>
@@ -1007,12 +1007,12 @@ const bodyHipsLabel = computed(() => {
         </div>
 
         <!-- Draft restore notice -->
-        <div v-if="showDraftNotice" class="my-3 rounded-md border border-amber-500/30 bg-amber-900/20 p-2.5">
+        <div v-if="showDraftNotice" class="my-3 rounded-md border border-warn/30 bg-warn/20 p-2.5">
           <div class="flex items-center justify-between">
             <p class="flex items-center gap-1.5 text-body text-warn" title="Bạn có một bản nháp chưa gửi từ lần làm việc trước"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Có bản nháp từ lúc {{ draftTime }}</p>
             <div class="flex gap-1.5">
-              <button @click="restoreDraft" class="rounded-lg bg-amber-600 px-2 py-1 text-label font-semibold text-white hover:bg-amber-500" title="Khôi phục toàn bộ cài đặt và prompt từ bản nháp">Khôi phục</button>
-              <button @click="dismissDraft" class="rounded-lg bg-ink-700 px-2 py-1 text-label text-cream-200 hover:bg-red-600" title="Xóa bản nháp và bắt đầu mới">Bỏ qua</button>
+              <button @click="restoreDraft" class="rounded-lg bg-warn px-2 py-1 text-label font-semibold text-warn-content hover:bg-warn" title="Khôi phục toàn bộ cài đặt và prompt từ bản nháp">Khôi phục</button>
+              <button @click="dismissDraft" class="rounded-lg bg-ink-700 px-2 py-1 text-label text-cream-200 hover:bg-danger" title="Xóa bản nháp và bắt đầu mới">Bỏ qua</button>
             </div>
           </div>
         </div>

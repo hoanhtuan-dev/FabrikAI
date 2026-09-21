@@ -6,6 +6,7 @@ import { inject } from 'vue';
 import { useStudioStore } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
 import SourceLibraryPicker from '../SourceLibraryPicker.vue';
+import { MOOD_COLOR } from '../../dataColors.js';
 const store = useStudioStore();
 // Nhãn ô mood board (backend trả tiếng Anh) — dịch để người dùng hiểu mỗi ô đại diện cho thứ gì.
 const MOOD_LABELS = {
@@ -143,9 +144,9 @@ const copyText = inject('copyText');
                     ? (store.designAgentAi ? 'AI đang xây brief…' : 'Đang xây dựng brief…')
                     : (collection ? 'Tạo lại brief' : 'Tạo brief bộ sưu tập') }}
                 </button>
-                <div v-if="collectionError || store.collectionBriefError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs leading-5 text-danger"><StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ collectionError || store.collectionBriefError }}</span></div>
-                <div v-if="briefStale" role="status" class="mt-3 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-5 text-warn"><StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Prompt/trend đã đổi. Bấm «Tạo lại brief» để cập nhật trước khi sang Canvas.</span></div>
-                <div v-else-if="briefModeMismatch" role="status" class="mt-3 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-5 text-warn"><StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Brief này được dựng ở chế độ {{ collection?.model?.mode === 'ai' ? 'AI' : 'tất định' }} — bấm «Tạo lại brief» nếu muốn theo đúng công tắc hiện tại.</span></div>
+                <div v-if="collectionError || store.collectionBriefError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-xs leading-5 text-danger"><StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ collectionError || store.collectionBriefError }}</span></div>
+                <div v-if="briefStale" role="status" class="mt-3 flex gap-2 rounded-lg border border-warn/40 bg-warn/10 p-3 text-xs leading-5 text-warn"><StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Prompt/trend đã đổi. Bấm «Tạo lại brief» để cập nhật trước khi sang Canvas.</span></div>
+                <div v-else-if="briefModeMismatch" role="status" class="mt-3 flex gap-2 rounded-lg border border-warn/40 bg-warn/10 p-3 text-xs leading-5 text-warn"><StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Brief này được dựng ở chế độ {{ collection?.model?.mode === 'ai' ? 'AI' : 'tất định' }} — bấm «Tạo lại brief» nếu muốn theo đúng công tắc hiện tại.</span></div>
               </div>
 
               <div v-if="radar" class="card p-4">
@@ -173,7 +174,7 @@ const copyText = inject('copyText');
                 </button>
 
                 <div v-if="shopOpen" class="mt-3 space-y-3">
-                  <div v-if="shopSummary && shopSummary.row_count" class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-body leading-5 text-ok">
+                  <div v-if="shopSummary && shopSummary.row_count" class="rounded-lg border border-ok/30 bg-ok/10 p-3 text-body leading-5 text-ok">
                     {{ shopSummary.narrative }}
                     <!-- Kỳ báo cáo trộn nhau: cộng dồn số bán của các kỳ khác nhau rồi kể như MỘT con số là
                          nói sai, nên phải nói ra và mời nhập lại theo cùng một kỳ. -->
@@ -259,7 +260,7 @@ const copyText = inject('copyText');
                   <div class="mt-2 flex flex-wrap items-center gap-1.5 text-label">
                     <span
                       class="rounded-full px-2 py-0.5 font-semibold"
-                      :class="modelReady ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'"
+                      :class="modelReady ? 'bg-ok/15 text-ok' : 'bg-warn/15 text-warn'"
                       :title="modelTitle"
                     >{{ modelShort }}</span>
                     <span v-for="row in appliedAi" :key="row" class="rounded bg-brand-500/15 px-2 py-0.5 text-brand-200">AI viết: {{ row }}</span>
@@ -297,7 +298,7 @@ const copyText = inject('copyText');
                     <div class="flex flex-wrap items-center justify-between gap-2">
                       <h3 class="font-display text-base font-semibold text-brand-300">Câu chuyện thương hiệu</h3>
                       <!-- Nói RÕ brief này dựa trên DNA nào: bạn khai hay hệ thống suy ra. -->
-                      <button type="button" class="rounded-full px-2 py-0.5 text-label font-semibold" :class="collection.brand_dna?.source === 'owner' ? 'bg-brand-500/20 text-brand-200' : 'bg-amber-500/15 text-warn'" @click="setStep('dna')">
+                      <button type="button" class="rounded-full px-2 py-0.5 text-label font-semibold" :class="collection.brand_dna?.source === 'owner' ? 'bg-brand-500/20 text-brand-200' : 'bg-warn/15 text-warn'" @click="setStep('dna')">
                         {{ collection.brand_dna?.source_label || 'Chưa rõ nguồn DNA' }}
                       </button>
                     </div>
@@ -340,10 +341,10 @@ const copyText = inject('copyText');
                       </label>
                     </div>
 
-                    <p v-if="briefStale" role="status" class="mt-3 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-body leading-5 text-warn">
+                    <p v-if="briefStale" role="status" class="mt-3 flex gap-2 rounded-lg border border-warn/40 bg-warn/10 p-3 text-body leading-5 text-warn">
                       <StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Brief đã cũ so với prompt/trend hiện tại — bấm «Tạo lại brief» rồi mới tin kế hoạch này.</span>
                     </p>
-                    <p v-if="store.planError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-body leading-5 text-danger">
+                    <p v-if="store.planError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-body leading-5 text-danger">
                       <StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ store.planError }}</span>
                     </p>
                   </div>
@@ -355,7 +356,7 @@ const copyText = inject('copyText');
                       <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"><p class="text-label text-cream-400">Vốn cần</p><p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatVnd(planTotals.capital_needed_vnd) }}</p><p class="text-label text-cream-400">Giá vốn TB {{ formatVnd(planTotals.avg_unit_cost_vnd) }}/cái</p></div>
                       <!-- HAI con số lợi nhuận phải nói rõ tên: phần tổng là TRƯỚC chi phí cố định, bảng kịch bản
                            bán là SAU khi trừ. Trước đây hai chỗ trả hai số khác nhau mà không nhãn nào phân biệt. -->
-                      <div class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5">
+                      <div class="rounded-lg border border-ok/40 bg-ok/10 px-3 py-2.5">
                         <p class="text-label text-ok">Lãi gộp (chưa trừ chi phí cố định)</p>
                         <p class="mt-1 text-lg font-semibold tabular-nums text-ok">{{ formatVnd(planTotals.profit_vnd) }}</p>
                         <p class="text-label text-ok">{{ planTotals.margin_pct }}% · {{ formatVnd(planTotals.avg_profit_unit_vnd) }}/cái</p>
@@ -367,7 +368,7 @@ const copyText = inject('copyText');
                       v-if="plan.price_check && plan.price_check.status !== 'within_band' && plan.price_check.status !== 'unknown'"
                       role="status"
                       class="flex gap-2 rounded-lg border p-3 text-body leading-5"
-                      :class="plan.price_check.status === 'above_band' ? 'border-red-500/40 bg-red-500/10 text-danger' : 'border-emerald-500/40 bg-emerald-500/10 text-ok'"
+                      :class="plan.price_check.status === 'above_band' ? 'border-danger/40 bg-danger/10 text-danger' : 'border-ok/40 bg-ok/10 text-ok'"
                     >
                       <StudioIcon :name="plan.price_check.status === 'above_band' ? 'alertTriangle' : 'info'" size="h-4 w-4" class="shrink-0" />
                       <span>
@@ -413,7 +414,7 @@ const copyText = inject('copyText');
                             <tr v-for="(line, index) in planLines" :key="index" class="text-cream-200">
                               <td class="py-2 pr-2">
                                 {{ line.category }}
-                                <span v-if="line.source === 'shop'" class="ml-1 rounded bg-emerald-500/15 px-1 py-0.5 text-tiny text-ok">theo shop</span>
+                                <span v-if="line.source === 'shop'" class="ml-1 rounded bg-ok/15 px-1 py-0.5 text-tiny text-ok">theo shop</span>
                                 <span v-else-if="line.source === 'prompt'" class="ml-1 rounded bg-brand-500/15 px-1 py-0.5 text-tiny text-brand-200">theo prompt</span>
                               </td>
                               <td class="py-2 pr-2 font-semibold">{{ line.size }}</td>
@@ -475,7 +476,7 @@ const copyText = inject('copyText');
                           <div v-for="scenario in planScenarios" :key="scenario.price_vnd" class="rounded-lg border border-ink-700 bg-ink-800 p-3">
                             <div class="flex items-center justify-between gap-2">
                               <span class="text-xs font-semibold text-cream-100">{{ formatVnd(scenario.price_vnd) }}</span>
-                              <span class="rounded px-2 py-0.5 text-label" :class="scenario.profit_vnd > 0 ? 'bg-emerald-500/15 text-ok' : 'bg-red-500/15 text-danger'">{{ scenario.label }}</span>
+                              <span class="rounded px-2 py-0.5 text-label" :class="scenario.profit_vnd > 0 ? 'bg-ok/15 text-ok' : 'bg-danger/15 text-danger'">{{ scenario.label }}</span>
                             </div>
                             <p class="mt-1 text-body text-cream-300">Lãi (đã trừ chi phí cố định) {{ formatVnd(scenario.profit_vnd) }} · biên {{ scenario.margin_pct }}%<span v-if="scenario.breakeven_units"> · hoà vốn ở {{ formatNumber(scenario.breakeven_units) }} cái</span></p>
                           </div>
@@ -498,8 +499,8 @@ const copyText = inject('copyText');
                   <div class="mb-1 flex items-center justify-between"><h3 class="font-display text-base font-semibold text-brand-300">Bảng mood</h3><span class="text-label text-cream-400">{{ moodboardItems.length }} ô</span></div>
                   <p class="mb-3 text-body leading-5 text-cream-400">Bảng màu + "tâm trạng" tổng thể của bộ sưu tập: mỗi ô là một sắc màu trong palette kết hợp với một hướng thời trang đã chọn — dùng để hình dung bộ sưu tập sẽ trông như thế nào trước khi tạo ảnh. Rê chuột lên ô để xem hướng gắn với ô đó.</p>
                   <div class="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
-                    <div v-for="(item, index) in moodboardItems" :key="item.id || index" class="group relative aspect-square overflow-hidden rounded-lg border border-ink-700" :style="{ backgroundColor: item.color || palette[index % Math.max(1, palette.length)]?.hex || '#b9c8c2' }" role="img" :aria-label="(item.label || 'Mood ' + (index + 1)) + ': ' + (item.caption || '')" :title="item.caption || item.label || 'Mood board'">
-                      <span class="absolute inset-x-0 bottom-0 p-1.5 text-tiny font-semibold leading-3 text-white shadow-[0_-12px_16px_-8px_rgba(0,0,0,0.8)]">{{ moodLabel(item.label) || 'Mood ' + (index + 1) }}</span>
+                    <div v-for="(item, index) in moodboardItems" :key="item.id || index" class="group relative aspect-square overflow-hidden rounded-lg border border-ink-700" :style="{ backgroundColor: item.color || palette[index % Math.max(1, palette.length)]?.hex || MOOD_COLOR }" role="img" :aria-label="(item.label || 'Mood ' + (index + 1)) + ': ' + (item.caption || '')" :title="item.caption || item.label || 'Mood board'">
+                      <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-scrim/85 to-transparent p-1.5 text-tiny font-semibold leading-3 text-scrim-content">{{ moodLabel(item.label) || 'Mood ' + (index + 1) }}</span>
                     </div>
                   </div>
                   <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

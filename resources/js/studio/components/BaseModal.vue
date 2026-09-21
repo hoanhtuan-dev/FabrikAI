@@ -34,7 +34,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey, true); trap
 </script>
 <template>
   <div v-if="modelValue" ref="rootEl" tabindex="-1" role="dialog" aria-modal="true" :aria-label="title || undefined"
-       class="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 outline-none"
+       class="fixed inset-0 z-[70] flex items-center justify-center bg-scrim/70 p-4 outline-none"
        @click.self="close">
     <!-- Mode 1: có height cố định -> flex-col + header cố định + body cuộn (inline style chống override) -->
     <div
@@ -46,7 +46,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey, true); trap
     >
       <div class="flex h-14 shrink-0 items-center justify-between border-b border-ink-700 bg-ink-900 px-5">
         <span class="text-sm font-semibold text-brand-300">{{ title }}</span>
-        <button @click="close" aria-label="Đóng" class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink-700 text-cream-200 transition hover:bg-red-600 hover:text-white" title="Đóng">✕</button>
+        <button @click="close" aria-label="Đóng" class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink-700 text-cream-200 transition hover:bg-danger hover:text-cream-50" title="Đóng">✕</button>
       </div>
       <div :style="{ flex: '1 1 0', minHeight: 0, overflowY: full ? 'hidden' : 'auto', overscrollBehavior: 'contain' }">
         <slot />
@@ -62,7 +62,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey, true); trap
     >
       <div class="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-ink-700 bg-ink-900 px-5">
         <span class="text-sm font-semibold text-brand-300">{{ title }}</span>
-        <button @click="close" aria-label="Đóng" class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink-700 text-cream-200 transition hover:bg-red-600 hover:text-white" title="Đóng">✕</button>
+        <button @click="close" aria-label="Đóng" class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink-700 text-cream-200 transition hover:bg-danger hover:text-cream-50" title="Đóng">✕</button>
       </div>
       <div class="p-5">
         <slot />

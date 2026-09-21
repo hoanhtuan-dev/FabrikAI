@@ -29,11 +29,11 @@ watch(() => props.modelValue, async (open) => {
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
 </script>
 <template>
-  <div v-if="modelValue" ref="rootEl" tabindex="-1" role="dialog" aria-modal="true" :aria-label="title" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4 outline-none" @click.self="close">
+  <div v-if="modelValue" ref="rootEl" tabindex="-1" role="dialog" aria-modal="true" :aria-label="title" class="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/90 p-4 outline-none" @click.self="close">
     <div class="w-full max-w-3xl">
       <div class="mb-3 flex items-center justify-between">
         <span class="text-sm font-semibold text-cream-100">{{ title }}</span>
-        <button @click="close" aria-label="Đóng" title="Đóng (Esc)" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white">✕</button>
+        <button @click="close" aria-label="Đóng" title="Đóng (Esc)" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-cream-50">✕</button>
       </div>
 
       <div class="relative mx-auto aspect-square max-h-[70vh] w-full select-none overflow-hidden rounded-lg border border-ink-700 bg-ink-900">

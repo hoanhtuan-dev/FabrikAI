@@ -100,14 +100,14 @@ async function copyColor(c) {
       </p>
       <div class="flex shrink-0 items-center gap-1">
         <div class="relative">
-          <button @click="blankMenuOpen = !blankMenuOpen" class="grid h-7 w-7 place-items-center rounded-lg bg-brand-600 text-white transition-colors hover:bg-brand-500" title="Thêm layer mới" aria-label="Thêm layer mới">
+          <button @click="blankMenuOpen = !blankMenuOpen" class="grid h-7 w-7 place-items-center rounded-lg bg-brand-600 text-primary-content transition-colors hover:bg-brand-500" title="Thêm layer mới" aria-label="Thêm layer mới">
             <StudioIcon name="plus" size="h-4 w-4" />
           </button>
           <!-- Backdrop phủ toàn màn hình: bấm ra ngoài menu → tự thoát popup (thoát tiêu điểm) -->
           <div v-if="blankMenuOpen" class="fixed inset-0 z-40" @pointerdown="blankMenuOpen = false"></div>
           <div v-if="blankMenuOpen" class="absolute right-0 top-9 z-50 flex w-56 flex-col gap-2 rounded-md border border-ink-700 bg-ink-900/95 p-3 shadow-2xl">
             <p class="px-1 text-label font-semibold text-cream-300">Nền layer mới</p>
-            <button @click="store.addBlankLayer(null, blankRatio); blankMenuOpen = false" class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-body text-cream-100 hover:bg-ink-800"><span class="h-5 w-5 rounded border border-ink-600" style="background: repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 8px 8px"></span>Trong suốt</button>
+            <button @click="store.addBlankLayer(null, blankRatio); blankMenuOpen = false" class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-body text-cream-100 hover:bg-ink-800"><span class="h-5 w-5 rounded border border-ink-600 checkerboard-sm"></span>Trong suốt</button>
 
             <div class="grid grid-cols-6 gap-1.5">
               <button v-for="c in ['#ffffff','#000000','#ff4d4f','#4f9dff','#4ade80','#fbbf24']" :key="c" @click="store.addBlankLayer(c, blankRatio); blankMenuOpen = false" class="h-7 w-7 rounded-full border border-ink-600 transition hover:scale-110" :style="{ background: c }" :title="c" :aria-label="'Layer nền màu ' + c"></button>
@@ -127,12 +127,12 @@ async function copyColor(c) {
 
             <p class="px-1 text-label font-semibold text-cream-300">Tỷ lệ khung hình</p>
             <div class="flex flex-wrap gap-1.5">
-              <button v-for="r in ['1:1','4:3','3:4','9:16','16:9','4:5','21:9']" :key="r" @click="blankRatio = r" class="rounded-md px-2 py-1 text-label font-semibold transition" :class="blankRatio === r ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'">{{ r }}</button>
+              <button v-for="r in ['1:1','4:3','3:4','9:16','16:9','4:5','21:9']" :key="r" @click="blankRatio = r" class="rounded-md px-2 py-1 text-label font-semibold transition" :class="blankRatio === r ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'">{{ r }}</button>
             </div>
           </div>
         </div>
         <button @click="store.openClearCanvasConfirm()"
-          class="grid h-7 w-7 place-items-center rounded-lg text-danger transition-colors hover:bg-red-600/25 hover:text-danger"
+          class="grid h-7 w-7 place-items-center rounded-lg text-danger transition-colors hover:bg-danger/25 hover:text-danger"
           title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)"
           aria-label="Dọn canvas — bỏ hết ảnh trên canvas">
           <StudioIcon name="trash" size="h-4 w-4" />
@@ -148,7 +148,7 @@ async function copyColor(c) {
       <template v-for="l in store.layersFrontFirst" :key="l.id">
         <!-- Folder nhóm (hiện trước layer đại diện) -->
         <template v-if="isGroupTop(l)">
-          <div class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1" :class="store.isGroupActive(l.groupId) ? 'border-violet-400 bg-violet-400/20' : 'border-violet-400/40 bg-ink-800/60'" @click="store.selectGroup(l.groupId)">
+          <div class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1" :class="store.isGroupActive(l.groupId) ? 'border-brand-500 bg-brand-600/20' : 'border-brand-500/40 bg-ink-800/60'" @click="store.selectGroup(l.groupId)">
             <button @click.stop="toggleGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700 hover:text-cream-100" :title="collapsedGroups.has(l.groupId) ? 'Mở rộng nhóm' : 'Thu gọn nhóm'"><StudioIcon :name="collapsedGroups.has(l.groupId) ? 'chevronUp' : 'chevronDown'" size="h-3.5 w-3.5" /></button>
             <StudioIcon name="group" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
             <template v-if="groupRenameId === l.groupId">
@@ -156,14 +156,14 @@ async function copyColor(c) {
             </template>
             <span v-else class="min-w-0 flex-1 truncate text-body font-semibold text-cream-100" :title="'Nhóm: ' + groupName(l.groupId) + ' — nhấn đúp để đổi tên'" @dblclick.stop="startGroupRename(l.groupId)">{{ groupName(l.groupId) }}</span>
             <span class="shrink-0 rounded bg-ink-700 px-1 text-tiny text-cream-300">{{ groupCount(l.groupId) }}</span>
-            <button @click.stop="store.ungroupGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300 hover:bg-red-600/25 hover:text-danger" :title="'Tách nhóm ' + groupName(l.groupId)"><StudioIcon name="unlink" size="h-3.5 w-3.5" /></button>
+            <button @click.stop="store.ungroupGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300 hover:bg-danger/25 hover:text-danger" :title="'Tách nhóm ' + groupName(l.groupId)"><StudioIcon name="unlink" size="h-3.5 w-3.5" /></button>
             <!-- [2026-09-20] Ba nút (khóa · nhân đôi · gỡ) LUÔN hiện. Trước đây chúng opacity-0 và chỉ
                  hiện khi hover ⇒ người dùng không biết là có, và trên thiết bị cảm ứng thì gần như không
                  bấm được (không có hover). -->
             <div class="flex items-center gap-0.5">
               <button @click.stop="store.toggleGroupLock(l.groupId)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" :title="groupLocked(l.groupId) ? 'Mở khóa nhóm' : 'Khóa nhóm'" :aria-label="groupLocked(l.groupId) ? 'Mở khóa nhóm' : 'Khóa nhóm'"><StudioIcon :name="groupLocked(l.groupId) ? 'lock' : 'lockOpen'" size="h-3.5 w-3.5" /></button>
               <button @click.stop="store.duplicateGroup(l.groupId)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Nhân đôi nhóm" aria-label="Nhân đôi nhóm"><StudioIcon name="copy" size="h-3.5 w-3.5" /></button>
-              <button @click.stop="store.deleteGroup(l.groupId)" class="grid h-6 w-6 place-items-center rounded bg-red-600/25 text-danger hover:bg-red-600" title="Xóa nhóm" aria-label="Xóa nhóm"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+              <button @click.stop="store.deleteGroup(l.groupId)" class="grid h-6 w-6 place-items-center rounded bg-danger/25 text-danger hover:bg-danger" title="Xóa nhóm" aria-label="Xóa nhóm"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
             </div>
           </div>
         </template>
@@ -171,7 +171,7 @@ async function copyColor(c) {
         <div v-if="!l.groupId || !collapsedGroups.has(l.groupId)"
         class="motion-ui group flex items-center gap-1.5 rounded-lg border px-1.5 py-1"
         :class="[
-          store.activeLayerId === l.id ? 'border-sky-400 bg-sky-400/15' : (store.isSelected(l.id) ? 'border-sky-400/60 bg-sky-400/10' : 'border-transparent hover:bg-ink-800/70'),
+          store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : (store.isSelected(l.id) ? 'border-brand-500/60 bg-brand-600/10' : 'border-transparent hover:bg-ink-800/70'),
           l.visible === false ? 'opacity-45' : '',
           l.groupId ? 'ml-3' : '',
           dropTargetId === l.id ? (dropBelow ? 'border-b-2 border-b-brand-400' : 'border-t-2 border-t-brand-400') : ''
@@ -195,7 +195,7 @@ async function copyColor(c) {
         <span v-if="renamingId !== l.id" class="min-w-0 flex-1 truncate text-body text-cream-100" :title="l.name" @dblclick.stop="startRename(l)">{{ l.name }}</span>
         <input v-else v-model="renameValue" class="min-w-0 flex-1 rounded bg-ink-950 px-1 py-0.5 text-body text-cream-100 outline-none ring-1 ring-brand-500" aria-label="Đổi tên layer" @keyup.enter="commitRename()" @keyup.esc="cancelRename()" @blur="commitRename()" @click.stop>
         <div class="flex shrink-0 items-center gap-0.5">
-          <button @click.stop="l.groupId ? store.toggleGroupLock(l.groupId) : store.toggleLayerLock(l.id)" class="grid h-6 w-6 place-items-center rounded" :class="l.locked ? 'bg-amber-500/20 text-warn' : 'text-cream-300 hover:bg-ink-700'" :title="l.groupId ? 'Khóa/Mở khóa nhóm' : (l.locked ? 'Mở khóa' : 'Khóa layer')" :aria-label="l.groupId ? 'Khóa/Mở khóa nhóm' : (l.locked ? 'Mở khóa' : 'Khóa layer')">
+          <button @click.stop="l.groupId ? store.toggleGroupLock(l.groupId) : store.toggleLayerLock(l.id)" class="grid h-6 w-6 place-items-center rounded" :class="l.locked ? 'bg-warn/20 text-warn' : 'text-cream-300 hover:bg-ink-700'" :title="l.groupId ? 'Khóa/Mở khóa nhóm' : (l.locked ? 'Mở khóa' : 'Khóa layer')" :aria-label="l.groupId ? 'Khóa/Mở khóa nhóm' : (l.locked ? 'Mở khóa' : 'Khóa layer')">
             <StudioIcon :name="l.locked ? 'lock' : 'lockOpen'" size="h-3.5 w-3.5" />
           </button>
           <!-- Ba nút (khóa · nhân đôi · gỡ khỏi canvas) LUÔN hiện — cùng lý do như khối nhóm ở trên. -->
@@ -203,7 +203,7 @@ async function copyColor(c) {
             <button @click.stop="l.groupId ? store.duplicateGroup(l.groupId) : store.duplicateLayer(l.id)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" :title="l.groupId ? 'Nhân đôi nhóm' : 'Nhân đôi layer'" :aria-label="l.groupId ? 'Nhân đôi nhóm' : 'Nhân đôi layer'">
               <StudioIcon name="copy" size="h-3.5 w-3.5" />
             </button>
-            <button @click.stop="l.groupId ? store.deleteGroup(l.groupId) : store.deleteLayer(l)" :disabled="l.locked" class="grid h-6 w-6 place-items-center rounded bg-red-600/25 text-danger hover:bg-red-600 disabled:opacity-30" :title="l.groupId ? 'Xóa nhóm' : (l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)')" :aria-label="l.groupId ? 'Xóa nhóm' : (l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)')">
+            <button @click.stop="l.groupId ? store.deleteGroup(l.groupId) : store.deleteLayer(l)" :disabled="l.locked" class="grid h-6 w-6 place-items-center rounded bg-danger/25 text-danger hover:bg-danger disabled:opacity-30" :title="l.groupId ? 'Xóa nhóm' : (l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)')" :aria-label="l.groupId ? 'Xóa nhóm' : (l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)')">
               <StudioIcon name="trash" size="h-3.5 w-3.5" />
             </button>
           </div>
@@ -295,7 +295,7 @@ async function copyColor(c) {
         :disabled="!store.activeLayer || !store.activeLayer.image"
         class="motion-ui flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-label font-semibold disabled:opacity-40"
         :class="store.canSaveActiveLayerToOutput
-          ? 'bg-brand-600 text-white ring-1 ring-brand-400/70 hover:bg-brand-500'
+          ? 'bg-brand-600 text-primary-content ring-1 ring-brand-400/70 hover:bg-brand-500'
           : 'bg-ink-800 text-cream-300 hover:bg-ink-700'"
         :title="store.canSaveActiveLayerToOutput ? 'Lưu layer đang chọn vào Output' : 'Ảnh này đã có trong Output — không lưu trùng'"
         :aria-label="store.canSaveActiveLayerToOutput ? 'Lưu layer đang chọn vào Output' : 'Ảnh này đã có trong Output'"

@@ -3,6 +3,7 @@ import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import StudioIcon from './StudioIcon.vue';
+import { PROJECT_COLOR } from '../dataColors.js';
 
 const store = useStudioStore();
 
@@ -206,10 +207,10 @@ async function usePrompt() {
 const statusMeta = computed(() => {
   const s = current.value?.status;
   return {
-    pending:    { label: 'Đang chờ',      cls: 'border-amber-500/40 bg-amber-500/15 text-warn' },
-    processing: { label: 'Đang xử lý',    cls: 'border-amber-500/40 bg-amber-500/15 text-warn' },
-    completed:  { label: 'Hoàn tất',      cls: 'border-emerald-500/40 bg-emerald-500/15 text-ok' },
-    failed:     { label: 'Lỗi',           cls: 'border-red-500/40 bg-red-500/15 text-danger' },
+    pending:    { label: 'Đang chờ',      cls: 'border-warn/40 bg-warn/15 text-warn' },
+    processing: { label: 'Đang xử lý',    cls: 'border-warn/40 bg-warn/15 text-warn' },
+    completed:  { label: 'Hoàn tất',      cls: 'border-ok/40 bg-ok/15 text-ok' },
+    failed:     { label: 'Lỗi',           cls: 'border-danger/40 bg-danger/15 text-danger' },
     cancelled:  { label: 'Đã hủy',        cls: 'border-ink-600 bg-ink-800 text-cream-300' },
   }[s] || { label: s || '—', cls: 'border-ink-600 bg-ink-800 text-cream-300' };
 });
@@ -305,9 +306,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="rootEl" tabindex="-1" role="dialog" aria-modal="true" aria-label="Xem ảnh" class="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-2 outline-none backdrop-blur-sm sm:p-5" @click.self="close">
+  <div ref="rootEl" tabindex="-1" role="dialog" aria-modal="true" aria-label="Xem ảnh" class="fixed inset-0 z-[110] flex items-center justify-center bg-scrim/90 p-2 outline-none backdrop-blur-sm sm:p-5" @click.self="close">
     <!-- Đóng -->
-    <button @click="close" class="absolute right-4 top-4 z-30 grid h-10 w-10 place-items-center rounded-full bg-ink-800 text-cream-200 transition hover:bg-ink-700 hover:text-white" title="Đóng (Esc)" aria-label="Đóng">
+    <button @click="close" class="absolute right-4 top-4 z-30 grid h-10 w-10 place-items-center rounded-full bg-ink-800 text-cream-200 transition hover:bg-ink-700 hover:text-cream-50" title="Đóng (Esc)" aria-label="Đóng">
       <StudioIcon name="x" size="h-5 w-5" />
     </button>
     <!-- Chuyển ảnh -->
@@ -344,7 +345,7 @@ onBeforeUnmount(() => {
         <!-- Thu gọn / mở thông tin ảnh -->
         <button @click="infoOpen = !infoOpen"
                 class="absolute right-3 top-14 z-20 grid h-7 w-7 place-items-center rounded-full border transition"
-                :class="infoOpen ? 'border-ink-600 bg-ink-800 text-cream-200 hover:bg-ink-700 hover:text-white' : 'border-brand-500 bg-brand-600/25 text-brand-200 hover:bg-brand-600/40'"
+                :class="infoOpen ? 'border-ink-600 bg-ink-800 text-cream-200 hover:bg-ink-700 hover:text-cream-50' : 'border-brand-500 bg-brand-600/25 text-brand-200 hover:bg-brand-600/40'"
                 :title="infoOpen ? 'Thu gọn thông tin ảnh' : 'Mở thông tin ảnh'"
                 :aria-label="infoOpen ? 'Thu gọn thông tin ảnh' : 'Mở thông tin ảnh'">
           <StudioIcon name="columns" size="h-3.5 w-3.5"/>
@@ -376,7 +377,7 @@ onBeforeUnmount(() => {
         <!-- Tiêu đề -->
         <div class="flex items-center justify-between">
           <p class="text-sm font-semibold text-cream-100">Ảnh #<span class="text-brand-300">{{ current?.id }}</span></p>
-          <button @click="close" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 transition hover:bg-ink-700 hover:text-white lg:hidden" title="Đóng" aria-label="Đóng">
+          <button @click="close" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 transition hover:bg-ink-700 hover:text-cream-50 lg:hidden" title="Đóng" aria-label="Đóng">
             <StudioIcon name="x" size="h-4 w-4" />
           </button>
         </div>
@@ -420,7 +421,7 @@ onBeforeUnmount(() => {
                   <StudioIcon name="link" size="h-3 w-3" />
                   Chuyển
                 </button>
-                <button @click="detachProject" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-label font-semibold text-cream-300 transition hover:border-red-500 hover:bg-red-600/10 hover:text-danger" title="Gỡ khỏi dự án">
+                <button @click="detachProject" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-label font-semibold text-cream-300 transition hover:border-danger hover:bg-danger/10 hover:text-danger" title="Gỡ khỏi dự án">
                   <StudioIcon name="unlink" size="h-3 w-3" />
                   Gỡ
                 </button>
@@ -444,7 +445,7 @@ onBeforeUnmount(() => {
               <!-- Danh sách dự án -->
               <template v-if="filteredProjects.length">
                 <button v-for="p in filteredProjects" :key="p.id" @click="attachToProject(p)" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-body transition hover:bg-ink-700">
-                  <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ backgroundColor: p.color || '#7aa2f7' }"></span>
+                  <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ backgroundColor: p.color || PROJECT_COLOR }"></span>
                   <span class="flex-1 truncate text-left text-cream-200">{{ p.name }}</span>
                   <span class="shrink-0 text-label text-cream-400">{{ p.generations_count ?? 0 }}</span>
                 </button>
@@ -457,7 +458,7 @@ onBeforeUnmount(() => {
         <div class="rounded-md border border-ink-700/60 bg-ink-800/70 p-2.5">
           <div class="mb-1 flex items-center justify-between">
             <p class="text-label font-semibold uppercase tracking-wide text-cream-400">Prompt</p>
-            <button @click="copyPrompt" class="inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-0.5 text-label font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-white" title="Sao chép prompt">
+            <button @click="copyPrompt" class="inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-0.5 text-label font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-cream-50" title="Sao chép prompt">
               <StudioIcon name="copy" size="h-3 w-3" />
               Sao chép
             </button>
@@ -495,7 +496,7 @@ onBeforeUnmount(() => {
         <!-- ══ Vùng nguy hiểm (tách biệt, xác nhận 2 bước) ══ -->
         <div class="mt-1 border-t border-ink-700/70 pt-3">
           <template v-if="!confirming">
-            <button @click="startConfirm" class="inline-flex items-center justify-center gap-1 w-full rounded-md border border-red-500/40 bg-transparent py-2 text-xs font-semibold text-danger transition hover:bg-red-600/10">
+            <button @click="startConfirm" class="inline-flex items-center justify-center gap-1 w-full rounded-md border border-danger/40 bg-transparent py-2 text-xs font-semibold text-danger transition hover:bg-danger/10">
               <StudioIcon name="trash" size="h-3.5 w-3.5" />
               Xóa ảnh
             </button>
@@ -504,7 +505,7 @@ onBeforeUnmount(() => {
             <p class="mb-1.5 flex items-center justify-center gap-1 text-center text-body font-medium text-danger"><StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> Xóa vĩnh viễn? Hành động này không thể hoàn tác.</p>
             <div class="flex gap-1.5">
               <button @click="resetConfirm" class="flex-1 rounded-md border border-ink-600 bg-ink-800 py-2 text-xs font-semibold text-cream-200 transition hover:bg-ink-700">Hủy</button>
-              <button @click="doDelete" :disabled="deleting" class="inline-flex items-center justify-center gap-1 flex-1 rounded-md bg-red-600 py-2 text-xs font-semibold text-white transition hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed">
+              <button @click="doDelete" :disabled="deleting" class="inline-flex items-center justify-center gap-1 flex-1 rounded-md bg-danger py-2 text-xs font-semibold text-danger-content transition hover:bg-danger disabled:opacity-60 disabled:cursor-not-allowed">
                 <StudioIcon name="trash" size="h-3.5 w-3.5" />
                 Xóa vĩnh viễn
               </button>

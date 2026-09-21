@@ -177,11 +177,14 @@ class DesignSystemTest extends TestCase
             // Nhấn / đang chọn
             'border-brand-500' => true,                                // ĐANG CHỌN
             'hover:border-brand-400' => true,                          // hover nút chưa chọn
-            // Ngữ nghĩa
-            'border-red-500/40' => true,   'hover:border-red-500' => true,   'border-red-500' => true,   // nguy hiểm
-            'border-amber-500/40' => true,                                                              // cảnh báo
-            'border-emerald-500/40' => true,                                                            // thành công
-            'border-sky-500/40' => true,                                                                // thông tin
+            // Ngữ nghĩa — TOKEN của theme, không phải bảng màu thô của Tailwind
+            // [2026-09-25] Đổi từ red/amber/emerald/sky sang danger/warn/ok/info: bảng màu thô KHÔNG
+            // đổi theo theme và không được đo tương phản, nên ở chế độ Sáng chúng là màu ngoài hệ.
+            'border-danger' => true, 'border-danger/40' => true, 'border-danger/30' => true,
+            'border-danger/50' => true, 'border-danger/70' => true, 'hover:border-danger' => true,
+            'border-warn/40' => true, 'border-warn/30' => true, 'border-warn/50' => true,
+            'border-ok/40' => true, 'border-ok/30' => true,
+            'border-info/40' => true, 'border-info/30' => true,
             // Ngoại lệ có lý do (đã ghi trong tài liệu)
             'border-cream-300/50' => true, 'hover:border-cream-200' => true,   // checkbox chọn ảnh (nổi trên mọi ảnh)
             'hover:border-cream-300' => true,                                  // nút kiểu btn-outline trên nền tối
@@ -404,6 +407,85 @@ class DesignSystemTest extends TestCase
      * (bg-brand-600 · bg-brand-500 · bg-danger/10 …). Nút đặt TRÊN ẢNH dùng token cố định
      * bg-scrim/NN + text-scrim-content (§1.1 quy tắc 5) — đó là môi trường ảnh, không phải bề mặt.
      */
+
+    /**
+     * KHÔNG THÀNH PHẦN NÀO SƠN BẰNG MÀU NGOÀI HỆ THEME (2026-09-25).
+     *
+     * Vì sao có bài này: đợt "áp dụng triệt để chuẩn theme" đo được 282 chỗ dùng bảng màu thô của
+     * Tailwind (bg-red-600 · bg-emerald-500/15 · border-amber-500/40 …) và 198 chỗ trắng/đen cứng
+     * (143 text-white · 15 bg-black/70 làm lớp phủ ảnh …). Ba hệ quả thật của chúng:
+     *   (a) chúng KHÔNG đổi theo theme — import một theme mới là giao diện vẫn còn nguyên đỏ/lục/hổ phách;
+     *   (b) chúng KHÔNG được đo tương phản — ở chế độ Sáng, bg-emerald-500/15 là tint của một màu sáng
+     *       trên nền sáng, còn chữ trắng trên nền tint sáng thì mất chữ (đo được 1,3:1);
+     *   (c) cùng một nghĩa lại có nhiều cách viết, nên hai nút cạnh nhau lệch màu mà không ai cố ý.
+     *
+     * Bốn luật được khoá:
+     *   1. Không bảng màu thô của Tailwind ở bất kỳ tệp giao diện nào (Vue · Blade · JS studio).
+     *   2. Không trắng/đen cứng: chữ trên nền màu dùng cặp -content của chính nó (bg-ok text-ok-content),
+     *      chữ trên ẢNH dùng text-scrim-content, lớp phủ ảnh dùng bg-scrim/NN.
+     *      Ngoại lệ ĐÃ GHI trong tài liệu (§1.1 quy tắc 5): border-white/* cho tay cầm vẽ trên ảnh.
+     *   3. Không mã màu viết thẳng trong class/style/:style/@apply — mã màu chỉ được sống trong app.css
+     *      (token) hoặc trong tệp hằng số dữ liệu (resources/js/studio/dataColors.js).
+     *   4. Bộ màu lớp phủ vẽ trên ảnh phải là token CỐ ĐỊNH trong app.css, và mã canvas phải ĐỌC token đó
+     *      (maskVeil) thay vì mỗi tệp tự viết một chuỗi rgba.
+     */
+    public function test_no_component_paints_with_colours_outside_the_theme(): void
+    {
+        $rawPalette = '/\b(?:bg|text|border|ring|fill|stroke|from|to|via|divide|outline|decoration|placeholder|caret|accent|shadow)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|stone)-[0-9]{2,3}\b/';
+        // Hai ngoại lệ ĐÃ GHI trong tài liệu (§1.1):
+        //   · border-white/*  — tay cầm crop/mặt nạ vẽ TRÊN ẢNH (môi trường ảnh, không theo theme);
+        //   · shadow-black/NN — BÓNG ĐỔ là độ sâu, không phải màu: bóng đen ở cả hai chế độ, còn
+        //     bóng theo theme thì chế độ Sáng sẽ đổ bóng trắng (vô hình trên nền trắng).
+        $hardInk = '/\b(?:text|bg|ring|fill|stroke|divide|decoration|placeholder|caret)-(?:white|black)(?:\/[0-9]{1,3})?\b/';
+        $hexInPaint = '/(?::?class|:?style)="[^"]*(?<![,\w])#[0-9a-fA-F]{3,8}|@apply[^;]*(?<![,\w])#[0-9a-fA-F]{3,8}|bg-\[#[0-9a-fA-F]{3,8}/';
+
+        $offenders = [];
+        $files = [];
+        foreach ([resource_path('js/studio'), resource_path('views')] as $dir) {
+            foreach (\Illuminate\Support\Facades\File::allFiles($dir) as $f) {
+                if (in_array($f->getExtension(), ['vue', 'js', 'blade.php', 'php'], true)) {
+                    $files[] = $f->getPathname();
+                }
+            }
+        }
+
+        foreach ($files as $file) {
+            $rel = str_replace(base_path().'/', '', $file);
+            $src = (string) file_get_contents($file);
+
+            foreach ([$rawPalette => 'bảng màu thô của Tailwind', $hardInk => 'trắng/đen cứng', $hexInPaint => 'mã màu viết thẳng'] as $re => $label) {
+                preg_match_all($re, $src, $m);
+                foreach (array_unique($m[0]) as $hit) {
+                    $offenders[] = $rel.' → '.$label.': '.trim($hit);
+                }
+            }
+        }
+
+        $this->assertSame([], array_values(array_unique($offenders)),
+            "Có thành phần sơn bằng màu NGOÀI hệ theme.\n"
+            ."· Trạng thái → dùng token: bg-danger/10 · border-warn/40 · text-ok · bg-info/15\n"
+            ."· Chữ trên nền màu → cặp của chính nó: bg-ok text-ok-content (KHÔNG dùng chữ trắng cứng)\n"
+            ."· Chữ/lớp phủ trên ẢNH → text-scrim-content · bg-scrim/70 (KHÔNG dùng trắng/đen cứng)\n"
+            ."· Màu vẽ trên ảnh (viền chọn · mặt nạ) → token cố định --color-select* / --color-mask-*\n"
+            ."· Màu DỮ LIỆU (tóc · nền studio · nhãn dự án) → hằng số trong resources/js/studio/dataColors.js\n"
+            .'Xem docs/DESIGN_SYSTEM.md §1.1.');
+
+        // Bộ màu lớp phủ phải là TOKEN trong app.css, và mã canvas phải đọc token đó.
+        $css = $this->src('resources/css/app.css');
+        foreach (['--color-select:', '--color-select-alt:', '--color-select-new:', '--color-canvas-dim:',
+            '--color-mask-veil:', '--color-mask-path:', '--color-mask-saved:', '--color-checker-a:'] as $token) {
+            $this->assertStringContainsString($token, $css, 'Thiếu token cố định cho lớp phủ vẽ trên ảnh: '.$token);
+        }
+        $this->assertStringContainsString('.ovl-path { stroke: var(--color-mask-path); }', $css,
+            'Nét mặt nạ vẽ trên ảnh phải đọc token --color-mask-path.');
+
+        $brush = (string) file_get_contents(resource_path('js/studio/store/actions/maskBrush.js'));
+        $this->assertStringContainsString('maskVeil()', $brush,
+            'Màu lớp mặt nạ phải đọc từ token --color-mask-veil (overlayTokens.js), không viết lại chuỗi rgba.');
+        $this->assertStringNotContainsString('rgba(220,38,38', $brush,
+            'Màu mặt nạ còn viết thẳng trong maskBrush.js — ba tệp vẽ mặt nạ phải dùng CHUNG một token.');
+    }
+
     public function test_button_backgrounds_use_one_token_per_state(): void
     {
         // Nền "kính mờ"/alpha lạ: KHÔNG bao giờ dùng cho trạng thái nghỉ của nút.

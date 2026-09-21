@@ -283,7 +283,7 @@ class CanvasControlsTest extends TestCase
         // Nút phải phản ánh đúng trạng thái đó.
         $this->assertStringContainsString('store.canSaveActiveLayerToOutput', $layers,
             'Nút "Lưu Output" phải sáng theo trạng thái có ảnh mới hay không.');
-        $this->assertStringContainsString('bg-brand-600 text-white', $layers,
+        $this->assertStringContainsString('bg-brand-600 text-primary-content', $layers,
             'Trạng thái có ảnh mới phải là nút SÁNG (màu thương hiệu).');
     }
 

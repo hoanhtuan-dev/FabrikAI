@@ -984,7 +984,7 @@ function onTouchEnd(e) {
           </div>
         </template>
         <template v-else>
-          <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-500/20 text-warn"><StudioIcon name="lock" size="h-4 w-4" /></span>
+          <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-warn/20 text-warn"><StudioIcon name="lock" size="h-4 w-4" /></span>
           <div class="leading-tight">
             <p class="text-sm font-semibold text-cream-50">Chưa đăng nhập</p>
             <p class="text-body text-cream-400">Đăng nhập để tạo ảnh/video &amp; lưu dữ liệu.</p>
@@ -998,7 +998,7 @@ function onTouchEnd(e) {
           <div v-if="applyOpen" class="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border border-ink-700 bg-ink-900 shadow-xl">
             <div class="p-2.5">
               <p class="mb-2 text-body font-semibold text-cream-200">Áp dụng bộ sưu tập cho phiên tạo ảnh</p>
-              <div v-if="store.projectScope !== 'own'" class="mb-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-label text-warn">Đang xem bộ sưu tập chờ duyệt. Mở bảng thiết kế để xem bộ sưu tập của bạn.</div>
+              <div v-if="store.projectScope !== 'own'" class="mb-2 rounded-lg bg-warn/10 px-2 py-1.5 text-label text-warn">Đang xem bộ sưu tập chờ duyệt. Mở bảng thiết kế để xem bộ sưu tập của bạn.</div>
               <div v-else class="max-h-64 overflow-y-auto">
                 <!-- Tối đa 20 dự án gần nhất, cuộn được (trước giới hạn cứng 8) -->
                 <div v-for="p in store.projects.slice(0, 20)" :key="p.id" @click="store.applyProject(p); applyOpen = false" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-ink-800" :class="store.appliedProjectId() === p.id ? 'bg-brand-600/20 text-brand-200' : 'text-cream-200'">
@@ -1009,7 +1009,7 @@ function onTouchEnd(e) {
                 </div>
                 <p v-if="!store.projects.length" class="px-2 py-1 text-label text-cream-400">Chưa có bộ sưu tập nào.</p>
               </div>
-              <button v-if="store.appliedProject" @click="store.unapplyProject(); applyOpen = false" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-red-500/40 bg-red-600/10 px-2 py-1.5 text-label font-semibold text-danger transition hover:bg-red-600/20">
+              <button v-if="store.appliedProject" @click="store.unapplyProject(); applyOpen = false" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-danger/40 bg-danger/10 px-2 py-1.5 text-label font-semibold text-danger transition hover:bg-danger/20">
                 <StudioIcon name="pinOff" size="h-3 w-3" /> Ngắt dự án hiện tại
               </button>
               <button @click="applyOpen = false; projectsOpen = true" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-600 bg-ink-800 px-2 py-1.5 text-label font-semibold text-cream-200 transition hover:bg-ink-700">
@@ -1020,8 +1020,8 @@ function onTouchEnd(e) {
           <div v-if="applyOpen" class="fixed inset-0 z-40" @click="applyOpen = false"></div>
         </div>
         <span v-if="store.appliedProject" class="tool-btn is-active hidden max-w-[13rem] md:inline-flex" :title="'Bộ sưu tập hiện tại: ' + store.appliedProject.name + ' — ảnh/video tạo mới sẽ tự gắn vào bộ này'">
-          <button type="button" @click="projectsOpen = true" class="flex min-w-0 items-center gap-1.5 truncate hover:text-white"><StudioIcon name="pin" size="h-3.5 w-3.5" /><span class="truncate">{{ store.appliedProject.name }}</span></button>
-          <button type="button" @click="store.unapplyProject()" class="shrink-0 text-brand-200/70 hover:text-white" aria-label="Ngắt dự án hiện tại"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
+          <button type="button" @click="projectsOpen = true" class="flex min-w-0 items-center gap-1.5 truncate hover:text-cream-50"><StudioIcon name="pin" size="h-3.5 w-3.5" /><span class="truncate">{{ store.appliedProject.name }}</span></button>
+          <button type="button" @click="store.unapplyProject()" class="shrink-0 text-brand-200/70 hover:text-cream-50" aria-label="Ngắt dự án hiện tại"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
         </span>
         <!-- [Đợt 1 — 2026-09-19] Badge credit cũ chỉ hiển thị con số (không biết gói, không có đường
              nâng cấp). Nay là nút mở popup "Gói & credit": gói hiện tại · credit còn lại · chi phí
@@ -1055,9 +1055,9 @@ function onTouchEnd(e) {
                 <span class="rounded bg-ink-800 px-2 py-1 text-cream-200">Ảnh tối đa {{ store.planStatus.limits.image_resolution_cap }}</span>
                 <span class="rounded bg-ink-800 px-2 py-1 text-cream-200">Video tối đa {{ store.planStatus.limits.video_resolution_cap }}p</span>
               </div>
-              <p v-if="store.planStatus.warning" class="mt-2 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-label text-warn">{{ store.planStatus.warning }}</p>
+              <p v-if="store.planStatus.warning" class="mt-2 rounded border border-warn/30 bg-warn/10 px-2 py-1.5 text-label text-warn">{{ store.planStatus.warning }}</p>
               <!-- [Q2] Yêu cầu nâng cấp đang chờ: nói ngay để khách không gửi trùng -->
-              <p v-if="store.planStatus.upgrade && store.planStatus.upgrade.open" class="mt-2 rounded border border-sky-500/30 bg-sky-500/10 px-2 py-1.5 text-label text-info">
+              <p v-if="store.planStatus.upgrade && store.planStatus.upgrade.open" class="mt-2 rounded border border-info/30 bg-info/10 px-2 py-1.5 text-label text-info">
                 Đang chờ xử lý: <b>{{ store.planStatus.upgrade.open.code }}</b> — gói {{ store.planStatus.upgrade.open.plan_name }}
                 · {{ store.planStatus.upgrade.open.amount_label }} · gửi {{ store.planStatus.upgrade.open.created_at }}
                 <span class="block text-info">FabrikAI sẽ liên hệ theo số bạn đã để lại. Cần gấp? Gọi {{ store.planStatus.payment.support.phone || 'số hỗ trợ của FabrikAI' }}.</span>
@@ -1074,8 +1074,8 @@ function onTouchEnd(e) {
                   <span class="rounded-full bg-ink-700 px-2 py-0.5 text-label text-cream-200">
                     ghế {{ store.team.seats.used }}/{{ store.team.seats.limit }}
                   </span>
-                  <span v-if="store.team.seats.remaining" class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-label font-semibold text-ok">còn {{ store.team.seats.remaining }} ghế</span>
-                  <span v-else class="rounded-full bg-amber-500/15 px-2 py-0.5 text-label font-semibold text-warn">hết ghế</span>
+                  <span v-if="store.team.seats.remaining" class="rounded-full bg-ok/15 px-2 py-0.5 text-label font-semibold text-ok">còn {{ store.team.seats.remaining }} ghế</span>
+                  <span v-else class="rounded-full bg-warn/15 px-2 py-0.5 text-label font-semibold text-warn">hết ghế</span>
                   <button type="button" class="icon-btn ml-auto !h-5 !w-5" title="Nạp lại danh sách nhóm" aria-label="Nạp lại danh sách nhóm" @click="store.loadTeam(true)">
                     <StudioIcon name="refresh" size="h-3 w-3" />
                   </button>
@@ -1110,7 +1110,7 @@ function onTouchEnd(e) {
                       <label class="block text-label text-cream-300">Số điện thoại (tuỳ chọn)
                         <input v-model="store.teamForm.phone" maxlength="32" class="input mt-0.5 !py-1 text-body" placeholder="0901234567">
                       </label>
-                      <button type="button" class="w-full rounded bg-brand-600 px-2 py-1.5 text-body font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                      <button type="button" class="w-full rounded bg-brand-600 px-2 py-1.5 text-body font-semibold text-primary-content transition hover:bg-brand-700 disabled:opacity-50"
                               :disabled="store.teamBusy" @click="store.inviteMember()">
                         {{ store.teamBusy ? 'Đang thêm…' : 'Thêm vào nhóm' }}
                       </button>
@@ -1119,7 +1119,7 @@ function onTouchEnd(e) {
                       </p>
                     </template>
                     <template v-else>
-                      <p class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-label text-ok">
+                      <p class="rounded border border-ok/30 bg-ok/10 px-2 py-1.5 text-label text-ok">
                         Đã thêm <b>{{ store.teamResult.member.name }}</b> ({{ store.teamResult.member.email }}) vào nhóm.
                       </p>
                       <div class="rounded bg-ink-800 px-2 py-1.5 text-label text-cream-200">
@@ -1174,8 +1174,8 @@ function onTouchEnd(e) {
                        chính nó và quy tắc KHÔNG nằm trong layer luôn thắng layer của Tailwind v4.
                        ⇒ đặt màu bằng inline style (thắng mọi quy tắc ngoài layer). -->
                   <button type="button"
-                          :style="p.is_current ? { background: '#26231d', color: '#e9e2d0', borderColor: '#3a352b' } : {}"
-                          :class="p.is_current ? 'border' : 'bg-brand-600 text-white hover:bg-brand-700'"
+                          :style="p.is_current ? { background: 'var(--color-ink-800)', color: 'var(--color-cream-200)', borderColor: 'var(--color-ink-600)' } : {}"
+                          :class="p.is_current ? 'border' : 'bg-brand-600 text-primary-content hover:bg-brand-700'"
                           class="mt-1.5 w-full rounded px-2 py-1 text-label font-semibold transition"
                           :disabled="p.is_current || store.planBusy"
                           @click="p.is_free ? store.subscribePlan(p.id) : store.openUpgrade(p)">
@@ -1209,14 +1209,14 @@ function onTouchEnd(e) {
                   <label class="block text-label text-cream-300">Ghi chú
                     <textarea v-model="store.upgradeForm.note" rows="2" maxlength="1000" class="input mt-0.5 !py-1 text-body" placeholder="vd: cần cho bộ Thu Đông, xuất hoá đơn công ty"></textarea>
                   </label>
-                  <button type="button" class="w-full rounded bg-brand-600 px-2 py-1.5 text-body font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                  <button type="button" class="w-full rounded bg-brand-600 px-2 py-1.5 text-body font-semibold text-primary-content transition hover:bg-brand-700 disabled:opacity-50"
                           :disabled="store.upgradeBusy" @click="store.submitUpgrade()">
                     {{ store.upgradeBusy ? 'Đang gửi…' : 'Gửi yêu cầu nâng cấp' }}
                   </button>
                   <p class="text-label leading-relaxed text-cream-300">FabrikAI sẽ liên hệ xác nhận trong giờ làm việc; gói chỉ được kích hoạt SAU khi thanh toán được xác nhận.</p>
                 </template>
                 <template v-else>
-                  <p class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-label text-ok">
+                  <p class="rounded border border-ok/30 bg-ok/10 px-2 py-1.5 text-label text-ok">
                     Đã gửi yêu cầu <b>{{ store.upgradeResult.code }}</b> — {{ store.upgradeResult.plan.name }} ·
                     {{ store.upgradeResult.units }} {{ store.upgradeResult.unit_label }}<span v-if="store.upgradeResult.unit_label !== 'tháng'"> ({{ store.upgradeResult.months }} tháng)</span> · {{ store.upgradeResult.amount_label }} · {{ store.upgradeResult.method_label }}.
                   </p>
@@ -1240,7 +1240,7 @@ function onTouchEnd(e) {
         <!-- [Đợt 0.6] đã gỡ nút "Cài đặt FabrikAI" (PWA) — bỏ PWA hoàn toàn (Q4) -->
         <a v-if="store.user && store.user.is_admin" href="/settings" class="tool-btn" title="Cài đặt AI Models & API Keys"><StudioIcon name="gear" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Cài đặt</span></a>
         <button v-if="store.user" type="button" @click="logout" class="tool-btn" title="Đăng xuất khỏi tài khoản">Đăng xuất</button>
-        <a v-else href="/dang-nhap?redirect=/" class="rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-amber-400">Đăng nhập</a>
+        <a v-else href="/dang-nhap?redirect=/" class="rounded-full bg-warn px-3 py-1 text-xs font-semibold text-warn-content transition hover:bg-warn">Đăng nhập</a>
       </div>
     </div>
     <!-- [Trục 2 — 2026-09-20] Trung tâm thông báo kiểu VSCode (thay ô flashMsg đơn lẻ):
@@ -1274,7 +1274,7 @@ function onTouchEnd(e) {
       <span class="flex items-center gap-1.5 font-display text-sm font-semibold"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-300" /> Studio</span>
       <div class="flex items-center gap-1.5">
         <button @click="projectsOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-600" :title="store.appliedProject ? 'Bộ sưu tập hiện tại: ' + store.appliedProject.name : 'Bộ sưu tập'" aria-label="Bộ sưu tập"><StudioIcon name="kanban" size="h-4 w-4" /><span v-if="store.appliedProject" class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand-400"></span></button>
-        <button @click="outputOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-600" title="Kết quả" aria-label="Kết quả"><StudioIcon name="grid" size="h-4 w-4" /><span v-if="store.generations.length" class="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-tiny font-bold leading-none text-white">{{ store.generations.length }}</span></button>
+        <button @click="outputOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-600" title="Kết quả" aria-label="Kết quả"><StudioIcon name="grid" size="h-4 w-4" /><span v-if="store.generations.length" class="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-tiny font-bold leading-none text-primary-content">{{ store.generations.length }}</span></button>
       </div>
     </div>
     <div v-if="store.studioView !== 'library'" class="flex flex-1 overflow-hidden">
@@ -1293,13 +1293,13 @@ function onTouchEnd(e) {
                   class="activity-btn relative" :class="[activeActivity === a.id ? 'is-active' : '', a.locked ? 'opacity-55' : '']"
                   :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label" :aria-label="a.label">
             <StudioIcon :name="a.icon" size="h-5 w-5" />
-            <span v-if="a.locked" class="absolute -right-0.5 -top-0.5 rounded-full bg-amber-500 p-0.5 text-on-accent" aria-hidden="true"><StudioIcon name="lock" size="h-2.5 w-2.5" /></span>
+            <span v-if="a.locked" class="absolute -right-0.5 -top-0.5 rounded-full bg-warn p-0.5 text-on-accent" aria-hidden="true"><StudioIcon name="lock" size="h-2.5 w-2.5" /></span>
           </button>
           <button v-else-if="a.kind === 'action'" @click="a.locked ? openUpgradeFor(a.id) : runToolbarAction(a.id)"
                   class="activity-btn relative" :class="[isToolbarActionActive(a.id) ? 'is-active' : '', a.locked ? 'opacity-55' : '']"
                   :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label" :aria-label="a.label">
             <StudioIcon :name="a.icon" size="h-5 w-5" />
-            <span v-if="a.locked" class="absolute -right-0.5 -top-0.5 rounded-full bg-amber-500 p-0.5 text-on-accent" aria-hidden="true"><StudioIcon name="lock" size="h-2.5 w-2.5" /></span>
+            <span v-if="a.locked" class="absolute -right-0.5 -top-0.5 rounded-full bg-warn p-0.5 text-on-accent" aria-hidden="true"><StudioIcon name="lock" size="h-2.5 w-2.5" /></span>
           </button>
         </template>
 
@@ -1359,7 +1359,7 @@ function onTouchEnd(e) {
           <span class="panel-title"><StudioIcon :name="activeActivityDef.icon" size="h-4 w-4" class="text-brand-300" /> {{ activeActivityDef.label }}</span>
           <div class="flex shrink-0 items-center gap-1.5">
             <span class="text-label text-cream-400">Credit {{ store.creditsLeft }}</span>
-            <button @click="store.leftPanelOpen = false" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-ink-600 text-cream-300 transition hover:border-brand-400 hover:bg-ink-700 hover:text-white" title="Ẩn bảng trái" aria-label="Ẩn bảng trái"><StudioIcon name="chevronLeft" size="h-4 w-4" /></button>
+            <button @click="store.leftPanelOpen = false" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-ink-600 text-cream-300 transition hover:border-brand-400 hover:bg-ink-700 hover:text-cream-50" title="Ẩn bảng trái" aria-label="Ẩn bảng trái"><StudioIcon name="chevronLeft" size="h-4 w-4" /></button>
           </div>
         </div>
         <div class="scrollbar-hide space-y-2.5 p-2.5">
@@ -1394,7 +1394,7 @@ function onTouchEnd(e) {
             <!-- Khung báo kéo-thả khi đang kéo ảnh vào canvas -->
             <div v-if="dropOver" class="pointer-events-none absolute inset-2 z-50 rounded-lg border-2 border-dashed border-brand-400 bg-brand-400/5"></div>
             <!-- Khung chọn nhóm (mỗi nhóm được chọn trọn = 1 đối tượng) -->
-            <template v-for="o in selectedGroupOutlines" :key="o.gid"><div class="pointer-events-none absolute z-40 rounded-lg border-2 border-dashed border-violet-400 bg-violet-400/10" :style="o.style"></div></template>
+            <template v-for="o in selectedGroupOutlines" :key="o.gid"><div class="pointer-events-none absolute z-40 rounded-lg border-2 border-dashed border-select-alt bg-select-alt/10" :style="o.style"></div></template>
             <!-- Thanh ngữ cảnh khi chọn nhiều layer: căn lề · chia đều · bắt điểm · xóa -->
             <!-- MultiSelectBar đã gộp vào ContextToolbar (hiện ở bottom toolbar) -->
           <!-- Floating tools (Crop/Select/Draw/Erase/Look) — mọi viewport; tự định vị theo màn hình -->
@@ -1411,7 +1411,7 @@ function onTouchEnd(e) {
                   <!-- Giữ nguyên nguồn ảnh cũ (upscaleSrc) để KHÔNG đổi luồng crop/inpaint; chỉ thêm điều
                        kiện ẩn/hiện: trước đây layer bị ẩn vẫn hiện ảnh dự phòng nên bấm con mắt không thấy
                        gì đổi. -->
-                  <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" :class="store.activeLayerId === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : ''" draggable="false" @load="store.onCanvasImgLoad()" />
+                  <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" :class="store.activeLayerId === store.highlightLayerId ? 'outline-2 outline-dashed outline-select-new' : ''" draggable="false" @load="store.onCanvasImgLoad()" />
                 </div>
               </div>
               <p v-else-if="store.activeLayer.visible === false" class="text-sm text-cream-400">Layer đang chọn đang bị <b>ẨN</b> — bấm con mắt trong bảng Lớp để hiện lại.</p>
@@ -1432,7 +1432,7 @@ function onTouchEnd(e) {
                   <!--.layer-body: ĐỘ MỜ RIÊNG của layer (inline, không chuyển động) — nhờ tách hai
                        tầng mà thanh trượt Độ mờ vẫn tức thì trong khi bật/tắt layer vẫn mờ mượt. -->
                   <div class="layer-body" :style="{ opacity: l.opacity != null ? l.opacity : 1 }">
-                  <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :title="l.groupId ? 'Thuộc nhóm — Alt+click để chỉnh sửa riêng layer này' : l.name" :class="[l.id === store.activeLayerId ? 'outline outline-2 -outline-offset-2 outline-sky-400' : (store.isSelected(l.id) ? 'outline outline-2 -outline-offset-2 outline-sky-400/70' : ''), l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']" draggable="false" />
+                  <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :title="l.groupId ? 'Thuộc nhóm — Alt+click để chỉnh sửa riêng layer này' : l.name" :class="[l.id === store.activeLayerId ? 'outline outline-2 -outline-offset-2 outline-select' : (store.isSelected(l.id) ? 'outline outline-2 -outline-offset-2 outline-select/70' : ''), l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-select-new' : '']" draggable="false" />
                   <!-- (Tay cầm chỉnh kích cỡ / xoay KHÔNG còn nằm trong thẻ layer — xem lớp phủ
                        "layer-handle" ở dưới: để trong thẻ thì bị overflow:hidden của vùng canvas cắt mất
                        khi layer phóng to hoặc kéo ra mép.) -->
@@ -1480,7 +1480,7 @@ function onTouchEnd(e) {
             </div>
 
             <!-- Overlay canvas xóa: bám đúng vùng ảnh hiển thị (chịu zoom/pan) -->
-            <canvas v-if="store.eraseMode" ref="eraseOverlay" class="absolute z-30 cursor-crosshair rounded bg-red-500/10" :style="eraseOverlayStyle" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
+            <canvas v-if="store.eraseMode" ref="eraseOverlay" class="absolute z-30 cursor-crosshair rounded bg-danger/10" :style="eraseOverlayStyle" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
             <!-- Overlay canvas vẽ (paint): tô màu lên layer -->
             <div v-if="store.drawMode" class="pointer-events-none absolute z-40 rounded-full border border-white/80" :style="brushCursorStyle"></div>
             <canvas v-if="store.drawMode" ref="drawOverlay" class="absolute z-30 cursor-crosshair rounded" :style="drawOverlayStyle" @pointerdown.stop="store.beginDrawBrush($event)" @pointermove="store.drawBrushMove($event)" @pointerup="store.endDrawBrush()" @pointerleave="store.endDrawBrush()"></canvas>
@@ -1491,7 +1491,7 @@ function onTouchEnd(e) {
             <div v-if="store.snapY != null" class="pointer-events-none absolute inset-x-0 z-40 h-px bg-brand-400/80" :style="{ top: 'calc(50% + ' + (store.snapY * store.zoom + store.pan.y) + 'px)' }"></div>
             <div v-if="store.cropMode && store.upscaleSrc" class="pointer-events-none absolute inset-0" style="z-index:30">
               <div class="absolute cursor-move select-none" style="pointer-events:auto; touch-action:none" :style="store.cropStyle()" @pointerdown.stop="store.cropStart($event,'move')" @dblclick="store.toggleCrop" title="Kéo để di chuyển · nhấn đúp để hủy">
-                <div class="pointer-events-none absolute inset-0 border-2 border-dashed border-brand-300" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);"></div>
+                <div class="pointer-events-none absolute inset-0 border-2 border-dashed border-select ovl-dim"></div>
                 <div class="pointer-events-none absolute inset-0 opacity-30">
                   <div class="absolute left-1/3 top-0 h-full w-px bg-brand-300/60"></div>
                   <div class="absolute left-2/3 top-0 h-full w-px bg-brand-300/60"></div>
@@ -1512,7 +1512,7 @@ function onTouchEnd(e) {
             <button v-for="l in store.layersFrontFirst" :key="l.id" @click="store.selectLayer(l)" class="h-7 w-7 shrink-0 overflow-hidden rounded-md transition" :class="store.activeLayerId === l.id ? 'ring-2 ring-brand-400' : 'opacity-60 hover:opacity-100'" :title="l.name">
               <img :src="l.image" class="h-7 w-7 object-cover" />
             </button>
-            <button @click="store.deleteLayer(store.activeLayer)" :disabled="!store.activeLayer" class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-ink-800 text-danger shadow hover:bg-red-600 hover:text-white disabled:opacity-30" title="Xóa layer khỏi canvas" aria-label="Xóa layer khỏi canvas"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+            <button @click="store.deleteLayer(store.activeLayer)" :disabled="!store.activeLayer" class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-ink-800 text-danger shadow hover:bg-danger hover:text-cream-50 disabled:opacity-30" title="Xóa layer khỏi canvas" aria-label="Xóa layer khỏi canvas"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
           </div>
           <!-- variant slider (bottom, only when multiple variants) -->
           <div v-if="store.showBatch && store.activeBatch.length > 1" class="batch-slider absolute bottom-14 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
@@ -1531,7 +1531,7 @@ function onTouchEnd(e) {
                   </span>
                 </template>
               </button>
-              <button @click="store.hideBatch()" class="ml-1 grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 transition-colors hover:bg-red-600" title="Ẩn biến thể" aria-label="Ẩn biến thể"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
+              <button @click="store.hideBatch()" class="ml-1 grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 transition-colors hover:bg-danger" title="Ẩn biến thể" aria-label="Ẩn biến thể"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
             </div>
           </div>
           </div><!-- /vùng canvas -->
@@ -1605,14 +1605,14 @@ function onTouchEnd(e) {
         </button>
         <button @click="store.toggleOutputDock()" data-dock-toggle="outputs" class="activity-btn" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">
           <StudioIcon name="grid" size="h-5 w-5" />
-          <span v-if="store.generations.length" class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-micro font-bold leading-none text-white">{{ store.generations.length }}</span>
+          <span v-if="store.generations.length" class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-micro font-bold leading-none text-primary-content">{{ store.generations.length }}</span>
         </button>
       </nav>
     </div>
 
     <!-- Mobile menu overlay -->
     <div v-if="menuOpen" role="dialog" aria-modal="true" aria-label="Menu Studio" class="fixed inset-0 z-50 lg:hidden" @click="menuOpen=false">
-      <div class="motion-fade-in absolute inset-0 bg-black/60"></div>
+      <div class="motion-fade-in absolute inset-0 bg-scrim/60"></div>
       <div class="motion-slide-in-left absolute left-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-300" /> Studio</span><button @click="menuOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng menu" aria-label="Đóng menu"><StudioIcon name="x" size="h-4 w-4" /></button></div>
         <div class="mb-3 flex gap-1.5 overflow-x-auto">
@@ -1621,20 +1621,20 @@ function onTouchEnd(e) {
           <template v-for="a in activityBar" :key="'m-' + a.id">
             <button v-if="a.kind === 'panel'" @click="a.locked ? openUpgradeFor(a.id) : selectActivity(a.id)"
                     class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors"
-                    :class="a.locked ? 'bg-ink-800 text-cream-400' : (activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300')"
+                    :class="a.locked ? 'bg-ink-800 text-cream-400' : (activeActivity === a.id ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-300')"
                     :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label">
                 <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-4 w-4" /> {{ a.label }}
             </button>
             <button v-else-if="a.kind === 'action'" @click="a.locked ? openUpgradeFor(a.id) : runToolbarAction(a.id); menuOpen = a.locked ? menuOpen : false"
                     class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors"
-                    :class="a.locked ? 'bg-ink-800 text-cream-400' : (isToolbarActionActive(a.id) ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300')"
+                    :class="a.locked ? 'bg-ink-800 text-cream-400' : (isToolbarActionActive(a.id) ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-300')"
                     :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label">
                 <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-4 w-4" /> {{ a.label }}
             </button>
           </template>
           <!-- [Đợt 0.5] Nguồn ảnh + Thư viện: trước đây chỉ có nút ở rail hidden lg:flex (≥1024px),
                nên người dùng điện thoại KHÔNG có cách mở. Nay cho vào drawer mobile. -->
-          <button @click="menuOpen = false; store.sourcePickerOpen = true" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors" :class="store.sourcePickerOpen ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300'" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm">
+          <button @click="menuOpen = false; store.sourcePickerOpen = true" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors" :class="store.sourcePickerOpen ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-300'" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm">
             <StudioIcon name="imagePlus" size="h-4 w-4" /> Nguồn ảnh
           </button>
           <button @click="menuOpen = false; goLibrary()" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors bg-ink-800 text-cream-300" title="Thư viện — xem ảnh đã tạo & file tải lên">
@@ -1654,7 +1654,7 @@ function onTouchEnd(e) {
     <!-- Mobile outputs overlay: [Đợt 0.5] trước đây drawer này RỖNG (div trong suông) dù OutputModule
          đã import sẵn — người dùng điện thoại bấm "Kết quả" nhận một ngăn trống. Nay render đúng lưới kết quả. -->
     <div v-if="outputOpen" role="dialog" aria-modal="true" aria-label="Kết quả tạo ảnh" class="fixed inset-0 z-50 lg:hidden">
-      <div class="motion-fade-in absolute inset-0 bg-black/60"></div>
+      <div class="motion-fade-in absolute inset-0 bg-scrim/60"></div>
       <div class="motion-slide-in-right absolute right-0 top-0 flex h-full w-80 flex-col scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="panel-head -mx-3 mb-2 flex shrink-0 items-center justify-between border-b border-ink-700 px-3">
           <span class="panel-title"><StudioIcon name="grid" size="h-3.5 w-3.5" class="text-brand-300" /> Kết quả</span>

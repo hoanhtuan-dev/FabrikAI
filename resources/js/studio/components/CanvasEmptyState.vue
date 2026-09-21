@@ -154,11 +154,11 @@ const shortcuts = [
             <div class="mt-3 flex flex-wrap items-center gap-2">
               <div class="flex items-center gap-1 rounded-lg bg-ink-800 p-1" role="group" aria-label="Số biến thể">
                 <span class="px-1 text-label text-cream-400">Biến thể</span>
-                <button v-for="n in [1, 2, 4]" :key="n" type="button" class="h-6 min-w-6 rounded-md px-1.5 text-body font-semibold transition" :class="Number(variantCount) === n ? 'bg-brand-600 text-white' : 'text-cream-400 hover:text-cream-100'" @click="variantCount = n">{{ n }}</button>
+                <button v-for="n in [1, 2, 4]" :key="n" type="button" class="h-6 min-w-6 rounded-md px-1.5 text-body font-semibold transition" :class="Number(variantCount) === n ? 'bg-brand-600 text-primary-content' : 'text-cream-400 hover:text-cream-100'" @click="variantCount = n">{{ n }}</button>
               </div>
               <div class="flex items-center gap-1 rounded-lg bg-ink-800 p-1" role="group" aria-label="Tỉ lệ khung hình">
                 <span class="px-1 text-label text-cream-400">Tỉ lệ</span>
-                <button v-for="r in ratioOptions" :key="r" type="button" class="h-6 rounded-md px-2 text-body font-semibold transition" :class="store.imageRatio === r ? 'bg-brand-600 text-white' : 'text-cream-400 hover:text-cream-100'" @click="store.imageRatio = r">{{ r }}</button>
+                <button v-for="r in ratioOptions" :key="r" type="button" class="h-6 rounded-md px-2 text-body font-semibold transition" :class="store.imageRatio === r ? 'bg-brand-600 text-primary-content' : 'text-cream-400 hover:text-cream-100'" @click="store.imageRatio = r">{{ r }}</button>
               </div>
               <span class="ml-auto text-label text-cream-400">Enter để tạo nhanh · Shift+Enter xuống dòng</span>
             </div>

@@ -132,7 +132,7 @@ export const maskSelectActions = {
       ctx.beginPath();
       pts.forEach((pt, i) => { const x = pt.nx * w, y = pt.ny * h; if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); } });
       ctx.closePath();
-      ctx.fillStyle = 'rgba(220,38,38,0.6)';
+      ctx.fillStyle = maskVeil();
       ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
       this._finalizeInpaintBrush();

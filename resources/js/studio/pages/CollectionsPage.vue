@@ -24,6 +24,7 @@ import { EXPORT_CHANNELS } from '../exportChannels.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import StudioIcon from '../components/StudioIcon.vue';
 import ProjectDesignView from '../components/ProjectDesignView.vue';
+import { STATUS_COLOR } from '../dataColors.js';
 
 // [Xem lại thiết kế] Bộ sưu tập đang xem bản thiết kế đã lưu.
 const designView = ref(null);
@@ -177,11 +178,11 @@ const statusFilters = computed(() => {
 
 // ══════════ HELPERS ══════════
 function statusLabel(s) { return (statuses.value[s] && statuses.value[s].label) || STATUS_LABELS[s] || s; }
-function statusColor(s) { return (statuses.value[s] && statuses.value[s].color) || '#6b6657'; }
+function statusColor(s) { return (statuses.value[s] && statuses.value[s].color) || STATUS_COLOR; }
 function stateTone(state) {
-  if (state === 'approved') return 'bg-emerald-500/85 text-on-accent';
-  if (state === 'rejected') return 'bg-red-500/85 text-on-accent';
-  if (state === 'campaign_ready') return 'bg-amber-500/90 text-on-accent';
+  if (state === 'approved') return 'bg-ok text-ok-content';
+  if (state === 'rejected') return 'bg-danger text-danger-content';
+  if (state === 'campaign_ready') return 'bg-warn text-warn-content';
   return 'bg-ink-800/85 text-cream-100';
 }
 function deadlineDays(d) {
@@ -388,9 +389,9 @@ onBeforeUnmount(() => {
                khi card thu gọn thì khả năng đó MẤT HẲN khỏi giao diện — hàng đợi chỉ còn chạy theo nhịp
                cron, người dùng không có cách nào thúc tại chỗ. -->
           <button v-if="runningCount" type="button" @click="store.processQueue()"
-                  class="motion-ui flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-info hover:bg-sky-500/25"
+                  class="motion-ui flex items-center gap-1.5 rounded-full border border-info/40 bg-info/15 px-3 py-1.5 text-xs font-semibold text-info hover:bg-info/25"
                   title="Chạy ngay hàng đợi tạo ảnh — không phải chờ nhịp cron">
-            <span class="h-3 w-3 animate-spin rounded-full border-2 border-sky-400/40 border-t-sky-300"></span>
+            <span class="h-3 w-3 animate-spin rounded-full border-2 border-info/40 border-t-info"></span>
             {{ runningCount }} ảnh đang tạo · Xử lý ngay
           </button>
           <button class="btn-brand btn-sm" @click="createOpen = true">
@@ -430,7 +431,7 @@ onBeforeUnmount(() => {
                 </span>
                 <div>
                   <p class="flex items-center gap-2 font-semibold text-cream-100">
-                    <span class="rounded-full bg-brand-600 px-2 py-0.5 text-label font-bold text-white">{{ idx + 1 }}</span>
+                    <span class="rounded-full bg-brand-600 px-2 py-0.5 text-label font-bold text-primary-content">{{ idx + 1 }}</span>
                     {{ step.title }}
                   </p>
                   <p class="mt-1.5 text-xs leading-relaxed text-cream-300">{{ step.desc }}</p>
@@ -517,7 +518,7 @@ onBeforeUnmount(() => {
 
               <!-- HÀNH ĐỘNG NHANH -->
               <div class="mt-4 flex flex-wrap gap-2">
-                <button class="tool-btn btn-sm" :class="awaiting.length ? '!border-amber-500/40 !bg-amber-500/10 !text-warn' : ''" @click="openReview()">
+                <button class="tool-btn btn-sm" :class="awaiting.length ? '!border-warn/40 !bg-warn/10 !text-warn' : ''" @click="openReview()">
                   <StudioIcon name="checkSquare" size="h-4 w-4" /> Duyệt mẫu<span v-if="awaiting.length"> · {{ awaiting.length }} chờ</span>
                 </button>
                 <button class="tool-btn btn-sm" @click="openShare()">
@@ -597,7 +598,7 @@ onBeforeUnmount(() => {
                 <div class="flex flex-1 flex-col p-4">
                   <div class="flex items-start justify-between gap-2">
                     <button class="min-w-0 text-left" @click="pick(p)" :title="'Áp dụng «' + p.name + '» cho phiên tạo ảnh'">
-                      <p class="motion-ui truncate text-sm font-semibold text-cream-50 group-hover:text-white">{{ p.name }}</p>
+                      <p class="motion-ui truncate text-sm font-semibold text-cream-50 group-hover:text-cream-50">{{ p.name }}</p>
                       <p v-if="p.brief" class="mt-0.5 line-clamp-1 text-xs text-cream-400">{{ p.brief }}</p>
                     </button>
                     <span class="shrink-0 rounded-full px-2 py-0.5 text-label font-semibold" :class="statusToneClass(p.status)">{{ statusLabel(p.status) }}</span>
@@ -625,7 +626,7 @@ onBeforeUnmount(() => {
                     <button
                       class="flex-1 rounded-lg px-3 py-1.5 text-center text-xs font-semibold transition"
                       :class="store.appliedProject?.id === p.id
-                        ? 'bg-brand-600 text-white'
+                        ? 'bg-brand-600 text-primary-content'
                         : 'border border-ink-600 text-cream-200 hover:border-brand-400 hover:text-brand-200'"
                       :disabled="store.appliedProject?.id === p.id"
                       @click="pick(p)"
@@ -648,7 +649,7 @@ onBeforeUnmount(() => {
     </main>
 
     <!-- ══ MODAL: TẠO BỘ SƯU TẬP ══ -->
-    <div v-if="createOpen" role="dialog" aria-modal="true" aria-label="Bộ sưu tập mới" class="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" @click.self="createOpen = false">
+    <div v-if="createOpen" role="dialog" aria-modal="true" aria-label="Bộ sưu tập mới" class="fixed inset-0 z-[90] flex items-center justify-center bg-scrim/60 p-4" @click.self="createOpen = false">
       <div class="w-full max-w-lg rounded-2xl border border-ink-700 bg-ink-950 p-6 shadow-2xl">
         <div class="mb-5 flex items-center justify-between">
           <h3 class="font-display text-base font-semibold text-cream-50">Bộ sưu tập mới</h3>
@@ -686,7 +687,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- ══ MODAL: DUYỆT MẪU THEO LÔ ══ -->
-    <div v-if="reviewOpen && applied" role="dialog" aria-modal="true" aria-label="Duyệt mẫu theo lô" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="reviewOpen = false">
+    <div v-if="reviewOpen && applied" role="dialog" aria-modal="true" aria-label="Duyệt mẫu theo lô" class="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/60 p-4" @click.self="reviewOpen = false">
       <div class="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-2xl border border-ink-700 bg-ink-950 shadow-2xl">
         <div class="shrink-0 border-b border-ink-700 px-5 py-4">
           <div class="flex items-start justify-between gap-3">
@@ -733,7 +734,7 @@ onBeforeUnmount(() => {
                 <img v-if="s.thumb" :src="s.thumb" :alt="'Ảnh ' + s.id" class="h-24 w-full object-cover" loading="lazy">
                 <span v-else class="flex h-24 w-full items-center justify-center bg-ink-800 text-cream-300"><StudioIcon name="image" size="h-5 w-5" /></span>
                 <span class="absolute left-2 top-2 rounded-lg px-1.5 py-0.5 text-tiny font-bold" :class="stateTone(s.shot_state)">{{ s.shot_label }}</span>
-                <span v-if="shotsSel.includes(s.id)" class="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-brand-500 text-on-accent">
+                <span v-if="shotsSel.includes(s.id)" class="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-brand-600 text-primary-content">
                   <StudioIcon name="check" size="h-3 w-3" />
                 </span>
               </button>
@@ -749,7 +750,7 @@ onBeforeUnmount(() => {
               <button class="btn-brand btn-sm" :disabled="reviewBusy || !selectedCount" title="Chốt các ảnh đã chọn (phím A)" @click="reviewBatch('approved')">
                 <StudioIcon name="check" size="h-4 w-4" /> Duyệt {{ selectedCount }} ảnh
               </button>
-              <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="reviewBusy || !selectedCount" title="Loại các ảnh đã chọn (phím R)" @click="reviewBatch('rejected')">
+              <button class="tool-btn btn-sm !text-danger hover:!bg-danger/15" :disabled="reviewBusy || !selectedCount" title="Loại các ảnh đã chọn (phím R)" @click="reviewBatch('rejected')">
                 <StudioIcon name="ban" size="h-4 w-4" /> Loại {{ selectedCount }} ảnh
               </button>
               <p v-if="!reviewBusy && !selectedCount" class="mt-1.5 text-label leading-4 text-warn">↳ Chưa chọn ảnh nào — bấm vào ảnh trong danh sách để chọn trước khi duyệt.</p>
@@ -758,7 +759,7 @@ onBeforeUnmount(() => {
               Phím tắt khi khối này đang mở: <b class="text-cream-100">S</b> chọn ảnh chờ duyệt · <b class="text-cream-100">N</b> chuyển bước · <b class="text-cream-100">A</b> duyệt · <b class="text-cream-100">R</b> loại · <b class="text-cream-100">Esc</b> đóng
             </p>
             <ul v-if="reviewErrors.length" class="mt-4 space-y-2">
-              <li v-for="err in reviewErrors" :key="err.id" class="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs text-danger">
+              <li v-for="err in reviewErrors" :key="err.id" class="rounded-xl border border-danger/30 bg-danger/10 px-4 py-2 text-xs text-danger">
                 Ảnh #{{ err.id }} ({{ store.shotLabel(err.shot_state) }}): {{ err.error }}
               </li>
             </ul>
@@ -768,7 +769,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- ══ MODAL: CHIA SẺ ══ -->
-    <div v-if="shareOpen && applied" role="dialog" aria-modal="true" aria-label="Chia sẻ link cho khách duyệt" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="shareOpen = false">
+    <div v-if="shareOpen && applied" role="dialog" aria-modal="true" aria-label="Chia sẻ link cho khách duyệt" class="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/60 p-4" @click.self="shareOpen = false">
       <div class="w-full max-w-lg rounded-2xl border border-ink-700 bg-ink-950 p-6 shadow-2xl">
         <div class="mb-5 flex items-center justify-between">
           <h3 class="font-display text-base font-semibold text-cream-50">Chia sẻ cho khách duyệt</h3>
@@ -787,7 +788,7 @@ onBeforeUnmount(() => {
             </div>
             <div class="flex gap-2">
               <button class="btn-brand btn-sm flex-1" @click="copyShare()"><StudioIcon name="copy" size="h-4 w-4" /> Copy link</button>
-              <button class="tool-btn btn-sm !text-danger hover:!bg-red-500/15" :disabled="shareBusy" @click="revokeShare()"><StudioIcon name="ban" size="h-4 w-4" /> Thu hồi</button>
+              <button class="tool-btn btn-sm !text-danger hover:!bg-danger/15" :disabled="shareBusy" @click="revokeShare()"><StudioIcon name="ban" size="h-4 w-4" /> Thu hồi</button>
             </div>
           </div>
           <div v-else class="space-y-4">
@@ -813,7 +814,7 @@ onBeforeUnmount(() => {
             <ul class="mt-2 space-y-2">
               <li v-for="fb in shareInfo.feedback.slice(0, 5)" :key="fb.id" class="text-xs">
                 <span class="font-semibold text-cream-100">{{ fb.author_name }}</span>
-                <span class="ml-1.5 rounded-full px-1.5 py-0.5 text-tiny font-semibold" :class="fb.decision === 'approved' ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'">{{ fb.decision_label }}</span>
+                <span class="ml-1.5 rounded-full px-1.5 py-0.5 text-tiny font-semibold" :class="fb.decision === 'approved' ? 'bg-ok/15 text-ok' : 'bg-warn/15 text-warn'">{{ fb.decision_label }}</span>
                 <span class="ml-1.5 text-cream-400">{{ fb.created_at }}</span>
                 <p v-if="fb.message" class="mt-0.5 whitespace-pre-line text-cream-200">{{ fb.message }}</p>
               </li>
@@ -824,7 +825,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- ══ MODAL: XUẤT GÓI ══ -->
-    <div v-if="exportOpen && applied" role="dialog" aria-modal="true" aria-label="Xuất gói cho xưởng" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="exportOpen = false">
+    <div v-if="exportOpen && applied" role="dialog" aria-modal="true" aria-label="Xuất gói cho xưởng" class="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/60 p-4" @click.self="exportOpen = false">
       <div class="w-full max-w-lg rounded-2xl border border-ink-700 bg-ink-950 p-6 shadow-2xl">
         <div class="mb-5 flex items-center justify-between">
           <h3 class="font-display text-base font-semibold text-cream-50">Xuất gói cho xưởng</h3>

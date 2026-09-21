@@ -3,6 +3,7 @@
 // Shell cung cấp toàn bộ trạng thái/logic qua provide(); component này chỉ inject đúng bề mặt nó dùng
 // rồi giữ NGUYÊN VĂN template của bước. Xem shell để biết định nghĩa gốc.
 import { inject } from 'vue';
+import { MOOD_COLOR } from '../../dataColors.js';
 import { useStudioStore } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
 const store = useStudioStore();
@@ -86,7 +87,7 @@ const formatVnd = inject('formatVnd');
               </div>
             </div>
 
-            <div v-if="store.trendRadarError" role="alert" class="mb-4 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-danger">
+            <div v-if="store.trendRadarError" role="alert" class="mb-4 flex gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-xs text-danger">
               <StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ store.trendRadarError }}</span>
             </div>
 
@@ -135,7 +136,7 @@ const formatVnd = inject('formatVnd');
                     <!-- Nhãn cũ "đo tự động · không cần AI" đọc lên thành "agent không dùng AI" — trong khi
                          lượt chạy có thể đang dùng công cụ tìm kiếm của model. Nhãn này nói ĐÚNG phạm vi của
                          nó: CON SỐ ở khối này do thuật toán đo, không phải AI đoán. -->
-                    <span class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-label font-semibold text-ok" title="Các con số trong khối này do thuật toán đếm từ bài báo, không phải AI viết ra">số đo từ tin thật · không phải AI đoán</span>
+                    <span class="rounded-full bg-ok/15 px-2 py-0.5 text-label font-semibold text-ok" title="Các con số trong khối này do thuật toán đếm từ bài báo, không phải AI viết ra">số đo từ tin thật · không phải AI đoán</span>
                   </span>
                   <span class="mt-1 block text-label leading-4 text-cream-400">Máy chủ đọc tin từ các nguồn đã nối rồi đếm từ khoá đang được nhắc tới — số liệu THẬT kèm nguồn, không phải dự đoán của AI.{{ marketAgeLabel ? ' · đo ' + marketAgeLabel : '' }}</span>
                 </summary>
@@ -145,7 +146,7 @@ const formatVnd = inject('formatVnd');
                       <span class="font-semibold text-cream-100">{{ signal.term }}</span>
                       <span class="text-cream-400">{{ signal.mentions }} tin · {{ signal.source_count }} nguồn</span>
                       <span v-if="signal.change_pct === null || signal.change_pct === undefined" class="text-tiny text-cream-400">lần đo đầu</span>
-                      <span v-else class="rounded px-1 py-0.5 text-tiny font-semibold" :class="signal.change_pct >= 0 ? 'bg-emerald-500/15 text-ok' : 'bg-amber-500/15 text-warn'">{{ signal.change_pct >= 0 ? '↗' : '↘' }} {{ Math.abs(signal.change_pct) }}%</span>
+                      <span v-else class="rounded px-1 py-0.5 text-tiny font-semibold" :class="signal.change_pct >= 0 ? 'bg-ok/15 text-ok' : 'bg-warn/15 text-warn'">{{ signal.change_pct >= 0 ? '↗' : '↘' }} {{ Math.abs(signal.change_pct) }}%</span>
                     </span>
                   </div>
 
@@ -212,7 +213,7 @@ const formatVnd = inject('formatVnd');
                       <h4 class="text-sm font-semibold leading-5 text-cream-50">{{ row.title }}</h4>
                       <span
                         class="shrink-0 rounded px-1.5 py-0.5 text-tiny font-semibold uppercase tracking-wide"
-                        :class="row.source === 'ai' ? 'bg-emerald-500/15 text-ok' : 'bg-ink-700 text-cream-400'"
+                        :class="row.source === 'ai' ? 'bg-ok/15 text-ok' : 'bg-ink-700 text-cream-400'"
                       >{{ row.source === 'ai' ? 'AI' : 'tất định' }}</span>
                     </div>
                     <!-- MỘT câu lý do: giúp hiểu "hướng này để làm gì, vì sao nên chọn" -->
@@ -277,13 +278,13 @@ const formatVnd = inject('formatVnd');
 
               <div class="mb-2 flex flex-wrap items-center gap-2 text-label text-cream-400">
                 <span>Hiện {{ visibleTrends.length }}/{{ trends.length }} hướng</span>
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-ok"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>{{ liveTrendCount }} đo từ tin thật</span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-ok/15 px-2 py-0.5 font-semibold text-ok"><span class="h-1.5 w-1.5 rounded-full bg-ok"></span>{{ liveTrendCount }} đo từ tin thật</span>
                 <!-- TÁCH RIÊNG phần do AI chủ động tra trong lượt này: đó không phải ảnh chụp định kỳ của
                      nguồn cấu hình, và gộp vào "đo từ tin thật" là nói thiếu sự thật về nguồn gốc số liệu. -->
                 <span v-if="aiTrendCount" class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/15 px-2 py-0.5 font-semibold text-brand-200" title="Hướng này khớp tin mà AI tự tra trong lượt này — máy chủ chạy lại câu hỏi của model trên nguồn tìm kiếm thật">
                   <span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span>{{ aiTrendCount }} AI tìm thấy
                 </span>
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-0.5 font-semibold text-warn"><span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>{{ trends.length - liveTrendCount }} bộ có sẵn</span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-warn/15 px-2 py-0.5 font-semibold text-warn"><span class="h-1.5 w-1.5 rounded-full bg-warn"></span>{{ trends.length - liveTrendCount }} bộ có sẵn</span>
                 <details class="ml-auto">
                   <summary class="cursor-pointer text-tiny text-cream-400 underline decoration-dotted">Giải thích</summary>
                   <p class="mt-1 max-w-md rounded-lg bg-ink-900 px-2.5 py-2 text-tiny leading-4 text-cream-300">
@@ -302,7 +303,7 @@ const formatVnd = inject('formatVnd');
                   :aria-pressed="selectedTrendIds.includes(String(trend.id))"
                   @click="toggleTrend(trend.id)"
                 >
-                  <span class="absolute inset-y-0 left-0 w-1" :style="{ backgroundColor: trend.color || '#b9c8c2' }"></span>
+                  <span class="absolute inset-y-0 left-0 w-1" :style="{ backgroundColor: trend.color || MOOD_COLOR }"></span>
                   <span class="flex items-start justify-between gap-3">
                     <span class="min-w-0">
                       <span class="flex flex-wrap items-center gap-1.5 text-label font-semibold uppercase tracking-wide text-cream-400">
@@ -311,18 +312,18 @@ const formatVnd = inject('formatVnd');
                         <!-- BA nhãn, không phải hai: tin của feed định kỳ · tin do AI tự tra trong lượt này ·
                              hướng mẫu chưa gắn tin nào. Gộp hai cái đầu là nói thiếu nguồn gốc số liệu. -->
                         <span v-if="(trend.live?.origin || trend.evidence_origin) === 'ai'" class="rounded bg-brand-500/15 px-1.5 py-0.5 normal-case tracking-normal text-brand-200" title="Hướng này khớp tin mà AI tự tra trong lượt này (model hỏi, máy chủ đi lấy) — số liệu bên dưới đo từ chính những tin đó, có link để bạn kiểm">AI tìm thấy</span>
-                        <span v-else-if="trend.evidence_mode === 'live'" class="rounded bg-emerald-500/15 px-1.5 py-0.5 normal-case tracking-normal text-ok" title="Hướng này có tin thật nhắc tới — số liệu bên dưới là số ĐO từ các tin đó">có tin thật</span>
-                        <span v-else class="rounded bg-amber-500/15 px-1.5 py-0.5 normal-case tracking-normal text-warn" :title="'Hướng mẫu của FabrikAI — chưa có tin nào (của nguồn bạn cấu hình hoặc do AI tra) nhắc tới hướng này'">bộ có sẵn</span>
+                        <span v-else-if="trend.evidence_mode === 'live'" class="rounded bg-ok/15 px-1.5 py-0.5 normal-case tracking-normal text-ok" title="Hướng này có tin thật nhắc tới — số liệu bên dưới là số ĐO từ các tin đó">có tin thật</span>
+                        <span v-else class="rounded bg-warn/15 px-1.5 py-0.5 normal-case tracking-normal text-warn" :title="'Hướng mẫu của FabrikAI — chưa có tin nào (của nguồn bạn cấu hình hoặc do AI tra) nhắc tới hướng này'">bộ có sẵn</span>
                       </span>
                       <span class="mt-1.5 block text-sm font-semibold text-cream-100">{{ trendTitle(trend) }}</span>
                       <span class="mt-1 block text-body leading-4 text-cream-400">{{ trend.description }}</span>
                     </span>
-                    <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full border" :class="selectedTrendIds.includes(String(trend.id)) ? 'border-brand-400 bg-brand-600 text-white' : 'border-ink-600 text-cream-400'">
+                    <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full border" :class="selectedTrendIds.includes(String(trend.id)) ? 'border-brand-400 bg-brand-600 text-primary-content' : 'border-ink-600 text-cream-400'">
                       <StudioIcon :name="selectedTrendIds.includes(String(trend.id)) ? 'check' : 'square'" size="h-3 w-3" />
                     </span>
                   </span>
                   <span class="mt-3 block text-label text-cream-400">{{ trendSignalLabel(trend) }}</span>
-                  <span class="mt-1.5 block h-1 overflow-hidden rounded bg-ink-700"><span class="block h-full bg-gradient-to-r from-brand-500 to-amber-300" :style="{ width: Math.min(100, Number(trend.momentum || 0)) + '%' }"></span></span>
+                  <span class="mt-1.5 block h-1 overflow-hidden rounded bg-ink-700"><span class="block h-full bg-gradient-to-r from-brand-500 to-warn" :style="{ width: Math.min(100, Number(trend.momentum || 0)) + '%' }"></span></span>
                   <span class="mt-2 block text-body leading-4 text-cream-400">{{ trend.recommended_action }}</span>
                 </button>
               </div>

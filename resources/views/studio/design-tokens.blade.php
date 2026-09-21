@@ -76,7 +76,7 @@
                           placeholder="https://daisyui.com/theme-generator/#theme=eJx…"
                           class="mt-1.5 w-full rounded-lg border border-ink-600 bg-ink-950 p-2.5 font-mono text-body text-cream-100 placeholder:text-cream-400 focus:border-brand-500 focus:outline-none">{{ old('link') }}</textarea>
                 <div class="mt-2 flex flex-wrap items-center gap-3">
-                    <button type="submit" class="motion-ui rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500">
+                    <button type="submit" class="motion-ui rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-primary-content hover:bg-brand-500">
                         Import theme
                     </button>
                     <span class="text-label text-cream-400">

@@ -104,7 +104,7 @@ const copyText = inject('copyText');
                     <button type="button" class="tool-btn mt-2 w-full justify-center !py-2.5" @click="setStep('brief')">
                       <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Chỉnh lại brief
                     </button>
-                    <div v-if="collectionError || store.collectionBriefError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs leading-5 text-danger"><StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ collectionError || store.collectionBriefError }}</span></div>
+                    <div v-if="collectionError || store.collectionBriefError" role="alert" class="mt-3 flex gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-xs leading-5 text-danger"><StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ collectionError || store.collectionBriefError }}</span></div>
                   </div>
 
                   <div class="card p-5">

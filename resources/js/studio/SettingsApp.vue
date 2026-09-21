@@ -112,12 +112,12 @@ const flowMeta = (token) => FLOW_META[token] || { label: token, short: token, ic
 const BADGE = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-label font-semibold';
 const BADGE_TONE = {
   neutral: 'bg-ink-700 text-cream-300',
-  ok: 'bg-emerald-500/15 text-ok',
-  warn: 'bg-amber-500/15 text-warn',
-  danger: 'bg-red-500/15 text-danger',
+  ok: 'bg-ok/15 text-ok',
+  warn: 'bg-warn/15 text-warn',
+  danger: 'bg-danger/15 text-danger',
   brand: 'bg-brand-600/25 text-brand-100',
-  info: 'bg-sky-500/15 text-info',
-  custom: 'bg-indigo-500/15 text-indigo-300',
+  info: 'bg-info/15 text-info',
+  custom: 'bg-accent/15 text-cream-100',
 };
 
 // ─────────────────────────── Trạng thái trang ───────────────────────────
@@ -358,10 +358,10 @@ const attention = computed(() => {
 // Bốn tông chú ý — CÙNG quy ước với viền nút: một nghĩa = ĐÚNG MỘT cặp màu + alpha (/40).
 // Xem docs/DESIGN_SYSTEM.md §5 "Viền".
 const attentionTone = (tone) => ({
-  danger: 'text-danger bg-red-500/10 border-red-500/40',
-  warn: 'text-warn bg-amber-500/10 border-amber-500/40',
-  info: 'text-info bg-sky-500/10 border-sky-500/40',
-  ok: 'text-ok bg-emerald-500/10 border-emerald-500/40',
+  danger: 'text-danger bg-danger/10 border-danger/40',
+  warn: 'text-warn bg-warn/10 border-warn/40',
+  info: 'text-info bg-info/10 border-info/40',
+  ok: 'text-ok bg-ok/10 border-ok/40',
 }[tone] || 'text-cream-300 bg-ink-700 border-ink-700');
 
 // ─────────────────────────── Lọc & nhóm danh sách ───────────────────────────
@@ -767,7 +767,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
     <div class="pointer-events-none fixed bottom-5 right-5 z-[80] flex w-[min(92vw,26rem)] flex-col gap-2">
       <transition name="fade">
         <div v-if="toast" role="status" aria-live="polite"
-             :class="toast.ok ? 'border-emerald-500/40 bg-emerald-950/95 text-ok' : 'border-red-500/50 bg-red-950/95 text-danger'"
+             :class="toast.ok ? 'border-ok/40 bg-ink-900/95 text-ok' : 'border-danger/50 bg-ink-900/95 text-danger'"
              class="pointer-events-auto flex items-start gap-2 rounded-lg border px-3.5 py-2.5 text-xs font-semibold shadow-2xl backdrop-blur">
           <StudioIcon :name="toast.ok ? 'check' : 'alertTriangle'" size="h-4 w-4 shrink-0" class="mt-px" />
           <span>{{ toast.msg }}</span>
@@ -816,7 +816,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           <div v-for="i in 4" :key="i" class="card h-24 animate-pulse"></div>
         </div>
       </div>
-      <div v-else-if="error" class="card border-red-500/40 p-6 text-sm text-danger">
+      <div v-else-if="error" class="card border-danger/40 p-6 text-sm text-danger">
         <p class="flex items-center gap-2 font-semibold"><StudioIcon name="alertTriangle" size="h-4 w-4" /> Không nạp được cấu hình</p>
         <p class="mt-1 text-xs text-danger">{{ error }}</p>
         <button class="btn-outline btn-sm mt-3" @click="load()">Thử lại</button>
@@ -1007,7 +1007,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                   </div>
                   <div class="mt-2 flex flex-wrap items-center gap-1.5">
                     <span v-for="p in familyProviders(t)" :key="p.slug" :class="[BADGE, p.configured ? BADGE_TONE.ok : BADGE_TONE.neutral]">
-                      <span class="h-1.5 w-1.5 rounded-full" :class="p.configured ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+                      <span class="h-1.5 w-1.5 rounded-full" :class="p.configured ? 'bg-ok' : 'bg-warn'"></span>
                       {{ p.name }}
                       <span v-if="p.key_count" class="opacity-70">×{{ p.key_count }}</span>
                     </span>
@@ -1075,7 +1075,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
               <div v-else class="mt-4 space-y-4">
                 <div v-for="[prov, rows] in keysByProvider" :key="prov">
                   <div class="flex flex-wrap items-center gap-2">
-                    <span class="h-2 w-2 rounded-full" :class="rows.some(k => k.enabled) ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+                    <span class="h-2 w-2 rounded-full" :class="rows.some(k => k.enabled) ? 'bg-ok' : 'bg-warn'"></span>
                     <h3 class="text-sm font-semibold text-cream-50">{{ providerName(prov) }}</h3>
                     <span v-if="providerOf(prov) && providerOf(prov).custom" :class="[BADGE, BADGE_TONE.custom]">Custom</span>
                     <span :class="[BADGE, BADGE_TONE.neutral]">×{{ rows.length }}</span>
@@ -1097,7 +1097,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                             <StudioIcon :name="k.enabled ? 'eyeOff' : 'eye'" size="h-3.5 w-3.5" /> {{ k.enabled ? 'Tắt' : 'Bật' }}
                           </button>
                           <button class="tool-btn" @click="openKeyModal(k)"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa</button>
-                          <button class="tool-btn !text-danger hover:!bg-red-500/15" @click="askDeleteKey(k)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
+                          <button class="tool-btn !text-danger hover:!bg-danger/15" @click="askDeleteKey(k)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
                         </span>
                       </div>
                       <p v-if="k.note" class="mt-1 text-body text-cream-300">{{ k.note }}</p>
@@ -1159,7 +1159,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
               <ul v-else class="mt-4 space-y-2">
                 <li v-for="p in filteredCustomProviders" :key="p.slug" class="rounded-lg border border-ink-700 bg-ink-900/40 p-3.5">
                   <div class="flex flex-wrap items-center gap-2">
-                    <span class="h-2 w-2 rounded-full" :class="p.configured ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+                    <span class="h-2 w-2 rounded-full" :class="p.configured ? 'bg-ok' : 'bg-warn'"></span>
                     <span class="text-sm font-semibold text-cream-50">{{ p.name }}</span>
                     <code class="rounded bg-ink-800 px-1.5 py-0.5 text-label text-cream-200">{{ p.slug }}</code>
                     <span :class="[BADGE, BADGE_TONE.custom]">{{ p.protocol }}</span>
@@ -1170,7 +1170,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     <span class="ml-auto flex flex-wrap items-center gap-1.5">
                       <button class="tool-btn" @click="gotoAddKey(p.slug)"><StudioIcon name="key" size="h-3.5 w-3.5" /> Thêm key</button>
                       <button class="tool-btn" @click="openProvModal(p)"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa</button>
-                      <button class="tool-btn !text-danger hover:!bg-red-500/15" @click="askDeleteProv(p)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
+                      <button class="tool-btn !text-danger hover:!bg-danger/15" @click="askDeleteProv(p)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
                     </span>
                   </div>
                   <p class="mt-1.5 truncate text-body text-cream-300">
@@ -1255,7 +1255,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                         <span v-if="m.api_key_ref && m.api_key_ref !== m.provider" class="text-label text-cream-300">key ref: {{ m.api_key_ref }}</span>
                         <span class="ml-auto flex flex-wrap items-center gap-1.5">
                           <button class="tool-btn" @click="openModelModal(m)"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa</button>
-                          <button class="tool-btn !text-danger hover:!bg-red-500/15" @click="askDeleteModel(m)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
+                          <button class="tool-btn !text-danger hover:!bg-danger/15" @click="askDeleteModel(m)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
                         </span>
                       </div>
                       <p v-if="m.note" class="mt-1 text-body text-cream-300">{{ m.note }}</p>
@@ -1374,7 +1374,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                 </div>
               </div>
 
-              <p v-if="ws.error" role="alert" class="mt-3 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-body text-danger">{{ ws.error }}</p>
+              <p v-if="ws.error" role="alert" class="mt-3 rounded-lg border border-danger/40 bg-danger/15 px-3 py-2 text-body text-danger">{{ ws.error }}</p>
               <p v-else-if="ws.loading" class="mt-3 text-body text-cream-400">Đang tải…</p>
               <p v-else-if="!ws.rows.length" class="mt-3 rounded-lg border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center text-body text-cream-400">
                 Chưa có nguồn nào. Bấm <b class="text-cream-200">Thêm nguồn mẫu</b> để bắt đầu với 3 nguồn đã đo chạy được.
@@ -1481,7 +1481,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                   <p class="mt-1">3. Ánh xạ trường bên dưới khai kết quả trả về: Google CSE trả <code class="text-cream-200">items</code> với <code class="text-cream-200">title</code> · <code class="text-cream-200">link</code> · <code class="text-cream-200">snippet</code>.</p>
                   <!-- CẢNH BÁO ĐÃ TRẢ GIÁ: đo thật 2026-09-21 — người khai dán MÃ CX vào ô API key, vì cả
                        hai đều là "mã của Google" và cùng nằm cạnh nhau trên trang này. -->
-                  <p class="mt-1 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-warn">
+                  <p class="mt-1 rounded border border-warn/40 bg-warn/10 p-2 text-warn">
                     <b>Đừng lẫn hai mã:</b> <code>cx=…</code> là <b>ID của search engine</b> (nằm trong URL, KHÔNG phải khoá).
                     Khoá API là chuỗi RIÊNG do Google Cloud cấp (thường bắt đầu bằng <code>AIza…</code>) và phải bật
                     <b>Custom Search API</b> cho project đó. Dán nhầm CX vào ô API key thì API trả
@@ -1624,7 +1624,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
               id="k-provider"
               v-model="keyModal.form.provider"
               class="input !py-2"
-              :class="keyModal.errors.provider ? '!border-red-500/70' : ''"
+              :class="keyModal.errors.provider ? '!border-danger/70' : ''"
               @change="onKeyProviderChange"
             >
               <option value="">— Chọn provider —</option>
@@ -1644,13 +1644,13 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           </div>
           <div>
             <label class="label" for="k-label">Nhãn</label>
-            <input id="k-label" v-model="keyModal.form.label" class="input !py-2" :class="keyModal.errors.label ? '!border-red-500/70' : ''" placeholder="VD: Qwen Token-Plan">
+            <input id="k-label" v-model="keyModal.form.label" class="input !py-2" :class="keyModal.errors.label ? '!border-danger/70' : ''" placeholder="VD: Qwen Token-Plan">
             <p v-if="keyModal.errors.label" class="mt-1 text-body text-danger">{{ keyModal.errors.label }}</p>
           </div>
         </div>
         <div>
           <label class="label" for="k-value">Khoá API {{ keyModal.mode === 'edit' ? '(để trống = giữ nguyên)' : '' }}</label>
-          <input id="k-value" v-model="keyModal.form.value" type="password" autocomplete="new-password" class="input !py-2 font-mono text-xs" :class="keyModal.errors.value ? '!border-red-500/70' : ''" placeholder="sk-…">
+          <input id="k-value" v-model="keyModal.form.value" type="password" autocomplete="new-password" class="input !py-2 font-mono text-xs" :class="keyModal.errors.value ? '!border-danger/70' : ''" placeholder="sk-…">
           <p v-if="keyModal.errors.value" class="mt-1 text-body text-danger">{{ keyModal.errors.value }}</p>
           <p class="mt-1 text-body text-cream-300">
             {{ providerOf(keyModal.form.provider) && providerOf(keyModal.form.provider).hint ? providerOf(keyModal.form.provider).hint : 'Key được mã hoá trước khi lưu và không bao giờ hiển thị lại.' }}
@@ -1663,7 +1663,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           </div>
           <div>
             <label class="label" for="k-priority">Ưu tiên</label>
-            <input id="k-priority" type="number" min="0" max="100" v-model.number="keyModal.form.priority" class="input !py-2" :class="keyModal.errors.priority ? '!border-red-500/70' : ''">
+            <input id="k-priority" type="number" min="0" max="100" v-model.number="keyModal.form.priority" class="input !py-2" :class="keyModal.errors.priority ? '!border-danger/70' : ''">
             <p v-if="keyModal.errors.priority" class="mt-1 text-body text-danger">{{ keyModal.errors.priority }}</p>
           </div>
           <div class="flex items-end pb-2">
@@ -1691,19 +1691,19 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
         <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label class="label" for="p-slug">Provider ID (slug)</label>
-            <input id="p-slug" v-model="provModal.form.slug" :disabled="provModal.mode === 'edit'" class="input !py-2 font-mono text-xs disabled:opacity-60" :class="provModal.errors.slug ? '!border-red-500/70' : ''" placeholder="VD: openrouter">
+            <input id="p-slug" v-model="provModal.form.slug" :disabled="provModal.mode === 'edit'" class="input !py-2 font-mono text-xs disabled:opacity-60" :class="provModal.errors.slug ? '!border-danger/70' : ''" placeholder="VD: openrouter">
             <p v-if="provModal.errors.slug" class="mt-1 text-body text-danger">{{ provModal.errors.slug }}</p>
             <p v-else-if="provModal.mode === 'edit'" class="mt-1 text-body text-cream-300">Provider ID cố định sau khi tạo (model và generation tham chiếu theo slug).</p>
           </div>
           <div>
             <label class="label" for="p-name">Tên hiển thị</label>
-            <input id="p-name" v-model="provModal.form.name" class="input !py-2" :class="provModal.errors.name ? '!border-red-500/70' : ''" placeholder="VD: OpenRouter">
+            <input id="p-name" v-model="provModal.form.name" class="input !py-2" :class="provModal.errors.name ? '!border-danger/70' : ''" placeholder="VD: OpenRouter">
             <p v-if="provModal.errors.name" class="mt-1 text-body text-danger">{{ provModal.errors.name }}</p>
           </div>
         </div>
         <div>
           <label class="label" for="p-url">Base URL</label>
-          <input id="p-url" v-model="provModal.form.base_url" class="input !py-2 font-mono text-xs" :class="provModal.errors.base_url ? '!border-red-500/70' : ''" placeholder="https://openrouter.ai/api/v1">
+          <input id="p-url" v-model="provModal.form.base_url" class="input !py-2 font-mono text-xs" :class="provModal.errors.base_url ? '!border-danger/70' : ''" placeholder="https://openrouter.ai/api/v1">
           <p v-if="provModal.errors.base_url" class="mt-1 text-body text-danger">{{ provModal.errors.base_url }}</p>
         </div>
         <div class="grid gap-3 sm:grid-cols-2">
@@ -1729,7 +1729,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
         </p>
         <div>
           <label class="label" for="p-keyref">Key ref — TÊN NHÓM KEY <span class="font-normal normal-case text-cream-300">(bỏ trống = dùng Provider ID)</span></label>
-          <input id="p-keyref" v-model="provModal.form.api_key_ref" class="input !py-2 font-mono text-xs" :class="provModal.errors.api_key_ref ? '!border-red-500/70' : ''" placeholder="vd: ckey — KHÔNG dán khoá API vào đây">
+          <input id="p-keyref" v-model="provModal.form.api_key_ref" class="input !py-2 font-mono text-xs" :class="provModal.errors.api_key_ref ? '!border-danger/70' : ''" placeholder="vd: ckey — KHÔNG dán khoá API vào đây">
           <p v-if="provModal.errors.api_key_ref" class="mt-1 text-body text-danger">{{ provModal.errors.api_key_ref }}</p>
           <p v-else class="mt-1 text-body text-cream-300">Khoá API thật thêm ở mục API Keys với provider = slug này.</p>
         </div>
@@ -1777,14 +1777,14 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           </div>
           <div>
             <label class="label" for="m-name">Tên model</label>
-            <input id="m-name" v-model="modelModal.form.name" class="input !py-2" :class="modelModal.errors.name ? '!border-red-500/70' : ''" placeholder="VD: Qwen Image 3.0 Pro">
+            <input id="m-name" v-model="modelModal.form.name" class="input !py-2" :class="modelModal.errors.name ? '!border-danger/70' : ''" placeholder="VD: Qwen Image 3.0 Pro">
             <p v-if="modelModal.errors.name" class="mt-1 text-body text-danger">{{ modelModal.errors.name }}</p>
           </div>
         </div>
         <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label class="label" for="m-provider">Provider</label>
-            <select id="m-provider" v-model="modelModal.form.provider" class="input !py-2" :class="modelModal.errors.provider ? '!border-red-500/70' : ''" @change="onModelProviderChange">
+            <select id="m-provider" v-model="modelModal.form.provider" class="input !py-2" :class="modelModal.errors.provider ? '!border-danger/70' : ''" @change="onModelProviderChange">
               <option value="">— Chọn provider —</option>
               <option v-for="p in sortedProviders" :key="p.slug" :value="p.slug">{{ p.name }} ({{ p.slug }})</option>
             </select>
@@ -1792,19 +1792,19 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           </div>
           <div>
             <label class="label" for="m-model-id">Model ID</label>
-            <input id="m-model-id" v-model="modelModal.form.model_id" class="input !py-2 font-mono text-xs" :class="modelModal.errors.model_id ? '!border-red-500/70' : ''" placeholder="qwen-image-3.0-pro">
+            <input id="m-model-id" v-model="modelModal.form.model_id" class="input !py-2 font-mono text-xs" :class="modelModal.errors.model_id ? '!border-danger/70' : ''" placeholder="qwen-image-3.0-pro">
             <p v-if="modelModal.errors.model_id" class="mt-1 text-body text-danger">{{ modelModal.errors.model_id }}</p>
           </div>
         </div>
         <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label class="label" for="m-keyref">Key ref <span class="font-normal normal-case text-cream-300">(tên nhóm key)</span></label>
-            <input id="m-keyref" v-model="modelModal.form.api_key_ref" class="input !py-2 font-mono text-xs" :class="modelModal.errors.api_key_ref ? '!border-red-500/70' : ''" placeholder="mặc định = provider">
+            <input id="m-keyref" v-model="modelModal.form.api_key_ref" class="input !py-2 font-mono text-xs" :class="modelModal.errors.api_key_ref ? '!border-danger/70' : ''" placeholder="mặc định = provider">
             <p v-if="modelModal.errors.api_key_ref" class="mt-1 text-body text-danger">{{ modelModal.errors.api_key_ref }}</p>
           </div>
           <div>
             <label class="label" for="m-priority">Ưu tiên (0–100)</label>
-            <input id="m-priority" type="number" min="0" max="100" v-model.number="modelModal.form.priority" class="input !py-2" :class="modelModal.errors.priority ? '!border-red-500/70' : ''">
+            <input id="m-priority" type="number" min="0" max="100" v-model.number="modelModal.form.priority" class="input !py-2" :class="modelModal.errors.priority ? '!border-danger/70' : ''">
             <p v-if="modelModal.errors.priority" class="mt-1 text-body text-danger">{{ modelModal.errors.priority }}</p>
             <p v-else class="mt-1 text-body text-cream-300">Chỉ so trong cùng nhóm provider — xem Luồng ưu tiên.</p>
           </div>
@@ -1830,7 +1830,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
       <p class="text-xs leading-relaxed text-cream-200">{{ confirmBox.message }}</p>
       <div class="mt-4 flex items-center justify-end gap-2 border-t border-ink-700 pt-3">
         <button class="tool-btn" @click="confirmBox.open = false">Huỷ</button>
-        <button class="btn-sm inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-500 disabled:opacity-60"
+        <button class="btn-sm inline-flex items-center gap-1.5 rounded-xl bg-danger px-4 py-2 font-semibold text-danger-content hover:bg-danger disabled:opacity-60"
                 :disabled="confirmBox.busy" @click="confirmRun">
           <StudioIcon name="trash" size="h-3.5 w-3.5" /> {{ confirmBox.busy ? 'Đang xoá…' : confirmBox.label }}
         </button>

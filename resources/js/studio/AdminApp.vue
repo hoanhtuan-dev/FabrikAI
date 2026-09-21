@@ -61,13 +61,13 @@ const ROLE_META = {
 const roleMeta = (r) => ROLE_META[r] || { label: r, cls: 'bg-ink-700 text-cream-300' };
 
 const TYPE_META = {
-  spend: { label: 'Tiêu credit', cls: 'bg-red-500/15 text-danger' },
-  refund: { label: 'Hoàn credit', cls: 'bg-emerald-500/15 text-ok' },
-  grant: { label: 'Tặng credit', cls: 'bg-emerald-500/15 text-ok' },
+  spend: { label: 'Tiêu credit', cls: 'bg-danger/15 text-danger' },
+  refund: { label: 'Hoàn credit', cls: 'bg-ok/15 text-ok' },
+  grant: { label: 'Tặng credit', cls: 'bg-ok/15 text-ok' },
   purchase: { label: 'Nạp gói', cls: 'bg-brand-600/25 text-brand-100' },
   renew: { label: 'Gia hạn', cls: 'bg-brand-600/25 text-brand-100' },
-  signup: { label: 'Đăng ký', cls: 'bg-sky-500/15 text-info' },
-  adjust: { label: 'Điều chỉnh', cls: 'bg-amber-500/15 text-warn' },
+  signup: { label: 'Đăng ký', cls: 'bg-info/15 text-info' },
+  adjust: { label: 'Điều chỉnh', cls: 'bg-warn/15 text-warn' },
   // [2026-09-19] Cấp credit theo CHU KỲ GÓI (plans.credits_per_month) — trước đây gói chỉ hiển thị
   // số credit/tháng mà không có đường cấp nào.
   plan_grant: { label: 'Cấp theo gói', cls: 'bg-brand-600/25 text-brand-100' },
@@ -79,7 +79,7 @@ const typeMeta = (t) => TYPE_META[t] || { label: t, cls: 'bg-ink-700 text-cream-
 const GUI_PINNED = ['settings'];
 const GUI_KIND = {
   panel: { label: 'Nhóm card', cls: 'bg-brand-600/25 text-brand-100', hint: 'Mở nhóm card ở sidebar trái' },
-  action: { label: 'Popup', cls: 'bg-amber-500/20 text-warn', hint: 'Mở popup riêng (không đổi sidebar)' },
+  action: { label: 'Popup', cls: 'bg-warn/20 text-warn', hint: 'Mở popup riêng (không đổi sidebar)' },
   menu: { label: 'Menu (ghim đáy)', cls: 'bg-ink-700 text-cream-300', hint: 'Menu Cài đặt — luôn nằm ở đáy thanh công cụ' },
 };
 const isGuiPinned = (it) => GUI_PINNED.indexOf(it.id) !== -1;
@@ -87,11 +87,11 @@ const isGuiPinned = (it) => GUI_PINNED.indexOf(it.id) !== -1;
 const BADGE = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-label font-semibold';
 const BADGE_TONE = {
   neutral: 'bg-ink-700 text-cream-300',
-  ok: 'bg-emerald-500/15 text-ok',
-  warn: 'bg-amber-500/15 text-warn',
-  danger: 'bg-red-500/15 text-danger',
+  ok: 'bg-ok/15 text-ok',
+  warn: 'bg-warn/15 text-warn',
+  danger: 'bg-danger/15 text-danger',
   brand: 'bg-brand-600/25 text-brand-100',
-  info: 'bg-sky-500/15 text-info',
+  info: 'bg-info/15 text-info',
   gold: 'bg-gold-400/15 text-gold-400',
 };
 
@@ -373,9 +373,9 @@ async function grantAllModules(plan) {
 }
 const moduleKindMeta = (k) => ({
   panel: { label: 'Nhóm card', cls: 'bg-brand-600/25 text-brand-100' },
-  action: { label: 'Popup', cls: 'bg-amber-500/20 text-warn' },
+  action: { label: 'Popup', cls: 'bg-warn/20 text-warn' },
   menu: { label: 'Menu', cls: 'bg-ink-700 text-cream-300' },
-  feature: { label: 'Tính năng', cls: 'bg-sky-500/15 text-info' },
+  feature: { label: 'Tính năng', cls: 'bg-info/15 text-info' },
 }[k] || { label: k, cls: 'bg-ink-700 text-cream-300' });
 
 function ensureLoaded(id) {
@@ -432,10 +432,10 @@ const attention = computed(() => {
 // Bốn tông chú ý — CÙNG quy ước với viền nút: một nghĩa = ĐÚNG MỘT cặp màu + alpha (/40).
 // Xem docs/DESIGN_SYSTEM.md §5 "Viền".
 const attentionTone = (tone) => ({
-  danger: 'text-danger bg-red-500/10 border-red-500/40',
-  warn: 'text-warn bg-amber-500/10 border-amber-500/40',
-  info: 'text-info bg-sky-500/10 border-sky-500/40',
-  ok: 'text-ok bg-emerald-500/10 border-emerald-500/40',
+  danger: 'text-danger bg-danger/10 border-danger/40',
+  warn: 'text-warn bg-warn/10 border-warn/40',
+  info: 'text-info bg-info/10 border-info/40',
+  ok: 'text-ok bg-ok/10 border-ok/40',
 }[tone] || 'text-cream-300 bg-ink-700 border-ink-700');
 
 // ─────────────────────────── Hộp thoại: người dùng ───────────────────────────
@@ -725,7 +725,7 @@ onMounted(async () => {
     <div class="pointer-events-none fixed bottom-5 right-5 z-[80] flex w-[min(92vw,26rem)] flex-col gap-2">
       <transition name="fade">
         <div v-if="toast" role="status" aria-live="polite"
-             :class="toast.ok ? 'border-emerald-500/40 bg-emerald-950/95 text-ok' : 'border-red-500/50 bg-red-950/95 text-danger'"
+             :class="toast.ok ? 'border-ok/40 bg-ink-900/95 text-ok' : 'border-danger/50 bg-ink-900/95 text-danger'"
              class="pointer-events-auto flex items-start gap-2 rounded-lg border px-3.5 py-2.5 text-xs font-semibold shadow-2xl backdrop-blur">
           <StudioIcon :name="toast.ok ? 'check' : 'alertTriangle'" size="h-4 w-4 shrink-0" class="mt-px" />
           <span>{{ toast.msg }}</span>
@@ -742,7 +742,7 @@ onMounted(async () => {
         </a>
         <div class="min-w-0 flex-1">
           <h1 class="flex items-center gap-2 font-display text-lg font-semibold text-cream-50">
-            <span class="grid h-6 w-6 place-items-center rounded-md bg-brand-600 text-body font-bold text-white">F</span>
+            <span class="grid h-6 w-6 place-items-center rounded-md bg-brand-600 text-body font-bold text-primary-content">F</span>
             Quản trị FabrikAI
           </h1>
           <p class="mt-0.5 hidden truncate text-body text-cream-300 sm:block">
@@ -795,7 +795,7 @@ onMounted(async () => {
               </li>
             </ul>
           </div>
-          <p v-if="!isSuper" class="mx-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-label leading-relaxed text-warn">
+          <p v-if="!isSuper" class="mx-3 rounded-lg border border-warn/30 bg-warn/10 p-2.5 text-label leading-relaxed text-warn">
             Vai trò của bạn không có quyền quản lý tài khoản người dùng (chỉ Owner). Các mục còn lại vẫn dùng bình thường.
           </p>
           <p class="mt-3 px-3 text-label leading-relaxed text-cream-300">
@@ -1015,7 +1015,7 @@ onMounted(async () => {
                             <button class="icon-btn" title="Xem sổ credit của người này" :aria-label="'Xem sổ credit của ' + u.name" @click="openUserLedger(u)"><StudioIcon name="receipt" size="h-4 w-4" /></button>
                             <button v-if="u.is_active" class="icon-btn" title="Khoá tài khoản" :aria-label="'Khoá tài khoản ' + u.name" :disabled="u.id === (me && me.id)" @click="askBanUser(u)"><StudioIcon name="lock" size="h-4 w-4" /></button>
                             <button v-else class="icon-btn !text-ok" title="Mở khoá tài khoản" :aria-label="'Mở khoá tài khoản ' + u.name" @click="toggleUserActive(u, true)"><StudioIcon name="lockOpen" size="h-4 w-4" /></button>
-                            <button class="icon-btn !text-danger hover:!bg-red-500/15" title="Xoá người dùng" :aria-label="'Xoá người dùng ' + u.name" :disabled="u.id === (me && me.id)" @click="askDeleteUser(u)"><StudioIcon name="userX" size="h-4 w-4" /></button>
+                            <button class="icon-btn !text-danger hover:!bg-danger/15" title="Xoá người dùng" :aria-label="'Xoá người dùng ' + u.name" :disabled="u.id === (me && me.id)" @click="askDeleteUser(u)"><StudioIcon name="userX" size="h-4 w-4" /></button>
                           </div>
                         </td>
                       </tr>
@@ -1123,7 +1123,7 @@ onMounted(async () => {
                   <button class="tool-btn" @click="openEditPlan(p)"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa</button>
                   <button v-if="p.is_active" class="tool-btn" @click="askTogglePlan(p, false)"><StudioIcon name="eyeOff" size="h-3.5 w-3.5" /> Ẩn gói</button>
                   <button v-else class="tool-btn" @click="askTogglePlan(p, true)"><StudioIcon name="eye" size="h-3.5 w-3.5" /> Mở bán</button>
-                  <button class="tool-btn !text-danger hover:!bg-red-500/15" @click="askDeletePlan(p)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
+                  <button class="tool-btn !text-danger hover:!bg-danger/15" @click="askDeletePlan(p)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
                 </div>
               </article>
             </div>
@@ -1351,7 +1351,7 @@ onMounted(async () => {
                                     :title="'Kích hoạt gói ' + (r.plan ? r.plan.name : '') + ' cho ' + (r.user ? r.user.name : '') + ' sau khi đã nhận ' + r.amount_label">
                               <StudioIcon name="check" size="h-3.5 w-3.5" /> Kích hoạt
                             </button>
-                            <button class="tool-btn !text-danger hover:!bg-red-500/15" @click="setUpgradeStatus(r, 'cancelled')" title="Huỷ yêu cầu (khách đổi ý / trùng)">
+                            <button class="tool-btn !text-danger hover:!bg-danger/15" @click="setUpgradeStatus(r, 'cancelled')" title="Huỷ yêu cầu (khách đổi ý / trùng)">
                               <StudioIcon name="ban" size="h-3.5 w-3.5" /> Huỷ
                             </button>
                           </template>
@@ -1403,7 +1403,7 @@ onMounted(async () => {
                   </button>
                 </div>
               </div>
-              <p v-if="moduleDirty" class="mt-3 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-body text-warn">
+              <p v-if="moduleDirty" class="mt-3 rounded border border-warn/30 bg-warn/10 px-3 py-2 text-body text-warn">
                 Có thay đổi chưa lưu — nhớ bấm <b>Lưu công tắc</b> (toàn cục) hoặc <b>Lưu</b> ở từng gói.
               </p>
             </div>
@@ -1494,7 +1494,7 @@ onMounted(async () => {
                         <button v-for="m in items" :key="p.slug + m.id"
                                 class="rounded border px-1.5 py-0.5 text-label transition"
                                 :class="(planModules[p.slug] || []).includes(m.id)
-                                  ? 'border-emerald-500/40 bg-emerald-500/15 text-ok'
+                                  ? 'border-ok/40 bg-ok/15 text-ok'
                                   : 'border-ink-600 bg-ink-800 text-cream-300 hover:border-ink-500'"
                                 :title="m.summary"
                                 @click="toggleGrant(p.slug, m.id)">
@@ -1608,12 +1608,12 @@ onMounted(async () => {
         <div class="grid gap-3 sm:grid-cols-2">
           <div class="sm:col-span-2">
             <label class="label" for="u-name">Tên</label>
-            <input id="u-name" v-model="userModal.form.name" class="input !py-2" :class="userModal.errors.name ? '!border-red-500/70' : ''" placeholder="VD: Nguyễn Văn A">
+            <input id="u-name" v-model="userModal.form.name" class="input !py-2" :class="userModal.errors.name ? '!border-danger/70' : ''" placeholder="VD: Nguyễn Văn A">
             <p v-if="userModal.errors.name" class="mt-1 text-body text-danger">{{ userModal.errors.name }}</p>
           </div>
           <div>
             <label class="label" for="u-email">Email</label>
-            <input id="u-email" v-model="userModal.form.email" type="email" class="input !py-2" :class="userModal.errors.email ? '!border-red-500/70' : ''" placeholder="email@example.com">
+            <input id="u-email" v-model="userModal.form.email" type="email" class="input !py-2" :class="userModal.errors.email ? '!border-danger/70' : ''" placeholder="email@example.com">
             <p v-if="userModal.errors.email" class="mt-1 text-body text-danger">{{ userModal.errors.email }}</p>
           </div>
           <div>
@@ -1622,7 +1622,7 @@ onMounted(async () => {
           </div>
           <div>
             <label class="label" for="u-role">Vai trò</label>
-            <select id="u-role" v-model="userModal.form.role" class="input !py-2" :class="userModal.errors.role ? '!border-red-500/70' : ''">
+            <select id="u-role" v-model="userModal.form.role" class="input !py-2" :class="userModal.errors.role ? '!border-danger/70' : ''">
               <option value="customer">Khách hàng</option>
               <option value="admin">Quản trị</option>
               <option value="super_admin">Owner (super admin)</option>
@@ -1638,7 +1638,7 @@ onMounted(async () => {
           </div>
           <div v-if="userModal.mode === 'create'" class="sm:col-span-2">
             <label class="label" for="u-pwd">Mật khẩu (tối thiểu 8 ký tự)</label>
-            <input id="u-pwd" v-model="userModal.form.password" type="password" autocomplete="new-password" class="input !py-2 font-mono text-xs" :class="userModal.errors.password ? '!border-red-500/70' : ''">
+            <input id="u-pwd" v-model="userModal.form.password" type="password" autocomplete="new-password" class="input !py-2 font-mono text-xs" :class="userModal.errors.password ? '!border-danger/70' : ''">
             <p v-if="userModal.errors.password" class="mt-1 text-body text-danger">{{ userModal.errors.password }}</p>
           </div>
         </div>
@@ -1666,7 +1666,7 @@ onMounted(async () => {
         </p>
         <div>
           <label class="label" for="c-amount">Số credit (dương = cộng, âm = trừ)</label>
-          <input id="c-amount" v-model.number="creditModal.form.amount" type="number" step="1" class="input !py-2" :class="creditModal.errors.amount ? '!border-red-500/70' : ''" placeholder="vd: 500 hoặc -100">
+          <input id="c-amount" v-model.number="creditModal.form.amount" type="number" step="1" class="input !py-2" :class="creditModal.errors.amount ? '!border-danger/70' : ''" placeholder="vd: 500 hoặc -100">
           <p v-if="creditModal.errors.amount" class="mt-1 text-body text-danger">{{ creditModal.errors.amount }}</p>
         </div>
         <div>
@@ -1689,7 +1689,7 @@ onMounted(async () => {
         <p v-if="pwdModal.row" class="text-xs text-cream-200">Đặt mật khẩu mới cho <b class="text-cream-50">{{ pwdModal.row.name }}</b> ({{ pwdModal.row.email }}).</p>
         <div>
           <label class="label" for="p-pwd">Mật khẩu mới (tối thiểu 8 ký tự)</label>
-          <input id="p-pwd" v-model="pwdModal.form.password" type="password" autocomplete="new-password" class="input !py-2 font-mono text-xs" :class="pwdModal.errors.password ? '!border-red-500/70' : ''">
+          <input id="p-pwd" v-model="pwdModal.form.password" type="password" autocomplete="new-password" class="input !py-2 font-mono text-xs" :class="pwdModal.errors.password ? '!border-danger/70' : ''">
           <p v-if="pwdModal.errors.password" class="mt-1 text-body text-danger">{{ pwdModal.errors.password }}</p>
         </div>
         <div class="flex items-center justify-end gap-2 border-t border-ink-700 pt-3">
@@ -1707,12 +1707,12 @@ onMounted(async () => {
         <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label class="label" for="pl-name">Tên gói</label>
-            <input id="pl-name" v-model="planModal.form.name" class="input !py-2" :class="planModal.errors.name ? '!border-red-500/70' : ''" placeholder="VD: Chuyên nghiệp">
+            <input id="pl-name" v-model="planModal.form.name" class="input !py-2" :class="planModal.errors.name ? '!border-danger/70' : ''" placeholder="VD: Chuyên nghiệp">
             <p v-if="planModal.errors.name" class="mt-1 text-body text-danger">{{ planModal.errors.name }}</p>
           </div>
           <div>
             <label class="label" for="pl-slug">Slug</label>
-            <input id="pl-slug" v-model="planModal.form.slug" class="input !py-2 font-mono text-xs" :class="planModal.errors.slug ? '!border-red-500/70' : ''" placeholder="vd: pro">
+            <input id="pl-slug" v-model="planModal.form.slug" class="input !py-2 font-mono text-xs" :class="planModal.errors.slug ? '!border-danger/70' : ''" placeholder="vd: pro">
             <p v-if="planModal.errors.slug" class="mt-1 text-body text-danger">{{ planModal.errors.slug }}</p>
           </div>
           <div class="sm:col-span-2">
@@ -1721,12 +1721,12 @@ onMounted(async () => {
           </div>
           <div>
             <label class="label" for="pl-price">Giá VNĐ / tháng (0 = miễn phí)</label>
-            <input id="pl-price" v-model.number="planModal.form.price_vnd" type="number" min="0" class="input !py-2" :class="planModal.errors.price_vnd ? '!border-red-500/70' : ''">
+            <input id="pl-price" v-model.number="planModal.form.price_vnd" type="number" min="0" class="input !py-2" :class="planModal.errors.price_vnd ? '!border-danger/70' : ''">
             <p v-if="planModal.errors.price_vnd" class="mt-1 text-body text-danger">{{ planModal.errors.price_vnd }}</p>
           </div>
           <div>
             <label class="label" for="pl-credits">Credit / tháng</label>
-            <input id="pl-credits" v-model.number="planModal.form.credits_per_month" type="number" min="0" class="input !py-2" :class="planModal.errors.credits_per_month ? '!border-red-500/70' : ''">
+            <input id="pl-credits" v-model.number="planModal.form.credits_per_month" type="number" min="0" class="input !py-2" :class="planModal.errors.credits_per_month ? '!border-danger/70' : ''">
             <p v-if="planModal.errors.credits_per_month" class="mt-1 text-body text-danger">{{ planModal.errors.credits_per_month }}</p>
           </div>
           <div>
@@ -1748,12 +1748,12 @@ onMounted(async () => {
           </div>
           <div>
             <label class="label" for="pl-img">Credit / ảnh</label>
-            <input id="pl-img" v-model.number="planModal.form.image_credit_cost" type="number" min="1" class="input !py-2" :class="planModal.errors.image_credit_cost ? '!border-red-500/70' : ''">
+            <input id="pl-img" v-model.number="planModal.form.image_credit_cost" type="number" min="1" class="input !py-2" :class="planModal.errors.image_credit_cost ? '!border-danger/70' : ''">
             <p v-if="planModal.errors.image_credit_cost" class="mt-1 text-body text-danger">{{ planModal.errors.image_credit_cost }}</p>
           </div>
           <div>
             <label class="label" for="pl-vid">Credit / video</label>
-            <input id="pl-vid" v-model.number="planModal.form.video_credit_cost" type="number" min="1" class="input !py-2" :class="planModal.errors.video_credit_cost ? '!border-red-500/70' : ''">
+            <input id="pl-vid" v-model.number="planModal.form.video_credit_cost" type="number" min="1" class="input !py-2" :class="planModal.errors.video_credit_cost ? '!border-danger/70' : ''">
             <p v-if="planModal.errors.video_credit_cost" class="mt-1 text-body text-danger">{{ planModal.errors.video_credit_cost }}</p>
           </div>
           <div>
@@ -1780,7 +1780,7 @@ onMounted(async () => {
                   <button v-for="m in items" :key="'pf-' + m.id" type="button"
                           class="rounded border px-1.5 py-0.5 text-label transition"
                           :class="(planModal.form.modules || []).includes(m.id)
-                            ? 'border-emerald-500/40 bg-emerald-500/15 text-ok'
+                            ? 'border-ok/40 bg-ok/15 text-ok'
                             : 'border-ink-600 bg-ink-800 text-cream-300 hover:border-ink-500'"
                           :title="m.summary + (m.depends_on.length ? ' · cần: ' + m.depends_on.join(', ') : '')"
                           @click="togglePlanFormModule(m.id)">
@@ -1856,7 +1856,7 @@ onMounted(async () => {
       <p class="text-xs leading-relaxed text-cream-200">{{ confirmBox.message }}</p>
       <div class="mt-4 flex items-center justify-end gap-2 border-t border-ink-700 pt-3">
         <button class="tool-btn" @click="confirmBox.open = false">Huỷ</button>
-        <button class="btn-sm inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-500 disabled:opacity-60"
+        <button class="btn-sm inline-flex items-center gap-1.5 rounded-xl bg-danger px-4 py-2 font-semibold text-danger-content hover:bg-danger disabled:opacity-60"
                 :disabled="confirmBox.busy" @click="confirmRun">
           <StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> {{ confirmBox.busy ? 'Đang xử lý…' : confirmBox.label }}
         </button>

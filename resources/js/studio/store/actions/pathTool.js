@@ -183,7 +183,7 @@ export const pathToolActions = {
           ctx.bezierCurveTo(a.x + a.ox, a.y + a.oy, b.x + b.ix, b.y + b.iy, b.x, b.y);
         }
         ctx.closePath();
-        ctx.fillStyle = 'rgba(220,38,38,0.6)';
+        ctx.fillStyle = maskVeil();
         ctx.fill();
       }
       ctx.globalCompositeOperation = 'source-over';

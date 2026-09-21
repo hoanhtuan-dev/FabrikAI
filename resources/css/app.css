@@ -128,6 +128,12 @@
     --color-danger: var(--color-error);
     --color-warn: var(--color-warning);
     --color-ok: var(--color-success);
+    /* Cặp CHỮ của ba bí danh trên. Vì sao cần: chữ trên nền màu phải đi THEO CẶP với nền của nó
+       (bg-ok + text-ok-content), chứ không phải một màu chữ cứng — ở chế độ Sáng token trạng thái là
+       màu ĐẬM, nên chữ trắng/đen cứng sẽ mất chữ ở một trong hai chế độ. */
+    --color-danger-content: var(--color-error-content);
+    --color-warn-content: var(--color-warning-content);
+    --color-ok-content: var(--color-success-content);
 
     /* ── NỀN CANVAS — token CỐ ĐỊNH (không khai lại ở [data-theme='light']): canvas là MÔI TRƯỜNG
        ẢNH, người dùng chọn "Trắng"/"Kem" để nhìn ảnh; nếu theo theme thì ở theme sáng "nền kem"
@@ -150,6 +156,29 @@
        — nếu dùng cream-* làm hover thì ở một trong hai theme nền hover sẽ cùng cực với chữ. */
     --color-invert-hover: #ffffff;
     --color-on-accent: #17150f;
+
+    /* ── LỚP PHỦ VẼ TRÊN ẢNH — token CỐ ĐỊNH (2026-09-25) ────────────────────────────────
+       Vì sao CỐ ĐỊNH, không theo theme: đây là những nét vẽ ĐÈ LÊN ẢNH. Ảnh có thể sáng hoặc tối
+       bất kỳ, nên viền/tay cầm phải giữ một bộ màu tương phản với ẢNH; nếu chúng theo theme thì ở
+       chế độ Sáng viền "đang chọn" sẽ hoá màu tối và biến mất trên ảnh tối (và ngược lại ở chế độ
+       Tối). Cùng nhóm với --color-canvas-* và --color-scrim: MÔI TRƯỜNG ẢNH, không phải bề mặt UI.
+       Vì sao vẫn phải là TOKEN (không viết mã màu trong markup): cùng một màu mặt nạ từng được viết
+       ở ba tệp (maskBrush · maskSelect · pathTool) — ba chỗ để lệch nhau lúc nào không biết. */
+    --color-select: #38bdf8;                    /* viền ĐANG CHỌN của layer, vẽ trên ảnh */
+    --color-select-alt: #a78bfa;                /* viền KHỐI CHỨA (nhóm), vẽ trên ảnh */
+    --color-select-new: #ef4444;                /* viền NHẤN TẠM THỜI (layer vừa tạo) */
+    --color-canvas-dim: rgba(14, 13, 9, 0.5);   /* làm tối phần ngoài vùng chọn */
+    --color-mask-veil: rgba(220, 38, 38, 0.6);  /* lớp mặt nạ phủ trên ảnh */
+    --color-mask-path: #f43f5e;                 /* nét mặt nạ đang vẽ */
+    --color-mask-path-fill: rgba(244, 63, 94, 0.12);
+    --color-mask-region: #a78bfa;               /* vùng mặt nạ đã khép kín */
+    --color-mask-region-fill: rgba(167, 139, 250, 0.12);
+    --color-mask-saved: #34d399;                /* vùng mặt nạ ĐÃ LƯU */
+    --color-mask-handle: #38bdf8;               /* tay cầm điểm neo */
+    --color-mask-inner: #f0abfc;                /* tay cầm bán kính trong */
+    --color-mask-cusp: #fb923c;                 /* điểm gãy (cusp) của đường bao */
+    --color-checker-a: #d8d2c4;                 /* ô caro "trong suốt" */
+    --color-checker-b: #ffffff;
 
     --radius-4xl: 2rem;
 
@@ -379,11 +408,11 @@
     /* Nút ĐẢO màu: ở theme tối là nút sáng, theme sáng là nút tối (token invert cố định,
        không theo dải bề mặt — nếu dùng bg-ink-900 thì theme sáng sẽ ra nút TRẮNG trên nền trắng). */
     .btn-primary {
-        @apply btn bg-invert px-6 py-3 text-invert-content hover:bg-brand-600 hover:text-white hover:shadow-lg hover:shadow-brand-900/20 active:scale-[.98];
+        @apply btn bg-invert px-6 py-3 text-invert-content hover:bg-brand-600 hover:text-primary-content hover:shadow-lg hover:shadow-brand-900/20 active:scale-[.98];
     }
 
     .btn-brand {
-        @apply btn bg-brand-600 px-6 py-3 text-white hover:bg-brand-700 hover:shadow-lg hover:shadow-brand-900/20 active:scale-[.98];
+        @apply btn bg-brand-600 px-6 py-3 text-primary-content hover:bg-brand-700 hover:shadow-lg hover:shadow-brand-900/20 active:scale-[.98];
     }
 
     /* Nút phụ: hover ĐẢO màu (nền invert + chữ invert-content) ⇒ đúng ở cả hai theme,
@@ -442,10 +471,10 @@
     .prose-content blockquote { @apply my-5 border-l-4 border-brand-500 bg-ink-800 py-3 pl-5 italic text-cream-200; }
     .prose-content a { @apply text-brand-300 underline underline-offset-2; }
     .prose-content img { @apply my-6 w-full rounded-2xl; }
-    .studio-nav { @apply flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-cream-100 transition-colors hover:bg-ink-700 hover:text-white;
+    .studio-nav { @apply flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-cream-100 transition-colors hover:bg-ink-700 hover:text-cream-50;
     }
     .studio-nav.is-active {
-        @apply bg-brand-600 font-semibold text-white hover:bg-brand-600;
+        @apply bg-brand-600 font-semibold text-primary-content hover:bg-brand-600;
     }
     .studio-nav-head {
         @apply mt-4 px-3 text-body font-semibold uppercase tracking-wide text-cream-300;
@@ -474,7 +503,7 @@
     /* Segmented control (tabs / chế độ / ngôn ngữ) — thay mọi chip lồng nhau */
     .seg { @apply flex gap-1 rounded-lg bg-ink-800 p-1; }
     .seg-btn { @apply flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-body font-semibold text-cream-300 transition-colors hover:text-cream-100; }
-    .seg-btn.is-active { @apply bg-brand-600 text-white hover:text-white; }
+    .seg-btn.is-active { @apply bg-brand-600 text-primary-content hover:text-primary-content; }
     /* Nút toolbar nhỏ trong card/panel (toggle lịch sử, templates, hành động phụ) */
     /* Viền NGHỈ của mọi nút phụ = border-ink-600 (xem docs/DESIGN_SYSTEM.md §5 "Viền") —
        trước đây .tool-btn dùng ink-700 còn nút viết tay dùng ink-600 nên hai nút cạnh nhau
@@ -597,6 +626,42 @@
     .canvas-bg-dark { background: var(--color-canvas-dark); }
     .canvas-bg-white { background: var(--color-canvas-white); }
     .canvas-bg-cream { background: var(--color-canvas-cream); }
+
+    /* Làm tối phần NGOÀI vùng chọn khi cắt/gọt (lớp phủ trên ẢNH ⇒ token cố định, không theo theme). */
+    .ovl-dim { box-shadow: 0 0 0 9999px var(--color-canvas-dim); }
+
+    /* Nét vẽ SVG TRÊN ẢNH (mặt nạ · đường bao · tay cầm). Mỗi class đọc MỘT token cố định ở trên —
+       markup không còn mã màu nào, nên đổi bộ màu lớp phủ chỉ phải sửa một chỗ. */
+    .ovl-path { stroke: var(--color-mask-path); }
+    .ovl-path-fill { fill: var(--color-mask-path-fill); }
+    .ovl-region { stroke: var(--color-mask-region); }
+    .ovl-region-fill { fill: var(--color-mask-region-fill); }
+    .ovl-region-solid { fill: var(--color-mask-region); }
+    .ovl-saved { stroke: var(--color-mask-saved); }
+    .ovl-handle { stroke: var(--color-mask-handle); }
+    .ovl-handle-solid { fill: var(--color-mask-handle); }
+    .ovl-inner { stroke: var(--color-mask-inner); }
+    .ovl-inner-solid { fill: var(--color-mask-inner); }
+    .ovl-node-outline { stroke: var(--color-scrim); }
+    .ovl-node-saved { fill: var(--color-mask-saved); }
+    .ovl-node-cusp { fill: var(--color-mask-cusp); }
+    .ovl-node-sharp { fill: var(--color-mask-path); }
+    .ovl-node-default { fill: var(--color-mask-region); }
+    .ovl-pill { fill: var(--color-scrim); stroke: var(--color-select); }
+    .ovl-pill-stroke { stroke: var(--color-scrim-content); }
+    .ovl-pill-fill { fill: var(--color-scrim-content); }
+    /* Ô caro "trong suốt" sau ảnh mặt nạ — quy ước của mọi trình chỉnh ảnh, màu cố định. */
+    .checkerboard {
+        background-image: repeating-conic-gradient(var(--color-checker-a) 0 25%, var(--color-checker-b) 0 50%);
+        background-size: 16px 16px;
+    }
+
+    /* Cùng bộ màu caro, cỡ nhỏ — cho ô màu 20px ở bảng Lớp. Nếu mỗi chỗ tự chọn một cặp xám thì
+       hai chỗ cùng hiển thị «trong suốt» lại khác nhau — đúng lỗi đã xảy ra với ô màu nền canvas. */
+    .checkerboard-sm {
+        background-image: repeating-conic-gradient(var(--color-checker-a) 0 25%, var(--color-checker-b) 0 50%);
+        background-size: 8px 8px;
+    }
 
     /* ── 3. BẬT/TẮT LAYER (nút con mắt ở bảng Lớp) ───────────────────────────────────────
        Layer ẩn KHÔNG bị gỡ khỏi DOM — nó mờ đi tại chỗ. Vì sao không gỡ: (a) hiệu ứng phải phủ CẢ thẻ

@@ -24,7 +24,7 @@ const emit = defineEmits(['update:modelValue', 'confirm']);
   <BaseModal :model-value="modelValue" :title="title" @update:model-value="emit('update:modelValue', $event)">
     <div class="flex items-start gap-3">
       <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full"
-            :class="danger ? 'bg-red-500/15 text-danger' : 'bg-brand-500/15 text-brand-300'">
+            :class="danger ? 'bg-danger/15 text-danger' : 'bg-brand-500/15 text-brand-300'">
         <StudioIcon :name="danger ? 'alertTriangle' : 'info'" size="h-4.5 w-4.5" />
       </span>
       <div class="min-w-0 flex-1">
@@ -34,8 +34,8 @@ const emit = defineEmits(['update:modelValue', 'confirm']);
     </div>
     <div class="mt-5 flex items-center justify-end gap-2">
       <button class="btn-outline btn-sm" :disabled="busy" @click="emit('update:modelValue', false)">{{ cancelLabel }}</button>
-      <button class="btn-sm rounded-md px-3 py-1.5 text-xs font-semibold text-white transition disabled:opacity-50"
-              :class="danger ? 'bg-red-600 hover:bg-red-500' : 'bg-brand-600 hover:bg-brand-500'"
+      <button class="btn-sm rounded-md px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50"
+              :class="danger ? 'bg-danger text-danger-content hover:bg-danger' : 'bg-brand-600 text-primary-content hover:bg-brand-500'"
               :disabled="busy" @click="emit('confirm')">
         {{ busy ? 'Đang xử lý…' : confirmLabel }}
       </button>

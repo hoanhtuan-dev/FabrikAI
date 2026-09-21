@@ -220,14 +220,14 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
       <p class="mt-0.5 text-label leading-4 text-cream-400">Đọc ảnh bạn đang có → gợi ý <span class="text-cream-200">phong cách · bảng màu · prompt</span> để tạo ảnh mới.</p>
     </div>
 
-    <p v-if="!store.suggestEnabled" role="status" class="mt-2 rounded-md border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-label leading-4 text-danger">
+    <p v-if="!store.suggestEnabled" role="status" class="mt-2 rounded-md border border-danger/40 bg-danger/10 px-2.5 py-1.5 text-label leading-4 text-danger">
       Tính năng đang tắt — bật lại trong <b>Cài đặt Studio → Gợi ý từ ảnh</b>.
     </p>
 
     <!-- ① ẢNH NGUỒN (bắt buộc) -->
     <div class="mt-3">
       <p class="flex items-center gap-1.5 text-body font-semibold text-cream-100">
-        <span class="grid h-4 w-4 place-items-center rounded-full bg-brand-600 text-tiny font-bold text-white">1</span>
+        <span class="grid h-4 w-4 place-items-center rounded-full bg-brand-600 text-tiny font-bold text-primary-content">1</span>
         Ảnh nguồn <span class="rounded bg-ink-800 px-1.5 py-0.5 text-tiny font-medium text-brand-200">bắt buộc</span>
       </p>
 
@@ -238,7 +238,7 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
       </button>
 
       <div v-if="store.upscaleSrc" class="mt-1.5 flex items-center gap-3 rounded-lg border border-ink-700 bg-ink-900/50 p-2">
-        <img :src="store.upscaleSrc" alt="Ảnh nguồn để phân tích" class="h-14 w-14 shrink-0 rounded-lg bg-ink-900 object-cover ring-1 ring-white/10">
+        <img :src="store.upscaleSrc" alt="Ảnh nguồn để phân tích" class="h-14 w-14 shrink-0 rounded-lg bg-ink-900 object-cover ring-1 ring-ink-600">
         <div class="min-w-0 flex-1">
           <p class="truncate text-body font-semibold text-cream-100">{{ sourceName }}</p>
           <p class="mt-0.5 text-label leading-4 text-cream-400">Muốn đổi ảnh: chọn ảnh khác trên canvas hoặc trong Thư viện ảnh.</p>
@@ -265,7 +265,7 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
       <div class="mt-1.5 flex flex-wrap gap-1.5">
         <button v-for="p in PRESETS" :key="p.key" type="button" :title="p.hint"
                 class="motion-ui inline-flex items-center gap-1 rounded-full border px-2 py-1 text-label font-medium transition"
-                :class="activePreset && activePreset.key === p.key ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"
+                :class="activePreset && activePreset.key === p.key ? 'border-brand-500 bg-brand-600 text-primary-content' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"
                 @click="applyPreset(p)">
           <StudioIcon :name="p.icon" size="h-3 w-3" /> {{ p.label }}
         </button>
@@ -327,12 +327,12 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
       <LoadingSpinner size="sm" :text="phaseLabel" :subtext="progressSubtext" :progress="stagePct" />
     </div>
 
-    <div v-if="store.suggestError" role="alert" class="mt-2.5 rounded-lg border border-red-500/40 bg-red-500/10 p-2.5 text-body text-danger">
+    <div v-if="store.suggestError" role="alert" class="mt-2.5 rounded-lg border border-danger/40 bg-danger/10 p-2.5 text-body text-danger">
       {{ store.suggestError }}
     </div>
 
     <!-- ── KẾT QUẢ ── -->
-    <div v-if="hasResult" class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/20 p-2.5">
+    <div v-if="hasResult" class="mt-3 rounded-lg border border-ok/40 bg-ok/20 p-2.5">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
           <p class="flex items-center gap-1.5 text-body font-semibold text-ok">
@@ -343,7 +343,7 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
             <span>· mức bám: {{ adherenceLabel }}</span>
           </p>
         </div>
-        <button class="motion-ui grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink-800 text-cream-200 transition hover:bg-red-600 hover:text-white"
+        <button class="motion-ui grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink-800 text-cream-200 transition hover:bg-danger hover:text-cream-50"
                 title="Xoá gợi ý này" aria-label="Xoá gợi ý này"
                 @click="store.suggestResult = null; store.suggestError = ''; lang = 'en'">
           <StudioIcon name="x" size="h-3.5 w-3.5" />
@@ -412,7 +412,7 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
 
     <!-- ── Tiến trình TẠO ẢNH: cùng một widget tiến trình, không vẽ bộ riêng ── -->
     <div v-if="genFlow !== 'idle'" role="status" aria-live="polite"
-         class="mt-2.5 rounded-lg border border-emerald-500/40 bg-emerald-900/20 p-2">
+         class="mt-2.5 rounded-lg border border-ok/40 bg-ok/20 p-2">
       <LoadingSpinner size="sm" :text="flowLabel" :subtext="genFlow === 'generating' || genFlow === 'done' ? Math.round(flowPct) + '%' : ''" :progress="genFlow === 'armed' ? null : flowPct" />
     </div>
 
@@ -436,7 +436,7 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
         <li v-for="item in store.suggestRecent" :key="item.id"
             class="motion-row flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-900/50 p-1.5 transition hover:border-brand-400">
           <button class="flex min-w-0 flex-1 items-center gap-2 text-left" :title="'Nạp lại gợi ý: ' + (item.garment_type || 'không tên')" @click="store.applyRecentSuggest(item)">
-            <img v-if="item.reference_thumb || item.reference_url" :src="item.reference_thumb || item.reference_url" :alt="item.garment_type || 'Ảnh gợi ý'" class="h-9 w-9 shrink-0 rounded-md bg-ink-900 object-cover ring-1 ring-white/10">
+            <img v-if="item.reference_thumb || item.reference_url" :src="item.reference_thumb || item.reference_url" :alt="item.garment_type || 'Ảnh gợi ý'" class="h-9 w-9 shrink-0 rounded-md bg-ink-900 object-cover ring-1 ring-ink-600">
             <span v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-ink-800 text-cream-400"><StudioIcon name="image" size="h-4 w-4" /></span>
             <span class="min-w-0 flex-1">
               <span class="block truncate text-body font-semibold text-cream-100">{{ item.garment_type || (item.styles || []).join(', ') || 'Gợi ý từ ảnh' }}</span>
@@ -475,7 +475,7 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
 /* Vòng xoay trên nút — dùng đúng token chuyển động, tự đứng khi bật "giảm chuyển động". */
 .suggest-spin {
   display: inline-block; width: 13px; height: 13px; border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff;
+  border: 2px solid var(--color-primary-content); border-top-color: transparent;
   animation: suggest-spin var(--motion-dur-reveal) linear infinite;
 }
 @keyframes suggest-spin { to { transform: rotate(360deg); } }

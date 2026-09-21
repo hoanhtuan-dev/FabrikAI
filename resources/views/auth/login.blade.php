@@ -7,7 +7,7 @@
         <p class="mt-1 text-sm text-cream-400">Studio thiết kế thời trang AI.</p>
 
         @if($errors->any())
-            <div class="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-danger">{{ $errors->first() }}</div>
+            <div class="mt-4 rounded-xl bg-danger/10 p-3 text-sm text-danger">{{ $errors->first() }}</div>
         @endif
 
         <form method="POST" action="{{ route('login.store') }}" class="mt-6 space-y-4">

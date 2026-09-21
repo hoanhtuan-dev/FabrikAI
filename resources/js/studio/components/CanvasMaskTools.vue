@@ -33,10 +33,10 @@ const invScale = computed(() => {
 const circleR = computed(() => Math.max(0.5, 3 * invScale.value));
 // Màu node theo KIỂU: smooth (tím) · cusp (cam) · sharp (hồng); node 0 highlight xanh khi hover snap.
 function nodeFill(p, i) {
-  if (i === 0 && store.inpaintPathCloseHover) return '#34d399';
-  if (p.kind === 'cusp') return '#fb923c';
-  if (p.kind === 'sharp') return '#f43f5e';
-  return '#a78bfa';
+  if (i === 0 && store.inpaintPathCloseHover) return 'ovl-node-saved';
+  if (p.kind === 'cusp') return 'ovl-node-cusp';
+  if (p.kind === 'sharp') return 'ovl-node-sharp';
+  return 'ovl-node-default';
 }
 function nodeKindLabel(p) { return p.kind === 'cusp' ? 'Cusp' : p.kind === 'sharp' ? 'Góc nhọn' : 'Mượt'; }
 
@@ -202,26 +202,26 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
         <svg v-if="store.inpaintMaskMode === 'freehand' && (store.inpaintFreehandPaths.length || store.inpaintFreehandPoints.length > 1)"
              class="pointer-events-none absolute left-0 top-0 h-full w-full">
           <template v-for="(path, idx) in freehandPaths" :key="idx">
-            <polyline :points="path" fill="none" stroke="#f43f5e" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
-            <polygon :points="path" fill="rgba(244,63,94,0.12)" stroke="none" />
+            <polyline :points="path" fill="none" class="ovl-path" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
+            <polygon :points="path" class="ovl-path-fill" stroke="none" />
           </template>
-          <polyline v-if="store.inpaintFreehandPoints.length > 1" :points="freehandPoints" fill="none" stroke="#f43f5e" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
+          <polyline v-if="store.inpaintFreehandPoints.length > 1" :points="freehandPoints" fill="none" class="ovl-path" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
         </svg>
 
         <!-- Path (curve) select: hiển thị TẤT CẢ vùng đã đóng + path đang vẽ -->
         <svg v-if="store.inpaintMaskMode === 'path' && (store.inpaintPathRegions.length || store.inpaintPathPoints.length > 0)"
              class="pointer-events-none absolute left-0 top-0 h-full w-full">
           <template v-for="(reg, idx) in pathRegionsPixels" :key="'r'+idx">
-            <polyline :points="reg" fill="none" stroke="#a78bfa" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
-            <polygon :points="reg" fill="rgba(167,139,250,0.12)" stroke="none" />
+            <polyline :points="reg" fill="none" class="ovl-region" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
+            <polygon :points="reg" class="ovl-region-fill" stroke="none" />
             <!-- Node của vùng ĐÃ ĐÓNG: nhỏ + mờ, có thể BẤM để mở lại chỉnh sửa (chỉ khi không đang vẽ) -->
             <template v-if="store.inpaintPathPoints.length === 0" v-for="(p2, j) in (store.inpaintPathRegions[idx] || [])" :key="'rn'+j">
-              <circle :cx="p2.nx * (anchor.w)" :cy="p2.ny * (anchor.h)" :r="circleR * 0.5" fill="#a78bfa" :opacity="0.55"
+              <circle :cx="p2.nx * (anchor.w)" :cy="p2.ny * (anchor.h)" :r="circleR * 0.5" class="ovl-region-solid" :opacity="0.55"
                       style="pointer-events:auto; cursor:pointer" :title="'Nhấp để chỉnh sửa lại vùng này' + (p2.kind === 'cusp' ? ' · Cusp' : p2.kind === 'sharp' ? ' · Góc nhọn' : '')" />
             </template>
           </template>
           <!-- Đang vẽ: ĐƯỜNG MỞ (chưa đóng vòng) — nối các điểm kế tiếp, không quay về đầu -->
-          <polyline v-if="store.inpaintPathPoints.length > 1" :points="pathSmoothPixels" fill="none" stroke="#a78bfa" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
+          <polyline v-if="store.inpaintPathPoints.length > 1" :points="pathSmoothPixels" fill="none" class="ovl-region" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
           <!-- Guide nối điểm cuối → điểm BẮT ĐẦU khi hover snap để đóng kín (Krita) -->
           <line
             v-if="store.inpaintPathCloseHover && store.inpaintPathPoints.length >= 3"
@@ -229,24 +229,24 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
             :y1="store.inpaintPathPoints[store.inpaintPathPoints.length - 1].ny * (anchor.h)"
             :x2="store.inpaintPathPoints[0].nx * (anchor.w)"
             :y2="store.inpaintPathPoints[0].ny * (anchor.h)"
-            stroke="#34d399" :stroke-width="1.5 * invScale" stroke-dasharray="5 4" stroke-linecap="round" />
+            class="ovl-saved" :stroke-width="1.5 * invScale" stroke-dasharray="5 4" stroke-linecap="round" />
           <template v-for="(p, i) in store.inpaintPathPoints" :key="'p'+i">
             <!-- Tay điều khiển Bezier (Krita): out (xanh) + in (hồng); kéo node/tay để chỉnh, right-click node = xóa.
                  Ẩn tay SUY BIẾN (độ dài ~0) để lần nhấp đầu hiện node sạch & kéo node không dính tay lệch. -->
             <template v-if="Math.hypot(p.ox||0, p.oy||0) * anchor.w > 2">
-              <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.ox||0)) * anchor.w" :y2="(p.ny + (p.oy||0)) * anchor.h" stroke="#38bdf8" :stroke-width="1.5 * invScale" stroke-linecap="round" />
-              <circle :cx="(p.nx + (p.ox||0)) * anchor.w" :cy="(p.ny + (p.oy||0)) * anchor.h" :r="circleR * 0.7" fill="#38bdf8" style="pointer-events:auto; cursor:move" />
+              <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.ox||0)) * anchor.w" :y2="(p.ny + (p.oy||0)) * anchor.h" class="ovl-handle" :stroke-width="1.5 * invScale" stroke-linecap="round" />
+              <circle :cx="(p.nx + (p.ox||0)) * anchor.w" :cy="(p.ny + (p.oy||0)) * anchor.h" :r="circleR * 0.7" class="ovl-handle-solid" style="pointer-events:auto; cursor:move" />
             </template>
             <template v-if="Math.hypot(p.ix||0, p.iy||0) * anchor.w > 2">
-              <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.ix||0)) * anchor.w" :y2="(p.ny + (p.iy||0)) * anchor.h" stroke="#f0abfc" :stroke-width="1.5 * invScale" stroke-linecap="round" />
-              <circle :cx="(p.nx + (p.ix||0)) * anchor.w" :cy="(p.ny + (p.iy||0)) * anchor.h" :r="circleR * 0.7" fill="#f0abfc" style="pointer-events:auto; cursor:move" />
+              <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.ix||0)) * anchor.w" :y2="(p.ny + (p.iy||0)) * anchor.h" class="ovl-inner" :stroke-width="1.5 * invScale" stroke-linecap="round" />
+              <circle :cx="(p.nx + (p.ix||0)) * anchor.w" :cy="(p.ny + (p.iy||0)) * anchor.h" :r="circleR * 0.7" class="ovl-inner-solid" style="pointer-events:auto; cursor:move" />
             </template>
             <!-- Node: node 0 = điểm BẮT ĐẦU (đóng kín) → highlight xanh khi hover snap; Ctrl+click node = đổi kiểu -->
             <circle :cx="p.nx * (anchor.w)" :cy="p.ny * (anchor.h)"
               :r="i === 0 && store.inpaintPathCloseHover ? circleR * 1.5 : circleR"
-              :fill="nodeFill(p, i)"
+              class="ovl-node-outline" :class="nodeFill(p, i)"
               :title="'Kiểu: ' + nodeKindLabel(p) + ' — Ctrl+click để đổi · click phải để xóa'"
-              stroke="#111" :stroke-width="1" style="pointer-events:auto; cursor:move" @contextmenu.prevent="store.pathDeleteNode(i)" />
+              :stroke-width="1" style="pointer-events:auto; cursor:move" @contextmenu.prevent="store.pathDeleteNode(i)" />
           </template>
           <!-- Nút "Sửa" khi hover vùng ĐÃ ĐÓNG (và không đang vẽ điểm mới) -->
           <g v-if="hoverRegionTransform && store.inpaintPathPoints.length === 0"
@@ -254,9 +254,9 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
              style="pointer-events:auto; cursor:pointer"
              @pointerdown.stop.prevent="store.enterEditRegion(store._pathHoverRegion)"
              title="Sửa lại vùng chọn này">
-            <rect x="-27" y="-11.5" width="54" height="23" rx="6" fill="#0b1220" fill-opacity="0.95" stroke="#38bdf8" stroke-width="1" />
-            <path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.36a.5.5 0 0 0 .62.62l4.36-1.32a2 2 0 0 0 .83-.5z" fill="none" stroke="#7dd3fc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" transform="translate(-16, -1) scale(0.55)" />
-            <text x="8" y="4" text-anchor="middle" font-size="11" fill="#7dd3fc" font-weight="600">Sửa</text>
+            <rect x="-27" y="-11.5" width="54" height="23" rx="6" class="ovl-pill" fill-opacity="0.95" stroke-width="1" />
+            <path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.36a.5.5 0 0 0 .62.62l4.36-1.32a2 2 0 0 0 .83-.5z" fill="none" class="ovl-pill-stroke" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" transform="translate(-16, -1) scale(0.55)" />
+            <text x="8" y="4" text-anchor="middle" font-size="11" class="ovl-pill-fill" font-weight="600">Sửa</text>
           </g>
         </svg>
 
@@ -268,12 +268,12 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
                  @pointerdown.stop="store.beginInpaintDrag('move', $event)"
                  @dblclick.stop="store.resetInpaintMaskBox()"
                  title="Kéo để di chuyển · đúp chuột để vẽ lại vùng">
-              <div class="pointer-events-none absolute -inset-px border-2 border-dashed border-brand-300"></div>
-              <div v-if="!invertedRect" class="pointer-events-none absolute -inset-px" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);"></div>
-              <div class="absolute -left-3 -top-3 h-6 w-6 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.beginInpaintDrag('nw', $event)" title="Kéo góc"></div>
-              <div class="absolute -right-3 -top-3 h-6 w-6 cursor-nesw-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.beginInpaintDrag('ne', $event)" title="Kéo góc"></div>
-              <div class="absolute -bottom-3 -left-3 h-6 w-6 cursor-nesw-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.beginInpaintDrag('sw', $event)" title="Kéo góc"></div>
-              <div class="absolute -bottom-3 -right-3 h-6 w-6 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.beginInpaintDrag('se', $event)" title="Kéo góc"></div>
+              <div class="pointer-events-none absolute -inset-px border-2 border-dashed border-select"></div>
+              <div v-if="!invertedRect" class="pointer-events-none absolute -inset-px ovl-dim"></div>
+              <div class="absolute -left-3 -top-3 h-6 w-6 cursor-nwse-resize rounded-sm border-2 border-white bg-select shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.beginInpaintDrag('nw', $event)" title="Kéo góc"></div>
+              <div class="absolute -right-3 -top-3 h-6 w-6 cursor-nesw-resize rounded-sm border-2 border-white bg-select shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.beginInpaintDrag('ne', $event)" title="Kéo góc"></div>
+              <div class="absolute -bottom-3 -left-3 h-6 w-6 cursor-nesw-resize rounded-sm border-2 border-white bg-select shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.beginInpaintDrag('sw', $event)" title="Kéo góc"></div>
+              <div class="absolute -bottom-3 -right-3 h-6 w-6 cursor-nwse-resize rounded-sm border-2 border-white bg-select shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.beginInpaintDrag('se', $event)" title="Kéo góc"></div>
             </div>
           </template>
         </div>
@@ -282,8 +282,8 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
         <template v-if="!editing && store.inpaintMaskDone">
           <!-- Rect đã lưu: viền xanh lá -->
           <div v-if="store._inpaintMaskKind === 'rect'" class="pointer-events-none absolute" :style="boxFrameStyle()">
-            <div class="pointer-events-none absolute -inset-px border-2 border-dashed border-emerald-400"></div>
-            <div class="pointer-events-none absolute -inset-px" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);"></div>
+            <div class="pointer-events-none absolute -inset-px border-2 border-dashed border-mask-saved"></div>
+            <div class="pointer-events-none absolute -inset-px ovl-dim"></div>
           </div>
           <!-- Brush đã lưu: mask đen-trắng phủ đúng vùng ảnh, opacity cao để thấy rõ -->
           <img v-else-if="store.inpaintBrushData" :src="'data:image/png;base64,' + store.inpaintBrushData"

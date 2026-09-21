@@ -58,12 +58,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
     role="dialog"
     aria-modal="true"
     :aria-label="title"
-    class="motion-fade-in fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4"
+    class="motion-fade-in fixed inset-0 z-[80] flex items-center justify-center bg-scrim/60 p-4"
     @click.self="cancel"
   >
     <div
       class="motion-pop-in w-full max-w-xs rounded-lg border bg-ink-900 p-4 shadow-2xl"
-      :class="danger ? 'border-red-500/40' : 'border-ink-700'"
+      :class="danger ? 'border-danger/40' : 'border-ink-700'"
     >
       <p class="text-sm font-semibold text-cream-100">{{ title }}</p>
       <p class="mt-1 text-xs leading-relaxed text-cream-300"><slot /></p>
@@ -72,8 +72,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
           ref="confirmBtn"
           type="button"
           @click="emit('confirm')"
-          class="flex-1 rounded-lg px-3 py-2 text-sm font-semibold text-white"
-          :class="danger ? 'bg-red-600 hover:bg-red-500' : 'bg-brand-600 hover:bg-brand-500'"
+          class="flex-1 rounded-lg px-3 py-2 text-sm font-semibold"
+          :class="danger ? 'bg-danger text-danger-content hover:bg-danger' : 'bg-brand-600 text-primary-content hover:bg-brand-500'"
         >{{ confirmLabel }}</button>
         <button
           type="button"

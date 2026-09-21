@@ -225,6 +225,49 @@ class ThemeImportTest extends TestCase
         $this->assertTrue(ThemeColor::isLiteral($tokens['--color-ink-950']), $label.': bề mặt không phải màu hợp lệ.');
     }
 
+    /**
+     * MỌI CẶP (màu vai trò, màu chữ của nó) PHẢI ĐỌC ĐƯỢC — Ở CẢ HAI CHẾ ĐỘ.
+     *
+     * Vì sao là bất biến riêng: từ 2026-09-25 mọi thành phần dùng cặp token thay cho chữ trắng cứng
+     * (bg-ok text-ok-content · bg-warn text-warn-content · bg-danger text-danger-content ·
+     * bg-brand-600 text-primary-content). Quy tắc đó CHỈ đúng nếu mỗi cặp thật sự đạt ngưỡng — mà ở
+     * chế độ Sáng token trạng thái là màu ĐẬM, nên một màu chữ cứng (trắng hoặc đen) không thể đúng
+     * cho cả hai chế độ. Đây là bài khoá cho toàn bộ đợt "áp dụng triệt để chuẩn theme".
+     */
+    public function test_every_role_colour_pair_is_readable_in_both_schemes(): void
+    {
+        // Tám màu VAI TRÒ của daisyUI (bảng token sinh ra đủ cặp). Ba BÍ DANH cũ của app
+        // (danger · warn · ok) trỏ về error · warning · success bằng var() trong app.css — chúng
+        // không sinh lại ở đây (một giá trị, hai tên gọi), nên phần kiểm bí danh nằm ở cuối bài.
+        $roles = ['primary', 'secondary', 'accent', 'neutral', 'info', 'success', 'warning', 'error'];
+
+        foreach (['dark' => 'Tối', 'light' => 'Sáng'] as $scheme => $label) {
+            $tokens = ThemeLibrary::tokens($scheme);
+
+            foreach ($roles as $role) {
+                $bg = $tokens['--color-'.$role] ?? null;
+                $fg = $tokens['--color-'.$role.'-content'] ?? null;
+
+                $this->assertNotNull($fg, sprintf('Chế độ %s: thiếu cặp --color-%s-content cho --color-%s.', $label, $role, $role));
+                $ratio = ThemeColor::contrast($bg, $fg);
+                $this->assertGreaterThanOrEqual(ThemeColor::AA, $ratio, sprintf(
+                    'Chế độ %s: chữ %s trên nền %s chỉ đạt %.2f:1 (cần ≥ %.1f:1) — cặp -content phải LUÔN đọc được, '
+                    .'vì mọi thành phần dùng bg-%s text-%s-content.',
+                    $label, $fg, $bg, $ratio, ThemeColor::AA, $role, $role
+                ));
+            }
+        }
+
+        // Ba bí danh cũ phải có ĐỦ cặp -content, nếu không thì các chip trạng thái đang dùng
+        // cặp bg-ok + text-ok-content sẽ không có class nào được sinh ra.
+        $css = (string) file_get_contents(resource_path('css/app.css'));
+        foreach (['danger' => 'error', 'warn' => 'warning', 'ok' => 'success'] as $alias => $canonical) {
+            $this->assertStringContainsString('--color-'.$alias.': var(--color-'.$canonical.');', $css);
+            $this->assertStringContainsString('--color-'.$alias.'-content: var(--color-'.$canonical.'-content);', $css,
+                'Thiếu --color-'.$alias.'-content — class text-'.$alias.'-content sẽ không tồn tại.');
+        }
+    }
+
     public function test_the_light_scheme_is_a_real_counterpart_not_a_copy(): void
     {
         $dark = ThemeLibrary::tokens('dark');

@@ -195,15 +195,15 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
     </div>
 
     <!-- Admin: chuyển giữa bản của mình và bản dùng chung -->
-    <div v-if="isAdmin" class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+    <div v-if="isAdmin" class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-warn/30 bg-warn/10 px-3 py-2">
       <StudioIcon name="lock" size="h-3.5 w-3.5 text-warn" />
       <p class="min-w-0 flex-1 text-body leading-relaxed text-warn">
         Bạn là owner. <b>Bản của tôi</b> chỉ ảnh hưởng bạn; <b>Dùng chung</b> sửa preset cho MỌI người.
       </p>
       <div class="flex overflow-hidden rounded-md border border-ink-600">
-        <button @click="mode = 'mine'" :class="mode === 'mine' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+        <button @click="mode = 'mine'" :class="mode === 'mine' ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
                 class="px-2.5 py-1 text-body font-medium transition">Bản của tôi</button>
-        <button @click="mode = 'global'" :class="mode === 'global' ? 'bg-amber-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+        <button @click="mode = 'global'" :class="mode === 'global' ? 'bg-warn text-warn-content' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
                 class="px-2.5 py-1 text-body font-medium transition">Dùng chung</button>
       </div>
     </div>
@@ -232,7 +232,7 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
     <!-- ── Thân ──────────────────────────────────────────────────────────── -->
     <SettingsSkeleton v-if="loading" :rows="4" />
 
-    <div v-else-if="error" class="card border-red-500/40 p-5">
+    <div v-else-if="error" class="card border-danger/40 p-5">
       <p class="flex items-center gap-2 text-sm text-danger"><StudioIcon name="alertTriangle" size="h-4 w-4" /> {{ error }}</p>
       <button @click="load" class="btn-outline btn-sm mt-3">Thử lại</button>
     </div>
@@ -285,7 +285,7 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
                   <button @click="beginEdit(p)" class="tool-btn" title="Sửa preset">
                     <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
                   </button>
-                  <button @click="askRemove(p)" class="tool-btn !text-danger hover:!bg-red-600/25" title="Xoá preset">
+                  <button @click="askRemove(p)" class="tool-btn !text-danger hover:!bg-danger/25" title="Xoá preset">
                     <StudioIcon name="trash" size="h-3 w-3" /> Xoá
                   </button>
                 </div>
@@ -297,11 +297,11 @@ const deleteMessage = computed(() => 'Xoá preset "' + deleteLabel.value + '"?')
     </template>
 
     <!-- ── Thêm preset ───────────────────────────────────────────────────── -->
-    <div v-if="addOpen" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-label="Thêm preset" @click.self="addOpen = false">
+    <div v-if="addOpen" class="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/70 p-4" role="dialog" aria-modal="true" aria-label="Thêm preset" @click.self="addOpen = false">
       <div class="w-full max-w-lg rounded-lg border border-ink-700 bg-ink-900 p-5 shadow-2xl">
         <div class="mb-4 flex items-center justify-between">
           <h3 class="text-sm font-semibold text-cream-50">Thêm preset</h3>
-          <button @click="addOpen = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 hover:bg-ink-700 hover:text-white" aria-label="Đóng">
+          <button @click="addOpen = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 hover:bg-ink-700 hover:text-cream-50" aria-label="Đóng">
             <StudioIcon name="x" size="h-4 w-4" />
           </button>
         </div>

@@ -29,7 +29,7 @@
     <header class="sticky top-0 z-40 border-b border-ink-700 bg-ink-900/95 backdrop-blur">
         <div class="container-x flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
             <a href="{{ url('/') }}" class="flex items-center gap-2">
-                <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">F</span>
+                <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-primary-content">F</span>
                 <span class="font-display text-base font-semibold text-cream-50">FabrikAI</span>
             </a>
             <nav class="ml-auto flex flex-wrap items-center gap-1.5 text-xs">
@@ -135,9 +135,9 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <h3 class="font-display text-lg font-semibold text-cream-50">{{ $plan->name }}</h3>
                         @if($plan->isFree())
-                            <span class="rounded-full bg-sky-500/15 px-2 py-0.5 text-label font-semibold text-info">Bắt đầu</span>
+                            <span class="rounded-full bg-info/15 px-2 py-0.5 text-label font-semibold text-info">Bắt đầu</span>
                         @elseif($plan->is_default)
-                            <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-label font-semibold text-warn">Mặc định</span>
+                            <span class="rounded-full bg-warn/15 px-2 py-0.5 text-label font-semibold text-warn">Mặc định</span>
                         @endif
                     </div>
                     @if($plan->tagline)

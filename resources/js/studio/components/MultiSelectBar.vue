@@ -35,7 +35,7 @@ const sep = 'h-4 w-px shrink-0 bg-ink-600';
     <span :class="sep"></span>
 
     <!-- Tạo nhóm / Tách nhóm -->
-    <button @click="store.groupSelection()" :class="[lblBtn, 'text-cream-100 hover:bg-brand-600 hover:text-white']" title="Tạo nhóm từ các layer đang chọn (click 1 layer trong nhóm = chọn cả nhóm)"><StudioIcon name="group" size="h-3.5 w-3.5"/>Nhóm</button>
+    <button @click="store.groupSelection()" :class="[lblBtn, 'text-cream-100 hover:bg-brand-600 hover:text-cream-50']" title="Tạo nhóm từ các layer đang chọn (click 1 layer trong nhóm = chọn cả nhóm)"><StudioIcon name="group" size="h-3.5 w-3.5"/>Nhóm</button>
     <button @click="store.ungroupSelection()" :class="[lblBtn, 'text-cream-200 hover:bg-ink-700']" title="Tách nhóm — trả các layer về độc lập"><StudioIcon name="unlink" size="h-3.5 w-3.5"/>Tách</button>
     <span :class="sep"></span>
 
@@ -44,6 +44,6 @@ const sep = 'h-4 w-px shrink-0 bg-ink-600';
     <span :class="sep"></span>
 
     <!-- Xóa -->
-    <button @click="store.deleteSelection()" :class="[lblBtn, 'text-danger hover:bg-red-600/25 hover:text-danger']" title="Xóa các layer đang chọn (Delete)"><StudioIcon name="trash" size="h-3.5 w-3.5"/>Xóa</button>
+    <button @click="store.deleteSelection()" :class="[lblBtn, 'text-danger hover:bg-danger/25 hover:text-danger']" title="Xóa các layer đang chọn (Delete)"><StudioIcon name="trash" size="h-3.5 w-3.5"/>Xóa</button>
   </div>
 </template>

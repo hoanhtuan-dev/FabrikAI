@@ -210,10 +210,10 @@ function saveSettings() {
         <template v-if="selected[i-1]">
           <img :src="selected[i-1].url" class="h-full w-full object-cover" @error="onSlotImgError(i-1)">
           <span v-if="slotImgError[i-1]" class="absolute inset-0 grid place-items-center bg-ink-900 text-2xl" title="Ảnh không tải được — bấm × để bỏ"><StudioIcon name="image" size="h-6 w-6" /></span>
-          <span class="absolute left-1 top-1 rounded-full bg-brand-500 px-1.5 text-tiny font-bold text-white">{{ i }}</span>
+          <span class="absolute left-1 top-1 rounded-full bg-brand-600 px-1.5 text-tiny font-bold text-primary-content">{{ i }}</span>
           <span class="absolute inset-x-0 bottom-0 bg-scrim/65 px-1 py-0.5 text-center text-tiny font-semibold text-scrim-content">{{ SLOT_ROLES[i-1] }}</span>
-          <span @click.stop="removeSlot(i-1)" title="Bỏ ảnh khỏi slot" class="motion-ui absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-red-600/90 text-body text-white hover:bg-red-500"><StudioIcon name="x" size="h-3.5 w-3.5" /></span>
-          <span v-if="i > 1" @click.stop="makeBase(i-1)" class="absolute bottom-6 right-1 grid h-5 w-5 place-items-center rounded-full bg-ink-800/90 text-tiny text-white" title="Đưa lên làm @image1">⤴</span>
+          <span @click.stop="removeSlot(i-1)" title="Bỏ ảnh khỏi slot" class="motion-ui absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-danger text-body text-danger-content hover:bg-danger"><StudioIcon name="x" size="h-3.5 w-3.5" /></span>
+          <span v-if="i > 1" @click.stop="makeBase(i-1)" class="absolute bottom-6 right-1 grid h-5 w-5 place-items-center rounded-full bg-ink-800/90 text-tiny text-cream-100" title="Đưa lên làm @image1">⤴</span>
         </template>
         <template v-else>
           <span class="grid h-6 w-6 place-items-center text-cream-400"><StudioIcon name="shirt" size="h-5 w-5" v-if="i === 1" /><span v-else>＋</span></span>
@@ -227,7 +227,7 @@ function saveSettings() {
     <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: lai tạo trang phục từ phom dáng của @image1 và màu sắc của @image2…"></textarea>
     <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-label">
       <button v-for="n in 3" :key="n" @click="insertTag('@image' + n)"
-              class="rounded-full bg-ink-800 px-2 py-0.5 font-semibold text-brand-300 transition hover:bg-brand-600 hover:text-white">@image{{ n }}</button>
+              class="rounded-full bg-ink-800 px-2 py-0.5 font-semibold text-brand-300 transition hover:bg-brand-600 hover:text-cream-50">@image{{ n }}</button>
       <button @click="useSamplePrompt" class="rounded-full border border-ink-600 px-2 py-0.5 font-semibold text-cream-200 transition hover:border-brand-400"
               title="Chèn lại prompt lai tạo mẫu của hệ thống">Prompt lai tạo mẫu</button>
     </div>
@@ -260,7 +260,7 @@ function saveSettings() {
       <div class="mt-1 flex flex-wrap gap-1.5">
         <button v-for="p in stylePresets" :key="p.name" @click="applyPreset(p)" class="group inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2.5 py-1 text-label font-medium text-cream-200 transition hover:border-brand-400">
           {{ p.name }}
-          <span @click.stop="deletePreset(p)" class="motion-ui grid h-4 w-4 place-items-center rounded-full text-cream-400 hover:bg-red-600 hover:text-white" title="Xóa preset">×</span>
+          <span @click.stop="deletePreset(p)" class="motion-ui grid h-4 w-4 place-items-center rounded-full text-cream-400 hover:bg-danger hover:text-cream-50" title="Xóa preset">×</span>
         </button>
         <span v-if="!stylePresets.length" class="text-label text-cream-400">Chưa có preset — lưu phong cách + trang trí + sáng tạo hiện tại để tái dùng cho cả bộ sưu tập.</span>
       </div>
@@ -274,7 +274,7 @@ function saveSettings() {
     <div class="mt-3 flex items-center gap-1.5 text-xs text-cream-200">
       <span class="mr-1">Số biến thể:</span>
       <button v-for="n in [1,2,3,4]" :key="n" @click="variants = n"
-              :class="variants === n ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+              :class="variants === n ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="h-7 w-7 rounded-full font-semibold transition-colors">{{ n }}</button>
     </div>
     <p v-if="variants > 1" class="mt-1 text-label leading-relaxed text-cream-400">Biến thể đi theo trục khác nhau để không trùng lặp: Classic · Modern · Bold · Fluid.</p>
@@ -312,18 +312,18 @@ function saveSettings() {
         :subtext="fmt(elapsedSec) + ' · ' + doneCount + '/' + store.composeGenIds.length + ' biến thể'"
         :progress="doneCount / Math.max(1, store.composeGenIds.length) * 100" />
       <div class="mt-2 flex justify-end">
-        <button @click="store.cancelCompose()" class="rounded-full bg-red-600/25 px-2.5 py-1 text-label font-semibold text-danger hover:bg-red-600">Hủy</button>
+        <button @click="store.cancelCompose()" class="rounded-full bg-danger/25 px-2.5 py-1 text-label font-semibold text-danger hover:bg-danger">Hủy</button>
       </div>
     </div>
 
     <!-- Thành công -->
-    <div v-if="store.composeStage === 'done'" class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-ok">
+    <div v-if="store.composeStage === 'done'" class="mt-3 rounded-lg border border-ok/40 bg-ok/25 p-3 text-xs text-ok">
       Đã lai tạo xong — kết quả đã được chọn trong Outputs.
       <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-ink-800 px-2 py-0.5 hover:bg-ink-700">Đóng</button>
     </div>
 
     <!-- Lỗi -->
-    <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-lg border border-red-500/40 bg-red-900/25 p-3 text-xs text-danger">
+    <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-lg border border-danger/40 bg-danger/25 p-3 text-xs text-danger">
       <p class="font-semibold">Ghép trang phục thất bại</p>
       <p class="mt-1 whitespace-pre-line leading-relaxed">{{ store.composeError }}</p>
       <div class="mt-2 flex gap-2">

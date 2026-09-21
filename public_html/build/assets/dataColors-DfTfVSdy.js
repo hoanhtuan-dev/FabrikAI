@@ -1,0 +1,1 @@
+var e=`#7aa2f7`,t=`#6b6657`,n=`#b9c8c2`,r=`#4a7a90`;export{r as i,e as n,t as r,n as t};

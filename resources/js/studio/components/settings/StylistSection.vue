@@ -7,6 +7,7 @@ import StudioIcon from '../StudioIcon.vue';
 import SettingsSkeleton from './SettingsSkeleton.vue';
 import SettingsEmpty from './SettingsEmpty.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
+import { STYLIST_TYPE_COLOR } from '../../dataColors.js';
 
 /**
  * MỤC "TRỢ LÝ THIẾT KẾ" — refactor từ components/StylistDataManager.vue (bản cũ).
@@ -42,7 +43,7 @@ const saving = ref(false);
 const typeQuery = ref('');
 const questionQuery = ref('');
 
-const typeForm = ref({ id: null, slug: '', name: '', emoji: '', color: '#4a7a90' });
+const typeForm = ref({ id: null, slug: '', name: '', emoji: '', color: STYLIST_TYPE_COLOR });
 const editingType = ref(false);
 const qForm = ref({ id: null, key: '', q: '', optsText: '' });
 const editingQuestion = ref(false);
@@ -85,9 +86,9 @@ async function del(url) {
   if (!r.ok) throw new Error('Lỗi xóa.');
 }
 
-function newType() { typeForm.value = { id: null, slug: '', name: '', emoji: '', color: '#4a7a90' }; editingType.value = true; }
-function editType(t) { typeForm.value = { id: t.id, slug: t.slug, name: t.name, emoji: t.emoji || '', color: t.color || '#4a7a90' }; editingType.value = true; }
-function cancelType() { editingType.value = false; typeForm.value = { id: null, slug: '', name: '', emoji: '', color: '#4a7a90' }; }
+function newType() { typeForm.value = { id: null, slug: '', name: '', emoji: '', color: STYLIST_TYPE_COLOR }; editingType.value = true; }
+function editType(t) { typeForm.value = { id: t.id, slug: t.slug, name: t.name, emoji: t.emoji || '', color: t.color || STYLIST_TYPE_COLOR }; editingType.value = true; }
+function cancelType() { editingType.value = false; typeForm.value = { id: null, slug: '', name: '', emoji: '', color: STYLIST_TYPE_COLOR }; }
 
 async function saveType() {
   saving.value = true;
@@ -212,8 +213,8 @@ const visibleQuestions = computed(() => {
         <span v-if="isAdmin" class="text-warn">Bạn là owner: <b>Dùng chung</b> sửa dữ liệu cho MỌI người.</span>
       </p>
       <div v-if="isAdmin" class="flex overflow-hidden rounded-md border border-ink-600">
-        <button @click="mode='mine'" :class="mode==='mine' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="px-2.5 py-1 text-body font-medium transition">Bản của tôi</button>
-        <button @click="mode='global'" :class="mode==='global' ? 'bg-amber-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="px-2.5 py-1 text-body font-medium transition">Dùng chung</button>
+        <button @click="mode='mine'" :class="mode==='mine' ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="px-2.5 py-1 text-body font-medium transition">Bản của tôi</button>
+        <button @click="mode='global'" :class="mode==='global' ? 'bg-warn text-warn-content' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="px-2.5 py-1 text-body font-medium transition">Dùng chung</button>
       </div>
       <button v-if="hasOverrides" @click="resetMine" class="btn-outline btn-sm whitespace-nowrap" title="Xoá mọi tùy chỉnh của bạn, quay về bản mặc định">
         <StudioIcon name="rotateCcw" size="h-3.5 w-3.5" /> Khôi phục mặc định
@@ -223,10 +224,10 @@ const visibleQuestions = computed(() => {
     <!-- Tab trong mục (khác sidebar: đây là 2 bảng dữ liệu của cùng một mục) -->
     <div class="mb-4 flex flex-wrap items-center gap-2">
       <div class="flex overflow-hidden rounded-lg border border-ink-600">
-        <button @click="tab='types'" :class="tab==='types' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="flex items-center gap-1.5 px-3 py-1.5 text-body font-medium transition">
+        <button @click="tab='types'" :class="tab==='types' ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="flex items-center gap-1.5 px-3 py-1.5 text-body font-medium transition">
           <StudioIcon name="shirt" size="h-3.5 w-3.5" /> Loại trang phục ({{ types.length }})
         </button>
-        <button @click="tab='questions'" :class="tab==='questions' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="flex items-center gap-1.5 px-3 py-1.5 text-body font-medium transition">
+        <button @click="tab='questions'" :class="tab==='questions' ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="flex items-center gap-1.5 px-3 py-1.5 text-body font-medium transition">
           <StudioIcon name="search" size="h-3.5 w-3.5" /> Câu hỏi ({{ questions.length }})
         </button>
       </div>
@@ -246,7 +247,7 @@ const visibleQuestions = computed(() => {
     <!-- Thân -->
     <SettingsSkeleton v-if="loading" :rows="4" />
 
-    <div v-else-if="loadError" class="card border-red-500/40 p-5">
+    <div v-else-if="loadError" class="card border-danger/40 p-5">
       <p class="flex items-center gap-2 text-sm text-danger"><StudioIcon name="alertTriangle" size="h-4 w-4" /> {{ loadError }}</p>
       <button @click="load" class="btn-outline btn-sm mt-3">Thử lại</button>
     </div>
@@ -263,7 +264,7 @@ const visibleQuestions = computed(() => {
       </SettingsEmpty>
       <div v-else class="space-y-2">
         <div v-for="t in visibleTypes" :key="t.id || t.slug" class="flex items-center gap-3 rounded-md border border-ink-700 bg-ink-900/60 p-2.5">
-          <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-900 text-lg" :style="{ boxShadow: 'inset 0 0 0 1px ' + (t.color || '#4a7a90') }">
+          <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-900 text-lg" :style="{ boxShadow: 'inset 0 0 0 1px ' + (t.color || STYLIST_TYPE_COLOR) }">
             <template v-if="t.emoji">{{ t.emoji }}</template>
             <StudioIcon v-else name="shirt" size="h-4 w-4 text-cream-400" />
           </span>
@@ -273,11 +274,11 @@ const visibleQuestions = computed(() => {
             </p>
             <p class="truncate text-label text-cream-400">slug: {{ t.slug }}</p>
           </div>
-          <span class="h-5 w-5 shrink-0 rounded-full border border-ink-600" :style="{ background: t.color || '#4a7a90' }"></span>
+          <span class="h-5 w-5 shrink-0 rounded-full border border-ink-600" :style="{ background: t.color || STYLIST_TYPE_COLOR }"></span>
           <button @click="editType(t)" class="tool-btn" :title="'Sửa ' + t.name">
             <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
           </button>
-          <button @click="deleteType(t)" class="tool-btn !text-danger hover:!bg-red-600/25" :title="'Xoá ' + t.name">
+          <button @click="deleteType(t)" class="tool-btn !text-danger hover:!bg-danger/25" :title="'Xoá ' + t.name">
             <StudioIcon name="trash" size="h-3 w-3" /> Xoá
           </button>
         </div>
@@ -304,7 +305,7 @@ const visibleQuestions = computed(() => {
             <button @click="editQuestion(q)" class="tool-btn shrink-0" :title="'Sửa ' + q.key">
               <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
             </button>
-            <button @click="deleteQuestion(q)" class="tool-btn shrink-0 !text-danger hover:!bg-red-600/25" :title="'Xoá ' + q.key">
+            <button @click="deleteQuestion(q)" class="tool-btn shrink-0 !text-danger hover:!bg-danger/25" :title="'Xoá ' + q.key">
               <StudioIcon name="trash" size="h-3 w-3" /> Xoá
             </button>
           </div>

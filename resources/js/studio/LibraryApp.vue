@@ -8,6 +8,7 @@ import GalleryModal from './components/GalleryModal.vue';
 import PromptLibraryTab from './components/PromptLibraryTab.vue';
 import StudioIcon from './components/StudioIcon.vue';
 import { gridClass } from './libraryLayout.js';
+import { PROJECT_COLOR } from './dataColors.js';
 
 const store = useStudioStore();
 // Lỗi trình duyệt hiện kèm mã tra cứu (xem clientErrors.js).
@@ -236,9 +237,9 @@ function applyFilteredProject() {
   if (filteredProject.value) store.applyProject(filteredProject.value);
 }
 function getProjectColor(g) {
-  if (!g || !g.project_id) return '#7aa2f7';
+  if (!g || !g.project_id) return PROJECT_COLOR;
   const p = store.projects.find(p => Number(p.id) === Number(g.project_id));
-  return p?.color || '#7aa2f7';
+  return p?.color || PROJECT_COLOR;
 }
 function clickProjectChip(g) {
   store.setLibraryFilter('project_id', g.project_id);
@@ -303,7 +304,7 @@ onMounted(async () => {
         </button>
         <button @click="switchTab('uploads')" class="seg-btn !py-2" :class="store.libraryTab === 'uploads' ? 'is-active' : ''" title="File đã tải lên">
           <StudioIcon name="folderOpen" size="h-4 w-4"/> File tải lên
-          <span v-if="uploadStats.unused_count" class="ml-1 rounded-full bg-red-500/30 px-1.5 py-0.5 text-label font-semibold text-danger">{{ uploadStats.unused_count }}</span>
+          <span v-if="uploadStats.unused_count" class="ml-1 rounded-full bg-danger/30 px-1.5 py-0.5 text-label font-semibold text-danger">{{ uploadStats.unused_count }}</span>
         </button>
         <button @click="switchTab('suggest')" class="seg-btn !py-2" :class="store.libraryTab === 'suggest' ? 'is-active' : ''" title="Prompt phân tích từ Gợi ý từ ảnh">
           <StudioIcon name="lightbulb" size="h-4 w-4"/> Prompt
@@ -426,22 +427,22 @@ onMounted(async () => {
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-sm font-semibold text-cream-100">Đã chọn <span class="text-brand-300">{{ selectedCount }}</span> mục</span>
           <button @click="toggleAll" class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1 text-xs text-cream-200 hover:bg-ink-700">{{ allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả' }}</button>
-          <button @click="store.librarySelectJunk" class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-warn hover:bg-amber-500/20">Chọn ảnh rác</button>
-          <button @click="store.librarySelectOld" class="rounded-lg border border-sky-500/40 bg-sky-500/10 px-2.5 py-1 text-xs text-info hover:bg-sky-500/20">Chọn ảnh cũ ({{ store.libraryFilters.old_days }} ngày)</button>
+          <button @click="store.librarySelectJunk" class="rounded-lg border border-warn/40 bg-warn/10 px-2.5 py-1 text-xs text-warn hover:bg-warn/20">Chọn ảnh rác</button>
+          <button @click="store.librarySelectOld" class="rounded-lg border border-info/40 bg-info/10 px-2.5 py-1 text-xs text-info hover:bg-info/20">Chọn ảnh cũ ({{ store.libraryFilters.old_days }} ngày)</button>
         </div>
 
         <div class="flex flex-wrap items-center gap-2 border-t border-ink-700/60 pt-2">
           <template v-if="confirmAction === ''">
-            <button @click="ask('bulk')" :disabled="!selectedCount" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-40"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xóa đã chọn ({{ selectedCount }})</button>
+            <button @click="ask('bulk')" :disabled="!selectedCount" class="rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-danger-content hover:bg-danger disabled:opacity-40"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xóa đã chọn ({{ selectedCount }})</button>
             <span class="text-cream-400">·</span>
             <select v-model="bulkAttachProjectId" class="rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-xs text-cream-100 outline-none focus:border-brand-500">
               <option :value="null">— Gắn vào bộ sưu tập —</option>
               <option v-for="p in store.projects" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
-            <button @click="bulkAttach" :disabled="!selectedCount || !bulkAttachProjectId" class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-500 disabled:opacity-40"><StudioIcon name="pin" size="h-3.5 w-3.5" /> Gắn vào bộ ({{ selectedCount }})</button>
-            <button @click="ask('junk')" class="rounded-lg border border-amber-500/40 px-3 py-1.5 text-xs text-warn hover:bg-amber-500/15" :disabled="store.libraryCleaning"><StudioIcon name="brush" size="h-3.5 w-3.5" /> Dọn ảnh rác ({{ fmtNum(stats.junk_count ?? 0) }})</button>
-            <button @click="ask('old')" class="rounded-lg border border-sky-500/40 px-3 py-1.5 text-xs text-info hover:bg-sky-500/15" :disabled="store.libraryCleaning"><StudioIcon name="clock" size="h-3.5 w-3.5" /> Dọn ảnh cũ ({{ fmtNum(stats.old_count ?? 0) }})</button>
-            <button @click="ask('orphans')" class="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-danger hover:bg-red-500/15" :disabled="store.libraryCleaning"><StudioIcon name="unlink" size="h-3.5 w-3.5" /> Dọn file mồ côi ({{ fmtNum(stats.orphan_count ?? 0) }})</button>
+            <button @click="bulkAttach" :disabled="!selectedCount || !bulkAttachProjectId" class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-primary-content hover:bg-brand-500 disabled:opacity-40"><StudioIcon name="pin" size="h-3.5 w-3.5" /> Gắn vào bộ ({{ selectedCount }})</button>
+            <button @click="ask('junk')" class="rounded-lg border border-warn/40 px-3 py-1.5 text-xs text-warn hover:bg-warn/15" :disabled="store.libraryCleaning"><StudioIcon name="brush" size="h-3.5 w-3.5" /> Dọn ảnh rác ({{ fmtNum(stats.junk_count ?? 0) }})</button>
+            <button @click="ask('old')" class="rounded-lg border border-info/40 px-3 py-1.5 text-xs text-info hover:bg-info/15" :disabled="store.libraryCleaning"><StudioIcon name="clock" size="h-3.5 w-3.5" /> Dọn ảnh cũ ({{ fmtNum(stats.old_count ?? 0) }})</button>
+            <button @click="ask('orphans')" class="rounded-lg border border-danger/40 px-3 py-1.5 text-xs text-danger hover:bg-danger/15" :disabled="store.libraryCleaning"><StudioIcon name="unlink" size="h-3.5 w-3.5" /> Dọn file mồ côi ({{ fmtNum(stats.orphan_count ?? 0) }})</button>
           </template>
           <template v-else>
             <p class="text-xs font-semibold text-danger">
@@ -453,7 +454,7 @@ onMounted(async () => {
             </p>
             <div class="flex gap-2">
               <button @click="cancelConfirm" class="rounded-lg border border-ink-600 bg-ink-800 px-3 py-1.5 text-xs text-cream-200 hover:bg-ink-700">Hủy</button>
-              <button @click="runConfirm" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500">Xác nhận xóa</button>
+              <button @click="runConfirm" class="rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-danger-content hover:bg-danger">Xác nhận xóa</button>
             </div>
           </template>
         </div>
@@ -483,17 +484,17 @@ onMounted(async () => {
             <!-- Badge trạng thái -->
             <span class="absolute left-2 top-2 rounded-full border px-2 py-0.5 text-tiny font-semibold uppercase tracking-wide"
                   :class="{
-                    'border-emerald-500/40 bg-emerald-500/15 text-ok': g.status === 'completed',
-                    'border-red-500/40 bg-red-500/15 text-danger': g.status === 'failed',
+                    'border-ok/40 bg-ok/15 text-ok': g.status === 'completed',
+                    'border-danger/40 bg-danger/15 text-danger': g.status === 'failed',
                     'border-ink-600 bg-ink-800 text-cream-300': g.status === 'cancelled',
-                    'border-amber-500/40 bg-amber-500/15 text-warn': ['pending','processing'].includes(g.status),
+                    'border-warn/40 bg-warn/15 text-warn': ['pending','processing'].includes(g.status),
                   }">
               {{ statusLabel(g.status) }}
             </span>
-            <span v-if="g.type === 'video'" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/80 text-white"><StudioIcon name="play" size="h-3.5 w-3.5" /></span>
+            <span v-if="g.type === 'video'" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/80 text-cream-100"><StudioIcon name="play" size="h-3.5 w-3.5" /></span>
 
             <!-- Overlay hover -->
-            <div class="absolute inset-0 bg-black/40 opacity-0 transition group-hover:opacity-100"></div>
+            <div class="absolute inset-0 bg-scrim/40 opacity-0 transition group-hover:opacity-100"></div>
             <div class="absolute inset-x-0 bottom-0 p-2 text-label text-cream-100 opacity-0 transition group-hover:opacity-100">
               {{ store.genName(g) }} <span v-if="g.created_at" class="text-cream-300">· {{ g.created_at }}</span>
               <span v-if="seedLabel(g)" class="ml-1 rounded bg-ink-900/80 px-1 py-0.5 text-tiny text-brand-200">{{ seedLabel(g) }}</span>
@@ -509,7 +510,7 @@ onMounted(async () => {
           <!-- Checkbox chọn (luôn hiện ở chế độ quản lý) -->
           <button v-if="store.libraryManage" @click.stop="store.toggleLibrarySelect(g.id)"
                   class="absolute right-2 bottom-2 grid h-7 w-7 place-items-center rounded-lg border text-sm"
-                  :class="isSelected(g.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-800 text-transparent hover:border-cream-200'">
+                  :class="isSelected(g.id) ? 'border-brand-500 bg-brand-600 text-primary-content' : 'border-cream-300/50 bg-ink-800 text-transparent hover:border-cream-200'">
             <StudioIcon name="check" size="h-3.5 w-3.5" />
           </button>
         </div>
@@ -529,10 +530,10 @@ onMounted(async () => {
               <span class="truncate text-xs font-semibold text-cream-100">{{ store.genName(g) }}</span>
               <span class="rounded-full border px-1.5 py-0.5 text-tiny font-semibold uppercase tracking-wide"
                     :class="{
-                      'border-emerald-500/40 bg-emerald-500/15 text-ok': g.status === 'completed',
-                      'border-red-500/40 bg-red-500/15 text-danger': g.status === 'failed',
+                      'border-ok/40 bg-ok/15 text-ok': g.status === 'completed',
+                      'border-danger/40 bg-danger/15 text-danger': g.status === 'failed',
                       'border-ink-600 bg-ink-800 text-cream-300': g.status === 'cancelled',
-                      'border-amber-500/40 bg-amber-500/15 text-warn': ['pending','processing'].includes(g.status),
+                      'border-warn/40 bg-warn/15 text-warn': ['pending','processing'].includes(g.status),
                     }">{{ statusLabel(g.status) }}</span>
               <span v-if="g.type === 'video'" class="rounded-full bg-ink-700 px-1.5 py-0.5 text-tiny text-cream-300">Video</span>
               <span v-if="seedLabel(g)" class="rounded-full bg-brand-600/20 px-1.5 py-0.5 text-tiny text-brand-200">{{ seedLabel(g) }}</span>
@@ -541,7 +542,7 @@ onMounted(async () => {
           </div>
           <button v-if="store.libraryManage" @click.stop="store.toggleLibrarySelect(g.id)"
                   class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border text-sm"
-                  :class="isSelected(g.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-800 text-transparent hover:border-cream-200'">
+                  :class="isSelected(g.id) ? 'border-brand-500 bg-brand-600 text-primary-content' : 'border-cream-300/50 bg-ink-800 text-transparent hover:border-cream-200'">
             <StudioIcon name="check" size="h-3.5 w-3.5" />
           </button>
         </div>
@@ -582,13 +583,13 @@ onMounted(async () => {
         <div v-if="store.libraryManage" class="mb-4 space-y-2 rounded-lg border border-brand-600/40 bg-brand-900/30 p-3">
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-sm font-semibold text-cream-100">Đã chọn <span class="text-brand-300">{{ uploadSelectedCount }}</span> file</span>
-            <button @click="store.uploadSelectUnused" class="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-xs text-danger hover:bg-red-500/20">Chọn file mồ côi</button>
+            <button @click="store.uploadSelectUnused" class="rounded-lg border border-danger/40 bg-danger/10 px-2.5 py-1 text-xs text-danger hover:bg-danger/20">Chọn file mồ côi</button>
             <button @click="store.uploadSelectNone" class="rounded-lg border border-ink-600 bg-ink-800 px-2.5 py-1 text-xs text-cream-200 hover:bg-ink-700">Bỏ chọn</button>
           </div>
           <div class="flex flex-wrap items-center gap-2 border-t border-ink-700/60 pt-2">
             <template v-if="confirmAction === ''">
-              <button @click="ask('ubulk')" :disabled="!uploadSelectedCount" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-40"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xóa đã chọn ({{ uploadSelectedCount }})</button>
-              <button @click="ask('uclean')" :disabled="!uploadUnusedCount" class="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-danger hover:bg-red-500/15"><StudioIcon name="unlink" size="h-3.5 w-3.5" /> Dọn file mồ côi ({{ uploadUnusedCount }})</button>
+              <button @click="ask('ubulk')" :disabled="!uploadSelectedCount" class="rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-danger-content hover:bg-danger disabled:opacity-40"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xóa đã chọn ({{ uploadSelectedCount }})</button>
+              <button @click="ask('uclean')" :disabled="!uploadUnusedCount" class="rounded-lg border border-danger/40 px-3 py-1.5 text-xs text-danger hover:bg-danger/15"><StudioIcon name="unlink" size="h-3.5 w-3.5" /> Dọn file mồ côi ({{ uploadUnusedCount }})</button>
             </template>
             <template v-else>
               <p class="text-xs font-semibold text-danger">
@@ -598,7 +599,7 @@ onMounted(async () => {
               </p>
               <div class="flex gap-2">
                 <button @click="cancelConfirm" class="rounded-lg border border-ink-600 bg-ink-800 px-3 py-1.5 text-xs text-cream-200 hover:bg-ink-700">Hủy</button>
-                <button @click="runConfirm" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500">Xác nhận xóa</button>
+                <button @click="runConfirm" class="rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-danger-content hover:bg-danger">Xác nhận xóa</button>
               </div>
             </template>
           </div>
@@ -614,12 +615,12 @@ onMounted(async () => {
         <div v-else-if="store.libraryView === 'grid'" class="grid gap-3" :class="gridCls">
           <div v-for="f in sortedUploads" :key="f.rel"
                class="group relative overflow-hidden rounded-lg border-2 transition"
-               :class="isUploadSelected(f.rel) ? 'border-brand-400' : (f.used ? 'border-ink-700' : 'border-red-500/40')">
+               :class="isUploadSelected(f.rel) ? 'border-brand-400' : (f.used ? 'border-ink-700' : 'border-danger/40')">
             <div class="relative cursor-pointer">
               <img :src="thumbUrl(f.url, 480)" class="aspect-square w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, f.url)">
-              <span v-if="f.used" class="absolute left-2 top-2 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-tiny font-semibold text-ok">đang dùng</span>
-              <span v-else class="absolute left-2 top-2 rounded-full border border-red-500/40 bg-red-500/15 px-2 py-0.5 text-tiny font-semibold text-danger">chưa dùng</span>
-              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-2 pb-1.5 pt-6">
+              <span v-if="f.used" class="absolute left-2 top-2 rounded-full border border-ok/40 bg-ok/15 px-2 py-0.5 text-tiny font-semibold text-ok">đang dùng</span>
+              <span v-else class="absolute left-2 top-2 rounded-full border border-danger/40 bg-danger/15 px-2 py-0.5 text-tiny font-semibold text-danger">chưa dùng</span>
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-scrim/85 via-scrim/40 to-transparent px-2 pb-1.5 pt-6">
                 <p class="truncate text-label font-medium text-cream-100">{{ f.name }}</p>
                 <p class="truncate text-tiny text-cream-300">{{ f.width }}×{{ f.height }} · {{ fmtBytes(f.size) }} · {{ f.kind === 'asset' ? 'tài nguyên' : 'ảnh nguồn' }}</p>
               </div>
@@ -634,17 +635,17 @@ onMounted(async () => {
             </div>
             <button v-if="store.libraryManage && !f.used" @click.stop="store.toggleUploadSelect(f.rel)"
                     class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-lg border text-sm"
-                    :class="isUploadSelected(f.rel) ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-800 text-transparent hover:border-cream-200'">
+                    :class="isUploadSelected(f.rel) ? 'border-brand-500 bg-brand-600 text-primary-content' : 'border-cream-300/50 bg-ink-800 text-transparent hover:border-cream-200'">
               <StudioIcon name="check" size="h-3.5 w-3.5" />
             </button>
             <!-- Xóa nhanh (ngoài chế độ quản lý, chỉ file chưa dùng) -->
             <div v-else-if="!f.used" class="absolute right-2 top-2 flex gap-1 transition"
                  :class="confirmUploadDelete === f.rel ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
               <template v-if="confirmUploadDelete === f.rel">
-                <button @click.stop="runUploadDelete" class="rounded-lg bg-red-600 px-2 py-1 text-label font-semibold text-white hover:bg-red-500">Xóa</button>
+                <button @click.stop="runUploadDelete" class="rounded-lg bg-danger px-2 py-1 text-label font-semibold text-danger-content hover:bg-danger">Xóa</button>
                 <button @click.stop="cancelUploadDelete" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-label font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
               </template>
-              <button v-else @click.stop="askUploadDelete(f)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-red-500 hover:bg-red-600/30 hover:text-danger" title="Xóa file"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+              <button v-else @click.stop="askUploadDelete(f)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-danger hover:bg-danger/30 hover:text-danger" title="Xóa file"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
             </div>
           </div>
         </div>
@@ -652,15 +653,15 @@ onMounted(async () => {
       <div v-else class="space-y-2">
         <div v-for="f in sortedUploads" :key="f.rel"
              class="group relative flex items-center gap-3 overflow-hidden rounded-lg border-2 bg-ink-800/70 p-2 transition"
-             :class="isUploadSelected(f.rel) ? 'border-brand-400' : (f.used ? 'border-ink-700' : 'border-red-500/40')">
+             :class="isUploadSelected(f.rel) ? 'border-brand-400' : (f.used ? 'border-ink-700' : 'border-danger/40')">
           <div class="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-ink-900">
             <img :src="thumbUrl(f.url, 320)" class="h-full w-full object-cover" loading="lazy" @error="onThumbError($event, f.url)">
           </div>
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5">
               <p class="truncate text-xs font-medium text-cream-100">{{ f.name }}</p>
-              <span v-if="f.used" class="shrink-0 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-tiny font-semibold text-ok">đang dùng</span>
-              <span v-else class="shrink-0 rounded-full border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-tiny font-semibold text-danger">chưa dùng</span>
+              <span v-if="f.used" class="shrink-0 rounded-full border border-ok/40 bg-ok/15 px-1.5 py-0.5 text-tiny font-semibold text-ok">đang dùng</span>
+              <span v-else class="shrink-0 rounded-full border border-danger/40 bg-danger/15 px-1.5 py-0.5 text-tiny font-semibold text-danger">chưa dùng</span>
             </div>
             <p class="truncate text-label text-cream-400">{{ f.width }}×{{ f.height }} · {{ fmtBytes(f.size) }} · {{ f.kind === 'asset' ? 'tài nguyên' : 'ảnh nguồn' }}</p>
             <select :value="f.project_id || ''" @change="onUploadProject(f, $event.target.value)"
@@ -672,17 +673,17 @@ onMounted(async () => {
           </div>
           <button v-if="store.libraryManage && !f.used" @click.stop="store.toggleUploadSelect(f.rel)"
                   class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border text-sm"
-                  :class="isUploadSelected(f.rel) ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-800 text-transparent hover:border-cream-200'">
+                  :class="isUploadSelected(f.rel) ? 'border-brand-500 bg-brand-600 text-primary-content' : 'border-cream-300/50 bg-ink-800 text-transparent hover:border-cream-200'">
             <StudioIcon name="check" size="h-3.5 w-3.5" />
           </button>
           <!-- Xóa nhanh (ngoài chế độ quản lý, chỉ file chưa dùng) -->
           <div v-else-if="!f.used" class="flex shrink-0 gap-1 transition"
                :class="confirmUploadDelete === f.rel ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
             <template v-if="confirmUploadDelete === f.rel">
-              <button @click.stop="runUploadDelete" class="rounded-lg bg-red-600 px-2 py-1 text-label font-semibold text-white hover:bg-red-500">Xóa</button>
+              <button @click.stop="runUploadDelete" class="rounded-lg bg-danger px-2 py-1 text-label font-semibold text-danger-content hover:bg-danger">Xóa</button>
               <button @click.stop="cancelUploadDelete" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-label font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
             </template>
-            <button v-else @click.stop="askUploadDelete(f)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-red-500 hover:bg-red-600/30 hover:text-danger" title="Xóa file"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+            <button v-else @click.stop="askUploadDelete(f)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-danger hover:bg-danger/30 hover:text-danger" title="Xóa file"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
           </div>
         </div>
       </div>

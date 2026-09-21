@@ -8,7 +8,7 @@ import StudioIcon from '../StudioIcon.vue';
  */
 const TONE = {
   success: { icon: 'check', cls: 'border-brand-500/40 bg-brand-900/40 text-cream-50', ico: 'text-brand-300' },
-  error:   { icon: 'alertTriangle', cls: 'border-red-500/40 bg-red-950/60 text-cream-50', ico: 'text-danger' },
+  error:   { icon: 'alertTriangle', cls: 'border-danger/40 bg-ink-900/95 text-cream-50', ico: 'text-danger' },
   info:    { icon: 'info', cls: 'border-ink-600 bg-ink-800 text-cream-50', ico: 'text-cream-300' },
 };
 const items = computed(() => toastState.items);

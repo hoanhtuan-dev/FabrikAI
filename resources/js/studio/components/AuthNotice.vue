@@ -56,7 +56,7 @@ const copy = {
       <a
         v-if="copy[store.authState].href"
         :href="copy[store.authState].href"
-        class="mt-5 inline-flex items-center gap-2 rounded-full bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-500"
+        class="mt-5 inline-flex items-center gap-2 rounded-full bg-brand-600 px-6 py-2.5 text-sm font-semibold text-primary-content transition hover:bg-brand-500"
       >{{ copy[store.authState].action }}</a>
       <p v-else class="mt-5 text-xs text-cream-400">Liên hệ quản trị viên qua fanpage / email đã đăng ký trên website.</p>
     </div>

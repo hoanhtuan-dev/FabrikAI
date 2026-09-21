@@ -101,7 +101,7 @@ function openSettings() { settingsOpen.value = true; }
           <button v-for="t in types" :key="t.id" type="button" @click="pickType(t)"
             class="group relative aspect-square overflow-hidden rounded-md border-2 border-ink-600 bg-ink-900 motion-ui motion-ui--size duration-fast hover:border-brand-400 hover:shadow-lg hover:shadow-brand-500/15 active:scale-[0.97]">
             <img :src="t.thumb || t.img" :alt="t.name" loading="lazy" decoding="async" class="h-full w-full object-cover opacity-90 transition-transform duration-base group-hover:scale-105">
-            <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-1.5 pb-1.5 pt-6 text-center text-label font-medium leading-tight text-white">{{ t.name }}</span>
+            <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-scrim/85 via-scrim/35 to-transparent px-1.5 pb-1.5 pt-6 text-center text-label font-medium leading-tight text-scrim-content">{{ t.name }}</span>
           </button>
         </div>
       </template>
@@ -117,9 +117,9 @@ function openSettings() { settingsOpen.value = true; }
           <div v-for="q in questions" :key="q.key" class="rounded-lg border border-ink-700 bg-ink-800/60 p-3">
             <p class="mb-2 text-xs font-semibold text-brand-200">{{ q.q }}</p>
             <div class="flex flex-wrap gap-1.5">
-              <button v-for="opt in q.opts" :key="opt" type="button" @click="toggleOpt(q.key, opt)" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="answers[q.key]?.includes(opt) ? 'border-brand-500 bg-brand-500/25 text-white' : 'border-ink-600 text-cream-200 hover:border-brand-400'">{{ opt }}</button>
+              <button v-for="opt in q.opts" :key="opt" type="button" @click="toggleOpt(q.key, opt)" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="answers[q.key]?.includes(opt) ? 'border-brand-500 bg-brand-600 text-primary-content' : 'border-ink-600 text-cream-200 hover:border-brand-400'">{{ opt }}</button>
             </div>
-            <input v-model="customNotes[q.key]" placeholder="Hoặc nhập tùy chỉnh…" class="mt-2 w-full rounded-lg border border-ink-700 bg-ink-900/60 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-brand-400">
+            <input v-model="customNotes[q.key]" placeholder="Hoặc nhập tùy chỉnh…" class="mt-2 w-full rounded-lg border border-ink-700 bg-ink-900/60 px-3 py-1.5 text-xs text-cream-100 placeholder:text-cream-400 focus:border-brand-400">
             <p v-if="selectedCount(q.key)" class="mt-1 text-label text-cream-400">Đã chọn {{ selectedCount(q.key) }} mục</p>
           </div>
         </div>

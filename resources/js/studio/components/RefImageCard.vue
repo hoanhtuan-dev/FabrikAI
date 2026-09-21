@@ -201,7 +201,7 @@ async function runRefgen() {
         <button v-for="p in presets" :key="p.id" @click="applyPreset(p)"
                 class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-label font-semibold motion-ui motion-ui--size"
                 :class="activePreset === p.id ? 'border-brand-500 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400 hover:bg-ink-700'">
-          <span class="h-4 w-4 shrink-0 rounded-full border border-ink-600 shadow-inner ring-1 ring-black/30" :style="{ background: p.color }" :title="'Mã màu ' + p.color"></span>
+          <span class="h-4 w-4 shrink-0 rounded-full border border-ink-600 shadow-inner ring-1 ring-ink-600" :style="{ background: p.color }" :title="'Mã màu ' + p.color"></span>
           <span class="truncate">{{ p.label }}</span>
         </button>
       </div>
@@ -291,7 +291,7 @@ async function runRefgen() {
           <button v-for="f in faces" :key="f.id" @click="faceModelId = (String(faceModelId) === String(f.id)) ? '' : String(f.id)"
                   :class="String(faceModelId) === String(f.id) ? 'border-brand-500 bg-brand-600/20 ring-1 ring-brand-500/40' : 'border-ink-600 bg-ink-800 hover:border-brand-400'"
                   class="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-label font-semibold text-cream-200 transition">
-            <img v-if="f.thumb || f.image" :src="f.thumb || f.image" loading="lazy" class="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
+            <img v-if="f.thumb || f.image" :src="f.thumb || f.image" loading="lazy" class="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-ink-600">
             <span v-else class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-ink-700"><StudioIcon name="user" size="h-4 w-4" /></span>
             <span class="truncate">{{ f.name }}</span>
           </button>
@@ -329,7 +329,7 @@ async function runRefgen() {
           <button v-for="p in poses" :key="p.id" @click="poseId = (String(poseId) === String(p.id)) ? '' : String(p.id)"
                   :class="String(poseId) === String(p.id) ? 'border-brand-500 bg-brand-600/20 ring-1 ring-brand-500/40' : 'border-ink-600 bg-ink-800 hover:border-brand-400'"
                   class="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-label font-semibold text-cream-200 transition">
-            <img v-if="p.thumb || p.image" :src="p.thumb || p.image" loading="lazy" class="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
+            <img v-if="p.thumb || p.image" :src="p.thumb || p.image" loading="lazy" class="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-ink-600">
             <span v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-700"><StudioIcon name="user" size="h-4 w-4" /></span>
             <span class="truncate">{{ p.name }}</span>
           </button>
@@ -343,7 +343,7 @@ async function runRefgen() {
           <button v-for="p in presets" :key="p.id" @click="applyPreset(p)"
                   class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-label font-semibold motion-ui motion-ui--size"
                   :class="activePreset === p.id ? 'border-brand-500 bg-brand-600/20 text-cream-50' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">
-            <span class="h-4 w-4 shrink-0 rounded-full border border-ink-600 shadow-inner ring-1 ring-black/30" :style="{ background: p.color }"></span>
+            <span class="h-4 w-4 shrink-0 rounded-full border border-ink-600 shadow-inner ring-1 ring-ink-600" :style="{ background: p.color }"></span>
             <span class="truncate">{{ p.label }}</span>
           </button>
         </div>

@@ -145,7 +145,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
 </script>
 
 <template>
-  <div v-if="modelValue" role="dialog" aria-modal="true" aria-label="Chọn từ thư viện" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" @click.self="close">
+  <div v-if="modelValue" role="dialog" aria-modal="true" aria-label="Chọn từ thư viện" class="fixed inset-0 z-[70] flex items-center justify-center bg-scrim/70 p-4" @click.self="close">
     <div class="flex h-[82vh] w-full max-w-3xl flex-col rounded-lg border border-ink-700 bg-ink-900 p-4 shadow-2xl" style="height: min(82vh, 760px)">
       <div class="mb-3 flex items-start justify-between">
         <div class="flex items-center gap-2.5">
@@ -155,7 +155,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
             <p class="text-body text-cream-400">{{ refs.length + output.length }} ảnh<template v-if="query"> · “{{ query }}”</template></p>
           </div>
         </div>
-        <button @click="close" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 transition-colors hover:bg-ink-700 hover:text-white" title="Đóng" :aria-label="'Đóng'"><StudioIcon name="x" size="h-4 w-4"/></button>
+        <button @click="close" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 transition-colors hover:bg-ink-700 hover:text-cream-50" title="Đóng" :aria-label="'Đóng'"><StudioIcon name="x" size="h-4 w-4"/></button>
       </div>
 
       <label class="mb-3 flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ink-600 bg-ink-800/40 text-xs font-medium text-cream-200 transition-colors hover:border-brand-400 hover:bg-brand-600/10 hover:text-brand-200">
@@ -197,9 +197,9 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
         <div class="grid content-start gap-2.5" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
           <div v-for="it in sortedRefs" :key="it.name" class="group relative cursor-pointer overflow-hidden rounded-md border transition-colors" :class="isSel({ ...it, key: 'ref-' + it.name, kind: 'ref' }) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" :title="it.name" style="padding-bottom: 100%" @click="clickItem({ key: 'ref-' + it.name, url: it.url, name: it.name, kind: 'ref' })">
             <img :src="thumbUrl(it.url)" class="absolute inset-0 h-full w-full object-cover" loading="lazy" alt="" @error="onThumbError($event, it.url)">
-            <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-tiny font-medium text-ok"><StudioIcon name="check" size="h-3 w-3"/>đang dùng</span>
-            <button v-if="!it.used" @click.stop="delRef(it)" class="absolute right-1.5 top-1.5 hidden h-6 w-6 place-items-center rounded-full bg-red-600/90 text-white transition-colors hover:bg-red-500 group-hover:grid" title="Xóa ảnh" :aria-label="'Xóa ảnh'"><StudioIcon name="trash" size="h-3.5 w-3.5"/></button>
-            <div class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-1.5 pb-1 pt-5">
+            <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-scrim/70 px-1.5 py-0.5 text-tiny font-medium text-ok"><StudioIcon name="check" size="h-3 w-3"/>đang dùng</span>
+            <button v-if="!it.used" @click.stop="delRef(it)" class="absolute right-1.5 top-1.5 hidden h-6 w-6 place-items-center rounded-full bg-danger text-danger-content transition-colors hover:bg-danger group-hover:grid" title="Xóa ảnh" :aria-label="'Xóa ảnh'"><StudioIcon name="trash" size="h-3.5 w-3.5"/></button>
+            <div class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-scrim/85 via-scrim/40 to-transparent px-1.5 pb-1 pt-5">
               <p class="truncate text-label font-medium text-cream-100">{{ it.name }}</p>
               <p class="truncate text-tiny text-cream-300">{{ it.width }}×{{ it.height }} · {{ fmtSize(it.size) }}</p>
             </div>
@@ -215,7 +215,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
           <template v-if="isPick">Nhấn 1 ảnh để chọn vào slot.</template>
           <template v-else>{{ totalSel ? 'Đã chọn ' + totalSel + ' ảnh' : 'Chọn 1 hoặc nhiều ảnh để thêm vào canvas' }}</template>
         </span>
-        <button v-if="!isPick" @click="confirmMulti" :disabled="!totalSel" class="flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-40">
+        <button v-if="!isPick" @click="confirmMulti" :disabled="!totalSel" class="flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-primary-content transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-40">
           <StudioIcon name="plus" size="h-4 w-4"/>Thêm vào canvas ({{ totalSel }})
         </button>
       </div>

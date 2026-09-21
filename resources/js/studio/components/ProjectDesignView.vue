@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import BaseModal from './BaseModal.vue';
 import StudioIcon from './StudioIcon.vue';
+import { MOOD_COLOR } from '../dataColors.js';
 
 const props = defineProps({ settings: { type: Object, default: () => ({}) }, name: { type: String, default: 'Bộ sưu tập' } });
 const open = defineModel({ type: Boolean, default: false });
@@ -53,8 +54,8 @@ const fmtVnd = (v) => { const n = Number(v); return Number.isFinite(n) ? new Int
         <section v-if="moodboard.length">
           <h3 class="font-display text-sm font-semibold text-brand-300">Bảng mood ({{ moodboard.length }} ô)</h3>
           <div class="mt-2 grid grid-cols-4 gap-1.5 sm:grid-cols-6 md:grid-cols-8">
-            <div v-for="m in moodboard" :key="m.id" class="aspect-square rounded-md border border-ink-700" :style="{ backgroundColor: m.color || '#b9c8c2' }" :title="(m.caption || '')" role="img" :aria-label="moodLabel(m.label) + (m.caption ? ': ' + m.caption : '')">
-              <span class="block px-1 pt-0.5 text-tiny font-semibold leading-3 text-white/90">{{ moodLabel(m.label) }}</span>
+            <div v-for="m in moodboard" :key="m.id" class="aspect-square rounded-md border border-ink-700" :style="{ backgroundColor: m.color || MOOD_COLOR }" :title="(m.caption || '')" role="img" :aria-label="moodLabel(m.label) + (m.caption ? ': ' + m.caption : '')">
+              <span class="block bg-gradient-to-t from-scrim/85 to-transparent px-1 pb-0.5 pt-2 text-tiny font-semibold leading-3 text-scrim-content">{{ moodLabel(m.label) }}</span>
             </div>
           </div>
         </section>

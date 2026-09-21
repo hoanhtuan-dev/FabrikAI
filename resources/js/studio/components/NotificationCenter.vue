@@ -22,9 +22,9 @@ const store = useStudioStore();
 
 const ICON = { success: 'check', error: 'alertTriangle', warning: 'alertTriangle', info: 'info' };
 const TONE = {
-  success: 'border-emerald-500/40 bg-emerald-950/85 text-ok',
-  error: 'border-red-500/50 bg-red-950/85 text-danger',
-  warning: 'border-amber-500/50 bg-amber-950/85 text-warn',
+  success: 'border-ok/40 bg-ink-900/95 text-ok',
+  error: 'border-danger/50 bg-ink-900/95 text-danger',
+  warning: 'border-warn/50 bg-ink-900/95 text-warn',
   info: 'border-ink-600 bg-ink-900/95 text-cream-100',
 };
 const ICON_TONE = {

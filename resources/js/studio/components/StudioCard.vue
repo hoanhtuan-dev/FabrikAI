@@ -169,14 +169,14 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
     </p>
 
     <p v-if="plan && plan.image_ready === false" role="status"
-       class="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-label leading-4 text-warn">
+       class="mt-2 rounded-md border border-warn/40 bg-warn/10 px-2.5 py-1.5 text-label leading-4 text-warn">
       Tính năng tạo ảnh AI chưa được bật — ảnh hiện ra chỉ là ảnh mẫu, không phải ảnh do AI tạo. Vui lòng báo cho quản trị viên.
     </p>
 
     <!-- ① ẢNH NGƯỜI MẪU (bắt buộc) -->
     <div class="mt-3">
       <p class="flex items-center gap-1.5 text-body font-semibold text-cream-100">
-        <span class="grid h-4 w-4 place-items-center rounded-full bg-brand-600 text-tiny font-bold text-white">1</span>
+        <span class="grid h-4 w-4 place-items-center rounded-full bg-brand-600 text-tiny font-bold text-primary-content">1</span>
         Ảnh người mẫu <span class="rounded bg-ink-800 px-1.5 py-0.5 text-tiny font-medium text-brand-200">bắt buộc</span>
       </p>
       <button type="button" @click="openSlot(0)" title="Chọn ảnh người mẫu đã tạo ở bước trước"
@@ -186,7 +186,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
           <img :src="selected[0].url" class="h-full w-full object-cover" @error="onSlotImgError(0)">
           <span v-if="slotImgError[0]" class="absolute inset-0 grid place-items-center bg-ink-900"><StudioIcon name="image" size="h-8 w-8" /></span>
           <span class="absolute inset-x-0 bottom-0 bg-scrim/70 px-2 py-1 text-label font-semibold text-scrim-content">Giữ nguyên ảnh này · bấm để đổi</span>
-          <span @click.stop="removeSlot(0)" title="Bỏ ảnh" class="motion-ui absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-red-600/90 text-white hover:bg-red-500"><StudioIcon name="x" size="h-3.5 w-3.5" /></span>
+          <span @click.stop="removeSlot(0)" title="Bỏ ảnh" class="motion-ui absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-danger text-danger-content hover:bg-danger"><StudioIcon name="x" size="h-3.5 w-3.5" /></span>
         </template>
         <span v-else class="flex flex-col items-center gap-1 text-cream-300">
           <StudioIcon name="shirt" size="h-6 w-6" />
@@ -210,7 +210,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
             <img :src="selected[i].url" class="h-full w-full object-cover" @error="onSlotImgError(i)">
             <span v-if="slotImgError[i]" class="absolute inset-0 grid place-items-center bg-ink-900"><StudioIcon name="image" size="h-6 w-6" /></span>
             <span class="absolute inset-x-0 bottom-0 bg-scrim/70 px-1 py-0.5 text-center text-tiny font-semibold text-scrim-content">{{ slotTitle(i) }}</span>
-            <span @click.stop="removeSlot(i)" title="Bỏ ảnh" class="motion-ui absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-label text-white hover:bg-red-500"><StudioIcon name="x" size="h-3 w-3" /></span>
+            <span @click.stop="removeSlot(i)" title="Bỏ ảnh" class="motion-ui absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-danger text-label text-danger-content hover:bg-danger"><StudioIcon name="x" size="h-3 w-3" /></span>
           </template>
           <span v-else class="flex flex-col items-center gap-0.5 px-1 text-center">
             <StudioIcon :name="i === 1 ? 'image' : 'imagePlus'" size="h-4 w-4" class="text-cream-400" />
@@ -227,7 +227,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
         <p class="flex items-center gap-1.5 text-body font-semibold text-cream-100">
           <span class="grid h-4 w-4 place-items-center rounded-full bg-ink-700 text-tiny font-bold text-cream-100">3</span>
           Chọn nhanh
-          <span v-if="selectedChips.length" class="rounded bg-brand-600 px-1.5 py-0.5 text-tiny font-bold text-white">{{ selectedChips.length }}</span>
+          <span v-if="selectedChips.length" class="rounded bg-brand-600 px-1.5 py-0.5 text-tiny font-bold text-primary-content">{{ selectedChips.length }}</span>
         </p>
         <div class="flex items-center gap-1.5">
           <a :href="settingsUrl" target="_blank" rel="noopener"
@@ -246,7 +246,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
         <div class="mt-1 flex flex-wrap gap-1.5">
           <button v-for="item in groupItems(group)" :key="item.id" type="button" :title="item.note || item.injection"
                   class="motion-ui rounded-full border px-2 py-1 text-label font-medium transition"
-                  :class="chipActive(item.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"
+                  :class="chipActive(item.id) ? 'border-brand-500 bg-brand-600 text-primary-content' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"
                   @click="toggleChip(item.id)">{{ item.label }}</button>
           <button v-if="hiddenCount(group) && !expanded[group.id]" type="button"
                   class="motion-ui rounded-full border border-ink-600 px-2 py-1 text-label text-cream-400 transition hover:border-brand-400 hover:text-cream-100"
@@ -256,7 +256,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
 
       <div v-if="selectedChips.length" class="mt-2 flex flex-wrap gap-1.5">
         <button v-for="id in selectedChips" :key="id" type="button"
-                class="motion-ui inline-flex items-center gap-1 rounded-full bg-ink-800 px-2 py-0.5 text-tiny text-cream-200 transition hover:bg-red-600/25"
+                class="motion-ui inline-flex items-center gap-1 rounded-full bg-ink-800 px-2 py-0.5 text-tiny text-cream-200 transition hover:bg-danger/25"
                 :title="'Bỏ chip: ' + chipLabelOf(id)" @click="toggleChip(id)">
           {{ chipLabelOf(id) }} <span class="text-cream-400">×</span>
         </button>
@@ -276,7 +276,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
       <!-- Chip thẻ ảnh + prompt mẫu (cùng cách card "Ghép trang phục") -->
       <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
         <button v-for="n in 3" :key="n" type="button" @click="insertTag('@image' + n)"
-                class="motion-ui rounded-full bg-ink-800 px-2 py-0.5 text-label font-semibold text-brand-300 transition hover:bg-brand-600 hover:text-white"
+                class="motion-ui rounded-full bg-ink-800 px-2 py-0.5 text-label font-semibold text-brand-300 transition hover:bg-brand-600 hover:text-cream-50"
                 :title="'Chèn @image' + n + ' vào prompt'">@image{{ n }}</button>
         <span class="text-cream-400">|</span>
         <button type="button" @click="useSamplePrompt"
@@ -330,7 +330,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
       <li v-for="(w, i) in visibleWarnings" :key="i" class="text-label leading-4"
           :class="w.level === 'error' ? 'text-danger' : 'text-warn'">• {{ w.message }}</li>
     </ul>
-    <div v-if="store.sceneError" role="alert" class="mt-2.5 rounded-lg border border-red-500/40 bg-red-500/10 p-2.5 text-body text-danger">
+    <div v-if="store.sceneError" role="alert" class="mt-2.5 rounded-lg border border-danger/40 bg-danger/10 p-2.5 text-body text-danger">
       {{ store.sceneError }}
     </div>
 
@@ -349,16 +349,16 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
         :subtext="fmt(elapsedSec) + ' · ' + doneCount + '/' + store.composeGenIds.length + ' ảnh'"
         :progress="doneCount / Math.max(1, store.composeGenIds.length) * 100" />
       <div class="mt-2 flex justify-end">
-        <button @click="store.cancelCompose()" class="rounded-full bg-red-600/25 px-2.5 py-1 text-label font-semibold text-danger hover:bg-red-600">Hủy</button>
+        <button @click="store.cancelCompose()" class="rounded-full bg-danger/25 px-2.5 py-1 text-label font-semibold text-danger hover:bg-danger">Hủy</button>
       </div>
     </div>
 
-    <div v-if="store.composeStage === 'done'" class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-body leading-5 text-ok">
+    <div v-if="store.composeStage === 'done'" class="mt-3 rounded-lg border border-ok/40 bg-ok/25 p-3 text-body leading-5 text-ok">
       Xong — ảnh đã vào <strong>Outputs</strong> (góc phải) và bảng Lớp.
       <button @click="store.clearComposeStatus()" class="ml-1 rounded-full bg-ink-800 px-2 py-0.5 hover:bg-ink-800">Đóng</button>
     </div>
 
-    <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-lg border border-red-500/40 bg-red-900/25 p-3 text-body leading-5 text-danger">
+    <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-lg border border-danger/40 bg-danger/25 p-3 text-body leading-5 text-danger">
       <p class="font-semibold">Studio không chạy được</p>
       <p class="mt-1 whitespace-pre-line">{{ store.composeError }}</p>
       <div class="mt-2 flex gap-2">

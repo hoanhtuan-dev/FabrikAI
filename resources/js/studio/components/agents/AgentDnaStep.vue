@@ -32,7 +32,7 @@ const setDnaList = inject('setDnaList');
                   Điền càng cụ thể, brief càng sát shop của bạn. Bỏ trống cũng chạy được — khi đó AI dựa vào dự án và ảnh bạn đã làm.
                 </p>
                 <div v-if="dna" class="mt-3 flex flex-wrap items-center gap-2 text-label">
-                  <span class="rounded-full px-2 py-0.5 font-semibold" :class="dna.is_set ? 'bg-brand-500/20 text-brand-200' : 'bg-amber-500/15 text-warn'">
+                  <span class="rounded-full px-2 py-0.5 font-semibold" :class="dna.is_set ? 'bg-brand-500/20 text-brand-200' : 'bg-warn/15 text-warn'">
                     {{ dna.is_set ? 'Đã khai' : 'Chưa khai' }}
                   </span>
                   <span class="text-cream-400">Bản đang dùng khi chạy: <b class="text-cream-200">{{ dna.summary ? 'DNA bạn khai' : 'suy ra từ dữ liệu tài khoản' }}</b></span>
@@ -58,7 +58,7 @@ const setDnaList = inject('setDnaList');
               </div>
 
               <div v-if="store.brandDnaLoading" class="mt-3 text-body text-cream-400">Đang tải hồ sơ…</div>
-              <p v-else-if="store.brandDnaError" role="alert" class="mt-3 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-body text-danger">{{ store.brandDnaError }}</p>
+              <p v-else-if="store.brandDnaError" role="alert" class="mt-3 rounded-lg border border-danger/40 bg-danger/15 px-3 py-2 text-body text-danger">{{ store.brandDnaError }}</p>
 
               <div v-else class="mt-3 grid gap-4">
                 <div>

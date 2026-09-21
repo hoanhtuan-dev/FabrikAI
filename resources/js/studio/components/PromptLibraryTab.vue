@@ -211,11 +211,11 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
       </div>
       <div class="flex flex-wrap items-center gap-2 border-t border-ink-700/60 pt-2">
         <template v-if="!confirmBulk">
-          <button @click="askBulkDelete" :disabled="!selectedCount" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-40"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xóa đã chọn ({{ selectedCount }})</button>
+          <button @click="askBulkDelete" :disabled="!selectedCount" class="rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-danger-content hover:bg-danger disabled:opacity-40"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xóa đã chọn ({{ selectedCount }})</button>
         </template>
         <template v-else>
           <p class="text-xs font-semibold text-danger"><StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> Xóa vĩnh viễn {{ selectedCount }} prompt đã chọn?</p>
-          <button @click="runBulk" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500">Xác nhận xóa</button>
+          <button @click="runBulk" class="rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-danger-content hover:bg-danger">Xác nhận xóa</button>
           <button @click="cancelBulk" class="rounded-lg border border-ink-600 bg-ink-800 px-3 py-1.5 text-xs text-cream-200 hover:bg-ink-700">Hủy</button>
         </template>
       </div>
@@ -246,9 +246,9 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
           </div>
           <!-- Badge loại + dùng -->
           <span v-if="item.garment_type" class="absolute left-2 top-2 max-w-[70%] truncate rounded-full border border-brand-500/40 bg-brand-600/20 px-2 py-0.5 text-tiny font-semibold text-brand-200">{{ item.garment_type }}</span>
-          <span v-if="item.apply_count" class="absolute right-2 top-2 rounded-full bg-emerald-800/50 px-1.5 py-0.5 text-tiny font-semibold text-ok">✓{{ item.apply_count }}x</span>
+          <span v-if="item.apply_count" class="absolute right-2 top-2 rounded-full bg-ok/25 px-1.5 py-0.5 text-tiny font-semibold text-ok">✓{{ item.apply_count }}x</span>
           <!-- Overlay hover -->
-          <div class="absolute inset-0 bg-black/40 opacity-0 transition group-hover:opacity-100"></div>
+          <div class="absolute inset-0 bg-scrim/40 opacity-0 transition group-hover:opacity-100"></div>
         </div>
         <!-- Nội dung -->
         <div class="p-2">
@@ -263,19 +263,19 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
         <!-- Checkbox chọn (chế độ quản lý) -->
         <button v-if="store.suggestLibManage" @click.stop="store.toggleSuggestLibSelect(item.id)"
                 class="absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-lg border text-sm"
-                :class="isSelected(item.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-800 text-transparent hover:border-cream-200'">
+                :class="isSelected(item.id) ? 'border-brand-500 bg-brand-600 text-primary-content' : 'border-cream-300/50 bg-ink-800 text-transparent hover:border-cream-200'">
           <StudioIcon name="check" size="h-3.5 w-3.5" />
         </button>
         <!-- Hành động nhanh (ngoài chế độ quản lý) -->
         <div v-else class="absolute right-1.5 top-1.5 flex gap-1 transition"
              :class="confirmDeleteId === item.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
           <template v-if="confirmDeleteId === item.id">
-            <button @click.stop="runDeleteSingle" class="rounded-lg bg-red-600 px-2 py-1 text-label font-semibold text-white hover:bg-red-500">Xóa</button>
+            <button @click.stop="runDeleteSingle" class="rounded-lg bg-danger px-2 py-1 text-label font-semibold text-danger-content hover:bg-danger">Xóa</button>
             <button @click.stop="cancelDeleteSingle" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-label font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
           </template>
           <template v-else>
             <button @click.stop="openEdit(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400 hover:bg-brand-600/30 hover:text-brand-200" title="Sửa prompt"><StudioIcon name="pencil" size="h-3.5 w-3.5" /></button>
-            <button @click.stop="askDeleteSingle(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-red-500 hover:bg-red-600/30 hover:text-danger" title="Xóa prompt"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+            <button @click.stop="askDeleteSingle(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-danger hover:bg-danger/30 hover:text-danger" title="Xóa prompt"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
           </template>
         </div>
       </div>
@@ -288,7 +288,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
            :class="isSelected(item.id) ? 'border-brand-400' : 'border-ink-700 hover:border-brand-500/50'">
         <button v-if="store.suggestLibManage" @click.stop="store.toggleSuggestLibSelect(item.id)"
                 class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border text-sm"
-                :class="isSelected(item.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-800 text-transparent hover:border-cream-200'">
+                :class="isSelected(item.id) ? 'border-brand-500 bg-brand-600 text-primary-content' : 'border-cream-300/50 bg-ink-800 text-transparent hover:border-cream-200'">
           <StudioIcon name="check" size="h-3.5 w-3.5" />
         </button>
         <div class="h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-md bg-ink-900" @click="store.suggestLibManage ? store.toggleSuggestLibSelect(item.id) : openDetail(item)">
@@ -306,12 +306,12 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
         <div v-if="!store.suggestLibManage" class="flex shrink-0 gap-1 transition"
              :class="confirmDeleteId === item.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
           <template v-if="confirmDeleteId === item.id">
-            <button @click.stop="runDeleteSingle" class="rounded-lg bg-red-600 px-2 py-1 text-label font-semibold text-white hover:bg-red-500">Xóa</button>
+            <button @click.stop="runDeleteSingle" class="rounded-lg bg-danger px-2 py-1 text-label font-semibold text-danger-content hover:bg-danger">Xóa</button>
             <button @click.stop="cancelDeleteSingle" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-label font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
           </template>
           <template v-else>
             <button @click.stop="openEdit(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400 hover:bg-brand-600/30 hover:text-brand-200" title="Sửa prompt"><StudioIcon name="pencil" size="h-3.5 w-3.5" /></button>
-            <button @click.stop="askDeleteSingle(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-red-500 hover:bg-red-600/30 hover:text-danger" title="Xóa prompt"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+            <button @click.stop="askDeleteSingle(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-800 text-cream-200 hover:border-danger hover:bg-danger/30 hover:text-danger" title="Xóa prompt"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
           </template>
         </div>
       </div>
@@ -326,12 +326,12 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
     </div>
 
     <!-- ══ Modal chi tiết ══ -->
-    <div v-if="showDetail" role="dialog" aria-modal="true" aria-label="Chi tiết prompt" class="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4" @click.self="closeDetail">
+    <div v-if="showDetail" role="dialog" aria-modal="true" aria-label="Chi tiết prompt" class="fixed inset-0 z-[90] flex items-center justify-center bg-scrim/70 p-4" @click.self="closeDetail">
       <div class="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-lg border border-brand-500/40 bg-ink-900 shadow-2xl" @click.stop>
         <template v-for="item in store.suggestLibItems.filter(x => x.id === showDetail)" :key="item.id">
           <div class="flex items-center justify-between border-b border-ink-700 px-4 py-3">
             <h3 class="text-sm font-semibold text-brand-300">Chi tiết Prompt</h3>
-            <button @click="closeDetail" class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
+            <button @click="closeDetail" class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-danger" title="Đóng"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
           </div>
           <div class="space-y-3 p-4 text-xs">
             <div v-if="item.reference_url" class="flex items-center gap-3 rounded-lg border border-ink-700 bg-cream-50/5 p-2">
@@ -377,7 +377,7 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
               <div class="max-h-24 overflow-y-auto rounded-md border border-ink-700 bg-cream-50/5 p-2 leading-relaxed text-cream-100">{{ item.negative_prompt }}</div>
             </div>
             <div v-if="(item.keywords || []).length" class="flex flex-wrap gap-1">
-              <span v-for="k in item.keywords" :key="k" class="rounded-full bg-emerald-800/40 px-2 py-0.5 text-label text-ok">#{{ k }}</span>
+              <span v-for="k in item.keywords" :key="k" class="rounded-full bg-ok/25 px-2 py-0.5 text-label text-ok">#{{ k }}</span>
             </div>
 
             <div class="flex items-center gap-3 text-label text-cream-400">
@@ -390,10 +390,10 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
               <button @click="closeDetail(); store.applySuggestPrompt(item)" class="btn-brand flex-1 text-xs">Áp dụng → Tạo Ảnh</button>
               <button @click="openEdit(item)" class="btn-outline text-xs">Sửa</button>
               <template v-if="confirmDeleteId === item.id">
-                <button @click="runDeleteSingle" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white">Xóa?</button>
+                <button @click="runDeleteSingle" class="rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-danger-content">Xóa?</button>
                 <button @click="cancelDeleteSingle" class="rounded-lg border border-ink-600 bg-ink-800 px-3 py-1.5 text-xs text-cream-200">Hủy</button>
               </template>
-              <button v-else @click="askDeleteSingle(item)" class="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-danger hover:bg-red-600/10">Xóa</button>
+              <button v-else @click="askDeleteSingle(item)" class="rounded-lg border border-danger/40 px-3 py-1.5 text-xs text-danger hover:bg-danger/10">Xóa</button>
             </div>
           </div>
         </template>
@@ -401,11 +401,11 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
     </div>
 
     <!-- ══ Modal thêm / sửa prompt (CRUD) ══ -->
-    <div v-if="editorOpen" role="dialog" aria-modal="true" aria-label="Sửa prompt" class="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4" @click.self="closeEditor">
+    <div v-if="editorOpen" role="dialog" aria-modal="true" aria-label="Sửa prompt" class="fixed inset-0 z-[90] flex items-center justify-center bg-scrim/70 p-4" @click.self="closeEditor">
       <div class="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-lg border border-brand-500/40 bg-ink-900 shadow-2xl" @click.stop>
         <div class="flex items-center justify-between border-b border-ink-700 px-4 py-3">
           <h3 class="text-sm font-semibold text-brand-300">{{ editingId ? 'Sửa Prompt' : 'Thêm Prompt' }}</h3>
-          <button @click="closeEditor" class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
+          <button @click="closeEditor" class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-danger" title="Đóng"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
         </div>
         <div class="space-y-3 p-4 text-xs">
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">

@@ -27,7 +27,7 @@ const store = useStudioStore();
           <img :src="thumbUrl(store.editSource.url)" class="aspect-square w-full bg-ink-900 object-cover" alt="" loading="lazy" @error="onThumbError($event, store.editSource.url)">
           <button
             @click.stop="store.removeEditSource()"
-            class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-md bg-scrim/55 text-scrim-content transition-colors hover:bg-red-600 hover:text-white"
+            class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-md bg-scrim/55 text-scrim-content transition-colors hover:bg-danger hover:text-cream-50"
             title="Bỏ ảnh nguồn khỏi canvas"
             :aria-label="'Bỏ ảnh nguồn khỏi canvas'"
           ><StudioIcon name="x" size="h-3 w-3"/></button>
