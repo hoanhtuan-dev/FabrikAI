@@ -174,9 +174,10 @@ class ToolSearchTest extends TestCase
         $this->model(DesignAgentService::SEARCH_GROUP, 'gw-search', 'search-1');
         $this->searchSource();
 
-        $calls = 0;
+        $sent = [];
         Http::fake([
-            'gw-search.example/*' => function () use (&$calls) {
+            'gw-search.example/*' => function ($request) use (&$calls, &$sent) {
+                $sent[] = json_decode($request->body(), true);
                 $calls++;
 
                 return $calls === 1
@@ -191,6 +192,9 @@ class ToolSearchTest extends TestCase
         $this->assertSame('ai-v1', $radar['engine']);
         $this->assertTrue($radar['model']['web_search']);
         $this->assertSame('tool', $radar['model']['tool_search']['mode']);
+        // Radar chạy CÔNG CỤ DO MÁY CHỦ CHẠY (đường /chat/completions), không phải /responses — nên
+        // request phải KHAI hàm web_search; trần lượt gọi do WebSearchTool::MAX_CALLS quyết định.
+        $this->assertSame('web_search', data_get($sent[0] ?? [], 'tools.0.function.name'));
         $this->assertSame(['xu hướng tweed'], $radar['model']['tool_search']['queries']);
         Http::assertSent(fn ($request) => str_contains($request->url(), 'news.example'));
     }
@@ -511,7 +515,8 @@ class ToolSearchTest extends TestCase
         // TỐI ƯU THỜI GIAN: giảm suy luận dài và CHẶN trần số lượt tìm — đo thật một lượt radar kéo tới
         // 6 truy vấn / 49 giây khi không có trần.
         $this->assertSame('low', data_get($sent[0]['body'], 'reasoning.effort'));
-        $this->assertSame(3, data_get($sent[0]['body'], 'max_tool_calls'));
+        // Đây là đường BRIEF ⇒ trần 2 (radar để 3, xem test_the_radar_allows_more_search_rounds_than_the_brief).
+        $this->assertSame(2, data_get($sent[0]['body'], 'max_tool_calls'));
 
         // (3) Số ĐO lấy từ phản hồi: 2 lượt tìm thật, có từ khoá và nguồn.
         $this->assertSame('ai-v1', $brief['engine']);
