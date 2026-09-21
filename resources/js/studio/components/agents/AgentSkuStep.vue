@@ -7,6 +7,7 @@
  * thuật toán. Nay người dùng chọn quy mô, hệ thống CHIA LẠI theo đúng tỉ lệ nhóm hàng đang có.
  */
 import { computed, inject, ref, watch } from 'vue';
+import { useStudioStore } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
 
 const skuTotal = inject('skuTotal');
@@ -15,7 +16,7 @@ const categoryRows = inject('categoryRows');
 const collection = inject('collection');
 const briefStale = inject('briefStale');
 const createBrief = inject('createBrief');
-const store = inject('store');
+const store = useStudioStore();
 
 const QUICK = [6, 9, 12, 18, 24, 30, 40];
 const chosen = ref(Math.max(1, Number(collection.value?.structure?.total_skus) || 12));

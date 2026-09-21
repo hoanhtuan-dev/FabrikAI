@@ -2352,7 +2352,14 @@ class DesignAgentService
             .'narrative: 1-2 câu DNA/định vị. brief: 3-5 câu tiếng Việt cho xưởng. moodboard_captions: ĐÚNG 24 caption ngắn tiếng Việt theo thứ tự ô. '
             .'category_rationale: mỗi nhóm hàng 1 câu, dùng ĐÚNG tên nhóm trong dữ liệu. outfit_goals: mỗi look 1 câu, dùng ĐÚNG id look trong dữ liệu. '
             .'prompt_vi: 1 đoạn mô tả ảnh tiếng Việt. prompt_en: 1 đoạn prompt ảnh tiếng Anh giàu chi tiết (chất liệu, dáng, ánh sáng, bố cục). '
-            .'next_steps: đúng 3 việc cần làm tiếp.';
+            .'next_steps: đúng 3 việc cần làm tiếp (MẢNG 3 phần tử). '
+            // [LỖI THẬT — production 2026-09-21] Model sinh văn bản dài hay XUỐNG DÒNG thật bên trong
+            // giá trị chuỗi; JSON không cho phép ký tự điều khiển trong chuỗi nên cả câu trả lời thành
+            // không đọc được và brief rơi về bộ quy tắc. Đường radar đã có câu dặn này từ trước, đường
+            // brief thì thiếu — nay có. (Bộ sửa JSON ở decodeJson vẫn là lưới an toàn, nhưng dặn trước
+            // thì rẻ hơn sửa sau.)
+            .'KHÔNG xuống dòng trong giá trị: mỗi trường là MỘT dòng, dùng dấu chấm để ngắt câu. '
+            .'Trả JSON NGAY, không viết phần suy luận/giải thích dài dòng.';
 
         // TÌM KIẾM: nhóm "Agent Studio — Tìm kiếm nguồn ngoài" quyết định (giống đường radar) — nhà cung
         // cấp tự tìm, hoặc MÁY CHỦ chạy công cụ `web_search` cho model gọi. Không có ⇒ dùng nhóm suy luận.
@@ -2647,7 +2654,119 @@ class DesignAgentService
             }
         }
 
+        // (4) SỬA LỖI JSON THƯỜNG GẶP — bước CUỐI, trước khi bỏ cuộc.
+        //
+        // [LỖI THẬT — production 2026-09-21, nhiều lượt] Model trả về JSON mở đầu và kết thúc đúng
+        // dạng (bắt đầu bằng { và kết thúc bằng }), nhưng KHÔNG đọc được ⇒ cả brief rơi về bộ quy tắc
+        // và người dùng đọc câu "AI trả về dữ liệu không dùng được". Hai kiểu hỏng hay gặp nhất của
+        // model sinh văn bản dài:
+        //   · xuống dòng THẬT trong giá trị chuỗi (JSON không cho phép ký tự điều khiển trong chuỗi);
+        //   · dấu phẩy thừa trước } hoặc ].
+        // Sửa hai lỗi đó là CƠ HỌC và tất định, không phải đoán nội dung — nên làm được mà không sợ
+        // bịa ra dữ liệu người dùng không viết.
+        $sanitized = $this->sanitizeJsonText($text);
+        if ($sanitized !== $text) {
+            $json = json_decode($sanitized, true);
+            if (is_array($json)) {
+                return $json;
+            }
+            $snippet = $this->jsonObjectSnippet($sanitized);
+            if ($snippet !== null) {
+                $json = json_decode($snippet, true);
+                if (is_array($json)) {
+                    return $json;
+                }
+                $repaired = $this->repairTruncatedJson($snippet);
+                if ($repaired !== null) {
+                    $json = json_decode($repaired, true);
+                    if (is_array($json)) {
+                        return $json;
+                    }
+                }
+            }
+        }
+
+        // NÓI RÕ VÌ SAO HỎNG. Không có dòng này thì lần sau lại phải mò: log cũ chỉ có 800 ký tự đầu,
+        // mà JSON hỏng ở GIỮA thì 800 ký tự đầu luôn trông hợp lệ.
+        logger()->warning('Agent Studio: không đọc được JSON của model sau mọi cách sửa', [
+            'json_error' => json_last_error_msg(),
+            'chars' => strlen($text),
+            'control_chars_inside_strings' => $sanitized !== $text,
+            'head' => substr($text, 0, 120),
+            'tail' => substr($text, -120),
+        ]);
+
         return null;
+    }
+
+    /**
+     * SỬA HAI LỖI JSON THƯỜNG GẶP của model — đi một lượt qua chuỗi, KHÔNG đụng vào nội dung:
+     *   · ký tự điều khiển (xuống dòng · tab) NẰM TRONG chuỗi ⇒ đổi thành dạng escape hợp lệ;
+     *   · dấu phẩy thừa ngay trước } hoặc ] ⇒ bỏ (chỉ khi ở NGOÀI chuỗi).
+     *
+     * Vì sao phải là máy trạng thái chứ không phải regex: cùng một dấu phẩy, ở ngoài chuỗi là lỗi cú
+     * pháp còn ở TRONG chuỗi là nội dung người dùng viết. Regex không phân biệt được hai chỗ đó nên nó
+     * sẽ sửa cả nội dung — đúng thứ không được phép xảy ra với dữ liệu của khách.
+     */
+    private function sanitizeJsonText(string $text): string
+    {
+        $out = '';
+        $inString = false;
+        $escaped = false;
+
+        for ($i = 0, $len = strlen($text); $i < $len; $i++) {
+            $char = $text[$i];
+
+            if ($inString) {
+                if ($escaped) {
+                    $out .= $char;
+                    $escaped = false;
+                    continue;
+                }
+                if ($char === chr(92)) {
+                    $out .= $char;
+                    $escaped = true;
+                    continue;
+                }
+                if ($char === '"') {
+                    $out .= $char;
+                    $inString = false;
+                    continue;
+                }
+                $ord = ord($char);
+                if ($ord < 0x20) {
+                    $out .= match ($char) {
+                        "\n" => chr(92).'n',
+                        "\r" => chr(92).'r',
+                        "\t" => chr(92).'t',
+                        default => chr(92).'u'.str_pad(dechex($ord), 4, '0', STR_PAD_LEFT),
+                    };
+                    continue;
+                }
+                $out .= $char;
+                continue;
+            }
+
+            if ($char === '"') {
+                $out .= $char;
+                $inString = true;
+                continue;
+            }
+
+            if ($char === ',') {
+                $j = $i + 1;
+                while ($j < $len && in_array($text[$j], [' ', "\n", "\r", "\t"], true)) {
+                    $j++;
+                }
+                if ($j < $len && ($text[$j] === '}' || $text[$j] === ']')) {
+                    continue;   // dấu phẩy thừa: bỏ hẳn
+                }
+            }
+
+            $out .= $char;
+        }
+
+        return $out;
     }
 
     /** Trích object JSON đầu tiên trong một chuỗi văn bản (bỏ qua ngoặc bên trong chuỗi). */

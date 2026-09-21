@@ -486,6 +486,38 @@ class DesignSystemTest extends TestCase
             'Màu mặt nạ còn viết thẳng trong maskBrush.js — ba tệp vẽ mặt nạ phải dùng CHUNG một token.');
     }
 
+    /**
+     * NÚT ĐÓNG THÔNG BÁO PHẢI BẤM ĐƯỢC TRÊN ĐIỆN THOẠI (phản hồi chủ dự án 2026-09-21).
+     *
+     * Đo được trước khi sửa: nút là `p-0.5` + icon 14px = **18×18px**, lại còn `opacity-60`. Người dùng
+     * đọc thành "thông báo không có nút tắt" — và đúng theo chuẩn: §8 đòi vùng chạm ≥ 24×24 (WCAG 2.2
+     * SC 2.5.8), và mờ-dần-chỉ-khi-trỏ-vào là cách giấu nút trên thiết bị cảm ứng (ở đó không có hover).
+     */
+    public function test_the_notification_close_button_is_tappable(): void
+    {
+        $center = $this->src('resources/js/studio/components/NotificationCenter.vue');
+
+        // Vùng chạm ≥ 24×24 (h-6 w-6) và có nhãn cho trình đọc màn hình.
+        $this->assertMatchesRegularExpression(
+            '/<button[^>]*class="grid h-6 w-6[^"]*"[^>]*aria-label="Đóng thông báo"/s',
+            $center,
+            'Nút đóng thông báo phải đạt vùng chạm 24×24 (docs/DESIGN_SYSTEM.md §8).'
+        );
+
+        // Không được giấu nút sau hover, và không được để nó mờ tới mức khó thấy.
+        // Bỏ CHÚ THÍCH trước khi soi: khối chú thích kể lại lỗi cũ có nhắc tới chính class đã gỡ
+        // (cùng cách UserFacingMessagesTest làm với những câu đã gỡ).
+        $code = (string) preg_replace(['/<!--.*?-->/s', '/\/\*.*?\*\//s', '/^[ \t]*\/\/.*$/m'], '', $center);
+        $this->assertStringNotContainsString('hover:opacity-100', $code,
+            'Nút đóng lại bị giấu sau hover — thiết bị cảm ứng không có hover nên nút thành vô hình.');
+        $this->assertStringNotContainsString('opacity-60', $code,
+            'Nút đóng thông báo lại bị làm mờ — người dùng không nhận ra đó là nút bấm.');
+
+        // Nút "Xoá hết" cũng phải đạt ngưỡng chạm.
+        $this->assertStringContainsString('min-h-6', $code,
+            'Nút «Xoá hết» cũng là nút bấm trên điện thoại — phải đạt 24px chiều cao.');
+    }
+
     public function test_button_backgrounds_use_one_token_per_state(): void
     {
         // Nền "kính mờ"/alpha lạ: KHÔNG bao giờ dùng cho trạng thái nghỉ của nút.

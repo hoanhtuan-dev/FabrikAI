@@ -116,9 +116,16 @@ const progress = computed(() => {
           class="shrink-0 rounded-md border border-ink-600 px-2 py-0.5 text-label font-semibold transition hover:bg-ink-800"
           @click="n.action.run(); store.dismissNotification(n.id)"
         >{{ n.action.label }}</button>
+        <!--
+          [LỖI THẬT — phản hồi chủ dự án 2026-09-21] Nút này từng là `p-0.5` + icon 14px = **18×18px**, lại
+          còn `opacity-60`. Trên điện thoại người dùng đọc thành "thông báo không có nút tắt" — và đúng
+          theo chuẩn: WCAG 2.2 SC 2.5.8 yêu cầu vùng chạm ≥ 24×24, còn §8 của hướng dẫn thiết kế ghi rõ
+          "nút nhỏ nhất đang dùng là h-6 w-6 (24px)". Nay đúng 24×24 và hiện rõ ngay từ đầu (mờ dần chỉ
+          khi trỏ vào là cách giấu nút trên thiết bị cảm ứng — ở đó không có hover).
+        -->
         <button
           type="button"
-          class="shrink-0 rounded-md p-0.5 opacity-60 transition hover:bg-ink-800 hover:opacity-100"
+          class="grid h-6 w-6 shrink-0 place-items-center rounded-md text-cream-200 transition hover:bg-ink-800 hover:text-cream-50"
           title="Đóng thông báo"
           aria-label="Đóng thông báo"
           @click="store.dismissNotification(n.id)"
@@ -130,7 +137,7 @@ const progress = computed(() => {
     <button
       v-if="store.notifications.length > 1"
       type="button"
-      class="pointer-events-auto self-end rounded-full border border-ink-600 bg-ink-900/95 px-2.5 py-1 text-label font-semibold text-cream-300 transition hover:bg-ink-800 hover:text-cream-100"
+      class="pointer-events-auto grid min-h-6 place-items-center self-end rounded-full border border-ink-600 bg-ink-900/95 px-3 py-1 text-label font-semibold text-cream-300 transition hover:bg-ink-800 hover:text-cream-100"
       @click="store.clearNotifications()"
     >Xoá hết ({{ store.notifications.length }})</button>
   </div>

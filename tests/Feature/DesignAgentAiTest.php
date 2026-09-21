@@ -98,6 +98,81 @@ class DesignAgentAiTest extends TestCase
         ], JSON_UNESCAPED_UNICODE);
     }
 
+    // ── 0. JSON HỎNG KIỂU THẬT của model vẫn phải dùng được ─────────────────
+
+    /**
+     * [LỖI THẬT — production 2026-09-21] Model trả về JSON mở đầu/kết thúc đúng dạng nhưng XUỐNG DÒNG
+     * thật bên trong giá trị chuỗi. JSON không cho phép ký tự điều khiển trong chuỗi ⇒ cả câu trả lời
+     * thành không đọc được, brief rơi về bộ quy tắc, và người dùng đọc câu "AI trả về dữ liệu không
+     * dùng được" dù AI ĐÃ trả lời đầy đủ.
+     */
+    public function test_a_model_reply_with_raw_newlines_inside_values_is_still_used(): void
+    {
+        $this->configurePromptModel();
+        $broken = str_replace(
+            '"Brief do AI viết cho xưởng may."',
+            "\"Brief do AI viết cho xưởng may.\nDòng thứ hai của brief.\"",
+            $this->briefJson()
+        );
+        $this->assertStringContainsString("may.\nDòng", $broken, 'Ca kiểm thử phải chứa xuống dòng THẬT.');
+        $this->fakeChat($broken);
+
+        $response = $this->actingAs($this->customer())
+            ->postJson('/api/design-agent/collection', ['prompt' => 'Bộ sưu tập linen pastel'])
+            ->assertOk();
+
+        $response->assertJsonPath('model.mode', 'ai');
+        $this->assertStringContainsString('Brief do AI viết', (string) $response->json('brief'));
+        $this->assertStringContainsString('Dòng thứ hai', (string) $response->json('brief'));
+    }
+
+    /** Dấu phẩy thừa trước ngoặc đóng — kiểu hỏng thứ hai hay gặp. */
+    public function test_a_model_reply_with_a_trailing_comma_is_repaired(): void
+    {
+        $this->configurePromptModel();
+        $json = $this->briefJson();
+        $broken = preg_replace('/\}\s*$/', ',}', $json);
+        $this->fakeChat($broken);
+
+        $response = $this->actingAs($this->customer())
+            ->postJson('/api/design-agent/collection', ['prompt' => 'Bộ sưu tập linen pastel'])
+            ->assertOk();
+
+        $response->assertJsonPath('model.mode', 'ai');
+        $this->assertSame('DNA shop do AI viết: tối giản, linen, màu pastel.', $response->json('brand_narrative.narrative'));
+    }
+
+    /**
+     * BỘ SỬA JSON KHÔNG ĐƯỢC SỬA NỘI DUNG. Cùng một dấu phẩy: ở ngoài chuỗi là lỗi cú pháp, ở TRONG
+     * chuỗi là câu người dùng viết. Regex không phân biệt được hai chỗ đó — nên bộ sửa phải là máy
+     * trạng thái, và bài này khoá đúng điều đó.
+     */
+    public function test_json_repair_never_rewrites_text_inside_strings(): void
+    {
+        $this->configurePromptModel();
+        $json = $this->briefJson();
+        // (a) câu chứa dấu phẩy + ngoặc đóng NGAY TRONG nội dung;
+        $json = str_replace(
+            '"DNA shop do AI viết: tối giản, linen, màu pastel."',
+            '"DNA shop, } giữ nguyên dấu đóng."',
+            $json
+        );
+        // (b) và một lỗi thật ở chỗ khác để bắt buộc bộ sửa phải chạy.
+        $broken = str_replace(
+            '"Brief do AI viết cho xưởng may."',
+            "\"Brief do AI viết cho xưởng may.\nDòng hai.\"",
+            $json
+        );
+        $this->fakeChat($broken);
+
+        $response = $this->actingAs($this->customer())
+            ->postJson('/api/design-agent/collection', ['prompt' => 'Bộ sưu tập linen pastel'])
+            ->assertOk();
+
+        $this->assertSame('DNA shop, } giữ nguyên dấu đóng.', $response->json('brand_narrative.narrative'),
+            'Bộ sửa JSON đã sửa cả nội dung bên trong chuỗi — đúng thứ không được phép xảy ra.');
+    }
+
     // ── 1. TrendRadar gọi đúng model của nhóm 'prompt' ──────────────────────
 
     public function test_radar_uses_the_configured_prompt_model(): void

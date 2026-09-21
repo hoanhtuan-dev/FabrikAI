@@ -9,6 +9,7 @@
  * Ba việc con đúng theo nhịp làm thật: dựng danh sách → làm từng mẫu → đưa sang Canvas.
  */
 import { computed, inject } from 'vue';
+import { useStudioStore } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
 
 const collection = inject('collection');
@@ -34,7 +35,7 @@ const sessionSaving = inject('sessionSaving');
 const sessionSavedAt = inject('sessionSavedAt');
 const saveSession = inject('saveSession');
 const closeSession = inject('closeSession');
-const store = inject('store');
+const store = useStudioStore();
 const formatNumber = inject('formatNumber');
 const copyText = inject('copyText');
 const setStep = inject('setStep');

@@ -7,6 +7,7 @@
  * bảng lệnh cắt dài ba màn hình.
  */
 import { inject, ref } from 'vue';
+import { useStudioStore } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
 
 const PLAN_FIELDS = inject('PLAN_FIELDS');
@@ -17,7 +18,7 @@ const planTotals = inject('planTotals');
 const plan = inject('plan');
 const briefStale = inject('briefStale');
 const collection = inject('collection');
-const store = inject('store');
+const store = useStudioStore();
 const formatNumber = inject('formatNumber');
 const formatVnd = inject('formatVnd');
 
