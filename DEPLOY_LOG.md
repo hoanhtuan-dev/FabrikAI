@@ -3168,3 +3168,113 @@ khỏi lệnh cắt.
 - Bảng cơ cấu chưa có "preset" như bảng size (ví dụ mẫu cơ cấu cho shop chỉ bán áo). Hiện có «Chia đều»
   và «Khớp về tổng» là đủ cho việc đặt số, nhưng nếu chủ dự án muốn mẫu sẵn thì nói một câu là thêm.
 - Lượt cập nhật tất định vẫn gộp chữ ở GIAO DIỆN; muốn hết hẳn thì phải để máy chủ tự gộp (nó biết bản cũ).
+
+---
+
+## Deploy 2026-09-21 — TÌM KIẾM INTERNET CỦA QWEN 3.8: đường đang chạy KHÔNG tìm gì, nay tìm thật
+
+### 0. Chủ dự án yêu cầu gì
+
+> "kiểm tra xem khả năng tìm kiếm internet của qwen-3.8-flash dùng cho agent studio -> tối ưu cho"
+
+### 1. ĐO TRƯỚC — bằng chứng, không suy đoán
+
+Chạy trên chính máy chủ production, với đúng khoá/model đang cấu hình (Qwen **Token Plan** · `qwen3.8-flash`),
+qua chính mã của ứng dụng:
+
+| Đường | Kết quả ĐO ĐƯỢC |
+|---|---|
+| `/chat/completions` + `enable_search: true` — **ĐƯỜNG ĐANG CHẠY** | HTTP **200** nhưng **KHÔNG tìm gì**: model trả lời nguyên văn *"Không truy cập được internet, nên không có giá BABA hôm nay và không có URL nguồn đọc trực tiếp"*, phản hồi **không có** `search_info` |
+| `/chat/completions` + `search_options.search_strategy = "agent"` | HTTP **400** `The current model does not support the "agent" search strategy` |
+| `/responses` + `tools:[{type:"web_search"}]` | HTTP **200**, có mục **`web_search_call`** thật · **20 URL nguồn** · trả về giá + 2 nguồn thật |
+| `/responses` + ép **`text.format=json_object`** (như lượt radar/brief) | HTTP **200**, có `web_search_call`, và chữ trả về là **JSON HỢP LỆ** (đúng `{"trends":[…]}`) |
+| `/responses` với **ĐÚNG thân request mã đang dựng** (instructions · reasoning.effort · max_tool_calls · include) | HTTP **200**, `web_search_call` có ⇒ bản cài đặt sẵn có chạy được nguyên vẹn với DashScope |
+
+Tài liệu Model Studio nói đúng điều đo được: *"The OpenAI compatible Chat Completions endpoint does not
+return search sources"*, và *"qwen3.8-max, qwen3.8-flash … do not support the agent value of search_strategy
+on the Chat Completions API. To use agent-style multi-turn retrieval with Qwen3.8, use the Responses API
+web_search tool"*.
+
+### 2. Vì sao khách nhìn thấy một câu SAI
+
+Vai "Tìm kiếm nguồn ngoài" có candidate đầu tiên là `qwen:qwen3.8-flash`. Giao thức `qwen` được khai là
+`body_flag/enable_search` với `verified => true` — **chỉ vì tham số đúng chuẩn giao thức** — và
+`searchHappened()` trả `true` vô điều kiện cho đường "native". Hệ quả: lượt chạy KHÔNG có lượt tìm nào
+mà màn hình vẫn nói *"Lượt này tìm kiếm nguồn ngoài do chính nhà cung cấp model thực hiện"*, và prompt còn
+dặn model *"Bạn CÓ công cụ tìm kiếm web"* — mời model bịa nguồn.
+
+### 3. Đã sửa
+
+| # | Chỗ | Trước | Nay |
+|---|---|---|---|
+| 1 | Chọn đường tìm kiếm | Giao thức `qwen` ⇒ luôn `enable_search` trong body | Model thuộc **họ đã đo được** (Qwen3.8/3.7/3.6/3.5/3-max) ⇒ đi **`/responses` + công cụ `web_search`**; so khớp theo tiền tố đã bỏ dấu câu nên `qwen3.8-flash`, `qwen-3.8-flash`, `Qwen3.8-Max` cùng một luật |
+| 2 | Hai câu hỏi khác nhau bị gộp | Chỉ có `verified` | Tách **`verified`** (tham số có đúng chuẩn giao thức không — Cài đặt đọc) khỏi **`claim`** (được phép NÓI "đã tìm" không — lượt chạy đọc). Cờ `enable_search` của Qwen: `verified=false, claim=false` (đã đo là bị bỏ qua) |
+| 3 | `searchHappened()` | `native` ⇒ `true` vô điều kiện | Chỉ `true` khi `claim` cho phép. Lời KHAI của người dùng trong Cài đặt vẫn `claim=true` (ý chí của họ về gateway của họ) — không đánh đổi |
+| 4 | Câu dặn model | Dặn "bạn CÓ công cụ tìm kiếm" cho mọi đường native | Chỉ dặn khi `claim` cho phép; đường không được phép thì nhánh chống-bịa bật lên |
+| 5 | Câu chữ trên màn hình | "Lượt này tìm kiếm nguồn ngoài do nhà cung cấp thực hiện" | Khi `claim=false`: *"có gửi yêu cầu tìm kiếm tới nhà cung cấp, nhưng họ không trả về nguồn nào để đối chiếu — hệ thống KHÔNG xác nhận được đã tra hay chưa"* |
+| 6 | Màn hình Cài đặt | `enable_search` hiện như một năng lực đã kiểm chứng | Tự đổi sang "· CHƯA kiểm chứng: gateway không hỗ trợ thì tham số bị bỏ qua" |
+
+### 4. MỘT LỖI CẤU HÌNH tìm thấy khi đo: dòng model gõ sai tên
+
+Trong Cài đặt → Model Registry, vai **Tìm kiếm nguồn ngoài** (và vai **Đọc ảnh**) có một dòng khai
+`qwen:qwen-3.8-flash`. Đo thật: **HTTP 404 `MODEL_NOT_FOUND` trên CẢ hai đường** (`/chat/completions`
+trả *"Model not exist."*), trong khi `qwen3.8-flash` (không gạch nối) trả HTTP 200.
+
+Nghĩa là: dòng đó **không bao giờ chạy được**. Hiện tại nó chưa gây sự cố vì candidate #1
+(`qwen3.8-flash`) chạy tốt, nhưng khi model đầu gặp lỗi thì hệ thống sẽ thử một model không tồn tại rồi
+mới tới DeepSeek — chậm thêm một vòng và làm nhiễu chẩn đoán.
+
+**Việc cần làm ở Cài đặt (chủ dự án tự sửa, tôi không đụng vào cấu hình của bạn):** xoá dòng
+`qwen-3.8-flash` hoặc sửa tên model thành `qwen3.8-flash` ở hai nhóm `agent_search` và `agent_vision`.
+
+### 5. Kiểm chứng SAU khi vá — trên production, qua chính mã ứng dụng
+
+```
+=== Vai tìm kiếm giờ đi đường nào ===
+  native = null
+  hosted = {"mode":"responses_web_search","param":"web_search","verified":true,"claim":true}
+  role_configured = true
+
+=== Gọi thật AiModelGateway::text('agent_search', …, search=true) ===
+  dùng model: qwen:qwen3.8-flash (nhóm agent_search) · 17.908 ms
+  finish_reason="completed" · reasoning_only=false
+  hosted_calls=1 · truy vấn: ["xu hướng thời trang nữ 2026 Việt Nam","women fashion trends Vietnam 2026"]
+  nguồn mở được: 20 · 2 cái đầu: vneconomy.vn · andora.com.vn
+  JSON hợp lệ? CÓ (2 mục)
+```
+
+Trước khi vá, cùng lời gọi đó: **0 lượt tìm**, model trả lời "không truy cập được internet", và màn hình
+vẫn khẳng định đã tìm. Nay: **1 lượt tra thật · 2 truy vấn · 20 nguồn · JSON dùng được ngay**.
+
+Đánh đổi đã biết: **~18 giây** cho một lượt có tra cứu (trước đây ~0 giây vì không tra gì). Đây là giá
+của việc có nguồn thật; ngân sách lượt tìm đã bị chặn trần từ trước (`max_tool_calls`).
+
+### 6. Khoá bằng test (4 bài mới — 1067 test XANH)
+
+| Bài | Khoá điều gì |
+|---|---|
+| `test_a_qwen_web_search_model_gets_the_tool_instead_of_the_ignored_flag` | Qwen3.8 phải đi `/responses` + `tools:[{type:web_search}]`, và request **không** được chứa `enable_search` |
+| `test_a_qwen_model_outside_the_tool_family_is_not_claimed_as_searching` | Model ngoài họ đã đo: vẫn gửi cờ, nhưng `web_search=false`, `verified=false`, `claim=false`, và Cài đặt hiện "CHƯA kiểm chứng" |
+| `test_the_qwen_model_spelling_does_not_change_the_route` | `qwen3.8-flash` · `qwen-3.8-flash` · `Qwen3.8-Max` · `qwen3-max` cùng một luật; `qwen-plus`/`qwen3.5-omni` thì không; giao thức `openai` thì không |
+| `test_the_copy_follows_the_evidence_not_the_protocol` | Câu chữ và câu dặn model phải theo `claim`, không theo giao thức |
+
+Sửa 1 bài cũ (`BrandDnaTest::test_declared_search_is_unverified_while_protocol_search_is_verified`) — nó
+khoá đúng hành vi vừa đổi, nay khoá **chặt hơn**: Qwen3.8 đi đường công cụ, còn model Qwen ngoài họ thì
+`verified=false` **và** `claim=false`.
+
+### 7. Kiểm chứng trên production sau deploy
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Sao lưu DB trước khi pull | `fabrikai-db-backup-before-qwensearch-20260921-162342.sql` · **4.235.294 bytes** |
+| HEAD máy chủ | `fb68757` → **`b3dc0e6`** — khớp local |
+| Asset | `agent-studio-DZSXQ3-Y.js` · md5 `808f63a842114e92db6abb78ca696fa9` — **giống hệt** local |
+| Log máy chủ | **0** ERROR/CRITICAL |
+| Đo lại sau deploy | `hosted=responses_web_search` · 1 lượt tra · 20 nguồn · JSON hợp lệ (mục 5) |
+
+### 8. Nợ còn lại
+
+- **Trần lượt tìm**: `max_tool_calls` (2 cho brief, 3 cho radar) là con số chọn tay. Nay đường tìm kiếm
+  chạy thật nên nên đo lại: một lượt radar 3 lần tra × ~6 giây có thể vượt thời gian chờ của người dùng.
+- **Dòng model gõ sai** (mục 4) — cần chủ dự án sửa trong Cài đặt.
+- **Máy chủ vẫn KHÔNG có cron** — nhắc lại lần thứ tư; đây là nguyên nhân của ba sự cố khác nhau rồi.
