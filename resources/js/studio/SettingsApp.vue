@@ -152,12 +152,29 @@ async function loadSources() {
   try {
     const d = await adminApi('/web-sources');
     ws.rows = d.sources || [];
-    ws.kinds = d.kinds || ['rss', 'json'];
+    ws.kinds = d.kinds || ['rss', 'json', 'search'];
   } catch (e) {
     ws.error = userFacingError(e, 'Không tải được danh sách nguồn ngoài.');
   } finally {
     ws.loading = false;
   }
+}
+
+/**
+ * Chọn kiểu nguồn = 'search' thì ĐIỀN SẴN ánh xạ trường của Google Custom Search.
+ *
+ * Vì sao: ba tên `items`/`link`/`snippet` không phải thứ người khai nguồn có thể đoán ra, mà thiếu chúng
+ * thì nguồn trả HTTP 200 kèm **0 tin** — đúng ca đã gặp. Chỉ điền khi ô còn TRỐNG: không ghi đè thứ người
+ * dùng đã khai cho dịch vụ khác.
+ */
+function onSourceKindChange() {
+  const d = ws.draft;
+  if (d.kind !== 'search') return;
+  if (!d.items_path) d.items_path = 'items';
+  if (!d.title_field) d.title_field = 'title';
+  if (!d.link_field) d.link_field = 'link';
+  if (!d.summary_field) d.summary_field = 'snippet';
+  if (!d.url) d.url = 'https://www.googleapis.com/customsearch/v1?cx=MÃ_ENGINE&num=10&hl=vi&q={query}';
 }
 
 function openSource(row) {
@@ -1433,7 +1450,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                 </label>
                 <div class="grid gap-3 sm:grid-cols-3">
                   <label class="block"><span class="label">Kiểu</span>
-                    <select v-model="ws.draft.kind" class="input !py-2"><option v-for="k in ws.kinds" :key="k" :value="k">{{ k }}</option></select>
+                    <select v-model="ws.draft.kind" class="input !py-2" @change="onSourceKindChange"><option v-for="k in ws.kinds" :key="k" :value="k">{{ k }}</option></select>
                   </label>
                   <label class="block"><span class="label">Ưu tiên (nhỏ = trước)</span>
                     <input v-model.number="ws.draft.priority" type="number" min="0" max="100" class="input !py-2">

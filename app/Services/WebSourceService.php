@@ -323,6 +323,15 @@ class WebSourceService
      */
     public function fetchWithQuery(WebSource $source, string $query): array
     {
+        // Chưa có khoá thì nói NGAY và nói ĐÚNG VIỆC CẦN LÀM — gọi ra API chỉ để nhận 403 rồi hiện câu lỗi
+        // tiếng Anh của Google là bắt người khai tự đoán.
+        if ($source->kind === 'search' && $this->searchKeyFor($source) === null) {
+            return [
+                'ok' => false, 'http' => null, 'ms' => 0, 'items' => [], 'parsed' => 0, 'dropped' => 0, 'stale' => false,
+                'error' => 'chưa có khoá API cho nguồn này — thêm ở Cài đặt → API key với provider = '.$source->slug,
+            ];
+        }
+
         $target = $this->withQuery($source, $query);
         $started = microtime(true);
 
@@ -344,6 +353,14 @@ class WebSourceService
      */
     private function searchOnce(WebSource $source, string $query, int $limit): array
     {
+        // Nguồn tìm kiếm thiếu khoá ⇒ trả lý do đọc được thay vì gọi ra API rồi nhận 403.
+        if ($source->kind === 'search' && $this->searchKeyFor($source) === null) {
+            return [
+                'ok' => false, 'http' => null, 'ms' => 0, 'items' => [], 'parsed' => 0, 'dropped' => 0, 'stale' => false,
+                'error' => 'chưa có khoá API cho nguồn này — thêm ở Cài đặt → API key với provider = '.$source->slug,
+            ];
+        }
+
         $target = $this->withQuery($source, $query);
         $key = self::SEARCH_CACHE_PREFIX.md5($source->slug.'|'.$query.'|'.$target->url);
 
@@ -426,6 +443,12 @@ class WebSourceService
             $result['error'] = 'HTTP '.$response->status();
         } elseif ($oversized) {
             $result['error'] = 'nội dung quá lớn';
+        } elseif ($source->kind !== 'rss' && ! $this->looksLikeJson($body)) {
+            // Xem chú thích ở interpret(): trả về HTML thì DỪNG, đừng "đọc" ra mục rác rồi im lặng báo 0 tin.
+            $result['error'] = $this->readErrorReason($source, $body, $response->status());
+            $result['ms'] = (int) round((microtime(true) - $started) * 1000);
+
+            return $result;
         } else {
             // Cùng lý do như interpret(): 'search' cũng là API JSON.
             $parsed = $source->kind === 'rss' ? $this->parseRss($body) : $this->parseJson($body, $source);
@@ -448,9 +471,14 @@ class WebSourceService
             $result['dropped'] = max(0, count($parsed) - count($kept));
             $result['items'] = array_slice($kept, 0, max(1, min(30, $limit)));
             if ($parsed === [] && trim($body) !== '') {
-                $result['error'] = $source->kind === 'json'
-                    ? 'không đọc được mục nào theo ánh xạ đã khai'
-                    : 'nội dung không phải RSS/Atom đọc được';
+                // LỖI PHẢI NÓI ĐÚNG BỆNH: ba nguyên nhân rất khác nhau và cách sửa cũng khác nhau.
+                //   · URL trả HTML  ⇒ đang trỏ vào TRANG WEB của dịch vụ, không phải endpoint API;
+                //   · API trả lỗi   ⇒ thiếu/sai khoá, hết hạn mức, engine chưa bật tìm toàn web;
+                //   · JSON đúng nhưng ánh xạ sai ⇒ items_path/*_field chưa khớp.
+                // Đo thật 2026-09-21: nguồn Google khai URL cse.google.com (trang HTML) mà báo
+                // "nội dung không phải RSS/Atom đọc được" — câu đó chỉ đúng với nguồn RSS và không giúp
+                // người khai biết phải sửa gì.
+                $result['error'] = $this->readErrorReason($source, $body, $response->status());
             }
         }
 
@@ -633,6 +661,23 @@ class WebSourceService
      * từ bảng API key (đã mã hoá) theo provider = slug của nguồn, rồi chỉ xuất hiện trong URL của ĐÚNG
      * lời gọi HTTP này.
      */
+    /** Khoá API của một nguồn TÌM KIẾM: slot theo SLUG của nguồn trước, rồi tới slot chung `google_cse`. */
+    private function searchKeyFor(WebSource $source): ?string
+    {
+        if (($source->kind ?? '') !== 'search') {
+            return null;
+        }
+
+        foreach (array_unique(array_filter([trim((string) $source->slug), 'google_cse'], 'strlen')) as $ref) {
+            $key = function_exists('studio_api_key') ? studio_api_key($ref) : null;
+            if ($key) {
+                return (string) $key;
+            }
+        }
+
+        return null;
+    }
+
     private function withSearchKey(WebSource $source): string
     {
         $url = (string) $source->url;
@@ -641,18 +686,7 @@ class WebSourceService
             return $url;
         }
 
-        $refs = array_values(array_unique(array_filter([
-            trim((string) $source->slug),
-            'google_cse',
-        ], 'strlen')));
-
-        $key = null;
-        foreach ($refs as $ref) {
-            $key = function_exists('studio_api_key') ? studio_api_key($ref) : null;
-            if ($key) {
-                break;
-            }
-        }
+        $key = $this->searchKeyFor($source);
 
         if (! $key) {
             // Không có khoá ⇒ gọi thẳng URL (API sẽ trả 401/403) và trạng thái nguồn nói rõ "Không lấy được".
@@ -734,6 +768,13 @@ class WebSourceService
             $result['error'] = 'HTTP '.$response->status();
         } elseif ($oversized) {
             $result['error'] = 'nội dung quá lớn';
+        } elseif ($source->kind !== 'rss' && ! $this->looksLikeJson($body)) {
+            // Nguồn JSON/TÌM KIẾM mà trả về HTML (hoặc bất cứ thứ gì không phải JSON) ⇒ DỪNG, không cố đọc.
+            //
+            // [LỖI THẬT — đo trên production 2026-09-21] Nguồn Google khai URL trang HTML: bộ đọc JSON vẫn
+            // "đọc" ra vài mục rác từ trang đó, nên `parsed > 0` và KHÔNG có lỗi nào được báo — màn hình chỉ
+            // hiện "0 tin" trơ trọi. Tệ hơn cả báo lỗi: người khai không biết đường nào mà sửa.
+            $result['error'] = $this->readErrorReason($source, $body, $response->status());
         } else {
             // CHỈ 'rss' mới đi đường RSS: 'json' VÀ 'search' đều là API trả JSON. Viết `=== 'json'` thì nguồn
             // tìm kiếm rơi vào bộ đọc RSS và luôn ra 0 tin dù API trả 200 — lỗi im lặng đúng kiểu khó thấy.
@@ -747,17 +788,55 @@ class WebSourceService
             $result['dropped'] = max(0, count($parsed) - count($filtered));
             $result['items'] = $filtered;
             if ($parsed === [] && trim($body) !== '') {
-                // Đọc được HTTP nhưng KHÔNG đọc được mục nào: gần như luôn là định dạng lạ hoặc ánh xạ sai
-                // (nguồn JSON khai sai items_path). Nói ra để người cấu hình biết mà sửa, không im lặng.
-                $result['error'] = $source->kind === 'json'
-                    ? 'không đọc được mục nào theo ánh xạ đã khai'
-                    : 'nội dung không phải RSS/Atom đọc được';
+                // Đọc được HTTP nhưng KHÔNG đọc được mục nào: định dạng lạ, ánh xạ sai, hoặc URL trỏ nhầm
+                // vào trang HTML. Nói ra để người cấu hình biết mà sửa, không im lặng.
+                $result['error'] = $this->readErrorReason($source, $body, $response->status());
             }
         }
 
         $result['ms'] = (int) round((microtime(true) - $started) * 1000);
 
         return $result;
+    }
+
+    /**
+     * Thân phản hồi có ĐÚNG ĐỊNH DẠNG JSON không (đủ để quyết định có nên cố đọc hay không).
+     *
+     * Đây là hàng rào chống "đọc rác thành tin": trang HTML, trang lỗi của proxy, hay một khối text đều có
+     * thể lọt qua bộ đọc JSON và sinh ra vài mục vô nghĩa — mà có mục thì lớp báo lỗi im lặng.
+     */
+    private function looksLikeJson(string $body): bool
+    {
+        $head = ltrim($body);
+
+        return $head !== '' && ($head[0] === '{' || $head[0] === '[');
+    }
+
+    /**
+     * Vì sao đọc được phản hồi mà KHÔNG ra mục nào — câu trả lời phải chỉ đúng việc cần sửa.
+     *
+     * @param  array<string, mixed>|null  $json
+     */
+    private function readErrorReason(WebSource $source, string $body, ?int $status): string
+    {
+        $trimmed = ltrim($body);
+
+        if (str_starts_with($trimmed, '<')) {
+            return 'URL này trả về TRANG HTML, không phải API JSON — hãy dùng endpoint API (vd Google: https://www.googleapis.com/customsearch/v1?cx=…&q={query})';
+        }
+
+        $json = json_decode($body, true);
+        $apiError = is_array($json) ? data_get($json, 'error.message') : null;
+        if (is_string($apiError) && trim($apiError) !== '') {
+            return 'API trả lỗi: '.Str::limit(trim($apiError), 160, '');
+        }
+
+        // Nguồn TÌM KIẾM luôn là JSON: câu "không phải RSS/Atom" ở đây là nói sai loại nguồn.
+        if ($source->kind !== 'rss') {
+            return 'không đọc được mục nào theo ánh xạ đã khai (kiểm tra items_path và các trường *_field)';
+        }
+
+        return 'nội dung không phải RSS/Atom đọc được';
     }
 
     /** Nguồn lỗi: ghi lý do ĐỌC ĐƯỢC (không phải tên lớp ngoại lệ). */

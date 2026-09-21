@@ -710,7 +710,65 @@ class ToolSearchTest extends TestCase
         $this->assertStringContainsString('tìm kiếm', (string) $row['state_label']);
         Http::assertNothingSent();
     }
+
+    /**
+     * LỖI PHẢI NÓI ĐÚNG BỆNH — ba nguyên nhân, ba câu khác nhau.
+     *
+     * Đo thật 2026-09-21: nguồn Google khai URL `cse.google.com/cse?cx=…` (TRANG HTML của dịch vụ) và màn
+     * Cài đặt báo "nội dung không phải RSS/Atom đọc được" — câu đó chỉ đúng với nguồn RSS, không cho người
+     * khai biết phải sửa gì. Ba ca dưới đây khoá lại từng câu.
+     */
+    public function test_a_search_source_reports_the_real_reason_when_it_finds_nothing(): void
+    {
+        $source = WebSource::create([
+            'slug' => 'gcse-search', 'name' => 'Google', 'kind' => 'search', 'enabled' => true,
+            'url' => 'https://www.googleapis.com/customsearch/v1?cx=CX1&q={query}',
+            'priority' => 1, 'max_items' => 10,
+        ]);
+
+        // MỘT stub duy nhất, đổi hành vi bằng biến — KHÔNG gọi `Http::fake()` trần ở giữa bài.
+        //
+        // Vì sao: `Http::fake()` không có tham số đăng ký một stub khớp MỌI URL, và Laravel MERGE các stub
+        // theo thứ tự (cái nào khớp trước thì thắng) chứ không xoá cái cũ. Gọi trần rồi gọi lại có tham số
+        // là stub rỗng thắng — bài test tưởng đang thử HTML nhưng thực ra nhận thân rỗng.
+        $mode = 'chua-co-khoa';
+        Http::fake([
+            'www.googleapis.com/*' => function () use (&$mode) {
+                return match ($mode) {
+                    'html' => Http::response('<!doctype html><html><body>Programmable Search</body></html>', 200),
+                    'api-error' => Http::response((string) json_encode([
+                        'error' => ['code' => 403, 'message' => 'The request is missing a valid API key.'],
+                    ]), 200),
+                    default => Http::response('', 500),
+                };
+            },
+        ]);
+
+        // (a) CHƯA CÓ KHOÁ ⇒ nói đúng việc cần làm, và KHÔNG gọi ra mạng.
+        $noKey = app(WebSourceService::class)->fetchWithQuery($source, 'linen');
+        $this->assertStringContainsString('chưa có khoá API', (string) $noKey['error']);
+        $this->assertStringContainsString('gcse-search', (string) $noKey['error'], 'Phải nói tên provider cần khai.');
+        Http::assertNothingSent();
+
+        StudioApiKey::create([
+            'provider' => 'gcse-search', 'label' => 'Google CSE', 'value' => 'key-1',
+            'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+        ]);
+
+        // (b) URL trỏ vào TRANG HTML (không phải API) ⇒ nói thẳng là trỏ nhầm endpoint.
+        $mode = 'html';
+        $html = app(WebSourceService::class)->fetchWithQuery($source, 'linen');
+        $this->assertStringContainsString('TRANG HTML', (string) $html['error']);
+        $this->assertStringContainsString('customsearch/v1', (string) $html['error'], 'Phải chỉ luôn endpoint đúng.');
+
+        // (c) API trả lỗi ⇒ hiện ĐÚNG câu lỗi của API (thiếu/sai khoá, hết hạn mức, engine chưa bật web).
+        $mode = 'api-error';
+        $apiError = app(WebSourceService::class)->fetchWithQuery($source, 'linen');
+        $this->assertStringContainsString('API trả lỗi', (string) $apiError['error']);
+        $this->assertStringContainsString('missing a valid API key', (string) $apiError['error']);
+    }
 }
+
 
 
 
