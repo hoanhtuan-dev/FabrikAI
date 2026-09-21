@@ -141,6 +141,13 @@ const liveTrendCount = computed(() => trends.value.filter((trend) => trend.evide
  * nguồn này: một cái là ảnh chụp định kỳ, một cái là do AI chủ động đi tra trong lượt này.
  */
 const aiTrendCount = computed(() => trends.value.filter((trend) => (trend.live?.origin || trend.evidence_origin) === 'ai').length);
+/**
+ * Hướng AI ĐÃ TRA nhưng KHÔNG ra tin — trạng thái THỨ BA, tách khỏi "bộ có sẵn".
+ *
+ * Gộp hai chuyện này là nói thiếu: "chưa ai tra hướng đó" khác hẳn "đã tra và không có tin nào nhắc tới".
+ * Người dùng cần biết hệ thống đã thử, và cần biết con số đang hiện vẫn là số mẫu.
+ */
+const aiCheckedCount = computed(() => trends.value.filter((trend) => trend.evidence_mode !== 'live' && trend.checked_by_ai).length);
 /** Tin hiển thị ưu tiên lấy từ radar (thứ phân tích THẬT SỰ đã dùng), rơi về báo cáo nguồn khi radar chưa có. */
 const newsItems = computed(() => {
   const items = (store.trendRadar?.external_evidence?.items?.length ? store.trendRadar.external_evidence.items : (store.webSources?.items || []));
@@ -193,7 +200,15 @@ const signalSamples = (signal) => (Array.isArray(signal?.samples) ? signal.sampl
 /** Câu mô tả con số của một hướng: hướng có tin nói bằng SỐ ĐO, hướng còn lại nói rõ là bộ có sẵn. */
 const trendSignalLabel = (trend) => {
   if (trend?.evidence_mode !== 'live') {
-    return 'Đà tăng ' + (trend?.momentum ?? 0) + '/100 · ' + formatNumber(trend?.evidence_count) + ' bằng chứng của bộ có sẵn';
+    const base = 'Đà tăng ' + (trend?.momentum ?? 0) + '/100 · ' + formatNumber(trend?.evidence_count) + ' bằng chứng của bộ có sẵn';
+    // Hướng AI ĐÃ TRA mà không ra tin: nói rõ là đã thử — để người dùng không tưởng hệ thống bỏ qua nó,
+    // và để con số mẫu kia không bị đọc như số đo.
+    // Lý do cụ thể do MÁY CHỦ ghi (model phán "có" mà dẫn nguồn không có thật, hoặc tra mà không thấy) —
+    // ưu tiên câu của máy chủ vì nó là bên đã đối chiếu URL.
+    if (trend?.check_note) return base + ' · ' + trend.check_note;
+    return trend?.checked_by_ai
+      ? base + ' · AI đã tra trong lượt này nhưng chưa thấy tin nào nhắc tới, nên số trên vẫn là số mẫu'
+      : base;
   }
   const live = trend.live || {};
   const parts = [(live.mentions || 0) + ' tin thật nhắc tới', (live.source_count || 0) + ' nguồn'];
@@ -863,6 +878,7 @@ provide('referenceNote', referenceNote);
 provide('liveSources', liveSources);
 provide('liveTrendCount', liveTrendCount);
 provide('aiTrendCount', aiTrendCount);
+provide('aiCheckedCount', aiCheckedCount);
 provide('newsItems', newsItems);
 provide('activeSourceCount', activeSourceCount);
 provide('fetchedAtLabel', fetchedAtLabel);

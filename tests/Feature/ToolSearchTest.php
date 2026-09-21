@@ -92,11 +92,11 @@ class ToolSearchTest extends TestCase
         ], JSON_UNESCAPED_UNICODE);
     }
 
-    private function directionsJson(): string
+    private function directionsJson(array $extra = []): string
     {
-        return (string) json_encode([
+        return (string) json_encode(array_merge([
             'directions' => array_fill(0, 6, ['title' => 'Hướng', 'thesis' => 't', 'why_now' => 'w', 'action' => 'a', 'risk' => 'r', 'price_band' => 'mid']),
-        ], JSON_UNESCAPED_UNICODE);
+        ], $extra), JSON_UNESCAPED_UNICODE);
     }
 
     /** Phản hồi của model: ĐÒI GỌI công cụ `web_search` với một từ khoá. */
@@ -814,6 +814,123 @@ class ToolSearchTest extends TestCase
         $this->assertContains('live-khong-con-ton-tai-abc', $dropped);
         $this->assertContains('cung-khong-co-luon', $dropped);
         $this->assertNotEmpty((string) $response->json('dropped_note'), 'Phải nói RA là đã bỏ hướng nào.');
+    }
+
+    /**
+     * "BỘ CÒN THIẾU" ĐƯỢC GIAO CHO AI TRA, VÀ AI ĐÃ TRA MÀ KHÔNG RA TIN THÌ PHẢI NÓI RA.
+     *
+     * Vai trò của "bộ có sẵn": 8 hướng mẫu của FabrikAI (Pastel dịu · Tailoring tối giản · Linen thoáng ·
+     * Quần ống rộng · Vàng bơ · Váy midi công sở · Quiet shine · Neutral đất) — chúng là XƯƠNG SỐNG của
+     * danh mục và là bộ từ vựng để định hướng bám vào, nhưng số liệu của chúng là SỐ MẪU. Hướng nào tin
+     * thật không nhắc tới thì phải mượn số mẫu — "bộ còn thiếu" chính là những hướng đó.
+     *
+     * Test này khoá ba việc: (1) danh sách hướng thiếu bằng chứng được GỬI cho model; (2) hướng AI đã tra
+     * mà không ra tin được đánh dấu `checked_by_ai` (không gộp vào "bộ có sẵn"); (3) hướng AI tra RA tin
+     * thì thành "có tin thật" như bình thường.
+     */
+    public function test_the_missing_trends_are_handed_to_the_model_to_search(): void
+    {
+        $this->hostedProvider('gw-hosted', 'v4-pro');
+        $this->searchSource();
+
+        $sent = [];
+        Http::fake([
+            // Model tra ĐÚNG một hướng còn thiếu ("Pastel dịu") và không tra hướng nào khác.
+            'gw-hosted.example/*' => function ($request) use (&$sent) {
+                $sent[] = json_decode($request->body(), true);
+
+                return Http::response($this->responsesBody($this->directionsJson(), 1, ['pastel dịu xu hướng 2026']), 200);
+            },
+            'news.example/*' => function ($request) {
+                // Tin của FEED không nhắc pastel; chỉ tin do CÂU HỎI CỦA MODEL mang về mới có.
+                return str_contains(urldecode($request->url()), 'pastel')
+                    ? Http::response($this->rss('Màu pastel lên ngôi mùa thu 2026', 'https://bao.example/pastel'), 200)
+                    : Http::response($this->rss('Tin chung về ngành may mặc', 'https://bao.example/chung'), 200);
+            },
+        ]);
+
+        $radar = app(DesignAgentService::class)->radar($this->customer(), 'all', true);
+
+        // (1) Danh sách "bộ còn thiếu" có mặt trong DỮ LIỆU gửi model — không để nó tự đoán chủ đề.
+        //
+        // `input` của /responses là CHUỖI có tiền tố ("DỮ LIỆU:" rồi mới tới JSON), không phải JSON thuần —
+        // phải cắt từ dấu ngoặc nhọn đầu tiên rồi mới giải mã (bài học từ readableBody ở AgentRolesTest).
+        $rawInput = (string) data_get($sent[0], 'input', '');
+        $start = strpos($rawInput, '{');
+        $payload = $start === false ? [] : (array) json_decode(substr($rawInput, $start), true);
+        $missing = (array) data_get($payload, 'trends_without_evidence', []);
+        $this->assertNotEmpty($missing, 'Phải gửi danh sách hướng CHƯA có bằng chứng cho model.');
+        $this->assertContains('soft-pastel', array_column($missing, 'id'));
+
+        // (3) Hướng model tra RA tin ⇒ thành "có tin thật", nguồn gốc là AI.
+        $pastel = collect($radar['trends'])->firstWhere('id', 'soft-pastel');
+        $this->assertSame('live', $pastel['evidence_mode'], 'Hướng AI tra RA tin phải thành "có tin thật".');
+        $this->assertSame('ai', $pastel['live']['origin'] ?? null);
+
+        // (2) Hướng model KHÔNG tra tới thì KHÔNG được gắn nhãn "đã tra" — nhãn phải đúng sự thật, vì nó
+        // là thứ nói với người dùng "hệ thống ĐÃ thử hướng này rồi".
+        $quiet = collect($radar['trends'])->firstWhere('id', 'quiet-shine');
+        $this->assertNotNull($quiet);
+        $this->assertArrayNotHasKey('checked_by_ai', (array) $quiet, 'Chưa tra thì không được nói là đã tra.');
+    }
+
+    /**
+     * MODEL PHÁN TỪNG HƯỚNG CÒN THIẾU — VÀ MÁY CHỦ CHỈ NHẬN KHI NGUỒN CÓ THẬT.
+     *
+     * Vì sao cần lời phán của model: nó nối được ngữ nghĩa ("tông màu đất" ↔ "Neutral đất"), còn tầng đo
+     * của máy chủ chỉ khớp theo TỪ VỰNG khai sẵn — đo thật: từ vựng không có chữ "đất" nên hướng
+     * "Neutral đất" không bao giờ được xác nhận dù báo có viết về nó.
+     *
+     * Vì sao vẫn phải kiểm: model nhỏ đã từng bịa cả tin lẫn URL. Luật ở đây — "confirmed" chỉ được nhận
+     * khi URL nằm trong kết quả máy chủ ĐÃ THẬT SỰ lấy về; dẫn nguồn không có thật thì KHÔNG tính là bằng
+     * chứng, và phải NÓI RA lý do.
+     */
+    public function test_the_model_can_confirm_a_missing_trend_but_only_with_a_real_source(): void
+    {
+        $this->hostedProvider('gw-hosted', 'v4-pro');
+        $this->searchSource();
+
+        Http::fake([
+            'gw-hosted.example/*' => Http::response($this->responsesBody($this->directionsJson([
+                'trend_checks' => [
+                    // (a) dẫn ĐÚNG url có trong kết quả tra được ⇒ được tính
+                    ['id' => 'earth-neutral', 'status' => 'confirmed', 'url' => 'https://bao.example/dat'],
+                    // (b) dẫn URL BỊA ⇒ KHÔNG được tính, và phải ghi rõ vì sao
+                    ['id' => 'quiet-shine', 'status' => 'confirmed', 'url' => 'https://bia-dat.example/khong-co-that'],
+                    // (c) tra mà không thấy ⇒ "đã tra, chưa có tin"
+                    ['id' => 'wide-leg', 'status' => 'not_found'],
+                ],
+            ]), 1, ['tông màu đất 2026', 'quần ống rộng 2026']), 200),
+            'news.example/*' => function ($request) {
+                // So trên chuỗi ĐÃ GIẢI MÃ: 'đất' mã hoá thành %C4%91... nên tìm 'dat' trên URL thô là
+                // không bao giờ khớp — đúng cái bẫy vừa làm bài test này đỏ.
+                return str_contains(urldecode($request->url()), 'đất')
+                    ? Http::response($this->rss('Tông màu đất trở lại mùa thu 2026', 'https://bao.example/dat'), 200)
+                    : Http::response($this->rss('Tin chung về ngành may mặc', 'https://bao.example/chung'), 200);
+            },
+        ]);
+
+        $radar = app(DesignAgentService::class)->radar($this->customer(), 'all', true);
+        $trend = fn (string $id) => (array) collect($radar['trends'])->firstWhere('id', $id);
+
+        // (a) XÁC NHẬN CÓ NGUỒN THẬT ⇒ thành "có tin thật", kèm link để bấm vào kiểm.
+        $earth = $trend('earth-neutral');
+        $this->assertSame('live', $earth['evidence_mode'], 'Hướng AI xác nhận CÓ nguồn thật phải thành có bằng chứng.');
+        $this->assertSame('ai', $earth['live']['origin'] ?? null);
+        $this->assertTrue($earth['live']['verified'] ?? false, 'Phải ghi rõ là đã đối chiếu URL.');
+        $this->assertSame('https://bao.example/dat', $earth['live']['articles'][0]['url'] ?? null);
+
+        // (b) NGUỒN BỊA ⇒ KHÔNG tính là bằng chứng, và nói rõ lý do.
+        $quiet = $trend('quiet-shine');
+        $this->assertSame('demo', $quiet['evidence_mode'], 'Nguồn bịa KHÔNG được biến thành bằng chứng.');
+        $this->assertTrue($quiet['checked_by_ai'] ?? false);
+        $this->assertStringContainsString('KHÔNG nằm trong kết quả tra được', (string) ($quiet['check_note'] ?? ''));
+
+        // (c) TRA MÀ KHÔNG THẤY ⇒ "đã tra", vẫn là số mẫu.
+        $wide = $trend('wide-leg');
+        $this->assertSame('demo', $wide['evidence_mode']);
+        $this->assertTrue($wide['checked_by_ai'] ?? false);
+        $this->assertStringContainsString('không thấy nguồn nào', (string) ($wide['check_note'] ?? ''));
     }
 
     /** Hình thức id vẫn phải hợp lệ — bỏ qua id cũ KHÔNG có nghĩa là nhận mọi chuỗi. */
