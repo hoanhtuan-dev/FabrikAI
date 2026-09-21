@@ -2095,7 +2095,8 @@ class DesignAgentService
 
         // NÓI THẬT lần chạy này có tìm kiếm hay không: nhà cung cấp tự tìm, HOẶC công cụ đã được provider
         // chấp nhận. Provider từ chối tham số `tools` thì KHÔNG được nói là đã có tìm kiếm — dù ta đã thử.
-        $toolSearch = $this->toolSearchBlock($tool, $answer, $search);
+        // Số đo tìm kiếm: lượt TRA RIÊNG (nếu có) là nguồn thật — nó đếm `web_search_call` của chính lượt tra.
+        $toolSearch = $call['tool_search'] ?? $this->toolSearchBlock($tool, $answer, $search);
         $webSearch = $this->searchHappened($search, $toolSearch);
 
         if ($answer === null) {
@@ -2465,7 +2466,8 @@ class DesignAgentService
         $answer = $call['answer'];
 
         // NÓI THẬT: nhà cung cấp tự tìm, HOẶC công cụ đã được provider chấp nhận (từ chối thì không tính).
-        $toolSearch = $this->toolSearchBlock($tool, $answer, $search);
+        // Số đo tìm kiếm: lượt TRA RIÊNG (nếu có) là nguồn thật — nó đếm `web_search_call` của chính lượt tra.
+        $toolSearch = $call['tool_search'] ?? $this->toolSearchBlock($tool, $answer, $search);
         $webSearch = $this->searchHappened($search, $toolSearch);
 
         if ($answer === null) {
@@ -2525,6 +2527,105 @@ class DesignAgentService
      * @param  list<array<string, mixed>>  $candidates
      * @return array{json: ?array, answer: ?array, attempts: int}
      */
+
+    /**
+     * TÁCH VIỆC TRA KHỎI VIỆC VIẾT JSON — để model NẶNG cũng tìm kiếm hiệu quả (2026-09-22).
+     *
+     * [LỖI THẬT — production 2026-09-22 00:16, mã tra cứu L-G8YM] Với model nặng (qwen3.8-omni-flash), lượt
+     * radar mang công cụ tìm kiếm CÙNG LÚC với một prompt khổng lồ (~6000 token) và yêu cầu viết JSON:
+     * nhà cung cấp không trả về byte nào trong 55 s ⇒ rơi về đường thường thêm 55 s nữa ⇒ HTTP 504, khách
+     * mất trắng. Càng nặng thì càng chắc chắn hỏng — nhưng bỏ tìm kiếm thì mất đúng thứ khách trả tiền.
+     *
+     * Cách sửa: ĐỔI CHỖ. Việc TRA là một lượt gọi RIÊNG, rất NHỎ (prompt ngắn, 1 lượt tra, ngân sách token
+     * bé, trần thời gian riêng), chỉ để lấy TỪ KHOÁ. Máy chủ chạy chính các từ khoá đó trên nguồn của mình
+     * (đường đã có sẵn: `collectAiEvidence`) rồi đưa TIN THẬT vào prompt. Lượt VIẾT JSON sau đó chạy KHÔNG
+     * công cụ — nhẹ, nhanh, và vẫn có bằng chứng thật để dẫn nguồn.
+     *
+     * Đo được với chính model gây lỗi: lượt tra nhỏ xong trong vài giây (so với 55 s rồi hết giờ), và số đo
+     * tìm kiếm vẫn là SỐ THẬT (lấy từ `web_search_call` của phản hồi, không phải lời hứa).
+     *
+     * @param  list<array<string,mixed>>  $candidates
+     * @return array{block:string, tool_search:array<string,mixed>}|null  null = không phải chế độ này
+     */
+    private function splitHostedSearch(string $instruction, string $region, array $candidates): ?array
+    {
+        $hosted = WebAccessService::planFor($candidates[0] ?? []);
+        if (! WebAccessService::isHostedMode($hosted)) {
+            return null;
+        }
+
+        // CHỈ ÁP CHO MODEL NẶNG. Đo thật trên cùng endpoint/máy chủ: qwen3.8-flash xong lượt tra trong
+        // 17,9 s (tốt, giữ nguyên đường một-lời-gọi), còn qwen3.8-omni-flash KHÔNG trả về byte nào trong
+        // 55 s ⇒ 504. Tách lượt tra là thuốc cho ca nặng; áp cho cả ca nhẹ chỉ làm thêm một vòng gọi.
+        $model = mb_strtolower((string) ($candidates[0]['model'] ?? ''));
+        if (! str_contains($model, 'omni')) {
+            return null;
+        }
+
+        $probe = 'Bạn tra cứu tin MỚI NHẤT trên internet cho yêu cầu dưới đây, rồi trả về JSON đúng dạng '
+            .'{"queries":["..."]} gồm tối đa 4 từ khoá bạn đã dùng (tiếng Việt, và tiếng Anh nếu cần). '
+            .'KHÔNG thêm chữ nào ngoài JSON. Yêu cầu: '.mb_substr($instruction, 0, 500);
+
+        $started = microtime(true);
+        $answer = $this->gateway->text(self::SEARCH_GROUP, [['role' => 'user', 'content' => $probe]], [
+            'search' => true,
+            'response_format' => 'json_object',
+            'max_tokens' => 400,          // chỉ cần từ khoá, không cần bài viết
+            'timeout' => 30,              // trần riêng, nhỏ: lượt này phải xong nhanh
+            'max_tool_calls' => 1,        // MỘT lượt tra là đủ để có từ khoá + nguồn
+            'fallback_groups' => [self::REASON_GROUP, self::AI_GROUP],
+        ]);
+        $ms = (int) round((microtime(true) - $started) * 1000);
+
+        if ($answer === null) {
+            logger()->warning('Agent Studio: lượt DÒ TÌM KIẾM thất bại — lượt viết JSON vẫn chạy (không công cụ)', [
+                'latency_ms' => $ms,
+            ]);
+
+            return null;   // để đường cũ lo (giữ nguyên hành vi khi lượt dò không dùng được)
+        }
+
+        // Từ khoá: ƯU TIÊN từ khoá THẬT model đã hỏi (hosted_queries lấy từ web_search_call), rồi mới tới
+        // phần nó tự khai trong JSON — khai báo là thứ dễ nói khác thực tế.
+        $queries = array_values(array_filter(array_map('strval', (array) ($answer['hosted_queries'] ?? [])), 'strlen'));
+        if ($queries === []) {
+            $json = $this->decodeJson($answer['text']);
+            $queries = array_values(array_filter(array_map(
+                fn ($q) => is_string($q) ? trim($q) : '',
+                (array) ($json['queries'] ?? []),
+            ), 'strlen'));
+        }
+
+        $evidence = $queries !== [] ? $this->collectAiEvidence($queries, $region) : ['items' => [], 'count' => 0];
+        $lines = [];
+        foreach (array_slice((array) ($evidence['items'] ?? []), 0, 8) as $row) {
+            $url = trim((string) ($row['url'] ?? ''));
+            if ($url === '') {
+                continue;
+            }
+            $title = trim((string) ($row['title'] ?? ''));
+            $lines[] = '- '.($title !== '' ? $title.' — ' : '').$url;
+        }
+
+        $block = "\n\nTIN MỚI TRA ĐƯỢC TỪ INTERNET"
+            .($queries !== [] ? ' (từ khoá: '.implode('; ', array_slice($queries, 0, 4)).')' : '')
+            .":\n".($lines !== []
+                ? implode("\n", $lines)."\nChỉ được dẫn nguồn CÓ trong danh sách trên; TUYỆT ĐỐI không bịa thêm tin hoặc URL."
+                : 'Không tra được tin mới. Trả lời bằng dữ liệu đã có và TUYỆT ĐỐI không bịa nguồn.')."\n";
+
+        logger()->info('Agent Studio: đã tách lượt tra ra khỏi lượt viết JSON', [
+            'probe_ms' => $ms,
+            'calls' => (int) ($answer['hosted_calls'] ?? 0),
+            'queries' => count($queries),
+            'evidence_items' => (int) ($evidence['count'] ?? count($lines)),
+        ]);
+
+        return [
+            'block' => $block,
+            'tool_search' => $this->toolSearchBlock(null, $answer, ['hosted' => $hosted]),
+        ];
+    }
+
     private function callJson(string $instruction, array $payload, int $budget, int $retryBudget, int $timeout, array $options = [], array $candidates = []): array
     {
         $messages = [
@@ -2543,6 +2644,19 @@ class DesignAgentService
         foreach ([self::SEARCH_GROUP, self::REASON_GROUP, self::AI_GROUP] as $otherGroup) {
             if ($otherGroup !== $group) {
                 $fallbacks[] = $otherGroup;
+            }
+        }
+
+        // TÁCH LƯỢT TRA KHỎI LƯỢT VIẾT (2026-09-22): model nặng không xong khi vừa tra vừa viết JSON trong
+        // một lời gọi — xem chú thích ở splitHostedSearch(). Đặt ở ĐÂY để cả radar lẫn brief dùng chung
+        // MỘT cơ chế; hai bản sao sẽ lệch nhau (bài học của cả dự án này).
+        $splitSearch = null;
+        if (! empty($options['search'])) {
+            $splitSearch = $this->splitHostedSearch($instruction, (string) ($payload['region'] ?? 'all'), $candidates);
+            if ($splitSearch !== null) {
+                $instruction .= $splitSearch['block'];
+                // Lượt viết JSON chạy KHÔNG công cụ: nhẹ, nhanh, và bằng chứng đã nằm trong prompt.
+                unset($options['search'], $options['tools'], $options['tool_handler'], $options['tool_begin'], $options['max_tool_calls']);
             }
         }
 
@@ -2574,7 +2688,7 @@ class DesignAgentService
 
         $json = $this->decodeJson($answer['text']);
         if ($json !== null) {
-            return ['json' => $json, 'answer' => $answer, 'attempts' => 1];
+            return ['json' => $json, 'answer' => $answer, 'attempts' => 1, 'tool_search' => $splitSearch['tool_search'] ?? null];
         }
 
         // TRẦN THỜI GIAN: nếu lần đầu đã chậm thì KHÔNG thử lại.
@@ -2638,7 +2752,7 @@ class DesignAgentService
             return ['json' => null, 'answer' => $retry, 'attempts' => 2];
         }
 
-        return ['json' => null, 'answer' => $answer, 'attempts' => 2];
+        return ['json' => null, 'answer' => $answer, 'attempts' => 2, 'tool_search' => $splitSearch['tool_search'] ?? null];
     }
 
     /**
