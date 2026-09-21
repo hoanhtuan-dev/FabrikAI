@@ -25,14 +25,14 @@ const setSub = inject('setSub');
 
 <template>
   <div>
-    <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-8 text-center">
+    <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center sm:p-8">
       <StudioIcon name="receipt" size="h-7 w-7" class="mx-auto text-brand-300" />
       <p class="mt-3 text-sm font-semibold text-cream-100">Chưa có brief để lập kế hoạch</p>
       <p class="mt-1 text-xs leading-5 text-cream-400">Tạo brief ở việc 1 rồi quay lại đây.</p>
     </div>
 
     <template v-else>
-      <div v-if="!planTotals" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-8 text-center">
+      <div v-if="!planTotals" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center sm:p-8">
         <StudioIcon name="receipt" size="h-7 w-7" class="mx-auto text-brand-300" />
         <p class="mt-3 text-sm font-semibold text-cream-100">Chưa có kế hoạch sản xuất</p>
         <p class="mt-1 text-xs leading-5 text-cream-400">Nhập đơn giá ở việc 5 — kế hoạch tự tính lại sau mỗi ô bạn sửa.</p>
@@ -42,7 +42,7 @@ const setSub = inject('setSub');
       </div>
 
       <template v-else>
-        <div class="card p-4 sm:p-5">
+        <div class="card p-3 sm:p-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="min-w-0">
               <h2 class="font-display text-base font-semibold text-brand-300">Lệnh cắt — {{ planLines.length }} dòng</h2>
@@ -95,7 +95,7 @@ const setSub = inject('setSub');
         </div>
 
         <div class="mt-4 grid gap-3 lg:grid-cols-3">
-          <div v-for="wave in planWaves" :key="wave.id" class="card p-4">
+          <div v-for="wave in planWaves" :key="wave.id" class="card p-3 sm:p-4">
             <div class="flex items-center justify-between gap-2">
               <h4 class="text-xs font-semibold text-cream-100">{{ wave.name }}</h4>
               <span class="rounded bg-ink-800 px-2 py-0.5 text-label text-cream-400">{{ wave.share_pct }}%</span>
@@ -114,7 +114,7 @@ const setSub = inject('setSub');
         </div>
 
         <div class="mt-4 grid gap-4 lg:grid-cols-2">
-          <div class="card p-4 sm:p-5">
+          <div class="card p-3 sm:p-4">
             <h3 class="font-display text-base font-semibold text-brand-300">Bảng size (cm)</h3>
             <p class="mt-0.5 text-body leading-5 text-cream-400">Số đo tham chiếu dáng nữ VN — phải đối chiếu rập thật của xưởng và độ co của vải.</p>
             <div v-for="chart in planSizeChart" :key="chart.category" class="mt-3 overflow-x-auto">
@@ -138,7 +138,7 @@ const setSub = inject('setSub');
             </div>
           </div>
 
-          <div class="card p-4 sm:p-5">
+          <div class="card p-3 sm:p-4">
             <h3 class="font-display text-base font-semibold text-brand-300">Ba mức giá — lãi tương ứng</h3>
             <p class="mt-0.5 text-body leading-5 text-cream-400">Đã trừ chiết khấu kênh {{ plan.assumptions.channel_discount_pct }}% và cộng chi phí cố định.</p>
             <div class="mt-3 space-y-2">

@@ -123,48 +123,47 @@ const primaryLabel = computed(() => {
     <AuthNotice />
 
     <!-- ══ THANH TRÊN (Material top app bar) — một thanh duy nhất cho nhận diện + điều khiển ══ -->
-    <header class="elev-bar relative z-30 flex shrink-0 items-center gap-2 bg-ink-900 px-3 py-2 sm:px-5 sm:py-2.5">
-      <a href="/" class="icon-btn motion-ui h-9 w-9 shrink-0" aria-label="Về Studio" title="Về Studio (xưởng thiết kế)">
+    <header class="elev-bar relative z-30 flex shrink-0 items-center gap-1.5 bg-ink-900 px-2 py-1.5 sm:gap-2 sm:px-4 sm:py-2">
+      <a href="/" class="icon-btn motion-ui h-8 w-8 shrink-0" aria-label="Về Studio" title="Về Studio (xưởng thiết kế)">
         <StudioIcon name="arrowLeft" size="h-4 w-4" />
       </a>
 
-      <div class="flex min-w-0 items-center gap-2.5">
-        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-600/15 text-brand-300">
+      <div class="flex min-w-0 items-center gap-2">
+        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-600/15 text-brand-300">
           <StudioIcon name="sparkles" size="h-4 w-4" />
         </span>
         <div class="min-w-0">
           <h1 class="truncate text-title font-semibold leading-5 text-cream-50">Agent Studio</h1>
-          <p class="hidden truncate text-label text-cream-400 sm:block">Từ tín hiệu xu hướng tới ảnh hoàn chỉnh</p>
+          <p class="hidden truncate text-label text-cream-400 xl:block">Từ tín hiệu xu hướng tới ảnh hoàn chỉnh</p>
         </div>
       </div>
 
-      <div class="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+      <div class="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5">
+        <!-- Badge model: dot-only trên mobile, mở rộng từ md+ -->
         <span
-          class="hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-label font-semibold sm:inline-flex"
+          class="flex items-center gap-1.5 rounded-full py-1 text-label font-semibold sm:px-3"
           :class="modelReady ? 'bg-ok/15 text-ok' : 'bg-warn/15 text-warn'"
           :title="modelTitle"
         >
           <span class="h-1.5 w-1.5 rounded-full" :class="modelReady ? 'bg-ok' : 'bg-warn'"></span>
-          {{ modelShort }}
+          <span class="hidden md:inline">{{ modelShort }}</span>
         </span>
 
         <button
           type="button"
-          class="tool-btn state-layer"
+          class="tool-btn state-layer !px-2 !py-1.5"
           :class="{ 'is-active': store.designAgentAi }"
           :aria-pressed="store.designAgentAi"
           :title="aiToggleTitle"
           @click="toggleAi"
         >
           <StudioIcon name="sparkles" size="h-3.5 w-3.5" />
-          <span class="hidden sm:inline">Suy luận AI</span>
+          <span class="hidden lg:inline">Suy luận AI</span>
         </button>
-
-        <div class="hidden h-5 w-px bg-ink-700 sm:block" aria-hidden="true"></div>
 
         <button
           type="button"
-          class="tool-btn state-layer"
+          class="tool-btn state-layer !px-2 !py-1.5"
           :title="'Giao diện đang là ' + (themeResolved === 'light' ? 'Sáng' : 'Tối') + ' — bấm để đổi (muốn theo hệ điều hành: Cài đặt của tôi → Giao diện)'"
           :aria-label="'Đổi giao diện Sáng/Tối, đang là ' + (themeResolved === 'light' ? 'Sáng' : 'Tối')"
           @click="toggleTheme"
@@ -177,8 +176,8 @@ const primaryLabel = computed(() => {
 
     <div class="flex min-h-0 flex-1">
       <!-- ══ RAIL BƯỚC (Material navigation rail) — tiến trình ở lại trên màn hình rộng ══ -->
-      <nav class="hidden w-64 shrink-0 flex-col gap-1 overflow-y-auto border-r border-ink-700/60 bg-ink-900 px-3 py-4 lg:flex" aria-label="Tiến trình thiết kế">
-        <p class="px-2 pb-2 text-label font-semibold uppercase tracking-[0.14em] text-cream-400">Tiến trình</p>
+      <nav class="hidden w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-ink-700/60 bg-ink-900 px-2 py-3 lg:flex" aria-label="Tiến trình thiết kế">
+        <p class="px-2 pb-1.5 text-label font-semibold uppercase tracking-[0.14em] text-cream-400">Tiến trình</p>
 
         <button
           v-for="(item, index) in STEPS"
@@ -199,61 +198,64 @@ const primaryLabel = computed(() => {
           </span>
         </button>
 
-        <!-- Phím tắt: gấp lại (thứ ít dùng — §4 luật 5) nhưng VẪN tìm thấy, thay vì nằm trong tài liệu. -->
-        <details class="mt-auto rounded-xl bg-ink-800 px-3 py-2.5 text-label text-cream-300">
-          <summary class="cursor-pointer font-semibold text-cream-200">Phím tắt</summary>
-          <ul class="mt-2 space-y-1.5 leading-5">
-            <li><b class="text-cream-100">Ctrl + →</b> bước kế tiếp</li>
-            <li><b class="text-cream-100">Ctrl + ←</b> quay lại</li>
-            <li><b class="text-cream-100">1…4</b> nhảy tới bước (khi không gõ trong ô nhập)</li>
-            <li><b class="text-cream-100">Ctrl + Enter</b> chốt/tiếp tục bước hiện tại</li>
-          </ul>
-        </details>
-
-        <dl class="mt-3 space-y-2 rounded-xl bg-ink-800 px-3 py-3 text-label">
-          <div class="flex items-center gap-2">
+        <!-- Tổng quan nhanh: khu vực · hướng · brief · SKU — gọn trong một khối -->
+        <dl class="mt-2 space-y-1.5 rounded-lg bg-ink-800/80 px-2.5 py-2.5 text-label">
+          <div class="flex items-center gap-1.5">
             <StudioIcon name="pin" size="h-3 w-3" class="shrink-0 text-brand-300" />
             <dt class="sr-only">Khu vực</dt>
             <dd class="truncate font-semibold text-cream-200">{{ regionName }}</dd>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1.5">
             <StudioIcon name="scan" size="h-3 w-3" class="shrink-0 text-brand-300" />
             <dt class="sr-only">Hướng đã chọn</dt>
             <dd class="truncate" :class="selectedTrendCount ? 'font-semibold text-cream-200' : 'text-cream-400'">
-              {{ selectedTrendCount ? selectedTrendCount + ' hướng đã chọn' : 'Chưa chọn hướng' }}
+              {{ selectedTrendCount ? selectedTrendCount + ' hướng' : 'Chưa chọn hướng' }}
             </dd>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1.5">
             <StudioIcon name="briefcase" size="h-3 w-3" class="shrink-0 text-brand-300" />
             <dt class="sr-only">Brief</dt>
             <dd class="truncate" :class="collection && !briefStale ? 'font-semibold text-ok' : (collection ? 'font-semibold text-warn' : 'text-cream-400')">
-              {{ collection && !briefStale ? 'Brief sẵn sàng' : (collection ? 'Brief cần cập nhật' : 'Chưa có brief') }}
+              {{ collection && !briefStale ? 'Brief sẵn sàng' : (collection ? 'Brief cũ' : 'Chưa có brief') }}
             </dd>
           </div>
-          <div v-if="collection" class="flex items-center gap-2">
+          <div v-if="collection" class="flex items-center gap-1.5">
             <StudioIcon name="package" size="h-3 w-3" class="shrink-0 text-brand-300" />
             <dt class="sr-only">Số mã hàng</dt>
-            <dd class="truncate font-semibold text-cream-200">{{ collection.structure?.total_skus || 0 }} mã hàng</dd>
+            <dd class="truncate font-semibold text-cream-200">{{ collection.structure?.total_skus || 0 }} mã</dd>
           </div>
         </dl>
+
+        <!-- Phím tắt: gấp lại (thứ ít dùng — §4 luật 5) nhưng VẪN tìm thấy, thay vì nằm trong tài liệu. -->
+        <details class="mt-auto rounded-lg bg-ink-800/80 px-2.5 py-2 text-tiny text-cream-300">
+          <summary class="cursor-pointer font-semibold text-cream-200">Phím tắt</summary>
+          <ul class="mt-1.5 space-y-1 leading-4">
+            <li><b class="text-cream-100">Ctrl + →</b> bước kế</li>
+            <li><b class="text-cream-100">Ctrl + ←</b> quay lại</li>
+            <li><b class="text-cream-100">1…4</b> nhảy tới bước</li>
+            <li><b class="text-cream-100">Ctrl+Enter</b> chốt bước</li>
+          </ul>
+        </details>
       </nav>
 
       <div class="flex min-w-0 flex-1 flex-col">
-        <!-- ══ DẢI BƯỚC cho màn hẹp — cùng dữ liệu, khác hình dạng (rail không vừa) ══ -->
-        <div class="scrollbar-hide shrink-0 overflow-x-auto border-b border-ink-700/60 bg-ink-900 px-3 py-2 lg:hidden">
-          <div class="flex w-max items-center gap-1.5">
+        <!-- ══ DẢI BƯỚC cho màn hẹp — pill tiến trình, không phải nút hành động ══ -->
+        <div class="scrollbar-hide shrink-0 overflow-x-auto border-b border-ink-700/60 bg-ink-900 px-2 py-1.5 lg:hidden">
+          <div class="flex w-max items-center gap-1">
             <button
               v-for="(item, index) in STEPS"
               :key="item.id"
               type="button"
-              class="tool-btn state-layer"
-              :class="{ 'is-active': step === item.id }"
+              class="step-pill state-layer"
+              :class="{ 'is-active': step === item.id, 'is-done': readiness[item.id] === 'done' }"
               :aria-current="step === item.id ? 'step' : undefined"
               @click="setStep(item.id)"
             >
-              <StudioIcon v-if="readiness[item.id] === 'done'" name="check" size="h-3.5 w-3.5" />
-              <span v-else class="text-tiny font-bold">{{ index + 1 }}</span>
-              {{ item.label }}
+              <span class="step-pill__num">
+                <StudioIcon v-if="readiness[item.id] === 'done'" name="check" size="h-3 w-3" />
+                <span v-else>{{ index + 1 }}</span>
+              </span>
+              <span class="truncate">{{ item.label }}</span>
             </button>
           </div>
         </div>
@@ -264,16 +266,18 @@ const primaryLabel = computed(() => {
              ở thẻ gốc vì .studio-shell (không thuộc layer nào) đã đặt bg-ink-900 cho thẻ gốc — CSS
              ngoài layer luôn thắng tiện ích trong layer, nên đặt ở gốc là bị ghi đè im lặng. -->
         <main class="min-h-0 flex-1 overflow-y-auto bg-ink-950">
-          <div class="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+          <div class="mx-auto w-full max-w-6xl px-3 py-4 sm:px-5 sm:py-6">
             <!-- Bảng chỉ đường của bước: LÀM GÌ + ĐẦU RA DÙNG VÀO VIỆC GÌ (§4 luật 1–2). -->
-            <header class="mb-5">
-              <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-label font-semibold uppercase tracking-[0.14em] text-brand-300">
-                <span>Bước {{ stepIndex + 1 }}/{{ STEPS.length }} · {{ STEPS[stepIndex].label }}</span>
+            <header class="mb-4">
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <p class="text-label font-semibold uppercase tracking-[0.14em] text-brand-300">
+                  Bước {{ stepIndex + 1 }}/{{ STEPS.length }} · {{ STEPS[stepIndex].label }}
+                </p>
                 <span class="rounded-full px-2 py-0.5 text-tiny normal-case tracking-normal" :class="STEPS[stepIndex].required ? 'bg-brand-600/20 text-brand-200' : 'bg-ink-800 text-cream-300'">
                   {{ STEPS[stepIndex].required ? 'bắt buộc' : 'tùy chọn' }}
                 </span>
-              </p>
-              <h2 class="mt-1.5 text-balance font-display text-xl font-semibold leading-7 text-cream-100 sm:text-2xl">{{ STEPS[stepIndex].hint }}</h2>
+              </div>
+              <h2 class="mt-1 text-balance font-display text-lg font-semibold leading-6 text-cream-100 sm:text-xl sm:leading-7">{{ STEPS[stepIndex].hint }}</h2>
               <p class="mt-1 text-body leading-5 text-cream-400">{{ stepNeeds(STEPS[stepIndex].id) }}</p>
             </header>
 
@@ -288,16 +292,24 @@ const primaryLabel = computed(() => {
 
             <!-- Gói không có module: KHÔNG dựng bốn bước để chúng lần lượt báo lỗi. Một màn hình,
                  một lời giải thích, một hành động — và vẫn để rail bên trái cho biết sẽ nhận gì. -->
-            <div v-if="planLocked" class="card p-6 text-center sm:p-8">
-              <span class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-warn/15 text-warn">
+            <div v-if="planLocked" class="card p-5 text-center sm:p-7">
+              <span class="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-warn/15 text-warn">
                 <StudioIcon name="lock" size="h-5 w-5" />
               </span>
-              <h3 class="mt-4 font-display text-lg font-semibold text-cream-100">Agent Studio chưa có trong gói của bạn</h3>
-              <p class="mx-auto mt-2 max-w-xl text-body leading-6 text-cream-300">
-                Luồng bốn bước (DNA shop → Tín hiệu → Định hướng → Thực thi) thuộc các gói <b class="text-cream-100">Pro · Studio · Xưởng theo vụ</b>.
-                Bạn xem được từng bước ở cột bên trái để biết mình sẽ nhận gì; mở gói là dùng được ngay, không phải nhập lại gì.
+              <h3 class="mt-3 font-display text-base font-semibold text-cream-100 sm:text-lg">Agent Studio chưa có trong gói của bạn</h3>
+              <p class="mx-auto mt-2 max-w-lg text-body leading-5 text-cream-300 sm:leading-6">
+                Luồng 4 bước (DNA shop → Tín hiệu → Định hướng → Thực thi) thuộc gói <b class="text-cream-100">Pro · Studio · Xưởng</b>.
+                Xem từng bước ở cột bên trái; mở gói là dùng được ngay.
               </p>
-              <div class="mt-5 flex flex-wrap items-center justify-center gap-3">
+              <!-- Preview 4 bước để người dùng thấy họ sẽ nhận gì -->
+              <div class="mx-auto mt-4 flex max-w-sm flex-wrap items-center justify-center gap-1.5 opacity-60">
+                <span v-for="(item, i) in STEPS" :key="item.id" class="flex items-center gap-1 text-tiny text-cream-400">
+                  <span class="grid h-5 w-5 place-items-center rounded-full bg-ink-700 text-tiny font-bold">{{ i + 1 }}</span>
+                  {{ item.label }}
+                  <StudioIcon v-if="i < STEPS.length - 1" name="chevronRight" size="h-3 w-3" class="text-cream-400" />
+                </span>
+              </div>
+              <div class="mt-5 flex flex-wrap items-center justify-center gap-2.5">
                 <a href="/bang-gia" class="btn-brand state-layer flex items-center gap-2 !px-5 !py-2.5 text-sm" title="Xem bảng giá và các gói có Agent Studio">
                   <StudioIcon name="coins" size="h-4 w-4" /> Xem gói &amp; nâng cấp
                 </a>
@@ -306,45 +318,47 @@ const primaryLabel = computed(() => {
             </div>
 
             <template v-else>
-              <AgentDnaStep v-if="step === 'dna'" />
-              <AgentRadarStep v-else-if="step === 'radar'" />
-              <AgentBriefStep v-else-if="step === 'brief'" />
-              <AgentCanvasStep v-else />
+              <div :key="step" class="motion-fade-in">
+                <AgentDnaStep v-if="step === 'dna'" />
+                <AgentRadarStep v-else-if="step === 'radar'" />
+                <AgentBriefStep v-else-if="step === 'brief'" />
+                <AgentCanvasStep v-else />
+              </div>
             </template>
           </div>
         </main>
 
         <!-- ══ THANH HÀNH ĐỘNG (Material bottom app bar) — MỘT hành động chính ══ -->
-        <footer class="elev-bar-up relative z-20 flex shrink-0 items-center gap-3 bg-ink-900 px-3 py-3 sm:px-6">
+        <footer class="elev-bar-up relative z-20 flex shrink-0 items-center gap-2 bg-ink-900 px-3 py-2.5 sm:px-5 sm:py-3">
           <button
             v-if="!planLocked && stepIndex > 0"
             type="button"
-            class="btn-ghost btn-sm state-layer"
+            class="btn-ghost btn-sm state-layer !px-3 !py-2"
             title="Quay lại bước trước (Ctrl+←)"
             @click="back"
           >
             <StudioIcon name="arrowLeft" size="h-4 w-4" /><span class="hidden sm:inline"> Quay lại</span>
           </button>
-          <span v-else-if="!planLocked" class="text-label text-cream-400">Bắt đầu bằng hồ sơ shop — hoặc bỏ qua để đọc tín hiệu ngay.</span>
-          <span v-else class="text-label text-cream-400">Xem từng bước ở cột bên trái — mở gói là dùng được ngay.</span>
+          <span v-else-if="!planLocked" class="text-tiny text-cream-400 sm:text-label">Bắt đầu bằng hồ sơ shop — hoặc bỏ qua.</span>
+          <span v-else class="text-tiny text-cream-400 sm:text-label">Mở gói là dùng được ngay.</span>
 
-          <span class="ml-auto hidden text-label text-cream-400 sm:inline">Bước {{ stepIndex + 1 }}/{{ STEPS.length }}</span>
+          <span class="ml-auto text-tiny tabular-nums text-cream-400 sm:text-label sm:text-cream-300">{{ stepIndex + 1 }}/{{ STEPS.length }}</span>
 
           <!-- Gói thiếu module: hành động chính là ĐƯỜNG NÂNG CẤP, không phải nút bị khoá mờ. -->
           <a
             v-if="planLocked"
             v-ripple
             href="/bang-gia"
-            class="btn-brand state-layer flex items-center gap-2 !px-5 !py-2.5 text-sm"
+            class="btn-brand state-layer flex items-center gap-2 !px-4 !py-2 text-sm sm:!px-5"
             title="Xem bảng giá và các gói có Agent Studio"
           >
-            <StudioIcon name="coins" size="h-4 w-4" /> Xem gói &amp; nâng cấp
+            <StudioIcon name="coins" size="h-4 w-4" /> <span class="hidden sm:inline">Xem gói &amp; nâng cấp</span><span class="sm:hidden">Nâng cấp</span>
           </a>
           <button
             v-else-if="step !== 'canvas'"
             v-ripple
             type="button"
-            class="btn-brand state-layer flex items-center gap-2 !px-5 !py-2.5 text-sm"
+            class="btn-brand state-layer flex items-center gap-2 !px-4 !py-2 text-sm sm:!px-5"
             :disabled="step === 'brief' && store.collectionBriefLoading"
             title="Tiếp tục (Ctrl+→)"
             @click="advance"
@@ -356,7 +370,7 @@ const primaryLabel = computed(() => {
             v-else
             v-ripple
             type="button"
-            class="btn-brand state-layer flex items-center gap-2 !px-5 !py-2.5 text-sm"
+            class="btn-brand state-layer flex items-center gap-2 !px-4 !py-2 text-sm sm:!px-5"
             title="Đưa prompt, tỉ lệ và số biến thể sang ô Tạo Ảnh trong Studio"
             @click="applyCanvas"
           >

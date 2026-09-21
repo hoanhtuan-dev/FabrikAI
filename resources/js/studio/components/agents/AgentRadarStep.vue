@@ -76,18 +76,18 @@ const formatVnd = inject('formatVnd');
 <template>
           <section id="agent-step-radar" role="region" aria-label="Tín hiệu" :aria-busy="store.trendRadarLoading">
             <AgentSubSteps step-id="radar" />
-            <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 class="text-base font-semibold text-cream-100">Tín hiệu thị trường</h2>
-                <p class="mt-0.5 text-xs text-cream-400">Chọn 2–4 hướng phù hợp nhất với DNA shop. Chưa chọn cũng chạy được với nhóm mặc định.</p>
+            <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
+              <div class="min-w-0">
+                <h2 class="text-sm font-semibold text-cream-100 sm:text-base">Tín hiệu thị trường</h2>
+                <p class="mt-0.5 text-tiny text-cream-400 sm:text-xs">Chọn 2–4 hướng phù hợp nhất với DNA shop. Chưa chọn cũng chạy được.</p>
               </div>
-              <div class="flex flex-wrap items-center gap-2">
+              <div class="flex shrink-0 items-center gap-1.5">
                 <label for="agent-region" class="sr-only">Khu vực đọc tín hiệu</label>
-                <select id="agent-region" v-model="selectedRegion" :disabled="store.trendRadarLoading" class="input !w-auto !bg-ink-800 !py-2 !text-xs !text-cream-100">
+                <select id="agent-region" v-model="selectedRegion" :disabled="store.trendRadarLoading" class="input !w-auto !bg-ink-800 !py-1.5 !text-xs !text-cream-100">
                   <option v-for="region in regions" :key="region.id" :value="region.id">{{ region.name }}</option>
                 </select>
-                <button type="button" class="tool-btn" :disabled="store.trendRadarLoading" @click="loadRadar(selectedRegion, { force: true })">
-                  <StudioIcon name="refresh" size="h-3.5 w-3.5" :class="store.trendRadarLoading ? 'animate-spin' : ''" /> Tải lại
+                <button type="button" class="tool-btn !px-2 !py-1.5" :disabled="store.trendRadarLoading" @click="loadRadar(selectedRegion, { force: true })">
+                  <StudioIcon name="refresh" size="h-3.5 w-3.5" :class="store.trendRadarLoading ? 'animate-spin' : ''" /> <span class="hidden sm:inline">Tải lại</span>
                 </button>
               </div>
             </div>
@@ -96,27 +96,27 @@ const formatVnd = inject('formatVnd');
               <StudioIcon name="alertTriangle" size="h-4 w-4" class="shrink-0" /><span>{{ store.trendRadarError }}</span>
             </div>
 
-            <div v-if="radar" class="mb-4">
-              <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                <div v-for="item in summaryItems" :key="item.key" class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5">
-                  <p class="text-label leading-4 text-cream-400">{{ item.label }}</p>
-                  <p class="mt-1 text-lg font-semibold tabular-nums text-cream-100">{{ formatNumber(item.value) }}</p>
-                  <p class="text-tiny leading-3 text-cream-400">{{ item.fromNews ? 'từ tin thật' : 'từ dữ liệu của bạn' }}</p>
+            <div v-if="radar" class="mb-3">
+              <div class="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
+                <div v-for="item in summaryItems" :key="item.key" class="rounded-lg border border-ink-700 bg-ink-900 px-2.5 py-2">
+                  <p class="text-tiny leading-3 text-cream-400">{{ item.label }}</p>
+                  <p class="mt-0.5 text-base font-semibold tabular-nums text-cream-100 sm:text-lg">{{ formatNumber(item.value) }}</p>
+                  <p class="text-tiny leading-3 text-cream-400">{{ item.fromNews ? 'tin thật' : 'của bạn' }}</p>
                 </div>
               </div>
               <!-- Nguồn của con số phải nằm NGAY DƯỚI số, không gấp trong khối khác (§18.2). -->
-              <p class="mt-1.5 text-label leading-5 text-cream-400">
+              <p class="mt-1 text-tiny leading-4 text-cream-400 sm:text-label sm:leading-5">
                 {{ marketLive
                   ? 'Số đầu tiên là số ĐO từ tin thật; các hướng còn lại ghi rõ hướng nào có tin thật, hướng nào thuộc bộ có sẵn.'
-                  : 'Chưa có tin thật nào: các hướng đang hiển thị thuộc BỘ XU HƯỚNG CÓ SẴN của FabrikAI, không phải số liệu thị trường.' }}
+                  : 'Chưa có tin thật: các hướng hiển thị thuộc BỘ XU HƯỚNG CÓ SẴN của FabrikAI, không phải số liệu thị trường.' }}
               </p>
               <!-- CÁCH DỮ LIỆU ĐƯỢC LƯU · QUẢN LÝ · TÁI SỬ DỤNG — trả lời "lưu ở đâu, ai lưu, dùng lại ra sao". -->
-              <details class="mt-1.5">
-                <summary class="cursor-pointer text-label text-cream-400 underline decoration-dotted">Cách dữ liệu này được lưu &amp; tái sử dụng</summary>
-                <div class="mt-1.5 space-y-1 rounded-lg bg-ink-900 px-3 py-2 text-label leading-5 text-cream-300">
-                  <p><b class="text-cream-200">Lưu tự động:</b> mỗi lần đo, hệ thống ghi một "ảnh chụp" (snapshot) nếu dữ liệu đổi hoặc đã cũ hơn 12 giờ — bạn không phải bấm lưu.</p>
-                  <p><b class="text-cream-200">Quản lý:</b> ảnh chụp cũ hơn 120 ngày tự xoá để CSDL không phình.</p>
-                  <p><b class="text-cream-200">Tái sử dụng:</b> số "tăng/giảm %" được tính bằng cách so ảnh chụp mới nhất với các lần đo trước — nhờ vậy bạn thấy hướng nào đang lên hay chậm lại theo thời gian, không cần AI.</p>
+              <details class="mt-1">
+                <summary class="cursor-pointer text-tiny text-cream-400 underline decoration-dotted sm:text-label">Cách dữ liệu này được lưu &amp; tái sử dụng</summary>
+                <div class="mt-1 space-y-1 rounded-lg bg-ink-900 px-2.5 py-2 text-tiny leading-4 text-cream-300 sm:text-label sm:leading-5">
+                  <p><b class="text-cream-200">Lưu tự động:</b> mỗi lần đo, hệ thống ghi "ảnh chụp" nếu dữ liệu đổi hoặc cũ hơn 12 giờ — bạn không phải bấm lưu.</p>
+                  <p><b class="text-cream-200">Quản lý:</b> ảnh chụp cũ hơn 120 ngày tự xoá.</p>
+                  <p><b class="text-cream-200">Tái sử dụng:</b> số "tăng/giảm %" được tính bằng cách so ảnh chụp mới nhất với các lần trước — thấy hướng nào đang lên hay chậm lại.</p>
                 </div>
               </details>
             </div>
@@ -179,7 +179,7 @@ const formatVnd = inject('formatVnd');
 
               <!-- ĐỊNH HƯỚNG: thu gọn để người dùng TẬP TRUNG vào hướng thời trang + hiểu đang chọn gì,
                    để làm gì. Chi tiết (việc làm · rủi ro · giá · độ tin cậy · nguồn) gấp vào <details>. -->
-              <div v-if="directions.length" class="mb-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
+              <div v-if="directions.length" class="mb-4 rounded-xl border border-ink-700 bg-ink-900/70 p-3 sm:p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div class="min-w-0">
                     <h3 class="font-display text-base font-semibold text-brand-300">Định hướng từ TrendRadar ({{ directions.length }})</h3>
@@ -213,8 +213,8 @@ const formatVnd = inject('formatVnd');
                     <StudioIcon name="target" size="h-3 w-3" /> Chọn 3 hướng đầu
                   </button>
                 </div>
-                <div class="mt-3 grid gap-2.5 lg:grid-cols-2">
-                  <article v-for="row in directions" :key="row.id" class="rounded-lg border border-ink-700 bg-ink-800 p-3">
+                <div class="mt-2.5 grid gap-2 lg:grid-cols-2">
+                  <article v-for="row in directions" :key="row.id" class="rounded-lg border border-ink-700 bg-ink-800 p-2.5 sm:p-3">
                     <div class="flex items-start justify-between gap-2">
                       <h4 class="text-sm font-semibold leading-5 text-cream-50">{{ row.title }}</h4>
                       <span
@@ -261,16 +261,16 @@ const formatVnd = inject('formatVnd');
               </template>
 
               <template v-else>
-              <div class="mb-3 flex flex-wrap items-center gap-2">
-                <div class="relative min-w-[12rem] flex-1">
+              <div class="mb-2 flex flex-wrap items-center gap-1.5">
+                <div class="relative min-w-[10rem] flex-1">
                   <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-400" />
                   <label for="trend-search" class="sr-only">Tìm xu hướng</label>
-                  <input id="trend-search" v-model="trendQuery" type="search" class="input !py-2 !pl-8 !text-xs" placeholder="Tìm theo tên, mô tả, hành động…">
+                  <input id="trend-search" v-model="trendQuery" type="search" class="input !py-1.5 !pl-8 !text-xs" placeholder="Tìm theo tên, mô tả…">
                 </div>
                 <!-- Nói NGAY trên đầu danh sách: bao nhiêu hướng có tin thật, bao nhiêu là bộ có sẵn. -->
                 <button
                   type="button"
-                  class="tool-btn"
+                  class="tool-btn !px-2 !py-1.5 !text-tiny"
                   :class="{ 'is-active': liveOnly }"
                   :aria-pressed="liveOnly"
                   :disabled="!liveTrendCount"
@@ -308,12 +308,12 @@ const formatVnd = inject('formatVnd');
                 </details>
               </div>
 
-              <div v-if="visibleTrends.length" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div v-if="visibleTrends.length" class="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                 <button
                   v-for="trend in visibleTrends"
                   :key="trend.id"
                   type="button"
-                  class="group motion-ui relative overflow-hidden rounded-xl border bg-ink-900 p-4 text-left transition hover:border-brand-400 hover:bg-ink-800"
+                  class="group motion-ui relative overflow-hidden rounded-xl border bg-ink-900 p-3 text-left transition hover:border-brand-400 hover:bg-ink-800 sm:p-4"
                   :class="selectedTrendIds.includes(String(trend.id)) ? 'border-brand-500 ring-1 ring-brand-500/50' : 'border-ink-600'"
                   :aria-pressed="selectedTrendIds.includes(String(trend.id))"
                   @click="toggleTrend(trend.id)"
@@ -338,8 +338,8 @@ const formatVnd = inject('formatVnd');
                       <StudioIcon :name="selectedTrendIds.includes(String(trend.id)) ? 'check' : 'square'" size="h-3 w-3" />
                     </span>
                   </span>
-                  <span class="mt-3 block text-label text-cream-400">{{ trendSignalLabel(trend) }}</span>
-                  <span class="mt-1.5 block h-1 overflow-hidden rounded bg-ink-700"><span class="block h-full bg-gradient-to-r from-brand-500 to-warn" :style="{ width: Math.min(100, Number(trend.momentum || 0)) + '%' }"></span></span>
+                  <span class="mt-2 block text-label text-cream-400">{{ trendSignalLabel(trend) }}</span>
+                  <span class="mt-1 block h-1 overflow-hidden rounded bg-ink-700"><span class="block h-full bg-gradient-to-r from-brand-500 to-warn" :style="{ width: Math.min(100, Number(trend.momentum || 0)) + '%' }"></span></span>
                   <span class="mt-2 block text-body leading-4 text-cream-400">{{ trend.recommended_action }}</span>
                 </button>
               </div>
@@ -347,7 +347,7 @@ const formatVnd = inject('formatVnd');
                 {{ trends.length ? 'Không có xu hướng nào khớp bộ lọc hiện tại — bỏ bộ lọc để xem tất cả.' : 'Chưa đọc được xu hướng nào. Bấm «Tải lại»; nếu vẫn trống, kiểm tra nguồn tin ở khối «Nguồn dữ liệu cho phân tích».' }}
               </p>
 
-              <details class="mt-5 rounded-xl border border-ink-700 bg-ink-900/70 p-4">
+              <details class="mt-4 rounded-xl border border-ink-700 bg-ink-900/70 p-3 sm:p-4">
                 <summary class="cursor-pointer text-xs font-semibold text-cream-200">Nguồn dữ liệu cho phân tích</summary>
                 <!-- NGUỒN DỮ LIỆU: một câu trạng thái + tin thật đang dùng; chi tiết kỹ thuật gấp lại.
                      Không đưa tên tham số API, mã HTTP hay tên nhà cung cấp ra bề mặt người dùng. -->

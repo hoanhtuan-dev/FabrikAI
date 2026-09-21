@@ -49,7 +49,7 @@ function normalize() {
 
 <template>
   <div>
-    <div class="card p-4 sm:p-5">
+    <div class="card p-3 sm:p-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
           <h2 class="font-display text-base font-semibold text-brand-300">Bảng size dự kiến</h2>
@@ -84,7 +84,7 @@ function normalize() {
       </div>
     </div>
 
-    <div class="card mt-4 p-4 sm:p-5">
+    <div class="card mt-3 p-3 sm:p-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <h3 class="font-display text-base font-semibold text-brand-300">Các size đang dùng</h3>
         <button type="button" class="tool-btn state-layer" :disabled="sizeRowsInput.length >= 12" @click="addSizeRow">

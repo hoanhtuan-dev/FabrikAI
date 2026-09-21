@@ -77,7 +77,7 @@ async function finishAndNext(id) {
 
 <template>
   <div>
-    <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-10 text-center">
+    <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-8 text-center sm:p-10">
       <StudioIcon name="wand" size="h-8 w-8" class="mx-auto text-brand-300" />
       <p class="mt-3 text-sm font-semibold text-cream-100">Chưa có brief để chuyển sang Canvas</p>
       <p class="mt-1 text-xs text-cream-400">Quay lại bước Định hướng và chốt brief trước.</p>
@@ -87,7 +87,7 @@ async function finishAndNext(id) {
     <template v-else>
       <!-- ── 4.1 DANH SÁCH MẪU ─────────────────────────────────────────────── -->
       <template v-if="sub === 'list'">
-        <div class="card p-4 sm:p-5">
+        <div class="card p-3 sm:p-4">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
               <h2 class="font-display text-base font-semibold text-brand-300">Danh sách mẫu cần làm</h2>
@@ -143,7 +143,7 @@ async function finishAndNext(id) {
 
       <!-- ── 4.2 SINH PROMPT TỪNG MẪU ──────────────────────────────────────── -->
       <template v-else-if="sub === 'prompts'">
-        <div class="card p-4 sm:p-5">
+        <div class="card p-3 sm:p-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="min-w-0">
               <h2 class="font-display text-base font-semibold text-brand-300">Làm từng mẫu một</h2>
@@ -254,7 +254,7 @@ async function finishAndNext(id) {
         </div>
 
         <!-- Bảng trạng thái tất cả mẫu: biết ngay mẫu nào còn, mẫu nào xong -->
-        <div v-if="samples.length" class="card mt-4 p-4 sm:p-5">
+        <div v-if="samples.length" class="card mt-3 p-3 sm:p-4">
           <h3 class="font-display text-base font-semibold text-brand-300">Tất cả mẫu</h3>
           <ul class="mt-3 space-y-1.5">
             <li v-for="(row, index) in samples" :key="row.id" class="flex flex-wrap items-center gap-2 rounded-lg bg-ink-800 px-3 py-2">
@@ -275,7 +275,7 @@ async function finishAndNext(id) {
 
       <!-- ── 4.3 ÁP DỤNG & LƯU ─────────────────────────────────────────────── -->
       <template v-else>
-        <div class="card p-4 sm:p-5">
+        <div class="card p-3 sm:p-4">
           <h2 class="font-display text-base font-semibold text-brand-300">Đưa sang Canvas &amp; lưu lại</h2>
           <p class="mt-0.5 text-body leading-5 text-cream-400">
             Prompt đã sinh cho mẫu nào thì đưa thẳng mẫu đó sang ô Tạo Ảnh của Studio. Phần còn lại của bộ sưu tập được lưu theo tài khoản.

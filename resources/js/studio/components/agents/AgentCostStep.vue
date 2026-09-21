@@ -35,14 +35,14 @@ const openGroup = ref('volume');
 
 <template>
   <div>
-    <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-8 text-center">
+    <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center sm:p-8">
       <StudioIcon name="receipt" size="h-7 w-7" class="mx-auto text-brand-300" />
       <p class="mt-3 text-sm font-semibold text-cream-100">Chưa có brief để tính giá vốn</p>
       <p class="mt-1 text-xs leading-5 text-cream-400">Giá vốn cần cơ cấu SKU và bảng size — quay lại việc 1 để tạo brief trước.</p>
     </div>
 
     <template v-else>
-      <div class="card p-4 sm:p-5">
+      <div class="card p-3 sm:p-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0">
             <h2 class="font-display text-base font-semibold text-brand-300">Đơn giá &amp; định mức của xưởng bạn</h2>
@@ -101,7 +101,7 @@ const openGroup = ref('volume');
         </p>
       </div>
 
-      <div v-if="planTotals" class="card mt-4 p-4 sm:p-5">
+      <div v-if="planTotals" class="card mt-3 p-3 sm:p-4">
         <h3 class="font-display text-base font-semibold text-brand-300">Kết quả vừa tính</h3>
         <div class="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
           <div class="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5">

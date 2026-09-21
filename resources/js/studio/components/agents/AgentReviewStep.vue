@@ -58,7 +58,7 @@ const moodPhrase = computed(() => moodboardItems.value
 
 <template>
   <div>
-    <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-8 text-center">
+    <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center sm:p-8">
       <StudioIcon name="briefcase" size="h-8 w-8" class="mx-auto text-brand-300" />
       <p class="mt-3 text-sm font-semibold text-cream-100">Chưa có brief để chốt</p>
       <p class="mt-1 text-xs leading-5 text-cream-400">Nhập mô tả ở việc 1 rồi bấm «Tạo brief bộ sưu tập».</p>
@@ -68,7 +68,7 @@ const moodPhrase = computed(() => moodboardItems.value
     </div>
 
     <template v-else>
-      <div class="card p-4 sm:p-5">
+      <div class="card p-3 sm:p-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0">
             <h2 class="font-display text-base font-semibold text-brand-300">Bạn vừa chốt những gì</h2>
@@ -130,7 +130,7 @@ const moodPhrase = computed(() => moodboardItems.value
       </div>
 
       <!-- PHIÊN LÀM VIỆC: nói rõ đang lưu ở đâu, và cho chốt -->
-      <div class="card mt-4 p-4 sm:p-5">
+      <div class="card mt-3 p-3 sm:p-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0">
             <h3 class="font-display text-base font-semibold text-brand-300">Phiên làm việc</h3>

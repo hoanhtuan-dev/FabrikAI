@@ -29,47 +29,52 @@ const setDnaList = inject('setDnaList');
   <section id="agent-step-dna" role="region" aria-label="DNA shop" :aria-busy="store.brandDnaLoading">
     <AgentSubSteps step-id="dna" />
 
-    <div class="grid gap-4 lg:grid-cols-[1fr_minmax(320px,420px)]">
-      <div class="space-y-4">
-        <div class="card p-4">
-          <h2 class="font-display text-base font-semibold text-brand-300">DNA shop của bạn</h2>
-          <p class="mt-1 text-body leading-5 text-cream-400">
-            Đây là phần <b class="text-cream-100">bạn tự khai</b> — agent dùng nó để viết brief, chọn nhóm hàng và loại bỏ những thứ bạn không làm.
-          </p>
-          <p class="mt-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-label leading-5 text-cream-300">
-            <StudioIcon name="info" size="h-3.5 w-3.5" class="mr-1 inline-block align-[-2px]" />
-            Điền càng cụ thể, brief càng sát shop của bạn. Bỏ trống cũng chạy được — khi đó AI dựa vào dự án và ảnh bạn đã làm.
-          </p>
-          <div v-if="dna" class="mt-3 flex flex-wrap items-center gap-2 text-label">
-            <span class="rounded-full px-2 py-0.5 font-semibold" :class="dna.is_set ? 'bg-brand-500/20 text-brand-200' : 'bg-warn/15 text-warn'">
-              {{ dna.is_set ? 'Đã khai' : 'Chưa khai' }}
-            </span>
-            <span class="text-cream-400">Bản đang dùng khi chạy: <b class="text-cream-200">{{ dna.summary ? 'DNA bạn khai' : 'suy ra từ dữ liệu tài khoản' }}</b></span>
+    <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
+      <div class="space-y-3">
+        <div class="card p-3 sm:p-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="font-display text-base font-semibold text-brand-300">DNA shop của bạn</h2>
+            <div v-if="dna" class="flex items-center gap-1.5 text-tiny">
+              <span class="rounded-full px-2 py-0.5 font-semibold" :class="dna.is_set ? 'bg-brand-500/20 text-brand-200' : 'bg-warn/15 text-warn'">
+                {{ dna.is_set ? 'Đã khai' : 'Chưa khai' }}
+              </span>
+              <span v-if="dna?.updated_at" class="text-cream-400">{{ new Date(dna.updated_at).toLocaleDateString('vi-VN') }}</span>
+            </div>
           </div>
-          <p v-if="dna?.updated_at" class="mt-1 text-label text-cream-400">Cập nhật lần cuối: {{ new Date(dna.updated_at).toLocaleString('vi-VN') }}</p>
-        </div>
-
-        <div v-if="sub === 'style'" class="card p-4">
-          <h3 class="font-display text-base font-semibold text-brand-300">Nguồn dữ liệu agent đang có</h3>
-          <ul class="mt-2 space-y-1.5 text-label leading-5 text-cream-300">
-            <li>· <b class="text-cream-100">DNA bạn khai</b> (màn hình này) — đáng tin nhất, sửa được bất cứ lúc nào.</li>
-            <li>· <b class="text-cream-100">Số bán của shop</b> (nhập ở bước Định hướng) — dữ liệu thật do bạn nhập.</li>
-            <li>· <b class="text-cream-100">Dự án &amp; ảnh đã tạo</b> của chính tài khoản — dấu vết công việc.</li>
-            <li>· <b class="text-cream-100">Danh mục xu hướng mẫu</b> — vẫn là dữ liệu MẪU, chưa nối sàn TMĐT.</li>
-          </ul>
+          <p class="mt-1 text-body leading-5 text-cream-400">
+            Phần <b class="text-cream-100">bạn tự khai</b> — agent dùng nó để viết brief, chọn nhóm hàng và loại bỏ những thứ bạn không làm.
+            <details class="mt-1.5 inline-block">
+              <summary class="cursor-pointer text-label text-brand-300 underline decoration-dotted">Điền thế nào?</summary>
+              <p class="mt-1 max-w-md rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-label leading-5 text-cream-300">
+                <StudioIcon name="info" size="h-3.5 w-3.5" class="mr-1 inline-block align-[-2px]" />
+                Điền càng cụ thể, brief càng sát shop. Bỏ trống cũng chạy được — AI dựa vào dự án và ảnh bạn đã làm.
+              </p>
+            </details>
+          </p>
+          <div v-if="sub === 'style'" class="mt-2.5">
+            <details>
+              <summary class="cursor-pointer text-label font-semibold text-cream-300">Nguồn dữ liệu agent đang có</summary>
+              <ul class="mt-1.5 space-y-1 text-label leading-5 text-cream-300">
+                <li>· <b class="text-cream-100">DNA bạn khai</b> (màn hình này) — đáng tin nhất, sửa được bất cứ lúc nào.</li>
+                <li>· <b class="text-cream-100">Số bán của shop</b> (nhập ở bước Định hướng) — dữ liệu thật do bạn nhập.</li>
+                <li>· <b class="text-cream-100">Dự án &amp; ảnh đã tạo</b> của chính tài khoản — dấu vết công việc.</li>
+                <li>· <b class="text-cream-100">Danh mục xu hướng mẫu</b> — vẫn là dữ liệu MẪU, chưa nối sàn TMĐT.</li>
+              </ul>
+            </details>
+          </div>
         </div>
       </div>
 
-      <div class="card p-4">
+      <div class="card p-3 sm:p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h3 class="font-display text-base font-semibold text-brand-300">{{ sub === 'positioning' ? 'Bạn bán cho ai' : 'Bạn làm ra cái gì' }}</h3>
-          <span v-if="dnaDirty" class="text-label text-warn">Có thay đổi chưa lưu</span>
+          <span v-if="dnaDirty" class="flex items-center gap-1 text-tiny text-warn"><span class="h-1.5 w-1.5 rounded-full bg-warn"></span>Chưa lưu</span>
         </div>
 
         <div v-if="store.brandDnaLoading" class="mt-3 text-body text-cream-400">Đang tải hồ sơ…</div>
         <p v-else-if="store.brandDnaError" role="alert" class="mt-3 rounded-lg border border-danger/40 bg-danger/15 px-3 py-2 text-body text-danger">{{ store.brandDnaError }}</p>
 
-        <div v-else class="mt-3 grid gap-4">
+        <div v-else class="mt-3 grid gap-3.5">
           <!-- VIỆC 1 — ĐỊNH VỊ KHÁCH HÀNG -->
           <template v-if="sub === 'positioning'">
             <div>

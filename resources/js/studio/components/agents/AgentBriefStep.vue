@@ -66,9 +66,9 @@ const createBrief = inject('createBrief');
     <AgentSubSteps step-id="brief" />
 
     <!-- ── 3.1 MÔ TẢ & ẢNH MẪU ─────────────────────────────────────────────── -->
-    <div v-if="sub === 'prompt'" class="grid gap-4 lg:grid-cols-[minmax(320px,400px)_1fr]">
+    <div v-if="sub === 'prompt'" class="grid gap-3 lg:grid-cols-[minmax(300px,380px)_1fr]">
       <div class="space-y-4">
-        <div class="card p-4">
+        <div class="card p-3 sm:p-4">
           <h2 class="font-display text-base font-semibold text-brand-300">Bộ sưu tập này cho ai?</h2>
           <p class="mt-0.5 text-xs text-cream-400">Mô tả khách hàng, dịp mặc, chất liệu, màu sắc hoặc định vị giá.</p>
           <label for="collection-prompt" class="label mt-4">Mô tả tiếng Việt <span class="font-normal text-cream-400">(bắt buộc)</span></label>
@@ -136,12 +136,12 @@ const createBrief = inject('createBrief');
           </div>
         </div>
 
-        <div v-if="radar" class="card p-4">
+        <div v-if="radar" class="card p-3 sm:p-4">
           <h3 class="text-xs font-semibold text-cream-100">Tín hiệu thương hiệu</h3>
           <p class="mt-1.5 text-body leading-5 text-cream-300">{{ radar.internal_brand_signal?.narrative || 'Chưa có narrative.' }}</p>
         </div>
 
-        <div class="card p-4">
+        <div class="card p-3 sm:p-4">
           <button
             type="button"
             class="motion-ui flex w-full items-start justify-between gap-2 text-left"
@@ -225,35 +225,34 @@ const createBrief = inject('createBrief');
         </div>
 
         <template v-else-if="collection">
-          <div class="card p-4 sm:p-5">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p class="text-label font-semibold uppercase tracking-wide text-brand-300">Bộ sưu tập đề xuất</p>
-                <h2 class="mt-1 text-lg font-semibold text-cream-100">Phương án cho bộ sưu tập của bạn</h2>
+          <div class="card p-3 sm:p-4">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="text-tiny font-semibold uppercase tracking-wide text-brand-300 sm:text-label">Bộ sưu tập đề xuất</p>
+                <h2 class="mt-0.5 text-base font-semibold text-cream-100 sm:text-lg">Phương án cho bộ sưu tập của bạn</h2>
               </div>
-              <span class="rounded-lg bg-ink-800 px-2.5 py-1 text-label text-cream-400">Khu vực: {{ collection.input?.region || selectedRegion }}</span>
+              <span class="shrink-0 rounded-lg bg-ink-800 px-2 py-0.5 text-tiny text-cream-400 sm:text-label">Khu vực: {{ collection.input?.region || selectedRegion }}</span>
             </div>
-            <div class="mt-2 flex flex-wrap items-center gap-1.5 text-label">
-              <!-- KHÔNG lặp lại chip trạng thái AI ở đây: thanh trên đã luôn hiện nó, và băng lý do cũng đã nói. Ba chỗ nói một câu là rối (phản hồi chủ dự án 2026-09-21). -->
-              <span v-for="row in appliedAi" :key="row" class="rounded bg-brand-500/15 px-2 py-0.5 text-brand-200">AI viết: {{ row }}</span>
-              <span v-if="collection.model?.cached" class="rounded bg-ink-800 px-2 py-0.5 text-cream-400" title="Cùng yêu cầu trước đó nên không cần tạo lại">Đã tạo {{ cacheAgeLabel }}</span>
-              <span v-else-if="modelReady" class="text-cream-400">Vừa phân tích xong</span>
+            <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-tiny sm:text-label">
+              <span v-for="row in appliedAi" :key="row" class="rounded bg-brand-500/15 px-2 py-0.5 text-brand-200">AI: {{ row }}</span>
+              <span v-if="collection.model?.cached" class="rounded bg-ink-800 px-2 py-0.5 text-cream-400" title="Cùng yêu cầu trước đó nên không cần tạo lại">{{ cacheAgeLabel }}</span>
+              <span v-else-if="modelReady" class="text-cream-400">Vừa xong</span>
               <span v-if="toolSearchLine" class="w-full text-cream-400">{{ toolSearchLine }}</span>
             </div>
 
-            <p class="mt-3 text-sm leading-6 text-cream-200">{{ collection.brief }}</p>
-            <div class="mt-4 grid gap-3 sm:grid-cols-3">
-              <div class="rounded-lg border border-ink-700 bg-ink-800 p-3"><p class="text-label uppercase tracking-wide text-cream-400">Tổng SKU</p><p class="mt-1 text-lg font-semibold text-cream-100">{{ collection.structure?.total_skus || 0 }}</p></div>
-              <div class="rounded-lg border border-ink-700 bg-ink-800 p-3"><p class="text-label uppercase tracking-wide text-cream-400">Dải giá</p><p class="mt-1 text-sm font-semibold text-cream-100">{{ collection.price_bands?.recommended_label || '—' }}</p></div>
-              <div class="rounded-lg border border-ink-700 bg-ink-800 p-3"><p class="text-label uppercase tracking-wide text-cream-400">Bảng mood</p><p class="mt-1 text-lg font-semibold text-cream-100">{{ collection.moodboard?.count || 0 }}</p></div>
+            <p class="mt-2.5 text-sm leading-6 text-cream-200">{{ collection.brief }}</p>
+            <div class="mt-3 grid gap-2 sm:grid-cols-3">
+              <div class="rounded-lg border border-ink-700 bg-ink-800 p-2.5"><p class="text-tiny uppercase tracking-wide text-cream-400 sm:text-label">Tổng SKU</p><p class="mt-0.5 text-base font-semibold text-cream-100 sm:text-lg">{{ collection.structure?.total_skus || 0 }}</p></div>
+              <div class="rounded-lg border border-ink-700 bg-ink-800 p-2.5"><p class="text-tiny uppercase tracking-wide text-cream-400 sm:text-label">Dải giá</p><p class="mt-0.5 text-sm font-semibold text-cream-100">{{ collection.price_bands?.recommended_label || '—' }}</p></div>
+              <div class="rounded-lg border border-ink-700 bg-ink-800 p-2.5"><p class="text-tiny uppercase tracking-wide text-cream-400 sm:text-label">Bảng mood</p><p class="mt-0.5 text-base font-semibold text-cream-100 sm:text-lg">{{ collection.moodboard?.count || 0 }}</p></div>
             </div>
 
-            <div class="mt-4 flex flex-wrap items-center gap-2">
-              <button type="button" class="tool-btn state-layer" @click="setSub('sku')">
-                <StudioIcon name="package" size="h-3 w-3" /> Việc 2: chọn số lượng SKU
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <button type="button" class="tool-btn state-layer !text-tiny sm:!text-body" @click="setSub('sku')">
+                <StudioIcon name="package" size="h-3 w-3" /> Việc 2: SKU
               </button>
-              <button type="button" class="tool-btn state-layer" @click="setSub('review')">
-                <StudioIcon name="briefcase" size="h-3 w-3" /> Việc 7: xem lại &amp; chốt
+              <button type="button" class="tool-btn state-layer !text-tiny sm:!text-body" @click="setSub('review')">
+                <StudioIcon name="briefcase" size="h-3 w-3" /> Việc 7: chốt
               </button>
             </div>
           </div>
@@ -267,10 +266,10 @@ const createBrief = inject('createBrief');
           </Notice>
         </template>
 
-        <div v-else class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-10 text-center">
-          <StudioIcon name="briefcase" size="h-8 w-8" class="mx-auto text-brand-300" />
-          <p class="mt-3 text-sm font-semibold text-cream-100">Chưa có brief bộ sưu tập</p>
-          <p class="mt-1 text-xs leading-5 text-cream-400">Nhập mô tả ở bên trái rồi bấm «Tạo brief bộ sưu tập». Các việc sau (SKU · size · mood · đơn giá) sẽ có số liệu để chia.</p>
+        <div v-else class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-8 text-center sm:p-10">
+          <StudioIcon name="briefcase" size="h-7 w-7 sm:h-8 sm:w-8" class="mx-auto text-brand-300" />
+          <p class="mt-2.5 text-sm font-semibold text-cream-100">Chưa có brief bộ sưu tập</p>
+          <p class="mt-1 text-xs leading-5 text-cream-400">Nhập mô tả bên trái rồi bấm «Tạo brief». Các việc sau (SKU · size · mood · giá) sẽ có số liệu để chia.</p>
         </div>
       </div>
     </div>

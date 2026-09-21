@@ -25,64 +25,67 @@ const current = computed(() => list.value[index.value] || null);
 </script>
 
 <template>
-  <div class="mb-5">
-    <!-- Màn rộng: thấy hết đường đi -->
-    <div class="hidden flex-wrap items-center gap-1.5 lg:flex" role="tablist" aria-label="Các việc trong bước này">
+  <div class="motion-fade-in mb-4" :key="stepId + '-' + sub">
+    <!-- Màn rộng: pill tiến trình, thấy hết đường đi -->
+    <div class="hidden flex-wrap items-center gap-1 lg:flex" role="tablist" aria-label="Các việc trong bước này">
       <button
         v-for="(item, i) in list"
         :key="item.id"
         type="button"
         role="tab"
-        class="tool-btn state-layer"
-        :class="{ 'is-active': item.id === sub }"
+        class="substep-chip state-layer"
+        :class="{ 'is-active': item.id === sub, 'is-done': i < index }"
         :aria-selected="item.id === sub"
         :title="item.hint"
         @click="setSub(item.id)"
       >
-        <span class="text-tiny font-bold opacity-70">{{ i + 1 }}</span>
-        {{ item.label }}
+        <span class="substep-chip__num">
+          <StudioIcon v-if="i < index" name="check" size="h-3 w-3" />
+          <span v-else>{{ i + 1 }}</span>
+        </span>
+        <span class="truncate">{{ item.label }}</span>
       </button>
     </div>
 
     <!-- Màn hẹp: một việc, một dòng, kèm chấm tiến trình bấm được -->
     <div class="lg:hidden">
       <div class="flex items-center gap-2">
-        <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-600 text-tiny font-bold text-primary-content">{{ index + 1 }}</span>
+        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-600 text-tiny font-bold text-primary-content">{{ index + 1 }}</span>
         <p class="min-w-0 flex-1">
           <span class="block truncate text-body font-semibold text-cream-100">{{ current?.label }}</span>
           <span class="block truncate text-tiny text-cream-400">Việc {{ index + 1 }}/{{ list.length }} · {{ current?.hint }}</span>
         </p>
         <button
           type="button"
-          class="tool-btn !px-2 !py-1.5"
+          class="icon-btn h-7 w-7"
           :disabled="index === 0"
           aria-label="Việc trước"
           @click="setSub(list[index - 1].id)"
         >
-          <StudioIcon name="chevronLeft" size="h-3.5 w-3.5" />
+          <StudioIcon name="chevronLeft" size="h-4 w-4" />
         </button>
         <button
           type="button"
-          class="tool-btn !px-2 !py-1.5"
+          class="icon-btn h-7 w-7"
           :disabled="index >= list.length - 1"
           aria-label="Việc kế tiếp"
           @click="setSub(list[index + 1].id)"
         >
-          <StudioIcon name="chevronRight" size="h-3.5 w-3.5" />
+          <StudioIcon name="chevronRight" size="h-4 w-4" />
         </button>
       </div>
-      <!-- Chấm tiến trình: vừa là chỉ báo, vừa là lối nhảy thẳng (vùng chạm 24px) -->
-      <div class="mt-2 flex items-center gap-1">
+      <!-- Chấm tiến trình: vừa là chỉ báo, vừa là lối nhảy thẳng (vùng chạm 28px) -->
+      <div class="mt-1.5 flex items-center gap-0.5">
         <button
           v-for="(item, i) in list"
           :key="item.id"
           type="button"
-          class="grid h-6 flex-1 place-items-center"
+          class="grid h-7 flex-1 place-items-center"
           :aria-label="'Tới việc ' + (i + 1) + ': ' + item.label"
           :aria-current="item.id === sub ? 'step' : undefined"
           @click="setSub(item.id)"
         >
-          <span class="h-1 w-full rounded-full" :class="i <= index ? 'bg-brand-500' : 'bg-ink-700'"></span>
+          <span class="h-1 w-full rounded-full transition-colors" :class="i < index ? 'bg-success' : (i === index ? 'bg-brand-500' : 'bg-ink-700')"></span>
         </button>
       </div>
     </div>

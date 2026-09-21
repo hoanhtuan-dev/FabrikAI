@@ -88,14 +88,14 @@ function useAuto() {
 
 <template>
   <div>
-    <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-8 text-center">
+    <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center sm:p-8">
       <StudioIcon name="package" size="h-7 w-7" class="mx-auto text-brand-300" />
       <p class="mt-3 text-sm font-semibold text-cream-100">Chưa có brief để chia SKU</p>
       <p class="mt-1 text-xs leading-5 text-cream-400">Quay lại việc 1 (Mô tả &amp; ảnh mẫu) và tạo brief trước — cơ cấu nhóm hàng là thứ để chia quy mô.</p>
     </div>
 
     <template v-else>
-      <div class="card p-4 sm:p-5">
+      <div class="card p-3 sm:p-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0">
             <h2 class="font-display text-base font-semibold text-brand-300">Tổng số mã hàng (SKU)</h2>
@@ -157,7 +157,7 @@ function useAuto() {
         </p>
       </div>
 
-      <div class="card mt-4 p-4 sm:p-5">
+      <div class="card mt-3 p-3 sm:p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h3 class="font-display text-base font-semibold text-brand-300">Cơ cấu theo nhóm hàng</h3>
           <div class="flex flex-wrap items-center gap-2">

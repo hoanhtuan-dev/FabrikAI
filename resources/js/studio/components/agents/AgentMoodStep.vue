@@ -90,14 +90,14 @@ async function applyToPrompt() {
 
 <template>
   <div>
-    <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-8 text-center">
+    <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center sm:p-8">
       <StudioIcon name="palette" size="h-7 w-7" class="mx-auto text-brand-300" />
       <p class="mt-3 text-sm font-semibold text-cream-100">Chưa có bảng mood để sửa</p>
       <p class="mt-1 text-xs leading-5 text-cream-400">Bảng mood được dựng cùng brief — quay lại việc 1 và tạo brief trước.</p>
     </div>
 
     <template v-else>
-      <div class="card p-4 sm:p-5">
+      <div class="card p-3 sm:p-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0">
             <h2 class="font-display text-base font-semibold text-brand-300">Bảng mood</h2>
@@ -149,7 +149,7 @@ async function applyToPrompt() {
       </div>
 
       <!-- Trình sửa MỘT ô: điện thoại chỉ hiện một ô một lúc, đúng nhịp "một việc một màn" -->
-      <div v-if="editing && current" class="card mt-4 p-4 sm:p-5">
+      <div v-if="editing && current" class="card mt-3 p-3 sm:p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h3 class="font-display text-base font-semibold text-brand-300">Ô {{ selected + 1 }}/{{ moodboardItems.length }}</h3>
           <div class="flex items-center gap-1.5">
@@ -214,7 +214,7 @@ async function applyToPrompt() {
       </div>
 
       <!-- BẢNG MÀU: nguồn màu cho các ô -->
-      <div class="card mt-4 p-4 sm:p-5">
+      <div class="card mt-3 p-3 sm:p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h3 class="font-display text-base font-semibold text-brand-300">Bảng màu</h3>
           <div class="flex flex-wrap items-center gap-1.5">
@@ -260,7 +260,7 @@ async function applyToPrompt() {
       </div>
 
       <!-- Câu sẽ vào prompt: bằng chứng bảng mood có tác dụng thật -->
-      <div class="card mt-4 p-4 sm:p-5">
+      <div class="card mt-3 p-3 sm:p-4">
         <h3 class="font-display text-base font-semibold text-brand-300">Câu từ bảng mood sẽ vào prompt ảnh</h3>
         <p class="mt-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-body leading-5 text-cream-200">{{ promptPhrase || 'Chưa có ô nào có nhãn hoặc chú thích.' }}</p>
         <p class="mt-1.5 text-label leading-4 text-cream-400">Tối đa 8 vế đầu tiên, bỏ vế trùng. Bước Thực thi sinh prompt cho TỪNG mẫu nên câu này được dùng ngay ở lần sinh kế tiếp.</p>
