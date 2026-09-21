@@ -84,15 +84,22 @@ class AiSdkBridgeTest extends TestCase
         $this->assertSame(['sk-one', 'sk-two', 'sk-three'], $keys, 'Thứ tự khoá phải theo priority trong Cài đặt.');
     }
 
-    public function test_failover_args_are_parallel_arrays_in_registry_order(): void
+    public function test_failover_args_are_a_provider_to_model_map(): void
     {
-        $this->provider('first', 'https://first.example/v1', 'model-a');
+        $this->provider('solo', 'https://solo.example/v1', 'model-a', ['sk-a'], DesignAgentService::VISION_GROUP);
 
-        $args = app(RegistryProviders::class)->failoverArgs(DesignAgentService::SEARCH_GROUP);
+        $args = app(RegistryProviders::class)->failoverArgs(DesignAgentService::VISION_GROUP);
 
-        $this->assertSame(count($args['providers']), count($args['models']), 'SDK ghép provider với model theo CẶP ⇒ hai mảng phải cùng độ dài.');
+        // HÌNH DẠNG NÀY LÀ HỢP ĐỒNG VỚI SDK, không phải lựa chọn của ta: prompt() khai ?string $model
+        // (model KHÔNG nhận mảng), còn tham số provider nhận BẢN ĐỒ tên => model. Truyền hai mảng song
+        // song là TypeError — đúng lỗi đã gặp thật khi chạy --live lần đầu trên production.
+        $this->assertNotEmpty($args['providers']);
+        foreach ($args['providers'] as $name => $model) {
+            $this->assertIsString($name, 'Khoá phải là TÊN provider.');
+            $this->assertIsString($model, 'Giá trị phải là MODEL của provider đó.');
+            $this->assertNotSame('', $model);
+        }
         $this->assertSame(count($args['providers']), count($args['labels']));
-        $this->assertSame('model-a', $args['models'][0]);
     }
 
     public function test_a_group_with_no_usable_provider_yields_an_empty_list_instead_of_a_broken_entry(): void

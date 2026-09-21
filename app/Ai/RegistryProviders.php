@@ -118,21 +118,30 @@ class RegistryProviders
     }
 
     /**
-     * Tên provider + model theo thứ tự ưu tiên, sẵn sàng cho tham số provider:/model: của SDK.
+     * Tham số failover cho SDK: MỘT BẢN ĐỒ provider => model, theo đúng thứ tự ưu tiên.
      *
-     * SDK nhận MẢNG cho cả hai và ghép theo CẶP — truyền hai mảng cùng thứ tự là failover đúng ý.
+     * [ĐỌC TỪ MÃ SDK, KHÔNG ĐOÁN] Promptable::prompt() khai ?string $model — model KHÔNG nhận mảng.
+     * Chỉ tham số provider nhận mảng, và khi ấy nó là một BẢN ĐỒ tên-provider => model (xem
+     * Provider::formatProviderAndModelList): khoá là số thì lấy model mặc định của provider, khoá là CHUỖI
+     * thì dùng đúng model ghi ở giá trị. Truyền hai mảng song song là TypeError ngay — đã dính thật khi
+     * chạy --live lần đầu.
      *
-     * @return array{providers:list<string>, models:list<string>, labels:list<string>}
+     * Bản đồ giữ ĐÚNG thứ tự chèn ⇒ SDK thử lần lượt theo thứ tự mà Cài đặt quyết định.
+     *
+     * @return array{providers:array<string,string>, labels:list<string>}
      */
     public function failoverArgs(string $group, array $fallbacks = []): array
     {
         $rows = $this->forGroup($group, $fallbacks);
 
-        return [
-            'providers' => array_column($rows, 'name'),
-            'models' => array_column($rows, 'model'),
-            'labels' => array_column($rows, 'label'),
-        ];
+        $map = [];
+        $labels = [];
+        foreach ($rows as $row) {
+            $map[$row['name']] = $row['model'];
+            $labels[] = $row['label'];
+        }
+
+        return ['providers' => $map, 'labels' => $labels];
     }
 
     /** Quên instance đã dựng của các provider vừa đăng ký (khoá/model có thể đã đổi giữa hai lần gọi). */

@@ -56,7 +56,8 @@ class AiSdkCheck extends Command
             $this->line(sprintf('      key    : %s', $this->mask((string) ($config['key'] ?? ''))));
         }
 
-        $this->line('  Thứ tự trên CHÍNH LÀ thứ tự failover của SDK (khớp Cài đặt → Nhóm công việc).');
+        $this->line('  Thứ tự trên khớp Cài đặt → Nhóm công việc. LƯU Ý về failover của SDK: nó CHỈ tự chuyển');
+        $this->line('  sang nhà cung cấp kế tiếp với 4 loại lỗi (quá tải · mất kết nối · bị giới hạn nhịp · hết credit).');
 
         if (! $this->option('live')) {
             $this->line('  (Thêm --live để gọi thật một lượt nhỏ và chứng minh đường nối chạy được.)');
@@ -68,7 +69,14 @@ class AiSdkCheck extends Command
     }
 
     /**
-     * Gọi THẬT một lượt nhỏ qua SDK — chứng minh đường nối, không chỉ in cấu hình.
+     * Gọi THẬT một lượt nhỏ qua TỪNG nhà cung cấp — chứng minh đường nối và chỉ ra CHÍNH XÁC cái nào hỏng.
+     *
+     * Vì sao gọi từng cái một thay vì đưa cả bản đồ cho SDK tự failover: failover của SDK CHỈ chạy với bốn
+     * loại lỗi (ProviderOverloaded · ProviderConnection · RateLimited · InsufficientCredits — xem
+     * Laravel\Ai\Exceptions). Lỗi xác thực (401/403) và sai model (404) NÉM THẲNG RA NGOÀI, không chuyển
+     * sang nhà cung cấp kế tiếp. Nghĩa là một khoá hỏng nằm ĐẦU danh sách sẽ chặn hết phần còn lại — đúng
+     * tình trạng đang có trên production (khoá qwen trả 401). Nếu lệnh này đưa cả bản đồ cho SDK thì nó sẽ
+     * báo "hỏng" mà KHÔNG nói được rằng các nhà cung cấp sau vẫn tốt.
      *
      * @param  list<string>  $fallbacks  nhóm dự phòng, y như lượt in cấu hình ở trên
      */
@@ -77,34 +85,49 @@ class AiSdkCheck extends Command
         $args = app(RegistryProviders::class)->failoverArgs($group, $fallbacks);
 
         $this->newLine();
-        $this->line('── GỌI THẬT QUA SDK ──');
+        $this->line('── GỌI THẬT QUA SDK (từng nhà cung cấp một) ──');
 
-        $started = microtime(true);
+        $ok = 0;
+        $index = 0;
+        foreach ($args['providers'] as $name => $model) {
+            // Nhãn đọc theo CHỈ SỐ RIÊNG: dùng $ok làm chỉ số là lệch ngay khi có provider hỏng (vì $ok
+            // chỉ tăng khi thành công) — nhãn sẽ trỏ nhầm nhà cung cấp.
+            $label = $args['labels'][$index] ?? $name;
+            $index++;
+            $started = microtime(true);
 
-        try {
-            $response = (new SamplePromptAgent(['probe' => true]))->prompt(
-                'Đây là lượt thử đường nối. Trả về nội dung ngắn, đúng bốn trường của schema.',
-                [],
-                provider: $args['providers'],
-                model: $args['models'],
-                timeout: 60,
-            );
-        } catch (\Throwable $e) {
-            $this->error('  THẤT BẠI: '.class_basename($e).' — '.mb_substr($e->getMessage(), 0, 200));
-            $this->line('  Lượt thử KHÔNG chạy được ⇒ SDK chưa dùng được cho nhóm này. Xem lại khoá/địa chỉ ở trên.');
+            try {
+                $response = (new SamplePromptAgent(['probe' => true]))->prompt(
+                    'Đây là lượt thử đường nối. Trả về nội dung ngắn, đúng bốn trường của schema.',
+                    [],
+                    // MỘT provider mỗi lần: xem chú thích ở trên — gộp lại thì lỗi 401 ở đầu sẽ che hết
+                    // những nhà cung cấp còn tốt. BẢN ĐỒ tên => model là hình dạng SDK yêu cầu.
+                    provider: [$name => $model],
+                    timeout: 60,
+                );
+            } catch (\Throwable $e) {
+                $ms = (int) round((microtime(true) - $started) * 1000);
+                $this->error(sprintf('  [HỎNG] %s — %s (%d ms)', $label, class_basename($e), $ms));
+                $this->line('         '.mb_substr(preg_replace('/\s+/', ' ', $e->getMessage()), 0, 160));
+
+                continue;
+            }
+
+            $ms = (int) round((microtime(true) - $started) * 1000);
+            $data = $response->structured ?? [];
+            $this->info(sprintf('  [OK]   %s — %d ms', $label, $ms));
+            $this->line(sprintf('         %s · prompt_vi: %s', $response->meta->model, mb_substr((string) ($data['prompt_vi'] ?? ''), 0, 60)));
+            $ok++;
+        }
+
+        $this->newLine();
+        if ($ok === 0) {
+            $this->error('  KHÔNG nhà cung cấp nào trả lời được — SDK chưa dùng được cho nhóm này.');
 
             return self::FAILURE;
         }
 
-        $ms = (int) round((microtime(true) - $started) * 1000);
-        $data = $response->structured ?? [];
-
-        $this->info(sprintf('  THÀNH CÔNG trong %d ms', $ms));
-        $this->line('  Nhà cung cấp đã trả lời: '.$response->meta->provider.' · '.$response->meta->model);
-        foreach (['prompt_vi', 'prompt_en', 'negative_prompt', 'note'] as $field) {
-            $value = (string) ($data[$field] ?? '');
-            $this->line(sprintf('      %-16s %s', $field.':', mb_substr($value, 0, 80)));
-        }
+        $this->info(sprintf('  %d/%d nhà cung cấp chạy được.', $ok, count($args['providers'])));
 
         return self::SUCCESS;
     }
