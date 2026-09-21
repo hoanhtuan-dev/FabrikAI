@@ -2012,7 +2012,7 @@ class DesignAgentService
                 // hướng) rồi tự thấy đủ và KHÔNG gọi lần nào (calls=0) — lượt chạy lại quay về đúng dữ liệu
                 // lấy sẵn, tức là vai tìm kiếm không mang thêm gì. Vai này tồn tại ĐỂ mang nguồn ngoài vào,
                 // nên khi nó được khai thì việc tìm là BẮT BUỘC, không phải tuỳ hứng.
-                ? 'Bạn CÓ công cụ tìm kiếm web của nhà cung cấp. BẮT BUỘC: hãy GỌI công cụ đó 2-4 LƯỢT trước khi viết JSON — mỗi lượt tra cho MỘT hướng/chủ đề cụ thể (từ khoá ngắn theo tên hướng, thêm năm nếu cần), chứ không tra chung chung một câu. '
+                ? 'Bạn CÓ công cụ tìm kiếm web của nhà cung cấp. BẮT BUỘC: hãy GỌI công cụ đó 2-3 LƯỢT trước khi viết JSON — mỗi lượt tra cho MỘT hướng/chủ đề cụ thể (từ khoá ngắn theo tên hướng, thêm năm nếu cần), chứ không tra chung chung một câu. '
                     // "BỘ CÒN THIẾU": danh mục nền có những hướng mà tin hiện có KHÔNG nhắc tới — chúng
                     // đang phải mượn số liệu mẫu. Việc đáng làm nhất của công cụ tìm kiếm là TRA ĐÚNG
                     // NHỮNG HƯỚNG ĐÓ để biết chúng còn diễn ra hay đã hết.
@@ -2066,6 +2066,11 @@ class DesignAgentService
         // prompt trong CÙNG cuộc hội thoại, nên model đọc được tin thật rồi mới viết JSON.
         $tool = $this->makeSearchTool((bool) ($search['tool'] ?? false));
         $options = $webSearch ? ['search' => true, 'split_search' => $splitSearchMode] : [];
+        // TRẦN LƯỢT TÌM CỦA RADAR = 2. Đo thật trên production 2026-09-22: với trần mặc định 3, lượt
+        // /responses đầy đủ (tra + viết JSON 6.000 token) không trả kịp trong ngân sách 55 s, nên
+        // candidate tìm kiếm bị bỏ và lượt chạy rơi sang model kế tiếp — chậm hơn HẲN và không tìm gì.
+        // Brief đã dùng trần 2 từ trước (đo 2026-09-21: brief chạm trần 3 lượt / 8 truy vấn / 32,2 s).
+        $options['max_tool_calls'] = 2;
         if ($tool !== null) {
             $options['tools'] = [$tool->definition()];
             $options['tool_handler'] = fn (string $name, array $args): array => $tool->handle($args, $region);

@@ -410,7 +410,16 @@ class AiModelGateway
      */
     protected function callWithTools(array $candidate, string $key, array $messages, array $options, array $tools): ?array
     {
-        $timeout = (int) ($options['timeout'] ?? 90);
+        // HẠN CHÓT CỦA CẢ LƯỢT áp cho MỌI lần gọi con — kể cả lần RƠI SANG CANDIDATE KẾ TIẾP.
+        //
+        // [LỖI THẬT ĐO ĐƯỢC TRÊN PRODUCTION 2026-09-22] Thiếu dòng này thì candidate đầu cạn thời gian
+        // KHÔNG chặn được candidate sau: /responses của qwen3.8-flash hết 55 s (không kịp trả), rồi vòng
+        // lặp candidate chuyển sang qwen3.8-omni-flash và cấp cho nó TRỌN timeout ⇒ một lượt radar thật
+        // mất 77,3 s ⇒ vượt trần proxy ⇒ khách nhận 504 và mất cả phần đã tính được.
+        $timeout = $this->remainingSeconds($options, (int) ($options['timeout'] ?? 90));
+        if ($timeout <= 0) {
+            return null;   // hết ngân sách thời gian ⇒ ĐỪNG bắt đầu một lời gọi mới
+        }
         $maxTokens = (int) ($options['max_tokens'] ?? 1024);
         $handler = $options['tool_handler'];
         // Trần vòng: đủ cho "tìm → đọc kết quả → tìm tiếp nếu cần", không đủ để một model lan man quay
@@ -695,7 +704,16 @@ class AiModelGateway
      */
     protected function callPlain(array $candidate, string $key, array $messages, array $options): ?array
     {
-        $timeout = (int) ($options['timeout'] ?? 90);
+        // HẠN CHÓT CỦA CẢ LƯỢT áp cho MỌI lần gọi con — kể cả lần RƠI SANG CANDIDATE KẾ TIẾP.
+        //
+        // [LỖI THẬT ĐO ĐƯỢC TRÊN PRODUCTION 2026-09-22] Thiếu dòng này thì candidate đầu cạn thời gian
+        // KHÔNG chặn được candidate sau: /responses của qwen3.8-flash hết 55 s (không kịp trả), rồi vòng
+        // lặp candidate chuyển sang qwen3.8-omni-flash và cấp cho nó TRỌN timeout ⇒ một lượt radar thật
+        // mất 77,3 s ⇒ vượt trần proxy ⇒ khách nhận 504 và mất cả phần đã tính được.
+        $timeout = $this->remainingSeconds($options, (int) ($options['timeout'] ?? 90));
+        if ($timeout <= 0) {
+            return null;   // hết ngân sách thời gian ⇒ ĐỪNG bắt đầu một lời gọi mới
+        }
         $maxTokens = (int) ($options['max_tokens'] ?? 1024);
 
         if ($candidate['transport'] === 'qwen') {
