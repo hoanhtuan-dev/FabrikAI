@@ -57,6 +57,32 @@ class ImageAIService
         return studio_api_key('fal');
     }
 
+    /** Số (model,khoá) THẬT SỰ gọi được ở đường tạo-ảnh-từ-ảnh-tham-chiếu — 0 nghĩa là thiếu khoá. */
+    public int $refgenAttemptable = -1;
+
+    /** Đường đã dùng cho lượt tạo-ảnh-từ-ảnh gần nhất: 'multimodal' | 'vision_describe'. */
+    public ?string $refgenRoute = null;
+
+    /**
+     * ĐƯỜNG BÁM TRỰC TIẾP ẢNH GỐC có gọi được không? (có model qwen-family VÀ có khoá dùng được cho nhóm ảnh)
+     *
+     * Dùng ở điểm vào để NÓI TRƯỚC cho người dùng biết lượt này sẽ đi đường nào — thay vì để họ chờ rồi
+     * nhận một kết quả khác tính chất mà không ai giải thích.
+     */
+    public function referenceRouteAvailable(): bool
+    {
+        foreach (collect(studio_model_candidates('image')) as $c) {
+            if (! in_array((string) ($c['provider'] ?? ''), ['qwen', 'wan', 'dashscope'], true)) {
+                continue;
+            }
+            if (studio_candidate_key($c, 'image') !== []) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected function provider(): string
     {
         return (string) studio_config('image_provider', 'qwen');
@@ -87,9 +113,33 @@ class ImageAIService
         if ($mode === 'refgen' && $baseImage) {
             $refUrl = $this->generateFromReference($prompt, $baseImage, $providerOverride, $modelOverride, $faceRef);
             if ($refUrl) {
+                $this->refgenRoute = 'multimodal';
                 // [Đợt 0.4] Đây là đường TẠO ảnh mới ⇒ áp đúng tỉ lệ + mức phân giải đã chọn.
                 return $this->normalizeOutputSize($refUrl, $resolution, $ratio) ?: $refUrl;
             }
+
+            // ── ĐƯỜNG DỰ PHÒNG: MÔ TẢ ẢNH GỐC RỒI SINH ẢNH ────────────────────────────────────────
+            //
+            // [LỖI THẬT — đo trên production 2026-09-21] Đường trên là đường DUY NHẤT bám trực tiếp ảnh
+            // gốc, nhưng nó chỉ nói được với DashScope multimodal — mà model sinh ảnh ở đó CHỈ chạy bằng
+            // khoá trả-theo-dùng. Tài khoản đang dùng khoá Token Plan ⇒ 0 model gọi được ⇒ tính năng chết
+            // trong 47 ms với câu "Không tạo được ảnh mới từ ảnh tham chiếu", không log, không lý do.
+            //
+            // Cách sửa: khi KHÔNG có (model,khoá) nào gọi được, đọc ảnh gốc bằng VAI ĐỌC ẢNH (đường này
+            // chạy được cả với khoá Token Plan — đo thật: 6,6 s, mô tả đúng chủ thể/trang phục/bối cảnh),
+            // rồi đưa mô tả đó vào đường sinh ảnh CHUNG. Đường chung đi qua mọi nhà cung cấp đã khai
+            // (kể cả gateway custom đang tạo ảnh được cho mọi card khác), nên tính năng CHẠY LẠI được.
+            //
+            // Đánh đổi phải nói rõ: kết quả bám theo MÔ TẢ (chủ thể · trang phục · màu · bối cảnh), không
+            // bám từng pixel như đường multimodal. Vì vậy lượt này được GHI LẠI là 'vision_describe', và
+            // giao diện báo trước cho người dùng biết mình đang ở chế độ nào.
+            if ($this->refgenAttemptable === 0) {
+                $described = $this->refgenViaDescription($prompt, $baseImage, $resolution, $ratio);
+                if ($described) {
+                    return $described;
+                }
+            }
+
             throw new \RuntimeException($this->dashscopeError ?: 'Không tạo được ảnh mới từ ảnh tham chiếu.');
         }
 
@@ -1174,6 +1224,13 @@ class ImageAIService
         }
 
         $last = null;
+        // ĐẾM số candidate THẬT SỰ gọi được. [LỖI THẬT — đo trên production 2026-09-21] Trước đây vòng lặp
+        // `continue` im lặng khi candidate không có khoá dùng được, nên khi tài khoản chỉ có khoá Token Plan
+        // (bị luật của `studio_candidate_key` loại cho nhóm ảnh) thì KHÔNG provider nào được gọi, KHÔNG lỗi
+        // nào được ghi, và người dùng nhận câu chung chung sau 47 ms — không log, không dấu vết. Nay đếm lại
+        // và nói rõ lý do.
+        $attemptable = 0;
+        $skipped = [];
         foreach ($candidates as $c) {
             $provider = (string) ($c['provider'] ?? '');
             $model = (string) ($c['model'] ?? '');
@@ -1182,10 +1239,18 @@ class ImageAIService
             // được. Candidate của nhóm 'image' thuộc provider khác (custom openai, gemini…) bị bỏ
             // qua CÓ CHỦ Ý — không phải quên: chúng không có transport tương ứng ở đây.
             if (! in_array($provider, ['qwen', 'wan', 'dashscope'], true)) {
+                $skipped[] = $provider.':'.$model.' (khác transport)';
                 continue;
             }
 
-            foreach (studio_candidate_key($c, 'image') as $key) {
+            $keys = studio_candidate_key($c, 'image');
+            if ($keys === []) {
+                $skipped[] = $provider.':'.$model.' (không có khoá dùng được cho nhóm ảnh)';
+                continue;
+            }
+
+            foreach ($keys as $key) {
+                $attemptable++;
                 $base = dashscope_base_url($key).'/api/v1';
                 logger()->info('RefGen attempt', ['model' => $model, 'key_prefix' => substr($key, 0, 8), 'base' => $base, 'face_ref' => (bool) $faceUri]);
 
@@ -1227,7 +1292,98 @@ class ImageAIService
             }
         }
 
+        if ($attemptable === 0) {
+            logger()->warning('RefGen: KHÔNG có model sinh ảnh nào gọi được — thiếu khoá dùng được cho nhóm ảnh', [
+                'skipped' => $skipped,
+                'hint' => 'Khoá Token/Coding-Plan không phục vụ model tạo ảnh; cần khoá trả-theo-dùng (Pay-As-You-Go) cho tài khoản này.',
+            ]);
+        }
+
+        $this->refgenAttemptable = $attemptable;
         $this->dashscopeError = $this->dashscopeError ?: ($last ?: 'Không tạo được ảnh mới từ ảnh tham chiếu.');
+
+        return null;
+    }
+
+    /**
+     * TẠO ẢNH MỚI TỪ ẢNH THAM CHIẾU **BẰNG MÔ TẢ** — đường dự phòng khi không có (model,khoá) multimodal.
+     *
+     * Vì sao cần (đo trên production 2026-09-21): tài khoản dùng khoá Token Plan, mà luật của
+     * `studio_candidate_key` loại khoá đó cho nhóm ảnh (host của nó không phục vụ model tạo ảnh). Kết quả:
+     * card "Tạo biến thể ảnh" chết ngay, trong khi MỌI card tạo ảnh khác vẫn chạy được vì chúng đi qua
+     * danh sách nhà cung cấp chung (có gateway custom).
+     *
+     * Cách làm: VAI ĐỌC ẢNH mô tả ảnh gốc (đường này chạy được với khoá Token Plan) → ghép mô tả vào
+     * prompt → đưa qua ĐƯỜNG SINH ẢNH CHUNG. Kết quả bám theo mô tả, không bám từng pixel — nên hàm này
+     * KHÔNG được gọi lặng lẽ: nơi gọi phải ghi lại đường đi để giao diện nói thật.
+     */
+    protected function refgenViaDescription(string $prompt, string $baseImage, ?string $resolution, ?string $ratio): ?string
+    {
+        $source = $this->imageDataUri($baseImage);
+        if (! $source) {
+            return null;
+        }
+
+        $description = '';
+        try {
+            $answer = app(\App\Services\AiModelGateway::class)->vision(
+                'vision',
+                'Mô tả NGẮN GỌN (tối đa 45 từ) bức ảnh này để làm cơ sở sinh một ảnh MỚI giống nó: chủ thể, trang phục và chất liệu, màu sắc chủ đạo, bối cảnh, ánh sáng, phong cách. Chỉ trả về đoạn mô tả.',
+                [$source],
+                ['max_tokens' => 220, 'timeout' => 60],
+            );
+            $description = trim((string) ($answer['text'] ?? ''));
+        } catch (\Throwable $e) {
+            logger()->warning('RefGen: không đọc được ảnh gốc bằng vai đọc ảnh', ['error' => $e->getMessage()]);
+        }
+
+        if ($description === '') {
+            $this->dashscopeError = 'Không đọc được ảnh gốc để dựng ảnh mới.';
+
+            return null;
+        }
+
+        // Prompt cho đường chung: mô tả ảnh gốc + yêu cầu biến thể của người dùng (giữ nguyên văn).
+        $enriched = 'Create a brand-new image that matches this description of a reference photo: '
+            .$description.'. Then apply: '.$prompt;
+
+        logger()->info('RefGen: dùng đường MÔ TẢ (không có model/khoá multimodal)', [
+            'description_chars' => strlen($description),
+        ]);
+
+        $url = $this->generateViaLadder($enriched, $resolution, $ratio);
+        if ($url) {
+            $this->refgenRoute = 'vision_describe';
+            logger()->info('RefGen succeeded via description ladder');
+        }
+
+        return $url;
+    }
+
+    /**
+     * Chạy ĐƯỜNG SINH ẢNH CHUNG (mọi nhà cung cấp đã khai, theo thứ tự ưu tiên trong Cài đặt) với một
+     * prompt đã dựng sẵn. Tách ra để đường dự phòng của refgen dùng CHUNG một cơ chế với Tạo ảnh 2D —
+     * hai bản sao sẽ lệch nhau (bài học của cả dự án này).
+     */
+    protected function generateViaLadder(string $prompt, ?string $resolution, ?string $ratio): ?string
+    {
+        foreach (collect(studio_model_candidates('image')) as $c) {
+            $provider = (string) ($c['provider'] ?? '');
+            $model = (string) ($c['model'] ?? '');
+            if ($provider === '' || $model === '') {
+                continue;
+            }
+
+            foreach (studio_candidate_key($c, 'image') as $key) {
+                $url = $this->attemptProvider($provider, $model, $prompt, $key, $resolution, $ratio);
+                if ($url) {
+                    $this->lastProvider = $provider;
+                    $this->lastModel = $model ?: $this->lastModel;
+
+                    return $this->normalizeOutputSize($url, $resolution, $ratio) ?: $url;
+                }
+            }
+        }
 
         return null;
     }

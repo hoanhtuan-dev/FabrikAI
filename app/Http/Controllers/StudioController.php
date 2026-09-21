@@ -763,6 +763,16 @@ class StudioController extends Controller
             ], 422);
         }
 
+        // NÓI TRƯỚC ĐƯỜNG ĐI. [LỖI THẬT — đo trên production 2026-09-21] Tài khoản chỉ có khoá Token Plan;
+        // luật của `studio_candidate_key` loại khoá đó cho nhóm ảnh (host của nó không phục vụ model tạo ảnh)
+        // ⇒ đường bám trực tiếp ảnh gốc có 0 model gọi được ⇒ card chết sau 47 ms với một câu chung chung.
+        // Nay lượt đó đi đường MÔ TẢ ảnh gốc (đọc ảnh bằng vai đọc ảnh rồi dựng ảnh mới) — khác tính chất,
+        // nên người dùng phải được biết TRƯỚC khi bấm, không phải tự đoán.
+        $reference = app(\App\Services\ImageAIService::class);
+        $routeNotice = $reference->referenceRouteAvailable()
+            ? ''
+            : 'Tài khoản chưa có khoá tạo ảnh bám trực tiếp ảnh gốc — hệ thống sẽ đọc ảnh gốc rồi dựng ảnh mới theo mô tả (bám chủ thể · trang phục · màu sắc · bối cảnh, không bám từng chi tiết).';
+
         $items = [];
         for ($i = 0; $i < $variants; $i++) {
             $items[] = $this->queueGeneration('image', [
@@ -781,7 +791,7 @@ class StudioController extends Controller
         return response()->json([
             'items' => $items,
             'credits_left' => studio_credit_balance(),
-            'notice' => $this->planNotice,
+            'notice' => trim($this->planNotice.' '.$routeNotice),
             'credit_warning' => $this->creditWarning(auth()->user(), $cost ?? 0, $variants ?? 1),
             'tryon' => $isTryon ? true : null,
             'face_model_id' => $isTryon && ! empty($data['face_model_id']) ? $data['face_model_id'] : null,
