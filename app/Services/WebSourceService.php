@@ -440,7 +440,7 @@ class WebSourceService
         $oversized = ($declared > 0 && $declared > self::MAX_BYTES) || strlen($body) > self::MAX_BYTES;
 
         if (! $response->successful()) {
-            $result['error'] = 'HTTP '.$response->status();
+            $result['error'] = $this->httpErrorReason($body, $response->status());
         } elseif ($oversized) {
             $result['error'] = 'nội dung quá lớn';
         } elseif ($source->kind !== 'rss' && ! $this->looksLikeJson($body)) {
@@ -765,7 +765,7 @@ class WebSourceService
         $oversized = ($declared > 0 && $declared > self::MAX_BYTES) || strlen($body) > self::MAX_BYTES;
 
         if (! $response->successful()) {
-            $result['error'] = 'HTTP '.$response->status();
+            $result['error'] = $this->httpErrorReason($body, $response->status());
         } elseif ($oversized) {
             $result['error'] = 'nội dung quá lớn';
         } elseif ($source->kind !== 'rss' && ! $this->looksLikeJson($body)) {
@@ -797,6 +797,25 @@ class WebSourceService
         $result['ms'] = (int) round((microtime(true) - $started) * 1000);
 
         return $result;
+    }
+
+    /**
+     * Câu lỗi cho một phản hồi KHÔNG thành công — kèm NGUYÊN VĂN lời nhà cung cấp khi họ có nói.
+     *
+     * Vì sao: "HTTP 400" không cho người khai biết phải sửa gì, còn API thì thường nói rất rõ
+     * ("API key not valid", "quota exceeded", "invalid cx"). Đo thật 2026-09-21: nguồn Google trả 400 mà
+     * màn Cài đặt chỉ hiện đúng ba chữ "HTTP 400" ⇒ muốn biết thiếu khoá phải đi đọc log.
+     */
+    private function httpErrorReason(string $body, ?int $status): string
+    {
+        $json = json_decode($body, true);
+        $message = is_array($json) ? data_get($json, 'error.message') : null;
+
+        if (is_string($message) && trim($message) !== '') {
+            return 'HTTP '.$status.' — '.Str::limit(trim($message), 160, '');
+        }
+
+        return 'HTTP '.$status;
     }
 
     /**
