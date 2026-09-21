@@ -2552,6 +2552,11 @@ class DesignAgentService
             'fallback_groups' => $fallbacks,
             // Trần của TỪNG lần gọi phải nằm trong trần của CẢ lượt — xem AI_CALL_CEILING_MS.
             'timeout' => $this->callTimeout($timeout),
+            // HẠN CHÓT TUYỆT ĐỐI của cả lượt (mốc thời gian). Mọi lần gọi con — kể cả lần DỰ PHÒNG khi
+            // đường /responses hỏng — phải nằm trong hạn này, nếu không thì "trần" chỉ là trang trí:
+            // đo thật 2026-09-22 00:16 — /responses hết 55 s rồi rơi về /chat/completions thêm 55 s nữa
+            // ⇒ vượt trần proxy ⇒ khách nhận **HTTP 504** (mã L-G8YM) và mất cả phần đã tính được.
+            'deadline_ts' => microtime(true) + self::AI_CALL_CEILING_MS / 1000,
         ];
 
         // Bấm giờ cho RIÊNG lần gọi đầu: quyết định "có thử lại không" dựa trên thời gian nó đã tốn.

@@ -654,6 +654,35 @@ class ToolSearchTest extends TestCase
         }
     }
 
+/**
+     * HẠN CHÓT LÀ CỦA CẢ LƯỢT CHẠY, KHÔNG PHẢI TỪNG LẦN GỌI.
+     *
+     * [LỖI THẬT — production 2026-09-22 00:16, mã tra cứu L-G8YM] Vai tìm kiếm chạy `qwen3.8-omni-flash`:
+     * lần gọi /responses quá 55 s (0 byte nhận được) ⇒ rơi về /chat/completions, lần này lại bắt đầu một
+     * lời gọi MỚI dài bằng lần trước ⇒ vượt trần proxy ⇒ khách nhận **HTTP 504** và mất cả phần đã tính.
+     */
+    public function test_the_fallback_refuses_to_start_a_new_call_when_time_is_out(): void
+    {
+        $gw = app(\App\Services\AiModelGateway::class);
+        $m = new \ReflectionMethod($gw, 'remainingSeconds');
+        $m->setAccessible(true);
+
+        // Không có hạn chót ⇒ giữ nguyên trần cũ (nơi gọi cũ không truyền).
+        $this->assertSame(90, $m->invoke($gw, [], 90));
+
+        // Có hạn chót ⇒ bị cắt theo phần còn lại, không bao giờ vượt hạn.
+        $this->assertSame(5, $m->invoke($gw, ['deadline_ts' => microtime(true) + 5.5], 90));
+        $this->assertSame(0, $m->invoke($gw, ['deadline_ts' => microtime(true) - 1], 90));
+        $this->assertLessThanOrEqual(10, $m->invoke($gw, ['deadline_ts' => microtime(true) + 10], 90));
+
+        // Bất biến trong mã: đường rơi về phải từ chối khi đã cạn thời gian, và lượt chạy phải đặt hạn chót.
+        $src = (string) file_get_contents(app_path('Services/AiModelGateway.php'));
+        $this->assertStringContainsString('KHÔNG rơi về /chat/completions (tránh 504)', $src);
+        $svc = (string) file_get_contents(app_path('Services/DesignAgentService.php'));
+        $this->assertStringContainsString("'deadline_ts' => microtime(true) + self::AI_CALL_CEILING_MS / 1000,", $svc,
+            'Thiếu hạn chót thì "trần" chỉ là trang trí: hai lần gọi cộng lại vẫn vượt trần proxy.');
+    }
+
     /**
      * 🔴 CÁI BẪY: model NHẬN tham số công cụ rồi trả lời trơn tru mà KHÔNG tìm gì.
      *

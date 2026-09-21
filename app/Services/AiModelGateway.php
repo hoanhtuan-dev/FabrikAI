@@ -358,6 +358,23 @@ class AiModelGateway
         return array_values(array_filter($tools, 'is_array'));
     }
 
+    /**
+     * Số giây còn lại trong HẠN CHÓT của cả lượt — nhỏ hơn hoặc bằng trần từng lần gọi.
+     *
+     * Không có hạn chót (nơi gọi cũ không truyền) thì trả về đúng trần cũ: hành vi không đổi.
+     *
+     * @param  array<string,mixed>  $options
+     */
+    protected function remainingSeconds(array $options, int $requested): int
+    {
+        $deadline = $options['deadline_ts'] ?? null;
+        if (! is_numeric($deadline)) {
+            return $requested;
+        }
+
+        return max(0, min($requested, (int) floor((float) $deadline - microtime(true))));
+    }
+
     /** Base URL chat-completions của một candidate (qwen/dashscope dùng compatible-mode của DashScope). */
     protected function chatBase(array $candidate, string $key): string
     {
@@ -518,7 +535,10 @@ class AiModelGateway
     protected function callResponsesWithSearch(array $candidate, string $key, array $messages, array $options): ?array
     {
         $plan = WebAccessService::planFor($candidate) ?? [];
-        $timeout = (int) ($options['timeout'] ?? 90);
+        $timeout = $this->remainingSeconds($options, (int) ($options['timeout'] ?? 90));
+        if ($timeout <= 0) {
+            return null;   // đã cạn hạn chót của cả lượt ⇒ đừng bắt đầu một lời gọi mới
+        }
         $maxTokens = (int) ($options['max_tokens'] ?? 1024);
         $base = $this->chatBase($candidate, $key);
 
@@ -584,6 +604,19 @@ class AiModelGateway
     /** Rơi về /chat/completions khi /responses không dùng được — báo ĐÚNG là lượt này không tìm kiếm. */
     protected function fallbackWithoutHostedSearch(array $candidate, string $key, array $messages, array $options, ?\Throwable $error = null, ?int $status = null): ?array
     {
+        // CẠN HẠN CHÓT THÌ ĐỪNG RƠI VỀ ĐƯỜNG THƯỜNG. Đây là đường dẫn tới 504: lần gọi đầu đã ăn hết
+        // thời gian cho phép, lần rơi về lại bắt đầu một lời gọi MỚI dài bằng lần trước ⇒ khách chờ tới khi
+        // proxy cắt và **mất tất cả**. Thà trả null ngay để nơi gọi dùng kết quả tất định kèm lý do thật.
+        if ($this->remainingSeconds($options, 999) < 8) {
+            logger()->warning('AiModelGateway: hết thời gian cho phép, KHÔNG rơi về /chat/completions (tránh 504)', [
+                'provider' => $candidate['provider'], 'model' => $candidate['model'], 'status' => $status,
+            ]);
+
+            return null;
+        }
+
+        $options['timeout'] = $this->remainingSeconds($options, (int) ($options['timeout'] ?? 90));
+
         logger()->warning('AiModelGateway: /responses không dùng được, quay về /chat/completions', [
             'provider' => $candidate['provider'], 'model' => $candidate['model'],
             'status' => $status, 'error' => $error?->getMessage(),
