@@ -166,5 +166,26 @@ class AiSdkBridgeTest extends TestCase
         $this->assertSame([DesignAgentService::REASON_GROUP, DesignAgentService::AI_GROUP], $bridge->chainFor('reason'));
         $this->assertSame([DesignAgentService::VISION_GROUP, 'vision'], $bridge->chainFor('vision'));
     }
+    public function test_it_downgrades_response_format_for_openai_compatible_providers(): void
+    {
+        // [ĐO THẬT 2026-09-22] DeepSeek trả HTTP 400 "This response_format type is unavailable now" khi
+        // nhận json_schema — mà SDK dựng json_schema cho MỌI agent có HasStructuredOutput. Không hạ về
+        // json_object thì agent chết ngay ở nhà cung cấp đầu tiên của nhóm.
+        $this->provider('paygo', 'https://maas.example.com/v1', 'm', ['sk-a'], DesignAgentService::VISION_GROUP);
+        $name = app(RegistryProviders::class)->forGroup(DesignAgentService::VISION_GROUP)[0]['name'];
+
+        $options = (new SamplePromptAgent)->providerOptions($name);
+
+        $this->assertSame(['response_format' => ['type' => 'json_object']], $options);
+    }
+
+    public function test_it_leaves_non_openai_compatible_providers_alone(): void
+    {
+        // Gemini có cách khai schema riêng; hạ response_format ở đó là mất ràng buộc mà không được gì.
+        config(['ai.providers.probe_gemini' => ['driver' => 'gemini', 'key' => 'k']]);
+
+        $this->assertSame([], (new SamplePromptAgent)->providerOptions('probe_gemini'));
+    }
 }
+
 
