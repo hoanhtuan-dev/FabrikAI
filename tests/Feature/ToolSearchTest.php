@@ -8,6 +8,7 @@ use App\Models\StudioProvider;
 use App\Models\User;
 use App\Models\WebSource;
 use App\Services\DesignAgentService;
+use App\Services\WebAccessService;
 use App\Services\WebSearchTool;
 use App\Services\WebSourceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -453,6 +454,128 @@ class ToolSearchTest extends TestCase
         $this->assertSame(1, $report['results']);
         $this->assertNull($report['error'], 'Đã có tin thật thì không được báo lỗi cho cả lượt chạy.');
     }
+
+// ── (F) QWEN 3.8: CÔNG CỤ `web_search` TRÊN /responses, KHÔNG PHẢI CỜ enable_search (2026-09-21) ──
+    //
+    // ĐO THẬT trên chính khoá/model đang chạy production (Qwen Token Plan · qwen3.8-flash):
+    //   · /chat/completions + enable_search:true → HTTP 200, model trả lời "Không truy cập được internet",
+    //     phản hồi KHÔNG có `search_info` ⇒ cờ bị BỎ QUA, không có lượt tìm nào;
+    //   · /responses + tools:[{type:web_search}] → HTTP 200, có `web_search_call` thật (2 từ khoá, 20 URL
+    //     nguồn), và ép `text.format=json_object` thì trả JSON hợp lệ.
+    // Trước đợt này Agent Studio đi đường thứ nhất và VẪN khẳng định "lượt này tìm kiếm nguồn ngoài do nhà
+    // cung cấp thực hiện" — một câu sai, đo được, hiện ngay trên màn hình khách.
+
+    /** Khai model + khoá của provider `qwen` (KHÔNG tạo Custom Provider — transport phải là qwen). */
+    private function qwenModel(string $group, string $modelId): void
+    {
+        StudioApiKey::create([
+            'provider' => 'qwen', 'label' => 'qwen', 'value' => 'sk-qwen-test',
+            'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+        ]);
+        StudioModel::create([
+            'group' => $group, 'name' => $modelId, 'provider' => 'qwen',
+            'model_id' => $modelId, 'api_key_ref' => 'qwen', 'priority' => 9, 'enabled' => true,
+        ]);
+        set_setting('studio_task_'.$group.'_model', 'qwen:'.$modelId);
+    }
+
+    /** Họ model Qwen3.8 phải đi đường CÔNG CỤ: đó là đường duy nhất đo được là có tìm thật. */
+    public function test_a_qwen_web_search_model_gets_the_tool_instead_of_the_ignored_flag(): void
+    {
+        $this->qwenModel(DesignAgentService::SEARCH_GROUP, 'qwen3.8-flash');
+        $this->searchSource();
+
+        $sent = [];
+        Http::fake([
+            'dashscope-intl.aliyuncs.com/*' => function ($request) use (&$sent) {
+                $sent[] = ['url' => $request->url(), 'body' => json_decode($request->body(), true)];
+
+                return Http::response($this->responsesBody($this->briefJson(), 1, ['xu hướng linen 2026']), 200);
+            },
+            'news.example/*' => Http::response($this->rss('Không dùng tới', 'https://bao.example/0'), 200),
+        ]);
+
+        $brief = app(DesignAgentService::class)->collectionBrief(['prompt' => 'đầm linen'], $this->customer(), true, true);
+
+        $this->assertStringEndsWith('/responses', (string) $sent[0]['url'],
+            'Qwen3.8 phải đi /responses — đó là đường đo được là tìm thật.');
+        $this->assertSame('web_search', data_get($sent[0]['body'], 'tools.0.type'));
+        $this->assertArrayNotHasKey('enable_search', (array) $sent[0]['body'],
+            'Cờ đã đo là bị bỏ qua thì không được gửi thay cho công cụ.');
+
+        $this->assertSame('hosted', $brief['model']['tool_search']['mode']);
+        $this->assertSame(1, $brief['model']['tool_search']['calls']);
+        $this->assertTrue($brief['model']['web_search']);
+    }
+
+    /**
+     * Model qwen NGOÀI họ đã đo: vẫn gửi cờ như cũ, nhưng KHÔNG được khai là đã kiểm chứng — và không
+     * được nói lượt này có tìm kiếm khi không có gì đối chiếu.
+     */
+    public function test_a_qwen_model_outside_the_tool_family_is_not_claimed_as_searching(): void
+    {
+        $this->qwenModel(DesignAgentService::SEARCH_GROUP, 'qwen-plus');
+        $this->searchSource();
+
+        $sent = [];
+        Http::fake([
+            'dashscope-intl.aliyuncs.com/*' => function ($request) use (&$sent) {
+                $sent[] = ['url' => $request->url(), 'body' => json_decode($request->body(), true)];
+
+                return Http::response($this->answerResponse($this->briefJson()), 200);
+            },
+            'news.example/*' => Http::response($this->rss('Không dùng tới', 'https://bao.example/0'), 200),
+        ]);
+
+        $brief = app(DesignAgentService::class)->collectionBrief(['prompt' => 'đầm linen'], $this->customer(), true, true);
+
+        $this->assertStringEndsWith('/chat/completions', (string) $sent[0]['url']);
+        $this->assertTrue(data_get($sent[0]['body'], 'enable_search'));
+
+        $this->assertSame('native', $brief['model']['tool_search']['mode']);
+        $this->assertFalse($brief['model']['tool_search']['verified'],
+            'Cờ enable_search đã đo là bị bỏ qua — không được khai là đã kiểm chứng.');
+        $this->assertFalse($brief['model']['tool_search']['claim'],
+            'Giao thức đã đo là bị bỏ qua thì không được phép nói "lượt này đã tìm".');
+        $this->assertFalse($brief['model']['web_search'],
+            'Không có bằng chứng nào thì không được nói lượt này có tìm kiếm.');
+
+        // Và màn hình Cài đặt cũng phải nói đúng điều đó.
+        $row = collect(app(WebAccessService::class)->providerSearchMap())->firstWhere('model', 'qwen-plus');
+        $this->assertNotNull($row);
+        $this->assertStringContainsString('CHƯA kiểm chứng', (string) $row['label']);
+    }
+
+    /** Tên model viết kiểu nào (có/không gạch nối, hoa thường) cũng phải vào cùng một luật. */
+    public function test_the_qwen_model_spelling_does_not_change_the_route(): void
+    {
+        foreach (['qwen3.8-flash', 'qwen-3.8-flash', 'Qwen3.8-Max', 'qwen3.8-omni-flash', 'qwen3-max', 'qwen3.7-plus', 'qwen3.6-flash'] as $model) {
+            $this->assertTrue(WebAccessService::hasWebSearchTool('qwen', $model), $model.' phải đi đường công cụ web_search.');
+        }
+
+        // Ngoài danh sách tài liệu ⇒ KHÔNG hứa. (Tài liệu ghi rõ Qwen3.5/3.7 "but NOT Omni models".)
+        foreach (['qwen-plus', 'qwen-turbo', 'qwen2.5-72b-instruct', 'qwen3-235b-a22b', 'qwen3.5-omni', 'qwen3.7-omni-plus'] as $model) {
+            $this->assertFalse(WebAccessService::hasWebSearchTool('qwen', $model), $model.' không nằm trong họ đã đo — không được hứa.');
+        }
+
+        // Chỉ giao thức DashScope: host của nhà cung cấp khác không chắc có endpoint /responses.
+        $this->assertFalse(WebAccessService::hasWebSearchTool('openai', 'qwen3.8-flash'));
+    }
+
+    /** Câu chữ trên màn hình phải theo BẰNG CHỨNG: đường chưa kiểm chứng thì không được nói "đã tìm". */
+    public function test_the_copy_follows_the_evidence_not_the_protocol(): void
+    {
+        $core = (string) file_get_contents(base_path('resources/js/studio/composables/useAgentStudio.js'));
+        $service = (string) file_get_contents(base_path('app/Services/DesignAgentService.php'));
+
+        $this->assertStringContainsString("if (t.claim === false)", $core);
+        $this->assertStringContainsString('KHÔNG xác nhận được đã tra hay chưa', $core);
+        $this->assertStringContainsString("return (\$search['native']['claim'] ?? true) === true;", $service,
+            'Đường "native" chỉ được tính là đã tìm khi CÓ CƠ SỞ, không phải vì giao thức có tham số.');
+        // Và không được dặn model "bạn CÓ công cụ tìm kiếm" trên đường không được phép nói đã tìm (mời bịa nguồn).
+        $this->assertStringContainsString("(\$search['native']['claim'] ?? true) === true)", $service);
+    }
+
 
     // ── (E) CÔNG CỤ TÌM KIẾM CỦA NHÀ CUNG CẤP QUA /responses (2026-09-21) ───
 

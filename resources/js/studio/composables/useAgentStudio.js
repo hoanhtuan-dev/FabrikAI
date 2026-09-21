@@ -723,6 +723,8 @@ export function useAgentStudio() {
   const aiSearchShort = computed(() => {
     if (!aiSearchOn.value) return '';
     if (aiSearchMode.value === 'hosted' && aiSearchCalls.value === 0) return 'AI không tìm trên internet lượt này';
+    // Đường "nhà cung cấp tự tìm bằng tham số": máy chủ KHÔNG đo được, nên nhãn không được nói như đã tìm.
+    if (aiSearchMode.value === 'native' && toolSearch.value?.claim === false) return 'Chưa xác nhận được AI có tra internet hay không';
 
     // Đếm TRUY VẤN, không đếm "lượt gọi công cụ": một lời gọi của DeepSeek có thể mang 6 câu hỏi, nên nhãn
     // "1 lượt" vừa rồi đọc lên như thể model chỉ tra một thứ — trong khi nó tra sáu chủ đề.
@@ -735,7 +737,15 @@ export function useAgentStudio() {
   const toolSearchLine = computed(() => {
     const t = toolSearch.value;
     if (!t || t.mode === 'off') return '';
-    if (t.mode === 'native') return 'Lượt này tìm kiếm nguồn ngoài do chính nhà cung cấp model thực hiện.';
+    if (t.mode === 'native') {
+      // ĐO THẬT 2026-09-21: cùng một khoá/model Qwen đang chạy production, gửi cờ `enable_search` →
+      // HTTP 200 mà nhà cung cấp KHÔNG tìm gì (model tự trả lời "không truy cập được internet"), trong khi
+      // màn hình vẫn nói "tìm kiếm do nhà cung cấp thực hiện". Câu đó chỉ được nói khi có cơ sở.
+      if (t.claim === false) {
+        return 'Lượt này có gửi yêu cầu tìm kiếm tới nhà cung cấp model, nhưng họ không trả về nguồn nào để đối chiếu — hệ thống KHÔNG xác nhận được đã tra hay chưa, nên đừng coi là có dẫn nguồn.';
+      }
+      return 'Lượt này tìm kiếm nguồn ngoài do chính nhà cung cấp model thực hiện.';
+    }
     // mode === 'hosted': công cụ tìm kiếm CỦA nhà cung cấp qua endpoint riêng. Đây là chỗ dễ nói dối nhất:
     // model nhỏ NHẬN tham số rồi trả lời trơn tru mà không tìm gì (đo thật: có model còn bịa cả tin lẫn URL)
     // ⇒ chỉ được nói "đã tìm" khi phản hồi có lời gọi tìm kiếm thật.

@@ -30,6 +30,15 @@ class WebAccessService
     /**
      * CÁCH BẬT TÌM KIẾM của từng GIAO THỨC (không phải của từng NHÀ CUNG CẤP).
      *
+     * HAI CỜ, HAI CÂU HỎI KHÁC NHAU (đừng gộp):
+     *   · `verified` — ta có chắc THAM SỐ này đúng chuẩn của giao thức không? (màn hình Cài đặt đọc cờ này)
+     *   · `claim`    — ta có được phép NÓI VỚI NGƯỜI DÙNG rằng lượt này đã tìm kiếm không?
+     * Cờ thứ hai mới là cờ dễ nói dối: gửi đúng tham số mà nhà cung cấp bỏ qua thì lượt chạy KHÔNG có tìm
+     * kiếm, dù tham số đúng 100%. ĐO THẬT 2026-09-21: `enable_search` trên Qwen bị bỏ qua (model tự trả lời
+     * "không truy cập được internet") ⇒ `claim => false` cho giao thức đó.
+     * Lời KHAI của người dùng trong Cài đặt thì vẫn giữ `claim => true`: đó là ý chí của họ về gateway của
+     * họ (OpenRouter ":online", gateway có plugin web…), khác hẳn một giao thức mà chính ta đã đo là hỏng.
+     *
      * Vì sao khoá theo giao thức: chọn dùng nhà cung cấp/model nào là việc của CÀI ĐẶT (Model Registry ·
      * Nhóm công việc · Luồng ưu tiên · Custom Providers). Mã nguồn chỉ được biết "giao thức này bật tìm
      * kiếm bằng cách nào" — thêm một nhà cung cấp mới nói cùng giao thức thì KHÔNG phải sửa mã.
@@ -37,11 +46,38 @@ class WebAccessService
      */
     public const SEARCH_DIALECTS = [
         // OpenAI-compatible trên DashScope: bật bằng cờ trong body.
-        'qwen' => ['mode' => 'body_flag', 'param' => 'enable_search'],
-        'dashscope' => ['mode' => 'body_flag', 'param' => 'enable_search'],
+        //
+        // [ĐO THẬT 2026-09-21 trên chính khoá/model đang chạy production — Qwen Token Plan · qwen3.8-flash]
+        // Gửi `enable_search: true` vào /chat/completions trả về HTTP 200 nhưng KHÔNG tìm gì: model trả lời
+        // nguyên văn "Không truy cập được internet, nên không có giá BABA hôm nay và không có URL nguồn",
+        // và phản hồi KHÔNG có mục `search_info` nào. Tức tham số bị bỏ qua — đúng ca DeepSeek đã đo trước
+        // đó, chỉ khác là lần này nó nằm ngay trên đường tìm kiếm chính của Agent Studio.
+        // Vì vậy cờ này KHÔNG được coi là bằng chứng: `verified => false` ⇒ giao diện không được nói
+        // "đã tìm", và Cài đặt cũng hiện đúng câu "CHƯA kiểm chứng".
+        'qwen' => ['mode' => 'body_flag', 'param' => 'enable_search', 'verified' => false, 'claim' => false],
+        'dashscope' => ['mode' => 'body_flag', 'param' => 'enable_search', 'verified' => false, 'claim' => false],
         // Gemini: grounding bằng Google Search (một "tool").
         'gemini' => ['mode' => 'tools', 'param' => 'google_search'],
     ];
+
+    /**
+     * GIA ĐÌNH MODEL có CÔNG CỤ `web_search` của nhà cung cấp trên endpoint /responses.
+     *
+     * Vì sao đây là đường ĐÚNG cho Qwen (đo thật 2026-09-21, cùng khoá/model đang chạy production):
+     *   · /chat/completions + enable_search:true  → HTTP 200 mà KHÔNG tìm (xem chú thích ở SEARCH_DIALECTS);
+     *   · /responses + tools:[{type:web_search}]  → HTTP 200, phản hồi có mục `web_search_call` THẬT
+     *     (2 từ khoá, 20 URL nguồn), và khi ép `text.format=json_object` thì trả về JSON hợp lệ —
+     *     đúng thứ lượt radar/brief cần.
+     * Danh sách dưới đây chép từ tài liệu Model Studio ("Supported by the Qwen3.8 Max, Flash and
+     * open-source series, and qwen3.8-omni-flash; the Qwen3.7 and Qwen3.5 series…, the Qwen3.6-Plus and
+     * Qwen3.6-Flash series, and qwen3.6-35b-a3b; qwen3-max…"). So khớp theo TIỀN TỐ đã bỏ dấu câu để
+     * `qwen3.8-flash`, `qwen-3.8-flash` và `qwen3.8-max` cùng khớp một luật.
+     *
+     * CHỈ áp cho giao thức DashScope (`qwen`/`dashscope`): đó là nơi /responses đã được đo là có thật.
+     * Nhà cung cấp khác đi đường `openai` phải tự khai ở Cài đặt (Custom Provider → search_param) —
+     * ta không đoán rằng host của họ có endpoint đó.
+     */
+    private const WEB_SEARCH_TOOL_FAMILIES = ['qwen3.8', 'qwen3.7', 'qwen3.6', 'qwen3.5', 'qwen3-max'];
 
     /**
      * Kế hoạch bật tìm kiếm cho MỘT candidate ĐANG ĐƯỢC CẤU HÌNH — null = không hỗ trợ/không rõ.
@@ -77,6 +113,7 @@ class WebAccessService
                 'mode' => isset(self::SEARCH_MODES[$mode]) ? $mode : 'body_flag',
                 'param' => $declared,
                 'source' => 'khai trong Cài đặt (Custom Provider)',
+                'claim' => true,
                 // Khai báo KHÔNG phải bằng chứng: ta gửi tham số, còn gateway có hiểu hay không chỉ gateway
                 // biết. Đo thật 2026-09-23 với DeepSeek: gửi `enable_search` → HTTP 200 nhưng BỎ QUA, model
                 // vẫn trả lời "không có quyền truy cập thông tin thời gian thực" ⇒ giao diện phải nói rõ.
@@ -84,13 +121,29 @@ class WebAccessService
             ];
         }
 
-        $dialect = self::SEARCH_DIALECTS[(string) ($candidate['transport'] ?? '')] ?? null;
+        $transport = (string) ($candidate['transport'] ?? '');
+
+        // Công cụ `web_search` của nhà cung cấp trên /responses — đường ĐO ĐƯỢC, nên nó đứng TRÊN giao
+        // thức: với cùng một model, cờ `enable_search` đã đo là bị bỏ qua còn công cụ này tìm thật.
+        if (self::hasWebSearchTool($transport, (string) ($candidate['model'] ?? ''))) {
+            return [
+                'mode' => 'responses_web_search',
+                'param' => 'web_search',
+                'source' => 'model thuộc họ có công cụ web_search (đo thật: tìm được và trả nguồn)',
+                'verified' => true,
+                'claim' => true,
+            ];
+        }
+
+        $dialect = self::SEARCH_DIALECTS[$transport] ?? null;
         if ($dialect === null) {
             return null;
         }
 
-        // Giao thức thì CHẮC CHẮN: chính mã này dựng request theo cách đã biết của giao thức đó.
-        return $dialect + ['source' => 'giao thức '.$candidate['transport'], 'verified' => true];
+        // Giao thức thì CHẮC CHẮN về THAM SỐ: chính mã này dựng request theo cách đã biết của giao thức đó.
+        // Còn được phép NÓI "đã tìm" hay không là chuyện khác — giao thức nào đã đo là bị bỏ qua thì trong
+        // chính mảng trên đã mang `claim => false`, và phép `+` giữ nguyên giá trị của bên trái.
+        return $dialect + ['source' => 'giao thức '.$candidate['transport'], 'verified' => true, 'claim' => true];
     }
 
     /**
@@ -102,6 +155,43 @@ class WebAccessService
     public static function isHostedMode(?array $plan): bool
     {
         return ($plan['mode'] ?? '') === 'responses_web_search';
+    }
+
+    /**
+     * Model này có CÔNG CỤ `web_search` của nhà cung cấp trên /responses không?
+     *
+     * So khớp theo tiền tố đã bỏ mọi dấu câu, để tên model viết kiểu nào cũng khớp một luật:
+     * `qwen3.8-flash`, `qwen-3.8-flash`, `Qwen3.8-Max` → cùng một họ.
+     */
+    public static function hasWebSearchTool(string $transport, string $model): bool
+    {
+        if (! in_array($transport, ['qwen', 'dashscope'], true)) {
+            return false;
+        }
+
+        $key = (string) preg_replace('/[^a-z0-9]/', '', mb_strtolower($model));
+        if ($key === '') {
+            return false;
+        }
+
+        // Qwen3.8: có công cụ, KỂ CẢ bản omni (tài liệu: "qwen3.8-omni-flash" nằm trong danh sách).
+        if (str_starts_with($key, 'qwen38')) {
+            return true;
+        }
+
+        // Qwen3.7/3.5: tài liệu ghi rõ "including open-source models, but NOT Omni models".
+        if (str_contains($key, 'omni')) {
+            return false;
+        }
+
+        foreach (self::WEB_SEARCH_TOOL_FAMILIES as $family) {
+            $prefix = (string) preg_replace('/[^a-z0-9]/', '', $family);
+            if ($prefix !== '' && str_starts_with($key, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Giao thức này có tìm kiếm tích hợp không? (giữ cho nơi gọi cũ; mặc định KHÔNG) */

@@ -695,9 +695,25 @@ class BrandDnaTest extends TestCase
      */
     public function test_declared_search_is_unverified_while_protocol_search_is_verified(): void
     {
-        // (a) Giao thức: chắc chắn — chính mã này dựng request đúng chuẩn của giao thức đó.
-        $dialect = WebAccessService::planFor(['transport' => 'qwen', 'provider' => 'qwen', 'model' => 'qwen3.8-flash']);
-        $this->assertTrue($dialect['verified']);
+        // (a) QWEN3.8: không còn đi bằng cờ trong body nữa.
+        //
+        // [ĐO THẬT 2026-09-21 — cùng khoá/model đang chạy production] `enable_search: true` trên
+        // /chat/completions trả HTTP 200 mà nhà cung cấp KHÔNG tìm gì (model tự trả lời "không truy cập được
+        // internet"), trong khi /responses + tools:[{type:web_search}] tìm thật (có web_search_call, 20 URL
+        // nguồn, và trả JSON hợp lệ khi ép `text.format=json_object`). Nên họ model này đi đường CÔNG CỤ —
+        // và đó cũng là đường ĐO ĐƯỢC, nên nó được phép nói "đã tìm".
+        $tool = WebAccessService::planFor(['transport' => 'qwen', 'provider' => 'qwen', 'model' => 'qwen3.8-flash']);
+        $this->assertSame('responses_web_search', $tool['mode']);
+        $this->assertSame('web_search', $tool['param']);
+        $this->assertTrue($tool['verified']);
+        $this->assertTrue($tool['claim']);
+        $this->assertStringContainsString('công cụ web_search', $tool['source']);
+
+        // (a2) Giao thức VẪN là một mức tin cho các model ngoài họ đó — nhưng lần này kèm điều kiện:
+        // tham số đúng chuẩn giao thức (`verified`) KHÔNG đồng nghĩa được phép nói "đã tìm" (`claim`).
+        $dialect = WebAccessService::planFor(['transport' => 'qwen', 'provider' => 'qwen', 'model' => 'qwen-plus']);
+        $this->assertFalse($dialect['verified'], 'Cờ enable_search đã đo là bị bỏ qua ở họ Qwen3.8 — không được khai là đã kiểm chứng.');
+        $this->assertFalse($dialect['claim'], 'Không có gì đối chiếu được thì không được nói lượt này đã tìm.');
         $this->assertStringContainsString('giao thức', $dialect['source']);
 
         // (b) Do người dùng khai: vẫn ra kế hoạch, nhưng đánh dấu CHƯA kiểm chứng.
