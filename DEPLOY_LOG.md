@@ -3066,3 +3066,105 @@ Bảy bài mới — **1053 test XANH** (trước đợt này: 1046):
 - Lượt cập nhật tất định vẫn chỉ giữ phần chữ theo danh sách trường đã biết; trường AI viết nào không
   nằm trong danh sách thì vẫn mất. Hết hẳn thì phải để MÁY CHỦ tự gộp (nó biết bản cũ), thay vì gộp ở
   giao diện như hiện nay.
+
+---
+
+## Deploy 2026-09-21 — BẢNG CƠ CẤU NHÓM HÀNG sửa được ở việc 2 · và một lỗi thật tìm ra khi kiểm chứng
+
+### 0. Chủ dự án yêu cầu gì
+
+> "Agent Studio -> bước 3 định hướng/bước 2 Số lượng sku -> có thể tùy chỉnh giống bước 3 bản size"
+
+Đọc đúng ý: việc **3 (Bảng size)** đã cho sửa TỪNG DÒNG — thêm/bớt size, đặt tỉ lệ %, cân về 100%.
+Việc **2 (Số lượng SKU)** thì chỉ cho chọn một CON SỐ TỔNG, còn bảng chia cho các nhóm hàng là bảng
+**chỉ-đọc**. Yêu cầu là làm việc 2 sửa được y như việc 3.
+
+### 1. Vì sao đây là thiếu sót THẬT, không phải "thiếu tính năng cho vui"
+
+Tổng số mã hàng chỉ nói **QUY MÔ**. Chia cho nhóm nào lại là quyết định của người bỏ vốn: xưởng mạnh
+gì, kho còn gì, nhóm nào đang bán chạy. Trước đây chỗ chia là của thuật toán — `applySkuTotal()` chia
+lại theo ĐÚNG tỉ lệ cũ. Nghĩa là muốn dồn 8 mã cho nhóm áo cũng **không có cách nào nói ra**, dù con số
+ấy đi thẳng vào lệnh cắt, giá vốn và số mét vải phải đặt.
+
+### 2. Đã làm gì
+
+| # | Chỗ | Trước | Nay |
+|---|---|---|---|
+| 1 | Việc 2 — bảng cơ cấu | Bảng chỉ-đọc (tên nhóm · số mã · thanh tỉ lệ) | **Sửa được từng dòng**: đổi tên nhóm, đặt số mã (thanh trượt + ô số), % tự tính; **thêm/bỏ nhóm** (tối đa 12) |
+| 2 | Việc 2 — nút phụ | «Để hệ thống đề xuất» (chỉ bỏ tổng) | Thêm **«Chia đều»**, **«Khớp về N mã»**, **«Bỏ bảng của tôi»** |
+| 3 | Việc 2 — nhãn nguồn | "Do bạn chọn / Hệ thống đề xuất" (chỉ nói về TỔNG) | Thêm nhãn cho **bảng**: "Do bạn đặt / Hệ thống đề xuất" |
+| 4 | Việc 2 — cảnh báo | Chỉ khi tổng chọn khác tổng hệ thống | Thêm: **"Bảng đang cộng ra X mã, trong khi quy mô bạn chọn là Y"** + nút khớp một bấm |
+| 5 | Máy chủ | Chỉ nhận `sku_total` rồi tự chia theo tỉ lệ | `structureOverride()`: danh sách gửi lên **CHÍNH LÀ bảng** — giữ nguyên thứ tự và từng con số |
+| 6 | Lệnh cắt & mẫu ảnh | Đọc bảng thuật toán tự chia | Đọc **đúng bảng người dùng đặt** (cùng một đường, không lệch nhau) |
+| 7 | Khoá bộ đệm | Chỉ có `sku:` | Thêm `structure:` — hai bảng khác nhau KHÔNG dùng chung bản đệm |
+| 8 | Phiên làm việc | Không có bảng cơ cấu | Mang theo `structure_rows` + `structure_edited` (mở lại trang là còn nguyên, không nhập lại) |
+
+### 3. LỖI THẬT tìm ra trong lúc kiểm chứng — do chính đợt này gây ra, và đã vá
+
+Bảng cơ cấu được **đổ từ brief ngay khi trang dựng**. Việc đổ đó làm bộ theo dõi ghi phiên bắn lên, và
+nếu lượt **GHI** chạy trước lượt **ĐỌC** phiên thì nó ghi đè phiên cũ bằng trạng thái rỗng: `collection`
+còn null ⇒ `brief_snapshot` thành null ⇒ mở lại trang thấy **"Chưa có brief"**, mất cả bộ sưu tập đang
+dựng — không một thông báo nào.
+
+Đo được: phiên thử nghiệm mất sạch bản brief sau lần tải đầu tiên; đúng lúc đó bàn kiểm tra trình duyệt
+báo `0 ô` ở mọi bước (vì không còn brief thì việc 2 chỉ hiện trạng thái rỗng).
+
+Vá hai tầng:
+
+1. **Cổng `sessionReady`** — `saveSession()` từ chối mọi lượt ghi cho tới khi biết mình đang ghi lên cái
+   gì; cờ mở trong `finally` của lượt đọc (người CHƯA có phiên nào cũng phải ghi được phiên đầu tiên).
+   Đây là tầng bất biến, không phải sửa từng đường đi.
+2. **Không ghi khi không có gì đổi** — `seedStructureRows` so dấu vân trước khi gán; gán lại một mảng y
+   hệt là thay đổi GIẢ, và chính nó là nguồn của lượt ghi giả lúc trang vừa dựng.
+
+> Nói thẳng: lỗi này **có sẵn từ trước** (bản nháp localStorage cũng đủ kích hoạt — người dùng quay lại
+> trang với bản nháp cũ là mất phiên), nhưng đợt này làm nó lộ ra ở MỌI lần tải. Nay đã khoá bằng test.
+
+### 4. Kiểm chứng trên Chrome thật (cùng một phiên, cùng kịch bản)
+
+| Bước | Đo được |
+|---|---|
+| A. Mở việc 2 | Bảng đổ từ đề xuất của hệ thống: 4 nhóm, tổng 18 mã; nhãn **"Hệ thống đề xuất"**; nút «Cập nhật số liệu» **TẮT** (chưa có gì để áp dụng) |
+| B. Sửa 2 ô số (nhóm 1 → 9, nhóm 2 → 3) | Nhãn đổi thành **"Do bạn đặt"**; badge **"16 mã · 4 nhóm"**; cảnh báo **"Bảng đang cộng ra 16 mã, trong khi quy mô bạn chọn là 18 mã"**; nút «Cập nhật» **BẬT** |
+| C. Bấm «Cập nhật số liệu» | Gói gửi máy chủ có `"structure":[{"category":"Áo / blouse","count":9},{"category":"Quần","count":3},{"category":"Váy","count":2},{"category":"Phụ kiện","count":2}]` · `refresh:1` · `ai:false` — tức bảng CÓ đi lên, và chỉ vì người dùng đã tự sửa |
+| D. F5 | Bảng, từng con số và nhãn **"Do bạn đặt"** còn nguyên (phiên làm việc mang theo cả bảng) |
+
+Bảng cơ cấu cũng đã được kiểm bằng test máy chủ đi thẳng vào **lệnh cắt**: 6 mã + 3 mã, 10 cái mỗi mã ⇒
+**90 cái**, đúng hai nhóm, mỗi dòng ghi nguồn `owner`, và nhóm "Váy" do thuật toán tự nghĩ ra **biến mất**
+khỏi lệnh cắt.
+
+### 5. Khoá bằng test (10 bài mới — 1063 test XANH)
+
+| Bài | Khoá điều gì |
+|---|---|
+| `test_the_owner_can_set_the_category_mix_group_by_group` | Danh sách gửi lên CHÍNH LÀ bảng: đúng thứ tự, đúng từng con số, nguồn `owner` |
+| `test_the_owner_mix_wins_over_the_chosen_total` | Bảng thắng con số quy mô (lệnh cắt đọc tổng CỦA BẢNG) |
+| `test_a_messy_mix_table_is_cleaned_instead_of_breaking_the_run` | Tên rỗng bị bỏ, trùng tên gộp, khoảng trắng gọn lại |
+| `test_a_negative_sku_count_is_rejected` | Số âm chặn ở cửa (422), không âm thầm sửa thành 0 |
+| `test_the_mix_table_is_capped_at_the_same_ceiling_as_the_total` | Trần cả bảng = 400 mã |
+| `test_the_owner_mix_reaches_the_cut_order` | Lệnh cắt: đúng nhóm, đúng số cái, nguồn `owner`, nhóm cũ biến mất |
+| `test_a_different_mix_is_not_served_from_the_other_mix_cache` | Khoá bộ đệm có bảng cơ cấu |
+| `test_a_refresh_keeps_the_owner_mix` | Lượt cập nhật tất định giữ nguyên bảng người dùng đặt |
+| `test_the_mix_table_is_editable_in_the_interface` | Giao diện có đủ phép sửa; chỉ gửi bảng khi người dùng tự đặt; bảng tự đổ khi chưa sửa |
+| `test_the_session_is_never_written_before_it_is_read` | **Cổng chặn của mục 3** — cờ mở ở `finally`, và lượt nạp phiên phải thật sự chạy |
+
+### 6. Kiểm chứng trên production sau deploy
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Sao lưu DB trước khi pull | `fabrikai-db-backup-before-mixtable-20260921-153253.sql` · **3.808.473 bytes** |
+| HEAD máy chủ | `6561f34` → **`dda8922`** — khớp local |
+| Asset | `agent-studio-Czd52U4G.js` **178.613 B** · `app-DZQXslIU.css` 138.571 B |
+| **Trùng khớp bản đã đo** | md5 `d32259a0fadf5878e79ce770ec185093` (JS) · `2028f5ba8a62535f48776b110cc3b813` (CSS) — **giống hệt** bản đã kiểm bằng Chrome thật |
+| HTTP | `/` **200** · `/up` **200** · `/agent-studio` **302 → đăng nhập** · asset cũ **404** |
+| Bảng cơ cấu có trong bytes bán cho khách | cả 8 dấu vết (`Số mã hàng (ô số) của nhóm` · `Tên nhóm hàng thứ` · `Thêm nhóm` · `Chia đều` · `Khớp về` · `Do bạn đặt` · `Hệ thống đề xuất` · `Bảng đang cộng ra`) — **có** |
+| Log máy chủ | **0** ERROR/CRITICAL |
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — hash JS **và** CSS đã đổi.
+
+### 7. Nợ còn lại (đã nhắc, chưa làm)
+
+- **Máy chủ vẫn KHÔNG có cron** — đã là nguyên nhân của ba sự cố người-dùng-nhìn-thấy khác nhau.
+- Bảng cơ cấu chưa có "preset" như bảng size (ví dụ mẫu cơ cấu cho shop chỉ bán áo). Hiện có «Chia đều»
+  và «Khớp về tổng» là đủ cho việc đặt số, nhưng nếu chủ dự án muốn mẫu sẵn thì nói một câu là thêm.
+- Lượt cập nhật tất định vẫn gộp chữ ở GIAO DIỆN; muốn hết hẳn thì phải để máy chủ tự gộp (nó biết bản cũ).
