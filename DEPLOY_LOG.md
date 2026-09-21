@@ -2974,3 +2974,95 @@ trang lỗi tối giản đọc `var(--color-canvas-*, #fallback)`.
 > ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — SPA giữ JS cũ ở tab đang mở (§14 luật 9).
 > Lần này bắt buộc: hash CSS/JS đã đổi, và bảng màu đổi ở gần như mọi thành phần.
 
+---
+
+## Deploy 2026-09-21 — «Brief này được dựng khi Suy luận AI đang TẮT» **DAI DẲNG**: năm lỗi thật trên MỘT đường đi
+
+### 0. Chủ dự án báo gì
+
+> "kiểm tra vấn đề dai dẳng (trước đó không có): Brief này được dựng khi Suy luận AI đang TẮT."
+
+Chữ "dai dẳng" mô tả đúng CƠ CHẾ, không phải cảm tính: băng ấy không phải thông báo sống trong trang —
+nó là kết luận đọc ra từ **dấu đã lưu trong phiên làm việc**, nên mở lại trang bao nhiêu lần thì nó
+hiện lại bấy nhiêu lần.
+
+### 1. Tái hiện trên ĐÚNG bản đang chạy production (trước khi sửa)
+
+Dựng lại gói cũ (lấy lõi + App từ HEAD, build, chạy, rồi khôi phục), gieo một phiên có bản brief ở
+chế độ quy tắc trong khi công tắc Suy luận AI **đang BẬT**, rồi chạy đúng thao tác người dùng làm:
+
+| Bước | Bản production (trước) | Ghi chú |
+|---|---|---|
+| A. Mở trang | băng **HIỆN**: "Đang chạy bằng bộ quy tắc có sẵn." | chỉ cần brief ở chế độ quy tắc là đủ |
+| B. Bấm «Cập nhật số liệu» | băng đổi thành "**Brief này được dựng khi Suy luận AI đang TẮT.**" | công tắc đang BẬT — câu sai |
+| C. F5 | băng **vẫn còn** · số mã hàng **về lại 12** | đúng hai chữ "dai dẳng" |
+
+### 2. Năm lỗi thật (đo được, không suy đoán)
+
+| # | Triệu chứng | Nguyên nhân THẬT | Cách sửa |
+|---|---|---|---|
+| 1 | Băng cảnh báo hiện ở MỌI lần mở trang | Băng dựng theo điều kiện "brief không phải chế độ AI" — tức mọi brief ở chế độ quy tắc đều dựng băng, bất kể vì sao. Mà chế độ và lý do nằm **trong bản brief đã lưu** ⇒ dấu đi theo phiên, F5 là hiện lại | Cờ cảnh báo nay chỉ dựng từ danh sách **sự cố thật** (`MODEL_ALARM_REASONS` = chưa gán model · AI không phản hồi · dữ liệu không dùng được). Hai lý do lịch sử (AI-tắt-khi-dựng, và lượt cập nhật số liệu) KHÔNG bao giờ dựng băng. Việc "brief lệch công tắc" vẫn được nói — ở băng trong bước Định hướng, nơi có hành động |
+| 2 | Lượt "cập nhật số liệu" bị đóng dấu "AI đang tắt" | Máy chủ gộp hai chuyện khác nhau làm một: người dùng TẮT công tắc, và người dùng BẤM cập nhật số liệu | Giao diện gửi `refresh: 1` cho lượt tất định; máy chủ trả lý do riêng `rules_refresh` (vẫn là "chưa gán model" khi thật sự chưa gán). **Khoá đệm phải gồm cờ `refresh`** — thiếu nó thì lượt cập nhật nhận lại bản đệm cũ và dấu sai quay về y nguyên |
+| 3 | Bấm cập nhật xong, F5 là **mất số liệu** (18 mã → 12 mã, và nút lại mời bấm đúng việc vừa bấm) | Bộ theo dõi ghi phiên theo dõi prompt/SKU/size/mood/mẫu nhưng **không theo dõi bản brief**, mà chỗ dựng lại brief cũng không tự ghi gì ⇒ cả lượt chỉ đổi màn hình | Ghi phiên NGAY sau khi dựng lại (nhịp gộp 1,5 giây không cứu được nếu người dùng đóng tab) **+** đưa bản brief vào danh sách trạng thái-phiên: đây là bất biến, không phải đường đi |
+| 4 | Đổi SỐ MÃ HÀNG là mất luôn brief/prompt do AI viết | Lượt tất định không có phần chữ, mà vẫn thay thẳng cả bản | `keepAiText`: SỐ lấy từ bản mới, CHỮ lấy từ bản cũ (chỉ giữ khi bản cũ THẬT SỰ do AI viết), gộp cả chữ nằm trong cấu trúc (lý do cơ cấu · mục tiêu phối · caption mood — bỏ qua ô người dùng tự sửa) |
+| 5 | Hai chuyện nhỏ cùng chỗ | (a) Nhánh lỗi khi dựng brief **xoá bản brief đang xem**; (b) câu mô tả "phần chữ giữ nguyên, con số vừa tính lại" có được tính ra nhưng **không hiển thị ở đâu** | (a) lỗi đã báo bằng toast rồi, không phạt thêm bằng cách xoá kết quả cũ; (b) chip ở thanh trên đọc câu mô tả trước — người dùng biết đúng chuyện vừa xảy ra với con số mình đang nhìn |
+
+### 3. Trước / Sau trên CÙNG một kịch bản (Chrome thật, cùng một phiên được gieo)
+
+| Bước | Bản production (trước) | Bản đã vá |
+|---|---|---|
+| A. Mở trang với brief ở chế độ quy tắc | băng **HIỆN** "Đang chạy bằng bộ quy tắc có sẵn." | **không có băng** |
+| B. Bấm «Cập nhật số liệu (không gọi AI)» | băng "**Brief này được dựng khi Suy luận AI đang TẮT.**" | **không có băng** · biểu đồ **18 mã** |
+| C. F5 | băng **vẫn còn** · số về **12 mã** | **không có băng** · **giữ 18 mã** |
+
+Và phép thử NGƯỢC, để chứng minh băng không phải bị làm câm: gieo một sự cố thật (lý do
+"AI không phản hồi") rồi nạp lại ⇒ băng **HIỆN** đúng câu "AI không phản hồi ở lượt này…".
+
+Phép đo cũng tự sửa một lỗi của chính người kiểm: lần dò đầu chỉ tìm ĐÚNG MỘT CÂU nên "không thấy
+băng" hoá ra chỉ là "không thấy câu đó"; bản đo sau tách **chữ hiện trên màn hình** khỏi **chú thích
+tooltip** và dò cả năm câu.
+
+### 4. Khoá bằng test (không thể tái phát)
+
+Bảy bài mới — **1053 test XANH** (trước đợt này: 1046):
+
+- `test_a_user_requested_number_refresh_is_not_reported_as_ai_being_off` — (a) TẮT công tắc ⇒ lý do
+  "đang tắt"; (b) BẤM cập nhật số liệu ⇒ lý do riêng "vừa cập nhật số liệu"; kèm bài
+  `the_refresh_flag_never_masks_a_missing_model`.
+- `test_the_ai_alarm_is_driven_by_real_failures_only` — đọc thẳng mã nguồn giao diện (repo không có
+  runner JS; tiền lệ `DesignSystemTest`/`AgentStudioPageTest`): danh sách báo động phải có đủ ba sự cố
+  thật và **không được chứa** hai lý do lịch sử; băng ở đầu trang phải do chính cờ đó quyết.
+- `test_the_interface_names_a_user_requested_refresh_instead_of_blaming_the_switch` — nhãn mới phải nói
+  rõ "(không gọi AI)", và băng "lệch công tắc" phải miễn trừ nó.
+- `test_a_deterministic_refresh_keeps_the_ai_written_text` — ba cờ đi cùng nhau + phần gộp chữ phải giữ
+  đủ sáu trường + câu mô tả phải HIỆN RA được (không phải dữ liệu chết).
+- `test_a_rebuilt_brief_is_written_to_the_session_at_once` — bất biến ghi phiên.
+- `test_a_failed_refresh_does_not_wipe_the_brief_on_screen` — nhánh lỗi không được xoá bản brief.
+
+### 5. Kiểm chứng trên production sau deploy
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Sao lưu DB trước khi pull | `fabrikai-db-backup-before-alarmfix-20260921-130239.sql` · **3.296.888 bytes** |
+| HEAD máy chủ | `dc68ecc` → **`a67abb4`** — khớp local |
+| Asset | `agent-studio-DU2SOqo-.js` **172.255 B** · `app-C8Qn0WyV.css` 138.521 B |
+| **Trùng khớp bản đã đo** | md5 `6f88f63cc03f5c46fd35a3f5506e79ee` (JS) · `55c0c1835c9d2ce08db22723003bbeb5` (CSS) — **giống hệt** bản đã kiểm bằng Chrome thật |
+| HTTP | `/` **200** · `/up` **200** · `/agent-studio` **302 → đăng nhập** · asset cũ **404** |
+| Bản vá có trong bytes bán cho khách | danh sách sự cố thật (đã thu gọn) **có** |
+| Lý do "AI đang tắt" còn trong gói | **1 lần** — đúng chỗ NHÃN, không nằm trong danh sách báo động |
+| Nhãn mới | "vừa cập nhật bằng bộ quy tắc (không gọi AI)" **có** |
+| Log máy chủ | **0** ERROR/CRITICAL |
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — hash JS đã đổi. Phiên làm việc đang mở vẫn
+> giữ dấu CŨ trong bản brief đã lưu; băng cảnh báo nay không dựng từ dấu ấy nữa, nhưng phải bấm
+> «Cập nhật số liệu» một lần nữa thì dấu mới mới được ghi vào phiên.
+
+### 6. Nợ còn lại (đã nhắc, chưa làm)
+
+- **Máy chủ vẫn KHÔNG có cron.** Hai việc cần thêm trong hPanel: một job chạy `queue:work
+  --stop-when-empty --max-time=55 --tries=1 --timeout=900`, một job chạy `schedule:run`. Đây đã là
+  nguyên nhân của ba sự cố người-dùng-nhìn-thấy khác nhau, trong đó có thẻ tiến trình "3 ảnh đang
+  tạo 0%" không tắt được.
+- Lượt cập nhật tất định vẫn chỉ giữ phần chữ theo danh sách trường đã biết; trường AI viết nào không
+  nằm trong danh sách thì vẫn mất. Hết hẳn thì phải để MÁY CHỦ tự gộp (nó biết bản cũ), thay vì gộp ở
+  giao diện như hiện nay.
