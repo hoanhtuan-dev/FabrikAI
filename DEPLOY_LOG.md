@@ -3278,3 +3278,132 @@ khoá đúng hành vi vừa đổi, nay khoá **chặt hơn**: Qwen3.8 đi đư�
   chạy thật nên nên đo lại: một lượt radar 3 lần tra × ~6 giây có thể vượt thời gian chờ của người dùng.
 - **Dòng model gõ sai** (mục 4) — cần chủ dự án sửa trong Cài đặt.
 - **Máy chủ vẫn KHÔNG có cron** — nhắc lại lần thứ tư; đây là nguyên nhân của ba sự cố khác nhau rồi.
+
+---
+
+## Kiểm tra 2026-09-21 — HAI VIỆC CÒN ĐỂ NGỎ: ngân sách lượt tìm, và cron của máy chủ
+
+### A. NGÂN SÁCH LƯỢT TÌM (`max_tool_calls`) — đo xong, và hai giả định của chính tôi bị số liệu bác bỏ
+
+**Đo trên production, qua chính gateway, cùng cấu hình thật (Qwen Token Plan · qwen3.8-flash):**
+
+| Trần đặt | Thời gian | Lượt tra THẬT | Truy vấn | Nguồn | JSON |
+|---|---|---|---|---|---|
+| 1 | **17,2 s** | 1 | 4 | 38 | hợp lệ |
+| 2 | **33,3 s** | **4** | 4 | 37 | **hỏng** |
+| 3 | 27,4 s | 1 | 4 | 37 | hợp lệ |
+
+**Kết luận 1 — cái "trần" không phải trần.** Đặt `max_tool_calls = 2` mà model vẫn tra **4 lượt**. Tham số
+này là GỢI Ý, không phải giới hạn cứng. Nghĩa là "tối ưu trần lượt tìm" theo nghĩa vặn con số lên/xuống
+**không có tác dụng thật** — và đây là điều tôi đã tưởng sai khi nói "nên đo lại trần".
+
+**Kết luận 2 — nói ngân sách trong prompt cũng không rút ngắn được.** Thử đúng cách đó (thêm câu "bạn có
+tối đa 2 lượt tra, đừng cố tra hết"): 34,4 s và 22,1 s cho hai lần chạy. Nhiễu của model lớn hơn tác dụng
+của câu chữ ⇒ **không đưa vào mã**. (Đã đo rồi mới quyết, không đoán.)
+
+**Kết luận 3 — cái thật sự chặn được 504 thì lại nằm ở chỗ khác.** `timeout` là **90 s cho lần đầu** và
+**180 s cho lần thử lại** — đó là trần của TỪNG lần gọi, không phải trần của cả lượt. Guard duy nhất
+(`retryWorthIt`, 30 s) chỉ nhìn lần đầu. Tổng có thể tới 30 s + 180 s, vượt xa trần proxy ⇒ khách nhận
+**HTTP 504 và mất TẤT CẢ**, kể cả phần đã tính được. Log production có 2 ca thật: 07:08 (brief) và 23:34
+(radar).
+
+**Đã sửa:** thêm trần TỔNG `AI_CALL_CEILING_MS = 60000` (suy từ chính ghi chép lỗi cũ: một lượt ~39 s cộng
+lần thử lại là vượt trần proxy ⇒ trần thật dưới ~65 s):
+
+| Chỗ | Trước | Nay |
+|---|---|---|
+| Timeout lần gọi đầu | 90 s | **55 s** (chừa 5 s trả phản hồi) |
+| Timeout lần thử lại | `$timeout * 2` = **180 s** | **phần thời gian CÒN LẠI** của lượt (10 s đã dùng ⇒ 45 s) |
+| Hết thời gian | vẫn ném thêm một lời gọi | **trả kết quả tất định ngay** kèm lý do thật |
+
+> Bài test đầu tiên của tôi cho công thức này đã **bắt được lỗi trong chính nó**: sàn cứng 8 s ở hàm tính
+> thời gian thử lại khiến mốc 59 s thành 59 + 8 = 67 s — vẫn vượt trần. Nay hết thời gian thì hàm trả **0**
+> ("đừng thử lại") và bài test quét MỌI mốc để khoá bất biến.
+
+**Kiểm chứng trần không cắt nhầm:** đo 3 lượt tìm thật sau khi vá — 15,9 s · 22 s · 11,7 s, **0/3 vượt 50 s**
+(trần 55 s còn nhiều khoảng trống).
+
+### B. LỖI THỨ BA tìm ra trong lúc kiểm (không liên quan tìm kiếm, nhưng khách đã gặp thật)
+
+Khi đọc log để kiểm việc A, tôi thấy **6 ca "không đọc được JSON của model"** trong một buổi tối. Tệp dump
+thô của ca khách thật lúc 23:39 cho thấy nguyên văn: model trả về **chuỗi suy luận** thay vì JSON —
+*"We need to output JSON only. The user asks: …"*. Hỏng ở đường SINH PROMPT ẢNH (không có tìm kiếm).
+
+**Đo được:** gửi `enable_thinking: false` ⇒ phản hồi KHÔNG có `reasoning_content`, không tốn token suy luận;
+không gửi ⇒ có `reasoning_content` và 325 token suy luận cho một câu rất ngắn.
+
+**Nguyên nhân thật:** ba chỗ gọi `/chat/completions` đều **bỏ cờ tắt suy luận với MỌI lỗi**. Gặp 429 (hết
+hạn mức — rất thường với gói Token Plan) hay 5xx là lần gọi lại chạy **không có cờ** ⇒ model tự bật lại
+suy luận dài, đốt ngân sách token và có lượt trả về nguyên chuỗi suy nghĩ.
+
+**Đã sửa:** gộp ba chỗ thành MỘT hàm `postChat()`, và chỉ bỏ cờ khi provider **từ chối THAM SỐ** (400/422).
+Lỗi không liên quan (429, 5xx, mạng) thì trả nguyên trạng cho nơi gọi tự quyết.
+
+> Trong lúc viết test cho phần này tôi phát hiện một cái bẫy của chính bộ test: **`Http::fake()` CỘNG DỒN
+> stub chứ không thay thế** — đăng ký stub thứ hai cho cùng một URL thì stub thứ nhất vẫn trả lời, nên bài
+> test đầu tiên của tôi "xanh" vì lý do sai. Nay dùng một stub duy nhất với ba chế độ. Ghi lại đây vì bất
+> kỳ bài test nào gọi `Http::fake` hai lần trong một hàm đều có thể đang kiểm nhầm thứ.
+
+### C. CRON CỦA MÁY CHỦ — vẫn KHÔNG có, nhưng thiệt hại NHỎ hơn tôi từng nói
+
+**Đo trên máy chủ (2026-09-21 16:35 UTC):**
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `crontab` | **không có lệnh này** trên host (cron do hPanel quản, không xem được từ SSH) |
+| `storage/logs/scheduler.log` · `worker.log` | **không tồn tại** ⇒ hai job khuyến nghị chưa từng được thêm |
+| Nhịp tim `studio:scheduler:heartbeat` | **KHÔNG CÓ** ⇒ `schedule:run` chưa bao giờ chạy |
+| Lịch đang khai (`schedule:list`) | 4 mục: clean-storage 03:00 · market-signals mỗi 30 phút · heartbeat mỗi 5 phút · prune 03:30 |
+| Hàng đợi | **8 `RenderImageJob` nằm chờ, `attempts=0`** (cũ nhất từ 07:38) · `failed_jobs=0` |
+| Cảnh báo liên quan trong log | **41** dòng "Không có queue worker xử lý generation #N sau 90s — chuyển sang xử lý inline" |
+
+**Nhưng thiệt hại bị chặn bởi chính ứng dụng** — và đây là chỗ tôi phải nói đúng hơn lần trước:
+
+1. **Ảnh vẫn ra.** Không có worker thì sau 90 s ứng dụng tự xử lý NGAY TRONG request (`chuyển sang xử lý
+   inline`) — generations `pending`/`processing` = **0**. Giá phải trả: khách chờ lâu hơn, và 8 dòng job
+   cũ nằm lại trong bảng `jobs` như rác gây nhiễu chẩn đoán.
+2. **Tín hiệu thị trường KHÔNG mất.** Đường web (`DesignAgentController::sources`) cũng gọi
+   `MarketSignalService::capture()`, và `capture()` tự gọi `prune()` ⇒ **mở màn hình là có đo và có dọn**.
+   Thiếu cron chỉ làm mẫu THƯA hơn (mỗi lần mở màn hình thay vì mỗi 30 phút), không làm mất dữ liệu.
+3. **Giao diện đã nói đúng.** Thiếu nhịp tim thì `studio_scheduler_alive()` trả false và hai nhãn tự đổi
+   thành "Khi mở màn hình" / `auto_refresh` khác đi — không còn câu hứa "tự động mỗi 30 phút".
+
+**Việc còn lại thật sự chỉ là:** `studio:clean-storage --queue` (dọn file orphan hằng ngày — không chạy thì
+storage phình dần) và việc biến "chờ 90 s rồi xử lý inline" thành tức thì. Cả hai đều cần **hai dòng cron
+trong hPanel** (tôi không có quyền vào hPanel, và host không có `crontab` để tôi tự thêm):
+
+```
+cd /home/u310846799/domains/fabrikai.shop && /usr/bin/php artisan schedule:run >> storage/logs/scheduler.log 2>&1
+cd /home/u310846799/domains/fabrikai.shop && /usr/bin/php artisan queue:work --stop-when-empty --max-time=55 --tries=1 --timeout=900 >> storage/logs/worker.log 2>&1
+```
+
+### D. Khoá bằng test
+
+| Bài | Khoá điều gì |
+|---|---|
+| `test_the_total_call_time_stays_inside_the_ceiling` | Trần 90 s ⇒ 55 s · lần thử lại chỉ dùng phần còn lại · quét MỌI mốc để tổng không vượt 60 s |
+| `test_the_thinking_off_flag_is_only_dropped_when_the_provider_rejects_it` | 429 ⇒ gửi ĐÚNG một lần, cờ còn nguyên · 400 ⇒ gọi lại KHÔNG có cờ · không khai cờ ⇒ không gọi lại |
+| (siết thêm) `MarketAnalysisFromSourcesTest` | Bất biến "chỉ bỏ cờ khi 400/422" phải nằm trong mã, không chỉ ở hành vi |
+
+**1069 test XANH** (trước đợt kiểm này: 1068).
+
+### E. Kiểm chứng sau deploy
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Sao lưu DB mỗi lần pull | `…-before-ceiling-20260921-164231.sql` (4.675.748 B) · `…-before-flag-20260921-164946.sql` (4.677.060 B) |
+| HEAD máy chủ | `6ea624f` → **`a8c2d59`** (trần) → **`529bc51`** (cờ suy luận) — khớp local |
+| Trần trên máy chủ | `callTimeout(90) = 55` · `retryTimeout(10000) = 45` · `retryTimeout(59000) = 0` |
+| Cờ trên máy chủ | `postChat` có mặt (4 chỗ) và điều kiện `in_array($response->status(), [400, 422], true)` **có** trong mã đã deploy |
+| Lượt tìm thật sau khi vá | 15,9 s · 22 s · 11,7 s — **0/3** vượt 50 s (trần 55 s) |
+| Log máy chủ | **0** ERROR/CRITICAL sau mỗi lần deploy |
+
+### F. Nợ còn lại
+
+- **Chất lượng JSON của model đang chạy vai tìm kiếm**: trong các phép đo của tôi, JSON hỏng ở một tỉ lệ
+  đáng kể (đo trên đường /responses với prompt của tôi). Đường THẬT của ứng dụng có lưới an toàn (thử lại
+  không tìm kiếm → engine tất định) nên khách vẫn có kết quả, nhưng đây là chỗ nên theo dõi tiếp — nay đã
+  có log `agent-json-fail-*.txt` để soi.
+- **8 dòng job rác** trong bảng `jobs` (không phải việc đang chờ). Dọn được bằng một lệnh, nhưng chỉ nên
+  làm sau khi có cron worker (nếu không thì lần sau lại đầy).
+- **Cron**: hai dòng ở mục C — việc của chủ dự án, cần hPanel.
