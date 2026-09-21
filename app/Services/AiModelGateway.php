@@ -556,6 +556,15 @@ class AiModelGateway
         if (($options['response_format'] ?? '') === 'json_object') {
             $body['text'] = ['format' => ['type' => 'json_object']];
         }
+        // GIẢM SUY LUẬN DÀI — cùng lý do như `enable_thinking: false` ở đường /chat/completions: model
+        // "suy luận" tính cả token nghĩ vào ngân sách, viết rất dài rồi mới ra JSON (đo thật: 2.025 token
+        // suy luận cho một lượt). Việc của agent là ĐỌC dữ liệu rồi trả JSON, không phải giải toán.
+        // Đã đo trên production: /responses nhận tham số này (HTTP 200), không phải provider nào cũng nhận —
+        // không nhận thì cả lời gọi hỏng và đường dự phòng /chat/completions sẽ chạy.
+        $body['reasoning'] = ['effort' => (string) ($options['reasoning_effort'] ?? 'low')];
+        // TRẦN LƯỢT TÌM: mỗi lượt tìm là một vòng ra mạng của nhà cung cấp. Không có trần thì model tự do
+        // tra cho tới hết ngân sách — đo thật: một lượt radar kéo tới 6 truy vấn và 49 giây.
+        $body['max_tool_calls'] = max(1, (int) ($options['max_tool_calls'] ?? 3));
         // Đo THẬT cần cả URL nguồn: thiếu `include` thì một số lượt không kèm danh sách nguồn đã mở.
         $body['include'] = ['web_search_call.action.sources'];
 

@@ -508,6 +508,10 @@ class ToolSearchTest extends TestCase
         $this->assertNotEmpty(data_get($sent[0]['body'], 'instructions'), 'Phần CHỈ DẪN phải đi qua instructions.');
         $this->assertNotEmpty(data_get($sent[0]['body'], 'input'));
         $this->assertSame('json_object', data_get($sent[0]['body'], 'text.format.type'), 'Radar/brief cần JSON nên phải khai format.');
+        // TỐI ƯU THỜI GIAN: giảm suy luận dài và CHẶN trần số lượt tìm — đo thật một lượt radar kéo tới
+        // 6 truy vấn / 49 giây khi không có trần.
+        $this->assertSame('low', data_get($sent[0]['body'], 'reasoning.effort'));
+        $this->assertSame(3, data_get($sent[0]['body'], 'max_tool_calls'));
 
         // (3) Số ĐO lấy từ phản hồi: 2 lượt tìm thật, có từ khoá và nguồn.
         $this->assertSame('ai-v1', $brief['engine']);
@@ -780,7 +784,44 @@ class ToolSearchTest extends TestCase
         $this->assertFalse($method->invoke($service, 20000), 'Chạm trần thì dừng.');
         $this->assertFalse($method->invoke($service, 39000), 'Brief 39 giây rồi mà thử lại là vượt trần proxy.');
     }
+
+    /**
+     * HƯỚNG ĐÃ CHỌN MÀ KHÔNG CÒN TỒN TẠI ⇒ KHÔNG ĐƯỢC CHẶN CẢ REQUEST.
+     *
+     * [LỖI THẬT — production 2026-09-21, mã tra cứu L-WJH6] Khách chọn một hướng đang hiện trên màn hình
+     * rồi bấm tạo bộ sưu tập và nhận HTTP 422 "Có xu hướng không tồn tại trong TrendRadar." — vì danh mục
+     * hướng KHÔNG cố định: hướng sinh từ tin thật (id live-…) phụ thuộc tin lấy được, và từ 2026-09-21 còn
+     * phụ thuộc câu hỏi model tự tra. Giữa lúc mở radar và lúc bấm tạo brief, danh mục có thể đã đổi.
+     *
+     * Nay id lạ bị BỎ RA và ĐẾM LẠI; hình thức id vẫn phải hợp lệ (chống dữ liệu rác).
+     */
+    public function test_a_selected_trend_that_vanished_does_not_block_the_brief(): void
+    {
+        Http::fake();
+
+        $response = $this->actingAs($this->customer())->postJson('/api/design-agent/collection', [
+            'prompt' => 'đầm linen công sở',
+            'trend_ids' => ['live-khong-con-ton-tai-abc', 'cung-khong-co-luon'],
+        ])->assertOk();   // KHÔNG được 422
+
+        $dropped = (array) $response->json('dropped_trend_ids');
+        $this->assertContains('live-khong-con-ton-tai-abc', $dropped);
+        $this->assertContains('cung-khong-co-luon', $dropped);
+        $this->assertNotEmpty((string) $response->json('dropped_note'), 'Phải nói RA là đã bỏ hướng nào.');
+    }
+
+    /** Hình thức id vẫn phải hợp lệ — bỏ qua id cũ KHÔNG có nghĩa là nhận mọi chuỗi. */
+    public function test_a_malformed_trend_id_is_still_rejected(): void
+    {
+        Http::fake();
+
+        $this->actingAs($this->customer())->postJson('/api/design-agent/collection', [
+            'prompt' => 'đầm linen công sở',
+            'trend_ids' => ['Hướng Xấu!!'],
+        ])->assertStatus(422);
+    }
 }
+
 
 
 

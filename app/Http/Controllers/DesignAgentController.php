@@ -75,9 +75,19 @@ class DesignAgentController extends Controller
 
         // `force=1` = bỏ qua BỘ ĐỆM và gọi model lại (nút "Tạo lại" trên giao diện). Mặc định dùng bộ đệm:
         // cùng đầu vào + cùng DNA + cùng model ⇒ kết quả y hệt, không có lý do trả thêm ~28 giây và token.
-        return response()->json($this->agents->collectionBrief(
+        $brief = $this->agents->collectionBrief(
             $data, $request->user(), (bool) ($data['ai'] ?? true), (bool) ($data['force'] ?? false)
-        ));
+        );
+
+        // Hướng đã chọn mà KHÔNG còn trong danh mục ⇒ brief vẫn được tạo, nhưng phải NÓI RA đã bỏ cái nào.
+        // Im lặng bỏ là người dùng tưởng brief bám đủ 3 hướng trong khi thực tế chỉ còn 2.
+        $dropped = array_values((array) ($data['dropped_trend_ids'] ?? []));
+        if ($dropped !== []) {
+            $brief['dropped_trend_ids'] = $dropped;
+            $brief['dropped_note'] = 'Đã bỏ '.count($dropped).' hướng không còn trong danh sách hiện tại (danh mục hướng thay đổi theo tin mới). Mở lại bước Tín hiệu rồi chọn lại nếu bạn muốn bám đúng các hướng đó.';
+        }
+
+        return response()->json($brief);
     }
 
     /**
@@ -202,13 +212,7 @@ class DesignAgentController extends Controller
             if (count(array_unique($ids)) !== count($ids)) {
                 $validator->errors()->add('trend_ids', 'Mỗi xu hướng chỉ được chọn một lần.');
             }
-            $known = $this->agents->trendIds();
-            foreach ($ids as $id) {
-                if (! in_array($id, $known, true)) {
-                    $validator->errors()->add('trend_ids', 'Có xu hướng không tồn tại trong TrendRadar.');
-                    break;
-                }
-            }
+            // KHÔNG chặn cả request vì một id đã biến mất — xem chú thích ở bước lọc bên dưới.
 
             foreach (array_keys($payload['size_distribution'] ?? []) as $size) {
                 if (! preg_match('/^[A-Za-z0-9]{1,8}$/', (string) $size)) {
@@ -219,6 +223,23 @@ class DesignAgentController extends Controller
         });
 
         $data = $validator->validate();
+
+        // XU HƯỚNG ĐÃ CHỌN MÀ KHÔNG CÒN TRONG DANH SÁCH ⇒ BỎ QUA, KHÔNG CHẶN.
+        //
+        // [LỖI THẬT — production 2026-09-21, mã tra cứu L-WJH6] Người dùng chọn một hướng đang hiện trên
+        // màn hình rồi bấm tạo bộ sưu tập và nhận **HTTP 422 "Có xu hướng không tồn tại trong TrendRadar."**
+        // Nguyên nhân: danh mục hướng KHÔNG còn cố định — hướng sinh từ tin thật (id `live-…`) phụ thuộc
+        // tin lấy được, và từ 2026-09-21 còn phụ thuộc cả câu hỏi model tự tra trong lượt đó. Giữa lúc mở
+        // radar và lúc bấm tạo brief, danh mục có thể đã đổi (đệm hết hạn, tin mới, model hỏi khác).
+        //
+        // Chặn cả request vì một id cũ là đánh đổi sai: người dùng mất toàn bộ công nhập liệu, và không có
+        // cách nào để họ tự sửa. Nay id lạ bị BỎ RA và ĐẾM LẠI — phản hồi nói rõ đã bỏ cái nào.
+        $selected = array_values(array_unique(array_map('strval', (array) ($data['trend_ids'] ?? []))));
+        $known = $this->agents->trendIds();
+        $kept = array_values(array_intersect($selected, $known));
+        $data['trend_ids'] = $kept;
+        $data['dropped_trend_ids'] = array_values(array_diff($selected, $kept));
+
         $data['size_distribution'] = collect($data['size_distribution'] ?? [])
             ->mapWithKeys(fn ($count, $size) => [strtoupper(substr((string) $size, 0, 8)) => (int) $count])
             ->all();
