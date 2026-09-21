@@ -263,6 +263,11 @@ class DesignAgentService
             // Ba thứ người dùng TỰ ĐẶT cũng phải nằm trong khoá đệm: đổi bảng mood mà vẫn nhận bản
             // đệm cũ là giao diện hiện bảng mood mới bên cạnh phần chữ của bảng mood cũ.
             'sku:'.(int) ($data['sku_total'] ?? 0),
+            // Cờ `refresh` ĐỔI KẾT QUẢ (nó đổi lý do trong khối `model`: rules_refresh thay vì
+            // ai_disabled) nên phải nằm trong khoá đệm — thiếu nó thì lượt "cập nhật số liệu" nhận lại
+            // bản đệm của lượt chạy tất định trước đó và câu sai quay lại y nguyên. Đúng kiểu lỗi mà
+            // chính chú thích ngay trên đây đã cảnh báo: "khoá đệm phải gồm MỌI thứ làm đổi kết quả".
+            'refresh:'.(int) ($data['refresh'] ?? 0),
             'palette:'.implode('|', array_column($palette, 'hex')),
             'mood:'.implode('|', array_map(fn ($row) => ($row['label'] ?? '').'~'.($row['caption'] ?? ''), $moodboard)),
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
@@ -294,6 +299,11 @@ class DesignAgentService
         // prompt trên ĐÚNG dữ liệu tất định ở trên. Con số (SKU, size, dải giá, cấu trúc) KHÔNG
         // đi qua AI; AI trả về chữ nên không thể bịa số liệu thị trường.
         $ai = $this->aiBrief([
+            // [LỖI THẬT — 2026-09-21] Cờ này phân biệt HAI chuyện rất khác nhau mà trước đây bị gộp làm
+            // một: "người dùng bấm cập nhật số liệu, hệ thống chạy tất định cho tức thì" và "AI đang
+            // tắt". Gộp lại thì mỗi lần bấm «Cập nhật cơ cấu» là bản brief bị đóng dấu "AI đang tắt" —
+            // dấu đó theo bản brief vào cả phiên làm việc, nên mở lại trang vẫn thấy câu sai ấy.
+            'rules_refresh' => (bool) ($data['refresh'] ?? false),
             'prompt' => $prompt,
             'region' => $region,
             'region_name' => $this->regionName($region),
@@ -1823,6 +1833,27 @@ class DesignAgentService
      * Khối "model" mà UI đọc để nói THẬT đang chạy bằng gì: mode=ai|rule, model nào, còn
      * candidate nào, mất bao lâu, có lấy từ cache không, và LÝ DO khi phải quay về rule.
      */
+    /**
+     * VÌ SAO lượt này chạy bằng bộ quy tắc — đọc từ NGỮ CẢNH, không đoán.
+     *
+     * Ba chuyện khác hẳn nhau và trước đây bị gộp làm một câu duy nhất:
+     *   · chưa cấu hình AI          → no_model_key;
+     *   · người dùng BẤM cập nhật số liệu (muốn tức thì) → rules_refresh;
+     *   · người dùng đang TẮT công tắc Suy luận AI       → ai_disabled.
+     * Gộp lại thì thao tác bình thường của người dùng bị ghi vào hồ sơ như một sự cố.
+     */
+    private function ruleReason(array $context, array $candidates): array
+    {
+        if ($candidates === []) {
+            return ['reason' => 'no_model_key'];
+        }
+        if (! empty($context['rules_refresh'])) {
+            return ['reason' => 'rules_refresh'];
+        }
+
+        return [];   // để modelBlock tự quyết (ai_disabled)
+    }
+
     private function modelBlock(string $mode, array $candidates, array $extra = []): array
     {
         return array_merge([
@@ -2308,7 +2339,7 @@ class DesignAgentService
     private function aiBrief(array $context, array $candidates, bool $useAi, array $evidence = []): array
     {
         if (! $useAi || $this->gateway === null) {
-            return ['model' => $this->modelBlock('rule', $candidates), 'data' => null];
+            return ['model' => $this->modelBlock('rule', $candidates, $this->ruleReason($context, $candidates)), 'data' => null];
         }
         // VAI TÌM KIẾM chạy ĐỘC LẬP được (giống đường radar): chỉ cần MỘT trong hai nhóm có model là đủ.
         // Trước đây kiểm `$candidates === []` TRƯỚC khi xét nhóm tìm kiếm ⇒ người dùng chỉ khai nhóm

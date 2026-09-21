@@ -121,7 +121,7 @@ const moodPhrase = computed(() => moodboardItems.value
           </button>
           <p v-if="briefStale" class="text-label leading-4 text-warn">↳ Còn thay đổi chưa vào brief — bấm «Áp dụng» bên dưới trước.</p>
           <button type="button" class="tool-btn state-layer" :disabled="busy" @click="regenerate(false)">
-            <StudioIcon name="refresh" size="h-3 w-3" /> {{ busy ? 'Đang cập nhật…' : 'Áp dụng mọi thay đổi (tức thì)' }}
+            <StudioIcon name="refresh" size="h-3 w-3" /> {{ busy ? 'Đang cập nhật…' : 'Cập nhật số liệu (không gọi AI)' }}
           </button>
           <button type="button" class="tool-btn state-layer" :disabled="busy" title="Nhờ AI viết lại phần chữ — tốn một lượt gọi, khoảng 30 giây">
             <StudioIcon name="sparkles" size="h-3 w-3" /> Tạo lại bằng AI

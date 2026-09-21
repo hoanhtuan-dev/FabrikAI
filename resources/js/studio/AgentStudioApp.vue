@@ -47,7 +47,7 @@ agent.provideAll(provide);
 const {
   store, STEPS, step, stepIndex, readiness, regionName, selectedTrendCount,
   collection, briefStale,
-  modelReady, modelShort, modelTitle, modelCandidates, aiToggleTitle, toggleAi,
+  modelReady, modelShort, modelTitle, modelCandidates, modelNeedsAttention, aiToggleTitle, toggleAi,
   activeModel, setStep, advance, back, applyCanvas,
 } = agent;
 
@@ -279,7 +279,7 @@ const primaryLabel = computed(() => {
 
             <!-- Vì sao đang chạy bằng bộ quy tắc: nói thẳng lý do + nơi bật (§18.2).
                  Dạng băng CÓ THỂ ĐÓNG: trước đây là một <p> dính mãi, người dùng không gạt đi được. -->
-            <Notice v-if="!planLocked && activeModel && !modelReady" tone="warn" class="mb-5" :watch-key="(activeModel?.reason || '') + ':' + store.designAgentAi + ':' + modelCandidates.length">
+            <Notice v-if="!planLocked && modelNeedsAttention" tone="warn" class="mb-5" :watch-key="(activeModel?.reason || '') + ':' + store.designAgentAi + ':' + modelCandidates.length">
               <p>{{ modelTitle }}</p>
               <p v-if="!store.designAgentAi" class="mt-1 text-cream-300">Bật «Suy luận AI» ở thanh trên để phần phân tích do AI thực hiện.</p>
               <p v-else-if="modelCandidates.length === 0" class="mt-1 text-cream-300">Cấu hình tại Cài đặt → Nhóm công việc → “Suy luận prompt” và thêm khoá trong Quản lý API.</p>

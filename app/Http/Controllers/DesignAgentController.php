@@ -205,7 +205,7 @@ class DesignAgentController extends Controller
 
             // quyết nên người dùng chỉ đọc được: tổng SKU, bảng màu, bảng mood.
 
-            'sku_total', 'palette', 'moodboard',
+            'sku_total', 'palette', 'moodboard', 'refresh',
         ]);
         $payload['prompt'] = trim((string) ($payload['prompt'] ?? ''));
         $payload['brief'] = trim((string) ($payload['brief'] ?? ''));
@@ -234,6 +234,9 @@ class DesignAgentController extends Controller
             'size_distribution.*' => ['nullable', 'integer', 'min:0', 'max:10000'],
             'ai' => ['nullable', 'boolean'],
             'force' => ['nullable', 'boolean'],
+            // `refresh=1` = người dùng bấm "cập nhật số liệu" (chạy tất định cho tức thì). KHÁC hẳn
+            // với việc họ tắt công tắc Suy luận AI — xem DesignAgentService::ruleReason().
+            'refresh' => ['nullable', 'boolean'],
             // Trần 400 mã: hơn nữa thì lệnh cắt và bảng size phình tới mức không ai đọc, và mỗi mẫu
 
             // còn tốn một lượt gọi model ở bước Thực thi.

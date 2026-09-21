@@ -555,6 +555,8 @@ export function useAgentStudio() {
     model_error: 'AI không phản hồi ở lượt này — kết quả vẫn đầy đủ.',
     invalid_output: 'AI trả về dữ liệu không dùng được ở lượt này — kết quả vẫn đầy đủ.',
     ai_disabled: 'Brief này được dựng khi Suy luận AI đang TẮT.',
+    // Người dùng TỰ bấm cập nhật số liệu: đây không phải sự cố, nên câu chữ cũng không được như sự cố.
+    rules_refresh: 'Số liệu vừa được cập nhật bằng bộ quy tắc (không gọi AI).',
   };
   const activeModel = computed(() => collection.value?.model || radar.value?.model || null);
   const modelReady = computed(() => activeModel.value?.mode === 'ai');
@@ -568,12 +570,27 @@ export function useAgentStudio() {
     const m = activeModel.value;
     if (!m) return 'Chưa có thông tin — mở bước Tín hiệu để đọc radar.';
     if (m.mode === 'ai') {
+      // `note` là câu NÓI ĐÚNG chuyện vừa xảy ra: lượt cập nhật số liệu giữ nguyên phần chữ của AI và
+      // chỉ tính lại các con số. Không có nhánh này thì chip chỉ nói "Có suy luận AI" — đúng về phần chữ
+      // nhưng bỏ mất việc người dùng vừa bấm, mà đó lại là thứ khiến họ tin được các con số đang nhìn.
+      if (m.note) return m.note;
       return 'Phần định hướng do AI viết trên dữ liệu mẫu ở trên'
         + (m.cached ? ' · kết quả lấy từ lần phân tích gần nhất' : '');
     }
     return MODEL_REASON_LABELS[m.reason] || 'Đang chạy bằng bộ quy tắc có sẵn.';
   });
   const modelCandidates = computed(() => activeModel.value?.available || []);
+  /**
+   * NHỮNG LÝ DO ĐÁNG DỰNG BĂNG CẢNH BÁO — chỉ SỰ CỐ THẬT của lượt vừa rồi.
+   *
+   * Cố ý KHÔNG có `ai_disabled`, và đây là chỗ bản trước sai: đó là chuyện ĐÃ XẢY RA với bản brief
+   * (dựng lúc AI tắt) chứ không phải trạng thái hiện tại, mà trong dữ liệu đã lưu nó KHÔNG phân biệt
+   * được với lượt "cập nhật số liệu" do chính người dùng bấm. Bản brief đi theo phiên làm việc, nên
+   * cờ dựa trên nó bật lên ở MỌI lần mở lại trang — đúng phản hồi "dai dẳng". Việc "brief lệch công
+   * tắc" vẫn được nói, nhưng ở đúng chỗ CÓ HÀNH ĐỘNG: băng briefModeMismatch trong bước Định hướng.
+   */
+  const MODEL_ALARM_REASONS = ['no_model_key', 'model_error', 'invalid_output'];
+  const modelNeedsAttention = computed(() => MODEL_ALARM_REASONS.includes(activeModel.value?.reason));
   /**
    * TÌM KIẾM BẰNG CÔNG CỤ — SỐ ĐO, không phải lời hứa (docs/DESIGN_SYSTEM.md §18.2).
    *
@@ -662,10 +679,18 @@ export function useAgentStudio() {
     if (a.next_steps) rows.push('bước tiếp theo');
     return rows;
   });
-  /** Brief hiện tại được dựng ở chế độ khác với công tắc AI hiện tại? */
+  /**
+   * Brief hiện tại được dựng ở chế độ khác với công tắc AI hiện tại?
+   *
+   * Miễn trừ: brief vừa được CẬP NHẬT SỐ LIỆU theo yêu cầu của chính người dùng (`rules_refresh`).
+   * Lúc đó chế độ lệch công tắc là ĐÚNG Ý MUỐN — báo "lệch" chỉ tạo ra một băng dính mãi mà không có
+   * việc gì để làm.
+   */
   const briefModeMismatch = computed(() => {
-    const mode = collection.value?.model?.mode;
+    const model = collection.value?.model;
+    const mode = model?.mode;
     if (mode !== 'ai' && mode !== 'rule') return false;
+    if (model?.reason === 'rules_refresh') return false;
     return mode !== (store.designAgentAi ? 'ai' : 'rule');
   });
   function directionConfidence(value) {
@@ -884,9 +909,26 @@ export function useAgentStudio() {
       return false;
     }
     try {
-      // `opts.ai === false` = chạy TẤT ĐỊNH cho lượt này: dùng khi người dùng vừa sửa bảng mood/bảng
-      // size và chỉ cần phần chữ bám theo — tức thì và không tốn lượt gọi model.
-      await store.createCollectionBrief(serverInput(), { force: !!opts.force, ai: opts.ai });
+      // `opts.ai === false` = lượt CẬP NHẬT SỐ LIỆU: người dùng vừa sửa SKU/size/mood và chỉ cần các
+      // con số cùng cơ cấu tính lại — tức thì, không tốn lượt gọi AI.
+      //
+      // Ba cờ đi CÙNG NHAU, thiếu một cái là hỏng một chuyện khác nhau:
+      //   · ai: false    — không gọi model (nhanh, không tốn tiền);
+      //   · refresh: 1   — máy chủ ghi lý do là "người dùng yêu cầu cập nhật số liệu", KHÔNG phải
+      //                    "AI đang tắt" (trước đây gộp làm một nên bản brief bị đóng dấu sai và câu
+      //                    sai ấy theo vào cả phiên làm việc);
+      //   · keepText     — giữ phần CHỮ do AI viết của bản trước, chỉ thay phần số.
+      const payload = serverInput();
+      if (opts.ai === false) payload.refresh = 1;
+      await store.createCollectionBrief(payload, {
+        force: !!opts.force,
+        ai: opts.ai,
+        keepText: opts.ai === false,
+      });
+      // GHI NGAY, không chờ nhịp gộp 1,5 giây: bộ theo dõi ghi phiên bên dưới không theo dõi bản brief,
+      // nên trước đây lượt "Cập nhật số liệu" chỉ đổi màn hình mà KHÔNG ghi gì — F5 là quay về con số cũ
+      // (đo được: biểu đồ hiện 18 mã, tải lại về 12 mã, và nút lại mời bấm đúng việc vừa bấm).
+      await saveSession();
       return true;
     } catch (error) {
       collectionError.value = store.collectionBriefError || error.message || 'Không tạo được brief bộ sưu tập.';
@@ -1049,6 +1091,9 @@ export function useAgentStudio() {
   watch([
     prompt, () => store.designAgentStep, subSteps, skuTotal, sizeRowsInput,
     paletteRows, moodRows, samples, () => store.selectedTrendIds,
+    // Bản brief cũng là TRẠNG THÁI PHIÊN: thiếu nó thì mọi thay đổi chỉ nằm trong bộ nhớ trang và mất
+    // khi tải lại. Đây là bất biến, không phải đường đi — nên nó thuộc về danh sách này.
+    collection,
   ], () => { saveAgentDraft(); scheduleSessionSave(); }, { deep: true });
 
   watch(prompt, () => { collectionError.value = ''; store.collectionBriefError = ''; });
@@ -1474,6 +1519,7 @@ export function useAgentStudio() {
     provide('readiness', readiness);
     provide('activeModel', activeModel);
     provide('modelReady', modelReady);
+    provide('modelNeedsAttention', modelNeedsAttention);
     provide('modelShort', modelShort);
     provide('modelTitle', modelTitle);
     provide('modelCandidates', modelCandidates);
@@ -1733,6 +1779,7 @@ export function useAgentStudio() {
     modelReady,
     modelShort,
     modelTitle,
+    modelNeedsAttention,
     modelCandidates,
     toolSearch,
     toolSearchLine,

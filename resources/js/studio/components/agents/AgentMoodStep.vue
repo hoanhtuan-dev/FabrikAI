@@ -270,9 +270,9 @@ async function applyToPrompt() {
         <StudioIcon name="info" size="h-4 w-4" class="shrink-0" />
         <span>Bảng mood đã đổi so với lần dựng brief gần nhất.</span>
         <button type="button" class="btn-brand btn-sm" :disabled="applying" @click="applyToPrompt">
-          {{ applying ? 'Đang cập nhật…' : 'Áp dụng vào brief (tức thì)' }}
+          {{ applying ? 'Đang cập nhật…' : 'Cập nhật số liệu (không gọi AI)' }}
         </button>
-        <span class="text-label">Chạy bằng bộ quy tắc — không tốn lượt gọi AI.</span>
+        <span class="text-label">Chạy bằng bộ quy tắc — không tốn lượt gọi AI, và phần chữ AI viết ở lượt trước được giữ nguyên.</span>
       </div>
     </template>
   </div>

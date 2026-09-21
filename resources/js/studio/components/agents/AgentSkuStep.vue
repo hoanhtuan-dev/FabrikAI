@@ -110,15 +110,14 @@ function useAuto() {
             @click="applyStructure"
           >
             <StudioIcon name="refresh" size="h-3.5 w-3.5" :class="applying ? 'animate-spin' : ''" />
-            {{ applying ? 'Đang chia lại…' : 'Cập nhật cơ cấu' }}
+            {{ applying ? 'Đang chia lại…' : 'Cập nhật số liệu (không gọi AI)' }}
           </button>
           <button type="button" class="tool-btn state-layer" :disabled="applying" @click="useAuto">
             <StudioIcon name="wand" size="h-3 w-3" /> Để hệ thống đề xuất
           </button>
         </div>
         <p class="mt-1.5 text-label leading-4 text-cream-400">
-          ↳ Cập nhật cơ cấu chạy bằng bộ quy tắc của hệ thống nên TỨC THÌ và không tốn lượt gọi AI — các con số giống hệt bản do AI dựng.
-          Muốn phần chữ cũng do AI viết lại thì sang việc 7 và bấm «Tạo lại bằng AI».
+          ↳ Cập nhật chạy bằng bộ quy tắc của hệ thống nên TỨC THÌ và không tốn lượt gọi AI. Phần CHỮ do AI viết ở lượt trước được GIỮ NGUYÊN, chỉ các con số được tính lại.
         </p>
       </div>
 

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\StudioApiKey;
+use App\Models\StudioModel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -50,6 +52,188 @@ class AgentStudioOptionsTest extends TestCase
             ], $extra))
             ->assertOk()
             ->json();
+    }
+
+    /**
+     * [LỖI THẬT — 2026-09-21] "CẬP NHẬT SỐ LIỆU" KHÁC "AI ĐANG TẮT".
+     *
+     * Người dùng bấm «Cập nhật số liệu» ở bước Định hướng (chạy tất định cho tức thì). Trước đây lượt
+     * đó bị máy chủ đóng dấu `ai_disabled` — y như thể họ vừa tắt công tắc Suy luận AI. Dấu ấy nằm trong
+     * bản brief, theo bản brief vào phiên làm việc, nên mở lại trang vẫn thấy câu "Brief này được dựng
+     * khi Suy luận AI đang TẮT" trong khi công tắc đang BẬT.
+     */
+    public function test_a_user_requested_number_refresh_is_not_reported_as_ai_being_off(): void
+    {
+        // Cần có model trong nhóm công việc thì nhánh `ai_disabled` mới tồn tại (không có model nào thì
+        // lý do luôn là no_model_key, và bài này không phân biệt được gì).
+        StudioModel::create([
+            'group' => 'prompt', 'name' => 'DeepSeek', 'provider' => 'deepseek',
+            'model_id' => 'deepseek-chat', 'api_key_ref' => 'deepseek', 'priority' => 9, 'enabled' => true,
+        ]);
+        StudioApiKey::create([
+            'provider' => 'deepseek', 'label' => 'deepseek', 'value' => 'sk-test',
+            'kind' => null, 'scopes' => ['*'], 'priority' => 5, 'enabled' => true,
+        ]);
+        set_setting('studio_task_prompt_model', 'deepseek:deepseek-chat');
+
+        $base = ['prompt' => 'Bộ sưu tập linen pastel cho nữ công sở', 'region' => 'all'];
+
+        // (a) Người dùng TẮT công tắc AI ⇒ lý do đúng là "đang tắt".
+        $off = $this->actingAs($this->customer())
+            ->postJson('/api/design-agent/collection', $base + ['ai' => false])->assertOk();
+        $this->assertSame('ai_disabled', $off->json('model.reason'));
+
+        // (b) Người dùng BẤM cập nhật số liệu ⇒ phải là lý do RIÊNG, không phải "AI đang tắt".
+        $refresh = $this->actingAs($this->customer())
+            ->postJson('/api/design-agent/collection', $base + ['ai' => false, 'refresh' => 1])->assertOk();
+        $this->assertSame('rules_refresh', $refresh->json('model.reason'),
+            'Thao tác cập nhật số liệu của người dùng bị ghi thành "AI đang tắt" — câu sai ấy sẽ theo bản brief vào phiên làm việc.');
+        $this->assertSame('rule', $refresh->json('model.mode'));
+    }
+
+    /** Không cấu hình model nào thì lý do vẫn phải là "chưa cấu hình", dù có cờ refresh hay không. */
+    public function test_the_refresh_flag_never_masks_a_missing_model(): void
+    {
+        $response = $this->actingAs($this->customer())
+            ->postJson('/api/design-agent/collection', [
+                'prompt' => 'Bộ sưu tập linen pastel cho nữ công sở', 'region' => 'all',
+                'ai' => false, 'refresh' => 1,
+            ])->assertOk();
+
+        $this->assertSame('no_model_key', $response->json('model.reason'));
+    }
+
+// ── GIAO DIỆN: băng cảnh báo KHÔNG được sáng lại từ một dữ kiện lịch sử ───────────
+    //
+    // Ba bài dưới đây khoá phần GIAO DIỆN của cùng lỗi vừa khoá ở trên. Repo không có runner JS
+    // (package.json chỉ có build/dev) nên bất biến phía client được khoá bằng cách đọc thẳng mã nguồn —
+    // đúng tiền lệ của DesignSystemTest và AgentStudioPageTest.
+
+    /** Đọc mã nguồn giao diện, tính từ gốc dự án. */
+    private function src(string $rel): string
+    {
+        $path = base_path($rel);
+        $this->assertFileExists($path, 'Thiếu tệp giao diện '.$rel.' — bài kiểm tra này đang trỏ sai chỗ.');
+
+        return (string) file_get_contents($path);
+    }
+
+    /**
+     * BĂNG CẢNH BÁO CHỈ ĐƯỢC DỰNG TỪ SỰ CỐ CỦA LƯỢT VỪA RỒI.
+     *
+     * Đây là chỗ bản trước sai và là lý do người dùng báo "dai dẳng": băng được quyết bởi một cờ nằm
+     * TRONG BẢN BRIEF, mà bản brief thì theo phiên làm việc qua mọi lần mở lại trang. Lý do `ai_disabled`
+     * — vốn không phân biệt được lượt "Cập nhật số liệu" do người dùng bấm với lượt AI thật sự bị tắt —
+     * nằm trong tệp phiên, nên cứ nạp lại là băng sáng lại dù công tắc đang BẬT.
+     */
+    public function test_the_ai_alarm_is_driven_by_real_failures_only(): void
+    {
+        $core = $this->src('resources/js/studio/composables/useAgentStudio.js');
+
+        $this->assertMatchesRegularExpression('/const MODEL_ALARM_REASONS = \\[([^\\]]*)\\];/', $core,
+            'Lõi chưa có danh sách lý do đáng dựng băng cảnh báo.');
+        preg_match('/const MODEL_ALARM_REASONS = \\[([^\\]]*)\\];/', $core, $found);
+        $list = $found[1];
+
+        foreach (['no_model_key', 'model_error', 'invalid_output'] as $reason) {
+            $this->assertStringContainsString($reason, $list, 'Thiếu sự cố thật '.$reason.' trong danh sách cảnh báo.');
+        }
+        foreach (['ai_disabled', 'rules_refresh'] as $never) {
+            $this->assertStringNotContainsString($never, $list,
+                'Lý do '.$never.' không phải sự cố của lượt vừa rồi, không được dựng băng cảnh báo: nó nằm trong '
+                .'bản brief đã lưu nên băng sẽ sáng lại ở mọi lần mở lại phiên.');
+        }
+
+        $this->assertStringContainsString(
+            'const modelNeedsAttention = computed(() => MODEL_ALARM_REASONS.includes(activeModel.value?.reason));',
+            $core, 'Cờ cảnh báo phải hỏi đúng danh sách lý do trên.');
+        $this->assertStringContainsString('v-if="!planLocked && modelNeedsAttention"',
+            $this->src('resources/js/studio/AgentStudioApp.vue'),
+            'Băng ở đầu trang phải do chính cờ đó quyết.');
+    }
+
+    /**
+     * CÁI GÌ ĐÃ LÀ SỰ LỰA CHỌN THÌ KHÔNG BÁO LỆCH — cái gì lệch thật thì phải báo.
+     *
+     * Lượt cập nhật số liệu chạy tất định là ĐÚNG Ý người dùng, nên băng "brief lệch công tắc" phải miễn
+     * trừ nó; còn hai câu chữ thì phải nói đúng nguyên nhân, không nói trạng thái công tắc.
+     */
+    public function test_the_interface_names_a_user_requested_refresh_instead_of_blaming_the_switch(): void
+    {
+        $core = $this->src('resources/js/studio/composables/useAgentStudio.js');
+
+        $this->assertStringContainsString(
+            "if (model?.reason === 'rules_refresh') return false;", $core,
+            'Băng "lệch công tắc" chưa miễn trừ lượt cập nhật số liệu — nó sẽ dính mãi mà không có việc gì để làm.');
+        $this->assertStringContainsString('rules_refresh:', $core, 'Thiếu nhãn cho lý do rules_refresh.');
+        $this->assertStringContainsString('Số liệu vừa được cập nhật bằng bộ quy tắc', $core);
+        $this->assertStringContainsString('không gọi AI', $core, 'Nhãn phải nói rõ lượt đó không gọi AI.');
+    }
+
+    /**
+     * ĐỔI SỐ MÀ KHÔNG MẤT CHỮ.
+     *
+     * Lượt tất định trả về bản brief không có phần chữ, nên nếu cứ thay thẳng thì người dùng chỉ định đổi
+     * số mã hàng là mất luôn brief/prompt do AI viết. Giao diện phải nói với máy chủ rằng đây là lượt
+     * "cập nhật số liệu" và phải giữ chữ; kho dữ liệu phải thật sự gộp.
+     */
+    public function test_a_deterministic_refresh_keeps_the_ai_written_text(): void
+    {
+        $core = $this->src('resources/js/studio/composables/useAgentStudio.js');
+        $store = $this->src('resources/js/studio/store/actions/agentStudio.js');
+
+        $this->assertStringContainsString('if (opts.ai === false) payload.refresh = 1;', $core,
+            'Lượt tất định chưa nói cho máy chủ biết đây là "cập nhật số liệu".');
+        $this->assertStringContainsString('keepText: opts.ai === false,', $core,
+            'Lượt tất định chưa xin giữ phần chữ của bản trước.');
+        $this->assertStringContainsString(
+            'this.collectionBrief = opts.keepText ? keepAiText(data, this.collectionBrief) : (data || null);',
+            $store, 'Kho dữ liệu chưa gộp chữ cũ vào bản mới.');
+
+        foreach (['brief', 'prompt_vi', 'prompt_en', 'brand_narrative', 'next_steps', 'canvas'] as $key) {
+            $this->assertStringContainsString("'".$key."'", $store, 'Phần chữ '.$key.' chưa được giữ lại.');
+        }
+        // Chỉ giữ chữ khi bản CŨ thật sự do AI viết — bản cũ cũng tất định thì không có gì để giữ.
+        $this->assertStringContainsString("if ((previous.model && previous.model.mode) !== 'ai') return fresh;", $store);
+        // Con số thì vẫn phải của bản MỚI, và phải nói đúng phần nào do ai viết.
+        $this->assertStringContainsString('merged.ai_applied = previous.ai_applied;', $store);
+        // Câu "phần chữ giữ nguyên, con số vừa tính lại" phải HIỆN RA được: nó nằm trong model.note và
+        // chỉ có chip đọc. Không có nhánh này thì nó là dữ liệu chết, còn chip nói "Có suy luận AI" —
+        // đúng về phần chữ nhưng giấu mất việc người dùng vừa bấm.
+        $this->assertStringContainsString('if (m.note) return m.note;', $core,
+            'Câu mô tả lượt cập nhật số liệu đã tính ra nhưng không được hiển thị ở đâu.');
+    }
+
+/**
+     * DỰNG LẠI BRIEF THÌ PHẢI GHI PHIÊN NGAY — NẾU KHÔNG THÌ F5 LÀ MẤT.
+     *
+     * Đo được trên trình duyệt thật: bấm «Cập nhật số liệu», biểu đồ hiện 18 mã, tải lại trang về 12 mã,
+     * và nút lại mời bấm đúng việc vừa bấm. Nguyên nhân: bộ theo dõi ghi phiên theo dõi prompt/bảng
+     * SKU/size/mood/mẫu nhưng KHÔNG theo dõi bản brief, mà createBrief lại không tự ghi gì.
+     */
+    public function test_a_rebuilt_brief_is_written_to_the_session_at_once(): void
+    {
+        $core = $this->src('resources/js/studio/composables/useAgentStudio.js');
+
+        $this->assertStringContainsString('await saveSession();', $core,
+            'Dựng lại brief xong phải ghi phiên NGAY (nhịp gộp 1,5 giây không cứu được nếu người dùng đóng tab).');
+        $this->assertMatchesRegularExpression(
+            '/collection,\s*\], \(\) => \{ saveAgentDraft\(\); scheduleSessionSave\(\); \}, \{ deep: true \}\)/',
+            $core,
+            'Bản brief phải nằm trong danh sách trạng thái được ghi vào phiên — đây là bất biến, không phải đường đi.');
+    }
+
+    /** Lượt cập nhật HỎNG không được xoá bản brief người dùng đang xem. */
+    public function test_a_failed_refresh_does_not_wipe_the_brief_on_screen(): void
+    {
+        $store = $this->src('resources/js/studio/store/actions/agentStudio.js');
+        $start = strpos($store, 'async createCollectionBrief(payload');
+        $this->assertNotFalse($start, 'Không tìm thấy createCollectionBrief trong kho dữ liệu.');
+        preg_match('/catch \(error\) \{\s*(.+?)finally/s', substr($store, $start), $caught);
+
+        $this->assertNotEmpty($caught, 'Không đọc được nhánh lỗi của createCollectionBrief.');
+        $this->assertStringNotContainsString('collectionBrief = null', $caught[1],
+            'Lỗi mạng mà xoá kết quả cũ thì người dùng mất luôn bản brief đang xem — lỗi đã được báo bằng toast rồi.');
     }
 
     // ── (a) TỔNG SKU ────────────────────────────────────────────────────────────────

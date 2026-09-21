@@ -1,6 +1,69 @@
 // TÁCH NGUYÊN VĂN từ store.js (đợt tối ưu 2026-09-24) — miền: AGENT STUDIO: kế hoạch sản xuất · dữ liệu shop · DNA · nguồn tin · radar · brief.
 // Action dùng this.* trỏ cùng store instance ⇒ gọi chéo giữa các miền hoạt động y hệt file gốc.
 import { apiError, userFacingError, PLAN_ASSUMPTION_DEFAULTS, CSRF } from '../helpers.js';
+/**
+ * CẬP NHẬT SỐ LIỆU MÀ GIỮ CHỮ — gộp bản brief vừa tính lại với phần CHỮ của bản trước.
+ *
+ * [LỖI THẬT — 2026-09-21] Nút "Cập nhật cơ cấu / Áp dụng (tức thì)" chạy tất định cho nhanh, nhưng
+ * bản trả về KHÔNG có phần chữ nên `brief`, `prompt_vi/en`, caption mood board… bị thay bằng câu do bộ
+ * quy tắc viết. Người dùng chỉ định đổi SỐ MÃ HÀNG mà mất luôn brief do AI viết — và bản brief bị đóng
+ * dấu "chạy bằng bộ quy tắc" rồi theo vào phiên làm việc.
+ *
+ * Luật gộp: SỐ lấy từ bản mới, CHỮ lấy từ bản cũ. Chỉ giữ chữ khi bản cũ THẬT SỰ do AI viết — bản cũ
+ * cũng tất định thì không có gì để giữ.
+ */
+function keepAiText(fresh, previous) {
+  if (!fresh || !previous) return fresh;
+  if ((previous.model && previous.model.mode) !== 'ai') return fresh;
+
+  const merged = { ...fresh };
+  ['brief', 'prompt_vi', 'prompt_en', 'brand_narrative', 'next_steps', 'canvas'].forEach((key) => {
+    if (previous[key] !== undefined && previous[key] !== null && previous[key] !== '') merged[key] = previous[key];
+  });
+
+  // Chữ NẰM TRONG cấu trúc: gộp theo khoá, chỉ lấy phần chữ — con số vẫn của bản mới.
+  const categories = (fresh.structure && fresh.structure.categories) || [];
+  const oldCategories = new Map(((previous.structure && previous.structure.categories) || [])
+    .map((row) => [String(row.category || ''), row.rationale]));
+  if (categories.length && oldCategories.size) {
+    merged.structure = {
+      ...fresh.structure,
+      categories: categories.map((row) => (oldCategories.get(String(row.category || ''))
+        ? { ...row, rationale: oldCategories.get(String(row.category || '')) }
+        : row)),
+    };
+  }
+
+  const outfits = fresh.outfit_matching || [];
+  const oldGoals = new Map(((previous.outfit_matching) || []).map((row) => [String(row.id || ''), row.goal]));
+  if (outfits.length && oldGoals.size) {
+    merged.outfit_matching = outfits.map((row) => (oldGoals.get(String(row.id || ''))
+      ? { ...row, goal: oldGoals.get(String(row.id || '')) }
+      : row));
+  }
+
+  const freshMood = (fresh.moodboard && fresh.moodboard.items) || [];
+  const oldMood = (previous.moodboard && previous.moodboard.items) || [];
+  if (freshMood.length && oldMood.length) {
+    merged.moodboard = {
+      ...fresh.moodboard,
+      items: freshMood.map((row, index) => (oldMood[index] && oldMood[index].source !== 'owner'
+        ? { ...row, caption: oldMood[index].caption }
+        : row)),
+    };
+  }
+
+  // NÓI ĐÚNG: phần chữ này do AI viết (giữ nguyên), phần số vừa được tính lại bằng bộ quy tắc.
+  merged.ai_applied = previous.ai_applied;
+  merged.model = {
+    ...(fresh.model || {}),
+    mode: 'ai',
+    reason: null,
+    note: 'Phần chữ giữ nguyên từ lượt AI trước; các con số (SKU · size · dải giá) vừa được tính lại.',
+  };
+
+  return merged;
+}
 export const agentStudioActions = {
     async loadPlan(payload = {}, opts = {}) {
       // silent = tự tính lại khi gõ (không bật planLoading để nút không nhảy "Đang tính…",
@@ -282,7 +345,8 @@ export const agentStudioActions = {
           // Ảnh mẫu đã chọn ở bước Định hướng — vai ĐỌC ẢNH dùng chúng để bám phong cách thật của shop.
           reference_images: (this.briefReferenceImages || []).slice(0, 3),
         });
-        this.collectionBrief = data || null;
+        // `keepText` = lượt CẬP NHẬT SỐ LIỆU (chạy tất định): giữ phần chữ của bản trước, chỉ lấy số mới.
+        this.collectionBrief = opts.keepText ? keepAiText(data, this.collectionBrief) : (data || null);
         this.collectionBriefInput = this.designBriefInput(payload);
         this.plan = null;          // cấu trúc/SKU đổi ⇒ kế hoạch cũ không còn đúng
         this.planError = '';
@@ -295,7 +359,9 @@ export const agentStudioActions = {
         return data;
       } catch (error) {
         this.collectionBriefError = userFacingError(error, 'Không tạo được brief bộ sưu tập.');
-        this.collectionBrief = null;
+        // KHÔNG xoá bản brief đang có. Lượt cập nhật hỏng (mạng, máy chủ) mà xoá kết quả cũ thì người
+        // dùng mất luôn thứ đang xem và phải chạy lại từ đầu — lỗi đã được báo bằng toast + dòng lỗi,
+        // thêm một hình phạt nữa không giúp ai. Không có bản cũ thì vốn đã là null.
         this.toast(this.collectionBriefError, 'error');
         throw error;
       } finally {
