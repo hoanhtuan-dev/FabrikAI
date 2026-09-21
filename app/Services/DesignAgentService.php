@@ -112,6 +112,44 @@ class DesignAgentService
         private readonly ?BrandLearningService $learning = null,
     ) {}
 
+
+    /**
+     * LỚP CẤU HÌNH HOÁ CHỈ DẪN — "prompt linh hoạt" không phải cơ chế mới.
+     *
+     * Dự án ĐÃ CÓ bảng prompt_templates + studio_prompt_template() từ Đợt 1.7 (khoá · version · is_active ·
+     * {placeholder} · fallback). Việc ở đây chỉ là ĐƯA chỉ dẫn của Agent Studio đi qua đúng đường đó, thay
+     * vì dựng một nơi cấu hình thứ hai — đúng luật của dự án: một nguồn sự thật cho mỗi việc.
+     *
+     * VÌ SAO CHỈ MỘT MỐC CHO MỖI CHỈ DẪN (không tách thành từng mảnh nhỏ): chỉ dẫn radar/brief được dựng
+     * bằng cách GHÉP các mảnh có điều kiện (có tin thật? có công cụ? chế độ tách lượt?). Tách mỗi mảnh
+     * thành một khoá riêng thì người sửa phải hiểu cả cây điều kiện mới sửa đúng một câu — và mọi tổ hợp
+     * sai đều im lặng. Một mốc cho cả chỉ dẫn thì người sửa chịu trách nhiệm trọn vẹn một khối, dễ hiểu
+     * hơn hẳn; còn các giá trị động vẫn đi vào qua {placeholder}.
+     *
+     * KHÔNG ĐỔI HÀNH VI KHI CHƯA CẤU HÌNH: không có hàng nào trong bảng ⇒ trả về CHÍNH chuỗi dựng trong
+     * mã. Đây là điều kiện để thay đổi này an toàn — bật/tắt bằng dữ liệu, không bằng deploy.
+     *
+     * @param  array<string, scalar>  $vars  giá trị thay cho {tên} trong bản cấu hình
+     */
+    private function instruction(string $key, string $built, array $vars = []): string
+    {
+        if (! function_exists('studio_prompt_template')) {
+            return $built;
+        }
+
+        try {
+            $configured = studio_prompt_template($key, $vars, $built);
+        } catch (\Throwable $e) {
+            // Bảng chưa migrate / DB lỗi ⇒ chạy bằng chuỗi trong mã. Một lớp cấu hình KHÔNG được phép làm
+            // hỏng lượt chạy chỉ vì nó không đọc được.
+            return $built;
+        }
+
+        // Bản cấu hình rỗng cũng bị coi như "chưa cấu hình": một hàng rỗng làm lượt chạy mất hết chỉ dẫn
+        // mà không ai thấy lỗi.
+        return trim($configured) === '' ? $built : $configured;
+    }
+
     public function radar(?User $user, string $region = 'all', bool $useAi = true): array
     {
         $region = $this->normalizeRegion($region);
@@ -651,6 +689,14 @@ class DesignAgentService
                     .'note: 1 câu vì sao mẫu này đáng làm trước. '
                     .'KHÔNG bịa con số (giá, số lượng, tỉ lệ %). KHÔNG nhắc tên model hay nhà cung cấp. '
                     .'Trả JSON NGAY, không viết phần suy luận dài dòng.';
+
+                // MỐC CẤU HÌNH cho chỉ dẫn viết prompt ảnh của MỘT mẫu — cùng cơ chế.
+                $instruction = $this->instruction('agent.sample_prompt.instruction', $instruction, [
+                    'today' => now()->format('d/m/Y'),
+                    'sample_name' => (string) ($seed['name'] ?? ''),
+                    'sample_category' => (string) ($seed['category'] ?? ''),
+                    'collection_prompt' => mb_substr($prompt, 0, 1000),
+                ]);
 
                 $call = $this->callJson($instruction, [
                     'collection_prompt' => $prompt,
@@ -2079,6 +2125,13 @@ class DesignAgentService
             $options['tool_begin'] = fn () => $tool->beginAttempt();
         }
 
+        // MỐC CẤU HÌNH: đổi chỉ dẫn radar không cần deploy. Không cấu hình ⇒ dùng đúng chuỗi vừa dựng.
+        $instruction = $this->instruction('agent.radar.instruction', $instruction, [
+            'today' => now()->format('d/m/Y'),
+            'region' => $region,
+            'region_name' => $this->regionName($region),
+        ]);
+
         $call = $this->callJson($instruction, [
             'region' => $region,
             'region_name' => $this->regionName($region),
@@ -2500,6 +2553,17 @@ class DesignAgentService
         // như radar vì đầu vào của nó đã có sẵn DNA + cấu trúc + tín hiệu; mỗi lượt tìm thêm là một vòng ra
         // mạng của nhà cung cấp, cộng thẳng vào thời gian khách phải chờ.
         $options['max_tool_calls'] = 2;
+
+        // MỐC CẤU HÌNH cho chỉ dẫn brief — cùng cơ chế với radar.
+        //
+        // Giá trị động lấy từ $context, KHÔNG phải biến cục bộ: aiBrief() nhận đúng một tham số $context,
+        // nên tham chiếu $region/$prompt ở đây là "Undefined variable" — đã dính thật (23 test đỏ 500).
+        $instruction = $this->instruction('agent.collection_brief.instruction', $instruction, [
+            'today' => now()->format('d/m/Y'),
+            'region' => (string) ($context['region'] ?? 'all'),
+            'region_name' => (string) ($context['region_name'] ?? ''),
+            'collection_prompt' => mb_substr((string) ($context['prompt'] ?? ''), 0, 2000),
+        ]);
 
         $started = microtime(true);
         $call = $this->callJson($instruction, $context, 6000, 16000, 90, $options, $runner);
