@@ -2171,6 +2171,11 @@ class DesignAgentService
             $knownUrls = array_merge(
                 array_column((array) $aiEvidence['items'], 'url'),
                 array_column((array) ($evidence['items'] ?? []), 'url'),
+                // URL mà NHÀ CUNG CẤP thật sự MỞ trong lượt tra (hosted_sources): /responses trả về danh
+                // sách nguồn này, và đó CHÍNH LÀ nguồn model được phép dẫn. Thiếu dòng này thì mọi lời
+                // phán "confirmed" của model đều bị LOẠI vì không khớp URL máy chủ tự lấy (RSS rỗng khi
+                // chưa khai nguồn tìm kiếm) — đúng cái bẫy "tìm thật rồi mà vẫn nói không có bằng chứng".
+                array_values(array_filter(array_map('strval', (array) ($toolSearch['sources'] ?? [])), 'strlen')),
             );
             $trends = $this->applyTrendChecks($trends, (array) ($call['json']['trend_checks'] ?? []), $knownUrls, (array) $aiEvidence['items']);
 
