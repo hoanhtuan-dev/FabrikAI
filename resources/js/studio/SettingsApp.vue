@@ -1479,6 +1479,14 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
                     <code class="break-all text-cream-200">https://www.googleapis.com/customsearch/v1?cx=MÃ_ENGINE&amp;num=10&amp;hl=vi&amp;q={query}</code></p>
                   <p class="mt-1">2. Khoá API <b class="text-cream-100">KHÔNG</b> dán vào URL (URL hiện nguyên văn trên màn này và trong log). Thêm khoá ở <b class="text-cream-100">Cài đặt → API key</b> với provider = <b class="text-cream-200">slug của nguồn này</b> (hoặc <code class="text-cream-200">google_cse</code>) — key được mã hoá khi lưu và chỉ gắn vào lời gọi HTTP lúc chạy.</p>
                   <p class="mt-1">3. Ánh xạ trường bên dưới khai kết quả trả về: Google CSE trả <code class="text-cream-200">items</code> với <code class="text-cream-200">title</code> · <code class="text-cream-200">link</code> · <code class="text-cream-200">snippet</code>.</p>
+                  <!-- CẢNH BÁO ĐÃ TRẢ GIÁ: đo thật 2026-09-21 — người khai dán MÃ CX vào ô API key, vì cả
+                       hai đều là "mã của Google" và cùng nằm cạnh nhau trên trang này. -->
+                  <p class="mt-1 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-warn">
+                    <b>Đừng lẫn hai mã:</b> <code>cx=…</code> là <b>ID của search engine</b> (nằm trong URL, KHÔNG phải khoá).
+                    Khoá API là chuỗi RIÊNG do Google Cloud cấp (thường bắt đầu bằng <code>AIza…</code>) và phải bật
+                    <b>Custom Search API</b> cho project đó. Dán nhầm CX vào ô API key thì API trả
+                    <i>«API key not valid»</i> — lỗi hiện ngay ở nút <b>Lấy thử</b>.
+                  </p>
                 </div>
                 <template v-if="ws.draft.kind === 'json' || ws.draft.kind === 'search'">
                   <div class="grid gap-3 sm:grid-cols-2">
