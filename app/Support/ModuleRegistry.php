@@ -164,7 +164,13 @@ class ModuleRegistry
             'id' => 'collection_bot', 'name' => 'CollectionBot', 'group' => 'Nội dung',
             'kind' => self::KIND_FEATURE, 'gui' => false, 'icon' => 'palette',
             'summary' => 'Brief, mood board, cấu trúc SKU, size và pricing từ prompt + TrendRadar.',
-            'endpoints' => ['design-agent/collection', 'design-agent/plan', 'design-agent/shop-signals'], 'depends_on' => ['collections'],
+            // [2026-09-25] Thêm HAI đường của luồng làm-từng-bước:
+            //   · design-agent/sample-prompt — sinh prompt cho TỪNG mẫu (bước Thực thi);
+            //   · design-agent/session      — phiên làm việc dai dẳng (GET/PUT + /close + /reopen).
+            // Cả hai thuộc nửa "thiết kế bộ sưu tập" của Agent Studio nên đi cùng collection_bot: gói
+            // không có CollectionBot thì cũng không có gì để mà lưu phiên. Khai ở đây là middleware
+            // EnforceModules tự chặn ở backend — ẩn nút trên giao diện không phải phân quyền.
+            'endpoints' => ['design-agent/collection', 'design-agent/plan', 'design-agent/shop-signals', 'design-agent/sample-prompt', 'design-agent/session'], 'depends_on' => ['collections'],
             'plans' => ['pro', 'studio', 'factory_season'],
         ],
         [

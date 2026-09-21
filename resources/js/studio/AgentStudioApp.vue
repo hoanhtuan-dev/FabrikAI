@@ -63,7 +63,11 @@ function toggleTheme() { setTheme(themeResolved.value === 'light' ? 'dark' : 'li
  */
 const STEP_PARAM = 'buoc';
 const wanted = new URLSearchParams(window.location.search).get(STEP_PARAM);
-if (STEPS.some((s) => s.id === wanted)) store.setDesignAgentStep(wanted);
+if (STEPS.some((s) => s.id === wanted)) {
+  store.setDesignAgentStep(wanted);
+  // Khoá bước theo URL: phiên làm việc nạp BẤT ĐỒNG BỘ về sau, không được ghi đè bước của link.
+  agent.lockStepToUrl();
+}
 // immediate: URL phải phản ánh bước NGAY từ lần vẽ đầu, không chỉ sau khi người dùng bấm đổi bước —
 // nếu không, người mở /agent-studio (không tham số) vẫn thấy thanh địa chỉ trống trong khi màn hình
 // đã ở bước 2, và copy link ở thời điểm đó là mất bước.

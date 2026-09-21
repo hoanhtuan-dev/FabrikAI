@@ -102,13 +102,24 @@ class AgentStudioPageTest extends TestCase
         // Bước trong URL phải là bước CÓ THẬT (nguồn duy nhất: STEPS của composable).
         $core = $this->src('resources/js/studio/composables/useAgentStudio.js');
         $this->assertMatchesRegularExpression(
-            "/if \(STEPS\.some\(\(s\) => s\.id === wanted\)\) store\.setDesignAgentStep\(wanted\);/",
+            "/if \(STEPS\.some\(\(s\) => s\.id === wanted\)\) \{/",
             $app,
             'Bước đọc từ URL phải được kiểm tra thuộc STEPS trước khi áp — nhận bừa giá trị lạ là mở ra bước không tồn tại.'
         );
         foreach (["id: 'dna'", "id: 'radar'", "id: 'brief'", "id: 'canvas'"] as $step) {
             $this->assertStringContainsString($step, $core, 'Thiếu bước '.$step.' trong STEPS.');
         }
+
+        // URL THẮNG PHIÊN: phiên nạp BẤT ĐỒNG BỘ về sau, nên nếu không khoá bước theo URL thì phiên ghi
+        // đè bước của link — gửi link cho đồng nghiệp mà họ lại mở đúng chỗ cũ của chính họ.
+        $this->assertStringContainsString('agent.lockStepToUrl();', $app,
+            'Thiếu khoá bước theo URL — phiên làm việc sẽ ghi đè bước mà link trỏ tới.');
+        $this->assertStringContainsString('stepLockedByUrl', $core, 'Lõi chưa có cờ khoá bước theo URL.');
+        $this->assertStringContainsString(
+            'session.step && !stepLockedByUrl.value',
+            $core,
+            'Nạp phiên vẫn ghi đè bước đọc từ URL — tham số trên link thành ra vô nghĩa.'
+        );
     }
 
     /**

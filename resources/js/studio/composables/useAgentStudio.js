@@ -11,7 +11,9 @@
  * sửa cả 4 bước mà không đổi hành vi.
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useStudioStore } from '../store.js';
+import { useStudioStore, userFacingError } from '../store.js';
+// CSRF nằm trong helpers (store.js chỉ re-export apiError · safeMessage · userFacingError).
+import { CSRF } from '../store/helpers.js';
 // Đọc bảng dán từ Excel nằm ở MODULE RIÊNG để kiểm được bằng máy (scripts/check-shop-paste.mjs) —
 // logic tiền nằm trong file .vue thì không test nào chạm tới, và đó đúng là cách lỗi cũ lọt qua.
 import { parseShopRows } from '../shopPaste.js';
@@ -76,6 +78,173 @@ export function useAgentStudio() {
     { id: 'women', label: 'Nữ ưu tiên S–M', values: { XS: 10, S: 30, M: 35, L: 20, XL: 5 } },
     { id: 'unisex', label: 'Unisex', values: { S: 25, M: 35, L: 30, XL: 10 } },
   ];
+  /**
+   * BƯỚC CON — mỗi bước chính chia thành nhiều việc nhỏ, mỗi việc MỘT quyết định.
+   *
+   * Vì sao: trên điện thoại, một màn hình dài 3-4 cuộn thì người dùng không biết mình đang ở đâu và
+   * còn phải làm gì. Bước con cho biết "3/7" và mỗi màn chỉ có một việc. Trên màn rộng vẫn giữ nguyên
+   * thứ tự này — cùng một đường đi, chỉ khác cách bày.
+   */
+  const SUBSTEPS = {
+    dna: [
+      { id: 'positioning', label: 'Định vị', hint: 'Bạn bán cho ai, ở tầm giá nào' },
+      { id: 'style', label: 'Phong cách', hint: 'Phong cách · màu · chất liệu · nhóm hàng · thứ KHÔNG làm' },
+    ],
+    radar: [
+      { id: 'signals', label: 'Nguồn & số đo', hint: 'Tin thật đang có và những gì đo được từ tin' },
+      { id: 'trends', label: 'Chọn hướng', hint: 'Chọn 2–4 hướng sẽ đi vào brief' },
+    ],
+    brief: [
+      { id: 'prompt', label: 'Mô tả & ảnh mẫu', hint: 'Bộ sưu tập này cho ai và nhìn như thế nào' },
+      { id: 'sku', label: 'Số lượng SKU', hint: 'Bao nhiêu mã hàng, chia cho nhóm nào' },
+      { id: 'size', label: 'Bảng size', hint: 'Size nào, mỗi size bao nhiêu phần trăm' },
+      { id: 'mood', label: 'Bảng mood', hint: 'Bảng màu + tâm trạng — đi thẳng vào prompt ảnh' },
+      { id: 'cost', label: 'Đơn giá xưởng', hint: 'Giá vải, công may, phụ liệu… do bạn nhập' },
+      { id: 'plan', label: 'Kế hoạch & lãi', hint: 'Lệnh cắt, giá vốn, ba mức giá bán' },
+      { id: 'review', label: 'Xem lại & chốt', hint: 'Kiểm tra rồi tạo brief để sang bước Thực thi' },
+    ],
+    canvas: [
+      { id: 'list', label: 'Danh sách mẫu', hint: 'Mỗi mã hàng là một mẫu, cần một prompt riêng' },
+      { id: 'prompts', label: 'Sinh prompt từng mẫu', hint: 'Làm từng mẫu một, xong mẫu nào chốt mẫu đó' },
+      { id: 'apply', label: 'Áp dụng & lưu', hint: 'Đưa prompt sang Canvas và lưu phiên' },
+    ],
+  };
+  /** Bước con đang mở của TỪNG bước chính — nhớ riêng để quay lại là về đúng chỗ đang làm. */
+  const subSteps = ref({ dna: 'positioning', radar: 'signals', brief: 'prompt', canvas: 'list' });
+  const subList = computed(() => SUBSTEPS[step.value] || []);
+  const subIndex = computed(() => Math.max(0, subList.value.findIndex((s) => s.id === subSteps.value[step.value])));
+  const sub = computed(() => subList.value[subIndex.value]?.id || '');
+  function setSub(id) {
+    if (!SUBSTEPS[step.value]?.some((s) => s.id === id)) return;
+    subSteps.value = { ...subSteps.value, [step.value]: id };
+  }
+  function subNext() { const next = subList.value[subIndex.value + 1]; if (next) setSub(next.id); }
+  function subPrev() { const prev = subList.value[subIndex.value - 1]; if (prev) setSub(prev.id); }
+
+  /**
+   * BƯỚC ĐANG MỞ do URL quyết định (link chia sẻ).
+   *
+   * Vì sao cần cờ này: phiên làm việc được nạp BẤT ĐỒNG BỘ, về sau khi trang đã vẽ. Không có cờ thì
+   * phiên ghi đè bước vừa đọc từ URL — gửi link cho đồng nghiệp mà họ lại mở đúng chỗ cũ của chính
+   * họ, và tham số trên URL thành ra vô nghĩa. URL thắng, giống hệt luật với bản nháp trên máy.
+   */
+  const stepLockedByUrl = ref(false);
+  function lockStepToUrl() { stepLockedByUrl.value = true; }
+
+  // ── SỐ LƯỢNG SKU do người dùng chọn (0 = để hệ thống đề xuất) ────────────────────────────
+  const skuTotal = ref(0);
+  const skuTotalSource = computed(() => collection.value?.structure?.total_skus_source || (skuTotal.value ? 'owner' : 'system'));
+
+  /**
+   * BẢNG SIZE người dùng đặt: danh sách size + tỉ lệ %. Tổng LUÔN được khoá về 100.
+   *
+   * Vì sao không dùng 3 preset cứng như trước: `CollectionPlanService` đọc CHÍNH bảng này để ra lệnh cắt
+   * (size nào bao nhiêu cái, đặt bao nhiêu mét vải). Shop có bảng size riêng thì mọi con số sản xuất đều
+   * sai. Preset nay chỉ còn là ĐIỂM BẮT ĐẦU — bấm vào là đổ số vào bảng, rồi sửa tiếp.
+   */
+  const sizeRowsInput = ref(Object.entries(SIZE_PRESETS[0].values).map(([size, pct]) => ({ size, pct })));
+  const sizePctTotal = computed(() => sizeRowsInput.value.reduce((sum, row) => sum + (Number(row.pct) || 0), 0));
+  const sizeTotalOk = computed(() => sizePctTotal.value === 100 && sizeRowsInput.value.length > 0);
+  function applySizePreset(preset) {
+    const found = SIZE_PRESETS.find((item) => item.id === preset);
+    if (!found) return;
+    sizeRowsInput.value = Object.entries(found.values).map(([size, pct]) => ({ size, pct }));
+  }
+  function addSizeRow() {
+    if (sizeRowsInput.value.length >= 12) return;
+    const used = new Set(sizeRowsInput.value.map((r) => r.size));
+    const free = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'].find((s) => !used.has(s)) || 'SIZE';
+    sizeRowsInput.value = [...sizeRowsInput.value, { size: free, pct: 0 }];
+  }
+  function removeSizeRow(index) {
+    if (sizeRowsInput.value.length <= 1) return;   // bảng size rỗng thì lệnh cắt không có gì để chia
+    sizeRowsInput.value = sizeRowsInput.value.filter((_, i) => i !== index);
+  }
+  function setSizeRow(index, patch) {
+    sizeRowsInput.value = sizeRowsInput.value.map((row, i) => (i === index ? { ...row, ...patch } : row));
+  }
+  /** Chia đều 100% cho các size đang có — nút "chia đều" khi người dùng chưa biết tỉ lệ nào hợp lý. */
+  function evenSizeRows() {
+    const n = sizeRowsInput.value.length;
+    if (!n) return;
+    const base = Math.floor(100 / n);
+    let rest = 100 - base * n;
+    sizeRowsInput.value = sizeRowsInput.value.map((row) => {
+      const pct = base + (rest > 0 ? 1 : 0);
+      if (rest > 0) rest--;
+      return { ...row, pct };
+    });
+  }
+
+  // ── BẢNG MÀU & BẢNG MOOD do người dùng sửa (rỗng = dùng bản hệ thống dựng) ──────────────
+  const paletteRows = ref([]);
+  const moodRows = ref([]);
+  /**
+   * LẦN SỬA ĐẦU TIÊN thì chép bảng hệ thống dựng thành dòng sửa được.
+   *
+   * Vì sao không chép ngay khi có brief: chép là `paletteRows` khác rỗng, mà `paletteRows` nằm trong
+   * đầu vào so sánh brief ⇒ brief VỪA TẠO đã bị coi là "đã cũ" dù người dùng chưa đổi gì. Chỉ chép
+   * khi người dùng THẬT SỰ sửa thì tín hiệu "brief đã cũ" mới đúng nghĩa.
+   */
+  function ensurePaletteRows() {
+    if (!paletteRows.value.length) {
+      paletteRows.value = (collection.value?.palette || []).map((row) => ({ ...row }));
+    }
+  }
+  function ensureMoodRows() {
+    if (!moodRows.value.length) {
+      moodRows.value = (collection.value?.moodboard?.items || []).map((row) => ({ ...row }));
+    }
+  }
+  function resetPaletteRows() { paletteRows.value = []; }
+  function resetMoodRows() { moodRows.value = []; }
+  function addPaletteRow() {
+    ensurePaletteRows();
+    if (paletteRows.value.length >= 12) return;
+    paletteRows.value = [...paletteRows.value, { name: 'Màu ' + (paletteRows.value.length + 1), hex: '#CCCCCC', role: '' }];
+  }
+  function removePaletteRow(index) { paletteRows.value = paletteRows.value.filter((_, i) => i !== index); }
+  function setPaletteRow(index, patch) {
+    ensurePaletteRows();
+    paletteRows.value = paletteRows.value.map((row, i) => (i === index ? { ...row, ...patch } : row));
+  }
+  function addMoodRow() {
+    ensureMoodRows();
+    if (moodRows.value.length >= 40) return;
+    const hex = paletteRows.value[0]?.hex || palette.value[0]?.hex || '#CCCCCC';
+    moodRows.value = [...moodRows.value, { id: 'mood-' + Date.now(), label: '', caption: '', color: hex }];
+  }
+  function removeMoodRow(index) { moodRows.value = moodRows.value.filter((_, i) => i !== index); }
+  function setMoodRow(index, patch) {
+    ensureMoodRows();
+    moodRows.value = moodRows.value.map((row, i) => (i === index ? { ...row, ...patch } : row));
+  }
+  /** Đổi thứ tự ô mood — thứ tự này cũng là thứ tự đưa vào prompt nên kéo lên/xuống là đổi prompt. */
+  function moveMoodRow(index, delta) {
+    ensureMoodRows();
+    const to = index + delta;
+    if (to < 0 || to >= moodRows.value.length) return;
+    const next = [...moodRows.value];
+    const [row] = next.splice(index, 1);
+    next.splice(to, 0, row);
+    moodRows.value = next;
+  }
+
+  // ── MẪU: mỗi mã hàng một prompt, người dùng chốt từng mẫu ────────────────────────────────
+  const samples = ref([]);
+  const sampleBusyId = ref('');
+  const sampleError = ref('');
+  const sampleProgress = computed(() => {
+    const rows = samples.value;
+    return {
+      total: rows.length,
+      done: rows.filter((s) => s.status === 'done').length,
+      skipped: rows.filter((s) => s.status === 'skipped').length,
+      todo: rows.filter((s) => s.status !== 'done' && s.status !== 'skipped').length,
+    };
+  });
+  /** Mẫu kế tiếp cần làm — nút chính ở bước Thực thi luôn nhắm vào đúng mẫu này. */
+  const nextSample = computed(() => samples.value.find((s) => s.status !== 'done' && s.status !== 'skipped') || null);
   const RATIO_OPTIONS = ['1:1', '4:5', '3:4', '9:16', '4:3'];
   const CATEGORY_LABELS = { color: 'Màu sắc', silhouette: 'Dáng', fabric: 'Chất liệu', price: 'Giá', detail: 'Chi tiết' };
   const LIFECYCLE_LABELS = { emerging: 'Mới nổi', peak: 'Đang đỉnh', declining: 'Giảm dần' };
@@ -319,18 +488,31 @@ export function useAgentStudio() {
         .map((value) => String(value || '').toLowerCase()).join(' ').includes(query);
     });
   });
-  const palette = computed(() => collection.value?.palette || []);
-  const moodboardItems = computed(() => collection.value?.moodboard?.items || []);
+  // Ưu tiên bản NGƯỜI DÙNG đang sửa; chưa sửa gì thì dùng bản hệ thống dựng trong brief.
+  const palette = computed(() => (paletteRows.value.length ? paletteRows.value : (collection.value?.palette || [])));
+  const moodboardItems = computed(() => (moodRows.value.length ? moodRows.value : (collection.value?.moodboard?.items || [])));
   const categoryRows = computed(() => collection.value?.structure?.categories || []);
   const outfitRows = computed(() => collection.value?.outfit_matching || []);
   const sizeRows = computed(() => collection.value?.size_distribution || []);
   const priceBand = computed(() => collection.value?.price_bands || null);
   const canvasSettings = computed(() => collection.value?.canvas || null);
-  const sizeDistribution = computed(() => (SIZE_PRESETS.find((item) => item.id === sizePreset.value) || SIZE_PRESETS[0]).values);
+  /**
+   * Bảng size gửi lên máy chủ: { size: tỉ lệ }. Máy chủ chỉ cần TỈ LỆ (nó tự quy về % và số cái), nên
+   * gửi thẳng phần trăm là đúng và không phải quy đổi hai lần.
+   */
+  const sizeDistribution = computed(() => Object.fromEntries(
+    sizeRowsInput.value
+      .filter((row) => String(row.size || '').trim() !== '')
+      .map((row) => [String(row.size).trim().toUpperCase(), Math.max(0, Number(row.pct) || 0)]),
+  ));
+  /** Đầu vào của brief — GỒM cả ba lựa chọn mới: đổi chúng là phần chữ của brief cũ không còn đúng. */
   const currentBriefInput = computed(() => ({
     prompt: prompt.value.trim(),
     region: selectedRegion.value,
     trend_ids: selectedTrendIds.value,
+    sku_total: skuTotal.value,
+    palette: paletteRows.value,
+    moodboard: moodRows.value,
     // [BUG ĐÃ SỬA] size_distribution PHẢI nằm trong input so sánh: thiếu nó thì brief vừa tạo LUÔN bị
     // coi là "đã cũ" (bảng size được ghi vào brief khi tạo, nhưng chỗ kiểm tra lại không đưa vào so sánh)
     // ⇒ người dùng chưa đổi gì vẫn thấy "Prompt/trend đã đổi. Bấm «Tạo lại brief»".
@@ -506,12 +688,7 @@ export function useAgentStudio() {
   const planLines = computed(() => plan.value?.cut_lines || []);
   const planSizeChart = computed(() => plan.value?.size_chart || []);
   const planScenarios = computed(() => plan.value?.selling || []);
-  const planInput = computed(() => ({
-    prompt: prompt.value.trim(),
-    region: selectedRegion.value,
-    trend_ids: selectedTrendIds.value,
-    size_distribution: sizeDistribution.value,
-  }));
+  const planInput = computed(() => serverInput());
   let planTimer = null;
   /** Tự tính lại khi GÕ số liệu — gộp nhiều lần gõ thành 1 lượt, chạy IM LẶNG để không nhảy nút "Đang tính…". */
   function schedulePlan() {
@@ -637,6 +814,23 @@ export function useAgentStudio() {
     if (id === 'radar' && !store.trendRadar) loadRadar(selectedRegion.value);
   }
 
+  /**
+   * Payload gửi máy chủ cho CẢ brief và kế hoạch — một chỗ duy nhất, vì hai đường phải nhận đúng cùng
+   * một đầu vào (cấu trúc danh mục, bảng size, dải giá). Thêm lựa chọn mới mà chỉ sửa một đường là
+   * màn hình hiện một đằng, lệnh cắt ra một nẻo.
+   */
+  function serverInput() {
+    return {
+      prompt: prompt.value.trim(),
+      region: selectedRegion.value,
+      trend_ids: selectedTrendIds.value,
+      size_distribution: sizeDistribution.value,
+      sku_total: skuTotal.value || undefined,
+      palette: paletteRows.value.length ? paletteRows.value : undefined,
+      moodboard: moodRows.value.length ? moodRows.value : undefined,
+    };
+  }
+
   async function loadRadar(region = selectedRegion.value || 'all', options = {}) {
     try { await store.loadTrendRadar(region, options); } catch (error) { /* store giữ lỗi */ }
   }
@@ -679,12 +873,9 @@ export function useAgentStudio() {
       return false;
     }
     try {
-      await store.createCollectionBrief({
-        prompt: value,
-        region: selectedRegion.value,
-        trend_ids: selectedTrendIds.value,
-        size_distribution: sizeDistribution.value,
-      }, { force: !!opts.force });
+      // `opts.ai === false` = chạy TẤT ĐỊNH cho lượt này: dùng khi người dùng vừa sửa bảng mood/bảng
+      // size và chỉ cần phần chữ bám theo — tức thì và không tốn lượt gọi model.
+      await store.createCollectionBrief(serverInput(), { force: !!opts.force, ai: opts.ai });
       return true;
     } catch (error) {
       collectionError.value = store.collectionBriefError || error.message || 'Không tạo được brief bộ sưu tập.';
@@ -807,16 +998,23 @@ export function useAgentStudio() {
   onMounted(() => window.addEventListener('keydown', agentKeydown));
   onBeforeUnmount(() => window.removeEventListener('keydown', agentKeydown));
 
-  // ── LƯU NHÁP BỀN (2026-09-24) ─────────────────────────────────────────────────────────────
-  // Prompt · bước đang mở · trend đã chọn · size preset KHÔNG mất khi tải lại trang / đóng modal.
-  // Agent Studio là "trợ thủ" thì người dùng không được mất công sức vì lỡ F5 hay máy tự reload.
+  // ── LƯU NHÁP BỀN Ở MÁY (2026-09-24 · mở rộng 2026-09-25) ─────────────────────────────────
+  // Đây là TẦNG THỨ NHẤT: cứu F5 và máy tự tải lại, chạy cả khi mất mạng / chưa đăng nhập lại được.
+  // Tầng thứ hai (bền theo TÀI KHOẢN, mở máy khác vẫn thấy) nằm ở phiên làm việc — xem saveSession().
+  // Giữ cả hai là cố ý: localStorage cứu ngay lập tức, phiên máy chủ cứu khi đổi thiết bị.
   const DRAFT_KEY = 'fabrikai.agentStudio.draft';
   function saveAgentDraft() {
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        v: 2,
         prompt: prompt.value,
         step: store.designAgentStep || 'dna',
-        sizePreset: sizePreset.value,
+        subSteps: subSteps.value,
+        skuTotal: skuTotal.value,
+        sizeRows: sizeRowsInput.value,
+        paletteRows: paletteRows.value,
+        moodRows: moodRows.value,
+        samples: samples.value,
         selectedTrendIds: (store.selectedTrendIds || []).slice(),
       }));
     } catch (e) { /* chế độ riêng tư / đầy bộ nhớ — không làm hỏng luồng chính */ }
@@ -827,12 +1025,20 @@ export function useAgentStudio() {
       if (!d) return;
       if (typeof d.prompt === 'string') prompt.value = d.prompt;
       if (d.step && STEPS.some((s) => s.id === d.step)) store.setDesignAgentStep(d.step);
-      if (d.sizePreset && SIZE_PRESETS.some((s) => s.id === d.sizePreset)) sizePreset.value = d.sizePreset;
+      if (d.subSteps && typeof d.subSteps === 'object') subSteps.value = { ...subSteps.value, ...d.subSteps };
+      if (Number(d.skuTotal) > 0) skuTotal.value = Number(d.skuTotal);
+      if (Array.isArray(d.sizeRows) && d.sizeRows.length) sizeRowsInput.value = d.sizeRows;
+      if (Array.isArray(d.paletteRows)) paletteRows.value = d.paletteRows;
+      if (Array.isArray(d.moodRows)) moodRows.value = d.moodRows;
+      if (Array.isArray(d.samples)) samples.value = d.samples;
       if (Array.isArray(d.selectedTrendIds)) store.selectedTrendIds = d.selectedTrendIds.map(String);
     } catch (e) { /* bỏ qua bản nháp hỏng */ }
   }
   restoreAgentDraft();
-  watch([prompt, () => store.designAgentStep, sizePreset, () => store.selectedTrendIds], saveAgentDraft);
+  watch([
+    prompt, () => store.designAgentStep, subSteps, skuTotal, sizeRowsInput,
+    paletteRows, moodRows, samples, () => store.selectedTrendIds,
+  ], () => { saveAgentDraft(); scheduleSessionSave(); }, { deep: true });
 
   watch(prompt, () => { collectionError.value = ''; store.collectionBriefError = ''; });
   watch(collection, (value) => {
@@ -860,9 +1066,316 @@ export function useAgentStudio() {
     if (!store.webAccess) store.loadWebAccess();
     if (!store.webSources) store.loadWebSources(false, selectedRegion.value);
     if (!store.trendRadar) loadRadar(selectedRegion.value);
+    // PHIÊN LÀM VIỆC — nạp SAU cùng và không chặn: màn hình vẽ được ngay bằng bản nháp trên máy, phiên
+    // của tài khoản về sau thì ghi đè. Chặn ở đây là mở trang phải chờ một vòng mạng mới thấy gì đó.
+    loadSession().then((restored) => {
+      if (restored) store.toast('Đã mở lại phiên làm việc đang dở của bạn.');
+    });
   }
 
 
+  // ══════════════════ PHIÊN LÀM VIỆC DAI DẲNG (tầng 2: theo TÀI KHOẢN) ══════════════════
+  // Tầng 1 là bản nháp localStorage ở trên (cứu F5). Tầng này cứu thứ localStorage không cứu được:
+  // đổi máy, đổi trình duyệt, xoá cache. Một bản nháp = MỘT phiên, lưu ở bảng projects (xem
+  // AgentSessionController) nên phiên cũng chính là bộ sưu tập trong /bo-suu-tap.
+  const sessionProjectId = ref(null);
+  const sessionSavedAt = ref('');
+  const sessionSaving = ref(false);
+  const sessionError = ref('');
+  const sessionClosed = ref(false);
+  const sessionName = ref('');
+  let sessionTimer = null;
+  let sessionHydrating = false;
+
+  /** Rút gọn brief trước khi lưu: chỉ giữ phần giao diện CẦN để vẽ lại màn hình đang làm dở. */
+  function briefSnapshot(value) {
+    if (!value) return null;
+    return {
+      brief: value.brief || '',
+      prompt_vi: value.prompt_vi || '',
+      prompt_en: value.prompt_en || '',
+      canvas: value.canvas || null,
+      palette: value.palette || [],
+      moodboard: value.moodboard || null,
+      structure: value.structure || null,
+      size_distribution: value.size_distribution || [],
+      price_bands: value.price_bands || null,
+      outfit_matching: value.outfit_matching || [],
+      brand_narrative: { narrative: value.brand_narrative?.narrative || '' },
+      brand_dna: value.brand_dna || null,
+      reference_style: value.reference_style || null,
+      model: value.model || null,
+      ai_applied: value.ai_applied || null,
+      input: value.input || null,
+      project_payload: value.project_payload || null,
+      next_steps: value.next_steps || [],
+      generated_at: value.generated_at || '',
+    };
+  }
+
+  function sessionSnapshot() {
+    return {
+      version: 1,
+      step: step.value,
+      sub: sub.value,
+      name: sessionName.value || collection.value?.project_payload?.name || '',
+      prompt: prompt.value,
+      region: selectedRegion.value,
+      trend_ids: selectedTrendIds.value,
+      sku_total: skuTotal.value || undefined,
+      size_distribution: sizeDistribution.value,
+      palette: paletteRows.value,
+      moodboard: moodRows.value,
+      plan_assumptions: { ...store.planAssumptions },
+      samples: samples.value,
+      brief: collection.value?.brief || '',
+      brief_snapshot: briefSnapshot(collection.value),
+      brief_input: currentBriefInput.value,
+    };
+  }
+
+  /** Lưu NGAY (không gộp). Trả về true khi ghi được. */
+  async function saveSession() {
+    if (sessionHydrating) return false;
+    sessionSaving.value = true;
+    sessionError.value = '';
+    try {
+      const body = { session: sessionSnapshot() };
+      if (sessionProjectId.value) body.project_id = sessionProjectId.value;
+      const res = await fetch('/api/design-agent/session', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': CSRF() },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || 'Không lưu được phiên làm việc.');
+      sessionProjectId.value = data?.project?.id || sessionProjectId.value;
+      sessionSavedAt.value = data?.saved_at || '';
+      sessionClosed.value = !!data?.project?.closed;
+      return true;
+    } catch (e) {
+      // Im lặng ở đây là cách tệ nhất: người dùng tin là đã lưu rồi đóng máy và mất bài.
+      sessionError.value = userFacingError(e, 'Không lưu được phiên làm việc — bản nháp trên máy này vẫn còn.');
+      return false;
+    } finally {
+      sessionSaving.value = false;
+    }
+  }
+
+  /** Gộp nhiều thay đổi liên tiếp thành MỘT lần ghi — người dùng gõ phím thì không gọi mạng mỗi ký tự. */
+  function scheduleSessionSave() {
+    if (sessionHydrating) return;
+    if (sessionTimer) clearTimeout(sessionTimer);
+    sessionTimer = setTimeout(() => { sessionTimer = null; saveSession(); }, 1500);
+  }
+
+  function hydrateSession(session) {
+    if (!session || typeof session !== 'object') return;
+    sessionHydrating = true;
+    try {
+      if (typeof session.prompt === 'string' && session.prompt !== '') prompt.value = session.prompt;
+      if (session.step && !stepLockedByUrl.value && STEPS.some((s) => s.id === session.step)) store.setDesignAgentStep(session.step);
+      if (session.sub && typeof session.sub === 'string') setSub(session.sub);
+      if (Number(session.sku_total) > 0) skuTotal.value = Number(session.sku_total);
+      if (Array.isArray(session.size_distribution) || (session.size_distribution && typeof session.size_distribution === 'object')) {
+        const rows = Array.isArray(session.size_distribution)
+          ? session.size_distribution
+          : Object.entries(session.size_distribution).map(([size, pct]) => ({ size, pct: Number(pct) }));
+        if (rows.length) sizeRowsInput.value = rows;
+      }
+      if (Array.isArray(session.palette)) paletteRows.value = session.palette;
+      if (Array.isArray(session.moodboard)) moodRows.value = session.moodboard;
+      if (Array.isArray(session.samples)) samples.value = session.samples;
+      if (session.plan_assumptions && typeof session.plan_assumptions === 'object') {
+        store.planAssumptions = { ...store.planAssumptions, ...session.plan_assumptions };
+      }
+      if (session.name) sessionName.value = String(session.name);
+      // Khôi phục BRIEF đã dựng: không có nó thì mở lại phiên là màn hình trắng và người dùng phải
+      // chạy lại model (tốn ~28 giây + token) chỉ để nhìn lại thứ mình đã làm hôm qua.
+      const snap = session.brief_snapshot;
+      if (snap && typeof snap === 'object' && !collection.value) {
+        // KHÔNG dựng lại `agent`/`engine` ở đây: hai trường đó là mã nội bộ của máy chủ, giao diện
+        // không hiển thị chúng (UserFacingMessagesTest cấm lộ chữ kỹ thuật ra màn hình khách).
+        store.collectionBrief = { ...snap, restored_from_session: true };
+        if (session.brief_input) store.collectionBriefInput = store.designBriefInput(session.brief_input);
+      }
+    } finally {
+      // Nhả cờ ở nhịp sau: watcher deep bắn ngay trong cùng tick với các phép gán trên, nên hạ cờ
+      // đồng bộ sẽ để lọt một lượt ghi đè phiên vừa đọc lên chính nó.
+      setTimeout(() => { sessionHydrating = false; }, 0);
+    }
+  }
+
+  /** Nạp phiên đang mở của tài khoản. Không có phiên nào thì im lặng — người mới không cần thấy lỗi. */
+  async function loadSession() {
+    try {
+      const res = await fetch('/api/design-agent/session', { headers: { Accept: 'application/json' } });
+      if (!res.ok) return false;
+      const data = await res.json().catch(() => ({}));
+      sessionProjectId.value = data?.project?.id || null;
+      sessionClosed.value = !!data?.project?.closed;
+      sessionSavedAt.value = data?.project?.updated_at || '';
+      if (data?.session) {
+        hydrateSession(data.session);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /** CHỐT PHIÊN — lưu lần cuối rồi đóng. Bộ sưu tập vẫn nằm trong /bo-suu-tap. */
+  async function closeSession() {
+    if (!sessionProjectId.value && !(await saveSession())) return false;
+    if (!sessionProjectId.value) return false;
+    try {
+      const res = await fetch('/api/design-agent/session/close', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': CSRF() },
+        body: JSON.stringify({ project_id: sessionProjectId.value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || 'Không chốt được phiên.');
+      sessionClosed.value = true;
+      store.toast('Đã lưu phiên vào bộ sưu tập «' + (data?.project?.name || '') + '». Mở lại được bất cứ lúc nào.');
+      return true;
+    } catch (e) {
+      sessionError.value = userFacingError(e, 'Không chốt được phiên làm việc.');
+      return false;
+    }
+  }
+
+  // ══════════════════ MẪU: mỗi mã hàng một prompt ══════════════════
+  /**
+   * Dựng danh sách mẫu từ CƠ CẤU SKU người dùng đã chốt: mỗi mã hàng là một mẫu, size lấy theo vòng
+   * từ bảng size (tỉ lệ size nào cao thì xuất hiện nhiều hơn).
+   *
+   * GIỮ NGUYÊN mẫu cũ theo id: dựng lại danh sách không được xoá prompt người dùng đã sinh và đã chốt.
+   */
+  function buildSamples() {
+    const cats = categoryRows.value;
+    if (!cats.length) {
+      sampleError.value = 'Chưa có cơ cấu SKU — tạo brief ở bước Định hướng trước.';
+      return;
+    }
+    const sizes = sizeRowsInput.value.length ? sizeRowsInput.value : [{ size: 'M', pct: 100 }];
+    const pool = [];
+    sizes.forEach((row) => {
+      const weight = Math.max(1, Math.round((Number(row.pct) || 0) / 10));
+      for (let i = 0; i < weight; i++) pool.push(String(row.size || 'M').toUpperCase());
+    });
+
+    const previous = new Map(samples.value.map((row) => [row.id, row]));
+    const rows = [];
+    let n = 0;
+    cats.forEach((cat) => {
+      const count = Math.max(0, Number(cat.count) || 0);
+      for (let i = 1; i <= count; i++) {
+        n += 1;
+        const id = 'sku-' + n;
+        const base = {
+          id,
+          name: String(cat.category || 'Mẫu') + ' #' + i,
+          category: String(cat.category || ''),
+          size: pool[(n - 1) % Math.max(1, pool.length)] || 'M',
+          status: 'todo',
+          prompt_vi: '', prompt_en: '', negative_prompt: '', note: '', context: '',
+        };
+        rows.push(previous.has(id) ? { ...base, ...previous.get(id), name: base.name, category: base.category, size: base.size } : base);
+      }
+    });
+    samples.value = rows;
+    sampleError.value = '';
+  }
+
+  /** Sinh prompt cho MỘT mẫu. Đây là hành động tốn lượt gọi model nên chỉ chạy khi người dùng bấm. */
+  async function generateSamplePrompt(id) {
+    const index = samples.value.findIndex((row) => row.id === id);
+    if (index < 0) return false;
+    if (prompt.value.trim().length < 3) {
+      sampleError.value = 'Nhập mô tả bộ sưu tập ở bước Định hướng trước khi sinh prompt cho mẫu.';
+      return false;
+    }
+    const row = samples.value[index];
+    sampleBusyId.value = id;
+    sampleError.value = '';
+    samples.value = samples.value.map((r, i) => (i === index ? { ...r, status: 'generating', error: '' } : r));
+    try {
+      const data = await store.api('/api/design-agent/sample-prompt', {
+        prompt: prompt.value.trim(),
+        region: selectedRegion.value,
+        trend_ids: selectedTrendIds.value,
+        brief: collection.value?.brief || '',
+        size_distribution: sizeDistribution.value,
+        sku_total: skuTotal.value || undefined,
+        palette: paletteRows.value,
+        moodboard: moodRows.value,
+        reference_images: (store.briefReferenceImages || []).slice(0, 3),
+        ai: store.designAgentAi,
+        sample: {
+          id: row.id, name: row.name, category: row.category, size: row.size,
+          index: index + 1, total: samples.value.length,
+        },
+      });
+      samples.value = samples.value.map((r, i) => (i === index ? {
+        ...r,
+        status: 'todo',
+        prompt_vi: data?.prompt_vi || '',
+        prompt_en: data?.prompt_en || '',
+        negative_prompt: data?.negative_prompt || '',
+        note: data?.note || '',
+        context: data?.photo_context || '',
+        model_mode: data?.model?.mode || 'rule',
+        model_note: data?.model?.note || '',
+        generated_at: data?.generated_at || '',
+      } : r));
+      scheduleSessionSave();
+      return true;
+    } catch (e) {
+      const text = userFacingError(e, 'Không sinh được prompt cho mẫu này.');
+      sampleError.value = text;
+      samples.value = samples.value.map((r, i) => (i === index ? { ...r, status: 'todo', error: text } : r));
+      return false;
+    } finally {
+      sampleBusyId.value = '';
+    }
+  }
+
+  /**
+   * ĐƯA PROMPT CỦA MỘT MẪU SANG CANVAS — cùng đường đi với applyCanvas() nhưng nội dung là của mẫu đó.
+   *
+   * Prompt của mẫu đã có sẵn từ bước trước nên không tốn thêm gì; vẫn phải ghi BẢN BỀN trước khi điều
+   * hướng vì store là bộ nhớ trong trang (xem applyCanvas).
+   */
+  function applySampleToCanvas(sample) {
+    const value = String(sample?.prompt_vi || sample?.prompt_en || '').trim();
+    if (!value) {
+      sampleError.value = 'Mẫu này chưa có prompt — bấm «Sinh prompt» cho mẫu trước đã.';
+      return false;
+    }
+    const ok = store.applyAgentPrompt(value, {
+      ratio: canvas.value.ratio,
+      variant_count: canvas.value.variantCount,
+      negative_prompt: canvas.value.useNegative ? (sample.negative_prompt || canvas.value.negativePrompt) : '',
+    });
+    if (!ok) return false;
+    store.savePromptMemory();
+    window.location.href = '/?panel=concept&open=prompt';
+    return true;
+  }
+
+  /** Người dùng QUYẾT ĐỊNH một mẫu đã xong (hoặc bỏ qua) — đây là bước chốt của từng mẫu. */
+  function setSampleStatus(id, status) {
+    const allowed = ['todo', 'done', 'skipped'];
+    if (!allowed.includes(status)) return;
+    samples.value = samples.value.map((row) => (row.id === id ? { ...row, status, error: '' } : row));
+    scheduleSessionSave();
+  }
+  function editSamplePrompt(id, field, value) {
+    if (!['prompt_vi', 'prompt_en', 'negative_prompt'].includes(field)) return;
+    samples.value = samples.value.map((row) => (row.id === id ? { ...row, [field]: value } : row));
+  }
   /**
    * Cung cấp bề mặt dùng chung cho 4 bước (components/agents/*.vue) — NGUYÊN VĂN hợp đồng cũ.
    * Danh sách này và object trả về bên dưới cùng rút từ MỘT nguồn nên không thể lệch nhau.
@@ -974,6 +1487,56 @@ export function useAgentStudio() {
     provide('planInput', planInput);
     provide('shopSummary', shopSummary);
     provide('shopRowCount', shopRowCount);
+    provide('SUBSTEPS', SUBSTEPS);
+    provide('sub', sub);
+    provide('subIndex', subIndex);
+    provide('subList', subList);
+    provide('setSub', setSub);
+    provide('lockStepToUrl', lockStepToUrl);
+    provide('subNext', subNext);
+    provide('subPrev', subPrev);
+    provide('skuTotal', skuTotal);
+    provide('skuTotalSource', skuTotalSource);
+    provide('sizeRowsInput', sizeRowsInput);
+    provide('sizePctTotal', sizePctTotal);
+    provide('sizeTotalOk', sizeTotalOk);
+    provide('applySizePreset', applySizePreset);
+    provide('addSizeRow', addSizeRow);
+    provide('removeSizeRow', removeSizeRow);
+    provide('setSizeRow', setSizeRow);
+    provide('evenSizeRows', evenSizeRows);
+    provide('paletteRows', paletteRows);
+    provide('moodRows', moodRows);
+    provide('ensurePaletteRows', ensurePaletteRows);
+    provide('ensureMoodRows', ensureMoodRows);
+    provide('resetPaletteRows', resetPaletteRows);
+    provide('resetMoodRows', resetMoodRows);
+    provide('addPaletteRow', addPaletteRow);
+    provide('removePaletteRow', removePaletteRow);
+    provide('setPaletteRow', setPaletteRow);
+    provide('addMoodRow', addMoodRow);
+    provide('removeMoodRow', removeMoodRow);
+    provide('setMoodRow', setMoodRow);
+    provide('moveMoodRow', moveMoodRow);
+    provide('samples', samples);
+    provide('sampleProgress', sampleProgress);
+    provide('nextSample', nextSample);
+    provide('sampleBusyId', sampleBusyId);
+    provide('sampleError', sampleError);
+    provide('buildSamples', buildSamples);
+    provide('generateSamplePrompt', generateSamplePrompt);
+    provide('setSampleStatus', setSampleStatus);
+    provide('editSamplePrompt', editSamplePrompt);
+    provide('applySampleToCanvas', applySampleToCanvas);
+    provide('sessionProjectId', sessionProjectId);
+    provide('sessionSavedAt', sessionSavedAt);
+    provide('sessionSaving', sessionSaving);
+    provide('sessionError', sessionError);
+    provide('sessionClosed', sessionClosed);
+    provide('saveSession', saveSession);
+    provide('loadSession', loadSession);
+    provide('closeSession', closeSession);
+    provide('briefSnapshot', briefSnapshot);
     provide('dnaListMax', dnaListMax);
     provide('dnaListText', dnaListText);
     provide('setDnaText', setDnaText);
@@ -1026,6 +1589,56 @@ export function useAgentStudio() {
     store,
     bootstrap,
     saveAgentDraft,
+    SUBSTEPS,
+    sub,
+    subIndex,
+    subList,
+    setSub,
+    lockStepToUrl,
+    subNext,
+    subPrev,
+    skuTotal,
+    skuTotalSource,
+    sizeRowsInput,
+    sizePctTotal,
+    sizeTotalOk,
+    applySizePreset,
+    addSizeRow,
+    removeSizeRow,
+    setSizeRow,
+    evenSizeRows,
+    paletteRows,
+    moodRows,
+    ensurePaletteRows,
+    ensureMoodRows,
+    resetPaletteRows,
+    resetMoodRows,
+    addPaletteRow,
+    removePaletteRow,
+    setPaletteRow,
+    addMoodRow,
+    removeMoodRow,
+    setMoodRow,
+    moveMoodRow,
+    samples,
+    sampleProgress,
+    nextSample,
+    sampleBusyId,
+    sampleError,
+    buildSamples,
+    generateSamplePrompt,
+    setSampleStatus,
+    editSamplePrompt,
+    applySampleToCanvas,
+    sessionProjectId,
+    sessionSavedAt,
+    sessionSaving,
+    sessionError,
+    sessionClosed,
+    saveSession,
+    loadSession,
+    closeSession,
+    briefSnapshot,
     prompt,
     promptInput,
     collectionError,

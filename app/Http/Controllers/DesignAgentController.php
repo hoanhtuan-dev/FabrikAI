@@ -7,6 +7,7 @@ use App\Services\DesignAgentService;
 use App\Services\MarketSignalService;
 use App\Services\WebAccessService;
 use App\Services\WebSourceService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -14,7 +15,7 @@ class DesignAgentController extends Controller
 {
     public function __construct(private readonly DesignAgentService $agents) {}
 
-    public function radar(Request $request): \Illuminate\Http\JsonResponse
+    public function radar(Request $request): JsonResponse
     {
         $data = $request->validate([
             'region' => ['nullable', 'string', 'in:all,hcm,hanoi,danang'],
@@ -166,6 +167,33 @@ class DesignAgentController extends Controller
     }
 
     /**
+     * SINH PROMPT CHO MỘT MẪU (2026-09-25) — bước Thực thi chạy TỪNG mẫu một.
+     *
+     * Vì sao tách khỏi đường brief: một bộ 12 mã dùng chung một prompt thì ra 12 ảnh giống nhau. Đường
+     * này viết prompt cho ĐÚNG một mẫu (nhóm hàng · size · bối cảnh riêng), và trả về cả bản tất định
+     * lẫn bản AI để giao diện nói thật đang dùng bản nào.
+     *
+     * Throttle riêng ở route: mỗi lần gọi là một lượt model, mà người dùng bấm cho TỪNG mẫu.
+     */
+    public function samplePrompt(Request $request): JsonResponse
+    {
+        $data = $this->validatedCollectionInput($request);
+        $sample = Validator::make($request->all(), [
+            'sample' => ['required', 'array'],
+            'sample.id' => ['nullable', 'string', 'max:60'],
+            'sample.name' => ['nullable', 'string', 'max:120'],
+            'sample.category' => ['nullable', 'string', 'max:80'],
+            'sample.size' => ['nullable', 'string', 'max:8'],
+            'sample.index' => ['nullable', 'integer', 'min:1', 'max:400'],
+            'sample.total' => ['nullable', 'integer', 'min:1', 'max:400'],
+            'sample.note' => ['nullable', 'string', 'max:240'],
+        ])->validate()['sample'];
+
+        return response()->json($this->agents->samplePrompt(
+            $data, $request->user(), (bool) ($data['ai'] ?? true), $sample
+        ));
+    }
+    /**
      * Validate dùng CHUNG cho brief và kế hoạch sản xuất — hai đường luôn nhận đúng một dạng đầu vào
      * nên không thể lệch nhau về cấu trúc danh mục, bảng size hay dải giá.
      */
@@ -173,6 +201,11 @@ class DesignAgentController extends Controller
     {
         $payload = $request->only([
             'prompt', 'region', 'trend_ids', 'brief', 'size_distribution', 'ai', 'force', 'reference_images',
+            // [2026-09-25] Ba lựa chọn của NGƯỜI DÙNG ở bước Định hướng. Trước đây cả ba do thuật toán
+
+            // quyết nên người dùng chỉ đọc được: tổng SKU, bảng màu, bảng mood.
+
+            'sku_total', 'palette', 'moodboard',
         ]);
         $payload['prompt'] = trim((string) ($payload['prompt'] ?? ''));
         $payload['brief'] = trim((string) ($payload['brief'] ?? ''));
@@ -201,6 +234,28 @@ class DesignAgentController extends Controller
             'size_distribution.*' => ['nullable', 'integer', 'min:0', 'max:10000'],
             'ai' => ['nullable', 'boolean'],
             'force' => ['nullable', 'boolean'],
+            // Trần 400 mã: hơn nữa thì lệnh cắt và bảng size phình tới mức không ai đọc, và mỗi mẫu
+
+            // còn tốn một lượt gọi model ở bước Thực thi.
+
+            'sku_total' => ['nullable', 'integer', 'min:1', 'max:400'],
+            'palette' => ['nullable', 'array', 'max:12'],
+            'palette.*.name' => ['nullable', 'string', 'max:40'],
+
+            'palette.*.hex' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+
+            'palette.*.role' => ['nullable', 'string', 'max:40'],
+
+            'moodboard' => ['nullable', 'array', 'max:40'],
+
+            'moodboard.*.id' => ['nullable', 'string', 'max:40'],
+
+            'moodboard.*.label' => ['nullable', 'string', 'max:60'],
+
+            'moodboard.*.caption' => ['nullable', 'string', 'max:240'],
+
+            'moodboard.*.color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+
         ]);
 
         $validator->after(function ($validator) use ($payload) {

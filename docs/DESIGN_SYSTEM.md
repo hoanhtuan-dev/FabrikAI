@@ -1007,6 +1007,8 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 
 | 30 | 2026-09-25 | **Agent Studio là một MODAL**: BỐN tầng thanh xếp chồng ăn ~200px chiều cao trước khi tới nội dung · bước đang làm không đánh dấu được lên URL (gửi link là mở lại từ đầu) · F5 mất vị trí · lớp phủ khoá phần còn lại của Studio mà không cho thêm chỗ | Chuyển thành **TRANG riêng `/agent-studio`** (entry Vite riêng) · lõi tách ra `composables/useAgentStudio.js` dùng chung với 4 bước qua `provideAll()` · nền **TỐI GIẢN + MATERIAL**: hai thanh thay vì bốn, ba tầng bề mặt diễn đạt bằng BÓNG (`.elev-*`) chứ không bằng viền, LỚP TRẠNG THÁI `.state-layer`, GỢN NƯỚC `v-ripple`, RAIL bước `.nav-step`, bước đánh dấu ở `?buoc=` | bốn tầng thanh → **2** · modal cũ **xoá khỏi đĩa** (còn ĐÚNG một bề mặt) · **7 test mới** (`AgentStudioPageTest`) · thêm **0 mã màu**, **0 biến thể nút** · full suite **1022 XANH** |
 
+| 31 | 2026-09-25 | Bước Định hướng là MỘT màn 5 tab (3–4 cuộn trên điện thoại) · tổng SKU và bảng size do thuật toán quyết · bảng mood chỉ để NHÌN · cả bộ dùng CHUNG một prompt nên 12 mã ra 12 ảnh giống nhau · chỉ có bản nháp localStorage | Chia mỗi bước chính thành BƯỚC CON (Định hướng 7 việc, Thực thi 3 việc), mỗi màn một quyết định · người dùng chọn tổng SKU · bảng size đầy đủ (size · % · khoá 100%) · bảng mood sửa được và nhãn+chú thích ĐI VÀO prompt · mỗi mã là một MẪU có prompt riêng, người dùng chốt từng mẫu · PHIÊN LÀM VIỆC lưu theo tài khoản (một bản nháp = một phiên, dùng bảng projects) | thêm **0 migration** · 15 test mới ( 8 ·  7) · 2 lỗi thật (bảng màu dưới 5 màu làm nổ brief · đọc cột JSON cast) · full suite **1039 XANH** |
+
 ### 16.1 Số đo trước → sau của cả hành trình
 
 | Chỉ số | Trước | Sau |
@@ -1438,3 +1440,83 @@ Bốn luật cũ vẫn áp nguyên cho trang này: `DesignSystemTest` (viền/n�
 bảng màu ngoài theme) · `MotionFoundationTest` (không thời lượng viết tay · bề mặt hover phải có chuyển
 động) · `UserFacingMessagesTest` (không lộ tên model/nhà cung cấp — trang nay nằm trong
 `designAgentsSource()` của `TestCase`) · `ToolSearchTest` · `MarketSignalTest` · `DebtFixesTest`.
+
+---
+
+## 22. Agent Studio — TỪNG BƯỚC cho mobile + quyền tuỳ chọn của người dùng (2026-09-25)
+
+> Đổi gốc lần hai trong cùng ngày. §21 đưa Agent Studio từ modal thành TRANG; §22 đổi cách làm việc
+> TRONG trang đó: mỗi bước chính chia thành các BƯỚC CON, và bốn thứ trước đây thuật toán quyết thì
+> nay người dùng quyết.
+
+### 22.1 Vì sao phải chia bước con — số đo, không phải cảm tính
+
+| Vấn đề của bản một-màn | Nay |
+|---|---|
+| Bước Định hướng là MỘT màn 5 tab; trên điện thoại thành 3–4 cuộn dài, người dùng không biết đang ở đâu và còn phải làm gì | 7 việc con, mỗi màn MỘT quyết định, có "Việc 3/7" + chấm tiến trình bấm được |
+| Tổng SKU do thuật toán tính, người dùng chỉ ĐỌC | Chọn 6/9/12/18/24/30/40 hoặc số bất kỳ; hệ thống chia lại theo đúng tỉ lệ nhóm hàng |
+| Bảng size chỉ có 3 preset cứng, không bỏ được size nào | Bảng size đầy đủ: chọn size · % từng size · thêm/bớt · khoá tổng 100% |
+| Bảng mood là lưới màu để NHÌN — sửa gì cũng không đổi prompt | Sửa từng ô (nhãn · chú thích · màu · thứ tự) và nhãn + chú thích ĐI VÀO prompt ảnh |
+| Đơn giá và kết quả tiền nằm chung một màn | Nhập là việc 5, đọc lệnh cắt là việc 6 |
+| Cả bộ dùng CHUNG một prompt ⇒ 12 mã ra 12 ảnh giống nhau; không biết mẫu nào đã xong | Mỗi mã là một MẪU có prompt riêng, sinh lần lượt, người dùng chốt từng mẫu |
+
+### 22.2 Bốn quyền mới của người dùng — và cái nào ĐI ĐẾN ĐÂU
+
+| Quyền | Đi vào đâu (không phải chỉ để nhìn) |
+|---|---|
+| **Tổng SKU** | `structure.categories[].count` chia lại theo tỉ lệ (làm tròn phần dư) ⇒ lệnh cắt, giá vốn, số vải, ba mức giá đều đổi theo |
+| **Bảng size** | `CollectionPlanService` đọc CHÍNH bảng này để ra lệnh cắt: size nào bao nhiêu cái, đặt bao nhiêu mét vải |
+| **Bảng màu + bảng mood** | nhãn + chú thích của từng ô vào `prompt_vi`/`prompt_en` (hàm `moodPhrase`) ⇒ prompt của mọi mẫu chưa chốt đổi theo |
+| **Đơn giá & định mức** | không đổi (đã có từ trước) nhưng nay nằm ở việc riêng, nhóm theo việc chủ xưởng thật sự làm |
+
+### 22.3 Luồng THỰC THI: mỗi mã một prompt, người dùng chốt từng mẫu
+
+Trước đây bước Thực thi chỉ có MỘT prompt cho cả bộ sưu tập — 12 mã dùng chung một prompt là 12 tấm
+ảnh giống nhau. Nay:
+
+1. **Việc 1 — Danh sách mẫu**: dựng từ cơ cấu SKU × bảng size; sửa tên/size được; dựng lại KHÔNG xoá
+   prompt đã sinh (mẫu trùng mã giữ nguyên trạng thái).
+2. **Việc 2 — Sinh prompt từng mẫu**: mỗi lần một mẫu; xong thì bấm «Đã xong, sang mẫu kế». Prompt khác
+   nhau theo nhóm hàng · size · và BỐI CẢNH CHỤP luân phiên (6 bối cảnh) — nếu không thì lookbook chỉ có
+   một kiểu ảnh.
+3. **Việc 3 — Áp dụng & lưu**: đưa prompt của từng mẫu sang Canvas, lưu phiên, hoặc chốt phiên.
+
+### 22.4 Phiên làm việc dai dẳng — hai tầng, cố ý
+
+| Tầng | Cứu được gì | Không cứu được gì |
+|---|---|---|
+| Bản nháp `localStorage` (tầng 1) | F5 · máy tự tải lại · mất mạng | đổi máy, đổi trình duyệt, xoá cache |
+| **Phiên theo TÀI KHOẢN** (tầng 2, mới) | tất cả những cái trên | không có |
+
+Phiên lưu ở bảng `projects` có sẵn: **MỘT BẢN NHÁP = MỘT PHIÊN** ⇒ không phải migrate production, và
+phiên thừa hưởng sẵn owner-scoped · xoá mềm · trạng thái · hiện ở /bo-suu-tap · xuất gói cho xưởng.
+Nội dung ở `settings.agent_session` (JSON), gồm cả `brief_snapshot` để mở lại KHÔNG phải chạy lại model.
+
+Ba luật của tầng này:
+1. **Trình duyệt gọi theo nhịp gộp** (1,5 giây) — người dùng gõ phím thì không gọi mạng mỗi ký tự.
+2. **Mốc thời gian do MÁY CHỦ đặt**, `status` của phiên KHÔNG nhận từ client (chỉ `close()`/`reopen()` đổi).
+   Nhận bừa là một lần lưu lỗi có thể tự đóng phiên.
+3. **URL thắng phiên**: mở link `?buoc=brief` thì phiên không được ghi đè bước — nếu không, gửi link cho
+   đồng nghiệp mà họ lại mở đúng chỗ cũ của chính họ.
+
+### 22.5 Hai lỗi thật bắt được trong đợt này
+
+1. **Bảng màu ít hơn 5 màu làm NỔ cả lượt tạo brief** (`outfitMatching` viết cứng `$palette[0]`…`$palette[4]`,
+   ngầm giả định bảng màu hệ thống 6 màu). Từ khi người dùng sửa được bảng màu, một bảng 2 màu ⇒ HTTP 500
+   "Undefined array key 2". Nay màu lấy theo vòng.
+2. **`(array) $arrayObject` không đọc được cột cast `AsArrayObject`** — `settings` phải đọc từ JSON gốc
+   (`getRawOriginal`) thì mới đúng trên cả MySQL lẫn SQLite.
+
+### 22.6 Bộ test giữ luật này
+
+`tests/Feature/AgentStudioOptionsTest.php` (8 test): tổng SKU chia lại giữ hình dạng cơ cấu và không nhóm
+nào về 0 mã · số đã chọn đi tới lệnh cắt · bảng size đầy đủ giữ đúng thứ tự và size đã bỏ KHÔNG tự quay
+lại · bảng màu + bảng mood của người dùng vào thẳng prompt · không đặt gì thì vẫn có bản hệ thống ·
+mỗi mẫu một prompt khác nhau (kể cả khi không có model) · endpoint từ chối đầu vào hỏng.
+
+`tests/Feature/AgentSessionTest.php` (7 test): chưa có phiên thì trả `null` (không phải vỏ rỗng) · ghi nhiều
+lần vẫn về ĐÚNG một dự án · phiên của người khác trả 404 (không phải 200 kèm dữ liệu) · chốt phiên rồi mở
+lại được · phiên nằm trong danh sách bộ sưu tập thật · payload hỏng bị từ chối · máy chủ tự đóng dấu thời
+gian và bỏ qua `status` do client gửi.
+
+`AgentStudioPageTest` thêm: URL thắng phiên (bước của link không bị ghi đè).

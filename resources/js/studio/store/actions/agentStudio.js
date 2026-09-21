@@ -247,6 +247,14 @@ export const agentStudioActions = {
         size_distribution: Object.entries(payload.size_distribution || {})
           .map(([size, count]) => size + ':' + count)
           .sort(),
+        // [2026-09-25] BA lựa chọn mới của người dùng cũng làm brief cũ sai — và chúng nằm trong khoá
+        // bộ đệm của MÁY CHỦ. Thiếu ở đây thì sửa bảng mood xong giao diện vẫn nói "brief khớp" trong
+        // khi phần chữ của brief đang mô tả bảng mood cũ.
+        sku_total: Number(payload.sku_total) || 0,
+        palette: (payload.palette || []).map((row) => String(row && row.hex || '')).join(','),
+        moodboard: (payload.moodboard || [])
+          .map((row) => String((row && row.label) || '') + '~' + String((row && row.caption) || ''))
+          .join('|'),
       };
     },
     /** Brief hiện tại đã cũ so với prompt/trend người dùng đang chọn? */
@@ -266,7 +274,10 @@ export const agentStudioActions = {
       try {
         const data = await this.api('/api/design-agent/collection', {
           ...(payload || {}),
-          ai: this.designAgentAi,
+          // `opts.ai` cho phép ÉP chạy tất định cho một lượt cụ thể — dùng khi người dùng vừa sửa bảng
+          // mood/bảng size và chỉ cần phần chữ bám theo, không cần trả thêm ~28 giây và token cho AI.
+          // Không có cờ này thì cách duy nhất để "áp dụng" là gọi AI, và người dùng sẽ ngại sửa.
+          ai: opts.ai === undefined ? this.designAgentAi : !!opts.ai,
           force: !!opts.force,
           // Ảnh mẫu đã chọn ở bước Định hướng — vai ĐỌC ẢNH dùng chúng để bám phong cách thật của shop.
           reference_images: (this.briefReferenceImages || []).slice(0, 3),

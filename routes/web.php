@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminWebSourceController;
+use App\Http\Controllers\AgentSessionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\BrandDnaController;
@@ -213,6 +214,19 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     // Không có call-site nào tham chiếu route name 'studio.asset' hay URL /studiosample.
     Route::post('/stylist', [StudioController::class, 'stylist'])->name('stylist');
     Route::post('/stylist/refine', [StudioController::class, 'stylistRefine'])->name('stylist.refine');
+    // ── PHIÊN LÀM VIỆC DAI DẲNG của Agent Studio (2026-09-25) ─────────────────────────────
+    // Luồng nay dài (7 bước con ở Định hướng + duyệt TỪNG mẫu ở Thực thi) nên trạng thái phải sống
+    // phía MÁY CHỦ: mở máy khác / trình duyệt khác vẫn thấy đúng chỗ đang làm. Một bản nháp = một phiên.
+    // Throttle rộng cho đường GHI vì trình duyệt gọi theo nhịp gộp khi người dùng đang thao tác.
+    Route::get('/design-agent/session', [AgentSessionController::class, 'show'])->name('design-agent.session');
+    Route::put('/design-agent/session', [AgentSessionController::class, 'store'])
+        ->middleware('throttle:120,1')->name('design-agent.session.save');
+    Route::post('/design-agent/session/close', [AgentSessionController::class, 'close'])->name('design-agent.session.close');
+    Route::post('/design-agent/session/reopen', [AgentSessionController::class, 'reopen'])->name('design-agent.session.reopen');
+    // SINH PROMPT CHO MỘT MẪU — mỗi lần gọi là một lượt model, và người dùng bấm cho TỪNG mẫu nên
+    // trần phải đủ rộng cho một bộ 12-20 mã mà vẫn chặn được vòng lặp bấm liên tục.
+    Route::post('/design-agent/sample-prompt', [DesignAgentController::class, 'samplePrompt'])
+        ->middleware('throttle:90,1')->name('design-agent.sample-prompt');
     Route::post('/design-agent/radar', [DesignAgentController::class, 'radar'])
         ->middleware('throttle:30,1')->name('design-agent.radar');
     Route::post('/design-agent/collection', [DesignAgentController::class, 'collection'])

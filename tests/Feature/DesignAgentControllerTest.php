@@ -87,7 +87,12 @@ class DesignAgentControllerTest extends TestCase
             ->assertJsonPath('canvas.variant_count', 2);
         $this->assertNotEmpty($response->json('input_signature'));
         $this->assertCount(2, $response->json('selected_trends'));
-        $this->assertSame(['S', 'M', 'L', 'XL'], array_column($response->json('size_distribution'), 'size'));
+        // [2026-09-25] ĐỔI CƠ CHẾ, có ý thức: trước đây bảng size gửi lên là bản GHI ĐÈ MỘT PHẦN —
+        // size nào không gửi thì lấy mặc định (S/M/L/XL). Từ khi người dùng được quyền BỎ một size
+        // (bảng size dự kiến đầy đủ), ghi đè một phần là sai: bỏ XL xong máy chủ tự thêm lại XL, và
+        // lệnh cắt ra số cái cho một size shop không làm. Nay danh sách gửi lên LÀ bảng size; giao
+        // diện luôn gửi đủ, không gửi gì thì dùng bộ mặc định.
+        $this->assertSame(['S', 'M'], array_column($response->json('size_distribution'), 'size'));
         $this->assertSame($before, Project::count(), 'project_payload chỉ là dữ liệu gợi ý, không tạo dự án.');
     }
 

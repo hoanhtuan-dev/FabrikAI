@@ -230,9 +230,13 @@ class DesignAgentService
         // VAI ĐỌC ẢNH được gọi SAU khi kiểm bộ đệm (bên dưới): gọi trước thì mỗi lần bấm lại vẫn tốn một
         // lượt model đọc ảnh rồi vứt kết quả đi khi bản đệm được dùng.
         $referenceImages = array_values(array_filter(array_map('strval', (array) ($data['reference_images'] ?? [])), 'strlen'));
-        $palette = $this->paletteFor($prompt, $selected);
-        $categoryMix = $this->categoryMix($prompt, $brand);
-        $moodboard = $this->moodboard($prompt, $selected, $palette);
+        // ── QUYỀN QUYẾT ĐỊNH CỦA NGƯỜI DÙNG (2026-09-25) ──────────────────────────────────
+        // Ba thứ dưới đây do NGƯỜI DÙNG đặt ở bước Định hướng và phải THẮNG giá trị hệ thống tự
+        // nghĩ ra: bảng màu + bảng mood họ sửa, và TỔNG số SKU họ chọn. Trước đây cả ba đều cố
+        // định theo thuật toán nên người dùng chỉ đọc được, không quyết được.
+        $palette = $this->paletteOverride($data['palette'] ?? null) ?? $this->paletteFor($prompt, $selected);
+        $categoryMix = $this->applySkuTotal($this->categoryMix($prompt, $brand), $data['sku_total'] ?? null);
+        $moodboard = $this->moodboardOverride($data['moodboard'] ?? null, $palette) ?? $this->moodboard($prompt, $selected, $palette);
         $outfits = $this->outfitMatching($palette);
         $priceBands = $this->priceBands($prompt, $brand);
         $sizeDistribution = $this->sizeDistribution($data);
@@ -256,6 +260,11 @@ class DesignAgentService
             array_map(fn ($row) => $row['size'].':'.$row['count'], $sizeDistribution),
             'brief:'.$brief,
             'reference:'.implode('|', $referenceImages),
+            // Ba thứ người dùng TỰ ĐẶT cũng phải nằm trong khoá đệm: đổi bảng mood mà vẫn nhận bản
+            // đệm cũ là giao diện hiện bảng mood mới bên cạnh phần chữ của bảng mood cũ.
+            'sku:'.(int) ($data['sku_total'] ?? 0),
+            'palette:'.implode('|', array_column($palette, 'hex')),
+            'mood:'.implode('|', array_map(fn ($row) => ($row['label'] ?? '').'~'.($row['caption'] ?? ''), $moodboard)),
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         $cacheKey = $this->briefCacheKey($inputSignature, $user, $brand, $candidates, $useAi, (string) ($evidence['fingerprint'] ?? ''));
         if (! $force) {
@@ -371,6 +380,20 @@ class DesignAgentService
             'outfits' => $outfits,
             'size_distribution' => $sizeDistribution,
             'price_band' => $priceBands,
+            // BẢNG MOOD của NGƯỜI DÙNG (nếu họ đã sửa) — để phần chữ do AI viết bám đúng cái họ
+
+            // đang nhìn, thay vì mô tả một bảng mood khác với bảng trên màn hình.
+
+            'moodboard' => array_map(fn ($row) => [
+
+                'label' => $row['label'] ?? '',
+
+                'caption' => $row['caption'] ?? '',
+
+                'color' => $row['color'] ?? '',
+
+            ], array_slice($moodboard, 0, 12)),
+
         ], $candidates, $useAi, $evidence);
 
         $aiData = $ai['data'] ?? [];
@@ -421,8 +444,8 @@ class DesignAgentService
                 ));
         $applied['brief'] = $brief === '' && ($aiData['brief'] ?? '') !== '';
 
-        $promptVi = ($aiData['prompt_vi'] ?? '') !== '' ? $aiData['prompt_vi'] : $this->promptVi($prompt, $selected, $palette);
-        $promptEn = ($aiData['prompt_en'] ?? '') !== '' ? $aiData['prompt_en'] : $this->promptEn($prompt, $selected, $palette);
+        $promptVi = ($aiData['prompt_vi'] ?? '') !== '' ? $aiData['prompt_vi'] : $this->promptVi($prompt, $selected, $palette, $moodboard);
+        $promptEn = ($aiData['prompt_en'] ?? '') !== '' ? $aiData['prompt_en'] : $this->promptEn($prompt, $selected, $palette, $moodboard);
         $applied['prompts'] = ($aiData['prompt_vi'] ?? '') !== '' || ($aiData['prompt_en'] ?? '') !== '';
 
         $nextSteps = array_values(array_filter((array) ($aiData['next_steps'] ?? []), 'strlen'));
@@ -475,6 +498,11 @@ class DesignAgentService
             'structure' => [
                 'total_skus' => array_sum(array_column($categoryMix, 'count')),
                 'categories' => $categoryMix,
+                // Nói RÕ quy mô này do ai quyết: người dùng chọn tổng SKU thì cơ cấu đã được chia lại,
+
+                // và con số "do bạn chọn" phải nhìn thấy được ngay cạnh bảng cơ cấu.
+
+                'total_skus_source' => ((int) ($data['sku_total'] ?? 0)) > 0 ? 'owner' : 'system',
                 'basis' => ($brand['shop']['row_count'] ?? 0) > 0 ? 'shop_data' : 'heuristic',
                 'rationale' => ($brand['shop']['row_count'] ?? 0) > 0
                     ? 'Số lượng SKU bám theo DỮ LIỆU BÁN HÀNG THẬT của shop ('.number_format((int) $brand['shop']['units_sold']).' cái đã bán, tồn '.number_format((int) $brand['shop']['stock_on_hand']).'), có đối chiếu xu hướng đang lên.'
@@ -528,6 +556,210 @@ class DesignAgentService
         $this->cacheBrief($cacheKey, $response);
 
         return $response;
+    }
+
+    /**
+     * SINH PROMPT CHO MỘT MẪU — trái tim của luồng "làm từng bước" (2026-09-25).
+     *
+     * VÌ SAO CÓ ĐƯỜNG RIÊNG thay vì dùng lại prompt của brief: một bộ sưu tập 12 mã mà cả 12 ảnh dùng
+     * CHUNG một prompt thì ra 12 tấm giống nhau — đúng thứ người dùng phàn nàn. Prompt của brief là
+     * "cả bộ sưu tập trông thế nào"; prompt của MẪU phải là "mã này trông thế nào".
+     *
+     * Ba luật:
+     *   · Mỗi mẫu một prompt KHÁC NHAU — khác theo nhóm hàng · size · và bối cảnh chụp luân phiên, nên
+     *     12 ảnh ra 12 kiểu chứ không phải 12 bản sao.
+     *   · Bảng mood + bảng màu của NGƯỜI DÙNG đi thẳng vào prompt (đây là phần làm bảng mood "hoạt động
+     *     thật"); đổi một ô mood là prompt của mọi mẫu chưa chốt đổi theo.
+     *   · Tất định làm NỀN, AI chỉ viết lại cho mượt: model hỏng thì mẫu vẫn có prompt dùng được ngay,
+     *     và người dùng không bị chặn giữa việc.
+     *
+     * @param  array  $sample  ['id','name','category','size','index','total','note']
+     */
+    public function samplePrompt(array $data, ?User $user, bool $useAi, array $sample): array
+    {
+        $prompt = trim((string) ($data['prompt'] ?? ''));
+        $region = $this->normalizeRegion((string) ($data['region'] ?? 'all'));
+        $brief = trim((string) ($data['brief'] ?? ''));
+        $requestedIds = array_values(array_filter(array_map('strval', (array) ($data['trend_ids'] ?? [])), 'strlen'));
+        $allTrends = $this->withMarketSignals($this->trendCatalog($region), $this->marketReport($region));
+        $selected = collect($allTrends)
+            ->filter(fn (array $trend) => in_array((string) $trend['id'], $requestedIds, true))
+            ->values()->all();
+
+        $brand = $this->internalBrandSignal($user);
+        $palette = $this->paletteOverride($data['palette'] ?? null) ?? $this->paletteFor($prompt, $selected);
+        $moodboard = $this->moodboardOverride($data['moodboard'] ?? null, $palette) ?? [];
+        $sizeDistribution = $this->sizeDistribution($data);
+        $categoryMix = $this->applySkuTotal($this->categoryMix($prompt, $brand), $data['sku_total'] ?? null);
+
+        $seed = $this->normalizeSample($sample, $categoryMix, $sizeDistribution);
+        $base = $this->samplePromptBase($seed, $prompt, $brief, $palette, $moodboard, $brand, $selected);
+
+        $model = [
+            'group' => null, 'mode' => 'rule', 'provider' => null, 'model' => null,
+            'candidates' => 0, 'latency_ms' => 0, 'cached' => false,
+            'reason' => 'no_model_key',
+            'note' => 'Prompt này do hệ thống dựng từ dữ liệu bạn đã chốt — không tốn lượt gọi AI.',
+        ];
+
+        $aiVi = '';
+        $aiEn = '';
+        if ($useAi) {
+            $candidates = $this->candidatesIn(self::REASON_GROUP, [self::AI_GROUP]);
+            if ($candidates !== []) {
+                $instruction = 'Bạn viết PROMPT ẢNH cho ĐÚNG MỘT mẫu trong bộ sưu tập thời trang. '
+                    .'Dữ liệu gồm: mô tả bộ sưu tập, DNA shop, bảng màu, bảng mood, và mẫu cần viết. '
+                    .'Chỉ trả về JSON đúng dạng: {"prompt_vi":"...","prompt_en":"...","negative_prompt":"...","note":"..."}. '
+                    .'prompt_vi: 1 đoạn 2-3 câu tiếng Việt tả ĐÚNG mẫu này (nhóm hàng, dáng, chất liệu, chi tiết, bối cảnh chụp, ánh sáng, tư thế). '
+                    .'prompt_en: bản tiếng Anh giàu chi tiết dùng được ngay cho công cụ tạo ảnh. '
+                    .'negative_prompt: những thứ cần tránh cho mẫu này (ngắn). '
+                    .'note: 1 câu vì sao mẫu này đáng làm trước. '
+                    .'KHÔNG bịa con số (giá, số lượng, tỉ lệ %). KHÔNG nhắc tên model hay nhà cung cấp. '
+                    .'Trả JSON NGAY, không viết phần suy luận dài dòng.';
+
+                $call = $this->callJson($instruction, [
+                    'collection_prompt' => $prompt,
+                    'collection_brief' => $brief,
+                    'brand_dna' => [
+                        'positioning' => $brand['dna']['positioning'] ?? '',
+                        'customer' => $brand['dna']['customer'] ?? '',
+                        'styles' => $brand['dna']['styles'] ?? [],
+                        'materials' => $brand['dna']['materials'] ?? [],
+                        'avoid' => $brand['dna']['avoid'] ?? [],
+                        'narrative' => $brand['narrative'] ?? '',
+                    ],
+                    'palette' => array_map(fn ($row) => $row['name'].' ('.$row['hex'].')', $palette),
+                    'moodboard' => array_map(fn ($row) => trim(($row['label'] ?? '').': '.($row['caption'] ?? ''), ' :'), $moodboard),
+                    'sample' => $seed,
+                    'photo_context' => $base['context'],
+                    'system_base_prompt_vi' => $base['prompt_vi'],
+                ], 900, 1600, 45, [], $candidates);
+
+                $json = $call['json'] ?? [];
+                $aiVi = trim((string) ($json['prompt_vi'] ?? ''));
+                $aiEn = trim((string) ($json['prompt_en'] ?? ''));
+                $answer = $call['answer'];
+                $model = [
+                    'group' => $candidates[0]['group'] ?? null,
+                    'mode' => ($aiVi !== '' || $aiEn !== '') ? 'ai' : 'rule',
+                    'provider' => $answer['provider'] ?? null,
+                    'model' => $answer['model'] ?? null,
+                    'candidates' => count($candidates),
+                    'latency_ms' => (int) round((float) ($answer['latency_ms'] ?? 0)),
+                    'cached' => false,
+                    'reason' => ($aiVi !== '' || $aiEn !== '') ? 'ok' : 'invalid_output',
+                    'note' => ($aiVi !== '' || $aiEn !== '')
+                        ? 'Phần chữ do AI viết trên đúng dữ liệu bạn đã chốt.'
+                        : 'AI trả về dữ liệu không dùng được — đã dùng bản hệ thống dựng (vẫn dùng được ngay).',
+                ];
+            }
+        }
+
+        return [
+            'sample_id' => $seed['id'],
+            'prompt_vi' => $aiVi !== '' ? Str::limit($aiVi, 1500, '') : $base['prompt_vi'],
+            'prompt_en' => $aiEn !== '' ? Str::limit($aiEn, 1500, '') : $base['prompt_en'],
+            'negative_prompt' => trim((string) (($call['json']['negative_prompt'] ?? '') ?: $base['negative_prompt'])),
+            'note' => trim((string) (($call['json']['note'] ?? '') ?: $base['note'])),
+            'variation_key' => $base['variation_key'],
+            'photo_context' => $base['context'],
+            'model' => $model,
+            'engine' => $model['mode'] === 'ai' ? 'ai-v1' : 'rule-based-v1',
+            'generated_at' => now()->toISOString(),
+        ];
+    }
+
+    /**
+     * Chuẩn hoá MỘT mẫu do giao diện gửi lên; thiếu gì thì suy ra từ cơ cấu SKU.
+     * Mẫu là DỮ LIỆU của người dùng — không tự đổi tên họ đã đặt.
+     */
+    private function normalizeSample(array $sample, array $categoryMix, array $sizeDistribution): array
+    {
+        $index = max(1, (int) ($sample['index'] ?? 1));
+        $firstCategory = (string) ($categoryMix[0]['category'] ?? 'Trang phục');
+        $sizes = array_values(array_map(fn ($row) => (string) $row['size'], $sizeDistribution));
+        $size = strtoupper(trim((string) ($sample['size'] ?? ''))) ?: ($sizes[min($index - 1, max(0, count($sizes) - 1))] ?? 'M');
+
+        return [
+            'id' => Str::limit(trim((string) ($sample['id'] ?? '')), 60, '') ?: 'sku-'.$index,
+            'name' => Str::limit(trim((string) ($sample['name'] ?? '')), 120, '') ?: ($firstCategory.' #'.$index),
+            'category' => Str::limit(trim((string) ($sample['category'] ?? '')), 80, '') ?: $firstCategory,
+            'size' => Str::limit($size, 8, ''),
+            'index' => $index,
+            'total' => max(1, (int) ($sample['total'] ?? count($categoryMix) ?: 1)),
+            'note' => Str::limit(trim((string) ($sample['note'] ?? '')), 240, ''),
+        ];
+    }
+
+    /**
+     * PROMPT TẤT ĐỊNH cho một mẫu — nền của mọi thứ, và là đường dùng khi không có model.
+     *
+     * Bối cảnh chụp LUÂN PHIÊN theo chỉ số mẫu: 12 mẫu mà cùng "nền trắng studio" thì lookbook chỉ có
+     * một kiểu ảnh. Vòng xoay này là thứ làm mỗi mẫu ra một tấm khác nhau ngay cả khi máy chủ không có
+     * model nào chạy.
+     */
+    private function samplePromptBase(array $sample, string $prompt, string $brief, array $palette, array $moodboard, array $brand, array $trends): array
+    {
+        $contexts = [
+            'nền studio trắng, ánh sáng mềm đều, toàn thân, dùng cho ảnh sàn TMĐT',
+            'ngoài trời nắng sớm, tường bê tông nhạt, dáng bước tự nhiên',
+            'trong nhà cạnh cửa sổ lớn, ánh sáng xiên, tông ấm',
+            'nền vải trơn cùng họ màu, chụp nửa người, tập trung chi tiết đường may',
+            'sảnh khách sạn tối giản, ánh sáng vàng dịu, dáng đứng nghiêng',
+            'ban công cây xanh, gió nhẹ, vải chuyển động nhẹ',
+        ];
+        $context = $contexts[($sample['index'] - 1) % count($contexts)];
+
+        $colorNames = collect($palette)->pluck('name')->filter()->join(', ');
+        $mood = $this->moodPhrase($moodboard);
+        $dnaStyles = implode(', ', array_slice((array) ($brand['dna']['styles'] ?? []), 0, 4));
+        $dnaMaterials = implode(', ', array_slice((array) ($brand['dna']['materials'] ?? []), 0, 4));
+        $avoid = implode(', ', array_slice((array) ($brand['dna']['avoid'] ?? []), 0, 4));
+        $trendNames = collect($trends)->pluck('title')->filter()->take(3)->join(', ');
+        $source = $brief !== '' ? $brief : $prompt;
+
+        $vi = sprintf(
+            'Ảnh thời trang cho mẫu %d/%d — %s (nhóm %s), size %s. %s Chất liệu: %s. Bảng màu: %s.%s%s Bối cảnh: %s.',
+            $sample['index'],
+            $sample['total'],
+            $sample['name'],
+            $sample['category'],
+            $sample['size'],
+            $source,
+            $dnaMaterials !== '' ? $dnaMaterials : 'chất liệu tự nhiên, bề mặt mờ',
+            $colorNames !== '' ? $colorNames : 'tông trung tính',
+            $dnaStyles !== '' ? ' Phong cách: '.$dnaStyles.'.' : '',
+            $mood !== '' ? ' Bám bảng mood: '.$mood.'.' : '',
+            $context,
+        );
+
+        $en = sprintf(
+            'Fashion photo for look %d of %d: %s (%s), size %s. %s Fabric %s, palette %s, %s. Setting: %s. Editorial lookbook quality, sharp focus on garment, natural skin tones.',
+            $sample['index'],
+            $sample['total'],
+            $sample['name'],
+            $sample['category'],
+            $sample['size'],
+            $prompt,
+            $dnaMaterials !== '' ? $dnaMaterials : 'matte natural fabric',
+            $colorNames !== '' ? $colorNames : 'neutral tones',
+            $mood !== '' ? 'mood: '.$mood : 'calm cohesive mood',
+            $context,
+        );
+
+        $negatives = ['mờ', 'nhoè', 'tay dị dạng', 'thừa ngón', 'chữ trên ảnh', 'watermark'];
+        if ($avoid !== '') {
+            $negatives[] = $avoid;
+        }
+
+        return [
+            'prompt_vi' => Str::limit(trim($vi), 1500, ''),
+            'prompt_en' => Str::limit(trim($en), 1500, ''),
+            'negative_prompt' => implode(', ', $negatives),
+            'note' => 'Mẫu '.$sample['index'].' bám bối cảnh "'.$context.'" — đổi bối cảnh cho mẫu này nếu shop có setup riêng.',
+            'context' => $context,
+            'variation_key' => $sample['category'].'|'.$sample['size'].'|'.(($sample['index'] - 1) % count($contexts)),
+        ];
     }
 
     /**
@@ -3041,28 +3273,301 @@ class DesignAgentService
         return $items;
     }
 
+    /**
+     * PHỐI OUTFIT — màu lấy theo VÒNG, không theo chỉ số cứng.
+     *
+     * [LỖI THẬT — bắt được bằng test 2026-09-25] Bản cũ viết thẳng `$palette[0]` … `$palette[4]`, tức là
+     * NGẦM giả định bảng màu luôn có ≥5 màu — đúng với bảng màu hệ thống (6 màu) nên không ai thấy.
+     * Từ khi NGƯỜI DÙNG sửa được bảng màu, một bảng 2 màu làm cả lượt tạo brief nổ "Undefined array
+     * key 2" (HTTP 500). Nay màu lấy theo vòng nên bảng 1 màu hay 12 màu đều chạy.
+     */
     private function outfitMatching(array $palette): array
     {
+        $palette = array_values($palette) ?: [['hex' => '#CCCCCC']];
+        $at = fn (int $i) => (string) ($palette[$i % count($palette)]['hex'] ?? '#CCCCCC');
+
         return [
-            ['id' => 'look-1', 'name' => 'Office soft', 'items' => ['Blouse linen', 'Quần ống rộng', 'Giày minimal'], 'palette' => [$palette[0]['hex'], $palette[2]['hex']], 'goal' => 'Look chủ đạo dễ bán'],
-            ['id' => 'look-2', 'name' => 'Weekend pastel', 'items' => ['Váy midi', 'Áo khoác nhẹ', 'Túi nhỏ'], 'palette' => [$palette[1]['hex'], $palette[3]['hex']], 'goal' => 'Tăng giá trị đơn hàng'],
-            ['id' => 'look-3', 'name' => 'Quiet shine evening', 'items' => ['Áo satin mờ', 'Quần tailoring', 'Phụ kiện kim loại mềm'], 'palette' => [$palette[4]['hex'], $palette[0]['hex']], 'goal' => 'Biến thể cao cấp'],
+            ['id' => 'look-1', 'name' => 'Office soft', 'items' => ['Blouse linen', 'Quần ống rộng', 'Giày minimal'], 'palette' => [$at(0), $at(2)], 'goal' => 'Look chủ đạo dễ bán'],
+            ['id' => 'look-2', 'name' => 'Weekend pastel', 'items' => ['Váy midi', 'Áo khoác nhẹ', 'Túi nhỏ'], 'palette' => [$at(1), $at(3)], 'goal' => 'Tăng giá trị đơn hàng'],
+            ['id' => 'look-3', 'name' => 'Quiet shine evening', 'items' => ['Áo satin mờ', 'Quần tailoring', 'Phụ kiện kim loại mềm'], 'palette' => [$at(4), $at(0)], 'goal' => 'Biến thể cao cấp'],
         ];
     }
 
+    /**
+     * BẢNG SIZE DỰ KIẾN — nay do NGƯỜI DÙNG quyết định đầy đủ (2026-09-25).
+     *
+     * Trước đây giao diện chỉ có 3 preset cứng (Chuẩn S–XL · Nữ ưu tiên S–M · Unisex) và người dùng
+     * không thêm/bớt được size nào. Nhưng `CollectionPlanService` lại đọc CHÍNH bảng này để ra lệnh
+     * cắt (size nào bao nhiêu cái) ⇒ shop có bảng size riêng thì mọi con số sản xuất đều sai.
+     *
+     * Nay nhận thẳng danh sách size người dùng đặt. Luật giữ nguyên: hệ thống KHÔNG tự thêm size mà
+     * người dùng đã bỏ, chỉ chuẩn hoá tên và tính lại `share` từ `count`.
+     */
     private function sizeDistribution(array $data): array
     {
+
         $custom = (array) ($data['size_distribution'] ?? []);
-        $base = ['S' => 20, 'M' => 35, 'L' => 30, 'XL' => 15];
+
+        $order = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
+
+        $base = $custom === []
+            ? ['S' => 20, 'M' => 35, 'L' => 30, 'XL' => 15]
+
+            : [];
+
         foreach ($custom as $size => $value) {
-            $size = strtoupper(substr((string) $size, 0, 8));
+
+            $size = strtoupper(substr(trim((string) $size), 0, 8));
+
             $number = (int) $value;
-            if ($size !== '' && $number >= 0) $base[$size] = $number;
+
+            if ($size !== '' && $number >= 0) {
+
+                $base[$size] = $number;
+
+            }
+
         }
+
+        if ($base === []) {
+
+            $base = ['S' => 20, 'M' => 35, 'L' => 30, 'XL' => 15];
+
+        }
+
+        // Giữ size theo thứ tự bảng size chuẩn khi biết, size lạ xếp sau theo thứ tự người dùng nhập —
+
+        // bảng size hiển thị lộn xộn (XL trước S) là thứ khiến người ta đọc sai bảng.
+
+        uksort($base, function ($a, $b) use ($order) {
+
+            $ia = array_search($a, $order, true);
+
+            $ib = array_search($b, $order, true);
+
+            if ($ia === false && $ib === false) return strcmp($a, $b);
+
+            if ($ia === false) return 1;
+
+            if ($ib === false) return -1;
+
+            return $ia <=> $ib;
+
+        });
+
         $total = array_sum($base) ?: 100;
+
         return collect($base)->map(fn ($count, $size) => [
+
             'size' => $size, 'count' => (int) $count, 'share' => (int) round(((int) $count / $total) * 100),
+
         ])->values()->all();
+
+    }
+
+
+    /**
+
+     * TỔNG SỐ SKU do người dùng chọn — chia lại về từng nhóm hàng theo ĐÚNG tỉ lệ đang có.
+
+     *
+
+     * Vì sao phải chia lại chứ không ghi đè một nhóm: cơ cấu danh mục (nhóm nào bao nhiêu mã) là kết
+
+     * quả phân tích của brief; người dùng chỉ nói QUY MÔ, không nói "bỏ hết nhóm kia". Chia theo tỉ lệ
+
+     * + làm tròn phần dư (largest remainder) giữ nguyên hình dạng cơ cấu và tổng đúng bằng số đã chọn —
+
+     * làm tròn từng nhóm một cách ngây thơ thì tổng lệch (12 SKU chia 5 nhóm ra 10 hoặc 15).
+
+     */
+
+    private function applySkuTotal(array $mix, $total): array
+
+    {
+
+        $target = (int) $total;
+
+        if ($target <= 0 || $mix === []) {
+
+            return $mix;
+
+        }
+
+        $target = max(count($mix), min(400, $target));   // mỗi nhóm ít nhất 1 mã, trần 400 mã
+
+        $sum = array_sum(array_map(fn ($row) => max(0, (int) ($row['count'] ?? 0)), $mix));
+
+        if ($sum <= 0) {
+
+            return $mix;
+
+        }
+
+
+        $remainders = [];
+
+        $allocated = 0;
+
+        foreach ($mix as $index => $row) {
+
+            $exact = ($target * max(0, (int) ($row['count'] ?? 0))) / $sum;
+
+            $floor = (int) floor($exact);
+
+            $mix[$index]['count'] = $floor;
+
+            $remainders[$index] = $exact - $floor;
+
+            $allocated += $floor;
+
+        }
+
+        arsort($remainders);
+
+        foreach (array_keys($remainders) as $index) {
+
+            if ($allocated >= $target) break;
+
+            $mix[$index]['count']++;
+
+            $allocated++;
+
+        }
+
+        // Nhóm nào bị làm tròn xuống 0 thì trả về 1 mã rồi lấy lại từ nhóm lớn nhất — "nhóm 0 mã"
+
+        // vừa vô nghĩa trong bảng cơ cấu vừa làm lệnh cắt thiếu hẳn một nhóm.
+
+        foreach ($mix as $index => $row) {
+
+            if ((int) $row['count'] > 0) continue;
+
+            $biggest = null;
+
+            foreach ($mix as $j => $other) {
+
+                if ((int) $other['count'] > 1 && ($biggest === null || (int) $other['count'] > (int) $mix[$biggest]['count'])) {
+
+                    $biggest = $j;
+
+                }
+
+            }
+
+            if ($biggest === null) break;
+
+            $mix[$biggest]['count']--;
+
+            $mix[$index]['count'] = 1;
+
+        }
+
+        foreach ($mix as $index => $row) {
+
+            $mix[$index]['share'] = (int) round(((int) $row['count'] / $total) * 100);
+
+        }
+
+
+        return $mix;
+
+    }
+
+
+    /**
+
+     * BẢNG MÀU do người dùng sửa — chỉ nhận mã màu hợp lệ, tối đa 12 ô.
+
+     * Trả null khi người dùng chưa đặt gì ⇒ dùng bảng màu hệ thống (không phá luồng cũ).
+
+     */
+
+    private function paletteOverride($raw): ?array
+
+    {
+
+        if (! is_array($raw)) return null;
+
+        $out = [];
+
+        foreach (array_slice($raw, 0, 12) as $index => $row) {
+
+            if (! is_array($row)) continue;
+
+            $hex = strtoupper(trim((string) ($row['hex'] ?? '')));
+
+            if (! preg_match('/^#[0-9A-F]{6}$/', $hex)) continue;
+
+            $out[] = [
+
+                'name' => mb_substr(trim((string) ($row['name'] ?? '')), 0, 40) ?: 'Màu '.($index + 1),
+
+                'hex' => $hex,
+
+                'role' => mb_substr(trim((string) ($row['role'] ?? '')), 0, 40),
+
+            ];
+
+        }
+
+        return $out === [] ? null : $out;
+
+    }
+
+
+    /**
+
+     * BẢNG MOOD do người dùng sửa — nhận tối đa 40 ô, mỗi ô cần màu hợp lệ.
+
+     * Màu không hợp lệ thì lấy màu tương ứng của bảng màu làm chỗ dựa, KHÔNG loại ô: ô người dùng đã
+
+     * đặt nhãn mà bị bỏ im lặng là mất công của họ.
+
+     */
+
+    private function moodboardOverride($raw, array $palette): ?array
+
+    {
+
+        if (! is_array($raw) || $raw === []) return null;
+
+        $out = [];
+
+        foreach (array_slice($raw, 0, 40) as $index => $row) {
+
+            if (! is_array($row)) continue;
+
+            $hex = strtoupper(trim((string) ($row['color'] ?? '')));
+
+            if (! preg_match('/^#[0-9A-F]{6}$/', $hex)) {
+
+                $hex = (string) ($palette[$index % max(1, count($palette))]['hex'] ?? '#CCCCCC');
+
+            }
+
+            $out[] = [
+
+                'id' => mb_substr(trim((string) ($row['id'] ?? '')), 0, 40) ?: 'mood-'.$index,
+
+                'label' => mb_substr(trim((string) ($row['label'] ?? '')), 0, 60),
+
+                'caption' => mb_substr(trim((string) ($row['caption'] ?? '')), 0, 240),
+
+                'color' => $hex,
+
+                'role' => '',
+
+                'source' => 'owner',
+
+                'image_url' => null,
+
+            ];
+
+        }
+
+        return $out === [] ? null : $out;
+
     }
 
     /**
@@ -3096,18 +3601,111 @@ class DesignAgentService
         return $band + ['avg_shop_vnd' => null, 'basis' => 'heuristic'];
     }
 
-    private function promptVi(string $prompt, array $trends, array $palette): string
+    /**
+     * CÂU MÔ TẢ BẢNG MOOD đưa vào prompt ảnh — phần làm cho bảng mood "HOẠT ĐỘNG THẬT".
+
+     *
+     * Trước đây bảng mood chỉ là lưới màu để nhìn: prompt ảnh lấy bảng màu + tên hướng, KHÔNG lấy gì
+
+     * từ bảng mood. Người dùng sửa ô nào cũng không đổi được ảnh sinh ra ⇒ nó là bảng trang trí.
+
+     *
+     * Nay: nhãn + chú thích của từng ô đi thẳng vào prompt. Bỏ ô trùng lặp và cắt trần để prompt không
+
+     * phình ra (mỗi ô một vế, tối đa 8 vế — nhiều hơn thì model loãng ý).
+
+     */
+    private function moodPhrase(array $moodboard, string $lang = 'vi'): string
+
     {
-        $colors = collect($palette)->pluck('name')->join(', ');
-        $trend = collect($trends)->pluck('title')->join(', ');
-        return trim(sprintf('%s. Phong cách tối giản, dễ phối; ưu tiên đường nét tinh gọn, chất liệu thoáng và bảng màu: %s. Gợi ý từ radar: %s.', $prompt, $colors, $trend));
+
+        $parts = [];
+
+        foreach ($moodboard as $item) {
+
+            $label = trim((string) ($item['label'] ?? ''));
+
+            $caption = trim((string) ($item['caption'] ?? ''));
+
+            if ($label === '' && $caption === '') {
+
+                continue;
+
+            }
+
+            $part = trim($label.($caption !== '' ? ': '.$caption : ''), ' :');
+
+            if ($part !== '' && ! in_array($part, $parts, true)) {
+
+                $parts[] = $part;
+
+            }
+
+            if (count($parts) >= 8) {
+
+                break;
+
+            }
+
+        }
+
+
+        return $parts === [] ? '' : implode(' · ', $parts);
+
     }
 
-    private function promptEn(string $prompt, array $trends, array $palette): string
+
+    private function promptVi(string $prompt, array $trends, array $palette, array $moodboard = []): string
+
     {
+
         $colors = collect($palette)->pluck('name')->join(', ');
+
+        $trend = collect($trends)->pluck('title')->join(', ');
+
+        $mood = $this->moodPhrase($moodboard);
+
+        return trim(sprintf(
+
+            '%s. Phong cách tối giản, dễ phối; ưu tiên đường nét tinh gọn, chất liệu thoáng và bảng màu: %s.%s Gợi ý từ radar: %s.',
+
+            $prompt,
+
+            $colors,
+
+            $mood !== '' ? ' Bám bảng mood: '.$mood.'.' : '',
+
+            $trend,
+
+        ));
+
+    }
+
+
+    private function promptEn(string $prompt, array $trends, array $palette, array $moodboard = []): string
+
+    {
+
+        $colors = collect($palette)->pluck('name')->join(', ');
+
         $fabrics = str_contains(mb_strtolower($prompt), 'linen') ? 'lightweight linen and cotton' : 'breathable natural fabric';
-        return trim(sprintf('%s. Minimal wearable fashion, clean tailoring, soft natural light, %s palette, %s, cohesive office-to-weekend styling, premium editorial look.', $prompt, $colors, $fabrics));
+
+        $mood = $this->moodPhrase($moodboard, 'en');
+
+        return trim(sprintf(
+
+            '%s. Minimal wearable fashion, clean tailoring, soft natural light, %s palette, %s, %s, cohesive office-to-weekend styling, premium editorial look.',
+
+            $prompt,
+
+            $colors,
+
+            $fabrics,
+
+            $mood !== '' ? 'mood: '.$mood : 'mood: calm and cohesive',
+
+        ));
+
     }
 
     private function collectionName(string $prompt, string $region): string

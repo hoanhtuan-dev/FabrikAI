@@ -6,7 +6,9 @@ import { inject } from 'vue';
 import { MOOD_COLOR } from '../../dataColors.js';
 import { useStudioStore } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
+import AgentSubSteps from './AgentSubSteps.vue';
 const store = useStudioStore();
+const sub = inject('sub');
 const trendQuery = inject('trendQuery');
 const trendCategory = inject('trendCategory');
 const liveOnly = inject('liveOnly');
@@ -73,6 +75,7 @@ const formatVnd = inject('formatVnd');
 
 <template>
           <section id="agent-step-radar" role="region" aria-label="Tín hiệu" :aria-busy="store.trendRadarLoading">
+            <AgentSubSteps step-id="radar" />
             <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 class="text-base font-semibold text-cream-100">Tín hiệu thị trường</h2>
@@ -128,6 +131,7 @@ const formatVnd = inject('formatVnd');
             </div>
 
             <template v-else-if="radar">
+              <template v-if="sub === 'signals'">
               <!-- TÍN HIỆU ĐO TỪ TIN THẬT: thu gọn + giải thích ngôn ngữ thường. Số liệu thật, đo bằng
                    thuật toán KHÔNG cần AI — nhưng không nên chiếm hết màn hình: mặc định thu khi nhiều tín hiệu. -->
               <details v-if="marketLive" class="mb-5 rounded-xl border border-ink-700 bg-ink-900/70" :open="marketSignals.length <= 4">
@@ -254,6 +258,9 @@ const formatVnd = inject('formatVnd');
                 </div>
               </div>
 
+              </template>
+
+              <template v-else>
               <div class="mb-3 flex flex-wrap items-center gap-2">
                 <div class="relative min-w-[12rem] flex-1">
                   <StudioIcon name="search" size="h-3.5 w-3.5" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-400" />
@@ -444,6 +451,7 @@ const formatVnd = inject('formatVnd');
                       </ul>
                     </div>
               </details>
+              </template>
             </template>
           </section>
 </template>
