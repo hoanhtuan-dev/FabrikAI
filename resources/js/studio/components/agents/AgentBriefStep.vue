@@ -44,9 +44,7 @@ const trends = inject('trends');
 const selectedTrendCount = inject('selectedTrendCount');
 const selectedTrendObjects = inject('selectedTrendObjects');
 const briefStale = inject('briefStale');
-const modelReady = inject('modelReady');
-const modelShort = inject('modelShort');
-const modelTitle = inject('modelTitle');
+const modelReady = inject('modelReady');   // còn dùng cho nhãn "Vừa phân tích xong"
 // Số ĐO của lượt chạy: có tìm nguồn ngoài thật hay không, hỏi gì, được mấy tin (xem shell).
 const toolSearchLine = inject('toolSearchLine');
 const appliedAi = inject('appliedAi');
@@ -236,7 +234,7 @@ const createBrief = inject('createBrief');
               <span class="rounded-lg bg-ink-800 px-2.5 py-1 text-label text-cream-400">Khu vực: {{ collection.input?.region || selectedRegion }}</span>
             </div>
             <div class="mt-2 flex flex-wrap items-center gap-1.5 text-label">
-              <span class="rounded-full px-2 py-0.5 font-semibold" :class="modelReady ? 'bg-ok/15 text-ok' : 'bg-warn/15 text-warn'" :title="modelTitle">{{ modelShort }}</span>
+              <!-- KHÔNG lặp lại chip trạng thái AI ở đây: thanh trên đã luôn hiện nó, và băng lý do cũng đã nói. Ba chỗ nói một câu là rối (phản hồi chủ dự án 2026-09-21). -->
               <span v-for="row in appliedAi" :key="row" class="rounded bg-brand-500/15 px-2 py-0.5 text-brand-200">AI viết: {{ row }}</span>
               <span v-if="collection.model?.cached" class="rounded bg-ink-800 px-2 py-0.5 text-cream-400" title="Cùng yêu cầu trước đó nên không cần tạo lại">Đã tạo {{ cacheAgeLabel }}</span>
               <span v-else-if="modelReady" class="text-cream-400">Vừa phân tích xong</span>

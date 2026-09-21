@@ -14,7 +14,7 @@
  *
  * Không đổi hành vi: `store.toast(msg, type)` vẫn là API duy nhất các nơi khác gọi.
  */
-import { computed, watch, onBeforeUnmount } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
 
@@ -74,19 +74,57 @@ const progress = computed(() => {
   }
   return null;
 });
+
+// ── THẺ TIẾN TRÌNH PHẢI GẠT ĐI ĐƯỢC (phản hồi chủ dự án 2026-09-21) ──────────────────────
+// Phản hồi thật: "3 ảnh đang tạo 0%" nằm mãi ở góc màn hình, không có nút tắt và không tự tắt.
+// Vì sao nó nằm mãi: thẻ chỉ tắt khi `progress` thành null, mà `progress` đọc trạng thái các bản ghi
+// sinh ảnh — trên host này KHÔNG CÓ CRON queue (nợ đã ghi ở DEPLOY.md §9.1undecies) nên một bản ghi
+// kẹt ở "pending" thì thẻ kẹt theo, vĩnh viễn. Người dùng không có cách nào gạt nó đi.
+//
+// Hai đường gạt, cố ý làm CẢ HAI:
+//   · nút tắt 24×24 — người dùng chủ động, có hiệu lực ngay;
+//   · tự tắt sau 2 phút KHÔNG có tiến triển — việc đứng thì thẻ không được chiếm góc màn hình mãi.
+// Thẻ HIỆN LẠI khi có thông tin mới (nhãn hoặc % đổi) — tức khi việc thật sự nhúc nhích.
+const PROGRESS_STUCK_MS = 120000;
+const progressKey = computed(() => (progress.value ? progress.value.label + '|' + progress.value.pct : ''));
+const dismissedKey = ref('');      // người dùng bấm tắt ở khoá này
+const stuckKey = ref('');          // tự tắt vì đứng yên ở khoá này
+let stuckTimer = null;
+
+watch(progressKey, (key) => {
+  if (stuckTimer) { clearTimeout(stuckTimer); stuckTimer = null; }
+  if (!key) return;
+  stuckTimer = setTimeout(() => { stuckKey.value = key; }, PROGRESS_STUCK_MS);
+}, { immediate: true });
+onBeforeUnmount(() => { if (stuckTimer) clearTimeout(stuckTimer); });
+
+const visibleProgress = computed(() => {
+  const key = progressKey.value;
+  if (!key) return null;
+  if (dismissedKey.value === key || stuckKey.value === key) return null;
+  return progress.value;
+});
+function dismissProgress() { dismissedKey.value = progressKey.value; }
 </script>
 
 <template>
   <div class="pointer-events-none fixed bottom-4 right-4 z-[95] flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2" role="region" aria-label="Thông báo" aria-live="polite">
-    <!-- Thẻ tiến trình: chỉ hiện khi có việc đang chạy -->
-    <div v-if="progress" class="pointer-events-auto overflow-hidden rounded-xl border border-brand-500/40 bg-ink-900/95 shadow-2xl backdrop-blur">
+    <!-- Thẻ tiến trình: chỉ hiện khi có việc đang chạy VÀ người dùng chưa gạt nó đi -->
+    <div v-if="visibleProgress" class="pointer-events-auto overflow-hidden rounded-xl border border-brand-500/40 bg-ink-900/95 shadow-2xl backdrop-blur">
       <div class="flex items-center gap-2 px-3 py-2.5">
         <span class="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-brand-400"></span>
-        <span class="min-w-0 flex-1 truncate text-body font-semibold text-cream-100">{{ progress.label }}</span>
-        <span class="shrink-0 text-body font-semibold tabular-nums text-brand-300">{{ progress.pct }}%</span>
+        <span class="min-w-0 flex-1 truncate text-body font-semibold text-cream-100">{{ visibleProgress.label }}</span>
+        <span class="shrink-0 text-body font-semibold tabular-nums text-brand-300">{{ visibleProgress.pct }}%</span>
+        <button
+          type="button"
+          class="grid h-6 w-6 shrink-0 place-items-center rounded-md text-cream-200 transition hover:bg-ink-800 hover:text-cream-50"
+          title="Ẩn thẻ tiến trình (việc vẫn chạy — xem ở Kết quả)"
+          aria-label="Ẩn thẻ tiến trình"
+          @click="dismissProgress"
+        ><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
       </div>
       <div class="h-1 w-full bg-ink-800">
-        <div class="h-full bg-gradient-to-r from-brand-500 to-brand-300 motion-ui motion-ui--size duration-slow ease-emphasized" :style="{ width: progress.pct + '%' }"></div>
+        <div class="h-full bg-gradient-to-r from-brand-500 to-brand-300 motion-ui motion-ui--size duration-slow ease-emphasized" :style="{ width: visibleProgress.pct + '%' }"></div>
       </div>
     </div>
 

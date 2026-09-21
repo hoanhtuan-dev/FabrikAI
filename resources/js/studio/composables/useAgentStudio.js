@@ -544,11 +544,17 @@ export function useAgentStudio() {
   //     bật công tắc rồi mà vẫn đọc thấy mình "chưa bật" ⇒ mất niềm tin vào công tắc);
   //   · ai_disabled nói "Bạn ĐANG tắt" trong khi đây chỉ là bản brief ĐƯỢC DỰNG LÚC đang tắt — công
   //     tắc có thể đã bật lại từ lâu. Nói snapshot bằng thì hiện tại là nói sai.
+  // [SỬA LỖI THẬT — phản hồi chủ dự án 2026-09-21] Hai câu này trước đây nói SAI về TRẠNG THÁI:
+  //   · no_model_key nói "AI chưa được bật" trong khi đúng ra là "CHƯA GÁN model AI";
+  //   · ai_disabled nói "Bạn ĐANG tắt" trong khi đây chỉ là bản brief ĐƯỢC DỰNG LÚC đang tắt.
+  // Và nay CÂU CHỮ ĐÃ ĐƯỢC RÚT GỌN: nhãn chỉ nói NGUYÊN NHÂN. Trạng thái "đang chạy bằng bộ quy tắc"
+  // do CHIP ở thanh trên nói (modelShort) — nhắc lại ở đây thì một màn hình có ba chỗ nói cùng một câu
+  // (chip thanh trên · chip trong card · cuối câu lý do), đúng thứ người dùng phản hồi là rối.
   const MODEL_REASON_LABELS = {
-    no_model_key: 'Chưa cấu hình AI cho nhóm công việc nên hai agent đang chạy bằng bộ quy tắc có sẵn.',
-    model_error: 'AI không phản hồi — đã tự chuyển sang bộ quy tắc có sẵn (kết quả vẫn đầy đủ).',
-    invalid_output: 'AI trả về dữ liệu không dùng được — đã tự chuyển sang bộ quy tắc có sẵn (kết quả vẫn đầy đủ).',
-    ai_disabled: 'Brief này được dựng khi Suy luận AI đang TẮT nên hai agent chạy bằng bộ quy tắc có sẵn.',
+    no_model_key: 'Chưa cấu hình AI cho nhóm công việc.',
+    model_error: 'AI không phản hồi ở lượt này — kết quả vẫn đầy đủ.',
+    invalid_output: 'AI trả về dữ liệu không dùng được ở lượt này — kết quả vẫn đầy đủ.',
+    ai_disabled: 'Brief này được dựng khi Suy luận AI đang TẮT.',
   };
   const activeModel = computed(() => collection.value?.model || radar.value?.model || null);
   const modelReady = computed(() => activeModel.value?.mode === 'ai');

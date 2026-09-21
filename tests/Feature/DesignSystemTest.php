@@ -518,6 +518,49 @@ class DesignSystemTest extends TestCase
             'Nút «Xoá hết» cũng là nút bấm trên điện thoại — phải đạt 24px chiều cao.');
     }
 
+    /**
+     * THẺ TIẾN TRÌNH PHẢI GẠT ĐI ĐƯỢC (phản hồi chủ dự án 2026-09-21: "3 ảnh đang tạo 0%" nằm mãi).
+     *
+     * Thẻ này chỉ tắt khi có tiến trình thật, mà trên host này KHÔNG có cron queue (nợ ở DEPLOY.md
+     * §9.1undecies) nên một bản ghi kẹt ở pending là thẻ kẹt vĩnh viễn. Bất biến: có NÚT TẮT, và có
+     * đường TỰ TẮT khi việc đứng yên — thiếu một trong hai là người dùng lại bị khoá góc màn hình.
+     */
+    public function test_the_progress_card_can_be_dismissed(): void
+    {
+        $center = $this->src('resources/js/studio/components/NotificationCenter.vue');
+
+        $this->assertStringContainsString('aria-label="Ẩn thẻ tiến trình"', $center,
+            'Thẻ tiến trình không có nút tắt — người dùng không gạt được nó đi.');
+        $this->assertMatchesRegularExpression(
+            '/<button[^>]*class="grid h-6 w-6[^"]*"[^>]*aria-label="Ẩn thẻ tiến trình"/s',
+            $center,
+            'Nút tắt thẻ tiến trình phải đạt vùng chạm 24×24 (docs/DESIGN_SYSTEM.md §8).'
+        );
+        $this->assertStringContainsString('PROGRESS_STUCK_MS', $center,
+            'Thẻ tiến trình không có đường TỰ TẮT khi việc đứng yên.');
+        $this->assertStringContainsString('v-if="visibleProgress"', $center,
+            'Template vẫn đọc trực tiếp progress thay vì bản đã lọc qua trạng thái đã-tắt.');
+    }
+
+    /**
+     * MỘT CÂU, MỘT CHỖ. Nhãn lý do KHÔNG được nhắc lại câu mà chip trạng thái đã nói — phản hồi thật:
+     * người dùng đọc "…hai agent chạy bằng bộ quy tắc có sẵn. Bộ quy tắc có sẵn." trên cùng một màn hình
+     * (cuối câu lý do · chip thanh trên · chip trong card) và thấy rối.
+     */
+    public function test_the_agent_reason_labels_do_not_restate_the_status_chip(): void
+    {
+        $core = $this->src('resources/js/studio/composables/useAgentStudio.js');
+        preg_match('/const MODEL_REASON_LABELS = \{(.*?)\};/s', $core, $m);
+        $this->assertNotEmpty($m[1] ?? '', 'Không đọc được các nhãn lý do của Agent Studio.');
+        $this->assertStringNotContainsString('bộ quy tắc có sẵn', mb_strtolower($m[1]),
+            'Nhãn lý do nhắc lại "bộ quy tắc có sẵn" trong khi chip trạng thái đã nói câu đó ngay cạnh.');
+
+        // Và chip trạng thái chỉ được render ở MỘT chỗ (thanh trên) — không lặp trong card brief.
+        $brief = $this->src('resources/js/studio/components/agents/AgentBriefStep.vue');
+        $this->assertStringNotContainsString('{{ modelShort }}', $brief,
+            'Chip trạng thái AI bị lặp lại trong card brief — thanh trên đã luôn hiện nó.');
+    }
+
     public function test_button_backgrounds_use_one_token_per_state(): void
     {
         // Nền "kính mờ"/alpha lạ: KHÔNG bao giờ dùng cho trạng thái nghỉ của nút.
