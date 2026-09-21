@@ -66,7 +66,33 @@ Phần TỐI GIẢN: **hai thanh thay vì bốn**; tiến trình + bối cảnh 
 - `npm run build` thoát 0 · `public_html/build/assets/agent-studio-*.js` **118,5 kB** (gzip 35,4 kB) · asset đã commit (máy chủ không có node).
 - `docs/DESIGN_SYSTEM.md` thêm **§21** (luật của trang) + cập nhật §2 (bảng class dùng chung) · §3 (component dùng chung) · §16 (vòng 30) + bảng lịch sử.
 
+### 7. Deploy lên production `c0e37f7` → `4bff3c4` (2026-09-21 10:37 giờ máy chủ)
+
+Không migration · không lớp PHP mới · **có** route mới + entry Vite mới ⇒ bắt buộc `route:cache` và
+asset phải commit (máy chủ không có node).
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Sao lưu DB trước khi pull | `fabrikai-db-backup-before-agentstudio-20260921-103707.sql` · **1.682.578 bytes · 40 bảng** |
+| `git pull --ff-only` | Fast-forward `c0e37f7..4bff3c4` · 75 tệp · HEAD máy chủ = HEAD local |
+| Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` — đều OK (bootstrap/cache ghi lúc 10:37) |
+| Route | `GET /agent-studio → StudioController@agentStudioPage` có trong route:list · 72 route GET |
+| Asset | `agent-studio-By6ZN0q1.js` **120.739 B** · `app-Da_KHtOl.css` **138.436 B** — 8/8 tệp của trang trả **200** |
+| Manifest | entry `agent-studio.js` `isEntry:true` + import đúng 6 chunk · `main.js` vẫn còn · **mọi entry đều có tệp** |
+| Blade render trên máy chủ | **10.612 ký tự**, có `agent-studio-root` + `__STUDIO_BOOT__`, `@vite` phân giải đúng cặp asset |
+| HTTP | `/` `/up` `/bang-gia` `/dang-nhap` **200** · `/agent-studio` **302 → /dang-nhap** (khách bị chặn đúng) |
+| **Trùng khớp bản đã đo** | md5 bundle production = md5 bản đã kiểm bằng Chrome thật ở local (`799587b7…` · `0802a6e4…`) |
+| Log | 5 ERROR + 32 WARNING của ngày — **tất cả trước 07:26**, deploy lúc 10:37 ⇒ **không có lỗi mới** |
+| `APP_DEBUG=false` | URL sai ⇒ trang 404 của app, **0** dấu vết stack trace |
+
+> ⚠️ Vẫn cần chủ dự án **bấm qua 4 bước trên production một lần**: quá trình verify không dùng mật khẩu
+> của bất kỳ tài khoản thật nào (6 tài khoản production đều là email khách thật).
+
+> 🔁 Nợ cũ của host (không do bản này): `storage/logs/` vẫn **không có `worker.log`/`scheduler.log`**
+> ⇒ hai cron ở hPanel chưa được thêm, lịch nền không chạy và render rơi về đường inline (§9.1undecies).
+
 ---
+
 ## Phiên 2026-09-24 (Tool search — vai «Tìm kiếm nguồn ngoài» của Agent Studio chạy được thật)
 
 ### Mục tiêu (yêu cầu chủ dự án)
