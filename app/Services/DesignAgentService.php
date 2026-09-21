@@ -69,10 +69,13 @@ class DesignAgentService
     /**
      * Trần thời gian cho phép THỬ LẠI một lượt gọi model (mili giây).
      *
-     * Đo trên production 2026-09-21: brief qua model có tìm kiếm mất ~39 s; thử lại lần hai đẩy tổng lên
-     * quá trần proxy ⇒ **504**. 20 s là ngưỡng để tổng thời gian còn nằm trong khoảng an toàn.
+     * Đo trên production 2026-09-21: brief qua model có tìm kiếm mất ~39 s; thử lại lần hai (lúc đó còn
+     * lặp cả các lượt tìm kiếm) đẩy tổng lên quá trần proxy ⇒ **504**.
+     *
+     * Từ khi lần thử lại KHÔNG tìm kiếm nữa (xem callJson) thì nó chỉ tốn ~8–12 s, nên ngưỡng 30 s vẫn
+     * giữ tổng thời gian dưới trần proxy mà không mất lưới cứu ca "JSON bị cắt".
      */
-    private const RETRY_TIME_BUDGET_MS = 20000;
+    private const RETRY_TIME_BUDGET_MS = 30000;
 
     /**
      * Tham số này BẮT BUỘC (kiểu nullable, không có default): container của Laravel KHÔNG tự
@@ -1655,6 +1658,9 @@ class DesignAgentService
                 'attempts' => $call['attempts'],
                 'chars' => strlen($answer['text']),
                 'raw' => substr($answer['text'], 0, 800),
+                // ĐUÔI của câu trả lời: chỉ ghi 800 ký tự ĐẦU thì không phân biệt được "JSON hỏng" với
+                // "JSON bị CẮT vì hết token" — đo thật 2026-09-21 phải mất thêm một vòng mới kết luận được.
+                'raw_tail' => substr($answer['text'], -200),
             ]);
 
             return [$ruleDirections, $this->modelBlock('rule', $runner, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch, 'tool_search' => $toolSearch]), $trends];
@@ -1994,6 +2000,9 @@ class DesignAgentService
                 'attempts' => $call['attempts'],
                 'chars' => strlen($answer['text']),
                 'raw' => substr($answer['text'], 0, 800),
+                // ĐUÔI của câu trả lời: chỉ ghi 800 ký tự ĐẦU thì không phân biệt được "JSON hỏng" với
+                // "JSON bị CẮT vì hết token" — đo thật 2026-09-21 phải mất thêm một vòng mới kết luận được.
+                'raw_tail' => substr($answer['text'], -200),
             ]);
 
             return ['model' => $this->modelBlock('rule', $runner, ['reason' => 'invalid_output', 'latency_ms' => $latency, 'attempted' => $attempted, 'attempts' => $call['attempts'], 'web_search' => $webSearch, 'tool_search' => $toolSearch]), 'data' => null];
@@ -2100,7 +2109,17 @@ class DesignAgentService
             'chars' => strlen($answer['text']),
         ]);
 
-        $retry = $this->gateway->text($group, $messages, $shared + [
+        // LẦN THỬ LẠI **KHÔNG TÌM KIẾM NỮA** (2026-09-21).
+        //
+        // Vì sao: lần thử lại trước đây lặp y nguyên lời gọi — kể cả các lượt tìm kiếm của nhà cung cấp —
+        // nên nó tốn thêm ~27 giây, đẩy tổng vượt trần proxy và khách nhận 504. Nhưng BỎ HẲN lần thử lại
+        // cũng sai: nó chính là lưới cứu ca "JSON bị cắt", và đo được là có ca thật rơi vào đó (brief rơi
+        // về engine tất định). Lần thử lại thứ hai chỉ cần VIẾT LẠI JSON — dữ liệu đã nằm trong prompt —
+        // nên bỏ tìm kiếm đi là đủ, và thời gian giảm còn khoảng một phần ba.
+        $retryOptions = $shared;
+        unset($retryOptions['search'], $retryOptions['tools'], $retryOptions['tool_handler'], $retryOptions['tool_begin']);
+
+        $retry = $this->gateway->text($group, $messages, $retryOptions + [
             'max_tokens' => $retryBudget,
             'timeout' => $timeout * 2,
         ]);
@@ -2120,7 +2139,7 @@ class DesignAgentService
     /**
      * Còn đáng thử lại không? — lần gọi đầu ĐÃ tốn bao nhiêu mili giây.
      *
-     * Ngưỡng lấy theo trần thời gian thực tế của proxy: một lần thử lại tốn THÊM chừng ấy thời gian nữa,
+     * Ngưỡng lấy theo trần thời gian thực tế của proxy: lần thử lại (đã bỏ tìm kiếm) tốn thêm ~8–12 s,
      * nên chỉ thử khi tổng dự kiến còn nằm trong trần. Đây là đánh đổi có chủ ý: bản JSON hỏng ⇒ quay về
      * engine tất định (vẫn có kết quả dùng được), còn 504 thì khách mất trắng.
      */

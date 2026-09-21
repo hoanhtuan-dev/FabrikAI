@@ -784,10 +784,11 @@ class ToolSearchTest extends TestCase
         $method = new \ReflectionMethod($service, 'retryWorthIt');
         $method->setAccessible(true);
 
+        // Ngưỡng 30 s: lần thử lại ĐÃ BỎ TÌM KIẾM nên chỉ tốn thêm ~8–12 s — tổng vẫn dưới trần proxy.
         $this->assertTrue($method->invoke($service, 1000), 'Lần đầu nhanh thì nên thử lại.');
-        $this->assertTrue($method->invoke($service, 19000));
-        $this->assertFalse($method->invoke($service, 20000), 'Chạm trần thì dừng.');
-        $this->assertFalse($method->invoke($service, 39000), 'Brief 39 giây rồi mà thử lại là vượt trần proxy.');
+        $this->assertTrue($method->invoke($service, 29000));
+        $this->assertFalse($method->invoke($service, 30000), 'Chạm trần thì dừng.');
+        $this->assertFalse($method->invoke($service, 49000), 'Radar 49 giây rồi mà thử lại là vượt trần proxy.');
     }
 
     /**
