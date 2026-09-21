@@ -120,6 +120,68 @@ class AiModelGatewayTest extends TestCase
         $this->assertSame('responses_web_search', $candidates[0]['search_mode']);
     }
 
+    /**
+     * CỜ TẮT SUY LUẬN CHỈ ĐƯỢC BỎ KHI PROVIDER TỪ CHỐI THAM SỐ — không phải với mọi lỗi.
+     *
+     * [LỖI THẬT — tìm ra 2026-09-21 khi rà lại đường tìm kiếm] Ba chỗ gọi `/chat/completions` đều bỏ cờ
+     * `enable_thinking: false` với MỌI lỗi: gặp 429 (hết hạn mức — rất thường với gói Token Plan) hay 5xx là
+     * lần gọi lại chạy KHÔNG có cờ ⇒ model bật lại suy luận dài, đốt ngân sách token, và có lượt trả về
+     * NGUYÊN CHUỖI SUY NGHĨ thay vì JSON. Log production có 6 ca "không đọc được JSON" trong một buổi tối;
+     * ca của khách thật bắt đầu bằng "We need to output JSON only. The user asks: …".
+     *
+     * Đo được trên chính khoá đang chạy: gửi cờ ⇒ phản hồi KHÔNG có `reasoning_content` và không tốn token
+     * suy luận; không gửi ⇒ có `reasoning_content` và 325 token suy luận cho một câu ngắn.
+     *
+     * Bài này gọi THẲNG hàm gửi request (không đi qua máy móc chọn model) để đo đúng một việc: cờ có bị bỏ
+     * hay không, và bỏ vì lý do gì.
+     */
+    public function test_the_thinking_off_flag_is_only_dropped_when_the_provider_rejects_it(): void
+    {
+        $body = ['model' => 'qwen3.8-flash', 'messages' => [['role' => 'user', 'content' => 'hi']], 'enable_thinking' => false];
+        $url = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
+
+        // MỘT stub duy nhất: `Http::fake()` CỘNG DỒN stub chứ không thay thế, nên đăng ký stub thứ hai cho
+        // cùng một URL là stub thứ nhất vẫn trả lời — bẫy đã làm bài test này "xanh" sai một lần.
+        $sent = [];
+        $mode = 'rate_limit';
+        Http::fake([
+            'dashscope-intl.aliyuncs.com/*' => function ($request) use (&$sent, &$mode) {
+                $sent[] = json_decode($request->body(), true);
+
+                return match ($mode) {
+                    'rate_limit' => Http::response(['error' => ['message' => 'rate limited']], 429),
+                    'reject_param' => count($sent) === 1
+                        ? Http::response(['error' => ['message' => 'unknown parameter: enable_thinking']], 400)
+                        : Http::response(['choices' => [['message' => ['content' => 'ok']]]], 200),
+                    default => Http::response(['error' => ['message' => 'bad request']], 400),
+                };
+            },
+        ]);
+
+        // (a) Lỗi KHÔNG liên quan tới cờ (429 hết hạn mức) ⇒ gửi ĐÚNG MỘT lần, cờ còn nguyên.
+        $this->callProtected(AiModelGateway::class, 'postChat', [$url, 'sk-x', $body, true, 30]);
+
+        $this->assertCount(1, $sent, 'Gặp 429 mà gọi lại không có cờ tắt suy luận = tự bật lại suy luận dài.');
+        $this->assertFalse($sent[0]['enable_thinking'] ?? null, 'Lần gọi đầu phải có cờ.');
+
+        // (b) Provider TỪ CHỐI THAM SỐ (400) ⇒ gọi lại, và lần gọi lại KHÔNG có cờ.
+        $sent = [];
+        $mode = 'reject_param';
+        $resp = $this->callProtected(AiModelGateway::class, 'postChat', [$url, 'sk-x', $body, true, 30]);
+
+        $this->assertCount(2, $sent, 'Provider từ chối tham số thì PHẢI gọi lại — tham số tuỳ chọn không được làm hỏng lời gọi.');
+        $this->assertFalse($sent[0]['enable_thinking'] ?? null);
+        $this->assertArrayNotHasKey('enable_thinking', $sent[1], 'Lần gọi lại phải KHÔNG có cờ.');
+        $this->assertTrue($resp->successful());
+
+        // (c) Không khai cờ thì đừng gọi lại lần nào — dù lỗi là 400.
+        $sent = [];
+        $mode = 'plain';
+        $this->callProtected(AiModelGateway::class, 'postChat', [$url, 'sk-x', ['model' => 'qwen3.8-flash', 'messages' => []], false, 30]);
+
+        $this->assertCount(1, $sent);
+    }
+
     private function creativeJson(string $marker): string
     {
         return json_encode([

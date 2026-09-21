@@ -431,11 +431,7 @@ class AiModelGateway
             $this->applySearch($body, $options, $candidate);
             $thinkingOff = $this->applyThinkingOff($body, $candidate, $options);
 
-            $response = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
-            if ($thinkingOff && ! $response->successful()) {
-                unset($body['enable_thinking']);
-                $response = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
-            }
+            $response = $this->postChat($base, $key, $body, $thinkingOff, $timeout);
 
             if (! $response->successful()) {
                 if (! $offerTools) {
@@ -680,13 +676,7 @@ class AiModelGateway
             // việc của Cài đặt. Không bật bừa: provider không khai thì gửi tham số lạ có thể hỏng request.
             $this->applySearch($body, $options, $candidate);
             $thinkingOff = $this->applyThinkingOff($body, $candidate, $options);
-            $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
-            if ($thinkingOff && ! $resp->successful()) {
-                // Provider không hiểu cờ tắt suy luận ⇒ gọi lại KHÔNG có cờ đó. Một tham số tuỳ chọn không
-                // bao giờ được phép làm hỏng cả lời gọi.
-                unset($body['enable_thinking']);
-                $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
-            }
+            $resp = $this->postChat($base, $key, $body, $thinkingOff, $timeout);
 
             return $resp->successful() ? $this->textResult($resp->json()) : null;
         }
@@ -729,11 +719,7 @@ class AiModelGateway
         // (`studio_providers.search_param`), tức là đến từ Cài đặt.
         $this->applySearch($body, $options, $candidate);
         $thinkingOff = $this->applyThinkingOff($body, $candidate, $options);
-        $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
-        if ($thinkingOff && ! $resp->successful()) {
-            unset($body['enable_thinking']);
-            $resp = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
-        }
+        $resp = $this->postChat($base, $key, $body, $thinkingOff, $timeout);
 
         return $resp->successful() ? $this->textResult($resp->json()) : null;
     }
@@ -753,6 +739,32 @@ class AiModelGateway
      * @param  array<string,mixed>  $body
      * @return bool  đã gửi cờ hay chưa (để biết có cần gọi lại khi provider từ chối)
      */
+    /**
+     * GỬI /chat/completions — có xử lý cờ tắt suy luận, và CHỈ bỏ cờ khi lỗi là DO CHÍNH CỜ ĐÓ.
+     *
+     * [LỖI THẬT — tìm ra 2026-09-21 khi rà lại đường tìm kiếm] Bản trước bỏ cờ `enable_thinking: false` với
+     * MỌI lỗi: gặp 429 (hết hạn mức — rất thường với gói Token Plan) hay 5xx là lần gọi lại chạy KHÔNG có
+     * cờ ⇒ model bật lại suy luận dài, đốt ngân sách token, và có lượt trả về NGUYÊN CHUỖI SUY NGHĨ thay vì
+     * JSON. Bằng chứng đo được: gửi `enable_thinking: false` thì phản hồi KHÔNG có `reasoning_content` và
+     * không tốn token suy luận; và log production có 6 ca "không đọc được JSON" trong một buổi tối (một ca
+     * của khách thật, đầu ra bắt đầu bằng "We need to output JSON only. The user asks: …").
+     *
+     * Một tham số tuỳ chọn không được phép làm hỏng lời gọi ⇒ vẫn gọi lại khi provider từ chối THAM SỐ
+     * (400/422). Nhưng lỗi không liên quan (429, 5xx, mạng) thì trả về nguyên trạng để nơi gọi tự quyết.
+     */
+    protected function postChat(string $base, string $key, array $body, bool $thinkingOff, int $timeout)
+    {
+        $response = Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
+
+        if (! $thinkingOff || $response->successful() || ! in_array($response->status(), [400, 422], true)) {
+            return $response;
+        }
+
+        unset($body['enable_thinking']);
+
+        return Http::withToken($key)->timeout($timeout)->post($base.'/chat/completions', $body);
+    }
+
     protected function applyThinkingOff(array &$body, array $candidate, array $options): bool
     {
         if (($options['disable_thinking'] ?? false) !== true) {

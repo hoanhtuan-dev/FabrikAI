@@ -172,6 +172,10 @@ class MarketAnalysisFromSourcesTest extends TestCase
         $this->assertStringContainsString('applyThinkingOff', $gateway);
         $this->assertStringContainsString('enable_thinking', $gateway);
         $this->assertStringContainsString("unset(\$body['enable_thinking'])", $gateway, 'Provider không hiểu cờ thì phải gọi lại KHÔNG có cờ.');
+        // NHƯNG chỉ khi lỗi là DO chính cờ đó. Bỏ cờ vì một 429/5xx là tự bật lại suy luận dài — đo thật:
+        // model trả về nguyên chuỗi suy nghĩ thay vì JSON (6 ca trong một buổi tối, một ca của khách).
+        $this->assertStringContainsString("in_array(\$response->status(), [400, 422], true)", $gateway,
+            'Cờ tắt suy luận không được bỏ vì những lỗi không liên quan (hết hạn mức, lỗi máy chủ).');
     }
 
     /** Giao diện: có chip lọc "có tin thật", có khối chủ đề, và nói rõ bao nhiêu hướng là bộ có sẵn. */
