@@ -180,6 +180,26 @@ Không migration (phiên dùng bảng `projects` sẵn có — chọn thiết k�
 Kiểm chứng: **1043 test XANH** (4 test mới: 3 test JSON hỏng kiểu thật + 1 test nút đóng thông báo) ·
 `npm run build` tất định · production md5 `d73c4bcd…` (JS) khớp bản đã đo · 0 lỗi mới trong log.
 
+### 10. VÁ AI-FALLBACK + THÔNG BÁO KHÔNG TỰ TẮT (deploy `d23122e` → `c9001aa`, 12:23 giờ máy chủ)
+
+Đây là lần thứ HAI sửa cùng một triệu chứng "AI trả về dữ liệu không dùng được" trong ngày. Lần 1
+(a55fe5b) vá xuống dòng + dấu phẩy thừa; lần này xem lại log production và thấy còn MỘT KIỂU HỎNG nữa
+mà 800 ký tự đầu log không lộ ra: nháy kép nằm trong nội dung (model viết tiếng Việt kiểu báo chí).
+
+| # | Người dùng báo | Nguyên nhân THẬT | Đã sửa |
+|---|---|---|---|
+| 1 | "AI trả về dữ liệu không dùng được" (log prod 3 lượt: 07:42 · 17:52 · 18:45, deepseek_search:deepseek-v4-pro, finish_reason=completed, ~5 KB) | JSON hợp lệ ở đầu/cuối nhưng hỏng ở GIỮA — đúng kiểu nháy kép chưa escape trong chuỗi | Bộ sửa JSON (máy trạng thái) thêm CHỮA NHÁY KÉP TRONG NỘI DUNG + **giữ nguyên văn ra storage/logs/agent-json-fail-*.txt** để lần sau mở tệp là thấy bệnh |
+| 2 | "Bạn đang tắt suy luận AI" khi không hề tắt | Nhãn lý do nói HIỆN TẠI trong khi nó là SNAPSHOT của lần dựng brief | "Brief này được dựng KHI Suy luận AI đang TẮT"; "Phần AI chưa được bật" → "Chưa cấu hình AI cho nhóm công việc" |
+| 3 | "thông báo không tự tắt / không có nút tắt" | Băng `role=status` (AI · brief cũ · chế độ tất định) dính mãi, không đóng được | Component `Notice.vue` (băng dạng chung, nút đóng 24×24, hiện lại khi điều kiện sau đổi) — thay 3 băng dính mãi |
+
+Kiểm chứng: **1044 test XANH** · build tất định · Chrome thật 390px: băng AI nói đúng bệnh + có nút đóng, bấm là đóng; băng "brief chế độ tất định" đóng được; không còn chữ "Bạn đang tắt suy luận AI"; 0 lỗi console.
+
+**Số liệu deploy:** backup `fabrikai-db-backup-before-ai-notice-20260921-122318.sql` (2.999.267 B) · HEAD `c9001aa` ·
+bundle `agent-studio-DMy_ukyo.js` 172.185 B, md5 `d2954ecb…` trùng khớp local · HTTP 200/200/302 · 0 lỗi mới.
+
+> **Bài học lần này:** lần 1 tôi vá mà không biết CHÍNH XÁC kiểu hỏng (log chỉ có 800 ký tự đầu, mà JSON hỏng
+> ở giữa). Lần 2 mới có `agent-json-fail-*.txt` giữ nguyên văn — vậy là đủ bằng chứng để sửa ĐÚNG một lần.
+
 ---
 ## Phiên 2026-09-24 (Tool search — vai «Tìm kiếm nguồn ngoài» của Agent Studio chạy được thật)
 
