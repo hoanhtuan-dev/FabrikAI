@@ -156,6 +156,30 @@ Không migration (phiên dùng bảng `projects` sẵn có — chọn thiết k�
 
 > ⚠️ Vẫn cần chủ dự án bấm qua trên production một lần bằng tài khoản thật.
 
+### 9. VÁ 3 LỖI THẬT TỪ PHẢN HỒI CHỦ DỰ ÁN (deploy `4795ab8` → `a55fe5b`, 12:03 giờ máy chủ)
+
+| # | Người dùng báo | Nguyên nhân THẬT | Đã sửa |
+|---|---|---|---|
+| 1 | "Bước 5 không hoạt động" | 3 component bước con gọi `inject('store')` nhưng `provideAll` không provide `store` ⇒ `TypeError: … 'planRecalculating'`, cả bước không vẽ được. Cùng lỗi ÂM THẦM làm hỏng luôn việc 3 "Áp dụng & lưu" | Dùng `import { useStudioStore }` như 4 bước cũ |
+| 2 | "Thông báo không có nút tắt" | Nút CÓ thật nhưng 18×18px + `opacity-60`, dưới ngưỡng 24×24 của chính §8 (WCAG 2.2 SC 2.5.8) | 24×24 · opacity 1 |
+| 3 | "AI trả về dữ liệu không dùng được" | Model xuống dòng THẬT trong giá trị chuỗi ⇒ JSON không đọc được ⇒ brief rơi về bộ quy tắc | Bộ sửa JSON cơ học (máy trạng thái) + dặn model + log chẩn đoán |
+
+> **Bài học đắt nhất của đợt này:** lỗi 1 sống sót qua cả một vòng "verify bằng Chrome thật" vì tôi chỉ
+> kiểm những việc con mà tôi ĐÃ đi qua, và bỏ qua dấu hiệu `Lần lưu gần nhất` trống — tôi cho đó là
+> "artifact của script kiểm thử" trong khi nó chính là triệu chứng của một component không vẽ được.
+> Lần sau: **mọi chi tiết bất thường trong lúc đo đều phải truy tới cùng**, không được gán cho script.
+
+Đo TRƯỚC khi deploy bằng Chrome thật ở 390px:
+
+| Phép đo | Trước | Sau |
+|---|---|---|
+| Bước 5 | console `TypeError`; 0 ô nhập | 4 nhóm; sửa Giá vải 85.000 → 120.000 ⇒ kế hoạch tính lại ngay (1.080 m · 129.600.000 đ) |
+| Nút đóng thông báo | 18×18 · opacity 0.6 | **24×24 · opacity 1** · bấm là tắt (còn 0 mục) |
+| Việc 3 "Áp dụng & lưu" | không vẽ được | "Đã xong 1/24 mẫu" · credit · "Lần lưu gần nhất: 19:01:16 21/9/2026" |
+
+Kiểm chứng: **1043 test XANH** (4 test mới: 3 test JSON hỏng kiểu thật + 1 test nút đóng thông báo) ·
+`npm run build` tất định · production md5 `d73c4bcd…` (JS) khớp bản đã đo · 0 lỗi mới trong log.
+
 ---
 ## Phiên 2026-09-24 (Tool search — vai «Tìm kiếm nguồn ngoài» của Agent Studio chạy được thật)
 
