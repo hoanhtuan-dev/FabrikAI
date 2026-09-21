@@ -78,6 +78,19 @@ class DesignAgentService
     private const RETRY_TIME_BUDGET_MS = 30000;
 
     /**
+     * TRẦN THỜI GIAN TỔNG của MỘT lượt gọi AI (lần đầu + lần thử lại), mili giây.
+     *
+     * Vì sao cần con số này: `timeout` của lần gọi HTTP (90 s) và của lần thử lại (gấp đôi = 180 s) là trần
+     * của TỪNG LẦN GỌI, không phải trần của cả lượt chạy. Cộng lại, một lượt có thể kéo 30 s + 180 s — xa hơn
+     * trần của proxy, và khách nhận **HTTP 504**: mất TẤT CẢ, kể cả phần đã tính được, thay vì nhận bản tất
+     * định kèm lý do. Đo thật trong log production: 2 lần 504 (07:08 đường brief · 23:34 đường radar).
+     *
+     * 60 s suy ra từ chính lịch sử lỗi: ghi chép 2026-09-21 nói một lượt ~39 s cộng lần thử lại là vượt trần
+     * proxy ⇒ trần thật nằm dưới ~65 s. Chọn 60 s để LUÔN còn chỗ trả phản hồi cho khách.
+     */
+    private const AI_CALL_CEILING_MS = 60000;
+
+    /**
      * Tham số này BẮT BUỘC (kiểu nullable, không có default): container của Laravel KHÔNG tự
      * inject tham số nullable-có-default — nó lấy giá trị default null — nên viết
      * "?AiModelGateway $gateway = null" sẽ khiến service LUÔN chạy ở chế độ tất định dù Cài đặt
@@ -2537,7 +2550,8 @@ class DesignAgentService
             'response_format' => 'json_object',
             'disable_thinking' => true,
             'fallback_groups' => $fallbacks,
-            'timeout' => $timeout,
+            // Trần của TỪNG lần gọi phải nằm trong trần của CẢ lượt — xem AI_CALL_CEILING_MS.
+            'timeout' => $this->callTimeout($timeout),
         ];
 
         // Bấm giờ cho RIÊNG lần gọi đầu: quyết định "có thử lại không" dựa trên thời gian nó đã tốn.
@@ -2591,9 +2605,23 @@ class DesignAgentService
         $retryOptions = $shared;
         unset($retryOptions['search'], $retryOptions['tools'], $retryOptions['tool_handler'], $retryOptions['tool_begin']);
 
+        // Lần thử lại chỉ được dùng PHẦN THỜI GIAN CÒN LẠI của lượt chạy, không phải "gấp đôi timeout".
+        // Trước đây chỗ này là `$timeout * 2` = 180 s: một lần thử lại treo là khách mất trắng vì 504.
+        $retrySeconds = $this->retryTimeout($elapsedMs);
+        if ($retrySeconds < 8) {
+            // Không còn cửa sổ nào cho một lần thử lại tử tế. Thà trả bản tất định NGAY (kèm lý do thật)
+            // còn hơn ném thêm một lời gọi nữa vào khoảng thời gian đã hết — đó chính là đường dẫn tới 504.
+            logger()->info('Agent Studio: không còn đủ thời gian cho lần thử lại, trả kết quả tất định', [
+                'elapsed_ms' => $elapsedMs,
+                'retry_window_s' => $retrySeconds,
+            ]);
+
+            return ['json' => null, 'answer' => $answer, 'attempts' => 1];
+        }
+
         $retry = $this->gateway->text($group, $messages, $retryOptions + [
             'max_tokens' => $retryBudget,
-            'timeout' => $timeout * 2,
+            'timeout' => $retrySeconds,
         ]);
 
         if ($retry !== null) {
@@ -2618,6 +2646,29 @@ class DesignAgentService
     private function retryWorthIt(int $elapsedMs, int $budgetMs = self::RETRY_TIME_BUDGET_MS): bool
     {
         return $elapsedMs < $budgetMs;
+    }
+
+    /**
+     * Trần thời gian cho MỘT lần gọi HTTP: không vượt trần của cả lượt, và luôn đủ dài để một lời gọi bình
+     * thường đi hết (đo thật: lượt radar có tìm kiếm mất 17–34 s).
+     */
+    private function callTimeout(int $requested): int
+    {
+        return max(10, min($requested, (int) floor(self::AI_CALL_CEILING_MS / 1000) - 5));
+    }
+
+    /**
+     * Trần thời gian cho LẦN THỬ LẠI: phần còn lại của lượt chạy, chừa 5 s để trả phản hồi.
+     *
+     * Trả **0** khi không còn đủ chỗ — và nơi gọi PHẢI coi 0 là "đừng thử lại". Bản đầu tiên của hàm này có
+     * sàn cứng 8 s, và chính bài test đã bắt được: ở mốc 59 s thì 59 + 8 = 67 s, tức vẫn vượt trần proxy.
+     * Một cái sàn đặt tuỳ tiện có thể phá đúng cái bất biến mà nó sinh ra để giữ.
+     */
+    private function retryTimeout(int $elapsedMs): int
+    {
+        $remainingMs = self::AI_CALL_CEILING_MS - max(0, $elapsedMs);
+
+        return max(0, (int) floor(($remainingMs - 5000) / 1000));
     }
 
     /** Chuẩn hoá phần chữ do model trả về; null = không có gì dùng được. */

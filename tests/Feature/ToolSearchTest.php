@@ -914,6 +914,46 @@ class ToolSearchTest extends TestCase
         $this->assertFalse($method->invoke($service, 49000), 'Radar 49 giây rồi mà thử lại là vượt trần proxy.');
     }
 
+/**
+     * TRẦN TỔNG của một lượt gọi AI — chỗ thật sự chặn được HTTP 504.
+     *
+     * ĐO THẬT: `timeout` từng là 90 s cho lần đầu và **180 s** cho lần thử lại. Đó là trần của TỪNG lần gọi,
+     * không phải của cả lượt: 30 s + 180 s vượt xa trần proxy ⇒ khách nhận 504 và mất TẤT CẢ, kể cả phần đã
+     * tính được. Log production có 2 ca thật (07:08 brief · 23:34 radar).
+     */
+    public function test_the_total_call_time_stays_inside_the_ceiling(): void
+    {
+        $service = app(DesignAgentService::class);
+
+        $call = new \ReflectionMethod($service, 'callTimeout');
+        $call->setAccessible(true);
+        $retry = new \ReflectionMethod($service, 'retryTimeout');
+        $retry->setAccessible(true);
+
+        // Lần đầu: 90 s yêu cầu ⇒ bị siết còn 55 s (chừa 5 s trả phản hồi cho khách).
+        $this->assertSame(55, $call->invoke($service, 90));
+        // Yêu cầu ngắn hơn trần thì giữ nguyên (đường đọc ảnh chỉ cần 45–60 s).
+        $this->assertSame(45, $call->invoke($service, 45));
+
+        // Lần thử lại: chỉ được dùng phần CÒN LẠI của lượt, không phải "gấp đôi timeout".
+        $this->assertSame(45, $retry->invoke($service, 10000), 'Lần đầu 10 s ⇒ còn 50 s, chừa 5 s ⇒ 45 s.');
+        $this->assertSame(16, $retry->invoke($service, 39000));
+        $this->assertSame(0, $retry->invoke($service, 59000),
+            'Hết thời gian thì trả 0 = "đừng thử lại" — một cái sàn cứng ở đây sẽ phá chính bất biến nó sinh ra để giữ.');
+
+        // BẤT BIẾN: ở MỌI mốc mà lần thử lại còn được phép, tổng thời gian vẫn nằm trong trần.
+        $worth = new \ReflectionMethod($service, 'retryWorthIt');
+        $worth->setAccessible(true);
+        for ($elapsed = 0; $elapsed <= 60000; $elapsed += 1000) {
+            if (! $worth->invoke($service, $elapsed)) {
+                continue;
+            }
+            $total = $elapsed + $retry->invoke($service, $elapsed) * 1000;
+            $this->assertLessThanOrEqual(60000, $total,
+                'Lượt chạy ở mốc '.$elapsed.' ms cộng lần thử lại vượt trần proxy — đây là đường dẫn tới 504.');
+        }
+    }
+
     /**
      * HƯỚNG ĐÃ CHỌN MÀ KHÔNG CÒN TỒN TẠI ⇒ KHÔNG ĐƯỢC CHẶN CẢ REQUEST.
      *
