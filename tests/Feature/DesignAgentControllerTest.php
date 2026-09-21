@@ -119,10 +119,16 @@ class DesignAgentControllerTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors('prompt');
 
+        // Id HỢP LỆ về hình thức nhưng KHÔNG còn trong danh mục ⇒ BỎ QUA và báo lại, KHÔNG chặn request.
+        //
+        // [Đổi hành vi 2026-09-21 — lỗi thật L-WJH6] Danh mục hướng không còn cố định (hướng sinh từ tin
+        // thật, và từ 2026-09-21 còn phụ thuộc câu hỏi model tự tra), nên giữa lúc mở radar và lúc bấm tạo
+        // brief một hướng có thể đã biến mất. Chặn cả request vì thế là bắt người dùng mất hết công nhập
+        // liệu mà không có cách nào tự sửa.
         $this->actingAs($this->customer())
             ->postJson('/api/design-agent/collection', $base + ['trend_ids' => ['not-a-real-trend']])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('trend_ids');
+            ->assertOk()
+            ->assertJsonPath('dropped_trend_ids.0', 'not-a-real-trend');
 
         $this->actingAs($this->customer())
             ->postJson('/api/design-agent/collection', $base + ['trend_ids' => ['soft-pastel', 'soft-pastel']])
