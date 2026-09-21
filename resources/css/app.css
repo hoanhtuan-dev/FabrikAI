@@ -537,6 +537,115 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   TẦNG "TỐI GIẢN + MATERIAL" — nền của TRANG Agent Studio (2026-09-25)
+   ═══════════════════════════════════════════════════════════════════════════
+   Vì sao cần một tầng nữa thay vì dùng lại .card/.tool-btn: Agent Studio nay là một TRANG riêng,
+   và một trang cần bốn thứ mà card trong workspace không có — TẦNG NỔI (mặt nào nổi trên mặt
+   nào), LỚP TRẠNG THÁI khi trỏ/bấm, GỢN NƯỚC ở nút chính, và một RAIL ĐIỀU HƯỚNG. Bốn thứ đó là
+   ảnh hưởng trực tiếp từ Material Design.
+
+   Phần "tối giản" nằm ở chỗ tầng này KHÔNG thêm màu mới và KHÔNG thêm biến thể nút mới:
+     · Tầng nổi diễn đạt bằng BÓNG, không bằng viền — viền đã có nghĩa riêng ở §5.1
+       ("khối chứa" = border-ink-700, "đang chọn" = border-brand-500).
+     · Lớp trạng thái lấy `currentColor` ⇒ nút màu nào ra tint màu đó, không cần token thứ hai,
+       và không có chuyện "nút tím tint xanh".
+     · Nút vẫn CHỈ có .btn-brand / .btn-ghost / .btn-outline / .tool-btn / .icon-btn (§2). Tầng
+       này là HÀNH VI gắn thêm, không phải bộ nút thứ hai.
+     · Mọi thời lượng đọc token chuyển động (§1.2) ⇒ công tắc "giảm chuyển động" tắt được hết.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer components {
+    /* ── TẦNG NỔI (elevation) ─────────────────────────────────────────────────
+       Material đánh số 0–5; ở đây giữ 4 mức vì giao diện chỉ có 4 quan hệ thật: mặt phẳng ·
+       thanh dính · thẻ nổi khi trỏ · lớp phủ. Bóng ĐEN ở cả hai theme — lý do đã ghi ở §1.1:
+       bóng theo theme thì chế độ Sáng sẽ đổ bóng trắng, tức là vô hình trên nền sáng. */
+    .elev-0 { box-shadow: none; }
+    .elev-1 { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.28), 0 1px 3px 1px rgb(0 0 0 / 0.14); }
+    .elev-2 { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.30), 0 2px 6px 2px rgb(0 0 0 / 0.16); }
+    .elev-3 { box-shadow: 0 4px 8px 3px rgb(0 0 0 / 0.16), 0 1px 3px 0 rgb(0 0 0 / 0.30); }
+    /* Thanh DÍNH luôn có bóng: nội dung luôn cuộn xuống dưới nó nên "đang nổi" là trạng thái
+       thường trực, không phải hiệu ứng lúc cuộn. */
+    .elev-bar { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.34); }
+    .elev-bar-up { box-shadow: 0 -1px 3px 0 rgb(0 0 0 / 0.34); }
+
+    /* ── LỚP TRẠNG THÁI (state layer) ────────────────────────────────────────
+       Material: khi trỏ/bấm thì PHỦ lên bề mặt một lớp mờ cùng màu chữ, thay vì đổi màu nền.
+       Nhờ vậy MỘT lớp chạy đúng cho nút tím, nút xám và nút nguy hiểm.
+       z-index âm + isolation: lớp này nằm TRÊN nền nút nhưng DƯỚI chữ — nếu vẽ trên chữ thì
+       độ tương phản của nhãn tụt đúng lúc người dùng đang đọc nó. */
+    .state-layer { position: relative; isolation: isolate; }
+    .state-layer::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        border-radius: inherit;
+        background: currentColor;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--motion-dur-fast) var(--motion-ease-standard);
+    }
+    .state-layer:hover::after { opacity: 0.08; }
+    .state-layer:active::after { opacity: 0.14; }
+
+    /* ── GỢN NƯỚC ở nút chính (ripple) ───────────────────────────────────────
+       Nét nhận diện rõ nhất của Material. Chạy bằng JS (resources/js/studio/ripple.js) vì gợn
+       phải bám ĐIỂM BẤM; CSS ở đây chỉ lo hình dáng và nhịp. */
+    .ripple-host { position: relative; overflow: hidden; }
+    .ripple-ink {
+        position: absolute;
+        border-radius: 9999px;
+        background: currentColor;
+        opacity: 0.22;
+        transform: scale(0);
+        pointer-events: none;
+        animation: ripple-out var(--motion-dur-slow) var(--motion-ease-emphasized) forwards;
+    }
+
+    /* ── RAIL ĐIỀU HƯỚNG THEO BƯỚC (Material navigation rail) ────────────────
+       Trạng thái "đang ở bước này" = bg-brand-600 + chữ trắng — ĐÚNG token §5.3, không phải
+       màu nhấn riêng của trang. */
+    .nav-step {
+        position: relative;
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 0.7rem;
+        border-radius: 0.75rem;
+        padding: 0.6rem 0.7rem;
+        text-align: left;
+        color: var(--color-cream-300);
+        transition: background-color var(--motion-dur-fast) var(--motion-ease-standard), color var(--motion-dur-fast) var(--motion-ease-standard);
+    }
+    .nav-step:hover { background: var(--color-ink-800); color: var(--color-cream-100); }
+    .nav-step.is-active { background: var(--color-brand-600); color: var(--color-primary-content); }
+    .nav-step.is-active:hover { background: var(--color-brand-600); color: var(--color-primary-content); }
+    /* Chấm đánh dấu bước ĐÃ XONG — tín hiệu phi màu (hình khác nhau), không chỉ khác màu chữ. */
+    .nav-step__dot {
+        display: grid;
+        height: 1.75rem;
+        width: 1.75rem;
+        flex-shrink: 0;
+        place-items: center;
+        border-radius: 9999px;
+        background: var(--color-ink-800);
+        color: var(--color-cream-300);
+        font-size: var(--text-label);
+        font-weight: 700;
+        transition: background-color var(--motion-dur-fast) var(--motion-ease-standard), color var(--motion-dur-fast) var(--motion-ease-standard);
+    }
+    .nav-step:hover .nav-step__dot { background: var(--color-ink-700); }
+    .nav-step.is-active .nav-step__dot { background: var(--color-primary-content); color: var(--color-brand-600); }
+    .nav-step__dot.is-done { background: var(--color-success); color: var(--color-success-content); }
+    /* Bước chưa tới được (chưa có brief ⇒ chưa sang được Thực thi) — vẫn bấm được để ĐỌC lý do,
+       nên chỉ giảm nhấn chứ không vô hiệu hoá (§14: đừng khoá điều khiển mà không nói vì sao). */
+    .nav-step.is-locked .nav-step__dot { opacity: 0.65; }
+}
+
+@keyframes ripple-out {
+    to { transform: scale(1); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    CƠ SỞ CHUNG CHO CHUYỂN ĐỘNG — "motion foundation" (2026-09-20)
    ═══════════════════════════════════════════════════════════════════════════
    Vì sao có khối này: mỗi component trước đây tự viết số ms + đường cong riêng

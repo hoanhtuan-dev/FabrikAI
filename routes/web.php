@@ -90,6 +90,16 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->group(function () {
 
     // [Yeu cau 2026-09-20] Trang BO SUU TAP day du - moi nguoi dung moi vao de lam viec.
     Route::get('/bo-suu-tap', [StudioController::class, 'collectionsPage'])->name('collections.page');
+
+    // [Yêu cầu 2026-09-25] TRANG AGENT STUDIO đầy đủ.
+    // Luồng 4 bước (DNA shop -> Tín hiệu -> Định hướng -> Thực thi) trước đây là một MODAL trong
+    // /studio: bốn tầng thanh xếp chồng ăn hết chiều cao trước khi tới nội dung, và bước đang làm
+    // không đánh dấu được lên URL nên gửi link cho đồng nghiệp là mở lại từ đầu. Nay là trang riêng,
+    // cùng một SPA (dùng chung Pinia store + toàn bộ API cũ), bước đang mở đọc/ghi ở tham số ?buoc=.
+    //
+    // Cấp quyền: auth + can-studio — ĐÚNG nhóm của /bo-suu-tap. Đây là dữ liệu và công việc CỦA
+    // CHÍNH người dùng (DNA shop của họ, brief của họ), không phải công cụ quản trị.
+    Route::get('/agent-studio', [StudioController::class, 'agentStudioPage'])->name('agent-studio.page');
 });
 // [Xác minh 2026-09-17] /admin là CONSOLE OWNER — KHÔNG được để chung nhóm shell công khai.
 // Trước đây ai cũng tải được vỏ quản trị (khách 200, customer 200), trái mô hình ở đầu file

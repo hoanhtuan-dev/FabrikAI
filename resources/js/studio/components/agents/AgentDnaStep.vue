@@ -20,7 +20,7 @@ const setDnaList = inject('setDnaList');
 </script>
 
 <template>
-          <section id="agent-step-dna" role="tabpanel" aria-label="DNA shop" :aria-busy="store.brandDnaLoading" class="grid gap-5 xl:grid-cols-[minmax(320px,420px)_1fr]">
+          <section id="agent-step-dna" role="region" aria-label="DNA shop" :aria-busy="store.brandDnaLoading" class="grid gap-5 xl:grid-cols-[minmax(320px,420px)_1fr]">
             <div class="space-y-4">
               <div class="card p-4">
                 <h2 class="font-display text-base font-semibold text-brand-300">DNA shop của bạn</h2>

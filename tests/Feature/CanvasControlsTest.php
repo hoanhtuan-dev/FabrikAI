@@ -562,7 +562,14 @@ class CanvasControlsTest extends TestCase
 
         // Lối vào mới: Agent Studio + đi nhanh.
         $this->assertStringContainsString('Agent Studio', $empty, 'Canvas trống phải mời mở Agent Studio.');
-        $this->assertStringContainsString("setDesignAgentStep", $empty, 'Nút Agent Studio phải mở đúng bước wizard.');
+        // [2026-09-25] Đổi CƠ CHẾ, giữ nguyên LUẬT ("mở ĐÚNG bước wizard"): trước đây Agent Studio
+        // là modal nên bước đi qua store; nay nó là TRANG riêng nên bước phải đi qua URL — store là
+        // bộ nhớ trong trang và bị xoá ngay khi trình duyệt tải trang mới, nên ghi vào đó chỉ tạo cảm
+        // giác "đã đặt bước" mà trang bên kia không nhận được gì.
+        $this->assertStringContainsString("'/agent-studio'", $empty,
+            'Nút Agent Studio phải ĐIỀU HƯỚNG sang trang riêng (/agent-studio).');
+        $this->assertStringContainsString("'?buoc='", $empty,
+            'Nút Agent Studio phải mở đúng bước wizard — nay qua tham số ?buoc= trên URL.');
         $this->assertStringContainsString('Prompt Tạo Ảnh', $empty, 'Phải có lối vào bảng Prompt Tạo Ảnh đầy đủ.');
         $this->assertStringContainsString('Nguồn ảnh', $empty, 'Phải có đi nhanh tới Nguồn ảnh.');
         $this->assertStringContainsString('Thư viện', $empty, 'Phải có đi nhanh tới Thư viện.');

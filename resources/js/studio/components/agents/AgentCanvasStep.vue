@@ -25,7 +25,7 @@ const copyText = inject('copyText');
 </script>
 
 <template>
-          <section id="agent-step-canvas" role="tabpanel" aria-label="Thực thi">
+          <section id="agent-step-canvas" role="region" aria-label="Thực thi">
             <div v-if="!collection" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-10 text-center">
               <StudioIcon name="wand" size="h-8 w-8" class="mx-auto text-brand-300" />
               <p class="mt-3 text-sm font-semibold text-cream-100">Chưa có brief để chuyển sang Canvas</p>

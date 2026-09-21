@@ -156,6 +156,21 @@ class StudioController extends Controller
         return view('studio.collections');
     }
 
+    /**
+     * [Yêu cầu 2026-09-25] TRANG AGENT STUDIO — luồng 4 bước nay là một TRANG riêng.
+     *
+     * Trước đây nó là modal gần-toàn-màn-hình mở từ /studio (components/DesignAgents.vue). Bốn tầng
+     * thanh xếp chồng ăn khoảng 200px chiều cao trước khi tới nội dung, lớp phủ khoá phần còn lại của
+     * Studio mà không cho thêm chỗ, và bước đang làm không đánh dấu được lên URL.
+     *
+     * Vỏ blade chỉ chở payload khởi động; toàn bộ giao diện nằm ở
+     * resources/js/studio/AgentStudioApp.vue (entry riêng: agent-studio.js).
+     */
+    public function agentStudioPage()
+    {
+        return view('studio.agent-studio');
+    }
+
 
     // storeProject() đã bị loại bỏ (finding: duplicate endpoint với validation yếu hơn
     // ProjectController::store). Route POST /studio/projects nay trỏ về ProjectController::store.

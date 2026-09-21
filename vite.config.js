@@ -20,6 +20,10 @@ export default defineConfig({
                 'resources/js/studio/my-settings.js',
                 'resources/js/studio/admin.js',
                 'resources/js/studio/collections.js',
+                // [Yêu cầu 2026-09-25] TRANG AGENT STUDIO — luồng 4 bước tách khỏi modal trong
+                // /studio thành trang riêng, nên có entry riêng: trang này KHÔNG cần cả xưởng thiết
+                // kế (canvas · dock · layers) mà main.js chở theo.
+                'resources/js/studio/agent-studio.js',
             ],
             refresh: true,
             publicDirectory: 'public_html',

@@ -302,6 +302,10 @@ npm run build                 # 4. CSS bán cho khách
 | Dock co/giãn | `.dock-panel` (+ `data-collapsed`) + `DockResizer` | |
 | Nền canvas | `.canvas-bg-grid/dark/white/cream` | tự khai `rgba()` cho ô màu |
 | Thanh cuộn ẩn | `.scrollbar-hide` | |
+| **Tầng nổi** (Material) | `.elev-0/1/2/3` · `.elev-bar` · `.elev-bar-up` | tự viết `box-shadow` cho thanh/thẻ |
+| **Lớp trạng thái** khi trỏ/bấm | `.state-layer` | `hover:bg-*` chồng lên nền đã có nghĩa |
+| **Gợn nước** ở nút chính | `v-ripple` (+ `.ripple-host` · `.ripple-ink`) | tự chế hiệu ứng bấm |
+| **Rail bước** (Material) | `.nav-step` + `.nav-step__dot` (`is-active` · `is-done` · `is-locked`) | tự vẽ danh sách bước |
 
 ---
 
@@ -322,6 +326,7 @@ npm run build                 # 4. CSS bán cho khách
 | `StylistSection.vue` | bản sao trình cài đặt Trợ lý thiết kế trong từng app |
 | `AppearanceSection.vue` | mục Giao diện (Sáng/Tối/Theo hệ điều hành) tự viết lại ở từng app |
 | `MultiSelectBar.vue` · `GalleryModal.vue` | thanh chọn nhiều · trình xem thư viện tự viết |
+| `AgentStudioApp.vue` | khung TRANG Agent Studio (thay modal cũ ở `components/DesignAgents.vue` — đã gỡ hẳn 2026-09-25) |
 
 > **Luật:** nếu hành vi đã có người làm rồi thì **dùng lại**; chỉ tạo mới khi bài toán KHÁC về bản
 > chất, và khi đó viết vào file này một dòng để người sau biết nó tồn tại.
@@ -1000,6 +1005,8 @@ Mọi quyết định giao diện phải trả lời được: **persona nào, �
 
 | 29 | 2026-09-23 | **Agent nói dữ liệu ngoài là "demo" bằng CÂU VĂN TĨNH** (không đo gì) · **DNA shop chỉ được SUY RA** (đếm dự án + dò từ khoá, không có thì dùng câu mặc định cứng) và chủ shop không sửa được | Giao diện nay đọc **số ĐO THẬT**: máy chủ có ra internet không (HEAD + mã HTTP + độ trễ) và model đang cấu hình có tìm kiếm tích hợp không — ba câu kết luận đúng thực tế · **DNA thành hồ sơ riêng, sửa được** (bảng `brand_dna`, bước 0 trong Agent Studio), ưu tiên `owner → shop_data → derived → default` và **đi thẳng vào prompt brief** · cờ `search` chỉ bật khi transport hỗ trợ (`enable_search`/`google_search`) và nằm trong khoá cache radar | 16 test mới (`BrandDnaTest`) · đo trên production: máy chủ **CÓ** internet (2/2 đích 200/204), model đang chạy `deepseek-flash` **KHÔNG** có tìm kiếm |
 
+| 30 | 2026-09-25 | **Agent Studio là một MODAL**: BỐN tầng thanh xếp chồng ăn ~200px chiều cao trước khi tới nội dung · bước đang làm không đánh dấu được lên URL (gửi link là mở lại từ đầu) · F5 mất vị trí · lớp phủ khoá phần còn lại của Studio mà không cho thêm chỗ | Chuyển thành **TRANG riêng `/agent-studio`** (entry Vite riêng) · lõi tách ra `composables/useAgentStudio.js` dùng chung với 4 bước qua `provideAll()` · nền **TỐI GIẢN + MATERIAL**: hai thanh thay vì bốn, ba tầng bề mặt diễn đạt bằng BÓNG (`.elev-*`) chứ không bằng viền, LỚP TRẠNG THÁI `.state-layer`, GỢN NƯỚC `v-ripple`, RAIL bước `.nav-step`, bước đánh dấu ở `?buoc=` | bốn tầng thanh → **2** · modal cũ **xoá khỏi đĩa** (còn ĐÚNG một bề mặt) · **7 test mới** (`AgentStudioPageTest`) · thêm **0 mã màu**, **0 biến thể nút** · full suite **1022 XANH** |
+
 ### 16.1 Số đo trước → sau của cả hành trình
 
 | Chỉ số | Trước | Sau |
@@ -1348,3 +1355,86 @@ chết không làm hỏng lượt · 5 trạng thái nguồn · bản lấy trư
 ngày kiểu Việt Nam · lọc từ khoá theo ranh giới từ · chống trùng theo tiêu đề · giao diện có khối tín hiệu và
 KHÔNG lộ chữ kỹ thuật · nhãn/aria cho khối mới.
 
+
+---
+
+## 21. Agent Studio — từ MODAL thành MỘT TRANG (2026-09-25)
+
+> Đổi gốc: luồng 4 bước (DNA shop → Tín hiệu → Định hướng → Thực thi) trước đây là một modal
+> "gần toàn màn hình" mở từ trong /studio. Nay nó là **trang riêng `/agent-studio`**.
+>
+> Đây là mục **LUẬT** cho trang đó: bốn thứ Material dùng ở đây, và ranh giới giữa "tối giản"
+> với "thiếu thông tin". Khoá bằng `tests/Feature/AgentStudioPageTest.php`.
+
+### 21.1 Vì sao phải rời khỏi modal — số đo, không phải cảm tính
+
+| Vấn đề đo được của bản modal | Nay |
+|---|---|
+| BỐN tầng thanh xếp chồng (đầu modal · tiến trình · bối cảnh · đầu bước) ăn ~200px chiều cao TRƯỚC khi tới nội dung | HAI thanh (thanh trên + thanh hành động); tiến trình và bối cảnh gom vào rail bên |
+| Lớp phủ khoá phần còn lại của Studio mà KHÔNG cho thêm chỗ — cửa sổ 1366×768 còn ~660px cho một luồng 4 bước | Trang riêng dùng trọn chiều cao cửa sổ |
+| Bước đang làm không đánh dấu được ⇒ gửi link cho đồng nghiệp là họ mở lại từ đầu | `?buoc=dna\|radar\|brief\|canvas` — đọc lúc vào, ghi khi đổi bước |
+| F5 mất vị trí đang làm (bản nháp chỉ cứu được prompt) | Bước nằm trên URL nên F5 về đúng chỗ |
+
+### 21.2 ẢNH HƯỞNG MATERIAL — bốn thứ, và lý do mỗi thứ có mặt
+
+| Thành phần | Lớp | Vì sao (không phải "cho đẹp") |
+|---|---|---|
+| **Ba tầng bề mặt** | vùng nội dung `ink-950` → thanh/rail `ink-900` → thẻ `.card` (`ink-800`) | Material gọi là *surface container*: mắt đọc được "cái nào nằm trên cái nào" mà không cần viền. Viền đã có nghĩa riêng ở §5.1. |
+| **Tầng nổi** | `.elev-1 … .elev-3` · `.elev-bar` (thanh trên) · `.elev-bar-up` (thanh hành động) | Thanh DÍNH luôn có nội dung cuộn dưới nó, nên "đang nổi" là trạng thái thường trực. Bóng ĐEN ở cả hai theme — xem §1.1. |
+| **Lớp trạng thái** | `.state-layer` | Material phủ một lớp mờ *cùng màu chữ* khi trỏ/bấm thay vì đổi màu nền ⇒ MỘT lớp chạy đúng cho nút tím, nút xám và nút nguy hiểm. Vẽ ở `z-index:-1` + `isolation:isolate` để lớp này nằm TRÊN nền nhưng DƯỚI chữ. |
+| **Gợn nước** | `v-ripple` (JS) + `.ripple-host`/`.ripple-ink` (CSS) | Phải bám ĐIỂM BẤM nên cần JS; nhịp vẫn đọc `--motion-dur-slow` nên công tắc "giảm chuyển động" tắt được. Là **hành vi gắn thêm**, KHÔNG phải một loại nút mới. |
+| **Rail điều hướng** | `.nav-step` + `.nav-step__dot` | Material *navigation rail*: chấm số + nhãn + chỉ báo "đang ở đây". Trạng thái đang chọn vẫn là `bg-brand-600` — ĐÚNG token §5.3, không phải màu nhấn riêng của trang. |
+
+### 21.3 ẢNH HƯỞNG TỐI GIẢN — chỗ dễ đi quá đà, và cách chặn
+
+1. **Hai thanh, không phải bốn.** Thứ gì đứng yên (tiến trình · bối cảnh · phím tắt) thì thu vào
+   rail; chỉ thứ ĐỔI THEO BƯỚC mới được chiếm chiều cao ở giữa.
+2. **Tối giản KHÔNG có nghĩa là bỏ thông tin.** Rail vẫn in trạng thái từng bước bằng CHỮ
+   (Xong · Sẵn sàng · Đang đọc… · Cần brief) và khối bối cảnh vẫn in khu vực · số hướng đã chọn ·
+   brief · số mã hàng. Bỏ chữ ở đây là biến "tối giản" thành "phải tự đoán" (§12 nguyên tắc 7).
+3. **Một hành động chính duy nhất** (§4 luật 3): nút chính ở thanh dưới đổi nhãn theo bước; nút
+   "Quay lại" luôn là thứ yếu. Nhãn nút chính lấy từ MỘT computed (`primaryLabel`).
+4. **Bắt buộc/tùy chọn ghi ngay cạnh tên bước** (§4 luật 2) — dữ liệu `required` nằm trong `STEPS`
+   của lõi, không viết lại ở template.
+5. **Không thêm biến thể nút, không thêm màu.** Tầng này chỉ thêm HÀNH VI (nổi · lớp trạng thái ·
+   gợn) lên đúng bộ nút đã có ở §2. Thêm nút thứ sáu là mở lại đúng vấn đề "hai cách làm một việc".
+
+### 21.4 Ranh giới kỹ thuật — nơi dễ sinh bản sao thứ hai
+
+- LÕI ở `resources/js/studio/composables/useAgentStudio.js` (trạng thái + hành động của cả 4 bước).
+  Khung TRANG ở `AgentStudioApp.vue`; 4 bước vẫn ở `components/agents/*.vue` và nhận bề mặt qua
+  `provideAll()` — hợp đồng `provide()`/`inject()` GIỮ NGUYÊN từ đợt tách 2026-09-24.
+- **Nạp lần đầu bằng hàm `bootstrap()`, KHÔNG bằng `watch(store.designAgentOpen)`.** Modal thì "mở"
+  là một sự kiện; TRANG thì không — giữ watcher là thứ tự đặt cờ quyết định việc nạp có chạy hay
+  không, tức là một lỗi im lặng.
+- **Đi sang Canvas là ĐIỀU HƯỚNG THẬT, nên phải ghi bản bền trước khi đi**: store là bộ nhớ trong
+  trang. "Áp dụng vào Canvas" gọi `savePromptMemory()` (đúng khoá `fabrikai.prompt-cfg` mà
+  ConceptCard vẫn dùng — KHÔNG mở khoá lưu thứ hai) rồi mới tới `/?panel=concept&open=prompt`.
+- **Chỉ có MỘT bề mặt.** Nút "Agent thiết kế" trên activity bar và lối vào ở màn hình canvas trống
+  đều ĐIỀU HƯỚNG sang trang; tệp modal cũ đã bị xoá khỏi đĩa. Hai bề mặt song song là hai bản sao
+  sẽ lệch nhau — đúng thứ `AgentStudioPageTest` chặn.
+- 4 khối `<section>` của các bước đổi từ `role="tabpanel"` sang `role="region"`: `tabpanel` chỉ
+  đúng khi có `tablist` điều khiển nó, mà trang thì không còn tablist bao ngoài.
+
+### 21.5 Một cái bẫy CSS đã trả giá ngay trong đợt này
+
+`.studio-shell` (khai TRẦN trong `app.css`, không nằm trong `@layer` nào) đặt `background` cho thẻ gốc.
+CSS ngoài layer LUÔN thắng tiện ích Tailwind (tiện ích nằm trong `@layer utilities`), nên đặt `bg-ink-950`
+lên chính thẻ mang `.studio-shell` là **bị ghi đè im lặng** — đo bằng Chrome mới thấy vùng nội dung vẫn
+mang màu `ink-900`, tức là tầng bề mặt thứ ba không hề tồn tại dù mã đọc lên có vẻ đúng.
+
+Nay nền của "giếng nội dung" đặt ở `<main>` (phần tử KHÔNG mang `.studio-shell`). Gặp lại hiện tượng
+"khai class rồi mà không đổi màu": kiểm `.studio-shell` trước khi đi tìm chỗ khác.
+
+### 21.6 Bộ test giữ luật này
+
+`tests/Feature/AgentStudioPageTest.php`: khách bị đẩy về đăng nhập · tài khoản studio mở được trang ·
+blade mount đúng `#agent-studio-root` và nạp ĐÚNG entry riêng (không nạp `main.js`) · modal cũ không
+còn trên đĩa và `/studio` không mount nó · bước đọc/ghi được ở `?buoc=` và giá trị lạ bị chặn · trang
+dựng từ lõi dùng chung (`provideAll`) · bốn lớp nền Material có thật trong `app.css` và được §21.2 mô tả ·
+bundle đã build chứa trang và directive gợn nước.
+
+Bốn luật cũ vẫn áp nguyên cho trang này: `DesignSystemTest` (viền/nền nút theo §5 · không emoji · không
+bảng màu ngoài theme) · `MotionFoundationTest` (không thời lượng viết tay · bề mặt hover phải có chuyển
+động) · `UserFacingMessagesTest` (không lộ tên model/nhà cung cấp — trang nay nằm trong
+`designAgentsSource()` của `TestCase`) · `ToolSearchTest` · `MarketSignalTest` · `DebtFixesTest`.

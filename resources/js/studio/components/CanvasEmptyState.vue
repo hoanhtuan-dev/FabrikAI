@@ -63,8 +63,11 @@ function openAgent(step = 'radar') {
     store.loadPlanStatus && store.loadPlanStatus(true);
     return;
   }
-  store.designAgentOpen = true;
-  store.setDesignAgentStep(step);
+  // [2026-09-25] Agent Studio KHÔNG còn là popup trong /studio — nó là một TRANG riêng. Bước muốn
+  // mở đi theo THAM SỐ URL (?buoc=…), không qua store: store là bộ nhớ trong trang và sẽ bị xoá
+  // ngay khi trình duyệt tải trang mới, nên ghi vào đó chỉ tạo cảm giác "đã đặt bước" mà thực ra
+  // trang bên kia không nhận được gì.
+  window.location.href = '/agent-studio' + (step && step !== 'dna' ? '?buoc=' + step : '');
 }
 
 function generate() {

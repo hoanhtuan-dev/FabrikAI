@@ -5,6 +5,68 @@
 
 ---
 
+## Phiên 2026-09-25 (Agent Studio: từ MODAL trong /studio thành MỘT TRANG riêng + nền tối giản · Material)
+
+### Mục tiêu (yêu cầu chủ dự án)
+"Chuyển đổi Agent Studio thành full trang SPA. Tinh chỉnh lại GUI | UX | UI → ảnh hưởng từ minimalist + material design."
+
+### 1. Khảo sát — vì sao modal là chỗ sai
+| Chặng | Thực tế đo được trong mã |
+|---|---|
+| Bề mặt cũ | `components/DesignAgents.vue` (1.110 dòng) render trong `BaseModal full` từ `StudioApp.vue`; lối vào là nút «Agent thiết kế» trên activity bar + màn hình canvas trống |
+| Số tầng thanh | **BỐN**: đầu modal · tiến trình · bối cảnh · đầu bước — ăn ~200px trước khi tới nội dung |
+| Chiều cao thật | modal `min(94vh, 960px)`; cửa sổ 1366×768 ⇒ còn ~660px cho một luồng 4 bước |
+| Đánh dấu được? | **Không** — bước đang làm không lên URL ⇒ gửi link cho đồng nghiệp là mở lại từ đầu, F5 cũng mất vị trí (bản nháp chỉ cứu prompt) |
+
+### 2. Cách sửa — TRANG riêng, một bề mặt duy nhất
+| # | Thay đổi | File |
+|---|---|---|
+| 1 | LÕI của luồng 4 bước tách khỏi phần render (trạng thái · đo đạc · 4 bước · phím tắt · nháp bền) | `resources/js/studio/composables/useAgentStudio.js` (mới, 1.150 dòng) |
+| 2 | Khung TRANG: thanh trên Material + rail bước + nội dung canh giữa + thanh hành động | `resources/js/studio/AgentStudioApp.vue` (mới) |
+| 3 | Entry Vite riêng + đăng ký directive gợn nước | `resources/js/studio/agent-studio.js` · `resources/js/studio/ripple.js` (mới) |
+| 4 | Vỏ blade (mount `#agent-studio-root`, nạp ĐÚNG entry của trang, KHÔNG nạp `main.js`) | `resources/views/studio/agent-studio.blade.php` (mới) |
+| 5 | Route `GET /agent-studio` (auth + can-studio, cùng nhóm `/bo-suu-tap`) + `StudioController::agentStudioPage()` | `routes/web.php` · `app/Http/Controllers/StudioController.php` |
+| 6 | Nền tảng TỐI GIẢN + MATERIAL: tầng nổi (`.elev-*`) · lớp trạng thái (`.state-layer`) · gợn nước (`.ripple-host/.ripple-ink`) · rail bước (`.nav-step`) | `resources/css/app.css` |
+| 7 | Nút «Agent thiết kế» + lối vào ở canvas trống nay ĐIỀU HƯỚNG sang trang (mang theo bước) | `StudioApp.vue` · `CanvasEmptyState.vue` |
+| 8 | Quyền theo gói + cấu hình thanh công cụ tách thành MỘT chỗ dùng chung cho mọi trang SPA | `resources/js/studio/guiConfig.js` (mới) |
+| 9 | XOÁ tệp modal cũ (không để lại bản sao thứ hai) + 4 bước đổi `role="tabpanel"` → `role="region"` | `components/DesignAgents.vue` (xoá) · `components/agents/*.vue` |
+| 10 | "Áp dụng vào Canvas" nay nằm ở LÕI và ĐIỀU HƯỚNG thật: ghi store → ghi bản bền (`fabrikai.prompt-cfg`, đúng khoá ConceptCard dùng) → sang `/?panel=concept&open=prompt`; `/studio` đọc tham số `open` mới | `useAgentStudio.js` · `StudioApp.vue` |
+
+### 3. Bốn ảnh hưởng Material, và lý do mỗi thứ có mặt
+| Thành phần | Vì sao (không phải "cho đẹp") |
+|---|---|
+| **Ba tầng bề mặt** (nội dung `ink-950` → thanh/rail `ink-900` → thẻ `ink-800`) | mắt đọc được "cái nào nằm trên cái nào" mà KHÔNG cần thêm viền — viền đã có nghĩa riêng ở §5.1 |
+| **Tầng nổi bằng BÓNG** (`.elev-bar` · `.elev-bar-up`) | thanh dính luôn có nội dung cuộn dưới nó ⇒ "đang nổi" là trạng thái thường trực, không phải hiệu ứng lúc cuộn |
+| **Lớp trạng thái** (`currentColor` khi trỏ/bấm) | một lớp chạy đúng cho nút tím, nút xám và nút nguy hiểm; vẽ ở `z-index:-1` để nằm TRÊN nền nhưng DƯỚI chữ |
+| **Gợn nước** ở nút chính (`v-ripple`) | phải bám ĐIỂM BẤM nên cần JS; nhịp vẫn đọc `--motion-dur-slow` nên công tắc "giảm chuyển động" tắt được. Là HÀNH VI gắn thêm, KHÔNG phải loại nút mới |
+
+Phần TỐI GIẢN: **hai thanh thay vì bốn**; tiến trình + bối cảnh + phím tắt thu vào rail; nội dung canh giữa rộng tối đa 6xl. Đổi lại KHÔNG bỏ thông tin — rail vẫn in trạng thái từng bước bằng CHỮ (Xong · Sẵn sàng · Đang đọc… · Cần brief) và khối bối cảnh vẫn in khu vực · số hướng đã chọn · brief · số mã hàng.
+
+### 4. Đo THẬT bằng Chrome (không chỉ đọc mã)
+| Phép đo | Kết quả |
+|---|---|
+| Cấu trúc 1440×900 | thanh trên **61px** · rail **256px** · nội dung **1184px** · thanh hành động **70px** — trước đây bốn tầng thanh ăn ~200px |
+| Tràn ngang ở 300 · 390 · 768 · 1024 · 1280 · 1440 | **0px** ở MỌI bề ngang |
+| Màn hẹp 390px | rail ẩn (`display:none`), dải bước ngang hiện, thanh hành động vẫn ở đáy |
+| Bước lên URL | mở `/agent-studio` ⇒ tự thành `?buoc=radar`; bấm bước 3 ⇒ `?buoc=brief`; mở thẳng `?buoc=canvas` ⇒ nút chính đổi thành «Áp dụng vào Canvas» |
+| Tham số rác `?buoc=khong-co-that` | bị bỏ qua, về bước mặc định (không mở ra bước không tồn tại) |
+| Gợn nước | `pointerdown` sinh `.ripple-ink`, tự gỡ sau khi chạy xong |
+| Lỗi console / exception | **0** ở cả đường có gói và đường bị khoá gói |
+| Ba tầng bề mặt (theme Tối) | nội dung `#15191e` · thanh/rail `#191e24` · thẻ `#1d232a` |
+| Theme Sáng | `data-theme=light` đổi tức thì, nội dung `#e5eef8` · thanh `#eff8ff` · thẻ `#f6feff` |
+| Nút «Agent thiết kế» ở /studio | điều hướng sang `/agent-studio`, KHÔNG còn mở modal |
+
+### 5. Một lỗi thật bắt được nhờ đo, và một lỗ hổng UX do việc chuyển trang tạo ra
+1. **CSS ngoài layer thắng tiện ích Tailwind**: `.studio-shell` (khai trần, không trong `@layer`) đặt `background` cho thẻ gốc ⇒ `bg-ink-950` đặt lên chính thẻ đó **bị ghi đè im lặng**; đo bằng Chrome mới thấy "giếng nội dung" vẫn mang màu `ink-900`, tức tầng bề mặt thứ ba không hề tồn tại. Nay nền đặt ở `<main>`.
+2. **Mở thẳng URL khi gói không có module**: trước đây không cần xử lý vì lối vào duy nhất nằm trong /studio (activity bar đã biết khoá mục theo gói). Nay trang mở được bằng URL, và vì `moduleLocked()` trả `false` khi "chưa biết", bốn bước chạy rồi mỗi lượt gọi API trả về *"Tính năng «TrendRadar» không có trong gói của bạn (mã L-XXXX)"* — người dùng đọc thành "sản phẩm hỏng". Nay trang nạp quyền theo gói qua `guiConfig.js` và hiện MỘT màn hình: giải thích + «Xem gói & nâng cấp» (`/bang-gia`) + «Về Studio».
+
+### 6. Kiểm chứng
+- **7 test mới** `tests/Feature/AgentStudioPageTest.php`: khách bị đẩy về đăng nhập · tài khoản studio mở được trang · blade mount đúng element gốc và nạp ĐÚNG entry riêng (không nạp `main.js`) · modal cũ không còn trên đĩa và `/studio` không mount nó · bước đọc/ghi được ở `?buoc=` và giá trị lạ bị chặn · trang dựng từ lõi dùng chung (`provideAll`) · bốn lớp nền Material có thật trong `app.css` và được §21.2 mô tả · bundle đã build chứa trang + directive gợn nước.
+- `TestCase::designAgentsSource()` nối lại đúng bốn nhóm tệp mới (khung trang · lõi · 4 bước) — **8 tệp test** đang quét giao diện Agent Studio (MarketSignal · ToolSearch · SchedulerHonesty · DebtFixes · MarketAnalysisFromSources · UserFacingMessages …) vẫn đọc đủ mảnh, và hàm nay NÉM LỖI nếu thiếu tệp thay vì lặng lẽ đọc thiếu.
+- `npm run build` thoát 0 · `public_html/build/assets/agent-studio-*.js` **118,5 kB** (gzip 35,4 kB) · asset đã commit (máy chủ không có node).
+- `docs/DESIGN_SYSTEM.md` thêm **§21** (luật của trang) + cập nhật §2 (bảng class dùng chung) · §3 (component dùng chung) · §16 (vòng 30) + bảng lịch sử.
+
+---
 ## Phiên 2026-09-24 (Tool search — vai «Tìm kiếm nguồn ngoài» của Agent Studio chạy được thật)
 
 ### Mục tiêu (yêu cầu chủ dự án)

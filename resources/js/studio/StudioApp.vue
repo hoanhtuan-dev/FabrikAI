@@ -20,7 +20,6 @@ const asyncModal = (loader) => defineAsyncComponent({ loader, loadingComponent: 
 const CollectionsCard = asyncCard(() => import('./components/CollectionsCard.vue'));
 const SuggestCard = asyncCard(() => import('./components/SuggestCard.vue'));
 const ConceptCard = asyncModal(() => import('./components/ConceptCard.vue'));
-const DesignAgents = asyncModal(() => import('./components/DesignAgents.vue'));
 const UpscaleCard = asyncCard(() => import('./components/UpscaleCard.vue'));
 const InpaintCard = asyncCard(() => import('./components/InpaintCard.vue'));
 // [Yêu cầu 2026-09-22] Card "Ghép ảnh" nay là STUDIO — phòng chụp thời trang chuyên nghiệp
@@ -38,6 +37,7 @@ const DirectorCard = asyncCard(() => import('./components/DirectorCard.vue'));
 // [Đợt 0.5] GỠ import chết: SourcePanel/LibraryCard từng được thay bằng SourcePickerPopup/LibraryApp
 // nhưng import còn sót — "card" cũ không render ở đâu, chỉ để lại ấn tượng mobile đang dùng chúng.
 const SourcePickerPopup = asyncModal(() => import('./components/SourcePickerPopup.vue'));
+import { applyGuiConfig, fetchGuiConfig } from './guiConfig.js';
 import OutputModule from './components/OutputModule.vue';
 const LibraryApp = asyncModal(() => import('./LibraryApp.vue'));
 // MultiSelectBar đã gộp vào ContextToolbar (layer selection bar).
@@ -64,9 +64,7 @@ toastClientErrors((text) => store.toast(text, 'error'));
 // Popup nặng nạp lưới NHƯNG sau lần mở đầu phải giữ mount — nếu gỡ khỏi DOM khi đóng thì bản nháp
 // nội bộ component (prompt đang gõ, tab đang xem) mất sạch, khác hẳn hành vi cũ.
 // Cờ everOpened: false -> chưa tải chunk; true -> đã tải và mount thường trực từ đó về sau.
-const designAgentsOpened = ref(!!store.designAgentOpen);
 const conceptPromptOpened = ref(!!store.promptOpen);
-watch(() => store.designAgentOpen, (open) => { if (open) designAgentsOpened.value = true; });
 watch(() => store.promptOpen, (open) => { if (open) conceptPromptOpened.value = true; });
 
 // [Q3 — 2026-09-19] GÓI THEO MÙA VỤ: mốc mua của gói xưởng là số VỤ (1 vụ = 3 tháng), không phải số
@@ -169,16 +167,23 @@ const activityNav = computed(() => activityBar.value.filter((a) => a.kind === 'p
 /** Mục menu Cài đặt — luôn ghim ở ĐÁY; nhãn/icon/ẩn-hiện theo cấu hình. */
 const settingsEntry = computed(() => activityBar.value.find((a) => a.kind === 'menu' && a.id === 'settings') || null);
 
-/** Nút KHÔNG đổi panel mà mở POPUP độc lập (Prompt Tạo Ảnh · Trợ lý thiết kế). */
+/**
+ * Nút KHÔNG đổi panel: (a) mở POPUP độc lập (Prompt Tạo Ảnh), hoặc (b) ĐIỀU HƯỚNG sang trang khác.
+ *
+ * [2026-09-25] 'stylist' (Agent Studio) KHÔNG còn là popup trong /studio — nó là một TRANG riêng
+ * (/agent-studio) vì luồng 4 bước cần chiều cao mà một lớp phủ không cho thêm được. Điều hướng
+ * bằng <a href> ở activity bar (xem activityBarNav) nên ở đây không còn nhánh nào cho nó.
+ */
+/** Đường dẫn trang Agent Studio — MỘT chỗ khai, để đổi URL chỉ phải sửa một nơi. */
+const AGENT_STUDIO_URL = '/agent-studio';
+
 function runToolbarAction(id) {
-  if (id === 'prompt') { store.promptOpen = true; store.designAgentOpen = false; outputOpen.value = false; settingsOpen.value = false; }
-  else if (id === 'stylist') { store.designAgentOpen = true; store.setDesignAgentStep('radar'); store.promptOpen = false; outputOpen.value = false; settingsOpen.value = false; }
+  if (id === 'prompt') { store.promptOpen = true; outputOpen.value = false; settingsOpen.value = false; return; }
+  if (id === 'stylist') { window.location.href = AGENT_STUDIO_URL; }
 }
 
 function isToolbarActionActive(id) {
-  if (id === 'prompt') return store.promptOpen;
-  if (id === 'stylist') return store.designAgentOpen;
-  return false;
+  return id === 'prompt' ? store.promptOpen : false;
 }
 
 // Owner ẩn đúng mục đang mở ⇒ nhảy về mục hiển thị đầu tiên, tránh panel rỗng không lối thoát.
@@ -195,17 +200,10 @@ watch(activityNav, (list) => {
  * (Đọc được với mọi tài khoản Studio; chỉ owner ghi được.)
  */
 async function loadGuiConfig() {
-  try {
-    const r = await fetch('/api/gui', { headers: { Accept: 'application/json' } });
-    if (!r.ok) return;
-    const d = await r.json();
-    if (Array.isArray(d.activityBar) && d.activityBar.length) activityCfg.value = d.activityBar;
-    // [Modules 2026-09-19] Quyền theo GÓI: mục nào bị khoá thì hiện ổ khoá + mời nâng cấp thay vì
-    // để khách bấm vào rồi bị chặn ở máy chủ mà không hiểu vì sao.
-    if (Array.isArray(d.modules)) {
-      store.setModuleAccess(d.modules, d.modules_allowed || [], d.modules_catalog || []);
-    }
-  } catch (e) { /* giữ bản gốc */ }
+  // Việc đọc + áp cấu hình nằm ở guiConfig.js — dùng CHUNG với trang Agent Studio, vì cả hai đều
+  // cần biết quyền theo gói (một bản sao thứ hai là cách hai trang lệch nhau).
+  const bar = applyGuiConfig(store, await fetchGuiConfig());
+  if (bar) activityCfg.value = bar;
 }
 
 /** Mở bảng «Gói & credit» để nâng cấp khi khách bấm vào tính năng không có trong gói. */
@@ -240,7 +238,6 @@ const projectsOpen = ref(false);
 const promptPopupOpen = ref(false);  // popup độc lập cho Prompt Tạo Ảnh (ConceptCard)
 // [P0] Chờ boot async xong mới render UI thật — tránh flash cấu hình sai (panel lộn, activity lỗi).
 const booting = ref(true);
-// Trợ lý thiết kế hợp nhất được mở qua store.designAgentOpen.
 // [Yêu cầu 2026-09-17] Menu Cài đặt ở GÓC TRÁI DƯỚI CÙNG của activity bar.
 const settingsOpen = ref(false);
 // Backdrop chỉ là <div> bắt click (không nhận bàn phím) nên phải tự lo đóng bằng Escape.
@@ -348,6 +345,10 @@ onMounted(async () => {
         activeActivity.value = panel;
         store.leftPanelOpen = true;
       }
+      // [2026-09-25] Mở SẴN một popup khi trang khác chuyển sang đây. Hiện dùng cho luồng
+      // Agent Studio: "Áp dụng vào Canvas" ghi prompt rồi tới /?panel=concept&open=prompt — người
+      // dùng phải thấy NGAY ô prompt vừa được điền, chứ không phải tự đi tìm.
+      if (params.get('open') === 'prompt') store.promptOpen = true;
       store.loadPaletteFromImage(store.upscaleSrc);
       window.addEventListener('keydown', onCanvasKey);
       window.addEventListener('keydown', onLayerKeys);
@@ -1700,7 +1701,8 @@ function onTouchEnd(e) {
       </div>
     </div>
     <ConceptCard v-if="conceptPromptOpened" popup />
-    <!-- Trợ lý thiết kế hợp nhất: TrendRadar + CollectionBot -->
-    <DesignAgents v-if="designAgentsOpened" v-model="store.designAgentOpen" />
+    <!-- [2026-09-25] Agent Studio KHÔNG còn mount ở đây: nó là trang riêng /agent-studio
+         (AgentStudioApp.vue + agent-studio.js). Nút «Agent thiết kế» trên activity bar điều
+         hướng sang đó — xem runToolbarAction(). -->
   </div>
 </template>

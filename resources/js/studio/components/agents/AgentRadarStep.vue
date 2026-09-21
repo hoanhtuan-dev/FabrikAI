@@ -72,7 +72,7 @@ const formatVnd = inject('formatVnd');
 </script>
 
 <template>
-          <section id="agent-step-radar" role="tabpanel" aria-label="Tín hiệu" :aria-busy="store.trendRadarLoading">
+          <section id="agent-step-radar" role="region" aria-label="Tín hiệu" :aria-busy="store.trendRadarLoading">
             <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 class="text-base font-semibold text-cream-100">Tín hiệu thị trường</h2>

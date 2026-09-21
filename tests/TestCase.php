@@ -17,17 +17,24 @@ abstract class TestCase extends BaseTestCase
     /**
      * Toàn bộ source của Agent Studio NHƯ MỘT văn bản duy nhất.
      *
-     * Từ đợt tối ưu 2026-09-24, DesignAgents.vue tách template theo 4 bước sang
-     * components/agents/*.vue (shell giữ script + khung). Test khoá luật quét giao diện vẫn
-     * phải đọc đủ mọi mảnh như trước — hàm này nối shell + 4 bước theo thứ tự ổn định.
+     * [2026-09-25] Agent Studio chuyển từ MODAL trong /studio (components/DesignAgents.vue) thành
+     * một TRANG riêng: khung nằm ở AgentStudioApp.vue, logic ở composables/useAgentStudio.js,
+     * còn 4 bước vẫn ở components/agents/*.vue. Test khoá luật quét giao diện vẫn phải đọc đủ mọi
+     * mảnh như trước — hàm này nối đúng bốn nhóm đó theo thứ tự ổn định.
      */
     protected static function designAgentsSource(): string
     {
-        $base = resource_path('js/studio/components');
+        $base = resource_path('js/studio');
         $files = array_merge(
-            [$base.'/DesignAgents.vue'],
-            glob($base.'/agents/*.vue') ?: [],
+            [$base.'/AgentStudioApp.vue', $base.'/composables/useAgentStudio.js'],
+            glob($base.'/components/agents/*.vue') ?: [],
         );
+
+        foreach ($files as $f) {
+            if (! is_file($f)) {
+                throw new \RuntimeException('Agent Studio: thiếu tệp nguồn '.$f.' — test khoá luật giao diện sẽ đọc thiếu mảnh.');
+            }
+        }
 
         return implode("\n", array_map(fn (string $f): string => (string) file_get_contents($f), $files));
     }

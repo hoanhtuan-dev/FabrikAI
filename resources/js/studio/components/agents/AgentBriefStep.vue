@@ -81,7 +81,7 @@ const copyText = inject('copyText');
 </script>
 
 <template>
-          <section id="agent-step-brief" role="tabpanel" aria-label="Định hướng" :aria-busy="store.collectionBriefLoading" class="grid gap-5 xl:grid-cols-[minmax(320px,380px)_1fr]">
+          <section id="agent-step-brief" role="region" aria-label="Định hướng" :aria-busy="store.collectionBriefLoading" class="grid gap-5 xl:grid-cols-[minmax(320px,380px)_1fr]">
             <div class="space-y-4">
               <div class="card p-4">
                 <h2 class="font-display text-base font-semibold text-brand-300">Brief đầu vào</h2>
