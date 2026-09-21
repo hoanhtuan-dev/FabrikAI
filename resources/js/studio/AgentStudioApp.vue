@@ -33,6 +33,7 @@ import { applyGuiConfig, fetchGuiConfig } from './guiConfig.js';
 import { toastClientErrors } from './clientErrors.js';
 import StudioIcon from './components/StudioIcon.vue';
 import AuthNotice from './components/AuthNotice.vue';
+import Notice from './components/Notice.vue';
 import NotificationCenter from './components/NotificationCenter.vue';
 import AgentDnaStep from './components/agents/AgentDnaStep.vue';
 import AgentRadarStep from './components/agents/AgentRadarStep.vue';
@@ -276,13 +277,14 @@ const primaryLabel = computed(() => {
               <p class="mt-1 text-body leading-5 text-cream-400">{{ stepNeeds(STEPS[stepIndex].id) }}</p>
             </header>
 
-            <!-- Vì sao đang chạy bằng bộ quy tắc: nói thẳng lý do + nơi bật. Không gấp lại (§18.2). -->
-            <p v-if="!planLocked && activeModel && !modelReady" role="status" class="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-warn/30 bg-warn/10 px-4 py-3 text-body leading-5 text-warn">
-              <StudioIcon name="info" size="h-3.5 w-3.5" class="shrink-0" />
-              <span>{{ modelTitle }}</span>
-              <span v-if="!store.designAgentAi">Bật «Suy luận AI» ở thanh trên để phần phân tích do AI thực hiện.</span>
-              <span v-else-if="modelCandidates.length === 0">Cấu hình tại Cài đặt → Nhóm công việc → “Suy luận prompt” và thêm khoá trong Quản lý API.</span>
-            </p>
+            <!-- Vì sao đang chạy bằng bộ quy tắc: nói thẳng lý do + nơi bật (§18.2).
+                 Dạng băng CÓ THỂ ĐÓNG: trước đây là một <p> dính mãi, người dùng không gạt đi được. -->
+            <Notice v-if="!planLocked && activeModel && !modelReady" tone="warn" class="mb-5" :watch-key="(activeModel?.reason || '') + ':' + store.designAgentAi + ':' + modelCandidates.length">
+              <p>{{ modelTitle }}</p>
+              <p v-if="!store.designAgentAi" class="mt-1 text-cream-300">Bật «Suy luận AI» ở thanh trên để phần phân tích do AI thực hiện.</p>
+              <p v-else-if="modelCandidates.length === 0" class="mt-1 text-cream-300">Cấu hình tại Cài đặt → Nhóm công việc → “Suy luận prompt” và thêm khoá trong Quản lý API.</p>
+              <p v-else class="mt-1 text-cream-300">Bấm «Tạo lại brief» (việc 7 của bước Định hướng) để dựng lại bằng AI.</p>
+            </Notice>
 
             <!-- Gói không có module: KHÔNG dựng bốn bước để chúng lần lượt báo lỗi. Một màn hình,
                  một lời giải thích, một hành động — và vẫn để rail bên trái cho biết sẽ nhận gì. -->

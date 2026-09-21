@@ -16,6 +16,7 @@ import { useStudioStore } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
 import SourceLibraryPicker from '../SourceLibraryPicker.vue';
 import AgentSubSteps from './AgentSubSteps.vue';
+import Notice from '../Notice.vue';
 import AgentSkuStep from './AgentSkuStep.vue';
 import AgentSizeStep from './AgentSizeStep.vue';
 import AgentMoodStep from './AgentMoodStep.vue';
@@ -259,12 +260,13 @@ const createBrief = inject('createBrief');
             </div>
           </div>
 
-          <div v-if="briefStale" role="status" class="mt-3 flex gap-2 rounded-lg border border-warn/40 bg-warn/10 p-3 text-xs leading-5 text-warn">
-            <StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Prompt, hướng hoặc các lựa chọn đã đổi. Sang việc 7 để áp dụng — chạy tất định nên tức thì.</span>
-          </div>
-          <div v-else-if="briefModeMismatch" role="status" class="mt-3 flex gap-2 rounded-lg border border-warn/40 bg-warn/10 p-3 text-xs leading-5 text-warn">
-            <StudioIcon name="info" size="h-4 w-4" class="shrink-0" /><span>Brief này được dựng ở chế độ {{ collection.model?.mode === 'ai' ? 'AI' : 'tất định' }} — sang việc 7 nếu muốn dựng lại theo công tắc hiện tại.</span>
-          </div>
+          <!-- Hai băng này DÍNH MÃI và không đóng được — đổi sang Notice để người dùng gạt đi được. -->
+          <Notice v-if="briefStale" tone="warn" class="mt-3" :watch-key="'stale' + collection.input_signature">
+            Prompt, hướng hoặc các lựa chọn đã đổi. Sang việc 7 để áp dụng — chạy tất định nên tức thì.
+          </Notice>
+          <Notice v-else-if="briefModeMismatch" tone="warn" class="mt-3" :watch-key="'mismatch' + collection.model?.mode + store.designAgentAi">
+            Brief này được dựng ở chế độ {{ collection.model?.mode === 'ai' ? 'AI' : 'tất định' }} — sang việc 7 nếu muốn dựng lại theo công tắc hiện tại.
+          </Notice>
         </template>
 
         <div v-else class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-10 text-center">

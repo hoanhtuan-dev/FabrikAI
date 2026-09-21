@@ -539,11 +539,16 @@ export function useAgentStudio() {
   // THẬT đang dùng gì — trước đây Agent Studio chạy thuần rule-based và không hề cho biết điều đó.
   // Câu hiển thị cho NGƯỜI DÙNG: nói TRẠNG THÁI, không nêu model/khoá/nhóm công việc
   // (docs/DESIGN_SYSTEM.md §6). Chi tiết kỹ thuật vẫn nằm trong payload trả về và trong log.
+  // [SỬA LỖI THẬT — phản hồi chủ dự án 2026-09-21] Hai câu này trước đây nói SAI về TRẠNG THÁI:
+  //   · no_model_key nói "AI chưa được bật" trong khi đúng ra là "CHƯA GÁN model AI" (người dùng
+  //     bật công tắc rồi mà vẫn đọc thấy mình "chưa bật" ⇒ mất niềm tin vào công tắc);
+  //   · ai_disabled nói "Bạn ĐANG tắt" trong khi đây chỉ là bản brief ĐƯỢC DỰNG LÚC đang tắt — công
+  //     tắc có thể đã bật lại từ lâu. Nói snapshot bằng thì hiện tại là nói sai.
   const MODEL_REASON_LABELS = {
-    no_model_key: 'Phần suy luận AI chưa được bật nên hai agent đang chạy bằng bộ quy tắc có sẵn.',
+    no_model_key: 'Chưa cấu hình AI cho nhóm công việc nên hai agent đang chạy bằng bộ quy tắc có sẵn.',
     model_error: 'AI không phản hồi — đã tự chuyển sang bộ quy tắc có sẵn (kết quả vẫn đầy đủ).',
-    invalid_output: 'AI trả về dữ liệu không dùng được — đã tự chuyển sang bộ quy tắc có sẵn.',
-    ai_disabled: 'Bạn đang tắt suy luận AI nên hai agent chạy bằng bộ quy tắc có sẵn.',
+    invalid_output: 'AI trả về dữ liệu không dùng được — đã tự chuyển sang bộ quy tắc có sẵn (kết quả vẫn đầy đủ).',
+    ai_disabled: 'Brief này được dựng khi Suy luận AI đang TẮT nên hai agent chạy bằng bộ quy tắc có sẵn.',
   };
   const activeModel = computed(() => collection.value?.model || radar.value?.model || null);
   const modelReady = computed(() => activeModel.value?.mode === 'ai');

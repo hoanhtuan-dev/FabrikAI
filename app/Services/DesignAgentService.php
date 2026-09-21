@@ -2686,17 +2686,38 @@ class DesignAgentService
             }
         }
 
-        // NÓI RÕ VÌ SAO HỎNG. Không có dòng này thì lần sau lại phải mò: log cũ chỉ có 800 ký tự đầu,
-        // mà JSON hỏng ở GIỮA thì 800 ký tự đầu luôn trông hợp lệ.
+        // NÓI RÕ VÌ SAO HỎNG, VÀ GIỮ NGUYÊN VĂN ra một tệp riêng. Log cũ chỉ có 800 ký tự đầu — mà
+        // JSON hỏng ở GIỮA thì 800 ký tự đầu luôn trông hợp lệ, nên lần sau phải đoán lại từ đầu.
+        // Tệp riêng chứa TRỌN VẸN câu trả lời để lần tới mở ra là thấy đúng chỗ hỏng.
+        $dump = $this->dumpBrokenJson($text);
         logger()->warning('Agent Studio: không đọc được JSON của model sau mọi cách sửa', [
             'json_error' => json_last_error_msg(),
             'chars' => strlen($text),
             'control_chars_inside_strings' => $sanitized !== $text,
             'head' => substr($text, 0, 120),
             'tail' => substr($text, -120),
+            'full_dump' => $dump,     // tên tệp trong storage/logs — mở ra là thấy nguyên văn
         ]);
 
         return null;
+    }
+
+    /**
+     * GIỮ NGUYÊN VĂN câu trả lời JSON hỏng ra một tệp, để lần sau chẩn đoán được bằng một lần mở tệp
+     * thay vì phải chờ người dùng tái hiện lại đúng câu hỏi. Không đổ vào log chính: một phản hồi ~5 KB
+     * mà nằm trong laravel.log thì log phình và khó đọc các lỗi khác.
+     */
+    private function dumpBrokenJson(string $text): string
+    {
+        try {
+            $name = 'agent-json-fail-'.now()->format('Ymd-His').'-'.substr(md5($text), 0, 6).'.txt';
+            $path = storage_path('logs/'.$name);
+            file_put_contents($path, $text);
+
+            return $name;
+        } catch (\Throwable $e) {
+            return '';
+        }
     }
 
     /**
@@ -2714,6 +2735,11 @@ class DesignAgentService
         $inString = false;
         $escaped = false;
 
+        // Ký tự cấu trúc hợp lệ ngay SAU một dấu nháy đóng chuỗi. Trong JSON hợp lệ, sau khi một
+        // chuỗi đóng thì ký tự kế tiếp CHỈ có thể là : , } ] hoặc hết văn bản. Vậy một dấu nháy mà
+        // ngay sau nó KHÔNG phải những ký tự đó thì gần như chắc chắn là nháy kép NẰM TRONG nội dung.
+        $structuralAfter = [':', ',', '}', ']'];
+
         for ($i = 0, $len = strlen($text); $i < $len; $i++) {
             $char = $text[$i];
 
@@ -2729,8 +2755,21 @@ class DesignAgentService
                     continue;
                 }
                 if ($char === '"') {
-                    $out .= $char;
-                    $inString = false;
+                    // Dấu nháy ĐÓNG chuỗi, hay nháy kép NẰM TRONG câu? Nhìn ký tự phi-khoảng-trắng
+                    // ngay sau nó mà quyết — đây là chỗ làm cho model viết "thoáng mát" (nháy kép kiểu
+                    // báo chí) không làm hỏng cả JSON.
+                    $j = $i + 1;
+                    while ($j < $len && in_array($text[$j], [' ', "\n", "\r", "\t"], true)) {
+                        $j++;
+                    }
+                    $structural = $j >= $len || in_array($text[$j], $structuralAfter, true);
+                    if ($structural) {
+                        $out .= $char;
+                        $inString = false;
+                        continue;
+                    }
+                    // Nháy kép TRONG nội dung — thoát nó, chuỗi vẫn đang mở.
+                    $out .= chr(92).'"';
                     continue;
                 }
                 $ord = ord($char);

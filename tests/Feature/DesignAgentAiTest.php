@@ -101,6 +101,30 @@ class DesignAgentAiTest extends TestCase
     // ── 0. JSON HỎNG KIỂU THẬT của model vẫn phải dùng được ─────────────────
 
     /**
+     * Nháy kép NẰM TRONG nội dung — kiểu hỏng hay gặp nhất của model viết tiếng Việt (nó dùng nháy
+     * kép kiểu báo chí cho một cụm, vd "dáng "may đo""). JSON cấm nháy kép chưa escape trong chuỗi.
+     */
+    public function test_a_model_reply_with_stray_double_quotes_inside_values_is_repaired(): void
+    {
+        $this->configurePromptModel();
+        // Dựng JSON hợp lệ rồi thay brief bằng một câu chứa nháy kép THẬT chưa escape.
+        $broken = str_replace(
+            '"Brief do AI viết cho xưởng may."',
+            '"Brief phong cách \\"may đo\\" và \\"dễ mặc\\"."',
+            $this->briefJson()
+        );
+        $this->assertStringContainsString('may đo', $broken);
+        $this->fakeChat($broken);
+
+        $response = $this->actingAs($this->customer())
+            ->postJson('/api/design-agent/collection', ['prompt' => 'Bộ sưu tập linen pastel'])
+            ->assertOk();
+
+        $response->assertJsonPath('model.mode', 'ai');
+        $this->assertStringContainsString('may đo', (string) $response->json('brief'));
+    }
+
+    /**
      * [LỖI THẬT — production 2026-09-21] Model trả về JSON mở đầu/kết thúc đúng dạng nhưng XUỐNG DÒNG
      * thật bên trong giá trị chuỗi. JSON không cho phép ký tự điều khiển trong chuỗi ⇒ cả câu trả lời
      * thành không đọc được, brief rơi về bộ quy tắc, và người dùng đọc câu "AI trả về dữ liệu không
