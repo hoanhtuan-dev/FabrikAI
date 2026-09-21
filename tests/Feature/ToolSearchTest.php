@@ -767,7 +767,21 @@ class ToolSearchTest extends TestCase
         $this->assertStringContainsString('API trả lỗi', (string) $apiError['error']);
         $this->assertStringContainsString('missing a valid API key', (string) $apiError['error']);
     }
+
+    /** Ngưỡng thử lại: lần đầu đã chậm thì KHÔNG thử lại — thà có kết quả tất định còn hơn 504. */
+    public function test_the_retry_is_skipped_when_the_first_call_was_already_slow(): void
+    {
+        $service = app(DesignAgentService::class);
+        $method = new \ReflectionMethod($service, 'retryWorthIt');
+        $method->setAccessible(true);
+
+        $this->assertTrue($method->invoke($service, 1000), 'Lần đầu nhanh thì nên thử lại.');
+        $this->assertTrue($method->invoke($service, 19000));
+        $this->assertFalse($method->invoke($service, 20000), 'Chạm trần thì dừng.');
+        $this->assertFalse($method->invoke($service, 39000), 'Brief 39 giây rồi mà thử lại là vượt trần proxy.');
+    }
 }
+
 
 
 

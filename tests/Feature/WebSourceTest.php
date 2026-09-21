@@ -381,6 +381,25 @@ class WebSourceTest extends TestCase
         }
     }
 
+    /**
+     * Nguồn TÌM KIẾM có `{query}` trong URL PHẢI lưu được từ giao diện.
+     *
+     * [LỖI THẬT — production 2026-09-21] Rule `url` của Laravel từ chối dấu { } nên URL
+     * `…&q={query}` không lưu được: người khai bấm Lưu và nhận "The url field must be a valid URL"
+     * trong khi URL hoàn toàn đúng (log production ghi đúng câu lỗi này ở client_error).
+     */
+    public function test_a_search_source_with_a_query_placeholder_can_be_saved(): void
+    {
+        $this->actingAs($this->admin(), 'web')->postJson('/api/admin/web-sources', [
+            'slug' => 'google-web', 'name' => 'Google — tìm kiếm web chung', 'kind' => 'search',
+            'url' => 'https://www.googleapis.com/customsearch/v1?cx=CX1&num=10&hl=vi&q={query}',
+            'items_path' => 'items', 'title_field' => 'title', 'link_field' => 'link', 'summary_field' => 'snippet',
+            'max_items' => 10,
+        ])->assertStatus(201);
+
+        $this->assertDatabaseHas('web_sources', ['slug' => 'google-web', 'kind' => 'search']);
+    }
+
     /** Nút "Thêm nguồn mẫu": tạo các nguồn mặc định còn thiếu, KHÔNG ghi đè nguồn đã có. */
     public function test_seeding_defaults_does_not_overwrite_existing_sources(): void
     {

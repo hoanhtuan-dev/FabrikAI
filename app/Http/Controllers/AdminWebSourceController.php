@@ -118,7 +118,17 @@ class AdminWebSourceController extends Controller
             'note' => ['nullable', 'string', 'max:255'],
         ];
         // Chỉ http/https: nguồn dữ liệu KHÔNG được là đường đọc file nội bộ (chống SSRF).
-        $rules['url'] = ['required', 'string', 'max:500', 'url', 'starts_with:http://,https://'];
+        //
+        // KHÔNG dùng rule `url` của Laravel: nó từ chối dấu { } nên URL có chỗ điền từ khoá
+        // (`…&q={query}`) KHÔNG LƯU ĐƯỢC từ giao diện — đo thật 2026-09-21, người dùng bấm Lưu và nhận
+        // "The url field must be a valid URL" trong khi URL hoàn toàn đúng. Kiểm bằng cách thay chỗ điền
+        // bằng một ký tự rồi validate — vẫn chặn được file://, ftp://, đường dẫn nội bộ.
+        $rules['url'] = ['required', 'string', 'max:500', 'starts_with:http://,https://', function (string $attribute, mixed $value, \Closure $fail) {
+            $probe = str_replace('{query}', 'x', trim((string) $value));
+            if (! filter_var($probe, FILTER_VALIDATE_URL)) {
+                $fail('URL không hợp lệ. Nếu đây là nguồn tìm kiếm, dùng {query} làm chỗ điền từ khoá.');
+            }
+        }];
         $rules['slug'] = $creating
             ? ['required', 'string', 'max:60', 'regex:/^[a-z0-9][a-z0-9-]*$/']
             : ['nullable', 'string', 'max:60'];

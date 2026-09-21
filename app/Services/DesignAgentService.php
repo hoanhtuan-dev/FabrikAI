@@ -67,6 +67,14 @@ class DesignAgentService
     private const AI_QUERY_LIMIT = 6;
 
     /**
+     * Trần thời gian cho phép THỬ LẠI một lượt gọi model (mili giây).
+     *
+     * Đo trên production 2026-09-21: brief qua model có tìm kiếm mất ~39 s; thử lại lần hai đẩy tổng lên
+     * quá trần proxy ⇒ **504**. 20 s là ngưỡng để tổng thời gian còn nằm trong khoảng an toàn.
+     */
+    private const RETRY_TIME_BUDGET_MS = 20000;
+
+    /**
      * Tham số này BẮT BUỘC (kiểu nullable, không có default): container của Laravel KHÔNG tự
      * inject tham số nullable-có-default — nó lấy giá trị default null — nên viết
      * "?AiModelGateway $gateway = null" sẽ khiến service LUÔN chạy ở chế độ tất định dù Cài đặt
@@ -2044,6 +2052,8 @@ class DesignAgentService
             'timeout' => $timeout,
         ];
 
+        // Bấm giờ cho RIÊNG lần gọi đầu: quyết định "có thử lại không" dựa trên thời gian nó đã tốn.
+        $firstStarted = microtime(true);
         $answer = $this->gateway->text($group, $messages, $shared + ['max_tokens' => $budget]);
 
         if ($answer === null) {
@@ -2058,6 +2068,21 @@ class DesignAgentService
         $json = $this->decodeJson($answer['text']);
         if ($json !== null) {
             return ['json' => $json, 'answer' => $answer, 'attempts' => 1];
+        }
+
+        // TRẦN THỜI GIAN: nếu lần đầu đã chậm thì KHÔNG thử lại.
+        //
+        // [LỖI THẬT — production 2026-09-21] Brief chạy trên model có tìm kiếm mất ~39 giây; lần thử lại
+        // (ngân sách token gấp đôi, timeout gấp đôi) đẩy tổng thời gian vượt trần của proxy ⇒ khách nhận
+        // **HTTP 504** và mất cả phần đã tính được. Thà trả về kết quả tất định còn hơn trả về lỗi cổng.
+        $elapsedMs = (int) round((microtime(true) - $firstStarted) * 1000);
+        if (! $this->retryWorthIt($elapsedMs)) {
+            logger()->info('Agent Studio: KHÔNG thử lại vì lần đầu đã chậm (giữ lượt chạy trong trần thời gian)', [
+                'elapsed_ms' => $elapsedMs,
+                'chars' => strlen($answer['text']),
+            ]);
+
+            return ['json' => null, 'answer' => $answer, 'attempts' => 1];
         }
 
         logger()->info('Agent Studio: lần gọi đầu chưa đọc được JSON, thử lại với ngân sách token lớn hơn', [
@@ -2083,6 +2108,18 @@ class DesignAgentService
         }
 
         return ['json' => null, 'answer' => $answer, 'attempts' => 2];
+    }
+
+    /**
+     * Còn đáng thử lại không? — lần gọi đầu ĐÃ tốn bao nhiêu mili giây.
+     *
+     * Ngưỡng lấy theo trần thời gian thực tế của proxy: một lần thử lại tốn THÊM chừng ấy thời gian nữa,
+     * nên chỉ thử khi tổng dự kiến còn nằm trong trần. Đây là đánh đổi có chủ ý: bản JSON hỏng ⇒ quay về
+     * engine tất định (vẫn có kết quả dùng được), còn 504 thì khách mất trắng.
+     */
+    private function retryWorthIt(int $elapsedMs, int $budgetMs = self::RETRY_TIME_BUDGET_MS): bool
+    {
+        return $elapsedMs < $budgetMs;
     }
 
     /** Chuẩn hoá phần chữ do model trả về; null = không có gì dùng được. */
