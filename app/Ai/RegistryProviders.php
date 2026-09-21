@@ -31,9 +31,6 @@ use Laravel\Ai\Ai;
  */
 class RegistryProviders
 {
-    /** Tiền tố tên provider đăng ký vào SDK — để không đụng tên provider dựng sẵn của SDK. */
-    private const PREFIX = 'fabrikai_';
-
     /**
      * CHUỖI DỰ PHÒNG CỦA TỪNG VAI — phải GIỐNG HỆT chuỗi mà DesignAgentService dùng khi chọn model.
      *
@@ -66,8 +63,10 @@ class RegistryProviders
         $seen = [];
         $seenModel = [];
 
+        $gateway = app(AiModelGateway::class);
+
         foreach (array_values(array_unique(array_merge([$group], $fallbacks))) as $candidateGroup) {
-            foreach (app(AiModelGateway::class)->candidates($candidateGroup) as $candidate) {
+            foreach ($gateway->candidates($candidateGroup) as $candidate) {
                 // Khử trùng theo (nhà cung cấp · model) GIỮA CÁC NHÓM: cùng một model xuất hiện ở cả nhóm
                 // vai lẫn nhóm nền là chuyện thường, và đăng ký hai lần thì SDK thử lại đúng một thứ hai lượt.
                 $signature = $candidate['provider'].':'.$candidate['model'];
@@ -75,35 +74,28 @@ class RegistryProviders
                     continue;
                 }
                 $seenModel[$signature] = true;
-                $driver = $this->driverFor($candidate);
-
                 foreach ((array) ($candidate['keys'] ?? []) as $index => $key) {
                     $key = (string) $key;
                     if ($key === '') {
                         continue;
                     }
 
-                    $base = $this->baseFor($candidate, $key);
-                    if ($base === '') {
+                    // MỘT nguồn cho luật driver/địa chỉ (xem SdkProviderMap) — chép ra đây là để hai nơi
+                    // lệch nhau, và lệch ở đây chỉ lộ ra lúc chạy thật.
+                    $providerConfig = SdkProviderMap::configFor($candidate, $key);
+                    if ($providerConfig === null) {
                         // Không có địa chỉ gọi được ⇒ ĐỪNG đăng ký một provider sẽ hỏng lúc chạy. Bỏ qua để
                         // danh sách còn lại làm việc; nơi gọi đọc forGroup() === [] mà nói thật với người dùng.
                         continue;
                     }
 
-                    $name = self::PREFIX.$candidate['provider'].'_'.$index;
+                    $name = SdkProviderMap::nameForKey($candidate, $key);
                     if (isset($seen[$name])) {
                         continue;
                     }
                     $seen[$name] = true;
 
-                    config(['ai.providers.'.$name => [
-                        'driver' => $driver,
-                        'key' => $key,
-                        'url' => $base,
-                        // SDK đòi model mặc định cho đường openai-compatible. Ta LUÔN truyền model tường
-                        // minh khi gọi, nhưng vẫn khai để provider dựng được mà không ném lỗi.
-                        'models' => ['text' => ['default' => (string) $candidate['model']]],
-                    ]]);
+                    config(['ai.providers.'.$name => $providerConfig]);
 
                     $out[] = [
                         'name' => $name,
@@ -156,32 +148,5 @@ class RegistryProviders
         }
     }
 
-    /**
-     * Driver SDK cho một candidate của dự án.
-     *
-     * Mọi thứ KHÔNG phải Gemini đều đi openai-compatible: dự án đã có sẵn địa chỉ đầy đủ + khoá cho từng
-     * nhà cung cấp, nên driver tổng quát là đường ít phụ thuộc nhất vào cách SDK hiểu từng hãng.
-     */
-    private function driverFor(array $candidate): string
-    {
-        return ($candidate['transport'] ?? '') === 'gemini' ? 'gemini' : 'openai-compatible';
-    }
-
-    /** Địa chỉ gọi thật của một candidate — CÙNG luật với AiModelGateway (đừng để hai nơi lệch nhau). */
-    private function baseFor(array $candidate, string $key): string
-    {
-        $transport = (string) ($candidate['transport'] ?? '');
-        $base = rtrim((string) ($candidate['base'] ?? ''), '/');
-
-        if ($transport === 'qwen') {
-            // Qwen: địa chỉ suy từ CHÍNH khoá (gói Token Plan nằm ở host riêng).
-            return function_exists('dashscope_base_url') ? dashscope_base_url($key).'/compatible-mode/v1' : '';
-        }
-
-        if ($transport === 'gemini') {
-            return $base !== '' ? $base : 'https://generativelanguage.googleapis.com/v1beta/';
-        }
-
-        return $base;
-    }
 }
+

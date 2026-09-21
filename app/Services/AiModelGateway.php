@@ -25,6 +25,11 @@ class AiModelGateway
     /** Nhật ký thử của lần gọi gần nhất (xem lastAttempts()) — để log nói ĐÚNG vì sao không dùng được model. */
     protected array $lastAttempts = [];
 
+    /** Động cơ Laravel AI SDK — dựng MUỘN, xem sdkEngine(). */
+    protected bool $sdkEngineResolved = false;
+
+    protected ?object $sdkEngineInstance = null;
+
     /** @return list<array{provider:string, model:string, transport:string, base:string, keys:list<string>, search_param?:?string}> */
     public function candidates(string $group): array
     {
@@ -337,7 +342,87 @@ class AiModelGateway
             return $this->callWithTools($candidate, $key, $messages, $options, $tools);
         }
 
+        // ĐỘNG CƠ LARAVEL AI SDK (2026-09-22) — mặc định cho MỌI lượt KHÔNG cần công cụ.
+        //
+        // Vì sao đặt ở ĐÂY: hai nhánh trên là những thứ SDK KHÔNG làm được (WebSearch của nhà cung cấp và
+        // vòng lặp hàm — SDK v0.11.2 không hỗ trợ chúng trên driver openai-compatible). Mọi lượt còn lại thì
+        // SDK làm được, nên nó thành đường CHÍNH; còn gateway là BỘ ĐIỀU PHỐI: nó quyết định lượt nào đi động
+        // cơ nào, và giữ nguyên hợp đồng công khai để mọi nơi gọi không phải biết.
+        //
+        // RƠI VỀ AN TOÀN: lỗi của SDK (kể cả lỗi lập trình) KHÔNG được làm hỏng lượt chạy — ghi lại rồi chạy
+        // đường HTTP tự viết đã kiểm chứng. Nhờ vậy bật động cơ mới không thể làm sập một luồng đang chạy.
+        // HAI ĐIỀU KIỆN DỪNG — cả hai đều là LỖI THẬT bắt được khi chạy bộ test với động cơ SDK đã bật:
+        //
+        // (1) LƯỢT CÓ TÌM KIẾM KHÔNG ĐI ĐỘNG CƠ SDK. Tham số tìm kiếm của từng giao thức (enable_search của
+        //     Qwen · google_search của Gemini · search_param của Custom Provider) do applySearch() gắn vào
+        //     thân request — động cơ SDK KHÔNG gọi hàm đó, nên đưa lượt tìm kiếm sang SDK là làm rơi tham số
+        //     và tìm kiếm TẮT ÂM THẦM. Đã bắt được đúng ca này: test "model qwen ngoài họ công cụ vẫn phải
+        //     gửi cờ enable_search" đỏ ngay.
+        //
+        // (2) CHỈ NHẬN KẾT QUẢ CÓ NỘI DUNG. Đường HTTP tự viết có một lưới cứu đã trả giá bằng sự cố thật:
+        //     khi model suy luận trả content RỖNG, nó lấy phần reasoning_content làm văn bản để tầng gọi còn
+        //     biết mà THỬ LẠI với ngân sách token lớn hơn. SDK không phơi reasoning_content, nên lượt đó sẽ
+        //     thành rỗng và mất luôn lưới cứu. Vì vậy: SDK trả rỗng ⇒ RƠI VỀ đường tự viết cho CHÍNH
+        //     candidate đó, chứ không kết thúc lượt.
+        $askSdk = empty($options['search'])
+            && $this->sdkEngineEnabled()
+            && ($engine = $this->sdkEngine()) !== null
+            && $engine->supports($candidate);
+
+        if ($askSdk) {
+            try {
+                $result = $engine->run($candidate, $key, $messages, $options);
+                if ($result !== null && trim((string) $result['text']) !== '') {
+                    return $result;
+                }
+            } catch (\Throwable $e) {
+                logger()->warning('AiModelGateway: động cơ SDK lỗi, quay về đường HTTP tự viết ('
+                    .$candidate['provider'].':'.$candidate['model'].'): '.$e->getMessage());
+            }
+        }
+
         return $this->callPlain($candidate, $key, $messages, $options);
+    }
+
+    /**
+     * Động cơ SDK — dựng MUỘN và chịu được việc SDK không có mặt.
+     *
+     * Vì sao không tiêm qua hàm dựng: AiModelGateway được cả app() lẫn new AiModelGateway() tạo ra, và thêm
+     * tham số bắt buộc vào hàm dựng là phá mọi nơi gọi cũ (kể cả test). Dựng muộn giữ nguyên chữ ký.
+     */
+    protected function sdkEngine(): ?object
+    {
+        if ($this->sdkEngineResolved) {
+            return $this->sdkEngineInstance;
+        }
+
+        $this->sdkEngineResolved = true;
+
+        try {
+            if (class_exists(\App\Ai\SdkTextEngine::class)) {
+                $this->sdkEngineInstance = app(\App\Ai\SdkTextEngine::class);
+            }
+        } catch (\Throwable) {
+            $this->sdkEngineInstance = null;
+        }
+
+        return $this->sdkEngineInstance;
+    }
+
+    /**
+     * Công tắc động cơ SDK. MẶC ĐỊNH BẬT (yêu cầu: SDK là trái tim điều phối), tắt được NGAY bằng
+     * set_setting('studio_ai_sdk_engine', '0') — không phải deploy lại — nếu production có sự cố.
+     *
+     * Đọc qua setting() là một lượt đọc ĐỆM (cả bảng settings nằm trong một khoá đệm), không phải query DB.
+     */
+    protected function sdkEngineEnabled(): bool
+    {
+        try {
+            return function_exists('setting') && (string) setting('studio_ai_sdk_engine', '1') !== '0';
+        } catch (\Throwable) {
+            // Không đọc được cấu hình (DB chưa migrate…) ⇒ chạy đường cũ đã kiểm chứng.
+            return false;
+        }
     }
 
     /**

@@ -345,7 +345,19 @@ class DesignAgentAiTest extends TestCase
         $this->assertGreaterThan($budgets[0], $budgets[1], 'Lần thử lại phải xin ngân sách token LỚN HƠN.');
     }
 
-    public function test_radar_retries_when_only_reasoning_came_back(): void
+    /**
+     * MODEL TRẢ VỀ CHỈ PHẦN SUY LUẬN (content rỗng) ⇒ VẪN PHẢI CÓ ĐỊNH HƯỚNG DO AI, KHÔNG được rơi về luật.
+     *
+     * Bất biến được khoá ở đây là KẾT QUẢ, không phải SỐ LẦN GỌI: một lượt chỉ có reasoning_content từng
+     * làm mất hẳn phần AI và người dùng thấy toàn hướng "bộ có sẵn".
+     *
+     * [ĐỔI 2026-09-22 — khi Laravel AI SDK thành động cơ chính] Trước đây lưới cứu là "gọi lại với ngân
+     * sách token lớn hơn" nên model.attempts = 2. Nay lượt rỗng của SDK RƠI VỀ đường HTTP tự viết cho CÙNG
+     * candidate (SDK không phơi reasoning_content — xem AiModelGateway::callText), và đường đó lấy đúng
+     * phản hồi kế tiếp của fake nên đọc được JSON ngay: attempts = 1 mà kết quả TỐT HƠN (chỉ hai lượt HTTP,
+     * không phải một lượt rỗng + một lượt thử lại nặng hơn). Vì vậy khoá theo engine + nội dung thật.
+     */
+    public function test_radar_recovers_when_only_reasoning_came_back(): void
     {
         $this->configurePromptModel();
         Http::fake([
@@ -362,7 +374,9 @@ class DesignAgentAiTest extends TestCase
 
         $response = $this->actingAs($this->customer())->postJson('/api/design-agent/radar')->assertOk();
 
-        $response->assertJsonPath('engine', 'ai-v1')->assertJsonPath('model.attempts', 2);
+        $response->assertJsonPath('engine', 'ai-v1');
+        $this->assertNotEmpty($response->json('directions'), 'Lượt chỉ có suy luận KHÔNG được làm mất định hướng.');
+        $this->assertGreaterThanOrEqual(2, count(Http::recorded()), 'Phải có lượt cứu (không kết thúc ở phản hồi rỗng).');
     }
 
     // ── 3. Lỗi model ⇒ quay về tất định và nói rõ lý do ─────────────────────
