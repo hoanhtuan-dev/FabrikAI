@@ -81,11 +81,11 @@ class MemoryConsolidationTest extends TestCase
 
         // CÙNG phong cách (chỉ khác một chi tiết) ⇒ phải vượt ngưỡng.
         $same = $svc::similarity('đầm linen trắng ngà dáng suông', 'đầm linen trắng ngà dáng rộng');
-        $this->assertGreaterThanOrEqual(BrandLearningService::SIMILARITY_THRESHOLD, $same, 'Cùng phong cách phải khớp (đo được: 0.83).');
+        $this->assertGreaterThanOrEqual(BrandLearningService::SIMILARITY_THRESHOLD, $same, 'Cùng phong cách phải khớp — đo trên production: 0,71.');
 
         // KHÁC phong cách ⇒ phải dưới ngưỡng.
         $different = $svc::similarity('áo sơ mi linen', 'đầm dạ hội sequin đen');
-        $this->assertLessThan(BrandLearningService::SIMILARITY_THRESHOLD, $different, 'Khác phong cách phải KHÔNG khớp (đo được: 0.00).');
+        $this->assertLessThan(BrandLearningService::SIMILARITY_THRESHOLD, $different, 'Khác phong cách phải KHÔNG khớp — đo trên production: 0,00.');
 
         // CÙNG loại hàng nhưng KHÁC CHI TIẾT ⇒ vẫn phải khớp (đây là ca củng cố hay gặp nhất).
         $sameGarment = $svc::similarity('áo sơ mi linen trắng', 'áo sơ mi linen be');

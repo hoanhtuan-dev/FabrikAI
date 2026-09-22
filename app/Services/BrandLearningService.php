@@ -35,9 +35,12 @@ class BrandLearningService
     /**
      * Ngưỡng coi hai quyết định là CÙNG MỘT ký ức.
      *
-     * 0,6 = trùng 3/5 từ khoá. Đo trên chính dữ liệu của dự án: "đầm linen trắng ngà dáng suông" vs
-     * "đầm linen trắng ngà dáng rộng" cho 0,83 (đủ khớp); còn "áo sơ mi linen" vs "đầm linen trắng ngà"
-     * cho 0,29 (không khớp). Đây là phép ĐO TỪ KHOÁ vì chưa có embedding — xem chú thích ở similarity().
+     * ĐO LẠI TRÊN PRODUCTION 2026-09-26 (3 ca thật của ngành):
+     *   · "đầm linen trắng ngà dáng suông" vs "… dáng rộng"  → **0,71** (cùng phong cách, khác chi tiết ⇒ khớp)
+     *   · "áo sơ mi linen form rộng" vs "áo thun linen form rộng" → **0,57** (CỐ Ý không khớp: khác loại hàng)
+     *   · "áo sơ mi linen" vs "đầm dạ hội sequin đen"            → **0,00**
+     * 0,6 nằm giữa 0,57 và 0,71 nên tách đúng hai chuyện rất khác nhau: "cùng món, khác chi tiết" và
+     * "cùng vải, khác sản phẩm". Đây là phép ĐO TỪ KHOÁ vì chưa có embedding — xem chú thích ở similarity().
      */
     public const SIMILARITY_THRESHOLD = 0.6;
 

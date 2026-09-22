@@ -5,6 +5,77 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 8) — CỦNG CỐ TRÍ NHỚ (GĐ3): vòng lặp tự học KHÉP KÍN
+
+**Commit:** `83d2192` (+ đính chính số đo). **Trạng thái: đã commit + push + DEPLOY production** — migration `2026_09_26_000005` đã chạy, cache dựng lại.
+
+### 1. Vì sao — và vì sao phải sau GĐ1/GĐ2
+GĐ1 đã biết GHI, GĐ2 đã biết RÚT BÀI HỌC. Nhưng cả hai **ghi rồi để đó**: mọi ký ức nặng như nhau, và
+`preferences()` luôn lấy **N ký ức MỚI NHẤT**. Cửa sổ prompt có trần (10 prompt + 5 bài học) ⇒ **một buổi
+duyệt 40 ảnh hôm nay XOÁ SẠCH ảnh hưởng của những phong cách đã đúng suốt nhiều tháng**. Trí nhớ thành
+NHẬT KÝ, không thành TRÍ NHỚ.
+
+### 2. Đã làm
+| # | Thay đổi | Tệp |
+|---|---|---|
+| 1 | `brand_learning` thêm `weight` (1–10) · `hits` · `refreshed_at` + index cho hai đường đọc nóng | `database/migrations/2026_09_26_000005_add_weight_to_brand_learning_table.php` |
+| 2 | Củng cố khi trùng + kế thừa lesson (KHÔNG gọi model) · suy yếu/`quên · `similarity()` thuần | `app/Services/BrandLearningService.php` |
+| 3 | `preferences()` xếp theo ĐỘ MẠNH thay vì mới nhất | (cùng tệp) |
+| 4 | Lệnh `studio:memory:consolidate` (+`--dry-run`) chạy 04:00 hằng ngày | `app/Console/Commands/ConsolidateMemory.php` · `routes/console.php` |
+| 5 | Chỉ dẫn brief nói rõ danh sách đã xếp theo độ mạnh | `app/Services/DesignAgentService.php` |
+| 6 | 12 test | `tests/Feature/MemoryConsolidationTest.php` |
+
+### 3. Ngưỡng "trùng nhau" — ĐO LẠI TRÊN PRODUCTION, và một đính chính
+Vì chưa có embedding (việc #9), dùng trùng TỪ KHOÁ (Jaccard). Ba số **đo trên chính mã đang chạy production**:
+
+| Cặp | Điểm | Ý nghĩa |
+|---|---|---|
+| `đầm linen trắng ngà dáng suông` vs `… dáng rộng` | **0,71** | cùng phong cách, khác chi tiết ⇒ **khớp** |
+| `áo sơ mi linen form rộng` vs `áo thun linen form rộng` | **0,57** | cùng vải, **khác loại hàng** ⇒ **CỐ Ý không khớp** (sơ mi ≠ thun) |
+| `áo sơ mi linen` vs `đầm dạ hội sequin đen` | **0,00** | khác phong cách |
+
+Ngưỡng 0,6 nằm giữa 0,57 và 0,71 nên tách đúng hai chuyện rất khác nhau.
+
+> **ĐÍNH CHÍNH:** ghi chú đầu tiên trong mã (và trong test) ghi ca đầu là **0,83** — SAI, đó là con số tôi
+> tính nhẩm lúc viết chứ chưa đo. Đo thật trên production ra **0,71**. Đã sửa cả hai chỗ và ghi rõ "đo trên
+> production". Không đổi hành vi (ngưỡng 0,6 vẫn tách đúng), nhưng con số trong tài liệu phải là số ĐO ĐƯỢC.
+
+Hai luật nhỏ cho tiếng Việt, mỗi luật có test riêng: **giữ từ 2 ký tự** (cắt ở 3 sẽ làm "áo sơ mi linen" và
+"áo thun linen" tách rời dù cùng là *áo linen*) và **bỏ từ đệm** (và · của · cho …).
+
+### 4. Kiểm chứng sau deploy (chạy trên production)
+| Kiểm tra | Kết quả |
+|---|---|
+| Migration | `2026_09_26_000005_add_weight_to_brand_learning_table` → **DONE** (12,56 ms) |
+| Cột bảng | `id, user_id, generation_id, decision, prompt, lesson, context, **weight, hits, refreshed_at**, source, created_at, updated_at` |
+| Lệnh mới | `php artisan studio:memory:consolidate --dry-run` → *"Chưa có ký ức nào — không có gì để củng cố."* (đúng: production đang 0 ký ức) |
+| Lịch | `schedule:list` có `studio:memory:consolidate` (04:00) |
+| HTTP · cron | `/` 200 · `cronjob_seKYAPOwkS` nhảy lúc 07:37:02 · `cronjob_3pc53LMYT5` 221 byte (worker đang chạy) |
+| Test | **1167 XANH / 8.422 assertion** (trước: 1155 / 8.377) |
+
+### 5. CỘT MỐC: vòng lặp tự học 5 bước đã KHÉP KÍN
+| Bước | Trạng thái |
+|---|---|
+| **Retrieve** — đọc gu vào brief | ✅ `preferences()` |
+| **Act** — viết brief | ✅ `aiBrief()` |
+| **Reflect** — người duyệt/loại ảnh | ✅ `reviewShots` → `shot_state` |
+| **Extract** — rút bài học khái quát | ✅ `ReflectBrandMemoryJob` (đợt 1) |
+| **Consolidate** — củng cố · suy yếu · quên | ✅ **đợt này** |
+
+Cả 5 bước nay **tự chạy**: cron `schedule:run` đã sống (đợt 6) nên `queue:work` và `memory:consolidate`
+không cần ai mở màn hình.
+
+### 6. Nợ còn lại của lộ trình
+| # | Việc | Ghi chú |
+|---|---|---|
+| 6 | **QC tool** (checklist theo loại hàng + ghi lỗi + AQL) | Mầm `defect_pct` đã có ở tầng giá thành |
+| 7 | **3 gate còn thiếu** (tech pack sign-off · duyệt kế hoạch SX · duyệt QC) | rẻ — dùng lại mẫu whitelist đã chạy |
+| 8 | Theo dõi sản xuất (so thực tế vs kế hoạch) | cần sau khi có mẫu + kế hoạch (đã có) |
+| 9 | `FileSearch` = vector retrieval | đắt nhất; để cuối |
+| — | Gán model cho vai "Agent Studio — Rút kinh nghiệm" | chủ dự án (bỏ trống thì rơi về nhóm suy luận) |
+
+---
+
 ## Phiên 2026-09-26 (đợt 7) — GỘP LỊCH VỀ MỘT CHỖ: `grant-plan-credits` vào `schedule:run`
 
 **Commit:** `6b46ef2`. **Trạng thái: đã commit + push + DEPLOY production** (không có migration).
