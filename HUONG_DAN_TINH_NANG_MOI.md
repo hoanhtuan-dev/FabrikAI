@@ -325,6 +325,27 @@ tin tức, chỉ 1 nguồn tìm được theo từ khoá):
 Muốn đo lại bất cứ lúc nào: `php artisan studio:web-search-probe` (hoặc `--q="câu hỏi của bạn"`).
 
 ### 11.6 Muốn AI tra được WEB CHUNG (không chỉ tin tức) — khai nguồn tìm kiếm
+
+**CÁCH NHANH NHẤT — MỘT LỆNH (từ 2026-09-26).** Lấy **cx** + **API key** của Google (2 phút, xem bảng dưới),
+rồi chạy NGAY TRÊN MÁY CHỦ để khoá không phải đi qua chat/email:
+
+```bash
+php artisan studio:web-search-setup --key=AIza… --cx=0123abc…
+# tuỳ chọn: --fresh=30 (chỉ lấy kết quả trong 30 ngày) · --test="câu hỏi để thử" · --num=10
+```
+
+Lệnh làm **cả bốn bước** (lưu khoá đã mã hoá · tạo nguồn `kind=search` · ánh xạ 4 trường · **THỬ THẬT một câu
+hỏi**), rồi in kết quả. Nếu chưa tra được gì, lệnh **nói đúng việc cần sửa** (khoá sai / chưa bật Custom Search
+API / cx sai / engine chưa bật "Search the entire web") và trả mã lỗi — chứ không im lặng coi như xong.
+
+**HAI điều phải biết trước khi tin vào nguồn này:**
+1. **Google CSE KHÔNG trả ngày đăng** ⇒ mục vào prompt với nhãn *"không ngày"*, và tin không ngày thì **không đo
+   được xu hướng tăng/giảm**. Muốn chắc là tin mới thì khai kèm `--fresh=30` — Google tự lọc ở phía họ.
+2. **Hạn mức miễn phí 100 truy vấn/ngày**; mỗi lời gọi công cụ của model là 1 truy vấn (có đệm 15 phút theo
+   *nguồn · từ khoá*, nên hỏi lại cùng câu không tốn thêm).
+
+Không muốn dùng lệnh thì khai tay theo bảng dưới đây — nhưng **bước 3-4 là bốn chỗ để sai**, và sai thì triệu
+chứng duy nhất nhìn thấy là "0 kết quả".
 RSS chỉ có tin tức, nên câu hỏi dạng "cách làm / giá / thông số" luôn trả 0 kết quả. Đường tra web chung là một
 **nguồn TÌM KIẾM** (kind = `search`) — đã có sẵn trong mã và đã có test; việc cần làm là **cấu hình**:
 
