@@ -33,15 +33,21 @@ class StudioHeaderAndPromptTest extends TestCase
         $this->assertStringContainsString('class="navbar elev-bar', $app,
             'Thanh tiêu đề Studio phải dùng .navbar của daisyUI (kèm .elev-bar để giữ độ nổi đã chốt).'
         );
-        $this->assertStringContainsString('navbar-start', $app, 'Thiếu nhóm trái (thương hiệu + bối cảnh).');
-        $this->assertStringContainsString('navbar-end', $app, 'Thiếu nhóm phải (công cụ · credit · tài khoản).');
+        // [đợt 34] Thứ tự do `order` quyết định (hai nhóm navbar-start/navbar-end nay là khung trong
+        // suốt `contents`), nên bài này khoá THỨ TỰ THỊ GIÁC: menu · thương hiệu · TÀI KHOẢN · CREDIT
+        // ở bên trái; nút điện thoại + khay công cụ đẩy sang phải.
+        foreach ([
+            'class="icon-btn shrink-0 lg:hidden order-1"' => 'nút menu',
+            'class="order-2 flex shrink-0 items-center gap-2"' => 'thương hiệu FabrikAI',
+            'class="order-3 relative"' => 'nút + menu tài khoản',
+            'class="order-4 relative"' => 'nút Gói & credit',
+            'class="order-5 ml-auto' => 'nút Bộ sưu tập (điện thoại)',
+            'class="order-7 ml-auto hidden' => 'khay điều hướng không gian làm việc',
+        ] as $needle => $what) {
+            $this->assertStringContainsString($needle, $app, "Thiếu thứ tự cho {$what}.");
+        }
 
-        // Tìm theo CLASS trong markup (không phải theo chữ trong chú thích giải thích phía trên).
-        $start = strpos($app, 'class="navbar-start');
-        $end = strpos($app, 'class="navbar-end');
-        $brand = strpos($app, 'FabrikAI</span>');
-        $this->assertNotFalse($brand, 'Nhóm trái phải có thương hiệu FabrikAI.');
-        $this->assertTrue($brand > $start && $brand < $end, 'Thương hiệu phải nằm trong navbar-start.');
+        $this->assertStringContainsString('>FabrikAI</span>', $app, 'Thương hiệu FabrikAI phải còn trong header.');
     }
 
     /** 2. MỘT menu tài khoản: danh tính + cài đặt + đăng xuất; nút Cài đặt riêng đã bị bỏ. */
@@ -53,9 +59,10 @@ class StudioHeaderAndPromptTest extends TestCase
         $this->assertStringContainsString('data-account-menu', $app, 'Thiếu menu tài khoản.');
         // [đợt 33] Menu tài khoản KHÔNG còn dùng anchor positioning của daisyUI (gây hiện sai chỗ và đè
         // nút Outputs trên vài trình duyệt) — nay định vị TƯỜNG MINH như mọi popover khác của Studio.
-        $this->assertStringContainsString('absolute right-0 top-full', $app,
-            'Menu tài khoản phải định vị tường minh ngay dưới bên phải nút tài khoản.');
-        $this->assertStringContainsString('class="menu absolute right-0 top-full', $app,
+        // [đợt 34] Nút tài khoản nay ở BÊN TRÁI (cạnh thương hiệu) ⇒ menu mở sang PHẢI: `left-0`.
+        $this->assertStringContainsString('absolute left-0 top-full', $app,
+            'Menu tài khoản phải định vị tường minh ngay dưới nút, mở sang phải.');
+        $this->assertStringContainsString('class="menu absolute left-0 top-full', $app,
             'Nội dung menu vẫn dùng .menu của daisyUI nhưng đặt vị trí tuyệt đối rõ ràng.');
 
         // Đếm trong PHẠM VI MENU: chú thích trong mã cũng nhắc tới chữ này khi giải thích vì sao nút rời đã bỏ.

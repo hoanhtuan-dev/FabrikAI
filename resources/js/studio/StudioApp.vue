@@ -263,6 +263,8 @@ const applyOpen = ref(false);
 // cách đó không mở được khi bấm bằng bàn phím/chuột phải/một số trình duyệt nhúng, và cũng không đóng
 // được khi bấm ra ngoài. Đóng bằng lớp phủ trong suốt, cùng lối với các popover khác của Studio.
 const accountOpen = ref(false);
+// Ảnh đại diện tải lỗi ⇒ hiện chữ cái thay vì để ô trống (trước đây chỉ ẩn ảnh đi).
+const avatarFailed = ref(false);
 function openApplyPopover() {
   applyOpen.value = !applyOpen.value;
   if (applyOpen.value && !store.projectLoaded) store.loadProjects();
@@ -992,37 +994,37 @@ function onTouchEnd(e) {
          Danh tính người dùng KHÔNG còn nằm trơ ở mép trái: nó vào menu tài khoản (dropdown) cùng lối
          đăng xuất — một chỗ cho mọi việc thuộc về tài khoản. -->
     <header class="navbar elev-bar relative z-30 !min-h-0 shrink-0 gap-2 border-b border-ink-700 bg-ink-900/95 px-2 py-1.5 backdrop-blur sm:px-4 sm:py-2">
-      <div class="navbar-start min-w-0 flex-1 items-center gap-2">
+      <div class="contents">
         <!-- Nút menu công cụ: chỉ có ở điện thoại/máy tính bảng hẹp (thanh rail bên trái hiện từ lg). -->
-        <button type="button" class="icon-btn shrink-0 lg:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ" @click="menuOpen = true">
+        <button type="button" class="icon-btn shrink-0 lg:hidden order-1" title="Mở menu công cụ" aria-label="Mở menu công cụ" @click="menuOpen = true">
           <StudioIcon name="sliders" size="h-4 w-4" />
         </button>
 
-        <a href="/" class="flex shrink-0 items-center gap-2" title="FabrikAI Studio">
+        <a href="/" class="order-2 flex shrink-0 items-center gap-2" title="FabrikAI Studio">
           <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-4 w-4" /></span>
           <span class="hidden font-display text-sm font-semibold text-cream-50 sm:inline">FabrikAI</span>
         </a>
 
-        <span v-if="!store.user" class="flex min-w-0 items-center gap-1.5 rounded-lg bg-warn/15 px-2 py-1 text-label font-semibold text-warn">
+        <span v-if="!store.user" class="order-3 flex min-w-0 items-center gap-1.5 rounded-lg bg-warn/15 px-2 py-1 text-label font-semibold text-warn">
           <StudioIcon name="lock" size="h-3.5 w-3.5" /> Chưa đăng nhập
         </span>
       </div>
 
-      <div class="navbar-end items-center gap-1.5 sm:gap-2">
+      <div class="contents">
         <!-- Hai lối vào hay dùng nhất trên ĐIỆN THOẠI (trước đây nằm ở thanh thứ hai, nay gộp vào đây):
              Bộ sưu tập và Kết quả. Từ lg trở lên chúng đã có ở rail/thanh trạng thái nên ẩn đi. -->
-        <button type="button" class="icon-btn shrink-0 lg:hidden" :title="store.appliedProject ? 'Bộ sưu tập hiện tại: ' + store.appliedProject.name : 'Bộ sưu tập'" aria-label="Bộ sưu tập" @click="projectsOpen = true">
+        <button type="button" class="order-5 ml-auto icon-btn shrink-0 lg:hidden" :title="store.appliedProject ? 'Bộ sưu tập hiện tại: ' + store.appliedProject.name : 'Bộ sưu tập'" aria-label="Bộ sưu tập" @click="projectsOpen = true">
           <StudioIcon name="kanban" size="h-4 w-4" />
           <span v-if="store.appliedProject" class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-brand-400"></span>
         </button>
-        <button type="button" class="icon-btn shrink-0 lg:hidden" title="Kết quả" aria-label="Kết quả" @click="outputOpen = true">
+        <button type="button" class="order-6 icon-btn shrink-0 lg:hidden" title="Kết quả" aria-label="Kết quả" @click="outputOpen = true">
           <StudioIcon name="grid" size="h-4 w-4" />
         </button>
 
         <!-- ══ CỤM 1 · ĐIỀU HƯỚNG KHÔNG GIAN LÀM VIỆC (desktop): MỘT khay gom mọi lối vào, nhóm theo
              chức năng — Bộ sưu tập (chọn bối cảnh) → Nguồn ảnh · Thư viện · Bảng lệnh · Outputs.
              Vạch mảnh phân tách hai nhóm con cho mắt dễ quét. Điện thoại vẫn dùng dock dưới. -->
-        <div class="hidden shrink-0 items-center gap-1 rounded-xl border border-ink-700 bg-ink-800/60 p-1 lg:flex" data-header-workspace>
+        <div class="order-7 ml-auto hidden shrink-0 items-center gap-1 rounded-xl border border-ink-700 bg-ink-800/60 p-1 lg:flex" data-header-workspace>
         <div class="relative">
           <button @click="openApplyPopover" class="icon-btn !h-8 !w-8" title="Bộ sưu tập — áp dụng nhanh hoặc mở bảng thiết kế quản lý"><StudioIcon name="kanban" size="h-4 w-4" /></button>
           <div v-if="applyOpen" class="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border border-ink-700 bg-ink-900 shadow-xl">
@@ -1076,7 +1078,7 @@ function onTouchEnd(e) {
           </button>
         </div>
 
-        <div v-if="store.user" class="relative">
+        <div v-if="store.user" class="order-4 relative">
           <button type="button" class="tool-btn" :class="store.creditsLow ? 'is-active' : ''"
                   :title="'Gói & credit — còn ' + store.creditsLeft + ' credit' + (store.planName ? ' · gói ' + store.planName : '')"
                   @click="store.togglePlanPopover()">
@@ -1087,7 +1089,7 @@ function onTouchEnd(e) {
           </button>
 
           <div v-if="store.planOpen" role="dialog" aria-label="Gói và credit"
-               class="fixed inset-x-3 top-16 z-50 rounded-md border border-ink-700 bg-ink-900 p-3 shadow-xl md:absolute md:inset-x-auto md:right-0 md:top-full md:mt-1 md:w-80">
+               class="fixed inset-x-3 top-16 z-50 rounded-md border border-ink-700 bg-ink-900 p-3 shadow-xl md:absolute md:inset-x-auto md:left-0 md:top-full md:mt-1 md:w-80">
             <template v-if="store.planStatus">
               <p class="flex items-center gap-2 text-xs font-semibold text-cream-50">
                 <StudioIcon name="package" size="h-3.5 w-3.5" class="text-brand-300" />
@@ -1291,21 +1293,21 @@ function onTouchEnd(e) {
              [2026-09-26 · đợt 27] Nút "Cài đặt" riêng và nút "Đăng xuất" riêng đã BỎ: cả hai nằm
              trong menu này. Lối vào cài đặt nay là /cai-dat — trang hợp nhất có đủ ba khu, và máy chủ
              vẫn tự ẩn khu chỉ owner, nên tài khoản thường không thấy mục nào họ không mở được. -->
-        <div v-if="store.user" class="relative">
+        <div v-if="store.user" class="order-3 relative">
           <button type="button" class="btn btn-ghost btn-circle relative" data-account-toggle title="Tài khoản" aria-label="Tài khoản"
                   :aria-expanded="accountOpen ? 'true' : 'false'" @click="accountOpen = !accountOpen" @keydown.escape="accountOpen = false">
-            <span class="avatar">
-              <span class="w-8 rounded-full ring-2 ring-brand-500/40">
-                <img v-if="store.user.avatar" :src="store.user.avatar" alt="" @error="$event.target.style.visibility = 'hidden'">
-                <span v-else class="grid h-8 w-8 place-items-center bg-ink-700 text-body font-bold text-cream-100">{{ (store.user.name || '?').charAt(0).toUpperCase() }}</span>
-              </span>
+            <!-- [đợt 34] MỘT vòng tròn 36px: overflow-hidden + ảnh đúng cỡ + object-cover ⇒ ảnh không
+                 thể tràn ra ngoài vòng ring. Ảnh tải lỗi thì hiện chữ cái đầu thay vì để ô trống. -->
+            <span class="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-ink-700 ring-2 ring-brand-500/40">
+              <img v-if="store.user.avatar && !avatarFailed" :src="store.user.avatar" alt="" class="h-9 w-9 rounded-full object-cover" @error="avatarFailed = true">
+              <span v-else class="text-body font-bold text-cream-100">{{ (store.user.name || '?').charAt(0).toUpperCase() }}</span>
             </span>
           </button>
           <div v-if="accountOpen" class="fixed inset-0 z-40" @click="accountOpen = false"></div>
           <!-- [2026-09-26 · đợt 33] Menu tài khoản định vị TƯỜNG MINH (absolute right-0 top-full) — đúng lối
                mọi popover khác của Studio. Bỏ CSS anchor positioning của daisyUI (dropdown/dropdown-
                content): trên một số trình duyệt nó hiện sai chỗ và đè lên nút Outputs. -->
-          <ul v-if="accountOpen" data-account-menu class="menu absolute right-0 top-full z-50 mt-2 w-64 rounded-box border border-ink-700 bg-ink-900 p-2 shadow-2xl">
+          <ul v-if="accountOpen" data-account-menu class="menu absolute left-0 top-full z-50 mt-2 w-64 rounded-box border border-ink-700 bg-ink-900 p-2 shadow-2xl">
             <li class="menu-title !flex-col !items-start gap-0.5">
               <span class="text-sm font-semibold text-cream-50">{{ store.user.name }}</span>
               <span class="text-label text-cream-400">{{ store.user.role_label || store.user.role }} · {{ store.user.email }}</span>
@@ -1327,7 +1329,7 @@ function onTouchEnd(e) {
             </li>
           </ul>
         </div>
-        <a v-else href="/dang-nhap?redirect=/" class="btn btn-warn btn-sm">Đăng nhập</a>
+        <a v-else href="/dang-nhap?redirect=/" class="btn btn-warn btn-sm order-4">Đăng nhập</a>
       </div>
     </header>
     <!-- [Trục 2 — 2026-09-20] Trung tâm thông báo kiểu VSCode (thay ô flashMsg đơn lẻ):
