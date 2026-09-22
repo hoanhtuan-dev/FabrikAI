@@ -157,7 +157,10 @@ class ModuleRegistry
             'id' => 'trend_radar', 'name' => 'TrendRadar', 'group' => 'Nội dung',
             'kind' => self::KIND_FEATURE, 'gui' => false, 'icon' => 'scan',
             'summary' => 'Radar xu hướng theo khu vực: màu sắc, dáng, chất liệu, giá và vòng đời.',
-            'endpoints' => ['design-agent/radar', 'design-agent/web-access', 'design-agent/sources'], 'depends_on' => [],
+            // [2026-09-26] Thêm design-agent/findings: SỔ NGUỒN mà công cụ tìm kiếm mang về. Nó thuộc
+            // TrendRadar vì đây chính là phần "AI đã tra được gì" của radar — khai ở đây thì middleware
+            // EnforceModules tự chặn ở backend cho gói không có TrendRadar.
+            'endpoints' => ['design-agent/radar', 'design-agent/web-access', 'design-agent/sources', 'design-agent/findings'], 'depends_on' => [],
             'plans' => ['pro', 'studio', 'factory_season'],
         ],
         [
@@ -170,7 +173,10 @@ class ModuleRegistry
             // Cả hai thuộc nửa "thiết kế bộ sưu tập" của Agent Studio nên đi cùng collection_bot: gói
             // không có CollectionBot thì cũng không có gì để mà lưu phiên. Khai ở đây là middleware
             // EnforceModules tự chặn ở backend — ẩn nút trên giao diện không phải phân quyền.
-            'endpoints' => ['design-agent/collection', 'design-agent/plan', 'design-agent/shop-signals', 'design-agent/sample-prompt', 'design-agent/session'], 'depends_on' => ['collections'],
+            // [2026-09-26] Thêm design-agent/chat/stream: CHAT của Agent Studio là phần "hỏi đáp trong lúc
+            // làm bộ sưu tập" (nó đọc DNA shop + quy tắc làm việc và dùng chung bộ công cụ với brief), nên
+            // đi cùng CollectionBot. Khai ở đây là middleware EnforceModules tự chặn ở backend.
+            'endpoints' => ['design-agent/collection', 'design-agent/plan', 'design-agent/shop-signals', 'design-agent/sample-prompt', 'design-agent/session', 'design-agent/chat/stream'], 'depends_on' => ['collections'],
             'plans' => ['pro', 'studio', 'factory_season'],
         ],
         [

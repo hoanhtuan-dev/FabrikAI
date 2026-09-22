@@ -6,6 +6,7 @@ use App\Services\CollectionPlanService;
 use App\Services\DesignAgentService;
 use App\Services\MarketSignalService;
 use App\Services\WebAccessService;
+use App\Services\WebFindingService;
 use App\Services\WebSourceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -68,6 +69,57 @@ class DesignAgentController extends Controller
         $evidence['market'] = $market->capture($region, $force);
 
         return response()->json($evidence);
+    }
+
+    /**
+     * SỔ NGUỒN ĐÃ TÌM — mắt xích "quay lại phục vụ Agent Studio" của vòng khép kín (2026-09-26).
+     *
+     * Vì sao cần endpoint này: công cụ tìm kiếm đã trả kết quả thật, nhưng giao diện chỉ có CON SỐ ĐẾM
+     * ("đã tự tra 2 lượt · 6 tin"). Không có nguồn nào để bấm vào, không có gì để giữ lại — nên người dùng
+     * không kiểm chứng được câu trả lời và gu của họ không quay lại nuôi lượt chạy sau.
+     *
+     * GET /api/design-agent/findings?region=all&limit=20&saved=1
+     */
+    public function findings(Request $request, WebFindingService $findings): JsonResponse
+    {
+        $data = $request->validate([
+            'region' => ['nullable', 'string', 'in:all,hcm,hanoi,danang'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'saved' => ['nullable', 'boolean'],
+        ]);
+
+        $user = $request->user();
+        $region = (string) ($data['region'] ?? 'all');
+
+        return response()->json([
+            // Nguồn ĐÃ LƯU đứng trước (xem WebFindingService::recent) — đó là thứ người dùng đã chọn giữ.
+            'items' => $findings->recent($user, $region, (int) ($data['limit'] ?? 20), (bool) ($data['saved'] ?? false)),
+            // Số đo của sổ: tổng · đã lưu · còn dùng lại được. Giao diện đọc để nói thật, không hứa suông.
+            'stats' => $findings->stats($user),
+            'keep_days' => WebFindingService::KEEP_DAYS,
+            'region' => $region,
+        ]);
+    }
+
+    /**
+     * LƯU / BỎ LƯU một nguồn trong sổ — hành động DUY NHẤT trong sổ mà máy không được tự làm.
+     *
+     * Nguồn đã lưu được xếp TRƯỚC trong mọi lần dùng lại và trong khối DỮ LIỆU của Agent Studio, nên đây
+     * là cách người dùng dạy cho agent biết "nguồn nào đáng tin cho ngành của tôi".
+     *
+     * PUT /api/design-agent/findings/{id}  body: {saved: true|false}
+     */
+    public function updateFinding(Request $request, int $id, WebFindingService $findings): JsonResponse
+    {
+        $data = $request->validate(['saved' => ['required', 'boolean']]);
+
+        $row = $findings->markSaved($request->user(), $id, (bool) $data['saved']);
+        if ($row === null) {
+            // 404 cho cả trường hợp nguồn của NGƯỜI KHÁC: id không thuộc sổ của mình thì với mình là không có.
+            return response()->json(['message' => 'Không tìm thấy nguồn này trong sổ của bạn.'], 404);
+        }
+
+        return response()->json($row + ['stats' => $findings->stats($request->user())]);
     }
 
     public function collection(Request $request): \Illuminate\Http\JsonResponse

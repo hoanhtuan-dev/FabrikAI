@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminPromptController;
 use App\Http\Controllers\AdminWebSourceController;
+use App\Http\Controllers\AgentChatController;
 use App\Http\Controllers\AgentSessionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
@@ -315,6 +316,18 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     // throttle rộng hơn web-access vì đường này KHÔNG gọi model, chỉ đọc/đệm lại nguồn.
     Route::get('/design-agent/sources', [DesignAgentController::class, 'sources'])
         ->middleware('throttle:20,1')->name('design-agent.sources');
+    // SỔ NGUỒN ĐÃ TÌM (2026-09-26) — kết quả công cụ tìm kiếm QUAY LẠI phục vụ Agent Studio: xem nguồn nào
+    // AI đã tra, bấm vào kiểm chứng, và LƯU nguồn đáng tin (nguồn đã lưu được ưu tiên cho mọi lượt sau).
+    // Không gọi model ⇒ throttle rộng, nhưng vẫn có trần vì đường này đọc bảng theo tài khoản.
+    Route::get('/design-agent/findings', [DesignAgentController::class, 'findings'])
+        ->middleware('throttle:30,1')->name('design-agent.findings');
+    Route::put('/design-agent/findings/{id}', [DesignAgentController::class, 'updateFinding'])
+        ->whereNumber('id')->middleware('throttle:60,1')->name('design-agent.findings.save');
+    // CHAT THEO LUỒNG của Agent Studio (2026-09-26) — chữ chảy về ngay khi model viết, và công cụ web dùng
+    // CHUNG bộ công cụ với radar/brief nên nguồn tra được cũng vào sổ nguồn. Mỗi lượt là một lời gọi model
+    // thật ⇒ throttle tương đương đường radar (mỗi lượt rẻ hơn nhưng người dùng bấm liên tục).
+    Route::post('/design-agent/chat/stream', [AgentChatController::class, 'stream'])
+        ->middleware('throttle:20,1')->name('design-agent.chat.stream');
     Route::post('/upscale', [StudioController::class, 'upscale'])->name('upscale');
     Route::post('/look', [StudioController::class, 'look'])->name('look');
     Route::post('/reframe', [StudioController::class, 'reframe'])->name('reframe');

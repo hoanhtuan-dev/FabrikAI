@@ -227,6 +227,382 @@ class AiModelGateway
     }
 
     /**
+     * CHAT THEO LUỒNG (STREAMING) — chữ chảy về người dùng ngay khi model viết (2026-09-26).
+     *
+     * Vì sao cần đường riêng thay vì dùng \`text()\`: \`text()\` trả về SAU KHI có đủ câu trả lời (blocking), nên
+     * với câu trả lời 600-1.200 token người dùng ngồi nhìn màn hình trống 10-30 giây. Đường này đọc SSE của
+     * \`/chat/completions\` và đẩy từng mảnh chữ ra ngoài qua \`$onDelta\`.
+     *
+     * HAI điều được giữ NGUYÊN so với đường thường — thiếu cái nào cũng là hồi quy:
+     *   1. VÒNG LẶP CÔNG CỤ vẫn chạy ở ĐÂY: model gọi công cụ ⇒ máy chủ thực thi ⇒ kết quả quay lại hội thoại.
+     *      Chỉ khác là thay vì một request blocking cho mỗi vòng, mỗi vòng đọc luồng (xem streamOnce).
+     *   2. LƯỢT CUỐI KHÔNG GỬI CÔNG CỤ (cùng luật với callWithTools): model buộc phải trả lời bằng dữ liệu
+     *      đang có, thay vì đòi tìm tiếp cho tới khi hết thời gian chờ.
+     *
+     * RƠI VỀ AN TOÀN: provider không hỗ trợ \`stream: true\` (trả JSON một cục, hoặc lỗi) ⇒ chạy lại đường
+     * blocking rồi phát TOÀN BỘ câu trả lời như MỘT mảnh chữ, kèm cờ \`streamed=false\` để tầng trên nói thật
+     * là lượt này không chảy chữ. Một tham số tuỳ chọn không được phép làm hỏng lượt chạy.
+     *
+     * @param  list<array{role:string, content:mixed}>  $messages
+     * @param  array{max_tokens?:int, timeout?:int, deadline_ts?:float, tools?:list<array<string,mixed>>, tool_handler?:callable, tool_rounds?:int, tool_begin?:callable, disable_thinking?:bool, search?:bool, fallback_groups?:list<string>}  $options
+     * @param  callable(string, array):void|null  $onDelta  nhận ('token', ['text' => …]) · ('tool', …) · ('tool_result', …)
+     * @return array<string, mixed>|null
+     */
+    public function stream(string $group, array $messages, array $options = [], ?callable $onDelta = null): ?array
+    {
+        $this->lastAttempts = [];
+
+        $groups = [$group];
+        foreach ((array) ($options['fallback_groups'] ?? []) as $fallback) {
+            $fallback = trim((string) $fallback);
+            if ($fallback !== '' && $fallback !== $group) {
+                $groups[] = $fallback;
+            }
+        }
+
+        $candidates = [];
+        $seen = [];
+        foreach (array_values(array_unique($groups)) as $candidateGroup) {
+            foreach ($this->candidates($candidateGroup) as $candidate) {
+                $signature = $candidate['provider'].':'.$candidate['model'];
+                if (isset($seen[$signature])) {
+                    continue;
+                }
+                $seen[$signature] = true;
+                $candidates[] = $candidate + ['group' => $candidateGroup];
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            foreach ($candidate['keys'] as $key) {
+                try {
+                    $result = $this->streamConversation($candidate, $key, $messages, $options, $onDelta);
+                } catch (\Throwable $e) {
+                    logger()->warning('AiModelGateway stream lỗi ('.$candidate['provider'].':'.$candidate['model'].'): '.$e->getMessage());
+                    $this->lastAttempts[] = [
+                        'group' => $candidate['group'], 'provider' => $candidate['provider'], 'model' => $candidate['model'],
+                        'ok' => false, 'note' => 'lỗi khi gọi: '.class_basename($e),
+                    ];
+                    continue;
+                }
+
+                if ($result !== null && trim((string) $result['text']) !== '') {
+                    $this->lastAttempts[] = [
+                        'group' => $candidate['group'], 'provider' => $candidate['provider'], 'model' => $candidate['model'],
+                        'ok' => true, 'finish_reason' => $result['finish_reason'], 'chars' => mb_strlen((string) $result['text']),
+                        'note' => $result['streamed'] ? 'chảy chữ theo luồng' : 'provider không chảy chữ — trả một cục',
+                    ];
+
+                    return $result + [
+                        'provider' => $candidate['provider'],
+                        'model' => $candidate['model'],
+                        'group' => $candidate['group'],
+                        'text' => trim((string) $result['text']),
+                    ];
+                }
+
+                $this->lastAttempts[] = [
+                    'group' => $candidate['group'], 'provider' => $candidate['provider'], 'model' => $candidate['model'],
+                    'ok' => false, 'chars' => 0,
+                    'note' => $result === null ? 'không gọi được' : 'không có nội dung dùng được',
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Trọn một cuộc hội thoại CÓ THỂ CÓ CÔNG CỤ, mỗi vòng đọc theo luồng.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function streamConversation(array $candidate, string $key, array $messages, array $options, ?callable $onDelta): ?array
+    {
+        $timeout = $this->remainingSeconds($options, (int) ($options['timeout'] ?? 60));
+        if ($timeout <= 0) {
+            return null;   // hết ngân sách thời gian ⇒ ĐỪNG bắt đầu một lời gọi mới
+        }
+
+        $maxTokens = (int) ($options['max_tokens'] ?? 1024);
+        // CÙNG luật với callWithTools: tối đa vài vòng có công cụ, rồi MỘT vòng cuối không công cụ.
+        $maxRounds = max(0, min(3, (int) ($options['tool_rounds'] ?? 1)));
+        // CÙNG luật với callText: công cụ chỉ gửi trên họ giao thức OpenAI-compatible. Transport khác
+        // (gemini…) có cách grounding RIÊNG, gửi \`tools\` kiểu OpenAI vào đó là gửi tham số sai hình dạng.
+        $tools = in_array((string) ($candidate['transport'] ?? ''), ['qwen', 'dashscope', 'openai'], true)
+            ? $this->toolDefinitions($options)
+            : [];
+        $handler = $options['tool_handler'] ?? null;
+        $allowed = array_values(array_filter(array_map(
+            fn (array $tool) => (string) ($tool['function']['name'] ?? ''),
+            $tools,
+        ), 'strlen'));
+
+        if (is_callable($options['tool_begin'] ?? null)) {
+            ($options['tool_begin'])();
+        }
+
+        $conversation = $messages;
+        $queries = [];
+        $calls = 0;
+        $results = 0;
+        $text = '';
+        $streamed = false;
+        $toolsAccepted = null;
+        $finish = null;
+
+        for ($round = 1; $round <= $maxRounds + 1; $round++) {
+            $offerTools = $round <= $maxRounds && $tools !== [];
+
+            $round1 = $this->streamOnce($candidate, $key, $conversation, $options, $offerTools ? $tools : [], $maxTokens, $timeout, $onDelta);
+
+            if ($round1 === null) {
+                // Vòng đầu hỏng ⇒ provider có thể KHÔNG hiểu \`tools\`/\`stream\`. Chạy lại đường blocking đã
+                // kiểm chứng rồi phát một cục — nói THẬT bằng \`streamed=false\`, không giả vờ đã chảy chữ.
+                if ($round === 1) {
+                    $plain = $this->callPlain($candidate, $key, $messages, $options);
+                    if ($plain === null) {
+                        return null;
+                    }
+                    if ($onDelta !== null && trim((string) $plain['text']) !== '') {
+                        $onDelta('token', ['text' => trim((string) $plain['text'])]);
+                    }
+
+                    return [
+                        'text' => (string) $plain['text'], 'finish_reason' => $plain['finish_reason'] ?? null,
+                        'reasoning_only' => (bool) ($plain['reasoning_only'] ?? false),
+                        'streamed' => false, 'tools_accepted' => false, 'tool_calls' => 0,
+                        'tool_queries' => [], 'tool_results' => 0, 'rounds' => 0,
+                        'truncated_rounds' => false,
+                    ];
+                }
+
+                break;
+            }
+
+            $streamed = $streamed || (bool) $round1['streamed'];
+            $text .= (string) $round1['text'];
+            $finish = $round1['finish_reason'] ?? $finish;
+            if ($offerTools) {
+                $toolsAccepted = true;
+            }
+
+            $toolCalls = (array) $round1['tool_calls'];
+            if ($toolCalls === []) {
+                return [
+                    'text' => $text, 'finish_reason' => $finish, 'reasoning_only' => false,
+                    'streamed' => $streamed, 'tools_accepted' => $toolsAccepted,
+                    'tool_calls' => $calls, 'tool_queries' => $queries, 'tool_results' => $results,
+                    'rounds' => $round, 'truncated_rounds' => false,
+                ];
+            }
+
+            // Lời gọi công cụ phải được ghi lại NGUYÊN VẸN trong hội thoại — thiếu nó thì vòng sau provider
+            // từ chối vì thấy role "tool" không có lời gọi tương ứng.
+            $conversation[] = [
+                'role' => 'assistant',
+                'content' => (string) ($round1['text'] ?? ''),
+                'tool_calls' => array_values($toolCalls),
+            ];
+
+            foreach ($toolCalls as $index => $call) {
+                $id = (string) (data_get($call, 'id') ?: 'call_'.$round.'_'.$index);
+                $name = (string) data_get($call, 'function.name');
+                $arguments = json_decode((string) data_get($call, 'function.arguments'), true);
+                $arguments = is_array($arguments) ? $arguments : [];
+                $calls++;
+
+                if ($onDelta !== null) {
+                    $onDelta('tool', ['name' => $name, 'arguments' => $arguments]);
+                }
+
+                if ($name === '' || ! in_array($name, $allowed, true)) {
+                    $payload = ['error' => 'không có công cụ tên "'.$name.'"'];
+                } elseif (is_callable($handler)) {
+                    $payload = (array) $handler($name, $arguments);
+                    $query = trim((string) ($payload['query'] ?? ''));
+                    if ($query !== '') {
+                        $queries[] = $query;
+                    }
+                    $results += (int) ($payload['found'] ?? 0);
+                } else {
+                    $payload = ['error' => 'công cụ chưa được nối ở máy chủ'];
+                }
+
+                if ($onDelta !== null) {
+                    $onDelta('tool_result', ['name' => $name, 'payload' => $payload]);
+                }
+
+                $conversation[] = [
+                    'role' => 'tool',
+                    'tool_call_id' => $id,
+                    'content' => (string) json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ];
+            }
+        }
+
+        return [
+            'text' => $text, 'finish_reason' => $finish, 'reasoning_only' => false,
+            'streamed' => $streamed, 'tools_accepted' => $toolsAccepted,
+            'tool_calls' => $calls, 'tool_queries' => $queries, 'tool_results' => $results,
+            'rounds' => $maxRounds + 1, 'truncated_rounds' => true,
+        ];
+    }
+
+    /**
+     * MỘT vòng đọc theo luồng. Trả null khi không đọc được gì (để tầng trên rơi về đường blocking).
+     *
+     * Cách đọc: SSE của giao thức OpenAI-compatible — mỗi dòng \`data: {json}\`, kết thúc bằng \`data: [DONE]\`.
+     * Mảnh \`tool_calls\` đến RỜI RẠC (index + tên + tham số ghép dần) nên phải CỘNG DỒN theo index; đọc thẳng
+     * từng dòng rồi coi mỗi dòng là một lời gọi hoàn chỉnh là mất tham số.
+     *
+     * @param  list<array<string, mixed>>  $tools
+     * @return array{text:string, tool_calls:list<array<string,mixed>>, finish_reason:?string, streamed:bool}|null
+     */
+    protected function streamOnce(array $candidate, string $key, array $messages, array $options, array $tools, int $maxTokens, int $timeout, ?callable $onDelta): ?array
+    {
+        $body = ['model' => $candidate['model'], 'messages' => $messages, 'max_tokens' => $maxTokens, 'stream' => true];
+        if ($tools !== []) {
+            $body['tools'] = $tools;
+            $body['tool_choice'] = 'auto';
+        }
+        $this->applySearch($body, $options, $candidate);
+        $thinkingOff = $this->applyThinkingOff($body, $candidate, $options);
+
+        $base = $this->chatBase($candidate, $key);
+
+        try {
+            $response = Http::withToken($key)
+                // \`stream\` của Guzzle: KHÔNG nạp cả thân phản hồi vào bộ nhớ — đọc dần từng khối.
+                ->withOptions(['stream' => true])
+                ->connectTimeout(10)
+                ->timeout(max(5, $timeout))
+                ->post($base.'/chat/completions', $body);
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        // Provider từ chối cờ tắt suy luận (400/422) ⇒ gọi lại KHÔNG có cờ, đúng như postChat làm.
+        if (! $response->successful() && $thinkingOff && in_array($response->status(), [400, 422], true)) {
+            unset($body['enable_thinking']);
+            try {
+                $response = Http::withToken($key)
+                    ->withOptions(['stream' => true])
+                    ->connectTimeout(10)
+                    ->timeout(max(5, $timeout))
+                    ->post($base.'/chat/completions', $body);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        // Provider BỎ QUA \`stream: true\` và trả JSON một cục: đọc thẳng, đánh dấu streamed=false.
+        $contentType = (string) $response->header('Content-Type');
+        if (! str_contains($contentType, 'event-stream')) {
+            $json = $response->json();
+            $text = trim((string) data_get($json, 'choices.0.message.content'));
+            if ($text === '') {
+                return null;
+            }
+            if ($onDelta !== null) {
+                $onDelta('token', ['text' => $text]);
+            }
+
+            return [
+                'text' => $text,
+                'tool_calls' => array_values((array) data_get($json, 'choices.0.message.tool_calls', [])),
+                'finish_reason' => data_get($json, 'choices.0.finish_reason'),
+                'streamed' => false,
+            ];
+        }
+
+        $stream = $response->toPsrResponse()->getBody();
+        $buffer = '';
+        $text = '';
+        $finished = false;
+        $finish = null;
+        /** @var array<int, array<string, mixed>> $toolCalls */
+        $toolCalls = [];
+
+        // Một dòng SSE xử lý ở MỘT chỗ: dòng cuối của luồng có thể không có ký tự xuống dòng, nên phải gọi
+        // được hàm này cho cả phần dư sau khi luồng kết thúc (bỏ sót là mất mảnh chữ cuối cùng).
+        $handleLine = function (string $line) use (&$text, &$toolCalls, &$finished, &$finish, $onDelta): void {
+            $line = trim($line);
+            if ($line === '' || ! str_starts_with($line, 'data:')) {
+                return;
+            }
+
+            $payload = trim(substr($line, 5));
+            if ($payload === '[DONE]') {
+                $finished = true;
+
+                return;
+            }
+
+            $json = json_decode($payload, true);
+            if (! is_array($json)) {
+                return;
+            }
+
+            $delta = (array) data_get($json, 'choices.0.delta', []);
+            $chunk = (string) ($delta['content'] ?? '');
+            if ($chunk !== '') {
+                $text .= $chunk;
+                if ($onDelta !== null) {
+                    $onDelta('token', ['text' => $chunk]);
+                }
+            }
+
+            // Mảnh \`tool_calls\` đến RỜI RẠC: index xác định lời gọi nào, tên và tham số ghép dần theo từng
+            // mảnh. Đọc mỗi dòng như một lời gọi hoàn chỉnh là mất sạch tham số.
+            foreach ((array) ($delta['tool_calls'] ?? []) as $frag) {
+                $index = (int) ($frag['index'] ?? 0);
+                $toolCalls[$index] ??= ['id' => '', 'type' => 'function', 'function' => ['name' => '', 'arguments' => '']];
+                if (($frag['id'] ?? '') !== '') {
+                    $toolCalls[$index]['id'] = (string) $frag['id'];
+                }
+                if (($frag['type'] ?? '') !== '') {
+                    $toolCalls[$index]['type'] = (string) $frag['type'];
+                }
+                $toolCalls[$index]['function']['name'] .= (string) data_get($frag, 'function.name', '');
+                $toolCalls[$index]['function']['arguments'] .= (string) data_get($frag, 'function.arguments', '');
+            }
+
+            if (data_get($json, 'choices.0.finish_reason') !== null) {
+                $finish = (string) data_get($json, 'choices.0.finish_reason');
+            }
+        };
+
+        while (! $finished && ! $stream->eof()) {
+            $buffer .= $stream->read(4096);
+
+            while (($pos = strpos($buffer, "\n")) !== false) {
+                $handleLine(substr($buffer, 0, $pos));
+                $buffer = substr($buffer, $pos + 1);
+            }
+        }
+
+        if (! $finished && trim($buffer) !== '') {
+            $handleLine($buffer);
+        }
+
+        if ($text === '' && $toolCalls === []) {
+            return null;   // luồng rỗng ⇒ để tầng trên rơi về đường blocking
+        }
+
+        return [
+            'text' => $text,
+            'tool_calls' => array_values($toolCalls),
+            'finish_reason' => $finish ?? null,
+            'streamed' => true,
+        ];
+    }
+
+    /**
      * Nhật ký những lần thử của lần gọi GẦN NHẤT: mỗi dòng nói rõ nhóm · model · vì sao không dùng được.
      *
      * @return list<array<string, mixed>>

@@ -23,7 +23,9 @@ class DesignAgentServiceTest extends TestCase
         // Tham số 5 = TRÍ NHỚ DÀI HẠN (GĐ1/GĐ2) và tham số 6 = TRÍ NHỚ THỦ TỤC. Cả hai là
         // BẮT BUỘC-kiểu-nullable (không default) — xem chú thích ở DesignAgentService::__construct:
         // có default thì container LUÔN truyền null và trí nhớ không bao giờ tới được prompt.
-        $this->agents = new DesignAgentService(null, new BrandDnaService(), null, null, null, null);
+        // Tham số 7 = SỔ NGUỒN ĐÃ TÌM (2026-09-26), cũng BẮT BUỘC-kiểu-nullable: null ở đây = lượt chạy
+        // tất định không có công cụ, và đó đúng là nhánh mà lớp test này khoá.
+        $this->agents = new DesignAgentService(null, new BrandDnaService(), null, null, null, null, null);
     }
 
     public function test_catalog_has_stable_data_backed_directions(): void

@@ -310,6 +310,101 @@ class WebSourceService
         return $out;
     }
 
+    /** Trần ký tự của một TRANG đọc theo URL đưa cho model (trang dài cắt bớt, và phải NÓI RA là đã cắt). */
+    public const PAGE_MAX_CHARS = 8000;
+
+    /**
+     * ĐỌC MỘT TRANG THEO URL — công cụ \`read_page\` gọi vào đây (2026-09-26).
+     *
+     * Vì sao phải nằm TRONG lớp này chứ không phải một lớp fetch mới: ba rào chắn an toàn của dự án
+     * (\`assertPublicUrl\` · \`isPublicHost\` · \`options\` chặn redirect về địa chỉ nội bộ) đều là PRIVATE ở đây.
+     * Viết một lớp fetch riêng là mở đúng đường vòng qua chúng — và đường vòng đó do MODEL điều khiển
+     * (model chọn URL), tức là biến máy chủ thành công cụ dò mạng nội bộ.
+     *
+     * KHÔNG BAO GIỜ NÉM: mọi thất bại (URL sai · địa chỉ nội bộ · site chặn · quá nặng) trả về một kết quả
+     * ĐỌC ĐƯỢC cho model, kèm lý do — để nó nói thật "không đọc được trang này" thay vì tưởng đã đọc.
+     *
+     * @return array{ok:bool, url:string, final_url:string, http:?int, chars:int, truncated:bool, title:string, text:string, fetched_at:string, error:?string}
+     */
+    public function fetchUrl(string $url, int $maxChars = self::PAGE_MAX_CHARS): array
+    {
+        $maxChars = max(500, min(40000, $maxChars));
+        $url = trim($url);
+
+        $out = [
+            'ok' => false, 'url' => $url, 'final_url' => $url, 'http' => null,
+            'chars' => 0, 'truncated' => false, 'title' => '', 'text' => '',
+            'fetched_at' => now()->toISOString(), 'error' => null,
+        ];
+
+        if (! preg_match('#^https?://#i', $url)) {
+            $out['error'] = 'chỉ đọc được địa chỉ http/https';
+
+            return $out;
+        }
+
+        try {
+            $this->assertPublicUrl($url);
+        } catch (\Throwable $e) {
+            // Nói ĐÚNG việc phải làm, không phơi chi tiết hạ tầng: đây là kết quả đi vào prompt.
+            $out['error'] = 'địa chỉ không công khai — chỉ đọc được trang trên internet';
+
+            return $out;
+        }
+
+        try {
+            $response = Http::withOptions($this->options())
+                ->withHeaders([
+                    'User-Agent' => 'FabrikAI-AgentPage/1.0 (+https://fabrikai.shop)',
+                    'Accept' => 'text/html,application/xhtml+xml,application/json;q=0.9,text/plain;q=0.8,*/*;q=0.5',
+                ])
+                ->connectTimeout(self::CONNECT_TIMEOUT)
+                ->timeout(self::TIMEOUT)
+                ->get($url);
+        } catch (\Throwable $e) {
+            $out['error'] = 'không kết nối được tới trang này';
+
+            return $out;
+        }
+
+        $out['http'] = $response->status();
+        $out['final_url'] = (string) ($response->effectiveUri() ?? $url);
+
+        if (! $response->successful()) {
+            $out['error'] = 'trang trả về lỗi (HTTP '.$response->status().')';
+
+            return $out;
+        }
+
+        // Trần dung lượng đọc vào bộ nhớ: trang bất thường (video/backup) không được kéo cả vào RAM.
+        $body = substr($response->body(), 0, self::MAX_BYTES);
+        $html = $this->toUtf8($body);
+
+        // TIÊU ĐỀ lấy TRƯỚC khi bỏ thẻ: sau \`clean()\` thì không còn phân biệt được tiêu đề với thân bài.
+        if (preg_match('#<title[^>]*>(.*?)</title>#is', $html, $m) === 1) {
+            $out['title'] = $this->clean($m[1], 200);
+        }
+
+        // BỎ HẲN script/style/noscript TRƯỚC khi bỏ thẻ: \`strip_tags\` chỉ bỏ THẺ, còn mã JavaScript và CSS
+        // nằm giữa chúng thì Ở LẠI trong văn bản — model sẽ đọc được cả rác điều khiển lẫn chuỗi tiêm nhiễm.
+        $html = (string) preg_replace('#<(script|style|noscript|template|svg)\b[^>]*>.*?</\1>#is', ' ', $html);
+        // Thẻ ngắt dòng/đoạn/kết thúc ô bảng thành dấu cách trước, để chữ không dính liền nhau ("giá 120nghìn").
+        $html = (string) preg_replace('#<(br|/p|/div|/li|/tr|/h[1-6])\b[^>]*>#i', ' ', $html);
+
+        $text = $this->clean($html, $maxChars + 1);
+        $chars = mb_strlen($text);
+        $out['truncated'] = $chars > $maxChars;
+        $out['text'] = $out['truncated'] ? mb_substr($text, 0, $maxChars) : $text;
+        $out['chars'] = mb_strlen($out['text']);
+        $out['ok'] = $out['chars'] > 0;
+
+        if (! $out['ok']) {
+            $out['error'] = 'trang không có chữ đọc được (có thể là trang chỉ chạy JavaScript)';
+        }
+
+        return $out;
+    }
+
     /**
      * LẤY THỬ MỘT NGUỒN TÌM KIẾM bằng một từ khoá mẫu — cho nút "Lấy thử" ở Cài đặt.
      *
