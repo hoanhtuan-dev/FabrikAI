@@ -36,3 +36,15 @@ Schedule::command('studio:market-signals --prune')->dailyAt('03:30')->onOneServe
 // sáng thì thư nằm đáy hộp thư lúc họ mở máy — và công dụng duy nhất của nó là để người ta LÀM gì đó
 // trong ngày. Chính lệnh tự chống trùng theo (tài khoản · ngày) nên chạy lại cũng không dội hộp thư.
 Schedule::command('studio:samples:remind')->dailyAt('08:00')->onOneServer()->withoutOverlapping();
+
+// [2026-09-26] CẤP CREDIT THEO CHU KỲ GÓI — gộp về MỘT chỗ quản lịch.
+//
+// Vì sao chuyển vào đây: lệnh này vốn có một entry cron RIÊNG trong hPanel, nghĩa là lịch của hệ thống
+// nằm ở HAI nơi (một phần trong mã, một phần trong panel) — và lần trước đã có người thêm lại đúng
+// entry đó với dạng lệnh sai khiến nó không chạy mà không ai thấy. Từ khi `schedule:run` chạy mỗi phút,
+// không còn lý do gì để giữ entry riêng: xoá nó trong hPanel và mọi lịch nằm trong tệp này.
+//
+// 00:30 giữ ĐÚNG giờ của entry cũ để không đổi hành vi cấp credit của khách đang dùng.
+// Lệnh tự idempotent (PlanService dùng CAS + transaction) nên nếu entry cũ còn sót lại thì chạy hai lần
+// cũng KHÔNG cấp trùng — nhưng vẫn nên xoá để chỉ còn một nguồn sự thật.
+Schedule::command('studio:grant-plan-credits')->dailyAt('00:30')->onOneServer()->withoutOverlapping();
