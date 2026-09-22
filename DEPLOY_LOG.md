@@ -5,6 +5,39 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 20) — STUDIO: THANH TRẠNG THÁI CANVAS THEO MATERIAL
+
+**Commit:** `00a1041`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Vấn đề
+Một hàng **36px** nhồi **13 điều khiển**: hoàn tác · làm lại · thu/phóng · % · vừa khung · bốn ô nền canvas · bắt điểm + cỡ · nhãn trạng thái · sáng/tối · lưu · panel. Trên điện thoại hàng đó bị bóp lại và **mọi thứ đều nhỏ như nhau** ⇒ không ai biết cái nào là việc chính.
+
+### 2. Đã làm — chia theo TẦN SUẤT DÙNG (mẫu Material)
+| | Trước | Sau |
+|---|---|---|
+| Chiều cao | 36px | **40px** (đệm thoáng hơn) |
+| Máy tính | 13 điều khiển trên một hàng | **15 điều khiển** (thêm cỡ bắt điểm hiện rõ) — vẫn một hàng, nút to hơn (28 → 32px) |
+| **Điện thoại** | 13 điều khiển bị bóp | **6 điều khiển hay dùng** (hoàn tác · làm lại · thu · % · phóng · vừa khung) + menu **"⋯"** chứa phần còn lại |
+| Ngưỡng chạm ở điện thoại | nhiều nút 20–28px | **thấp nhất 40px** |
+
+Menu "⋯" gồm: 4 ô nền canvas (ô màu thật, có viền chọn) · bắt điểm (bật/tắt + bốn cỡ) · giao diện Sáng/Tối · lưu trang · panel Layers — **cùng hàm, không mở đường tắt nào mới**.
+
+### 3. Đo sau khi sửa
+| Bề rộng | Chiều cao thanh | Điều khiển hiện | Nút nhỏ nhất | Tràn ngang |
+|---|---|---|---|---|
+| 1440px | 40px | 15 | 24px (ô màu — chuột) | 0 |
+| 390px | 41px | **7** (6 dùng nhiều + "⋯") | **40px** | 0 |
+
+### 4. Lỗi tự gây ra khi sửa (lần thứ hai trong ngày, cùng một nguyên nhân)
+Tôi xoá "9 dòng đầu của vùng vừa đọc" để bỏ một khối bình luận — nhưng **đọc lệch một dòng** nên xoá mất cả thẻ `<template>` mở đầu và để lại một `-->` mồ côi. Build báo `Invalid end tag`; tìm ra bằng `@vue/compiler-sfc` (in **đúng số dòng + cột**), rồi khôi phục `<template>`.
+> **NGUYÊN NHÂN GỐC (đã ghi ở đợt 18, và tôi vẫn tái phạm):** xoá theo **số dòng đọc được từ một lần `read` đã cũ**. Từ giờ, mọi thao tác xoá khối phải dùng **nội dung** làm mốc (đúng chuỗi), không dùng số dòng.
+
+### 5. Còn lại của bước "Studio"
+| Việc |
+|---|
+| Gom thanh công cụ dày đặc phía TRÊN canvas (10 tab chế độ) thành cụm nút + menu "thêm" trên điện thoại |
+
+---
 ## Phiên 2026-09-26 (đợt 19) — STUDIO: THANG BỀ MẶT MATERIAL (hết phẳng)
 
 **Commit:** `df3c1cd`. **Trạng thái: đã commit + push + DEPLOY production.**
