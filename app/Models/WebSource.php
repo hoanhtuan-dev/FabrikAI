@@ -15,19 +15,31 @@ class WebSource extends Model
     protected $table = 'web_sources';
 
     /**
-     * Ba KIỂU nguồn:
+     * BỐN KIỂU nguồn:
      *   · rss    — feed tin (RSS/Atom);
      *   · json   — API trả JSON, khai ánh xạ trường qua items_path/*_field;
      *   · search — API TÌM KIẾM theo TỪ KHOÁ (2026-09-21): URL có chỗ điền `{query}`, và khoá API
-     *              KHÔNG nằm trong URL — nó đọc từ bảng API key (provider = slug của nguồn) lúc gọi.
+     *              KHÔNG nằm trong URL — nó đọc từ bảng API key (provider = slug của nguồn) lúc gọi;
+     *   · page   — ĐỊA CHỈ WEB BÌNH THƯỜNG (2026-09-26): một TRANG CHUYÊN MỤC (danh sách bài) không có
+     *              RSS, hoặc TRANG TÌM KIẾM của chính website đó nếu URL có chỗ điền `{query}`
+     *              (vd tuoitre.vn/tim-kiem.htm?keywords={query}) — KHÔNG cần API, KHÔNG cần khoá.
+     *              Bộ đọc chỉ nhận liên kết TRÔNG NHƯ BÀI VIẾT (cùng tên miền, đường dẫn dài, tiêu đề đủ
+     *              dài); đa số trang danh sách KHÔNG có ngày đăng nên item để published_at = null.
      *
      * Vì sao cần kiểu thứ ba: đo thật — Google News RSS (kiểu rss) CHỈ có tin tức, nên câu hỏi tra cứu
      * thường ("cách giặt vải linen") và câu hỏi thương mại ("xưởng may gia công ở Tân Bình") đều trả về
      * **0 kết quả**. Muốn tra được WEB CHUNG thì phải gọi một API tìm kiếm thật (vd Google Custom Search
      * JSON API), và API đó cần khoá.
      */
-    public const KINDS = ['rss', 'json', 'search'];
+    public const KINDS = ['rss', 'json', 'search', 'page'];
 
+    /**
+     * Cột `items_path` mang HAI nghĩa tuỳ loại nguồn — nói rõ ở đây vì cùng một ô nhập trên màn Cài đặt:
+     *   · json/search (API): ĐƯỜNG DẪN tới mảng kết quả trong JSON (vd `items`, `data.results`);
+     *   · page (địa chỉ web thường): TIỀN TỐ ĐƯỜNG DẪN BẮT BUỘC của bài viết (vd `/thoi-trang-c13/`).
+     *     Khai càng hẹp càng ít rác — đo thật: không khai thì bộ bóc lấy cả bài của mục khác (khối
+     *     "đọc nhiều" toàn site) và nguồn báo "10 tin" trong khi nội dung sai.
+     */
     protected $fillable = [
         'slug', 'name', 'url', 'kind', 'enabled', 'priority', 'keywords', 'region', 'max_items',
         'items_path', 'title_field', 'link_field', 'date_field', 'summary_field', 'note',

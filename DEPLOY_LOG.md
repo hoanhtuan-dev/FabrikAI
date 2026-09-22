@@ -5,6 +5,65 @@
 
 ---
 
+## Phiên 2026-09-23 (đợt 40) — DÙNG ĐỊA CHỈ WEB BÌNH THƯỜNG THAY VÌ RSS: làm được, nhưng ĐO RA thì chỉ đáng tin ở một số site
+
+**Commit:** `<?>` (một commit: loại nguồn `page` + lệnh thử + tài liệu). **Trạng thái: đã push + deploy; CHƯA khai nguồn `page` nào trên production — cố ý.**
+
+Câu hỏi của chủ dự án: *"có thể dùng địa chỉ web bình thường thay vì rss không?"*
+
+### 1. Trả lời ngắn: ĐƯỢC, và đã làm — nhưng KHÔNG bật sẵn, vì đo trên web thật thì nó hay lấy NHẦM
+
+Trước đợt này lớp nguồn ngoài **cố tình từ chối mọi HTML** (`interpret()` trả lỗi "URL này trả về TRANG HTML…"),
+vì đã có lỗi thật 2026-09-21: bộ đọc JSON "đọc" một trang HTML ra vài mục rác rồi im lặng báo 0 tin. Nay có
+**bộ đọc HTML riêng** cho loại nguồn thứ tư: `page`.
+
+### 2. ĐO THẬT trước khi thiết kế xong — bảng này là lý do không bật sẵn
+
+| Địa chỉ | Kết quả đo (2026-09-26, từ máy dev) |
+|---|---|
+| `tuoitre.vn/thoi-trang.htm` | HTTP 200 · bóc 10 mục nhưng là **liên kết điều hướng** ("Tuổi Trẻ Start-Up Award", "Hành trình 500 ngày đêm"…); trang chỉ có **0** liên kết bài đủ dài theo cách đọc tĩnh |
+| `eva.vn/thoi-trang-c13.html` | HTTP 200 · bóc 10 mục nhưng **10/10 là bài NUÔI CON** — bộ bóc lấy khối "đọc nhiều" của toàn site |
+| `vnexpress.net/thoi-trang` | **HTTP 406** — site chặn đọc tự động |
+| Trang tìm kiếm của site (`tuoitre.vn/tim-kiem.htm?keywords=…`) | HTTP 200 nhưng trả về **đúng mấy liên kết điều hướng đó**, không phải kết quả tìm kiếm |
+| Trang tìm kiếm VnExpress (`timkiem.vnexpress.net/?q=…`) | bóc 0 mục ⇒ báo lỗi "không có danh sách bài nào đọc được" |
+
+⇒ Nếu bật thẳng, nguồn sẽ báo **"10 tin"** trong khi nội dung SAI. Đó đúng là kiểu nói dối mà dự án này cấm
+(cùng họ với lỗi 2026-09-21), nên loại nguồn này được làm ra KÈM ba ràng buộc:
+
+1. **Lọc theo TIỀN TỐ ĐƯỜNG DẪN** (ô `items_path`, vd `/thoi-trang-c13/`) — hàng rào quan trọng nhất. Đo lại
+   trên chính trang eva: khai tiền tố `/nuoi-con/` thì chỉ 10/10 mục thuộc đúng tiền tố đó được nhận.
+2. **Ra 0 mục ⇒ BÁO LỖI** chỉ đúng việc cần sửa ("nên khai một trang CHUYÊN MỤC…"), không im lặng thành công.
+3. **Lệnh THỬ TRƯỚC KHI KHAI**: `php artisan studio:web-page-probe --url=… [--prefix=…]` — in số mục + 5 tiêu đề
+   đầu + câu kết luận nói thẳng: *"máy bóc được N mục — nhưng MÁY KHÔNG BIẾT chúng có đúng chuyên mục hay không"*.
+   Không ai kiểm hộ được ngoài mắt người khai.
+
+### 3. Đã làm gì trong mã
+
+| Việc | Chi tiết | File |
+|---|---|---|
+| Loại nguồn thứ tư `page` | `KINDS = ['rss','json','search','page']` + docblock nói rõ `items_path` mang NGHĨA KHÁC theo loại nguồn | `app/Models/WebSource.php` |
+| Bộ đọc HTML | `parseHtmlPage()`: bóc `<a href>` → tiêu đề; đường dẫn TƯƠNG ĐỐI → TUYỆT ĐỐI; **cùng tên miền**; bỏ mục menu (`PAGE_SKIP_SEGMENTS`); tiêu đề ≥ 20 ký tự và ≥ 3 từ; đường dẫn ≥ 10 ký tự; khử trùng theo URL; **lọc tiền tố `items_path`** | `app/Services/WebSourceService.php` |
+| MỘT chỗ chọn bộ đọc | `parseFor()` dùng chung cho đường lấy tin VÀ đường tìm theo từ khoá (hai đường từng lệch nhau và đã gây lỗi im lặng) | nt |
+| Lỗi nói đúng việc sửa | `formatErrorFor()`: nguồn `page` ra 0 mục thì câu lỗi khác hẳn nguồn JSON/RSS | nt |
+| Thử ứng viên | `previewUrl()` — KHÔNG lưu nguồn, KHÔNG ghi đệm | nt |
+| Lệnh | `studio:web-page-probe --url=… [--prefix=…] [--limit=…]` | `app/Console/Commands/WebPageProbeCommand.php` |
+| Màn Cài đặt | Danh sách loại nguồn lấy từ máy chủ; cập nhật cả danh sách dự phòng khi API lỗi | `resources/js/studio/SettingsApp.vue` |
+| Test | `tests/Feature/WebPageSourceTest.php` (6 bài): bóc bài thật + bỏ menu · đường dẫn tương đối · khử trùng · **lọc tiền tố** · 0 mục thì báo lỗi · trang tìm kiếm HTML không cần khoá · vẫn qua rào SSRF | nt |
+| Hướng dẫn người dùng | **§11.7** mới: quy trình 4 bước + bảng đo thật + hai điều phải biết (không ngày đăng ⇒ không đo được xu hướng; bộ bóc theo quy tắc chung, site đổi giao diện thì tụt và BÁO LỖI) | `HUONG_DAN_TINH_NANG_MOI.md` |
+
+**Test:** `vendor/bin/phpunit --no-coverage` ⇒ **OK (1273 tests, 9678 assertions)**.
+
+### 4. Còn lại
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Tra web chung một cách CHẮC CHẮN** vẫn là API tìm kiếm có khoá (Google CSE) — xem §11.6 | Không phụ thuộc giao diện site, có cấu trúc, có trường ngày |
+| 2 | Loại nguồn `page` chỉ nên bật cho site đã THỬ và ĐỌC BẰNG MẮT | Quy trình ở §11.7 |
+| 3 | Chưa khai nguồn `page` nào trên production | Cố ý: cần chủ dự án chọn site và xác nhận bằng mắt |
+
+
+---
+
 ## Phiên 2026-09-23 (đợt 39) — ƯU TIÊN TÌM KIẾM THỰC TRƯỚC: buộc tra trước khi trả lời + ĐO ĐỘ PHỦ
 
 **Commit:** `1987d56` (ưu tiên tìm kiếm thực) · `88ef02c` (`chat-check --show`). **Trạng thái: ĐÃ PUSH + ĐÃ DEPLOY `88ef02c` + ĐÃ ĐO trên production.**

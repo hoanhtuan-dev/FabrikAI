@@ -178,6 +178,27 @@ class WebSourceService
     private const SEARCH_QUERY_KEYS = ['q', 'query', 'keyword', 'keywords'];
 
     /**
+     * NGUỒN LOẠI `page` — ĐỊA CHỈ WEB BÌNH THƯỜNG (2026-09-26).
+     *
+     * Trang danh sách của một site có hàng chục liên kết điều hướng; ba hằng số dưới đây là bộ lọc để chỉ
+     * những gì TRÔNG NHƯ BÀI VIẾT đi vào prompt. Chúng cố tình ĐƠN GIẢN và đọc được — site đổi giao diện thì
+     * số mục tụt, và lớp này BÁO LỖI khi ra 0 mục thay vì im lặng.
+     */
+    /** Đoạn đường dẫn bị coi là mục menu, không phải bài. */
+    private const PAGE_SKIP_SEGMENTS = [
+        'dang-nhap', 'dang-ky', 'login', 'signin', 'sign-in', 'register', 'logout', 'dang-xuat',
+        'gio-hang', 'cart', 'checkout', 'thanh-toan', 'lien-he', 'contact', 'gioi-thieu', 'about',
+        'tim-kiem', 'search', 'tag', 'tags', 'author', 'tac-gia', 'rss', 'feed', 'sitemap',
+        'privacy', 'dieu-khoan', 'terms', 'quang-cao', 'advertise', 'video', 'podcast', 'lien-ket',
+    ];
+
+    /** Tiêu đề ngắn hơn mức này gần như chắc chắn là mục menu ("Trang chủ", "Xem thêm"). */
+    private const PAGE_MIN_TITLE = 20;
+
+    /** Đường dẫn ngắn hơn mức này thường là trang mục; bài viết thật có slug dài. */
+    private const PAGE_MIN_PATH = 10;
+
+    /**
      * Nguồn này TÌM ĐƯỢC theo từ khoá không?
      *
      * Nhận hai dạng, cố ý KHÔNG cần cột cấu hình mới: `{query}` tường minh, hoặc URL đã có sẵn một
@@ -538,15 +559,15 @@ class WebSourceService
             $result['error'] = $this->httpErrorReason($body, $response->status());
         } elseif ($oversized) {
             $result['error'] = 'nội dung quá lớn';
-        } elseif ($source->kind !== 'rss' && ! $this->looksLikeJson($body)) {
+        } elseif (! in_array($source->kind, ['rss', 'page'], true) && ! $this->looksLikeJson($body)) {
             // Xem chú thích ở interpret(): trả về HTML thì DỪNG, đừng "đọc" ra mục rác rồi im lặng báo 0 tin.
             $result['error'] = $this->readErrorReason($source, $body, $response->status());
             $result['ms'] = (int) round((microtime(true) - $started) * 1000);
 
             return $result;
         } else {
-            // Cùng lý do như interpret(): 'search' cũng là API JSON.
-            $parsed = $source->kind === 'rss' ? $this->parseRss($body) : $this->parseJson($body, $source);
+            // Cùng lý do như interpret(): 'search' cũng là API JSON; 'page' là trang web thường.
+            $parsed = $this->parseFor($source, $body);
             $result['parsed'] = count($parsed);
             $result['ok'] = true;
 
@@ -573,7 +594,7 @@ class WebSourceService
                 // Đo thật 2026-09-21: nguồn Google khai URL cse.google.com (trang HTML) mà báo
                 // "nội dung không phải RSS/Atom đọc được" — câu đó chỉ đúng với nguồn RSS và không giúp
                 // người khai biết phải sửa gì.
-                $result['error'] = $this->readErrorReason($source, $body, $response->status());
+                $result['error'] = $this->formatErrorFor($source, $body, $response->status());
             }
         }
 
@@ -863,7 +884,7 @@ class WebSourceService
             $result['error'] = $this->httpErrorReason($body, $response->status());
         } elseif ($oversized) {
             $result['error'] = 'nội dung quá lớn';
-        } elseif ($source->kind !== 'rss' && ! $this->looksLikeJson($body)) {
+        } elseif (! in_array($source->kind, ['rss', 'page'], true) && ! $this->looksLikeJson($body)) {
             // Nguồn JSON/TÌM KIẾM mà trả về HTML (hoặc bất cứ thứ gì không phải JSON) ⇒ DỪNG, không cố đọc.
             //
             // [LỖI THẬT — đo trên production 2026-09-21] Nguồn Google khai URL trang HTML: bộ đọc JSON vẫn
@@ -871,9 +892,10 @@ class WebSourceService
             // hiện "0 tin" trơ trọi. Tệ hơn cả báo lỗi: người khai không biết đường nào mà sửa.
             $result['error'] = $this->readErrorReason($source, $body, $response->status());
         } else {
-            // CHỈ 'rss' mới đi đường RSS: 'json' VÀ 'search' đều là API trả JSON. Viết `=== 'json'` thì nguồn
-            // tìm kiếm rơi vào bộ đọc RSS và luôn ra 0 tin dù API trả 200 — lỗi im lặng đúng kiểu khó thấy.
-            $parsed = $source->kind === 'rss' ? $this->parseRss($body) : $this->parseJson($body, $source);
+            // Bộ đọc theo LOẠI nguồn nằm ở MỘT chỗ (parseFor) để hai đường không bao giờ hiểu dữ liệu khác
+            // nhau. Viết `=== 'json'` ở đây thì nguồn tìm kiếm rơi vào bộ đọc RSS và luôn ra 0 tin dù API
+            // trả 200 — lỗi im lặng đúng kiểu khó thấy.
+            $parsed = $this->parseFor($source, $body);
             $result['parsed'] = count($parsed);
             $result['ok'] = true;
             // GIỮ BẢN ĐỌC ĐƯỢC (rộng) trong đệm: việc cắt theo trần là rẻ, việc đi mạng là đắt. Nhờ vậy lần
@@ -885,7 +907,7 @@ class WebSourceService
             if ($parsed === [] && trim($body) !== '') {
                 // Đọc được HTTP nhưng KHÔNG đọc được mục nào: định dạng lạ, ánh xạ sai, hoặc URL trỏ nhầm
                 // vào trang HTML. Nói ra để người cấu hình biết mà sửa, không im lặng.
-                $result['error'] = $this->readErrorReason($source, $body, $response->status());
+                $result['error'] = $this->formatErrorFor($source, $body, $response->status());
             }
         }
 
@@ -1060,6 +1082,208 @@ class WebSourceService
      *
      * @return list<array{title:string, url:string, published_at:?string, summary:string}>
      */
+    /**
+     * XEM THỬ MỘT ĐỊA CHỈ WEB BÌNH THƯỜNG — KHÔNG lưu nguồn, KHÔNG dùng đệm (2026-09-26).
+     *
+     * Vì sao cần đường riêng: loại nguồn `page` chỉ đáng tin khi bóc ĐÚNG vùng danh sách bài, mà điều đó phụ
+     * thuộc giao diện từng site. Đo thật: cùng một hàm bóc, trang này ra bài thật còn trang khác ra toàn mục
+     * "đọc nhiều" của site. Người khai cần thử ỨNG VIÊN trước khi lưu — nút "Lấy thử" trong Cài đặt chỉ thử
+     * được nguồn ĐÃ lưu.
+     *
+     * KHÔNG ghi đệm: đây là phép THỬ trên địa chỉ có thể chưa từng được khai; ghi đệm cho một nguồn không có
+     * id là để lại rác trong bộ đệm dùng chung.
+     *
+     * @return array<string, mixed>
+     */
+    public function previewUrl(string $url, string $pathPrefix = '', int $limit = 10): array
+    {
+        $source = new WebSource([
+            'slug' => 'xem-thu', 'name' => 'Xem thử địa chỉ web',
+            'url' => $url, 'kind' => 'page', 'enabled' => true,
+            'priority' => 1, 'max_items' => max(1, min(50, $limit)),
+            'items_path' => trim($pathPrefix) !== '' ? trim($pathPrefix) : null,
+        ]);
+
+        $started = microtime(true);
+
+        try {
+            return $this->interpret($source, $this->request($source), $started);
+        } catch (\Throwable $e) {
+            return $this->failure($source, $e, $started);
+        }
+    }
+
+    /**
+     * BỘ ĐỌC THEO LOẠI NGUỒN — MỘT chỗ duy nhất cho cả đường lấy tin cố định và đường tìm theo từ khoá.
+     *
+     * Vì sao phải gom: hai đường này từng tự chọn bộ đọc, và đã có lần chúng lệch nhau (nguồn tìm kiếm rơi
+     * vào bộ đọc RSS ⇒ luôn 0 tin dù API trả 200). Thêm loại nguồn thứ tư là lúc dễ lệch nhất.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function parseFor(WebSource $source, string $body): array
+    {
+        return match ($source->kind) {
+            'rss' => $this->parseRss($body),
+            'page' => $this->parseHtmlPage($body, $source),
+            // 'json' VÀ 'search' đều là API trả JSON.
+            default => $this->parseJson($body, $source),
+        };
+    }
+
+    /** Câu lỗi phải nói ĐÚNG VIỆC CẦN SỬA — mỗi loại nguồn hỏng vì một lý do khác nhau. */
+    private function formatErrorFor(WebSource $source, string $body, ?int $status): string
+    {
+        if (($source->kind ?? '') === 'page') {
+            return 'trang này không có danh sách bài nào đọc được — nên khai một trang CHUYÊN MỤC (trang danh '
+                .'sách bài viết), không phải trang chủ, trang liên hệ, hay trang chỉ chạy JavaScript';
+        }
+
+        return $this->readErrorReason($source, $body, $status);
+    }
+
+    /**
+     * ĐỊA CHỈ WEB BÌNH THƯỜNG (kind = 'page') — đọc danh sách BÀI trên một trang, không cần RSS (2026-09-26).
+     *
+     * Vì sao cần loại nguồn này: rất nhiều site thời trang Việt KHÔNG có RSS, mà lại có trang chuyên mục đầy
+     * bài mới. Trước đây những địa chỉ đó không dùng được: bộ đọc JSON "đọc" trang HTML ra vài mục rác (đã có
+     * lỗi thật 2026-09-21), nên lớp này CỐ TÌNH từ chối mọi HTML. Nay có bộ đọc HTML riêng, và nó chỉ nhận
+     * những gì TRÔNG NHƯ BÀI VIẾT:
+     *   · cùng tên miền với nguồn (bỏ liên kết ra mạng xã hội/quảng cáo);
+     *   · đường dẫn không phải mục menu (đăng nhập, giỏ hàng, tag, liên hệ, tìm kiếm…);
+     *   · tiêu đề đủ dài và đủ nhiều từ (bỏ "Trang chủ", "Xem thêm", "Đọc tiếp").
+     *
+     * HAI điều phải nói thật vì chúng ảnh hưởng chất lượng dữ liệu:
+     *   1. ĐA SỐ trang danh sách KHÔNG có ngày đăng ⇒ item giữ `published_at = null`. Bộ lọc độ mới KHÔNG
+     *      loại item thiếu ngày (xem filter()), nên bài vẫn vào prompt nhưng hiển thị "không ngày" — người
+     *      dùng cần biết vì tin không ngày thì không đo được xu hướng tăng/giảm.
+     *   2. KHÔNG có bộ đọc riêng cho từng site: đây là bộ đọc THEO QUY TẮC CHUNG. Site đổi giao diện thì số
+     *      mục có thể tụt — vì vậy khi ra 0 mục, lớp này BÁO LỖI chỉ đúng việc cần sửa, không im lặng.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function parseHtmlPage(string $body, WebSource $source): array
+    {
+        $html = $this->toUtf8($body);
+        // Bỏ script/style TRƯỚC khi bóc liên kết: menu dựng bằng JavaScript và chuỗi mã cũng chứa href.
+        $html = (string) preg_replace('#<(script|style|noscript|template|svg)\b[^>]*>.*?</\1>#is', ' ', $html);
+
+        $base = (string) $source->url;
+        $host = mb_strtolower((string) (parse_url($base, PHP_URL_HOST) ?: ''));
+        $out = [];
+        $seen = [];
+
+        if (preg_match_all('#<a\b[^>]*href\s*=\s*["\']([^"\']+)["\'][^>]*>(.*?)</a>#is', $html, $rows, PREG_SET_ORDER)) {
+            foreach ($rows as $row) {
+                $href = html_entity_decode(trim((string) $row[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $title = $this->clean((string) $row[2], 200);
+                $url = $this->absoluteUrl($base, $href);
+
+                if ($url === null || $title === '' || isset($seen[$url])) {
+                    continue;
+                }
+                // CÙNG TÊN MIỀN: nguồn là "bài của site này", không phải bảng tin liên kết ra ngoài.
+                if ($host !== '' && ! str_ends_with(mb_strtolower((string) (parse_url($url, PHP_URL_HOST) ?: '')), $host)) {
+                    continue;
+                }
+                // Tiêu đề phải GIỐNG TIÊU ĐỀ BÀI: đủ dài và đủ nhiều từ (menu toàn chữ ngắn).
+                if (mb_strlen($title) < self::PAGE_MIN_TITLE
+                    || count(preg_split('/\s+/u', $title, -1, PREG_SPLIT_NO_EMPTY) ?: []) < 3) {
+                    continue;
+                }
+                if ($this->isBoilerplatePath($url)) {
+                    continue;
+                }
+                // TIỀN TỐ ĐƯỜNG DẪN (tuỳ chọn, khai ở ô "items_path"): đây là hàng rào QUAN TRỌNG NHẤT của
+                // loại nguồn này. Đo thật 2026-09-26: bóc một trang chuyên mục mà KHÔNG lọc thì kết quả toàn
+                // liên kết của khối "đọc nhiều" toàn site (eva.vn: 10/10 mục là bài NUÔI CON trên trang thời
+                // trang) — nguồn báo "10 tin" trong khi nội dung sai, đúng loại nói dối mà dự án này cấm.
+                // Khai tiền tố (vd "/thoi-trang-c13/") thì chỉ bài CỦA CHUYÊN MỤC ĐÓ đi vào prompt.
+                $prefix = trim((string) $source->items_path);
+                if ($prefix !== '' && ! str_contains(mb_strtolower($url), mb_strtolower($prefix))) {
+                    continue;
+                }
+
+                $seen[$url] = true;
+                $out[] = [
+                    'title' => $title,
+                    'url' => Str::limit($url, 500, ''),
+                    // Trang danh sách thường không nói ngày đăng — để null, KHÔNG bịa ngày.
+                    'published_at' => null,
+                    'summary' => '',
+                ];
+            }
+        }
+
+        // Giữ THỨ TỰ XUẤT HIỆN trên trang: trang chuyên mục tin thường xếp bài mới nhất trước, và đó là thứ
+        // tự duy nhất đáng tin khi không có ngày đăng.
+        return array_slice($out, 0, max(1, min(60, (int) $source->max_items)));
+    }
+
+    /**
+     * Đường dẫn này là MỤC MENU chứ không phải bài viết?
+     *
+     * Vì sao phải lọc: một trang chuyên mục có hàng chục liên kết điều hướng ("Đăng nhập", "Giỏ hàng", "Tag",
+     * "Liên hệ"). Không lọc thì prompt đầy mục rác và máy đo tín hiệu thị trường đếm cả chúng — sai số liệu.
+     */
+    private function isBoilerplatePath(string $url): bool
+    {
+        $path = mb_strtolower((string) (parse_url($url, PHP_URL_PATH) ?: ''));
+        if (trim($path, '/') === '') {
+            return true;   // trang chủ
+        }
+
+        foreach (self::PAGE_SKIP_SEGMENTS as $segment) {
+            if (preg_match('#(^|[/.-])'.preg_quote($segment, '#').'($|[/.-])#u', $path) === 1) {
+                return true;
+            }
+        }
+
+        // Đường dẫn quá ngắn thường là trang mục; bài viết thật gần như luôn có slug dài.
+        return mb_strlen(trim($path, '/')) < self::PAGE_MIN_PATH;
+    }
+
+    /**
+     * Đổi đường dẫn TƯƠNG ĐỐI thành TUYỆT ĐỐI (trang danh sách hay dùng `/bai-viet.htm` hoặc `bai-viet.htm`).
+     *
+     * Trả null khi không phải http/https — KHÔNG trả về chuỗi rác để rồi nó thành một "nguồn" giả trong prompt.
+     */
+    private function absoluteUrl(string $base, string $href): ?string
+    {
+        $href = trim(str_replace(["\r", "\n", "\t"], '', $href));
+        if ($href === '' || str_starts_with($href, '#')) {
+            return null;
+        }
+        if (preg_match('#^(mailto|tel|javascript|data|blob):#i', $href) === 1) {
+            return null;
+        }
+
+        $parts = parse_url($base);
+        if (! is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return null;
+        }
+        $root = $parts['scheme'].'://'.$parts['host'].(isset($parts['port']) ? ':'.$parts['port'] : '');
+
+        if (preg_match('#^https?://#i', $href) === 1) {
+            $url = $href;
+        } elseif (str_starts_with($href, '//')) {
+            $url = $parts['scheme'].':'.$href;
+        } elseif (str_starts_with($href, '/')) {
+            $url = $root.$href;
+        } else {
+            $dir = isset($parts['path']) ? rtrim(dirname($parts['path']), '/') : '';
+            $url = $root.$dir.'/'.$href;
+        }
+
+        // Bỏ mảnh neo: cùng một bài với hai mảnh neo là hai mục khác nhau nếu giữ nguyên.
+        $cut = strpos($url, '#');
+        if ($cut !== false) {
+            $url = substr($url, 0, $cut);
+        }
+
+        return preg_match('#^https?://#i', $url) === 1 ? $url : null;
+    }
+
     private function parseRss(string $body): array
     {
         $body = trim($body);

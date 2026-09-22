@@ -157,7 +157,7 @@ async function loadSources() {
   try {
     const d = await adminApi('/web-sources');
     ws.rows = d.sources || [];
-    ws.kinds = d.kinds || ['rss', 'json', 'search'];
+    ws.kinds = d.kinds || ['rss', 'json', 'search', 'page'];
   } catch (e) {
     ws.error = userFacingError(e, 'Không tải được danh sách nguồn ngoài.');
   } finally {

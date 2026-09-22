@@ -336,7 +336,36 @@ RSS chỉ có tin tức, nên câu hỏi dạng "cách làm / giá / thông số
 Khoá **không** nằm trong cột URL (cột đó hiện nguyên văn trên màn Cài đặt); nó được gắn vào URL **chỉ ở lời gọi HTTP
 thật**, đọc từ bảng API key theo slug của nguồn.
 
-### 11.7 Cần gì để tính năng chạy
+### 11.7 Dùng ĐỊA CHỈ WEB BÌNH THƯỜNG thay vì RSS (loại nguồn `page`)
+Từ **2026-09-26** có thêm loại nguồn thứ tư: **`page`** — bạn khai một **trang chuyên mục** (trang danh sách bài)
+của site không có RSS, máy chủ đọc các liên kết bài trên trang đó. Nếu URL có chỗ điền `{query}` thì nó trở thành
+**trang tìm kiếm của chính website** — tra được mà **không cần API, không cần khoá**.
+
+⚠️ **Nhưng phải THỬ trước khi khai — đo thật trên web Việt Nam (2026-09-26):**
+
+| Địa chỉ thử | Kết quả ĐO |
+|---|---|
+| `tuoitre.vn/thoi-trang.htm` | HTTP 200 nhưng bóc ra **liên kết điều hướng** ("Tuổi Trẻ Start-Up Award"…), không phải bài chuyên mục |
+| `eva.vn/thoi-trang-c13.html` (trang thời trang) | HTTP 200 nhưng **10/10 mục đầu là bài NUÔI CON** — bộ bóc lấy khối "đọc nhiều" của toàn site |
+| `vnexpress.net/thoi-trang` | **HTTP 406** — site chặn đọc tự động |
+| Trang tìm kiếm của site (`tuoitre.vn/tim-kiem.htm?keywords=…`) | Trả về đúng mấy liên kết điều hướng đó, **không** phải kết quả tìm kiếm |
+
+⇒ **Cùng một hàm bóc: site này dùng được, site kia thì không.** Nên quy trình bắt buộc là:
+
+| Bước | Việc |
+|---|---|
+| 1 | Chạy `php artisan studio:web-page-probe --url=<địa chỉ trang chuyên mục>` — xem máy bóc được mấy mục |
+| 2 | Nếu bóc ra nhiều mục: **ĐỌC 5 TIÊU ĐỀ ĐẦU BẰNG MẮT**. Máy KHÔNG biết chúng có đúng chuyên mục hay không; nếu là menu/quảng cáo/mục khác thì **ĐỪNG khai** |
+| 3 | Bóc ra mục của mục khác (như eva) ⇒ thêm `--prefix=/thoi-trang-c13/` để **chỉ nhận bài thuộc chuyên mục đó** |
+| 4 | Khai nguồn trong Cài đặt: kind = **page**; ô **`items_path`** = **tiền tố đường dẫn** (rất nên khai); bấm **Lấy thử** để xem lại 5 mục đầu |
+
+**Hai điều phải biết trước khi bật:**
+1. Đa số trang danh sách **không có ngày đăng** ⇒ item vào prompt với nhãn "không ngày". Tin không ngày thì
+   **không đo được xu hướng tăng/giảm** — chỉ dùng làm ngữ cảnh.
+2. Đây là bộ bóc **theo quy tắc chung**, không có bộ đọc riêng cho từng site. Site đổi giao diện thì số mục tụt;
+   khi ra **0 mục nó BÁO LỖI** chỉ đúng việc cần sửa (không im lặng coi như thành công).
+
+### 11.8 Cần gì để tính năng chạy
 | Việc | Điều kiện |
 |---|---|
 | AI tra internet và ghi sổ | Một model được gán cho vai **"Agent Studio — Tìm kiếm nguồn ngoài"** (Cài đặt → Nhóm công việc). Bỏ trống ⇒ không có công cụ, lượt chạy vẫn xong bằng dữ liệu đã có |
