@@ -22,6 +22,7 @@ import { userFacingError, apiError } from './store.js';
 import { toastClientErrors } from './clientErrors.js';
 import StudioIcon from './components/StudioIcon.vue';
 import BaseModal from './components/BaseModal.vue';
+import { useSessionStore } from './store/session.js';
 
 const BASE = '/api/admin';
 const csrf = (() => {
@@ -102,7 +103,11 @@ const BADGE_TONE = {
 };
 
 // ─────────────────────────── Trạng thái ───────────────────────────
-const me = ref(null);
+// [2026-09-26 · đợt 25] Danh tính lấy từ STORE DÙNG CHUNG (store/session.js) thay vì ref riêng của
+// khu này: sửa tên người dùng ở đây là thanh chung + các khu khác thấy NGAY, không cần nạp lại trang.
+// SettingsHubApp đã nhúng sẵn danh tính (data-me) vào store nên thường không tốn request nào.
+const session = useSessionStore();
+const me = computed(() => session.me);
 const section = ref('dashboard');
 const toast = ref(null);
 const loading = reactive({ dashboard: true, plans: false, users: false, ledger: false, gui: false, upgrades: false, modules: false });
@@ -590,13 +595,26 @@ async function saveUser() {
     else await api('/users', 'POST', payload);
   }, userModal.mode === 'edit' ? 'Đã cập nhật người dùng.' : 'Đã tạo người dùng.');
   userModal.saving = false;
-  if (ok) { userModal.open = false; await loadUsers(); await loadDashboard(); }
+  if (ok) {
+    // [đợt 25] Sửa CHÍNH MÌNH thì đẩy ngay vào store dùng chung — thanh chung và các khu khác đổi
+    // theo tức thì; sửa người khác thì applyUser() tự bỏ qua (không phải danh tính của phiên này).
+    if (userModal.mode === 'edit') {
+      session.applyUser({
+        id: userModal.row.id, name: payload.name, email: payload.email, role: payload.role,
+        role_label: roleMeta(payload.role).label, is_super_admin: payload.role === 'super_admin',
+      });
+    }
+    userModal.open = false; await loadUsers(); await loadDashboard();
+  }
 }
 /** Khoá / mở khoá nhanh: dùng lại PUT /users/{id} với đầy đủ trường bắt buộc. */
 async function toggleUserActive(u, active) {
   const payload = { name: u.name, email: u.email, phone: u.phone || null, role: u.role, is_active: active, plan_id: u.plan ? u.plan.id : null };
   const ok = await run(() => api('/users/' + u.id, 'PUT', payload), active ? 'Đã mở khoá «' + u.name + '».' : 'Đã khoá «' + u.name + '».');
-  if (ok) { await loadUsers(); await loadDashboard(); }
+  if (ok) {
+    session.applyUser({ id: u.id, is_active: active });
+    await loadUsers(); await loadDashboard();
+  }
 }
 async function saveCredit() {
   const amt = Number(creditModal.form.amount);
@@ -811,10 +829,9 @@ function navBadge(id) {
 onMounted(async () => {
   section.value = sectionFromUrl();
   // /api/boot cho biết vai trò thật (is_super_admin) — dùng để ẩn/hiện phần Người dùng.
-  try {
-    const r = await fetch('/api/boot', { headers: { Accept: 'application/json' } });
-    if (r.ok) me.value = (await r.json()).user;
-  } catch (e) { /* không lấy được danh tính: vẫn hiển thị phần không cần quyền */ }
+  // [2026-09-26 · đợt 25] Danh tính nằm ở store dùng chung: trang đã nhúng sẵn (data-me) thì load()
+  // trả về ngay, KHÔNG tốn request; nếu chưa có thì nó gọi /api/boot đúng MỘT lần cho mọi khu dùng chung.
+  await session.load();
   await loadDashboard();
   await loadPlans();
   // [Q2] Nạp luôn hàng đợi nâng cấp: menu hiện số việc đang chờ ngay khi mở trang Quản trị.

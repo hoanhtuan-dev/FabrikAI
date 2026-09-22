@@ -55,18 +55,9 @@ class StudioController extends Controller
         $plan = $user?->activePlan();
 
         return response()->json([
-            'user' => $user ? [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role,
-                'role_label' => $user->roleLabel(),
-                'avatar' => $user->avatar,
-                // [Q4] Thành viên nhóm thấy SỐ DƯ CỦA NHÓM (bể credit của chủ nhóm) — nếu trả số dư
-                // riêng của tài khoản phụ thì thanh công cụ hiện một con số không dùng được.
-                'credits_balance' => studio_credit_balance($user),
-                'is_admin' => $user->isAdmin(),
-                'is_super_admin' => $user->isSuperAdmin(),
+            // [2026-09-26 · đợt 25] Danh tính do App\Support\SessionIdentity dựng — CÙNG lớp mà trang
+            // hợp nhất dùng cho data-me, nên hai đường không thể trả hai hình dạng khác nhau.
+            'user' => $user ? array_merge(\App\Support\SessionIdentity::for($user), [
                 // Gói hiện hành + hạn mức chu kỳ: để giao diện nói đúng "bạn đang ở gói nào,
                 // còn bao nhiêu credit kỳ này, mỗi ảnh tốn bao nhiêu".
                 'plan' => $plan ? [
@@ -91,7 +82,7 @@ class StudioController extends Controller
                 ]),
                 // [Modules 2026-09-19] Quyền module theo GÓI — giao diện dùng ngay từ lần boot đầu tiên.
                 'modules' => user_modules($user),
-            ] : null,
+            ]) : null,
             'project_statuses' => app(\App\Services\ProjectWorkflowService::class)->states(),
         ]);
     }

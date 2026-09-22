@@ -40,6 +40,10 @@
          data-areas='@json(\App\Support\SettingsAreas::visibleFor(auth()->user()))'
          data-section="{{ $section ?? 'presets' }}"
          data-user-id="{{ auth()->id() }}"
-         data-user-admin="{{ auth()->user()?->isAdmin() ? '1' : '0' }}"></div>
+         data-user-admin="{{ auth()->user()?->isAdmin() ? '1' : '0' }}"
+         {{-- Danh tính cho STORE DÙNG CHUNG (store/session.js): cùng lớp App\Support\SessionIdentity
+              mà /api/boot dùng, nên mọi khu đọc ra đúng một hình dạng. Nhúng sẵn ở đây thì trang
+              không tốn thêm request nào để biết "tôi là ai". --}}
+         data-me='@json(\App\Support\SessionIdentity::for(auth()->user()))'></div>
 </body>
 </html>

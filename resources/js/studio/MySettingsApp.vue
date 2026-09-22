@@ -9,6 +9,7 @@ import AppearanceSection from './components/settings/AppearanceSection.vue';
 import { notify } from './composables/useSettingsToast.js';
 import { toastClientErrors } from './clientErrors.js';
 import { setCatalogErrorHandler } from './composables/useLocalCatalog.js';
+import { useSessionStore } from './store/session.js';
 
 /**
  * KHU "CÀI ĐẶT CỦA TÔI" HỢP NHẤT.
@@ -51,14 +52,19 @@ toastClientErrors(notify.err);
 const section = ref('presets');
 const navOpen = ref(false);   // sidebar dạng ngăn kéo trên màn hình hẹp
 
-const USER = (() => {
+// [2026-09-26 · đợt 25] Danh tính lấy từ STORE DÙNG CHUNG — cùng nguồn với khu Quản trị, nên đổi tên
+// ở đó là khu này thấy ngay. Vẫn giữ đường dự phòng đọc DOM (data-user-id/data-user-admin) cho
+// trường hợp app được mount lẻ, không qua trang hợp nhất.
+const session = useSessionStore();
+const USER = computed(() => {
+  if (session.me) return { id: String(session.userId ?? ''), admin: session.isOwner };
   if (typeof document === 'undefined') return { id: '', admin: false };
   const el = document.querySelector('[data-user-id]');
   return {
     id: (el && el.getAttribute('data-user-id')) || '',
     admin: ((el && el.getAttribute('data-user-admin')) || '0') === '1',
   };
-})();
+});
 
 const active = computed(() => SECTIONS.find((s) => s.id === section.value) || SECTIONS[0]);
 const component = computed(() => {
@@ -121,6 +127,12 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
             </button>
           </nav>
           <div class="border-t border-ink-700 p-3">
+            <!-- [2026-09-26 · đợt 25] Danh tính đọc từ STORE DÙNG CHUNG: sửa tên ở khu Quản trị xong
+                 quay sang khu này là thấy tên mới ngay, không phải nạp lại trang. -->
+            <p v-if="session.me" class="mb-2 flex items-center gap-1.5 text-label text-cream-300">
+              <span class="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-brand-600/25 text-[9px] font-bold text-brand-200">{{ session.initial }}</span>
+              <span data-mine-user class="truncate">{{ session.name }}</span>
+            </p>
             <a href="/" class="flex items-center justify-center gap-1.5 rounded-lg border border-ink-600 px-3 py-2 text-body font-medium text-cream-200 transition hover:border-cream-300 hover:bg-invert hover:text-invert-content">
               <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Về xưởng thiết kế
             </a>

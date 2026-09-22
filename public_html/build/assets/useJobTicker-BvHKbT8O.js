@@ -1,1 +1,0 @@
-import{Y as e,et as t,z as n}from"./pageBoot-W_dUvfBF.js";function r(r){let i=t(Date.now()),a=null;function o(){a&&=(clearInterval(a),null)}return e(r,e=>{e?(i.value=Date.now(),a||=setInterval(()=>{i.value=Date.now()},1e3)):o()},{immediate:!0}),n(o),{now:i}}export{r as t};

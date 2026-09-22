@@ -4,6 +4,7 @@ import StudioIcon from './components/StudioIcon.vue';
 import MySettingsApp from './MySettingsApp.vue';
 import SettingsApp from './SettingsApp.vue';
 import AdminApp from './AdminApp.vue';
+import { useSessionStore } from './store/session.js';
 
 /**
  * TRANG HỢP NHẤT: CÀI ĐẶT & QUẢN TRỊ.
@@ -27,16 +28,34 @@ import AdminApp from './AdminApp.vue';
 const views = { mine: MySettingsApp, system: SettingsApp, admin: AdminApp };
 
 const CFG = (() => {
-  if (typeof document === 'undefined') return { area: 'mine', areas: [] };
+  if (typeof document === 'undefined') return { area: 'mine', areas: [], me: null };
   const el = document.getElementById('hub-root');
   let areas = [];
+  let me = null;
   try {
     areas = JSON.parse((el && el.getAttribute('data-areas')) || '[]') || [];
+    me = JSON.parse((el && el.getAttribute('data-me')) || 'null');
   } catch (e) {
     areas = [];
+    me = null;
   }
-  return { area: (el && el.getAttribute('data-area')) || 'mine', areas };
+  return { area: (el && el.getAttribute('data-area')) || 'mine', areas, me };
 })();
+
+// ── PHIÊN LÀM VIỆC DÙNG CHUNG ────────────────────────────────────────────────
+// [2026-09-26 · đợt 25] Trang hợp nhất nhúng sẵn danh tính (data-me, do App\Support\SessionIdentity
+// dựng — CÙNG lớp mà /api/boot dùng) vào store dùng chung TRƯỚC khi các khu con được tạo. Nhờ vậy:
+//   · mọi khu đọc ra đúng một danh tính, không khu nào tự gọi API riêng;
+//   · khu Quản trị sửa tên người dùng ⇒ store đổi ⇒ thanh này và các khu khác đổi NGAY,
+//     không phải nạp lại trang (trước đây tên nằm trong blade đã render nên phải F5 mới thấy).
+const session = useSessionStore();
+session.hydrate(CFG.me);
+
+const creditsLabel = computed(() =>
+  session.credits === null || session.credits === undefined
+    ? ''
+    : new Intl.NumberFormat('vi-VN').format(session.credits)
+);
 
 // Danh sách khu do MÁY CHỦ quyết định (App\Support\SettingsAreas::visibleFor) rồi truyền xuống qua
 // data-areas — không khai lại ở đây để không có hai danh sách lệch nhau.
@@ -77,11 +96,36 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
           <span class="hidden sm:inline">Studio</span>
         </a>
         <div class="min-w-0 flex-1">
-          <h1 class="flex items-center gap-2 font-display text-lg font-semibold text-cream-50">
+          <!-- text-base trên màn hình hẹp: tiêu đề dài ("Cài đặt của tôi") bị xuống 2 dòng khi có
+               thêm chip danh tính — đo ở 390px, thanh từ 115px vọt lên 148px. -->
+          <h1 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50 lg:text-lg">
             <StudioIcon :name="active.icon" size="h-4 w-4" class="text-brand-300" />
             {{ active.label }}
           </h1>
           <p class="mt-0.5 hidden truncate text-body text-cream-300 sm:block">{{ active.desc }}</p>
+        </div>
+
+        <!-- Danh tính (điện thoại): cùng dữ liệu với chip ở chế độ rộng — store dùng chung -->
+        <span v-if="session.me" data-hub-user-mobile :title="session.email"
+              class="flex shrink-0 items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-800/70 px-2 py-2 text-xs font-semibold text-cream-200 lg:hidden">
+          <span class="grid h-5 w-5 place-items-center rounded-full bg-brand-600/25 text-label font-bold text-brand-200">{{ session.initial }}</span>
+          <!-- Tên cắt ngắn: nhường chỗ cho tiêu đề khu trên màn hình hẹp (đo được: tiêu đề bị xuống
+              2 dòng khi chip rộng 160px ở 390px). -->
+          <span class="max-w-[5.5rem] truncate">{{ session.name }}</span>
+        </span>
+
+        <!-- Danh tính + credit (màn hình rộng). Số credit lấy từ store dùng chung nên nếu khu Quản
+             trị vừa cộng/trừ credit của chính bạn thì con số này đổi ngay, không cần tải lại. -->
+        <div v-if="session.me" class="hidden items-center gap-2 lg:flex">
+          <span data-hub-user :title="session.email"
+                class="flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-800/70 px-2.5 py-1.5 text-xs font-semibold text-cream-200">
+            <span class="grid h-5 w-5 place-items-center rounded-full bg-brand-600/25 text-label font-bold text-brand-200">{{ session.initial }}</span>
+            <span class="max-w-[10rem] truncate">{{ session.name }}</span>
+            <span class="text-cream-400">· {{ session.roleLabel }}</span>
+          </span>
+          <span v-if="creditsLabel" class="flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-800/70 px-2.5 py-1.5 text-xs font-semibold text-cream-200">
+            <StudioIcon name="coins" size="h-3.5 w-3.5" /> {{ creditsLabel }}
+          </span>
         </div>
 
         <!-- Bộ chuyển khu (màn hình rộng) -->

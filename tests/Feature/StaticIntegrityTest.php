@@ -200,6 +200,28 @@ class StaticIntegrityTest extends TestCase
         );
     }
 
+    /**
+     * [2026-09-26 · đợt 25] Cú pháp bình luận của BLADE ({{-- --}}) đặt trong file .vue làm hỏng
+     * `vite build` ngay ("Unexpected character"), nhưng chỉ lộ ra khi build — và lỗi ấy đã xảy ra BA
+     * lần trong repo. Rào chắn ở đây để lần thứ tư không thể lọt: file .vue phải dùng <!-- -->.
+     */
+    public function test_vue_files_never_use_blade_comment_syntax(): void
+    {
+        $bad = [];
+
+        foreach (\Illuminate\Support\Facades\File::allFiles(resource_path('js')) as $f) {
+            if ($f->getExtension() !== 'vue') {
+                continue;
+            }
+
+            if (str_contains((string) file_get_contents($f->getPathname()), '{{--')) {
+                $bad[] = $this->rel($f->getPathname());
+            }
+        }
+
+        $this->assertSame([], $bad, "File .vue dùng bình luận Blade ({{-- --}}) ⇒ vite build sẽ đỏ:\n".implode("\n", $bad));
+    }
+
     public function test_spa_entries_all_boot_through_the_shared_module(): void
     {
         // Lớp bug đã tái diễn nhiều lần trong repo: bản vá áp ở MỘT chỗ rồi bỏ quên chỗ tương đương.
