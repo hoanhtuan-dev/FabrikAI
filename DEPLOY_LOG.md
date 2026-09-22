@@ -5,6 +5,54 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 17) — ĐÍNH CHÍNH: "SAO TÔI KHÔNG THẤY KHÁC BIỆT" + PASS NHÌN THẤY ĐƯỢC
+
+**Commit:** `26dca4b` · `029f0a5`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Phản hồi thật của chủ dự án
+*"bạn có thiết kế lại không vậy, sao tôi không thấy khác biệt"* — và khi được hỏi đang xem màn nào: **"mọi nơi"**.
+
+### 2. ĐÍNH CHÍNH — tôi đã làm đúng nhưng làm SAI TRỌNG TÂM
+Các đợt 12–16 chủ yếu đổi **TOKEN** (bán kính 8/12/16px · họ chữ Inter · cỡ chữ nhỏ +1,5px · sàn chạm 40px · `--depth`) và **đo bằng chỉ số chất lượng** (0 phần tử chạm <40px, 0 tràn ngang, 0 chữ <11px). Những chỉ số đó ĐÚNG nhưng **không phải là thứ mắt nhận ra**. Kết quả: CSS đã đổi thật (kiểm chứng được: `--radius-field .75rem`, nút 40px nền `#605dff`, chữ Inter, thẻ 16px) mà **cảm giác giao diện vẫn như cũ** — vì bố cục, khoảng cách và tương phản bề mặt gần như không đổi.
+
+Bảng thật về những gì đã đổi:
+| Đã đổi BỐ CỤC (nhìn thấy) | Chỉ ăn nền token (gần như không thấy) |
+|---|---|
+| `/dang-nhap` · `/dang-ky` — hai cột trên máy tính, một cột trên điện thoại | **Studio** — canvas · panel · thanh công cụ giữ nguyên bố cục |
+| `/bo-suu-tap` — thanh hành động Material + tấm trượt đáy | **Thư viện** · **Cài đặt** · **Quản trị** · **Bảng giá** |
+| Điện thoại — dock điều hướng dưới · sàn chạm 40px · thanh tài khoản gọn 61→53px | **Agent Studio** — mới thêm dải tiến trình, bố cục 4 bước giữ nguyên |
+
+### 3. Pass "NHÌN THẤY ĐƯỢC" — đổi ở tầng dùng chung nên MỌI màn đổi cùng lúc
+| Hạng mục | Trước | Sau |
+|---|---|---|
+| Tiêu đề | h1 1,5rem · h2 1,25rem · h3 1,125rem | **h1 1,75rem · h2 1,5rem · h3 1,25rem · h4 1,125rem**, weight 650 |
+| Nhịp chữ | mặc định | **line-height 1,55** — chữ dày đặc là thứ làm giao diện trông cũ |
+| Độ nổi | `--depth: 1` | **`--depth: 2`** ⇒ bóng của MỌI nút và bề mặt nổi sâu hơn (một token của daisyUI) |
+| Thẻ | bóng đổ xuống | **ánh sáng mặt trên + bóng sâu hơn** (`inset 0 1px 0` trắng 3,5%) — thẻ "nổi lên" thay vì chỉ có viền |
+| Tiêu đề panel | chữ suông | **vạch nhấn 3px màu thương hiệu** phía trước — phân cấp bằng chi tiết nhỏ, không thêm đường kẻ |
+| Nền trang | phẳng | **vệt sáng thương hiệu ở đỉnh** (`radial-gradient` theo token brand, tự đúng ở cả hai theme) |
+
+### 4. Một lỗi do chính đợt này gây ra — và cách sửa
+Sửa `--depth` **bên trong khối bảng màu sinh tự động** ⇒ `ThemeImportTest` so khớp TỪNG KÝ TỰ với bản `theme:sync` sinh ra ⇒ **2 test đỏ** (đã bắt được ngay, không lọt ra production ở trạng thái đỏ vì tôi chạy test trước khi báo). Sửa: `php artisan theme:sync` khôi phục khối sinh, rồi khai `--depth: 2` **ở luật riêng** `html[data-theme=…]` — ngoài khối sinh.
+
+### 5. Kiểm chứng
+| Kiểm tra | Kết quả |
+|---|---|
+| Test | **1233 XANH / 9.340 assertion** |
+| HEAD máy chủ | `26dca4b` → `029f0a5` — khớp local = origin |
+| CSS đang phục vụ | `app-5UYxLvko.css` (mới) |
+| Giá trị đo trong trình duyệt | thẻ 16px + ánh sáng trên · nút 40px `rgb(96,93,255)` · ô nhập 48px · chữ Inter · `--depth` 2 |
+
+> **BÀI HỌC GHI LẠI:** "đo được" và "nhìn thấy được" là HAI tiêu chí khác nhau. Chỉ số chất lượng (sàn chạm · tràn ngang · tương phản) chứng minh giao diện ĐÚNG; muốn chứng minh giao diện ĐÃ ĐỔI thì phải đo **bố cục và tương phản bề mặt** (kích thước tiêu đề · khoảng cách · độ nổi · màu nền), không phải các ngưỡng tuân thủ.
+
+### 6. Việc tiếp theo để khác biệt RÕ (bố cục, không phải token)
+| # | Việc |
+|---|---|
+| 1 | **Studio**: dựng lại thanh trên thành MỘT app bar (brand + ngữ cảnh bộ sưu tập + menu tài khoản), bề mặt panel tách tầng rõ, thanh công cụ gom lại |
+| 2 | **Thư viện** |
+| 3 | **Gộp quản trị + Cài đặt thành MỘT SPA** (kế hoạch đã khảo sát ở đợt 16) |
+
+---
 ## Phiên 2026-09-26 (đợt 16) — STUDIO: THANH TÀI KHOẢN GỌN TRÊN ĐIỆN THOẠI + GHI RÕ HAI VIỆC CÒN LẠI
 
 **Commit:** `9f1b2bd`. **Trạng thái: đã commit + push + DEPLOY production.**
