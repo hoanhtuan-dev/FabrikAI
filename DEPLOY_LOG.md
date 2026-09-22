@@ -5,6 +5,38 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 31) — VẼ LẠI HEADER TỪ ĐẦU: ba cụm chức năng rõ ràng, đã TÍNH bề rộng
+
+**Commit:** `c483396`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### Vì sao phải vẽ lại từ đầu
+
+Các đợt trước chỉ vá từng nút (thêm rồi bớt) nên header thành một dãy nút hỗn độn, dễ hết chỗ và đè nhau.
+Nay sắp xếp lại theo NHÓM CHỨC NĂNG, mỗi nhóm có ranh giới mắt nhìn thấy, và bề rộng được TÍNH để luôn vừa.
+
+### Ba cụm chức năng
+
+| Cụm | Thành phần | Bề rộng đo được |
+|---|---|---|
+| **Thương hiệu** (`navbar-start`) | nút menu (điện thoại) · logo + chữ FabrikAI · chip "Chưa đăng nhập" | ~104px |
+| **Điều hướng không gian làm việc** (`data-header-workspace`) | **Bộ sưu tập** → vạch ngăn → **Nguồn ảnh · Thư viện · Bảng lệnh · Outputs** — một khay nổi gồm 5 nút icon, nhóm con phân tách bằng vạch mảnh | **191px** (không đổi ở mọi bề rộng) |
+| **Tài nguyên + tài khoản** | nút credit (số, tên gói chỉ từ 2xl và cắt ngắn) · menu tài khoản | ~100–230px |
+
+Tổng bề rộng ở mốc hẹp nhất của desktop (`lg` = 1024): 104 + 191 + 100 + khoảng cách ≈ **410px** — còn dư hơn 600px,
+nên **không thể** đè nhau hay tràn ngang bằng dữ liệu thật.
+
+### Đo được (Chrome headless + CDP, owner thật)
+
+| Bề ngang | Khay workspace | Nút account đè Outputs | Credit/account nằm ngoài khay | Tràn ngang |
+|---|---|---|---|---|
+| 1024 · 1152 · 1280 · 1440 · 1920 | 191px, 6 con (Bộ sưu tập · vạch · 4 nút) | **không** (cả 5) | **đúng** (tách cụm) | **0** (cả 5) |
+
+### Khoá bằng test · Deploy
+
+Toàn bộ: **1248 test XANH** (9481 assertions) — không nới lỏng bất kỳ ràng buộc `data-header-action`/
+`data-dock-toggle` nào. HEAD máy chủ **`c483396`** khớp local; sao lưu DB + cache đầy đủ; không lỗi mới trong log.
+
+---
 ## Phiên 2026-09-26 (đợt 30) — Header KHÔNG THỂ đè nhau nữa (nút tài khoản ↔ Outputs)
 
 **Commit:** `80dc145`. **Trạng thái: đã commit + push + DEPLOY production.**
