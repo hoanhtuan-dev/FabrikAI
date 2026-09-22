@@ -5,6 +5,76 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 26) — STUDIO GỌN HƠN: gộp rail phải lên thanh tiêu đề + Canvas trống CHỈ còn ô mô tả tạo ảnh
+
+**Commit:** `7f8c419`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Việc 1 — gộp thanh công cụ bên phải lên thanh tiêu đề
+
+| Trước | Sau |
+|---|---|
+| Một cột dọc `nav.activity-bar.right` rộng **56px** (`w-14`) sát mép phải, chỉ có ở desktop, chứa 4 nút: Nguồn ảnh · Thư viện · Bảng lệnh · Outputs | **Không còn cột nào.** Bốn nút nằm cùng hàng với Bộ sưu tập & credit trên thanh tiêu đề, gắn `data-header-action="source|library|palette|outputs"` |
+| Bề ngang canvas bị cột ấy ăn mất 56px | Vùng canvas rộng **972px** ở 1440 (đo được, dock Layers đóng) |
+| Nút Outputs ở rail có `data-dock-toggle` để trả focus khi ẩn dock | Giữ nguyên thuộc tính đó trên nút mới (bài `StudioDockResizeTest` canh) |
+| Quy tắc CSS `.activity-bar.right` | Đã xoá khỏi `app.css` (hết nơi dùng) — rail TRÁI vẫn giữ nguyên `.activity-bar` + `.activity-btn` |
+
+**Đo được (Chrome headless + CDP, owner thật, sau khi nạp lại trang):**
+
+| Bề ngang | `scrollWidth` vs `innerWidth` | Nhóm nút trên header | Phần tử tràn ra ngoài |
+|---|---|---|---|
+| 1024 | 1024 / 1024 | 136px, 4 nút hiện | **0** |
+| 1280 | 1280 / 1280 | 136px | **0** |
+| 1440 | 1440 / 1440 | 136px | **0** |
+| 390 (điện thoại) | 482 / 482 | 0 (ẩn dưới `lg` — điện thoại vẫn dùng dock dưới) | **0** |
+
+Thanh tiêu đề **66px** ở desktop, **59px** ở điện thoại — không cao thêm dù chở thêm 4 nút.
+
+**Hai lỗi THẬT tìm ra trong lúc đo (không phải giả định):**
+
+1. **Tràn ngang 2px ở MỌI bề ngang desktop.** Thủ phạm là huy hiệu đếm số ảnh: nó đặt `-right-0.5 -top-0.5`
+   nên lệch ra ngoài nút 2px; khi nút nằm sát mép phải thì cả trang tràn. Đã đưa huy hiệu vào TRONG nút
+   (`right-0 top-0`) ⇒ `scrollWidth` bằng đúng `innerWidth`.
+2. **Ở 1024px, header bị chật** (nhóm nút mới đẩy nội dung ra ngoài 10px). Đã siết: nút `!h-8 !w-8`,
+   `gap-0.5`, và **tên gói trong nút credit chỉ hiện từ `xl`** (số credit vẫn luôn hiện) ⇒ hết tràn ở 1024.
+
+### 2. Việc 2 — Canvas trống chỉ còn ô mô tả tạo ảnh
+
+| Đã GỠ khỏi màn hình trống | Đã GIỮ / thêm |
+|---|---|
+| 3 thẻ Agent Studio + nút "Mở Agent Studio" | Ô mô tả (**6 dòng**, `!text-base`) |
+| Cột "Đi nhanh": Prompt đầy đủ · Nguồn ảnh · Thư viện · Bộ sưu tập · Gói & credit | Biến thể 1/2/4 · Tỉ lệ 1:1…9:16 · `~N credit` · nút **Tạo ảnh** |
+| Khối "Phím tắt" và dòng phụ đề "hoặc để Agent Studio…" | **3 gợi ý bấm-là-điền** (Váy linen pastel · Sơ mi oversize · Đầm dạ hội) |
+| Dải chip bối cảnh (credit · gói · bộ sưu tập · số lớp) | Nút **Bảng đầy đủ** (mở bảng Prompt Tạo Ảnh) + dòng "Enter để tạo nhanh" |
+
+**Tối ưu ô mô tả:** tự đặt con trỏ khi màn hình trống hiện ra — nhưng **chỉ trên thiết bị trỏ mịn**; đo được
+ở 390px con trỏ vẫn ở `BODY` (không tự bật bàn phím ảo che nửa màn hình). Dòng lý do khoá nút nay nằm NGAY
+DƯỚI nút chính (theo `docs/DESIGN_SYSTEM.md` §4.4) và vẫn lấy từ đúng computed `blockReason` dùng để khoá nút.
+
+**Không mất tính năng nào:** Agent Studio ở rail công cụ trái (mục "Agent thiết kế" → `/agent-studio`);
+Nguồn ảnh · Thư viện · Bảng lệnh · Outputs nay ở thanh tiêu đề; Bộ sưu tập ngay cạnh đó.
+
+**Đo được trên màn hình trống:** 14 phần tử tương tác — tất cả đều thuộc luồng tạo ảnh (1 ô mô tả, 3 biến thể,
+5 tỉ lệ, 1 nút Tạo ảnh, 3 gợi ý, 1 nút Bảng đầy đủ); tràn ngang **0** ở cả 1440 và 390.
+
+### 3. Khoá bằng test (sửa hợp đồng cũ, không nới lỏng)
+
+| Bài | Thay đổi |
+|---|---|
+| `CanvasControlsTest::test_canvas_empty_state_is_only_the_prompt_composer` (đổi tên từ `…_command_center_…`) | Vẫn khoá z-0 + `generateImage()` + hai khối cũ không quay lại; THÊM: màn hình trống phải có đủ phần tạo ảnh, **không** được còn `AGENT_STEPS` · `quickActions` · "Đi nhanh" · "Mở Agent Studio" · `shortcuts` · "Phím tắt"; và **bốn nút rail phải nằm ở `data-header-action`** + `activity-bar right` không được quay lại |
+| `AgentStudioPageTest` | Bỏ kỳ vọng "canvas trống mở Agent Studio"; nay khoá điều ngược lại (lối vào duy nhất ở rail công cụ, đúng hợp đồng URL có `?buoc=`) |
+| `DesignSystemTest` | Không sửa luật — **bắt được tôi**: dòng `↳ lý do khoá` ban đầu đặt TRÊN nút nên bị coi là thiếu; đã chuyển xuống dưới nút |
+
+Toàn bộ: **1243 test XANH** (9443 assertions).
+
+### 4. Deploy + kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD máy chủ | **`7f8c419`** — khớp local |
+| Sao lưu DB · cache | có sao lưu; `config/route/view:cache` + `queue:restart` chạy lại |
+| Log lỗi | không phát sinh dòng ERROR/CRITICAL nào sau deploy |
+
+---
 ## Phiên 2026-09-26 (đợt 25) — MỘT STORE PHIÊN DÙNG CHUNG: đổi tên ở Quản trị là mọi khu thấy NGAY, không cần nạp lại trang
 
 **Commit:** `8a4b2af`. **Trạng thái: đã commit + push + DEPLOY production.**
