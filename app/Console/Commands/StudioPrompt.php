@@ -66,9 +66,13 @@ class StudioPrompt extends Command
         $this->line('── CHỈ DẪN AGENT STUDIO ĐI QUA MỐC CẤU HÌNH ──');
         foreach (PromptCatalog::keys() as $key) {
             $row = PromptTemplate::query()->where('key', $key)->where('is_active', true)->orderByDesc('version')->first();
-            $this->line(sprintf('  %-42s %s', $key, $row
+            // Bản MẶC ĐỊNH đã ghi nhận (phiên bản 0) hiện luôn ở đây: nếu không, người đọc tưởng
+            // "mặc định trong mã" nghĩa là chưa có gì để xem trên giao diện — trong khi ảnh chụp đã có.
+            $chars = mb_strlen((string) PromptCatalog::defaultBody($key));
+            $this->line(sprintf('  %-42s %s', $key, ($row
                 ? 'ĐANG CẤU HÌNH (v'.$row->version.', '.mb_strlen((string) $row->body).' ký tự)'
-                : 'mặc định trong mã'));
+                : 'mặc định trong mã')
+                .($chars > 0 ? ' · đã ghi nhận bản mặc định ('.$chars.' ký tự)' : ' · CHƯA ghi nhận bản mặc định')));
         }
 
         $others = PromptTemplate::query()->select('key')->distinct()->pluck('key')->all();
