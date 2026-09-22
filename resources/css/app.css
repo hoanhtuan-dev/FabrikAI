@@ -230,15 +230,6 @@
     --noise: 0;
     /* @theme:sync:end */
 
-    /* HÌNH DẠNG của bản thiết kế lại — ghi ĐÈ bán kính mà khối sinh tự động khai ở trên.
-       Vì sao phải ghi đè ở đây: khối @theme phía trên do "php artisan theme:sync" SINH RA và có
-       ThemeSystemTest khoá lại, nên không được sửa tay bên trong nó; bản sinh ra vẫn khai --radius-*
-       theo thang cũ (ô nhập 0,25rem · thẻ 0,5rem). Hai luật cùng độ ưu tiên ⇒ luật ĐỨNG SAU thắng.
-       ĐO ĐƯỢC (production, 2026-09-26): thiếu luật này thì nút trả bán kính **4px** và thẻ **8px**
-       dù theme daisyUI khai 0,75/1rem — tức là bản thiết kế mới không tới được người dùng. */
-    --radius-selector: 0.5rem;   /* chip · badge · nút icon */
-    --radius-field: 0.75rem;     /* ô nhập · nút */
-    --radius-box: 1rem;          /* thẻ · khối bề mặt */
 
     /* ── LỚP NGỮ NGHĨA THEO ĐÚNG BỘ TÊN CỦA daisyUI ──────────────────────────────────────
        [2026-09-23] Người dùng đưa một theme daisyUI để tham chiếu. Bộ tên của nó nay là lớp
@@ -535,6 +526,27 @@
    "CƠ SỞ CHUNG CHO CHUYỂN ĐỘNG" ở dưới (dùng token --motion-*) — không khai báo
    số ms cứng ở đây nữa, tránh hai nguồn lệch nhau. */
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   HÌNH DẠNG của bản thiết kế lại — KHÔNG nằm trong @theme (2026-09-26)
+
+   Vì sao không khai trong @theme: biến khai trong @theme được Tailwind phát MỘT LẦN ở khối :root
+   ĐẦU TỆP, nên nó luôn thua mọi <style> phía sau — kể cả <style id="fabrikai-theme-override"> mà
+   bảng màu người dùng import phát ra trong <head>. ĐO ĐƯỢC trên production: bản đầu khai trong
+   @theme ⇒ trình duyệt trả --radius-field 0,25rem (nút 4px · thẻ 8px) dù tệp CSS có ghi 0,75rem —
+   bản thiết kế mới không tới được người dùng mà test nào cũng xanh.
+
+   Nay khai bằng luật thật, đặt sau khối @theme và dùng `html[data-theme=…]` (0-1-1, cao hơn 0-1-0
+   của cả `:root` lẫn `[data-theme=…]`) ⇒ thắng bất kể thứ tự tệp.
+
+   PHẠM VI: đây là HÌNH DẠNG, không phải bảng màu. Bảng màu vẫn do `theme:sync` và theme người dùng
+   import quyết định; bán kính do bản thiết kế quyết định để mọi bề mặt (thẻ · ô nhập · nút · chip) đi
+   theo đúng MỘT thang Material: 8 · 12 · 16px. */
+html[data-theme='dark'],
+html[data-theme='light'] {
+    --radius-selector: 0.5rem;   /* chip · badge · nút icon */
+    --radius-field: 0.75rem;     /* ô nhập · nút */
+    --radius-box: 1rem;          /* thẻ · khối bề mặt */
+}
 @layer components {
     .container-x {
         @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
