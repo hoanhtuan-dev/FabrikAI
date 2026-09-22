@@ -104,7 +104,7 @@
     --size-selector: 0.25rem;
     --size-field: 0.25rem;
     --border: 1px;
-    --depth: 1;
+    --depth: 2;
     --noise: 0;
 }
 
@@ -141,7 +141,7 @@
     --size-selector: 0.25rem;
     --size-field: 0.25rem;
     --border: 1px;
-    --depth: 1;
+    --depth: 2;
     --noise: 0;
 }
 
@@ -226,7 +226,7 @@
     --size-selector: 0.25rem;
     --size-field: 0.25rem;
     --border: 1px;
-    --depth: 1;
+    --depth: 2;
     --noise: 0;
     /* @theme:sync:end */
 
@@ -541,6 +541,45 @@
    PHẠM VI: đây là HÌNH DẠNG, không phải bảng màu. Bảng màu vẫn do `theme:sync` và theme người dùng
    import quyết định; bán kính do bản thiết kế quyết định để mọi bề mặt (thẻ · ô nhập · nút · chip) đi
    theo đúng MỘT thang Material: 8 · 12 · 16px. */
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   PASS "NHÌN THẤY ĐƯỢC" — thang tiêu đề + nhịp chữ (2026-09-26)
+
+   Vì sao cần pass này: các đợt trước đổi TOKEN (bán kính · họ chữ · cỡ chữ nhỏ) nên ĐÚNG nhưng KHÓ THẤY —
+   phản hồi thật: "sao tôi không thấy khác biệt". Nay đổi thứ người dùng nhìn thẳng vào:
+     · TIÊU ĐỀ to và đậm hơn (h1 1,5 → 1,75rem · h2 1,25 → 1,5rem · h3 1,125 → 1,25rem);
+     · dòng chữ thoáng hơn (line-height 1,55) — chữ dày đặc là thứ làm giao diện trông cũ;
+     · độ nổi: --depth 1 → 2 ⇒ bóng của MỌI nút và bề mặt nổi sâu hơn (một token của daisyUI).
+   Tất cả ở tầng DÙNG CHUNG nên mọi màn hình đổi cùng lúc, không phải sửa từng trang. */
+@layer base {
+    h1, h2, h3, h4, h5, h6 {
+        font-weight: 650;
+        letter-spacing: -0.015em;
+        line-height: 1.25;
+    }
+
+    h1 { font-size: calc(1.75rem * var(--font-scale, 1)); }
+    h2 { font-size: calc(1.5rem * var(--font-scale, 1)); }
+    h3 { font-size: calc(1.25rem * var(--font-scale, 1)); }
+    h4 { font-size: calc(1.125rem * var(--font-scale, 1)); }
+
+    body { line-height: 1.55; }
+
+    /* VỆT SÁNG THƯƠNG HIỆU ở đỉnh trang — áp cho MỌI trang (2026-09-26).
+       Vì sao cần: ba tầng bề mặt hiện tại (nền ink-950 · panel ink-900 · thẻ ink-800) đều gần đen nên mắt
+       không đọc ra "mặt nào nổi trên mặt nào" — giao diện đúng nhưng trông phẳng và cũ. Một vệt sáng rất
+       nhẹ ở đỉnh tạo chiều sâu cho cả trang mà không thêm màu mới, không thêm đường kẻ nào (tối giản).
+       Dùng color-mix theo token brand ⇒ theme Sáng/Tối tự đúng, không cần khai hai bản. */
+    body {
+        background-image: radial-gradient(
+            1100px 520px at 50% -8%,
+            color-mix(in oklab, var(--color-brand-600) 9%, transparent),
+            transparent 70%
+        );
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }
+}
+
 html[data-theme='dark'],
 html[data-theme='light'] {
     --radius-selector: 0.5rem;   /* chip · badge · nút icon */
@@ -595,7 +634,8 @@ html[data-theme='light'] {
     .card {
         @apply border border-ink-700 bg-ink-800;
         border-radius: var(--radius-box);
-        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.24), 0 1px 3px 1px rgb(0 0 0 / 0.12);
+        /* Material: mặt TRÊN hắt sáng, mặt dưới đổ bóng ⇒ thẻ "nổi lên" thay vì chỉ có viền bao quanh. */
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 1px 2px 0 rgb(0 0 0 / 0.3), 0 2px 6px 2px rgb(0 0 0 / 0.14);
     }
 
     .card-hover {
@@ -683,7 +723,17 @@ html[data-theme='light'] {
     }
     /* Header chuẩn của panel/card trong workspace */
     .panel-head { @apply flex shrink-0 items-center justify-between gap-2 px-2.5 py-2; }
+    /* Tiêu đề panel có VẠCH NHẤN màu thương hiệu: mắt bám được vào chỗ bắt đầu của khối mà không phải
+       thêm một đường kẻ ngang nào (tối giản = phân cấp bằng chi tiết nhỏ, không bằng đường kẻ). */
     .panel-title { @apply flex min-w-0 items-center gap-1.5 text-body font-semibold text-cream-100; }
+    .panel-title::before {
+        content: '';
+        width: 3px;
+        height: 14px;
+        flex-shrink: 0;
+        border-radius: 9999px;
+        background: var(--color-brand-500);
+    }
     /* Activity bar (VSCode-style) — thanh icon cố định bên trái, mỗi icon mở 1 card */
     .activity-bar { @apply flex w-14 shrink-0 flex-col items-center gap-2 border-r border-ink-700 bg-ink-900 py-2.5; }
     .activity-bar.right { @apply border-l border-r-0; }
