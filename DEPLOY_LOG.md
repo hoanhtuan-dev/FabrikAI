@@ -5,6 +5,41 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 18) — STUDIO: GỘP HAI THANH THÀNH MỘT APP BAR
+
+**Commit:** `39d6198`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Đo trước khi sửa (390px, /studio)
+Trước: **HAI thanh xếp chồng** trên điện thoại — thanh tài khoản **53px** + thanh "Studio" **57px** = **110px**, chỉ để nói tên tài khoản và ba nút. Cộng dock 56px ⇒ **166px chrome trên màn 844px (20%)**.
+
+### 2. Đã làm — MỘT app bar cho mọi bề rộng
+| Trước | Sau |
+|---|---|
+| Thanh tài khoản (avatar · tên · vai trò · Bộ sưu tập · credit · Đăng xuất) | **Một `<header>` duy nhất**, thêm nút menu công cụ + hai lối vào hay dùng (Bộ sưu tập · Kết quả) chỉ hiện ở màn nhỏ |
+| Thanh "Studio" riêng (menu · tên · Bộ sưu tập · Kết quả) | **XOÁ HẲN** — nội dung đã gộp vào app bar |
+| Hai thanh = **110px** | **Một thanh = 53px** ⇒ **bớt 57px** (≈12% màn hình điện thoại) |
+
+### 3. Đo lại
+| Kiểm tra | Kết quả |
+|---|---|
+| Chrome trên /studio @390px | **header 53px + dock 56px** (trước: 53 + 56 + 57) |
+| Dock điều hướng dưới | **4 tab nguyên vẹn**: Tạo ảnh · Bộ sưu tập · Kết quả · Công cụ |
+| Điều khiển ở đỉnh trang | Menu công cụ · Bộ sưu tập · Kết quả · chip Bộ sưu tập · credit · Đăng xuất |
+| Tràn ngang · phần tử chạm <40px | **0 · 0** |
+| Test | **1233 XANH / 9.340 assertion** |
+
+### 4. Lỗi tự gây ra khi sửa (ghi để lần sau cẩn thận hơn)
+Khi xoá thanh thứ hai, tôi cắt theo SỐ DÒNG đọc được từ một lần `read` đã cũ ⇒ **cắt nhầm vào đuôi dock** (mất 2 tab và thẻ `</nav>`) và để lại thanh cũ. `npm run build` báo `Element is missing end tag` **không kèm số dòng**; tìm ra bằng `@vue/compiler-sfc` (parse + compileTemplate) — cho **đúng số dòng**. Đã phục hồi đủ 4 tab và kiểm chứng lại bằng đo trong trình duyệt.
+> Bài học: `read` để LẤY NỘI DUNG, không để đếm dòng — số dòng đổi ngay sau mỗi lần sửa ở trên.
+
+### 5. Còn lại của bước "Studio"
+| Việc |
+|---|
+| Tách tầng bề mặt panel rõ hơn (panel · thẻ · thanh) — hiện ba tầng gần như cùng độ sáng |
+| Gom thanh công cụ dày đặc thành cụm nút + menu "thêm" trên điện thoại |
+| Bàn giao canvas (thanh trạng thái dưới) |
+
+---
 ## Phiên 2026-09-26 (đợt 17) — ĐÍNH CHÍNH: "SAO TÔI KHÔNG THẤY KHÁC BIỆT" + PASS NHÌN THẤY ĐƯỢC
 
 **Commit:** `26dca4b` · `029f0a5`. **Trạng thái: đã commit + push + DEPLOY production.**
