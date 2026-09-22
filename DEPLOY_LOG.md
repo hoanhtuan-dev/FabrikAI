@@ -5,6 +5,110 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 3) — PHIẾU KỸ THUẬT TƯƠNG TÁC (tech pack) + KIỂM TRA SÂU AI SDK & HỖ TRỢ fal.ai
+
+**Commit:** `b049e85` (trên `986f4bf`). **Trạng thái: đã commit + push + DEPLOY production** — migration `2026_09_26_000003` đã chạy, cache dựng lại, `queue:restart` đã phát tín hiệu.
+
+### 0. Hai việc được giao
+1. **Việc #3 của lộ trình** — nâng gói xuất cho xưởng thành **phiếu kỹ thuật TƯƠNG TÁC**.
+2. **Kiểm tra sâu Laravel AI SDK → hỗ trợ fal-ai.**
+
+---
+
+## PHẦN A — TECH PACK TƯƠNG TÁC
+
+### A1. Vì sao (không phải "thêm tính năng cho vui")
+Gói xuất cho xưởng đã có từ Đợt 4, nhưng "phiếu kỹ thuật" trong đó chỉ là **tệp CHỮ CÓ DÒNG CHẤM** để xưởng
+tự điền. Nghĩa là chủ shop **không có chỗ nào GHI thông số trong ứng dụng** — mỗi lần xuất là một tờ giấy
+trắng mới, còn thông số thật chỉ nằm trong đầu họ. Đây là mắt xích mất giữa "ảnh AI" và "lệnh cho xưởng".
+
+### A2. Đã làm gì
+| # | Thay đổi | Tệp |
+|---|---|---|
+| 1 | Bảng `tech_packs` (1 hàng/bộ sưu tập, cascade khi xoá bộ) | `database/migrations/2026_09_26_000003_create_tech_packs_table.php` |
+| 2 | `TechPackService`: `normalize()` THUẦN · `completeness()` NÓI RÕ còn thiếu gì nhưng **KHÔNG chặn lưu** · `textSheet()` · `measurementsCsv()` · `measurementTable()` | `app/Services/TechPackService.php` |
+| 3 | Model + 4 đường (3 API + bản in) | `app/Models/TechPack.php` · `app/Http/Controllers/TechPackController.php` · `routes/web.php` |
+| 4 | **BẢN IN A4** — trang tự đủ, không @vite, nút "In / Lưu thành PDF" | `resources/views/studio/tech-pack-print.blade.php` |
+| 5 | Gói ZIP dùng **thông số THẬT** + `bang-thong-so.csv` + `manifest.tech_pack` | `app/Services/ProjectExportService.php` |
+| 6 | Trình biên tập trong khối "Xuất gói cho xưởng" (card sidebar + /bo-suu-tap) | `resources/js/studio/components/TechPackEditor.vue` · `CollectionsCard.vue` · `CollectionsPage.vue` · `store/actions/projects.js` · `store/state.js` |
+| 7 | 12 test | `tests/Feature/TechPackTest.php` |
+
+### A3. QUYẾT ĐỊNH ĐÁNG GHI: **xuất PDF bằng TRANG IN, không thêm thư viện PDF**
+Lộ trình ghi "xuất PDF". Tôi làm **trang in A4** (trình duyệt → "Lưu thành PDF") thay vì sinh file PDF ở máy
+chủ, vì hai lý do ĐO ĐƯỢC chứ không phải cho tiện:
+- `vendor/` **KHÔNG nằm trong git** (`git ls-files vendor | wc -l` = 0) ⇒ thêm gói composer nghĩa là máy
+  chủ phải chạy `composer install`, mà host này **chặn proc_open** (đã ghi nhiều lần trong sổ này).
+- Repo vốn không thêm phụ thuộc khi chưa cần. Trang in cho ra **cùng kết quả**, không cài gì, và chạy cả
+  trên điện thoại.
+Muốn file PDF sinh ở máy chủ thì cần `composer require dompdf/dompdf` — việc riêng, đã ghi ở PHẦN D.
+
+### A4. Ba luật giao diện đã khoá bằng test
+- Chưa lập phiếu ⇒ gói **vẫn xuất được** (giữ mẫu trắng + câu chỉ đường). Bỏ mẫu trắng là làm gói mất chức
+  năng với người chưa dùng phiếu.
+- Đã lập phiếu ⇒ **BỎ** các dòng chấm ở từng mẫu (phát mẫu trắng cạnh dữ liệu thật là mời xưởng điền lại).
+- Dòng có SỐ ĐO mà chưa có ĐIỂM ĐO ⇒ **khoá nút Lưu kèm lý do**, vì máy chủ bỏ dòng đó — bỏ im lặng là ghi
+  đè công sức người ta gõ.
+
+---
+
+## PHẦN B — KIỂM TRA SÂU LARAVEL AI SDK + HỖ TRỢ fal.ai
+
+### B1. Phát hiện (mỗi dòng đã TỰ ĐỌC LẠI để kiểm chứng, không tin báo cáo suông)
+| Câu hỏi | Kết luận | Bằng chứng |
+|---|---|---|
+| SDK có provider fal? | **KHÔNG.** 16 driver dựng sẵn: anthropic · azure · bedrock · cohere · deepseek · eleven · gemini · groq · jina · mistral · ollama · openai · openai-compatible · openrouter · voyageai · xai | `AiManager.php:285-453` (các hàm create*Driver) · `Providers/` |
+| SDK tạo được ẢNH không? | **CÓ** — contract `ImageProvider` + gateway `ImageGateway`; nhưng chỉ 6 provider làm được: OpenAi · Gemini · Xai · OpenRouter · Azure · Bedrock | `Contracts/Providers/ImageProvider.php:9-47` |
+| openai-compatible tạo ảnh được không? | **KHÔNG** | `Providers/OpenAiCompatibleProvider.php:15` — chỉ implements Embedding/Text/Transcription |
+| Đăng ký driver riêng từ app được không? | **ĐƯỢC, không cần vá vendor** — `AiManager extends MultipleInstanceManager` (không phải `Manager`), lớp đó có `extend($name, Closure)` và `resolve()` ưu tiên `customCreators` trước create*Driver | `AiManager.php:40` · `MultipleInstanceManager.php:130,155-157,202-210` |
+| fal có lọt vào đường VĂN BẢN không? | **Không** — nhưng **CÓ BẪY**: `SdkProviderMap::driverFor()` cũ coi **mọi thứ không phải gemini là openai-compatible**, kể cả fal ⇒ `SdkTextEngine::supports()` nói "chạy được" trong khi `configFor()` trả `null` (hai lớp nói hai chuyện khác nhau về cùng một candidate) | `SdkProviderMap.php:58-61` (cũ) · `SdkTextEngine.php:28-31` |
+| Vì sao fal chưa từng tới được SDK? | Catalog `fal` **thiếu `base_url`** ⇒ `AiModelGateway::resolve()` trả `null` ⇒ không bao giờ thành candidate | `helpers.php:1082` · `AiModelGateway.php:335-340` |
+
+### B2. Đã làm gì
+| # | Thay đổi | Tệp |
+|---|---|---|
+| 1 | Cổng tạo ảnh theo **API hàng đợi** fal (submit → poll → tải ảnh → base64), auth "Key …"; **nhịp poll tham số hoá** để test không phải ngủ thật | `app/Ai/Gateways/FalImageGateway.php` |
+| 2 | Provider SDK **chỉ** implements `ImageProvider` (fal không có endpoint chat); "WxH" → {width,height} vì fal KHÔNG nhận chuỗi như OpenAI | `app/Ai/Providers/FalProvider.php` |
+| 3 | Đăng ký `AiManager::extend('fal', …)` + ghi rõ vì sao KHÔNG vá vendor | `app/Providers/AppServiceProvider.php` |
+| 4 | fal → driver `fal`, base = gốc hàng đợi, `models.image`; đường cũ **không đổi** | `app/Ai/SdkProviderMap.php` |
+| 5 | 10 test | `tests/Feature/FalDriverTest.php` |
+
+**Nói thẳng:** đường tạo ảnh đang chạy thật của app (`ImageAIService::tryFal`) **cố ý KHÔNG đụng** — nó đã
+chạy production. Việc này làm fal **đi được qua SDK** và bịt lỗi map sai, **không** thay đường ảnh đang sống.
+
+### B3. Khoá bằng test
+driver phân giải ra `FalProvider` qua đường công khai `imageProvider()` · payload + header đúng chuẩn fal
+(`num_images`, `image_size` dạng object, `Authorization: Key …`) · ảnh về **base64 + mime thật** · thiếu
+khoá và fal từ chối đều **NÉM kèm lý do** (không nuốt thành ảnh rỗng) · `supports()` **từ chối** fal ở
+đường văn bản · provider thường **không đổi hành vi**.
+
+---
+
+## PHẦN C — KIỂM CHỨNG SAU DEPLOY
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | local `b049e85` = máy chủ `b049e85` |
+| Sao lưu TRƯỚC khi migrate | `~/db-backups/fabrikai-20260922-061151.sql.gz` · 524K · **41 bảng · kết thúc hợp lệ** |
+| Migration | `2026_09_26_000003_create_tech_packs_table` → **Ran [28]** (179,29 ms) |
+| Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` → **exit=0** |
+| Class mới tự nạp | TechPack · TechPackService · TechPackController · **FalProvider** · **FalImageGateway** = **OK** |
+| Cột bảng | `tech_packs` = `id, project_id, data, created_at, updated_at` |
+| Route mới | 4 đường: `du-an/{project}/phieu-ky-thuat` + 3× `api/projects/{project}/tech-pack` |
+| **DRIVER fal trên máy chủ** | `imageProvider()` → `App\Ai\Providers\FalProvider` · model mặc định `fal-ai/flux-1.1-schnell` · map fal → driver `fal`, base `https://queue.fal.run/`, models `image` |
+| HTTP | `/` 200 · `/dang-nhap` 200 · `/bo-suu-tap` 302 (đúng — chưa đăng nhập) |
+| Log | **0** dòng nhắc TechPack/tech_packs/FalProvider/FalImageGateway |
+| Test | **1145 XANH / 8.321 assertion** (trước đợt này: 1135 / 8.274) |
+
+## PHẦN D — NỢ CÒN LẠI
+| # | Nợ | Vì sao | Ai làm |
+|---|---|---|---|
+| 1 | **Máy chủ vẫn KHÔNG có queue worker** (như hai phiên trước) | Host chặn `crontab`, cron do hPanel quản. Ảnh hưởng: job **rút bài học** (GĐ2) vẫn nằm hàng đợi. Tech pack và driver fal **KHÔNG phụ thuộc worker** | Chủ dự án: 2 dòng cron hPanel (mục C, phiên 2026-09-21) |
+| 2 | Chưa gán model cho vai "Agent Studio — Rút kinh nghiệm" | Bỏ trống thì rơi về `agent_reason` → `prompt` | Chủ dự án |
+| 3 | PDF sinh ở máy chủ (nếu muốn) | Cần `composer require dompdf/dompdf` + xử lý việc host chặn proc_open. Hiện đã có bản in A4 → "Lưu thành PDF" | Việc riêng, chờ quyết định |
+| 4 | Đường tạo ảnh của app chưa đi qua driver fal | `ImageAIService::tryFal` vẫn là HTTP tự viết (đang chạy tốt). Gộp về SDK là việc lớn hơn, cần đo trước khi đổi | Việc sau |
+
+---
+
 ## Phiên 2026-09-26 (đợt 2) — TRÍ NHỚ THỦ TỤC (`brand_rules`) + VÁ LỖI INJECT khiến trí nhớ dài hạn không tới được prompt
 
 **Commit:** `deac094` (trên `acab2cd`). **Trạng thái: đã commit + push + DEPLOY production** — migration `2026_09_26_000002` đã chạy, cache đã dựng lại, `queue:restart` đã phát tín hiệu.
