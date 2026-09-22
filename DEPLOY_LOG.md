@@ -5,6 +5,36 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 16) — STUDIO: THANH TÀI KHOẢN GỌN TRÊN ĐIỆN THOẠI + GHI RÕ HAI VIỆC CÒN LẠI
+
+**Commit:** `9f1b2bd`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Đã làm — đo trước, sửa sau
+ĐO ĐƯỢC trên /studio ở 390px: các dải chrome phía trên vùng canvas là
+`thanh tài khoản 61px` + `dock 56px` + `thanh trên 57px` — tổng **174px trên màn 844px (21%)**, trong đó thanh tài khoản chỉ để nói TÊN tài khoản của người đã đăng nhập.
+
+| Việc | Kết quả đo |
+|---|---|
+| Điện thoại: thanh tài khoản co còn MỘT dòng (avatar 28px · bỏ dòng vai trò · đệm dọc 2,5 → 1,5) | **61px → 53px** |
+| Máy tính | **không đổi** (bố cục cũ, vì ở đó chiều cao không phải vấn đề) |
+| Test | **1233 XANH / 9.300 assertion** |
+
+### 2. HAI VIỆC CÒN LẠI — ghi rõ để phiên sau làm tiếp, kèm kế hoạch đã khảo sát
+
+**(a) Thư viện (`LibraryApp.vue`)** — chưa thiết kế lại bố cục. Hiện trạng ĐO ĐƯỢC: không tràn ngang ở 390px, sàn chạm 40px đã áp (đợt 13). Việc còn lại là bố cục: lưới ảnh + bộ lọc + trạng thái rỗng theo ngôn ngữ mới, và gom hành động phụ vào menu như đã làm ở Bộ sưu tập.
+
+**(b) Gộp QUẢN TRỊ + CÀI ĐẶT thành MỘT SPA** — chưa làm. Kết quả khảo sát kiến trúc (để phiên sau không phải dò lại):
+
+| Bề mặt | Hiện trạng |
+|---|---|
+| Entry | **4 entry riêng**: `main.js` (studio) · `settings.js` → `SettingsApp.vue` (1850 dòng) · `admin.js` → `AdminApp.vue` (2076 dòng) · `my-settings.js` → `MySettingsApp.vue` (169 dòng) |
+| Blade | `admin.blade.php` (15 dòng) · `settings.blade.php` (15) · `my-settings.blade.php` (26) · `design-tokens.blade.php` (289 — trang riêng, chưa gộp) · `team-costs.blade.php` (89) |
+| **AdminApp ĐÃ CÓ sẵn mô hình cần dùng** | `SECTIONS` + `navSections` nhóm theo `group` + sidebar `<nav class="hidden lg:sticky …">` + điều hướng bằng `?tab=` (đọc/ghi URL) ⇒ chỉ cần **hợp nhất danh sách mục** thay vì viết lại |
+| MySettingsApp | cũng có `SECTIONS` + sidebar + `data-section` trên element gốc (4 URL cùng dùng) |
+| Cách gộp rẻ nhất | **(1)** một entry `hub.js` + `SettingsHubApp.vue` giữ MỘT sidebar với 3 nhóm (Cài đặt của tôi · Hệ thống · Quản trị); **(2)** thêm prop `embedded` cho 3 app để ẩn thanh tiêu đề + sidebar riêng của chúng (mỗi tệp ~2 dòng: `v-if="!embedded"`); **(3)** mỗi app nhận `section` từ hub (ưu tiên hơn `?tab=`) để deep-link vẫn chạy; **(4)** trỏ `/admin` · `/settings` · `/cai-dat/*` vào hub, giữ nguyên URL cũ |
+| Vì sao KHÔNG làm vội | Đây là bề mặt chứa **khoá API · nhà cung cấp · model · gói và credit**. Làm nửa đường rồi bỏ dở ở đây có thể làm owner không cấu hình được hệ thống — hỏng đúng chỗ khó tự sửa nhất. Cần một đợt riêng có đo đạc hai bề rộng và kiểm tra cả 5 URL cũ |
+
+---
 ## Phiên 2026-09-26 (đợt 15) — AGENT STUDIO: DẢI TIẾN TRÌNH KIỂU MATERIAL + SÀN CHẠM CHO LIÊN KẾT
 
 **Commit:** `c25b259`. **Trạng thái: đã commit + push + DEPLOY production.**
