@@ -5,6 +5,80 @@
 
 ---
 
+## Phiên 2026-09-23 (đợt 39) — ƯU TIÊN TÌM KIẾM THỰC TRƯỚC: buộc tra trước khi trả lời + ĐO ĐỘ PHỦ
+
+**Commit:** `1987d56` (ưu tiên tìm kiếm thực) · `88ef02c` (`chat-check --show`). **Trạng thái: ĐÃ PUSH + ĐÃ DEPLOY `88ef02c` + ĐÃ ĐO trên production.**
+
+Câu hỏi của chủ dự án: *"bây giờ model đã tìm kiếm thật trên web được chưa → ưu tiên tìm kiếm thực trước"*. Trả lời bằng số đo, tách làm HAI câu hỏi khác nhau — vì gộp chúng lại là chỗ dễ tự lừa mình nhất.
+
+### 1. "Công cụ có chạy thật không?" — CÓ (đã đo ở đợt 38 và đo lại ở đợt này)
+
+| Phép đo | Kết quả |
+|---|---|
+| Câu hỏi TIN TỨC qua chat (`studio:chat-check --live`) | model **tự gọi công cụ 2 lượt**, **2 kết quả**, **2 trích dẫn thật**; mảnh chữ đầu tiên 4.017 ms |
+| Radar thật (tài khoản admin id 2) | `mode=hosted` · `calls=1` · `results=1` · **`stored=1`** ⇒ có hàng trong `web_findings` trên MySQL |
+
+### 2. "Nó tra được GÌ?" — TRƯỚC ĐỔT NÀY: CHỈ TIN TỨC
+
+Lệnh mới `php artisan studio:web-search-probe` (chạy trên production, `88ef02c`):
+
+```
+── NGUỒN TÌM ĐƯỢC THEO TỪ KHOÁ (all) ──
+  · google-news-thoi-trang         rss (không cần khoá)
+
+  xu hướng áo dạ tweed 2026   CÓ KẾT QUẢ · 2 nguồn · đọc được 44 · bỏ vì cũ 42 · 2 ms
+  cách giặt vải linen         0 KẾT QUẢ · 0 nguồn · đọc được 16 · bỏ vì cũ 16 · 1 ms
+  giá vải linen               0 KẾT QUẢ · 0 nguồn · đọc được 23 · bỏ vì cũ 23 · 1 ms
+
+Kết luận: 2/3 câu hỏi KHÔNG tra được gì — nguồn hiện khai thiên về TIN TỨC.
+```
+
+Năm nguồn đang khai (Google News · Tuổi Trẻ · Ngoisao/VnExpress · Eva · Thanh niên) đều là **RSS tin tức**; chỉ
+Google News là "tìm được theo từ khoá". Câu hỏi web chung (cách làm, giá, thông số) đi qua Google News nên hoặc
+không có gì, hoặc có mà **quá 60 ngày** (bộ lọc độ mới loại hết) ⇒ **0 kết quả**.
+
+### 3. Việc đã làm để "ưu tiên tìm kiếm thực trước"
+
+| # | Thay đổi | Vì sao |
+|---|---|---|
+| 1 | **Chỉ dẫn BUỘC tra trước** (chat + radar + brief): với mọi câu hỏi cần dữ kiện bên ngoài thì **phải gọi công cụ TRƯỚC KHI trả lời**; chỉ trả lời ngay khi câu hỏi chỉ về chính shop, hoặc người dùng yêu cầu rõ là không cần tra; tra không ra thì **nói thẳng, không suy đoán thay** | Bản cũ viết "gọi khi cần" ⇒ model tự quyết là *không cần* và trả lời bằng trí nhớ trong khi máy chủ có sẵn công cụ tra thật |
+| 2 | **Đảo thứ tự khối DỮ LIỆU**: tin VỪA LẤY trước, nguồn trong sổ sau (`mergeFindings`) | Model đọc khối này từ TRÊN XUỐNG; mở đầu bằng bản ghi CŨ là mở đầu bằng thứ dễ lỗi thời nhất |
+| 3 | **Nói thật lượt nào có tra**: dòng số đo trên giao diện nay LUÔN nói một trong hai — `Đã tự tra N lượt · M nguồn` hoặc `Lượt này KHÔNG tra web` | Bản cũ chỉ hiện khi CÓ nguồn ⇒ người dùng không phân biệt được câu trả lời có bằng chứng với câu trả lời từ trí nhớ |
+| 4 | **Lệnh đo độ phủ** `studio:web-search-probe` + `chat-check --show` (in cả NỘI DUNG câu trả lời, không chỉ số đo) | "Chạy được" ≠ "tra được"; và câu hỏi "nó có bịa không" chỉ trả lời được bằng chính câu trả lời |
+
+### 4. ĐO LẠI SAU KHI DEPLOY — hành vi mới chạy đúng
+
+**Câu hỏi web chung** (`--ask="Cách giặt vải linen cho khỏi nhão?"`):
+```
+công cụ : 2 lượt · 0 kết quả · 0 trích dẫn      ← model ĐÃ TRA TRƯỚC khi trả lời (bản cũ sẽ trả lời luôn)
+CHẢY THEO LUỒNG : CÓ · 969 ký tự
+
+── CÂU TRẢ LỜI (đầu) ──
+Chưa tra được nguồn mới nhất về vấn đề này. Tuy nhiên, dựa trên nguyên tắc chung của vải linen (dễ giãn khi ướt),
+bạn có thể áp dụng các bước sau để tránh làm nhão: 1. Giặt nước lạnh hoặc ấm nhẹ…
+```
+⇒ Đúng cả hai điều: **tra trước**, và khi tra không ra thì **nói thẳng là chưa tra được** rồi mới nói nguyên tắc
+chung — không đội lốt "nguồn" cho kiến thức sẵn có.
+
+### 5. Đường KHÔNG CẦN KHOÁ đã THỬ và KHÔNG dùng — nói rõ để lần sau không thử lại
+
+Đo từ chính máy chủ production: `https://html.duckduckgo.com/html/?q=…` lần đầu trả **HTTP 200 · 35.559 B · 10 kết
+quả**, lần sau (User-Agent khác) trả **HTTP 202 · 14.177 B · 0 kết quả**. Nghĩa là **bị chặn theo nhịp, kết quả thất
+thường** — đúng loại nguồn im lặng trả 0 mà dự án này cấm. ⇒ KHÔNG dựng nguồn tìm kiếm bằng cách đọc HTML của máy
+tìm kiếm.
+
+### 6. Việc CÒN LẠI để tra được WEB CHUNG (việc CẤU HÌNH, không phải việc mã)
+
+Khai một nguồn **kind = `search`** với khoá **Google Programmable Search** (miễn phí 100 truy vấn/ngày). Mã đã hỗ
+trợ sẵn và **đã có test** (`ToolSearchTest::test_a_search_source_gets_the_api_key_at_call_time_only`): khoá đọc từ
+bảng API key theo **slug của nguồn** (hoặc slot chung `google_cse`) và chỉ được gắn vào URL **ở đúng lời gọi HTTP** —
+không nằm trong cột URL hiện nguyên văn trên màn Cài đặt. Công thức 4 bước ở **HUONG_DAN_TINH_NANG_MOI.md §11.6**.
+Sau khi khai: chạy `php artisan studio:web-search-probe` — câu "cách giặt vải linen" phải chuyển từ **0 KẾT QUẢ**
+sang **CÓ KẾT QUẢ**.
+
+
+---
+
 ## Phiên 2026-09-23 (đợt 38) — DEPLOY PRODUCTION: vòng khép kín tìm kiếm + chat theo luồng
 
 **Commit:** `21e173c` (3 commit: `d9a2cb1` backend · `5a15220` giao diện + bundle · `21e173c` tài liệu). **Trạng thái: ĐÃ PUSH + ĐÃ DEPLOY + ĐÃ ĐO trên production.**
