@@ -5,6 +5,93 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 12) — THIẾT KẾ LẠI GUI THEO daisyUI 5 (minimalist + Material, mobile-first)
+
+**Commit:** `3f6d84e` · `180a58c` · `61b0da8`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Yêu cầu và cách tiếp cận
+Yêu cầu: *"sáng tạo 100%: tuân thủ quy tắc daisyui.com → thiết kế lại GUI/UI theo phong cách minimalist + material design → bỏ qua hướng dẫn thiết kế cũ → đảm bảo gui mới đẹp mắt → clean → dễ sử dụng → đáp ứng mobile mode"*.
+
+Cách làm: **đổi ở tầng NỀN trước, rồi mới tới từng trang** — vì giao diện có 116 tệp JS/Vue + 20 blade, sửa từng trang là hàng tuần và sẽ lệch nhau giữa chừng. Lớp nền gồm: (a) cài daisyUI THẬT, (b) khai hai theme `dark`/`light` ăn khớp với `data-theme` sẵn có, (c) viết lại các lớp component cũ để chúng đứng TRÊN token của daisyUI, (d) nâng thang chữ cho mobile.
+
+### 2. daisyUI 5 — DÙNG THẬT, KHÔNG MÔ PHỎNG TÊN LỚP
+Trước đợt này dự án chỉ **chép TÊN** biến của daisyUI (`--color-primary`, `--radius-field`, `--depth`, `--noise`…) vào một hệ token tự viết; daisyUI không có trong `package.json`.
+
+| Việc | Chi tiết |
+|---|---|
+| Cài | `daisyui@5.7.43` (devDependency) |
+| Plugin | `@plugin 'daisyui' { themes: false; include: … }` + 2 × `@plugin 'daisyui/theme'` |
+| Tên theme | **`dark` · `light`** — trùng đúng `data-theme` mà `layouts/app.blade.php` đã đặt từ trước ⇒ không phải sửa tầng theme |
+| Giá trị | Mọi token TRỎ VỀ bảng màu đã sinh (`var(--color-ink-800)`…): **một nguồn**, theme Sáng/Tối vẫn do `theme:sync` quyết định |
+| Hình dạng | `--radius-selector .5rem · --radius-field .75rem · --radius-box 1rem · --size-field .25rem · --border 1px · --depth 1` — thang Material 8 · 12 · 16px |
+
+**Chỉ nạp component sẽ dùng** (`include:`). ĐO ĐƯỢC: nạp tất cả làm CSS từ **152 KB lên 365 KB (+140%)**; chọn lọc còn **227 KB raw · 31,6 KB gzip**.
+
+**KHÔNG nạp 6 component trùng tên** với lớp đang dùng: `card` (121 chỗ) · `input` (245) · `label` (1008) · `badge` · `link` · `tab`. Lý do: daisyUI phát CSS vào tầng `utilities`, tức SAU tầng `components` của dự án ⇒ nạp chúng là ghi đè ngầm (`.card` của daisyUI thêm `display:flex; flex-direction:column` vào 121 thẻ, `.label` biến nhãn chữ thành khay flex). Bốn lớp đó được **tái tạo theo đúng thông số** của daisyUI nên vẫn một giọng.
+
+### 3. Ba lỗi THẬT do đo trong trình duyệt mới lộ ra
+Công cụ: **Chrome headless + CDP** (Node 26 có `WebSocket` sẵn, không cần thư viện), đo trên **production**: bề rộng 390 và 1440, đăng nhập THẬT qua biểu mẫu để đo cả trang trong studio.
+
+| # | Hiện tượng đo được | Nguyên nhân | Sửa |
+|---|---|---|---|
+| 1 | Nút `btn btn-primary` cao **20px**, nền trong suốt | `@utility btn` của dự án nằm ở tầng `utilities` nên LUÔN thắng `.btn` của daisyUI; `@apply btn` rơi vào bản tự vẽ | Xoá `@utility btn`; nạp component `button` của daisyUI; các lớp cũ chỉ còn gán `--btn-color`/`--btn-fg` ⇒ nút cao **40px**, bán kính 12px, nền `#605dff` |
+| 2 | Production trả `--radius-field: 0.25rem` (nút **4px**, thẻ **8px**) dù tệp CSS ghi 0,75rem | Token khai trong `@theme` được Tailwind phát MỘT LẦN ở khối `:root` ĐẦU TỆP ⇒ luôn thua `<style id="fabrikai-theme-override">` (theme người dùng import) trong `<head>` | Khai bằng **luật thật** `html[data-theme='dark'], html[data-theme='light']` (0-1-1, sau `@theme`) ⇒ production trả **0,75rem / 1rem**, nút 12px, thẻ 16px |
+| 3 | Nhãn dock điều hướng dưới **10px** trên điện thoại | daisyUI khai `.dock-label` 0,6875rem — dưới ngưỡng đọc của thang chữ mới | `.dock .dock-label { font-size: var(--text-tiny) }` |
+
+> Bài học chung: cả ba lỗi đều **xanh trên mọi test** và chỉ lộ ra khi đo **giá trị đã tính trong trình duyệt**. Cách đo nay nằm trong sổ (xem §7).
+
+### 4. Bản thiết kế mới — những gì người dùng thấy
+| Hạng mục | Trước | Sau |
+|---|---|---|
+| Họ chữ | Inter (nội dung) + **Fraunces serif** (tiêu đề) | **MỘT họ: Inter** — bỏ serif ở tiêu đề (bản tối giản chỉ cần một giọng; serif cỡ nhỏ trên mobile xuống nét) |
+| Thang chữ | 9 · 10 · 11 · 12,5 · 13 · 14px | **10 · 11,5 · 12,5 · 14 · 14,5 · 15,5px** — nhích lần hai cho mobile; cơ chế nhân `--font-scale` giữ nguyên |
+| Bán kính | mỗi nơi một kiểu (2xl/md/lg…) + ngoại lệ riêng trong studio | **MỘT thang theo token** 8/12/16px; đã xoá ngoại lệ `.studio-shell .card/.input/.chip` |
+| Nút | 5 lớp tự vẽ, mỗi lớp một bộ padding/bóng | Dựng trên **`.btn` của daisyUI**; `btn-sm` · `btn-outline` · `btn-ghost` là lớp CỦA daisyUI |
+| Ô nhập | 42px, bán kính 16px | **47px** (ngưỡng chạm ≥44px), bán kính 12px, focus ring theo token |
+| Điều hướng mobile | chỉ có nút menu ở góc trên | **Dock điều hướng dưới** (daisyUI `dock`): Tạo ảnh · Bộ sưu tập · Kết quả · Công cụ — mỗi đích MỘT chạm, mỗi tab cao **47px** |
+| Trang đăng nhập/đăng ký | một thẻ giữa màn hình | **Hai cột** trên máy tính (giới thiệu + biểu mẫu), **một cột** trên điện thoại; `viewport-fit=cover` cho tai thỏ |
+
+### 5. Kiểm chứng trên PRODUCTION (số đo, không phải cảm nhận)
+| Kiểm tra | Kết quả |
+|---|---|
+| Trang | `/` **200** · `/dang-nhap` **200** · `/dang-ky` **200** |
+| CSS phục vụ thật | `app-z5ZGc8oe.css` · **226,9 KB raw · 31,6 KB gzip** (trước: 143,6 KB · 21,0 KB) |
+| Token trong trình duyệt | `--radius-field` **0,75rem** · `--radius-box` **1rem** · nút **12px** · thẻ **16px** |
+| Nút thật của daisyUI | cao **40px** · nền `rgb(96,93,255)` = đúng `--color-primary` của theme |
+| Ô nhập | cao **47px** · bán kính 12px |
+| Tràn ngang @390px | **0px** (đăng nhập · đăng ký · trang chủ) |
+| Chữ dưới 11px (đăng nhập) | **0 chỗ** |
+| Dock mobile | `position: fixed` · `bottom: 0` · cao **56px** · 4 tab, mỗi tab **47px** (đo trên /studio @390px) |
+| Test | **1231 XANH / 9.271 assertion** |
+
+### 6. Ba test của bản thiết kế CŨ đã được cập nhật theo luật mới
+| Test | Vì sao phải sửa |
+|---|---|
+| `ThemeSystemTest::test_font_scale_is_a_token_scale…` | Khoá cứng sáu con số px của thang chữ ⇒ cập nhật theo lần nhích thứ hai cho mobile (cơ chế `calc(px * var(--font-scale))` không đổi) |
+| `DesignSystemTest::test_button_borders/backgrounds…` | Khoá NGUYÊN DÒNG `.tool-btn { @apply … rounded-md border border-ink-600 bg-ink-800 …}` ⇒ mọi thay đổi HÌNH DẠNG đều đỏ dù luật màu vẫn đúng. Nay kiểm **đúng luật** (regex trong khối `.tool-btn`) |
+| Cùng test, phần "KHÔNG quay lại viền cũ" | Tìm cả tệp nên `.card` hợp lệ dùng `border border-ink-700 bg-ink-800` làm đỏ OAN (bắt được trong đợt này) ⇒ kiểm trong khối `.tool-btn` |
+
+### 7. Cách đo lại bản thiết kế (không cần mắt người, không cần thư viện)
+Chrome headless + CDP bằng Node thuần — script `cdp-audit.mjs` trả về JSON: bề rộng khung nhìn · tràn ngang · họ chữ · nền trang · số phần tử bấm được · danh sách phần tử chạm <40px · chữ <11px · bán kính/chiều cao/nền của nút · thẻ · ô nhập. Cách chạy:
+```
+google-chrome --headless=new --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-audit about:blank &
+node /tmp/cdp-audit.mjs 'https://fabrikai.shop/dang-nhap' 390 844
+```
+Muốn đo trang TRONG studio: dùng `cdp-auth-audit.mjs` — nó đăng nhập thật qua biểu mẫu rồi mới đo (không thêm đường tắt nào vào mã nguồn).
+
+### 8. CÒN LẠI — phần chưa làm của yêu cầu "thiết kế lại toàn bộ"
+Nói thẳng để không chờ nhầm: đợt này xong **tầng nền + trang đăng nhập/đăng ký + vỏ mobile của studio**. Phần CHƯA thiết kế lại theo bố cục mới (chúng đã ăn theme/token/typography mới nhưng cấu trúc trang vẫn là bố cục cũ):
+
+| Hạng mục | Số đo hiện tại |
+|---|---|
+| Bảng thiết kế bộ sưu tập (`CollectionsPage` 953 dòng) + thẻ bên cạnh | chưa đổi bố cục |
+| Agent Studio (4 bước) | chưa đổi bố cục |
+| Thư viện · Cài đặt · Quản trị · Bảng giá · Trang chia sẻ | chưa đổi bố cục |
+| Thanh công cụ sâu trong studio | **38 phần tử chạm <40px** đo ở /studio @390px (nhiều nhất: 10 tab trên thanh trên 32px · 8 nút `h-7 w-7` 28px · 5 nút tỉ lệ 24px) |
+
+> Bước tiếp theo rẻ nhất và rõ nhất: **thay các thanh công cụ dày đặc trong studio bằng cụm nút lớn + menu "thêm"** cho mobile (đưa 38 phần tử nhỏ đó xuống dưới 10), rồi tới bảng bộ sưu tập.
+
+---
 ## Phiên 2026-09-26 (đợt 11) — ĐÓNG NỐT BA MỤC "CHƯA CÓ": màn hình TRÍ NHỚ · TIẾN ĐỘ SẢN XUẤT (#8) · TÌM THIẾT KẾ CŨ (#9)
 
 **Commit:** `2d73116` + `0e28d20` (bản sửa lô nhúng). **Trạng thái: đã commit + push + DEPLOY production** — hai migration đã chạy, cache dựng lại, chỉ mục đã lập cho tài khoản thật.
