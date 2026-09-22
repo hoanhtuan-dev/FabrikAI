@@ -5,6 +5,85 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 27) — HEADER THEO CHUẨN daisyUI + Ô MÔ TẢ CUỘN/ẨN/GỌI LẠI + TAB TRÒ CHUYỆN TÌM XU HƯỚNG
+
+**Commit:** `2052aa9`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Header Studio — đúng chuẩn daisyUI, gom đúng nhóm, một chỗ cho tài khoản
+
+| Trước | Sau |
+|---|---|
+| `<header class="elev-bar flex …">` tự dựng | `navbar elev-bar` của daisyUI + hai nhóm **`navbar-start`** (thương hiệu + bộ sưu tập đang áp dụng) và **`navbar-end`** (công cụ · credit · tài khoản) |
+| Danh tính người dùng (ảnh + tên + vai trò) nằm trơ ở mép TRÁI | Nhóm trái là **thương hiệu FabrikAI**; danh tính vào **menu tài khoản** |
+| Nút "Cài đặt" riêng + nút "Đăng xuất" riêng ở cuối thanh | **BỎ CẢ HAI**: một `dropdown dropdown-end` + `menu` gồm danh tính · **Cài đặt & quản trị** (`/cai-dat`) · **Agent Studio** · **Đăng xuất** |
+| Menu chỉ mở nhờ `:focus-within` | Mở bằng **state** (`dropdown-open` + lớp phủ đóng khi bấm ra ngoài, `Esc` để đóng) — bấm được cả khi không có focus, và đóng được |
+
+Không còn lối nào trong Studio trỏ thẳng tới `/settings`: cả bảng lệnh lẫn menu rail đều đi qua `/cai-dat`
+(trang hợp nhất ba khu, máy chủ tự ẩn khu chỉ owner). Biểu tượng `logout` được THÊM vào `icons.json` — nguồn
+duy nhất cho cả Vue lẫn PHP — và hướng dẫn thiết kế đổi theo (132 → **133 icon**).
+
+**Đo được (Chrome headless + CDP, owner thật):** thanh tiêu đề **63px** ở 1440 (trước 66px) · **59px** ở 390;
+`navbar/start/end` đều có; **không** còn `a[href*="/settings"]`; "Đăng xuất" **không** còn nút nào ngoài menu;
+menu mở ra 3 mục, cao 213px, mép phải 1424/1440 (điện thoại: 382/390); tràn ngang **0** ở 390 · 1024 · 1280 · 1440.
+
+### 2. Ô mô tả tạo ảnh — cuộn · ẩn · gọi lại
+
+| Yêu cầu | Cách làm | Đo được |
+|---|---|---|
+| **Cuộn được** | textarea `max-h-[38vh] overflow-y-auto` (cả vùng canvas trống vẫn cuộn) | mô tả 2.560 ký tự: khung 211px, nội dung 1.708px ⇒ **tự cuộn**, nút Tạo ảnh vẫn trong tầm mắt, trang không tràn |
+| **Ẩn được** | nút `data-prompt-collapse` trong thẻ | thẻ biến mất, khoá `fabrikai:studio:prompt-collapsed` = `1` |
+| **Gọi lại được** | nút `Mở ô tạo ảnh` (`data-prompt-recall`) | thẻ trở lại, khoá = `0`, **nội dung mô tả còn nguyên 2.560 ký tự** |
+
+### 3. Tab Trò chuyện — tìm thông tin & xu hướng bằng dữ liệu THẬT
+
+Hai tab trong màn hình trống: **Tạo ảnh** · **Trò chuyện** (nhớ tab đã chọn). Tab Trò chuyện hỏi–đáp theo
+hướng: gõ câu hỏi (hoặc bấm 1 trong 3 câu gợi ý) → trả lời gồm **xu hướng đang lên** (kèm "Nên làm"),
+**tin nguồn có liên kết**, và **kết quả trong kho thiết kế cũ của chính bạn**; mỗi xu hướng có nút
+**Đưa vào mô tả ảnh** để đi thẳng sang tab Tạo ảnh.
+
+**Ba đường mạng trong MỘT câu hỏi — và bài học đo được:** đọc tín hiệu (radar) · tin nguồn · tìm kho thiết kế.
+Chỉ cần MỘT đường không trả về là cả giao diện đứng ở "Đang đọc tín hiệu…" **vô hạn** (đã đo: >100 giây).
+Nay cả ba đều có trần thời gian (12s · 6s · 5s) và `finally` giữ bất biến: **dù nhánh nào chạy, trạng thái
+"đang đọc" phải được nhả**. Quá hạn thì trả lời bằng dữ liệu đã có sẵn và NÓI RÕ bản đầy đủ chưa xong.
+
+**Một lỗi thật do chính đợt này gây ra, tìm bằng cách đọc console trình duyệt:** một dòng còn sót lại
+(`searchNote.value = ''`) trỏ tới biến đã xoá ⇒ `ReferenceError` **ngay trước** khối `try`, nên không nhánh
+nào chạy và vòng xoay treo mãi. Đã xoá dòng đó và chuyển việc nhả trạng thái vào `finally` để lớp lỗi này
+không thể lặp lại.
+
+**Đo được:** ở máy dev (chưa cấu hình model) tab Trò chuyện trả lời sau **~2 giây** bằng nhánh dự phòng:
+3 tin nguồn THẬT kèm liên kết, không bịa xu hướng nào. Trên **production** đo trực tiếp hai đường dữ liệu:
+
+| Đường | Thời gian | Dữ liệu trả về |
+|---|---|---|
+| Tin nguồn + tín hiệu (`sources`) | **0,5s** | 14 tin · 16 tín hiệu · `source_mode=live` |
+| Radar bất định (`ai=false`) | **0,2s** | 14 xu hướng · 6 nguồn · `source_mode=live` |
+
+⇒ Trên production tab Trò chuyện trả lời bằng xu hướng thật trong chưa đầy một giây.
+
+### 4. Khoá bằng test
+
+`tests/Feature/StudioHeaderAndPromptTest.php` (mới, 5 bài): header dùng `navbar`/`navbar-start`/`navbar-end` và
+thương hiệu nằm trong nhóm trái · menu tài khoản chứa danh tính + `/cai-dat` + **đúng một** hành động đăng
+xuất và **không** còn `/settings` · biểu tượng `logout` lấy từ `icons.json` (và `IconRegistry::has('logout')`) ·
+ô mô tả có trần chiều cao + tự cuộn + ẩn/gọi lại được (khoá `fabrikai:`) · tab Trò chuyện đọc radar + kho
+thiết kế, có câu gợi ý và nút đưa xu hướng vào mô tả, và **nói thật khi không khớp / không có dữ liệu**.
+
+`CanvasControlsTest` giữ nguyên luật cũ (màn hình trống chỉ còn phần tạo ảnh) — bài này bắt được một câu chữ
+của tôi vô tình lặp lại cụm "Mở Agent Studio"; đã viết lại thành chỉ dẫn đúng chỗ ("mục «Agent thiết kế» ở
+thanh công cụ bên trái") thay vì nới luật.
+
+Toàn bộ: **1248 test XANH** (9477 assertions) — trước đợt này 1243.
+
+### 5. Deploy + kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD máy chủ | **`2052aa9`** — khớp local |
+| Sao lưu DB · cache | có sao lưu; `config/route/view:cache` + `queue:restart` chạy lại |
+| Log lỗi | không phát sinh dòng ERROR/CRITICAL nào sau deploy |
+
+---
 ## Phiên 2026-09-26 (đợt 26) — STUDIO GỌN HƠN: gộp rail phải lên thanh tiêu đề + Canvas trống CHỈ còn ô mô tả tạo ảnh
 
 **Commit:** `7f8c419`. **Trạng thái: đã commit + push + DEPLOY production.**
