@@ -26,6 +26,7 @@ class ChatCheckCommand extends Command
     protected $signature = 'studio:chat-check
         {--live : Gọi THẬT một lượt chat ngắn (tốn token) để đo đường luồng}
         {--ask=Xu hướng áo dạ tweed mùa thu này thế nào? : Câu hỏi dùng cho lượt đo}
+        {--show : In luôn phần đầu CÂU TRẢ LỜI (để kiểm nội dung, không chỉ số đo)}
         {--region=all : Vùng dữ liệu (all|hcm|hanoi|danang)}';
 
     protected $description = 'Đo đường CHAT THEO LUỒNG của Agent Studio: chữ có chảy thật không, mảnh đầu về sau bao lâu, công cụ có chạy không.';
@@ -113,6 +114,15 @@ class ChatCheckCommand extends Command
             (int) ($result['tool_search']['stored'] ?? 0)));
         $this->line(sprintf('  trích dẫn          : %d', count((array) ($result['citations'] ?? []))));
         $this->line(sprintf('  độ dài trả lời     : %d ký tự', mb_strlen((string) ($result['text'] ?? ''))));
+
+        // IN NỘI DUNG khi được yêu cầu: số đo cho biết máy đã làm gì, nhưng câu hỏi "nó có BỊA không" chỉ trả
+        // lời được bằng chính câu trả lời — nhất là ca tra không ra kết quả nào.
+        if ((bool) $this->option('show')) {
+            $text = trim((string) ($result['text'] ?? ''));
+            $this->newLine();
+            $this->line('── CÂU TRẢ LỜI (đầu) ──');
+            $this->line($text === '' ? '(rỗng)' : mb_substr($text, 0, 600));
+        }
 
         if (($result['failed'] ?? false) === true) {
             $this->error('  Lượt chạy HỎNG: '.(string) ($result['message'] ?? ''));

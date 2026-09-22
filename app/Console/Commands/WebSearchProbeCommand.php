@@ -43,7 +43,7 @@ class WebSearchProbeCommand extends Command
         $this->line('── NGUỒN TÌM ĐƯỢC THEO TỪ KHOÁ ('.$region.') ──');
         if ($targets === []) {
             $this->warn('  KHÔNG có nguồn nào tìm được theo từ khoá ⇒ công cụ web_search luôn trả 0 kết quả.');
-            $this->line('  Cần khai một nguồn có {query} trong URL — xem HUONG_DAN_TINH_NANG_MOI.md §11.4.');
+            $this->line('  Cần khai một nguồn có {query} trong URL — xem HUONG_DAN_TINH_NANG_MOI.md §11.6.');
 
             return self::SUCCESS;
         }
@@ -77,7 +77,7 @@ class WebSearchProbeCommand extends Command
         $this->line($live === count($questions)
             ? 'Kết luận: MỌI câu hỏi đều có kết quả thật.'
             : 'Kết luận: '.(count($questions) - $live).'/'.count($questions).' câu hỏi KHÔNG tra được gì — nguồn hiện khai thiên về TIN TỨC. '
-                .'Muốn tra được web chung thì khai thêm nguồn tìm kiếm (vd Google Programmable Search): xem HUONG_DAN_TINH_NANG_MOI.md §11.4.');
+                .'Muốn tra được web chung thì khai thêm nguồn tìm kiếm (vd Google Programmable Search): xem HUONG_DAN_TINH_NANG_MOI.md §11.6.');
 
         return self::SUCCESS;
     }
