@@ -5,6 +5,44 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 32) — GỐC RỄ THẬT: nút tài khoản đè lên nút Outputs là do huy hiệu đếm neo SAI chỗ
+
+**Commit:** `8c848bc`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### Nguyên nhân (cuối cùng đã tìm đúng)
+
+Nút Outputs có **huy hiệu đếm số ảnh** (`absolute right-0 top-0`) nhưng `.icon-btn` KHÔNG có `position:
+relative` ⇒ `absolute` neo về thẻ cha ĐỊNH VỊ gần nhất (thẻ `<header relative>`), không phải về nút. Huy hiệu
+vì vậy bay lên **góc trên-phải của header** — đúng chỗ nút tài khoản — và nút tài khoản vẽ ĐÈ LÊN nó.
+
+Đây là lý do mọi lần đo bề rộng trước đây đều "không thấy đè": tôi đo khoảng cách giữa HAI NÚT, còn thứ
+đè lên nút tài khoản là HƯƠNG HUY HIỆU (một phần tử tuyệt đối nằm ngoài khung nút Outputs).
+
+### Fix
+
+Thêm `relative` vào `.icon-btn` (đúng như `.activity-btn` đã có sẵn) — huy hiệu giờ neo ĐÚNG vào nút.
+
+### Đo trước ↔ sau (CDP, 1280px)
+
+| | Huy hiệu đếm | |
+|---|---|---|
+| Trước | neo về góc phải header (~x 1240–1260) | nằm dưới nút tài khoản (1224–1264) |
+| Sau | nằm TRONG nút Outputs (x 1107–1123, nút 1091–1123) | `badgeOnAcc = false`, `badgeInsideOut = true` |
+
+### Khoá bằng test
+
+`StudioHeaderAndPromptTest::test_icon_buttons_anchor_their_badges_inside_the_button` — `.icon-btn` phải
+khai báo `relative`. Toàn bộ: **1249 test XANH** (9484 assertions).
+
+### Deploy + kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD máy chủ | **`8c848bc`** — khớp local |
+| Sao lưu DB · cache | có sao lưu; `config/route/view:cache` + `queue:restart` chạy lại |
+| Log lỗi | không phát sinh dòng ERROR/CRITICAL nào sau deploy |
+
+---
 ## Phiên 2026-09-26 (đợt 31) — VẼ LẠI HEADER TỪ ĐẦU: ba cụm chức năng rõ ràng, đã TÍNH bề rộng
 
 **Commit:** `c483396`. **Trạng thái: đã commit + push + DEPLOY production.**
