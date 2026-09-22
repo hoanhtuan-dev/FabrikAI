@@ -99,7 +99,9 @@ async function askForget(row) {
               <span v-if="row.created_at_label">{{ row.created_at_label }}</span>
               <span v-if="row.age_days !== null">· {{ row.age_days }} ngày trước</span>
               <span v-if="row.hits">· nhắc lại {{ row.hits }} lần</span>
-              <span v-if="row.source">· {{ row.source }}</span>
+              <!-- Cột `source` của ký ức chứa "nhà cung cấp · model · thời điểm" — thông tin hạ tầng,
+                   không hiện cho người dùng (docs/DESIGN_SYSTEM.md §6). Nó vẫn nằm trong dữ liệu trả về
+                   để bộ phận kỹ thuật tra cứu. -->
 
               <button type="button" class="tool-btn btn-sm ml-auto !py-0.5 text-tiny"
                       :class="pendingForget === row.id ? '!border-danger/50 !text-danger' : ''"

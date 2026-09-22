@@ -76,10 +76,14 @@ function sourceClass(type) {
           <span class="rounded-full bg-ink-700 px-2.5 py-0.5 text-label text-cream-200">
             Chỉ mục: {{ stats.indexed || 0 }}/{{ stats.total || 0 }} tài liệu<span v-if="stats.percent !== null && stats.percent !== undefined"> ({{ stats.percent }}%)</span>
           </span>
-          <span v-if="stats.provider" class="rounded-full bg-brand-600/20 px-2.5 py-0.5 text-label text-brand-200">
-            {{ stats.provider.provider }} · {{ stats.provider.model }}
+          <!-- KHÔNG hiện tên nhà cung cấp AI hay model ở đây (docs/DESIGN_SYSTEM.md §6): người dùng cần
+               biết "tìm theo ngữ nghĩa có bật không", không cần biết hạ tầng nào đang chạy. -->
+          <span v-if="stats.can_embed" class="rounded-full bg-brand-600/20 px-2.5 py-0.5 text-label text-brand-200">
+            Tìm theo ngữ nghĩa: đã bật
           </span>
-          <span v-else class="rounded-full bg-warn/15 px-2.5 py-0.5 text-label text-warn">chưa có nhà cung cấp nhúng</span>
+          <span v-else class="rounded-full bg-warn/15 px-2.5 py-0.5 text-label text-warn">
+            Tìm theo ngữ nghĩa: chưa bật (đang tìm theo từ khoá)
+          </span>
           <button type="button" class="tool-btn btn-sm ml-auto" :disabled="store.searchBusy" @click="indexNow">
             <StudioIcon name="sparkles" size="h-3.5 w-3.5" /> {{ store.searchBusy ? 'Đang lập chỉ mục…' : 'Lập chỉ mục ngay (50 tài liệu)' }}
           </button>

@@ -271,11 +271,23 @@ class DesignSearchService
             }
         }
 
+        // CÂU CHỮ NÓI VỚI NGƯỜI DÙNG — KHÔNG nêu nhà cung cấp · endpoint · tên model (docs/DESIGN_SYSTEM.md §6).
+        // Chi tiết kỹ thuật để ở log phía máy chủ; ở đây chỉ nói: đang tìm bằng cách nào và khác gì.
         $reason = $this->embeddings->available()
-            ? 'Nhà cung cấp nhúng trả lỗi ở lượt này nên đang tìm theo TỪ KHOÁ — đây KHÔNG phải tìm ngữ nghĩa.'
-            : 'Chưa có nhà cung cấp nào nhúng được văn bản, nên đang tìm theo TỪ KHOÁ — đây KHÔNG phải tìm ngữ nghĩa. Muốn tìm theo ngữ nghĩa thì cần một nhà cung cấp có endpoint /embeddings (đã đo: ckey và qwen-paygo có, deepseek không).';
+            ? 'Lượt này tính năng tìm theo ngữ nghĩa không phản hồi, nên đang tìm theo TỪ KHOÁ — kết quả vẫn dùng được nhưng KHÔNG phải tìm theo ngữ nghĩa.'
+            : 'Tìm theo ngữ nghĩa chưa được bật cho tài khoản này, nên đang tìm theo TỪ KHOÁ — đây KHÔNG phải tìm theo ngữ nghĩa.';
+        $this->logFallback($this->embeddings->provider());
 
         return $this->searchByKeyword($user, $query, $limit, $reason, $started) + ['query' => $query, 'shape' => $this->shape()];
+    }
+
+    /** Ghi chi tiết kỹ thuật ra log (chỉ lập trình viên đọc) — KHÔNG đưa vào câu trả lời cho giao diện. */
+    private function logFallback(?array $provider): void
+    {
+        \Illuminate\Support\Facades\Log::info('studio:search dùng chế độ từ khoá', [
+            'provider' => $provider['provider'] ?? null,
+            'model' => $provider['model'] ?? null,
+        ]);
     }
 
     /** @return array<string, mixed>|null null = không quét được vec-tơ nào (nơi gọi lùi về từ khoá) */

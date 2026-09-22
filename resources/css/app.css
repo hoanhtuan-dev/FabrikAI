@@ -1306,6 +1306,37 @@ html[data-theme='light'] {
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .studio-shell .scrollbar-hide, .studio-shell { scroll-behavior: smooth; }
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   SÀN CHẠM CHO MOBILE — "đáp ứng mobile mode" (2026-09-26)
+
+   VẤN ĐỀ ĐO ĐƯỢC: ở bề rộng 390px, thanh công cụ studio có **38 phần tử bấm được dưới 40px**
+   (10 tab cao 32px · 8 nút 28px · 5 nút tỉ lệ 24px · 4 nút nền canvas 20px). Trên điện thoại đó là
+   ngưỡng chạm sai — ngón tay chạm vào hai nút cùng lúc hoặc trượt sang nút bên cạnh.
+
+   VÌ SAO KHÔNG SỬA TỪNG COMPONENT: hơn 40 tệp đang dùng `h-5/h-6/h-7/h-8`, và mật độ dày đó là ĐẶC
+   ĐIỂM trên máy tính (chuột chính xác tới pixel). Sửa từng tệp vừa mất mật độ desktop, vừa để lọt
+   những chỗ thêm sau này. Nay chỉ có MỘT luật, chỉ áp cho màn hình hẹp:
+     · mọi nút / role=button / select trong studio cao ≥ 40px;
+     · nút CHỈ CÓ ICON (đang là hình vuông 20–32px) cũng rộng ≥ 40px.
+   PHẠM VI: TOÀN BỘ ứng dụng, không riêng studio. ĐO ĐƯỢC: trang Bộ sưu tập ở 390px có 11/11 phần tử
+   bấm được dưới 40px và trang đó KHÔNG nằm trong .studio-shell — luật chỉ áp cho studio là bỏ sót cả
+   một nửa giao diện. Máy tính (>1023px) không đổi một pixel nào. */
+@media (max-width: 1023px) {
+    body button,
+    body [role='button'],
+    body select,
+    body input[type='button'],
+    body input[type='submit'] {
+        min-height: 2.5rem;
+    }
+
+    body button[class*='h-5'][class*='w-5'],
+    body button[class*='h-6'][class*='w-6'],
+    body button[class*='h-7'][class*='w-7'],
+    body button[class*='h-8'][class*='w-8'] {
+        min-width: 2.5rem;
+    }
+}
 /* [2026-09-26] Nhãn của dock điều hướng dưới: daisyUI khai 0,6875rem (~10px) — đo trên production là
    ĐÚNG 10px, dưới ngưỡng đọc của thang chữ mới. Nhãn này là chữ người dùng phải đọc để chọn đúng mục,
    không phải chú thích trang trí, nên theo token --text-tiny của dự án. */

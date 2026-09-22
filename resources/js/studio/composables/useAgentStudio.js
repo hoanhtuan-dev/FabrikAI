@@ -689,7 +689,9 @@ export function useAgentStudio() {
   // do CHIP ở thanh trên nói (modelShort) — nhắc lại ở đây thì một màn hình có ba chỗ nói cùng một câu
   // (chip thanh trên · chip trong card · cuối câu lý do), đúng thứ người dùng phản hồi là rối.
   const MODEL_REASON_LABELS = {
-    no_model_key: 'Chưa cấu hình AI cho nhóm công việc.',
+    // [2026-09-26] Câu cũ nhắc "nhóm công việc" — khái niệm của trang quản trị. Người dùng chỉ cần
+    // biết AI CHƯA ĐƯỢC BẬT cho tài khoản, và kết quả họ đang xem vẫn dùng được.
+    no_model_key: 'AI chưa được bật cho tài khoản này.',
     model_error: 'AI không phản hồi ở lượt này — kết quả vẫn đầy đủ.',
     invalid_output: 'AI trả về dữ liệu không dùng được ở lượt này — kết quả vẫn đầy đủ.',
     ai_disabled: 'Brief này được dựng khi Suy luận AI đang TẮT.',
