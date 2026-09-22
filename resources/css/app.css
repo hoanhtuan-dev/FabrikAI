@@ -226,7 +226,7 @@
     --size-selector: 0.25rem;
     --size-field: 0.25rem;
     --border: 1px;
-    --depth: 2;
+    --depth: 1;
     --noise: 0;
     /* @theme:sync:end */
 
@@ -585,6 +585,11 @@ html[data-theme='light'] {
     --radius-selector: 0.5rem;   /* chip · badge · nút icon */
     --radius-field: 0.75rem;     /* ô nhập · nút */
     --radius-box: 1rem;          /* thẻ · khối bề mặt */
+
+    /* ĐỘ NỔI 2 bậc (Material elevation). Khai Ở ĐÂY, không khai trong khối sinh tự động phía trên:
+       khối đó do `php artisan theme:sync` sinh và ThemeImportTest so khớp TỪNG KÝ TỰ — sửa tay trong đó
+       là làm lệch bản sinh (đã dính thật ở đợt này: sửa --depth trong khối sinh ⇒ 2 test đỏ). */
+    --depth: 2;
 }
 @layer components {
     .container-x {
