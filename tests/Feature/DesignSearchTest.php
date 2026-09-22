@@ -133,7 +133,10 @@ class DesignSearchTest extends TestCase
 
         $this->assertSame('keyword', $res->json('mode'));
         $this->assertStringContainsString('TỪ KHOÁ', (string) $res->json('mode_label'));
-        $this->assertStringContainsString('KHÔNG phải tìm ngữ nghĩa', (string) $res->json('reason'));
+        // Câu chữ nói với NGƯỜI DÙNG: nói đang tìm bằng cách nào, KHÔNG nêu nhà cung cấp/endpoint/model.
+        $this->assertStringContainsString('KHÔNG phải tìm theo ngữ nghĩa', (string) $res->json('reason'));
+        $this->assertDoesNotMatchRegularExpression('/embeddings|ckey|qwen|deepseek|provider|endpoint/i', (string) $res->json('reason'),
+            'Lý do hiển thị cho khách không được chứa chi tiết kỹ thuật (docs/DESIGN_SYSTEM.md §6).');
         $this->assertSame('generation', $res->json('items.0.source_type'));
         $this->assertStringContainsString('linen', $res->json('items.0.snippet'));
         $this->assertContains('linen', $res->json('items.0.matched'), 'Chế độ từ khoá phải nói nó khớp từ nào.');
