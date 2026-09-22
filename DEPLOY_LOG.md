@@ -5,6 +5,80 @@
 
 ---
 
+## Phiên 2026-09-25 (đợt 4) — BẢN CHỈ DẪN MẶC ĐỊNH VÀO CSDL + SỬA ĐƯỜNG SAO LƯU
+
+### Mục tiêu (yêu cầu chủ dự án)
+"ghi prompt mặc định vào chỉ dẫn ai + Sao lưu DB không bị hỏng"
+
+### 1. Vì sao tab «Chỉ dẫn AI» trống, và cách sửa đúng
+Chỉ dẫn radar dài ~2.900 ký tự và được **lắp theo tình trạng của lượt chạy** (hôm nay ngày nào, khu vực
+nào, có nguồn ngoài hay không, có công cụ tìm kiếm hay không). Nghĩa là nó **không phải một chuỗi cố định**
+— nên chép tay vào tài liệu là tạo bản sao thứ hai và nó lệch ngay ở lần sửa mã tiếp theo.
+
+Cách đã chọn: **chạy thật các luồng với mạng được GIẢ LẬP** rồi ghi lại chính câu lệnh đã dựng.
+
+| # | Thay đổi | Tệp |
+|---|---|---|
+| 1 | Ảnh chụp mặc định lưu **BỀN VỮNG** ở phiên bản 0 của `prompt_templates` (`is_active = false`) | `app/Ai/PromptCatalog.php` |
+| 2 | `studio:prompt --capture` — chạy 3 luồng với nhà cung cấp giả, **không tốn token** | `app/Console/Commands/StudioPrompt.php` |
+| 3 | `captureMode()` — bỏ qua bộ đệm cả ĐỌC lẫn GHI khi ghi nhận | `app/Services/DesignAgentService.php` |
+| 4 | 6 test khoá hành vi | `tests/Feature/PromptCaptureTest.php` |
+
+Vì sao **phiên bản 0** chứ không phải cache (bản đầu tôi làm bằng cache): cache bị `cache:clear`/hết hạn
+là mất — mất **đúng lúc cần đối chiếu nhất**. Phiên bản 0 không bao giờ được bật nên resolver
+`studio_prompt_template()` không bao giờ chọn nó, và nó bị lọc khỏi lịch sử phiên bản của owner.
+
+### 2. LỖI THẬT gặp trên production khi ghi nhận
+Lần chạy đầu chỉ được **2/3 khoá** — radar im lặng không ghi. Nguyên nhân: đường radar **trả về từ bộ đệm
+TRƯỚC khi dựng câu lệnh**, nên lượt ghi nhận trúng bộ đệm thì không bao giờ đi qua mốc cấu hình.
+Đã sửa bằng `captureMode()`, và **chặn cả đường GHI** — lượt ghi nhận chạy bằng nhà cung cấp giả, ghi kết
+quả giả vào bộ đệm dùng chung là biến lượt quét thật của khách thành câu trả lời rỗng.
+
+Lần hai: **3/3 khoá**, radar 2.895 · brief 2.809 · prompt mẫu 680 ký tự.
+
+### 3. Sao lưu DB — vì sao hỏng và nay đã hỏng ở đâu nữa không
+| Lần | Triệu chứng | Nguyên nhân THẬT |
+|---|---|---|
+| 1 | `Access denied … (using password: NO)` | Lệnh viết tay thiếu `MYSQL_PWD` |
+| 2 | vẫn `using password: NO` dù đã đọc `.env` | `parse_ini_file` trả về rỗng với `.env` này ⇒ mật khẩu rỗng. **Rất dễ kết luận sai là "mật khẩu sai"** |
+| 3 | Bản sao lưu TỐT bị báo HỎNG | Chính bước kiểm chứng của tôi sai: `tail -c 200 | gzip -dc` cắt giữa luồng gzip |
+| 4 | Báo thiếu INSERT ở MỌI bảng | Mẫu grep sai: mysqldump viết `INSERT INTO \`tên\`` (có dấu backtick) |
+
+**Cách sửa tận gốc:** `ops/fabrikai-db-cnf.php` lấy thông tin đăng nhập từ **chính Laravel** (đúng cái ứng
+dụng đang dùng ⇒ không thể lệch), ghi ra `my.cnf` tạm `chmod 600` và xoá trong mọi đường thoát.
+Không còn chỗ nào tự đoán mật khẩu.
+
+**Ba tệp trong `ops/`** (đã đưa vào git — bản đầu tôi viết thẳng trên máy chủ, nghĩa là **máy chủ mất là
+mất luôn cách sao lưu**):
+
+| Tệp | Việc |
+|---|---|
+| `fabrikai-db-cnf.php` | MỘT nơi lấy thông tin DB (từ Laravel) |
+| `fabrikai-backup.sh` | Sao lưu + **TỰ KIỂM CHỨNG** + tự dọn bản cũ |
+| `fabrikai-backup-verify.sh` | Kiểm chứng 2 mức (xem dưới) |
+
+### 4. Kiểm chứng sau deploy
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD máy chủ | `87bff3b` → `2f54c14` → **`2d6a426`** — khớp local |
+| Sao lưu (chạy 3 lần, mỗi lần trước khi pull) | `368K · 376K · 408K` — **40 bảng · kết thúc hợp lệ**, đều ĐẠT |
+| Ghi nhận chỉ dẫn | **3/3 khoá**: radar 2.895 · brief 2.809 · mẫu 680 ký tự |
+| Phiên bản 0 có bị bật không? | **KHÔNG** (`is_active = false`) · `configured = KHÔNG` · `số phiên bản = 0` |
+| Resolver có đổi hành vi không? | **KHÔNG** — vẫn trả chuỗi mặc định trong mã |
+| Giao diện nhận được gì | 3 khoá, mỗi khoá đều có `default_body` + danh sách `vars` để chèn |
+| Test | **1107 XANH** (+6) |
+
+### 5. Nợ còn lại
+- **Chưa khôi phục thử được ở Mức 2**: tài khoản CSDL **không có quyền `CREATE DATABASE`** (`ERROR 1044`).
+  Mức 1 đã đạt (nén nguyên vẹn · đủ 40 bảng · 30 bảng có dữ liệu đều có `INSERT`). Muốn chứng minh khôi
+  phục thật: tạo một CSDL trống trong hPanel rồi chạy
+  `~/bin/fabrikai-backup-verify.sh <tệp> <tên-csdl-tạm>` — script tự đối chiếu số dòng TỪNG BẢNG rồi xoá CSDL tạm.
+- Ảnh chụp mặc định là **ảnh chụp của MỘT lượt chạy**: câu lệnh thật còn đổi theo tình trạng nguồn dữ liệu
+  (lượt ghi nhận chạy với nguồn tin giả lập). Nó là **điểm xuất phát để sửa**, không phải bản sao tuyệt đối.
+- **Không có cron** trên máy chủ ⇒ sao lưu phải chạy tay (hoặc đặt cron trong hPanel).
+
+---
+
 ## Phiên 2026-09-25 (đợt 3) — QUẢN LÝ CHỈ DẪN AI TRÊN WEB (bỏ SSH) + VISION QUA SDK
 
 ### Mục tiêu (yêu cầu chủ dự án)
