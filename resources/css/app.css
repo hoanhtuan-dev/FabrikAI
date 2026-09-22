@@ -230,6 +230,16 @@
     --noise: 0;
     /* @theme:sync:end */
 
+    /* HÌNH DẠNG của bản thiết kế lại — ghi ĐÈ bán kính mà khối sinh tự động khai ở trên.
+       Vì sao phải ghi đè ở đây: khối @theme phía trên do "php artisan theme:sync" SINH RA và có
+       ThemeSystemTest khoá lại, nên không được sửa tay bên trong nó; bản sinh ra vẫn khai --radius-*
+       theo thang cũ (ô nhập 0,25rem · thẻ 0,5rem). Hai luật cùng độ ưu tiên ⇒ luật ĐỨNG SAU thắng.
+       ĐO ĐƯỢC (production, 2026-09-26): thiếu luật này thì nút trả bán kính **4px** và thẻ **8px**
+       dù theme daisyUI khai 0,75/1rem — tức là bản thiết kế mới không tới được người dùng. */
+    --radius-selector: 0.5rem;   /* chip · badge · nút icon */
+    --radius-field: 0.75rem;     /* ô nhập · nút */
+    --radius-box: 1rem;          /* thẻ · khối bề mặt */
+
     /* ── LỚP NGỮ NGHĨA THEO ĐÚNG BỘ TÊN CỦA daisyUI ──────────────────────────────────────
        [2026-09-23] Người dùng đưa một theme daisyUI để tham chiếu. Bộ tên của nó nay là lớp
        NGỮ NGHĨA CHÍNH của FabrikAI (dùng được ngay: bg-base-100 · text-base-content ·
@@ -1283,6 +1293,11 @@
 .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .studio-shell .scrollbar-hide, .studio-shell { scroll-behavior: smooth; }
+
+/* [2026-09-26] Nhãn của dock điều hướng dưới: daisyUI khai 0,6875rem (~10px) — đo trên production là
+   ĐÚNG 10px, dưới ngưỡng đọc của thang chữ mới. Nhãn này là chữ người dùng phải đọc để chọn đúng mục,
+   không phải chú thích trang trí, nên theo token --text-tiny của dự án. */
+.dock .dock-label { font-size: var(--text-tiny); }
 
 /* [2026-09-23] ĐÃ XOÁ khối "Storefront Vue SPA design system" (~115 dòng: .sf-* · .glass ·
    .card-surface · .section-title/kicker · .sf-input · .pb-safe · .reveal-anim).
