@@ -5,6 +5,64 @@
 
 ---
 
+## Phiên 2026-09-23 (đợt 42) — NÚT NỔI TRỢ LÝ + VÁ MARKUP DEEPSEEK + GÁN deepseek-flash VÀO VAI TÌM KIẾM
+
+**Commit:** `b8d41c7` (FAB) · `4c0ced4` (vá markup). **Trạng thái: đã push + deploy + ĐO trên production.**
+
+### 1. Nút Trợ lý thành NÚT NỔI (FAB)
+
+| Việc | Chi tiết |
+|---|---|
+| Nút | `ChatFab.vue` (mới): tròn, **48px dưới `lg` / 56px từ `lg`**, icon `bot`, `aria-label` + `title` nói rõ có dẫn nguồn, `shadow-2xl` + `.state-layer`, ẩn khi hộp thoại của chính nó đang mở |
+| Vị trí | Con TRỰC TIẾP của khối vùng canvas (`div.relative.flex-1.overflow-hidden` mang nền `canvas-bg-*`) ⇒ dock trái, dock Outputs và bảng Layers **không thể che**. Toạ độ `bottom-32 right-3` dưới `lg` (trên ba dải nổi ở đáy, đo từ mã) và `lg:bottom-4 lg:right-4` từ `lg` (chuẩn Material) |
+| Gỡ bản cũ | Bỏ `data-header-action="chat"` ở cụm công cụ thanh trên + mục «Trợ lý» trong menu mobile; GIỮ lệnh trong bảng lệnh (đường cho bàn phím) |
+| **LỖI THẬT bắt được khi làm** | Lần đặt đầu, nút rơi vào `canvasZoom` (khối có `@pointerdown` + `cursor-grab`) ⇒ mỗi cú bấm kéo theo xử lý nền canvas (bỏ chọn layer, bắt đầu quét chọn). Đã dời ra và khoá bằng test |
+| Test | Viết lại khối tương ứng với ghi chú "ĐỔI CHÍNH SÁCH (lần 2)" + **kiểm đột biến**: phá từng bất biến (đưa nút ra ngoài vùng canvas · đặt vào header · bỏ `v-if` · trả lại nút header · đặt vào `canvasZoom`) ⇒ test ĐỎ hết |
+| Tài liệu | `docs/DESIGN_SYSTEM.md` §3 + **§3.1 "Nút nổi (FAB) — luật riêng"** + viết lại §6.9 + checklist §10 |
+
+### 2. VÁ LỖI MARKUP CỦA DEEPSEEK — lỗi này chặn việc gán model, nên phải vá TRƯỚC
+
+**[ĐO THẬT]** Với `deepseek-flash`, khi công cụ được khai, provider trả **cả hai**: trường `tool_calls` chuẩn (máy chủ chạy được công cụ) **và** một khối markup riêng của DeepSeek nằm trong `content` — tức là **chữ hiển thị**. Lượt CUỐI (không khai công cụ) thì chỉ còn markup: đo được câu trả lời dài **332 ký tự**, bắt đầu bằng thẻ, **không có lời văn nào**.
+
+Ba việc đã làm (không chọn một):
+1. **KHAI THÁC** — đọc markup thành lời gọi công cụ thật (tên hàm + tham số) để vòng lặp chạy tiếp, thay vì coi khối markup là "câu trả lời";
+2. **DỌN** — gỡ markup khỏi **mọi** chữ đi ra: kết quả `text()`, chốt cuối `textResult()`, **từng mảnh chữ ở đường chảy**, và cả chữ gửi LẠI cho provider (gửi nguyên markup là dạy nó tiếp tục trả bằng định dạng đó);
+3. **VÒNG GIA HẠN** — lượt cuối mà model vẫn xin gọi công cụ thì được **một vòng nữa có công cụ** (tốn 2 vòng: khai công cụ + chốt).
+
+Cơ chế giữ mảnh chữ ở đường chảy: **chỉ giữ khi chuỗi đang giữ còn khớp ĐẦU của markup**; lệch một ký tự là phát ngay. [LỖI THẬT khi viết] Bản đầu giữ cố định 32 ký tự đầu ⇒ **gộp các mảnh đầu thành một cục**, làm hỏng đúng thứ đang muốn có — bị test `AgentChatStreamTest` bắt.
+
+Số đo mới: `text()`/`stream()` trả thêm **`tool_markup_calls`**. Test mới `ToolMarkupTest` (3 bài).
+
+### 3. GÁN `deepseek-flash` VÀO VAI «TÌM KIẾM NGUỒN NGOÀI» + ĐO LẠI
+
+| Việc | Trước | Sau |
+|---|---|---|
+| `studio_task_agent_search_model` | `''` (bỏ trống ⇒ rơi về chuỗi mặc định) | `deepseek:deepseek-flash` |
+| Nguồn TÌM ĐƯỢC theo từ khoá (`{query}`) | **0 nguồn** — cả 3 nguồn đang khai là `kind=page` KHÔNG có `{query}` ⇒ `web_search` luôn trả *"chưa có nguồn tìm kiếm nào được bật"* | **1 nguồn**: tạo lại `google-news-search` (`kind=rss`, URL `news.google.com/rss/search?q={query}…`) — nguồn mặc định của dự án, đã từng có trên production |
+
+**ĐO ĐỘ PHỦ sau khi khai nguồn** (`studio:web-search-probe`): câu hỏi TIN TỨC → **2 nguồn**; "cách giặt vải linen" và "giá vải linen" → **0** (đọc được 16/23 tin nhưng đều quá cũ) ⇒ vẫn cần API tìm kiếm cho web chung (§11.6).
+
+**ĐO CHAT THẬT với deepseek ở vai tìm kiếm** (`studio:chat-check --live --show`):
+```
+mảnh chữ đầu tiên : 3197 ms      CHẢY THEO LUỒNG: CÓ · 62 mảnh · 11.659 ms
+công cụ            : 5 lượt · 3 kết quả · 1 trích dẫn        ← DeepSeek TỰ TRA 5 lượt
+CÂU TRẢ LỜI: "Dữ liệu tìm kiếm hiện tại khá hạn chế và có dấu hiệu lỗi thời (tin duy nhất từ
+tháng 7/2026, đã hơn 2 tháng)… mình KHÔNG THỂ khẳng định chính xác xu hướng vi mô nào đang hot…"
+```
+⇒ Ba điều cùng lúc: **tra trước**, **KHÔNG rò markup** (vá có tác dụng thật trên production), và **nói thật về chất lượng dữ liệu** thay vì bịa.
+
+### 4. Nợ còn lại
+
+| # | Việc |
+|---|---|
+| 1 | **Chưa bấm tay trong trình duyệt**: vị trí FAB ở 320/375px, hover/active, bóng bị `overflow-hidden` cắt mép, **cả hai theme** — mọi khoảng cách hiện là số ĐO TỪ MÃ |
+| 2 | Ca biên trên `lg`: canvas hẹp < ~474px **và** đang có dải biến thể — chưa loại trừ được bằng mắt |
+| 3 | **Tra web chung vẫn cần API tìm kiếm có khoá** (Google CSE, §11.6); nguồn RSS chỉ có tin tức |
+| 4 | Hai nguồn `kind=page` đang khai: `vnexpress` bóc TỐT (5 bài thật); `bazaarvietnam` bóc RÁC (tiêu đề chuyên mục + URL chính trang đó) ⇒ nên bỏ hoặc khai `items_path`; `news.google.com` topic bài 0 mục (đã báo lỗi đúng) |
+
+
+---
+
 ## Phiên 2026-09-23 (đợt 41) — TÁCH CHAT KHỎI CANVAS TRỐNG THÀNH MODAL «TRỢ LÝ THIẾT KẾ» (Material, tối giản)
 
 **Commit:** `<?>`. **Trạng thái: đã push + deploy.**
