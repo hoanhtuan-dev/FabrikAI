@@ -975,13 +975,17 @@ function onTouchEnd(e) {
     <!-- [Đợt 0.1] Banner 3 trạng thái xác thực — thay thế 403 im lặng bằng thông báo rõ ràng -->
     <AuthNotice />
     <!-- ══ Top account bar: thông tin người dùng + đăng nhập/đăng xuất + điều hướng quản trị ══ -->
-    <div class="flex items-center justify-between gap-3 border-b border-ink-700 bg-ink-900/90 px-3 py-2.5 sm:px-4">
+    <!-- [2026-09-26 · thiết kế lại] ĐIỆN THOẠI: thanh này co lại còn MỘT dòng (avatar 28px + tên + nút),
+         bỏ dòng vai trò và giảm đệm dọc (2,5 → 1,5). ĐO ĐƯỢC trước khi sửa: thanh cao **61px** trên màn
+         844px — chỉ để nói tên tài khoản, trong khi người dùng đã đăng nhập rồi và việc cần làm nằm ở dưới.
+         Máy tính (sm trở lên) giữ nguyên bố cục cũ vì ở đó chiều cao không phải vấn đề. -->
+    <div class="flex items-center justify-between gap-3 border-b border-ink-700 bg-ink-900/90 px-3 py-1.5 sm:px-4 sm:py-2.5">
       <div class="flex min-w-0 items-center gap-2.5">
         <template v-if="store.user">
-          <img :src="store.user.avatar || '/images/placeholder.svg'" class="h-8 w-8 shrink-0 rounded-full bg-ink-700 object-cover ring-2 ring-brand-500/40" @error="$event.target.src = '/images/placeholder.svg'" alt="Ảnh đại diện">
+          <img :src="store.user.avatar || '/images/placeholder.svg'" class="h-7 w-7 shrink-0 rounded-full bg-ink-700 object-cover ring-2 ring-brand-500/40" @error="$event.target.src = '/images/placeholder.svg'" alt="Ảnh đại diện">
           <div class="min-w-0 leading-tight">
-            <p class="truncate text-sm font-semibold text-cream-50">{{ store.user.name }}</p>
-            <p class="truncate text-body text-cream-400">{{ store.user.role_label || store.user.role }}<span class="hidden sm:inline"> · {{ store.user.email }}</span></p>
+            <p class="truncate text-body font-semibold text-cream-50 sm:text-sm">{{ store.user.name }}</p>
+            <p class="hidden truncate text-body text-cream-400 sm:block">{{ store.user.role_label || store.user.role }}<span class="hidden sm:inline"> · {{ store.user.email }}</span></p>
           </div>
         </template>
         <template v-else>
