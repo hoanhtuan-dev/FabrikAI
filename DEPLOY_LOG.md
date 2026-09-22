@@ -5,6 +5,95 @@
 
 ---
 
+## Phiên 2026-09-23 (đợt 38) — DEPLOY PRODUCTION: vòng khép kín tìm kiếm + chat theo luồng
+
+**Commit:** `21e173c` (3 commit: `d9a2cb1` backend · `5a15220` giao diện + bundle · `21e173c` tài liệu). **Trạng thái: ĐÃ PUSH + ĐÃ DEPLOY + ĐÃ ĐO trên production.**
+
+> ⚠️ **Lệch đồng hồ giữa hai máy — đọc số giờ cho đúng:** máy dev (harness) là **2026-09-23**, máy chủ Hostinger là **2026-09-22 18:2x**. Cùng một buổi deploy. Mọi mốc dưới đây ghi theo **giờ MÁY CHỦ** khi là việc chạy trên host.
+
+### 1. Trình tự đã chạy (đúng §7 của DEPLOY.md)
+
+```bash
+# LOCAL — test TRƯỚC, build SAU
+vendor/bin/phpunit --no-coverage            # OK (1266 tests, 9643 assertions) — chạy TRƯỚC khi commit
+npm run build                               # xanh; bundle public_html/build/** đã commit cùng giao diện
+git push origin main                        # 64c209d..21e173c
+
+# HOST
+cd ~/domains/fabrikai.shop
+git config core.fileMode false
+git pull --ff-only origin main              # 0c65d9e → 21e173c
+php artisan package:discover                # chạy TAY — proc_open bị chặn trên host này
+~/bin/fabrikai-backup.sh                    # SAO LƯU TRƯỚC KHI MIGRATE (có migration mới)
+php artisan migrate --force                 # 2026_09_26_000010_create_web_findings_table DONE 133.81ms (batch 34)
+php artisan config:cache && php artisan route:cache && php artisan view:cache
+php artisan queue:restart
+```
+
+**Sao lưu:** `/home/u310846799/db-backups/fabrikai-20260922-182005.sql.gz` — **848K · 47 bảng · kết thúc hợp lệ** (script tự kiểm; xoá bản cũ theo `KEEP`).
+
+### 2. Verify production — SỐ ĐO THẬT, không phải checklist
+
+| Hạng mục | Kết quả ĐO ĐƯỢC |
+|---|---|
+| Mã trên host | `git rev-parse --short HEAD` = **21e173c** |
+| Cache đã nạp lại | `bootstrap/cache/config.php` **28.289 B** · `routes-v7.php` **323.340 B** (đều 18:20 giờ máy chủ) |
+| Route mới | `POST api/design-agent/chat/stream` · `GET api/design-agent/findings` · `PUT api/design-agent/findings/{id}` — đều có trong `route:list` |
+| Bảng mới | `web_findings` — `migrate:status` = **Ran**, batch **34** |
+| HTTP | `/up` **200** · `/` **200** · `/dang-nhap` **200** |
+| Chặn khách (API) | `GET /api/design-agent/findings` (Accept: json) → **401**; `POST /api/design-agent/chat/stream` → **419 CSRF** (đúng: middleware web chặn trước `auth`; trình duyệt gửi kèm `X-XSRF-TOKEN`) |
+| Bundle entry | `build/assets/agent-studio-CumVev63.js` → **200 · 212.481 B**, có chuỗi **"Hỏi đáp"** (2) và **"Nguồn để bạn tự kiểm"** (1) |
+| Chunk dùng chung | `build/assets/pageBoot-D2xyhjz9.js` → **200 · 301.667 B**, có **`design-agent/chat/stream`** và **`agentChatAsk`** (mã chat nằm ở chunk chung vì store dùng cho cả 6 entry — grep riêng file entry sẽ không thấy) |
+| Hàng đợi | `failed_jobs=0` · `pending=0` |
+| Log | **KHÔNG phát sinh lỗi mới**. Lỗi duy nhất trong log là lỗi **CHRONIC có từ 2026-09-17** (25 lần): `proc_open` bị chặn ⇒ Laravel Scheduler không chạy được command qua Symfony Process (`studio:market-signals` mỗi 30 phút). Đây là hạn chế đã biết của host, KHÔNG liên quan đợt này |
+
+### 3. ĐO THẬT đường chat theo luồng — `php artisan studio:chat-check --live`
+
+```
+  hỏi: Xu hướng áo dạ tweed mùa thu này thế nào?
+       0 ms  Đang chuẩn bị câu trả lời…
+      16 ms  Đang đọc hồ sơ thương hiệu của bạn…
+      18 ms  Đang suy luận…
+    1609 ms  Đang tra: xu hướng áo dạ tweed thu đông 2026   ← model TỰ gọi công cụ
+    1913 ms  kết quả công cụ: 1 nguồn
+    1914 ms  Đang tra: tweed jacket trend fall winter 2026
+    2220 ms  kết quả công cụ: 1 nguồn
+   10536 ms  Đã trả lời
+
+  mảnh chữ đầu tiên : 4017 ms      ← mấu chốt: chữ về TRƯỚC khi câu trả lời kết thúc
+  tổng thời gian     : 10536 ms
+  số mảnh chữ        : 103
+  CHẢY THEO LUỒNG    : CÓ          ← nhà cung cấp + proxy đều chịu luồng (X-Accel-Buffering: no)
+  công cụ            : 2 lượt · 2 kết quả · 2 trích dẫn · 1075 ký tự trả lời
+```
+
+⇒ Đây là phép đo mà test KHÔNG THỂ thay được: nó chứng minh `stream: true` chạy thật trên hạ tầng này (nhà cung cấp không bỏ qua tham số, proxy không đệm). Trước phép đo này, "chat mượt" chỉ là suy đoán từ fake trong PHPUnit.
+
+### 4. ĐO THẬT vòng khép kín SỔ NGUỒN trên MySQL (khác hẳn SQLite của bộ test)
+
+Chạy một lượt radar THẬT cho tài khoản `admin@fabrikai.shop` (id 2) rồi đọc lại sổ:
+
+| Lượt | Đo được |
+|---|---|
+| Lượt 1 (gọi model thật) | `engine=ai-v1` · `latency_ms=45656` · `tool_search.mode=hosted` · `calls=1` · `results=1` · **`stored=1`** ⇒ `web_findings` có **1 hàng** trên MySQL (đường hosted nay CŨNG ghi sổ — chính là phần thêm trong `collectAiEvidence`) |
+| Lượt 2 (mở lại màn hình) | **`cached=true`** · `latency_ms=292` (KHÔNG tốn lượt model) · `external_evidence.findings_count=1` ⇒ **nguồn trong sổ đã quay về khối DỮ LIỆU của Agent Studio** |
+| `php artisan studio:web-findings --user=2` | `tổng 1 nguồn · đã lưu 0 · còn dùng lại được 1 (hạn 30 ngày)` + in ra tiêu đề, URL và **câu hỏi đã tra** của nguồn đó |
+
+**MỘT QUAN SÁT THẬT cần ghi lại (không tô hồng):** ở cấu hình production hiện tại, nguồn AI tra được **trùng URL với chính feed Google News** của máy chủ ⇒ bộ khử trùng lấy bản của feed, nên mục trong khối DỮ LIỆU **không mang nhãn `found_by=ai_search`** (nhãn đó chỉ hiện khi URL chỉ có trong sổ). Giá trị của sổ ở cấu hình này nằm ở: (a) DÙNG LẠI khi feed rỗng/cũ hoặc mạng hỏng, (b) danh sách nguồn + nút **Lưu nguồn** trên giao diện, (c) số đo trung thực "AI đã tra gì". Muốn nhãn hiện rõ hơn thì phải khai một nguồn tìm kiếm KHÁC nguồn feed (nguồn `kind=search` có khoá API) — việc cấu hình, không phải việc mã.
+
+### 5. Nợ còn lại sau deploy
+
+| # | Việc | Trạng thái |
+|---|---|---|
+| 1 | **Chưa bấm tay trong trình duyệt** (đăng nhập thật, mở `/agent-studio?buoc=chat`, xem chữ chảy + bấm Dừng + Lưu nguồn) | Chưa làm — cần một người ngồi trước màn hình. Mọi khẳng định về giao diện hiện dựa trên mã + bundle ĐÃ phục vụ qua CDN, không phải ảnh chụp |
+| 2 | Lịch sử hội thoại chưa lưu phía máy chủ | Như đã ghi ở đợt 37: client gửi lại 12 lượt gần nhất |
+| 3 | Nhãn `found_by=ai_search` không hiện khi nguồn trùng feed | Xem §4 — việc CẤU HÌNH (khai nguồn tìm kiếm riêng) |
+| 4 | Lỗi `proc_open` của Scheduler (mỗi 30 phút, 25 lần từ 2026-09-17) | Nợ CÓ TRƯỚC, không thuộc đợt này; muốn hết phải bỏ chạy command qua Symfony Process (hoặc xin host mở `proc_open`) |
+| 5 | Ảnh hưởng của luồng chat lên worker PHP-FPM khi nhiều người chat cùng lúc | Chưa đo tải — trần 45 s + throttle 20/phút là lớp chặn hiện có |
+
+
+---
+
 ## Phiên 2026-09-26 (đợt 37) — CHAT THEO LUỒNG CỦA AGENT STUDIO: chữ chảy về khi model viết, công cụ web dùng CHUNG bộ với radar/brief
 
 **Commit:** chưa có — phiên này KHÔNG commit và KHÔNG push theo yêu cầu. **Trạng thái: MÁY CHỦ + GIAO DIỆN
