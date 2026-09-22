@@ -26,6 +26,11 @@ import { setCatalogErrorHandler } from './composables/useLocalCatalog.js';
  *   · đổi mục thì cập nhật URL bằng history.pushState sang /cai-dat/<mục> nên vẫn deep-link được.
  */
 
+// [2026-09-26] `embedded`: app này được nhúng vào trang hợp nhất (SettingsHubApp). Khi đó hai tiêu
+// đề "Cài đặt của tôi" (sidebar + hàng chọn mục trên điện thoại) bị ẩn — thanh của trang hợp nhất
+// đã nói rõ đang ở khu nào.
+const props = defineProps({ embedded: { type: Boolean, default: false } });
+
 const SECTIONS = [
   { id: 'presets', label: 'Preset', icon: 'palette', desc: 'Mẫu prompt dùng trong Studio', hint: 'Cặp key: value được chèn vào prompt khi bạn chọn nó trong Studio.' },
   { id: 'model', label: 'Khuôn mặt', icon: 'user', desc: 'Khuôn mặt người mẫu', hint: 'Dùng cho Thay người mẫu và Ghép ảnh. Mục bạn thêm là của riêng bạn.' },
@@ -99,7 +104,7 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
       <!-- Sidebar (màn hình rộng) -->
       <aside class="hidden w-64 shrink-0 lg:block">
         <div class="sticky top-6 flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-xl border border-ink-700 bg-ink-800/70">
-          <div class="border-b border-ink-700 px-4 py-4">
+          <div v-if="!props.embedded" class="border-b border-ink-700 px-4 py-4">
             <p class="text-label font-semibold uppercase tracking-wider text-cream-400">FabrikAI</p>
             <h1 class="mt-1 font-display text-base font-semibold text-cream-50">Cài đặt của tôi</h1>
           </div>
@@ -129,7 +134,7 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
         <!-- Chọn mục cho màn hình hẹp (sidebar bị ẩn dưới lg) -->
         <div class="border-b border-ink-700 bg-ink-900/95 px-4 py-3 lg:hidden">
           <div class="flex items-center justify-between gap-2">
-            <h1 class="font-display text-base font-semibold text-cream-50">Cài đặt của tôi</h1>
+            <h1 v-if="!props.embedded" class="font-display text-base font-semibold text-cream-50">Cài đặt của tôi</h1>
             <button @click="navOpen = !navOpen" class="btn-outline btn-sm" :aria-expanded="navOpen">
               <StudioIcon name="layers" size="h-3.5 w-3.5" /> {{ active.label }}
             </button>

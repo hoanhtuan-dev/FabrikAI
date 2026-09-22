@@ -28,10 +28,13 @@ use Illuminate\Validation\Rules\Password;
  */
 class AdminController extends Controller
 {
-    /** Trang Quản trị SPA (shell Blade) — Vue mount vào #admin-root. */
+    /**
+     * Trang Quản trị SPA — nay là KHU "admin" của trang hợp nhất Cài đặt & Quản trị
+     * (view studio.hub, Vue mount vào #hub-root). [2026-09-26]
+     */
     public function adminPage()
     {
-        return view('studio.admin');
+        return view('studio.hub', ['area' => 'admin']);
     }
 
     // ── [Yêu cầu 2026-09-17] Giao diện ─────────────────────────────────────

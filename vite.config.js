@@ -19,6 +19,9 @@ export default defineConfig({
                 // 4 lối vào: /cai-dat/<mục> cùng các URL cũ /presets · /stylist-data · /model-settings.
                 'resources/js/studio/my-settings.js',
                 'resources/js/studio/admin.js',
+                // [Yêu cầu 2026-09-26] TRANG HỢP NHẤT "Cài đặt & Quản trị" — thay khung nhìn của
+                // settings.js · admin.js · my-settings.js bằng một thanh tiêu đề và một bộ chuyển khu.
+                'resources/js/studio/hub.js',
                 'resources/js/studio/collections.js',
                 // [Yêu cầu 2026-09-25] TRANG AGENT STUDIO — luồng 4 bước tách khỏi modal trong
                 // /studio thành trang riêng, nên có entry riêng: trang này KHÔNG cần cả xưởng thiết

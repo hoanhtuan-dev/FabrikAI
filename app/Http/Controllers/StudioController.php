@@ -108,7 +108,8 @@ class StudioController extends Controller
         return response()->view('studio.index')->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
-    public function settingsPage() { return view('studio.settings'); }
+    /** [2026-09-26] Cài đặt hệ thống nay là KHU "system" của trang hợp nhất /cai-dat. */
+    public function settingsPage() { return view('studio.hub', ['area' => 'system']); }
 
     /**
      * [Yêu cầu 2026-09-20] KHU "CÀI ĐẶT CỦA TÔI" HỢP NHẤT.
@@ -140,7 +141,7 @@ class StudioController extends Controller
             $section = 'presets';
         }
 
-        return view('studio.my-settings', ['section' => $section]);
+        return view('studio.hub', ['area' => 'mine', 'section' => $section]);
     }
 
     public function presetsPage() { return $this->mySettingsPage('presets'); }

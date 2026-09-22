@@ -1,0 +1,1 @@
+import{f as e,l as t,n,t as r}from"./pageBoot-DurM21Fp.js";import{t as i}from"./SettingsApp-5cs8_jUT.js";r(),n(e(i).use(t()),`#settings-root`);

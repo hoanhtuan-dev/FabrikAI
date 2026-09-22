@@ -1,0 +1,1 @@
+import{f as e,l as t,n,t as r}from"./pageBoot-DurM21Fp.js";import{t as i}from"./AdminApp-Cro1qnEN.js";r(),n(e(i).use(t()),`#admin-root`);

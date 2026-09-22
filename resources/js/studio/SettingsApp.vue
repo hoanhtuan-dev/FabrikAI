@@ -61,6 +61,10 @@ async function adminApi(path, method = 'GET', body = null) {
   return d;
 }
 
+// [2026-09-26] `embedded`: app này được nhúng vào trang hợp nhất (SettingsHubApp). Khi đó thanh
+// tiêu đề riêng bị ẩn — thanh của trang hợp nhất đã có tên khu, lối về Studio và bộ chuyển khu.
+const props = defineProps({ embedded: { type: Boolean, default: false } });
+
 // ─────────────────────────── Điều hướng & nhãn ───────────────────────────
 const SECTIONS = [
   { id: 'overview',  group: 'Bắt đầu',      label: 'Tổng quan',        icon: 'activity' },
@@ -776,8 +780,8 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
       </transition>
     </div>
 
-    <!-- ═════════ Thanh tiêu đề ═════════ -->
-    <header class="sticky top-0 z-40 border-b border-ink-700 bg-ink-900/95 backdrop-blur">
+    <!-- ═════════ Thanh tiêu đề (ẩn khi nhúng vào trang hợp nhất) ═════════ -->
+    <header v-if="!props.embedded" class="sticky top-0 z-40 border-b border-ink-700 bg-ink-900/95 backdrop-blur">
       <div class="mx-auto flex w-full max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5 lg:px-6">
         <a href="/" class="tool-btn shrink-0" title="Về Studio">
           <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" />
@@ -825,7 +829,7 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
 
       <div v-else class="grid grid-cols-1 gap-5 lg:grid-cols-[15.5rem_minmax(0,1fr)]">
         <!-- ═════════ Danh mục (desktop) ═════════ -->
-        <nav class="hidden lg:sticky lg:top-[4.75rem] lg:block lg:self-start" aria-label="Mục cài đặt">
+        <nav class="hidden lg:sticky lg:block lg:self-start" :class="props.embedded ? 'lg:top-[4.25rem]' : 'lg:top-[4.75rem]'" aria-label="Mục cài đặt">
           <div v-for="group in SECTION_GROUPS" :key="group" class="mb-4">
             <p class="mb-1.5 px-3 text-label font-semibold uppercase tracking-[0.14em] text-cream-300">{{ group }}</p>
             <ul class="space-y-0.5">
