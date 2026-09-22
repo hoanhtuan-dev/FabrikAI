@@ -342,9 +342,13 @@ class ThemeSystemTest extends TestCase
         $css = $this->css();
 
         // Mọi bậc chữ phải là token theo VAI và nhân với --font-scale ⇒ cùng một công tắc chỉnh cả app.
-        foreach (['micro' => 9, 'tiny' => 10, 'label' => 11, 'body' => 12.5, 'body-lg' => 13, 'title' => 14] as $role => $px) {
+        // [2026-09-26 · thiết kế lại] NHÍCH LẦN HAI cho MOBILE: bậc nhỏ trước đây (10 · 11 · 12,5px) là cỡ
+        // cho màn hình desktop đặt gần mắt; trên điện thoại, nhãn 11px là dưới ngưỡng đọc thoải mái.
+        // Cơ chế KHÔNG đổi (mọi bậc vẫn là calc(px * var(--font-scale))) nên công tắc "Cỡ chữ" vẫn chỉnh
+        // được toàn cục — chỉ con số nền đổi.
+        foreach (['micro' => 10, 'tiny' => 11.5, 'label' => 12.5, 'body' => 14, 'body-lg' => 14.5, 'title' => 15.5] as $role => $px) {
             $this->assertStringContainsString('--text-'.$role.': calc('.$px.'px * var(--font-scale, 1));', $css,
-                'Thiếu token cỡ chữ theo vai: --text-'.$role.' (đã nhích lên '.$px.'px).');
+                'Thiếu token cỡ chữ theo vai: --text-'.$role.' (đã nhích lên '.$px.'px — lần nhích thứ hai dành cho mobile).');
         }
         $this->assertStringContainsString('--font-scale: 1;', $css, 'Thiếu giá trị mặc định --font-scale.');
 

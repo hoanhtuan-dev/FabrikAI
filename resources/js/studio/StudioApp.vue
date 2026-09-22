@@ -1269,6 +1269,31 @@ function onTouchEnd(e) {
     <LibraryApp v-if="store.studioView === 'library'" embedded @back="store.studioView = 'studio'" />
     <!-- [Đợt 0.6] Đã gỡ banner "Cài đặt FabrikAI" (PWA) — Chốt Q4 bỏ PWA hoàn toàn, nên không còn gì
          để trình duyệt bật lời mời cài đặt (đã bỏ service worker lẫn manifest). -->
+    <!-- ══ DOCK ĐIỀU HƯỚNG DƯỚI (MOBILE) — thanh điều hướng dưới cùng kiểu Material ══════════════════════
+         [2026-09-26 · thiết kế lại] Vì sao thêm: trên điện thoại, mọi thứ đều nằm sau nút menu ở góc trên
+         trái — nghĩa là tới việc dùng hằng ngày (xem kết quả · đổi bộ sưu tập · mở ô tạo ảnh) cũng phải
+         hai lần chạm và một lần quét mắt qua danh sách. Thanh dưới là mẫu điều hướng chuẩn của Material cho
+         điện thoại: bốn đích chính luôn nằm trong tầm ngón tay cái, mỗi đích MỘT chạm.
+         Bốn mục này KHÔNG mở đường tắt nào mới: chúng gọi đúng những hàm mà thanh trên cùng đang gọi, nên
+         luật khoá theo gói vẫn do máy chủ quyết định. -->
+    <nav v-if="store.studioView !== 'library'" class="dock dock-sm z-40 lg:hidden" aria-label="Điều hướng chính">
+      <button type="button" data-dock-tab="prompt" :class="store.promptOpen ? 'dock-active' : ''" @click="store.promptOpen = true">
+        <StudioIcon name="sparkles" size="h-5 w-5" />
+        <span class="dock-label">Tạo ảnh</span>
+      </button>
+      <button type="button" data-dock-tab="projects" :class="projectsOpen ? 'dock-active' : ''" @click="projectsOpen = true">
+        <StudioIcon name="kanban" size="h-5 w-5" />
+        <span class="dock-label">Bộ sưu tập</span>
+      </button>
+      <button type="button" data-dock-tab="outputs" :class="outputOpen ? 'dock-active' : ''" @click="outputOpen = true">
+        <StudioIcon name="grid" size="h-5 w-5" />
+        <span class="dock-label">Kết quả</span>
+      </button>
+      <button type="button" data-dock-tab="menu" :class="menuOpen ? 'dock-active' : ''" @click="menuOpen = true">
+        <StudioIcon name="sliders" size="h-5 w-5" />
+        <span class="dock-label">Công cụ</span>
+      </button>
+    </nav>
     <!-- Mobile top bar (chỉ ở view studio) -->
     <div v-if="store.studioView !== 'library'" class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
       <button @click="menuOpen = true" class="icon-btn !h-9 !w-9 border border-ink-600 md:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>
@@ -1278,7 +1303,9 @@ function onTouchEnd(e) {
         <button @click="outputOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-600" title="Kết quả" aria-label="Kết quả"><StudioIcon name="grid" size="h-4 w-4" /><span v-if="store.generations.length" class="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-tiny font-bold leading-none text-primary-content">{{ store.generations.length }}</span></button>
       </div>
     </div>
-    <div v-if="store.studioView !== 'library'" class="flex flex-1 overflow-hidden">
+    <!-- pb-14 trên điện thoại: chừa chỗ cho dock điều hướng dưới, nếu không thì hàng cuối của canvas bị
+         thanh dock che mất. -->
+    <div v-if="store.studioView !== 'library'" class="flex flex-1 overflow-hidden pb-14 lg:pb-0">
       <!-- Activity bar (VSCode-style) + Sidebar card của activity đang chọn (desktop) -->
       <nav class="activity-bar hidden md:flex" aria-label="Công cụ">
         <div class="mb-2 grid h-11 w-11 shrink-0 place-items-center text-brand-300" title="Studio"><StudioIcon name="bot" size="h-5 w-5" /></div>

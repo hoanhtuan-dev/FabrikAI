@@ -28,9 +28,130 @@
 @source '../views';
 @source '../js/studio';
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   daisyUI 5 — DÙNG THẬT, KHÔNG MÔ PHỎNG TÊN LỚP (2026-09-26)
+
+   Trước đây dự án chỉ CHÉP TÊN lớp của daisyUI (--color-primary, --radius-field, --depth…) vào
+   một hệ token tự viết. Nay daisyUI là plugin thật, nên markup dùng được đúng bộ component của nó
+   (navbar · drawer · card · btn · badge · input · select · tabs · steps · stat · alert · modal ·
+   table · dropdown · progress · tooltip · join · skeleton) thay vì tự dựng lại từng cái.
+
+   HAI THEME THEO ĐÚNG CƠ CHẾ CỦA daisyUI, và TÊN TRÙNG VỚI THỨ ĐANG CÓ: giao diện đã đặt
+   `data-theme="dark"` / `data-theme="light"` trên thẻ <html> từ trước (layouts/*.blade.php), nên
+   đặt tên theme là `dark`/`light` là ăn khớp ngay — không phải sửa một dòng nào ở tầng theme.
+
+   GIÁ TRỊ KHÔNG VIẾT LẠI: mọi token dưới đây TRỎ VỀ bảng màu đã sinh ở khối @theme phía trên
+   (nguồn duy nhất, có ThemeSystemTest khoá lại). Nhờ vậy theme Sáng/Tối vẫn do `php artisan
+   theme:sync` quyết định, còn daisyUI chỉ là lớp NGỮ NGHĨA ngồi trên nó.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+/*
+ * CHỈ NẠP COMPONENT SẼ DÙNG — `include` là lựa chọn của chính daisyUI, không phải mẹo cắt CSS.
+ * ĐO ĐƯỢC: nạp TẤT CẢ component làm CSS build từ 152 KB lên **365 KB** (+140%). Bản này chỉ giữ bộ
+ * đồ nghề thật sự có mặt trong giao diện (điều hướng · biểu mẫu · thẻ · bảng · phản hồi) và bỏ những
+ * thứ không dùng tới (chat · carousel · calendar · countdown · mockup · rating · otp · megamenu…).
+ * Đây là điều kiện để bản thiết kế còn nhẹ cho MOBILE — chính yêu cầu của đợt này.
+ */
+@plugin 'daisyui' {
+    themes: false;
+    logs: false;
+    /*
+     * KHÔNG nạp 6 component mà tên lớp TRÙNG với lớp đang dùng trong dự án: `card` (121 chỗ), `input`
+     * (245), `label` (1008), `badge`, `link`, `tab`. Lý do: daisyUI phát CSS của nó vào tầng `utilities`,
+     * tức là SAU tầng `components` của dự án — nạp chúng là ghi đè ngầm toàn bộ những chỗ đó (ví dụ
+     * `.card` của daisyUI thêm `display:flex; flex-direction:column` vào 121 thẻ, `.label` biến nhãn chữ
+     * thành khay flex). Bốn lớp đó vẫn được TÁI TẠO theo đúng thông số của daisyUI (bán kính --radius-box
+     * · --radius-field · màu --color-base-*), nên giao diện vẫn một giọng; chỉ không nạp bản CSS trùng tên.
+     */
+    include: button, navbar, drawer, dock, footer, hero, menu, breadcrumbs, divider, fab, indicator, collapse, stack,
+        select, textarea, fieldset, checkbox, radio, toggle, range, fileinput, validator,
+        stat, table, list, avatar, progress, radialprogress, loading, skeleton, kbd, status, mask, timeline, steps, alert, toast, tooltip,
+        modal, dropdown, swap, join, radius;
+}
+
+/* ── THEME TỐI (mặc định) ──────────────────────────────────────────────────────────────── */
+@plugin 'daisyui/theme' {
+    name: 'dark';
+    default: true;
+    color-scheme: dark;
+
+    /* BỀ MẶT: base-100 là mặt THẺ, base-200 panel, base-300 nền trang (đúng quy ước daisyUI). */
+    --color-base-100: var(--color-ink-800);
+    --color-base-200: var(--color-ink-900);
+    --color-base-300: var(--color-ink-950);
+    --color-base-content: var(--color-cream-100);
+
+    --color-primary: var(--color-brand-600);
+    --color-primary-content: var(--color-primary-content);
+    --color-secondary: var(--color-secondary);
+    --color-secondary-content: var(--color-secondary-content);
+    --color-accent: var(--color-accent);
+    --color-accent-content: var(--color-accent-content);
+    --color-neutral: var(--color-ink-700);
+    --color-neutral-content: var(--color-cream-100);
+    --color-info: var(--color-info);
+    --color-info-content: var(--color-info-content);
+    --color-success: var(--color-success);
+    --color-success-content: var(--color-success-content);
+    --color-warning: var(--color-warning);
+    --color-warning-content: var(--color-warning-content);
+    --color-error: var(--color-error);
+    --color-error-content: var(--color-error-content);
+
+    /* HÌNH DẠNG kiểu MATERIAL: góc mềm theo bậc (thẻ > ô nhập > chip), viền 1px, độ nổi 1 bậc. */
+    --radius-selector: 0.5rem;
+    --radius-field: 0.75rem;
+    --radius-box: 1rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 0;
+}
+
+/* ── THEME SÁNG ────────────────────────────────────────────────────────────────────────── */
+@plugin 'daisyui/theme' {
+    name: 'light';
+    color-scheme: light;
+
+    --color-base-100: var(--color-ink-800);
+    --color-base-200: var(--color-ink-900);
+    --color-base-300: var(--color-ink-950);
+    --color-base-content: var(--color-cream-100);
+
+    --color-primary: var(--color-brand-600);
+    --color-primary-content: var(--color-primary-content);
+    --color-secondary: var(--color-secondary);
+    --color-secondary-content: var(--color-secondary-content);
+    --color-accent: var(--color-accent);
+    --color-accent-content: var(--color-accent-content);
+    --color-neutral: var(--color-ink-700);
+    --color-neutral-content: var(--color-cream-100);
+    --color-info: var(--color-info);
+    --color-info-content: var(--color-info-content);
+    --color-success: var(--color-success);
+    --color-success-content: var(--color-success-content);
+    --color-warning: var(--color-warning);
+    --color-warning-content: var(--color-warning-content);
+    --color-error: var(--color-error);
+    --color-error-content: var(--color-error-content);
+
+    --radius-selector: 0.5rem;
+    --radius-field: 0.75rem;
+    --radius-box: 1rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 0;
+}
+
 @theme {
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
-    --font-display: 'Fraunces', ui-serif, Georgia, serif;
+    /* [2026-09-26 · thiết kế lại] MỘT họ chữ cho cả giao diện: bỏ serif ở tiêu đề.
+       Lý do: bản tối giản + Material chỉ cần một họ; tiêu đề serif cạnh nhãn sans làm giao diện có hai
+       giọng, và trên mobile chữ serif ở cỡ nhỏ xuống nét kém rõ. Mọi chỗ đang dùng `font-display` tự
+       đổi theo — không phải sửa file nào. */
+    --font-display: 'Inter', ui-sans-serif, system-ui, sans-serif;
 
     /* ══ BẢNG MÀU — KHỐI SINH TỰ ĐỘNG, KHÔNG SỬA TAY ═══════════════════════════════════════
        [2026-09-25] Từ đây bảng màu KHÔNG còn được viết tay. Nó được sinh bởi
@@ -190,12 +311,16 @@
          8px → micro 9px · 9px → tiny 10px · 10px → label 11px ·
          11px → body 12,5px · 12px → body-lg 13px · 13px → title 14px
        Quy tắc: KHÔNG viết text-[Npx] trong mã nữa (DesignSystemTest giữ luật này). */
-    --text-micro: calc(9px * var(--font-scale, 1));
-    --text-tiny: calc(10px * var(--font-scale, 1));
-    --text-label: calc(11px * var(--font-scale, 1));
-    --text-body: calc(12.5px * var(--font-scale, 1));
-    --text-body-lg: calc(13px * var(--font-scale, 1));
-    --text-title: calc(14px * var(--font-scale, 1));
+    /* [2026-09-26 · thiết kế lại] NHÍCH LẦN HAI cho MOBILE: thang cũ (10 · 11 · 12,5px) là cỡ cho màn
+       hình desktop đặt gần mắt; trên điện thoại, nhãn 11px và chữ phụ 10px là dưới ngưỡng đọc thoải mái.
+       Lần này cộng ~1,5px vào các bậc nhỏ và ~1px vào bậc lớn; giữ NGUYÊN cơ chế nhân --font-scale để
+       công tắc "Cỡ chữ" trong Cài đặt vẫn chỉnh được toàn cục. */
+    --text-micro: calc(10px * var(--font-scale, 1));
+    --text-tiny: calc(11.5px * var(--font-scale, 1));
+    --text-label: calc(12.5px * var(--font-scale, 1));
+    --text-body: calc(14px * var(--font-scale, 1));
+    --text-body-lg: calc(14.5px * var(--font-scale, 1));
+    --text-title: calc(15.5px * var(--font-scale, 1));
 
     /* Các bậc rem mặc định của Tailwind cũng phải theo công tắc cỡ chữ — nếu không thì chữ ở
        khối dùng text-xs/text-sm/text-base đứng yên trong khi phần còn lại to lên. */
@@ -405,41 +530,50 @@
         @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
     }
 
-    /* Nút ĐẢO màu: ở theme tối là nút sáng, theme sáng là nút tối (token invert cố định,
-       không theo dải bề mặt — nếu dùng bg-ink-900 thì theme sáng sẽ ra nút TRẮNG trên nền trắng). */
+    /* ── NÚT — nay ĐỨNG TRÊN NÚT CỦA daisyUI (2026-09-26) ────────────────────────────────────
+       Bốn tên cũ giữ nguyên (0 file phải sửa) nhưng KHÔNG tự vẽ lại nút nữa: chúng chỉ gán ĐÚNG hai
+       biến mà daisyUI dùng (--btn-color · --btn-fg) rồi để `.btn` của daisyUI lo hình dạng, chiều cao,
+       bóng, nhịp chuyển động và trạng thái disabled.
+
+       Vì sao đổi: trước đây mỗi nút tự khai bán kính/padding/bóng riêng, nên nút trong dự án và nút
+       daisyUI (dùng ở các màn mới) trông gần giống nhưng lệch nhau vài pixel — kiểu lệch không ai chỉ
+       tên được nhưng ai cũng thấy. Nay chỉ còn MỘT nguồn hình dáng.
+
+       `.btn-sm`, `.btn-outline`, `.btn-ghost` bị XOÁ khỏi tệp này: daisyUI có sẵn đúng ba lớp cùng tên
+       và cùng nghĩa, nên chúng tự áp dụng cho markup đang viết `btn-sm`/`btn-outline`/`btn-ghost`. */
     .btn-primary {
-        @apply btn bg-invert px-6 py-3 text-invert-content hover:bg-brand-600 hover:text-primary-content hover:shadow-lg hover:shadow-brand-900/20 active:scale-[.98];
+        @apply btn;
+        --btn-color: var(--color-neutral);
+        --btn-fg: var(--color-neutral-content);
     }
 
     .btn-brand {
-        @apply btn bg-brand-600 px-6 py-3 text-primary-content hover:bg-brand-700 hover:shadow-lg hover:shadow-brand-900/20 active:scale-[.98];
+        @apply btn;
+        --btn-color: var(--color-primary);
+        --btn-fg: var(--color-primary-content);
     }
 
-    /* Nút phụ: hover ĐẢO màu (nền invert + chữ invert-content) ⇒ đúng ở cả hai theme,
-       và không còn cần ngoại lệ riêng cho studio như trước. */
-    .btn-outline {
-        @apply btn border border-ink-600 bg-transparent px-6 py-3 text-cream-200 hover:border-brand-400 hover:bg-invert hover:text-invert-content active:scale-[.98];
-    }
-
-    .btn-ghost {
-        @apply btn px-4 py-2 text-cream-200 hover:bg-ink-700 hover:text-cream-100 active:scale-[.98];
-    }
-
-    .btn-sm {
-        @apply px-4 py-2 text-xs;
-    }
-
-    /* Ô nhập: bề mặt ink-900 + chữ cream-50 ⇒ theme tối là ô tối, theme sáng là ô trắng.
-       Placeholder dùng BẬC NỘI DUNG (cream-400) chứ không dùng opacity — opacity cho ra
-       tương phản không kiểm soát được (đây chính là lỗi "chữ mờ khó đọc" 2026-09-23). */
-    .input { @apply w-full rounded-2xl border border-ink-700 bg-ink-900 px-4 py-3 text-sm text-cream-50 placeholder:text-cream-400 transition-colors focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-400/20;
+    /* ── Ô NHẬP — theo THÔNG SỐ của daisyUI, không nạp bản trùng tên ─────────────────────────
+       Bán kính --radius-field · bề mặt --color-base-200 · chữ --color-base-content. Chiều cao tối thiểu
+       44px là NGƯỠNG CHẠM trên điện thoại: đây là yêu cầu "dùng được ở mobile mode", và 44px là mức mà
+       ngón tay chạm chính xác được — ô nhập 36px trên điện thoại là ô nhập bị chạm nhầm liên tục.
+       Placeholder dùng BẬC NỘI DUNG chứ không dùng opacity (opacity cho tương phản không kiểm soát được). */
+    .input {
+        @apply w-full border bg-base-200 px-4 py-3 text-body text-base-content transition-colors placeholder:text-cream-400 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-400/20;
+        border-radius: var(--radius-field);
+        border-color: var(--color-ink-600);
+        min-height: 44px;
     }
 
     .label {
-        @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-cream-300;
+        @apply mb-1.5 block text-label font-semibold tracking-wide text-cream-300;
     }
 
-    .card { @apply rounded-2xl border border-ink-700 bg-ink-800 shadow-sm shadow-black/10;
+    /* ── THẺ — theo daisyUI: bán kính --radius-box + mặt --color-base-100 ──────────────────── */
+    .card {
+        @apply border border-ink-700 bg-ink-800;
+        border-radius: var(--radius-box);
+        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.24), 0 1px 3px 1px rgb(0 0 0 / 0.12);
     }
 
     .card-hover {
@@ -448,10 +582,15 @@
         transition-duration: var(--motion-dur-base);
     }
 
-    .badge { @apply inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-body font-semibold uppercase tracking-wide;
+    .badge {
+        @apply inline-flex items-center gap-1 px-2.5 py-1 text-body font-semibold tracking-wide;
+        border-radius: var(--radius-selector);
     }
 
-    .chip { @apply inline-flex items-center gap-2 rounded-2xl border border-ink-600 bg-ink-900 px-4 py-2 text-sm font-medium text-cream-200 transition-colors hover:border-brand-400 hover:text-brand-200;
+    /* Chip = viên thuốc: bán kính lớn hơn nút để mắt phân biệt "cái để chọn" với "cái để bấm". */
+    .chip { @apply inline-flex items-center gap-2 border border-ink-600 bg-ink-900 px-4 py-2 text-body-lg font-medium text-cream-200 transition-colors hover:border-brand-400 hover:text-brand-200;
+        border-radius: calc(var(--radius-field) + 0.25rem);
+        min-height: 40px;
     }
 
 
@@ -491,10 +630,10 @@
    một dòng ".studio-shell .x { ... }" để 'sửa màu cho khớp', gần như chắc chắn là nên sửa
    class trong component cho đúng vai (bề mặt = ink-*, nội dung = cream-*). */
     .studio-shell { @apply bg-ink-900 text-cream-100; }
-    .studio-shell .card { @apply rounded-lg; }
+    /* [2026-09-26] ĐÃ XOÁ ba ngoại lệ bán kính (.card/.input/.chip bé hơn ngoài studio) và ngoại lệ bóng
+       của .card-hover. Lý do: chúng là ba chỗ duy nhất khiến thẻ/ô nhập trong studio trông KHÁC với cùng
+       thẻ/ô nhập ở trang khác. Nay mọi bề mặt đi theo đúng token --radius-* của daisyUI. */
     .studio-shell .card-hover { @apply hover:shadow-black/50; }
-    .studio-shell .input { @apply rounded-md; }
-    .studio-shell .chip { @apply rounded-md; }
 
 /* ── Studio Designer Workspace — shared chrome patterns (UI-2, 2026-09-07) ──
    Dùng chung cho mọi panel/card chrome trong /studio để đồng bộ 1 phong cách.
@@ -508,12 +647,18 @@
     /* Viền NGHỈ của mọi nút phụ = border-ink-600 (xem docs/DESIGN_SYSTEM.md §5 "Viền") —
        trước đây .tool-btn dùng ink-700 còn nút viết tay dùng ink-600 nên hai nút cạnh nhau
        lệch màu viền. Hover đi lên ink-500 (nút rất phụ) hoặc brand-400 (nút thường). */
-    .tool-btn { @apply inline-flex items-center gap-1.5 rounded-md border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-body font-semibold text-cream-200 transition hover:border-ink-500 hover:bg-ink-700 disabled:opacity-40; }
+    .tool-btn { @apply inline-flex items-center gap-1.5 border border-ink-600 bg-ink-800 px-3 py-2 text-body font-semibold text-cream-200 transition hover:border-ink-500 hover:bg-ink-700 disabled:opacity-40;
+        border-radius: var(--radius-field);
+        min-height: 40px;
+    }
     /* "Đang chọn" = border-brand-500 — ĐÚNG token của §5.1. Trước đây dùng border-brand-500/70 nên trên
        CÙNG một màn hình có hai kiểu viền cho cùng một trạng thái (thẻ hướng /100, nút /70). */
     .tool-btn.is-active { @apply border-brand-500 bg-brand-600/20 text-brand-200 hover:bg-brand-600/30; }
     /* Nút icon vuông chuẩn (mọi chrome studio) */
-    .icon-btn { @apply grid h-7 w-7 shrink-0 place-items-center rounded text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-30; }
+    /* Nút icon: 36×36 là mức chạm tối thiểu thoải mái trên điện thoại (7×7 = 28px quá nhỏ cho ngón tay). */
+    .icon-btn { @apply grid h-10 w-10 shrink-0 place-items-center text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-30;
+        border-radius: var(--radius-selector);
+    }
     /* Header chuẩn của panel/card trong workspace */
     .panel-head { @apply flex shrink-0 items-center justify-between gap-2 px-2.5 py-2; }
     .panel-title { @apply flex min-w-0 items-center gap-1.5 text-body font-semibold text-cream-100; }
@@ -1120,8 +1265,12 @@
 ::-webkit-scrollbar-thumb:active { background: var(--color-brand-500); }
 * { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
 
-@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
-}
+/* [2026-09-26 · thiết kế lại] ĐÃ XOÁ `@utility btn` CỦA DỰ ÁN.
+   Lý do: nó là bản tự vẽ thứ hai của nút, nằm ở tầng `utilities` nên LUÔN thắng `.btn` của daisyUI —
+   đo được ngay sau khi nạp daisyUI: nút `btn btn-primary` cao **20px**, nền trong suốt, bán kính 20px,
+   vì `@apply btn` trong các lớp .btn-brand/.btn-primary rơi vào bản tự vẽ chứ không vào daisyUI.
+   Nay chỉ còn MỘT nguồn: component `button` của daisyUI (nạp qua `include` ở đầu tệp) — chiều cao theo
+   --size-field, bán kính --radius-field, bóng theo --depth, có lớp nhấn và trạng thái disabled của nó. */
 
 @layer utilities {
     .scrollbar-hide::-webkit-scrollbar { display: none !important; }

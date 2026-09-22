@@ -227,11 +227,21 @@ class DesignSystemTest extends TestCase
             .'nguy hiểm = border-red-500/40 (+ hover:border-red-500) · cảnh báo/thành công/thông tin = .../500/40.');
 
         // Class DÙNG CHUNG cũng phải theo đúng từ vựng đó (nút dùng .tool-btn không được lệch với nút viết tay).
+        //
+        // [2026-09-26 · thiết kế lại] Đổi từ SO KHỚP CẢ DÒNG sang KIỂM ĐÚNG LUẬT. Bản cũ khoá nguyên chuỗi
+        // `@apply inline-flex items-center gap-1.5 rounded-md border border-ink-600 …`, nên mọi thay đổi HÌNH
+        // DÁNG (bán kính nay lấy từ token --radius-field của daisyUI, thêm chiều cao chạm 40px) đều làm đỏ
+        // test dù luật màu vẫn đúng — một rào chắn báo động vì lý do không liên quan sẽ bị tắt đi.
+        // Nay kiểm: `.tool-btn` dùng ĐÚNG token viền nghỉ, ĐÚNG token nền nghỉ, và KHÔNG quay lại viền cũ.
         $css = $this->src('resources/css/app.css');
-        $this->assertStringContainsString('.tool-btn { @apply inline-flex items-center gap-1.5 rounded-md border border-ink-600',
-            $css, 'Nút nghỉ của .tool-btn phải là border-ink-600 — lệch với nút viết tay là hai nút cạnh nhau khác viền.');
-        $this->assertStringNotContainsString('rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1.5',
-            $css, 'Đã quay lại viền nghỉ border-ink-700 cho .tool-btn.');
+        $this->assertMatchesRegularExpression('/\.tool-btn\s*\{[^}]*border-ink-600[^}]*\}/s', $css,
+            'Nút nghỉ của .tool-btn phải là border-ink-600 — lệch với nút viết tay là hai nút cạnh nhau khác viền.');
+        $this->assertMatchesRegularExpression('/\.tool-btn\s*\{[^}]*bg-ink-800[^}]*\}/s', $css,
+            'Nút nghỉ của .tool-btn phải là bg-ink-800.');
+        // [2026-09-26] Kiểm "KHÔNG quay lại viền cũ" NGAY TRONG khối .tool-btn. Bản cũ tìm cả tệp nên
+        // khi `.card` hợp lệ dùng `border border-ink-700 bg-ink-800` thì test đỏ oan (bắt được trong đợt này).
+        $this->assertDoesNotMatchRegularExpression('/\.tool-btn\s*\{[^}]*border-ink-700[^}]*\}/s', $css,
+            'Đã quay lại viền nghỉ border-ink-700 cho .tool-btn.');
 
         /* [Đợt 31 — 2026-09-23] TỪ VỰNG PHẢI ĐÓNG CẢ Ở LỚP CSS.
            Lỗ thật: test chỉ quét file .vue, nên token viền khai trong app.css thoát khỏi từ vựng —
@@ -590,8 +600,9 @@ class DesignSystemTest extends TestCase
             .'Xem docs/DESIGN_SYSTEM.md §5.3 — nút nghỉ = bg-ink-800 · hover = bg-ink-700 · nút trên ẢNH = bg-scrim/NN.');
 
         // Nút dùng CHUNG cũng phải theo đúng nền đó (không lệch với nút viết tay).
+        // [2026-09-26] Kiểm theo LUẬT thay vì khớp cả dòng — cùng lý do đã ghi ở test viền phía trên.
         $css = $this->src('resources/css/app.css');
-        $this->assertStringContainsString('.tool-btn { @apply inline-flex items-center gap-1.5 rounded-md border border-ink-600 bg-ink-800',
-            $css, '.tool-btn phải dùng nền nghỉ bg-ink-800 — lệch với nút viết tay là hai nút cạnh nhau khác nền.');
+        $this->assertMatchesRegularExpression('/\.tool-btn\s*\{[^}]*bg-ink-800[^}]*\}/s', $css,
+            '.tool-btn phải dùng nền nghỉ bg-ink-800 — lệch với nút viết tay là hai nút cạnh nhau khác nền.');
     }
 }
