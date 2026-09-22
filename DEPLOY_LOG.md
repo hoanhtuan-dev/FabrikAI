@@ -5,6 +5,99 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 23) — GỘP "QUẢN TRỊ" + "CÀI ĐẶT" THÀNH MỘT TRANG: ba khu, MỘT thanh tiêu đề, MỘT bộ chuyển khu
+
+**Commit:** `e058ade`. **Trạng thái: đã commit + push + DEPLOY production.** Việc thứ ba và là việc CUỐI của loạt
+"hoàn thiện sâu rộng" (thứ tự chủ dự án chốt: Studio → Thư viện → gộp Quản trị + Cài đặt).
+
+### 1. Vấn đề (đo TRƯỚC khi sửa)
+
+| Hiện trạng | Bằng chứng |
+|---|---|
+| **Ba trang SPA riêng**, mỗi trang một entry + một blade | `settings.js`→`SettingsApp.vue` (1.9k dòng) · `admin.js`→`AdminApp.vue` (2.1k dòng) · `my-settings.js`→`MySettingsApp.vue` · blades `settings.blade.php` · `admin.blade.php` · `my-settings.blade.php` |
+| **Ba thanh tiêu đề khác nhau** cho cùng một việc "cấu hình hệ thống" | `SettingsApp.vue:780` và `AdminApp.vue:837` mỗi file một `<header class="sticky top-0 …">` + nút "về Studio" riêng |
+| **Muốn sang khu khác phải đi vòng** | hai header chỉ có link chéo `/admin` ↔ `/settings`; khu "Cài đặt của tôi" không có link nào tới hai khu kia |
+| **Trang con còn rời hơn nữa** | `/he-thong-thiet-ke` (bảng token, 289 dòng blade) · `/bao-cao-nhom` (89 dòng) vẫn là trang riêng |
+
+### 2. Cách làm — hợp nhất KHUNG NHÌN, không viết lại nghiệp vụ
+
+Mỗi khu là một nghiệp vụ lớn đã có test khoá hành vi. Viết lại một app khổng lồ sẽ đổi hành vi đang chạy đúng,
+nên tôi chỉ hợp nhất phần người dùng NHÌN THẤY:
+
+| File | Vai trò |
+|---|---|
+| `resources/views/studio/hub.blade.php` (mới) | MỘT blade cho cả ba lối vào. Truyền `data-area` (`mine` · `system` · `admin`) + `data-section` + `data-user-id` + `data-user-admin` xuống `#hub-root` |
+| `resources/js/studio/hub.js` (mới) | MỘT entry, MỘT `createPinia()` dùng chung cho cả ba app con |
+| `resources/js/studio/SettingsHubApp.vue` (mới) | Thanh tiêu đề DUY NHẤT + bộ chuyển khu (dải nút trên màn hình rộng, hàng cuộn ngang ≥40px trên điện thoại) + nhúng app của khu đang mở |
+| `SettingsApp.vue` · `AdminApp.vue` · `MySettingsApp.vue` | Thêm prop `embedded`; khi nhúng thì **ẩn thanh tiêu đề riêng** và hạ mốc dính của sidebar (`lg:top-[4.75rem]` → `lg:top-[4.25rem]`) |
+| `StudioController::settingsPage/mySettingsPage` · `AdminController::adminPage` | Nay cùng trả `view('studio.hub', …)` — không còn blade riêng |
+
+**Mọi URL cũ giữ nguyên** (bookmark và `tests/Feature/UserCatalogTest.php` đều khoá "trang cũ trả 200"):
+`/cai-dat` · `/cai-dat/{mục}` · `/presets` · `/stylist-data` · `/model-settings` · `/settings` · `/admin`.
+Bộ chuyển khu vẫn là liên kết thật (deep-link dán được vào chat), không phải tab ngầm phía trình duyệt.
+
+**Phân quyền không đổi:** hai khu `system`/`admin` bị ẩn khỏi menu khi tài khoản không phải owner, nhưng
+máy chủ vẫn là nơi chặn thật (`middleware auth+admin` trên `/settings` và `/admin`).
+
+### 3. Đo được (Chrome headless + CDP, đăng nhập thật bằng form, `owner@fabrikai.shop`)
+
+| Lối vào | `data-area` | Thanh tiêu đề NHÌN THẤY | Bộ chuyển khu | Tràn ngang | Nút <40px |
+|---|---|---|---|---|---|
+| `/cai-dat/presets` @1280 | `mine` | **1** (của hub) + 1 tiêu đề mục "Preset" | 3 khu, đang chọn "Cài đặt của tôi" | −10px | 24 (đều là nút phụ trong bảng) |
+| `/settings` @1440 | `system` | **1** | 3 khu, chọn "Cài đặt hệ thống" | −10px | 13 |
+| `/admin` @1440 | `admin` | **1** | 3 khu, chọn "Quản trị" | −10px | 15 |
+| `/cai-dat` @390 | `mine` | **1** (115px, hai hàng: tiêu đề + dải khu) | 3 khu ("Của tôi · Hệ thống · Quản trị") | **0px** | **0** |
+
+Trước đợt này `/settings` và `/admin` có **2 thanh** (thanh tiêu đề riêng + thanh của app con khi bị nhúng vào
+chỗ khác) và không có lối nào sang khu "Cài đặt của tôi"; nay **đúng một thanh** cho mỗi trang, có đủ ba khu.
+
+### 4. Khoá bằng test
+
+`php artisan test` → **1233 passed (9357 assertions)**, thời lượng 126 s — không bài nào đỏ. Các bất biến cũ vẫn
+canh đúng chỗ mới: `UserCatalogTest` (trang cũ trả 200 + mỗi trang nhúng `data-user-id`), `ThemeSystemTest`
+(`data-section` render đúng mục), `StaticIntegrityTest` (blade cũ không còn được controller nào trả về nhưng
+vẫn còn file — không tham chiếu chết), `TechnicalLeakTest` (không lộ provider/model trong chữ hiển thị).
+
+### 5. Nợ còn lại (nói thẳng)
+
+- **Hai trang con chưa nhập vào hub:** `/he-thong-thiet-ke` (bảng token + thư viện theme) và `/bao-cao-nhom`
+  (cơ cấu nhóm hàng). Chúng nên thành khu thứ tư "Hệ thống thiết kế" hoặc hai mục trong khu `admin` — hiện
+  vẫn mở ra trang riêng theo lối cũ.
+- **Chuyển khu là điều hướng trang**, không phải đổi component tại chỗ: bấm "Quản trị" sẽ nạp lại trang
+  (nhanh, deep-link được, nhưng không phải SPA thuần). Muốn đổi tại chỗ thì phải hợp nhất cả ba store.
+- Ba blade cũ (`admin.blade.php` · `settings.blade.php` · `my-settings.blade.php`) và ba entry cũ vẫn nằm
+  trong repo nhưng **không còn được trả về** — giữ để tham chiếu, nên xoá khi chắc chắn không cần.
+
+---
+## Phiên 2026-09-26 (đợt 22) — THƯ VIỆN TRÊN ĐIỆN THOẠI: bỏ 490px "chrome" trước nội dung
+
+**Commit:** `50722ee`. **Trạng thái: đã commit + push + DEPLOY production.** Việc thứ hai trong thứ tự đã chốt.
+
+### 1. Vấn đề (đo TRƯỚC khi sửa)
+
+Trên điện thoại, mở Thư viện (`/?view=library`) thì **phải cuộn qua ~490px** khung điều khiển (7 ô số liệu + bộ
+lọc + khối hiển thị, tất cả mở sẵn) mới thấy tấm ảnh đầu tiên. Người dùng vào đây để XEM ẢNH, không phải để
+đọc số liệu.
+
+### 2. Cách sửa
+
+| Thay đổi | Chi tiết |
+|---|---|
+| Ba khối nặng **mặc định ĐÓNG trên điện thoại** | `libStatsOpen` · `libFiltersOpen` · `libOptionsOpen` — mở/đóng bằng ba nút "Số liệu · Lọc · Hiển thị"; từ `sm` trở lên vẫn mở sẵn như cũ |
+| Chip số liệu GỌN thay cho 7 ô | một hàng chip: `X mục` · `X xong` · `X rác` — vẫn thấy tình trạng, không chiếm chỗ |
+| Hàng điều khiển mới chỉ có trên điện thoại | `lg:hidden`, mỗi nút cao ≥40px theo sàn chạm |
+
+### 3. Đo được (CDP @390×844)
+
+| Chỉ số | Trước | Sau |
+|---|---|---|
+| Ô số liệu hiển thị mặc định | 7 | **0** |
+| Nút dưới 40px | — | **0** |
+| Tràn ngang | 0px | **0px** |
+| Phần tử tương tác phải đi qua trước nội dung | — | **16** (ba nút gập + chip) |
+| "Chrome" phải cuộn qua trước tấm ảnh đầu | ~490px | **0** (ba khối đóng sẵn) |
+
+---
 ## Phiên 2026-09-26 (đợt 21) — STUDIO XONG: THANH CÔNG CỤ CANVAS GOM NHÓM CHO ĐIỆN THOẠI
 
 **Commit:** `07179fa`. **Trạng thái: đã commit + push + DEPLOY production.** Đây là việc CUỐI của bước "Studio".
