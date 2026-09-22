@@ -5,6 +5,69 @@
 
 ---
 
+## Phiên 2026-09-25 (đợt 3) — QUẢN LÝ CHỈ DẪN AI TRÊN WEB (bỏ SSH) + VISION QUA SDK
+
+### Mục tiêu (yêu cầu chủ dự án)
+"Đưa vision qua SDK (đo trước rồi mới đổi), + viết giao diện quản lý prompt thay vì dùng SSH."
+
+### 1. Vision qua SDK — ĐO TRƯỚC, rồi mới đổi
+| Chặng | Số liệu thật |
+|---|---|
+| Đo trên máy chủ, ảnh 84 KB, `deepseek:deepseek-flash` qua `openai-compatible` | **2.302 ms**, mô tả đúng nội dung ảnh (áo halter cổ thắt nút, chân váy midi suông, satin kem thêu viền tím…) |
+| Cách đổi | `AiModelGateway::vision()` thử `SdkTextEngine::runVision()` trước; SDK trả null/rỗng ⇒ **lui về đường cũ** `callVision()`. Không có nhánh nào mất đường dự phòng |
+| Tắt được bằng DỮ LIỆU | setting `studio_ai_sdk_engine` (mặc định `1`) — tắt không cần deploy |
+
+### 2. Vì sao phải có GIAO DIỆN, không chỉ lệnh SSH
+Lớp cấu hình chỉ dẫn (Đợt 1.7, bảng `prompt_templates`) đã chạy, nhưng đường ĐẶT giá trị duy nhất là
+`php artisan studio:prompt --set-file=/tmp/p.txt`. Nghĩa là: muốn sửa một câu lệnh phải có SSH trong tay,
+phải tạo tệp, phải nhớ cú pháp. Tính năng đúng nhưng **không dùng được** trong lúc đang làm việc.
+
+| # | Thay đổi | File |
+|---|---|---|
+| 1 | DANH MỤC KHOÁ + trạng thái + lịch sử + ảnh chụp bản mặc định — MỘT nguồn sự thật | `app/Ai/PromptCatalog.php` (mới) |
+| 2 | 4 route `api/admin/prompts` (xem · lưu · tắt · khôi phục phiên bản) | `app/Http/Controllers/AdminPromptController.php` (mới) |
+| 3 | Tab **Chỉ dẫn AI** trong /admin: sửa · chép bản mặc định · quay về mặc định · lịch sử phiên bản | `resources/js/studio/AdminApp.vue` |
+| 4 | Lệnh `studio:prompt` đọc CHÍNH danh mục đó (trước đây khai báo lặp 3 khoá ở hai nơi) | `app/Console/Commands/StudioPrompt.php` |
+| 5 | Cột `label` cho `prompt_templates` | migration `2026_09_22_000001` |
+
+### 3. "Bản đang chạy" — chỗ dễ sai nhất
+Chỉ dẫn radar dài hơn 3.000 ký tự và được LẮP từ nhiều mảnh ngay trong `DesignAgentService`. Nếu giao
+diện chỉ hiện bản đã cấu hình thì owner phải sửa trong bóng tối. Nên `instruction()` **ghi nhớ ảnh chụp**
+chuỗi mặc định trong mã mỗi khi hệ thống thật sự chạy bằng nó (cache 30 ngày, rẻ: một lần đọc/lượt) —
+giao diện hiển thị bản đó và có nút «Chép bản mặc định vào ô».
+
+### 4. BA LỖI do test bắt được (không phải do đọc mã)
+| Lỗi | Vì sao nguy hiểm |
+|---|---|
+| `put()` không tắt bản đang bật trước khi tạo bản mới | nhiều bản cùng bật ⇒ "bản đang chạy" phụ thuộc thứ tự truy vấn, nút Khôi phục thành vô nghĩa |
+| `activate()` dùng `$row->update(['is_active' => true])` trên model ĐANG bật | Eloquent thấy không có gì thay đổi nên **không chạy câu UPDATE nào** — khôi phục phiên bản cũ im lặng không làm gì |
+| Nhánh ghi nhớ bản mặc định không bao giờ chạy | `studio_prompt_template()` trả về chính `$built` khi không có hàng nào bật, nên điều kiện "chuỗi rỗng" không bao giờ đúng |
+
+### 5. Kiểm chứng sau deploy
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD máy chủ | `1dcf2ab` → **`b1d6b49`** — khớp local |
+| Migration | `2026_09_22_000001_add_label_to_prompt_templates_table → DONE` (39 ms) · `Schema::hasColumn('prompt_templates','label') = true` |
+| Route | `api.admin.prompts.index` có mặt trên máy chủ |
+| Ghi thật rồi dọn sạch | `put` tạo phiên bản mới (cột `label` ghi được) · bản cũ còn nguyên · `turnOff` tắt được · **xoá hàng kiểm chứng ⇒ 0 hàng, dữ liệu về đúng như trước** |
+| Gói JS đã deploy | `admin-C2k9nC5D.js` có chuỗi "Chỉ dẫn AI" |
+| Test | **1101 XANH** (+12: `PromptAdminTest`) |
+
+**Lưu ý khi kiểm chứng:** `GET /api/admin/prompts` gọi thẳng qua `app()->handle()` trong tinker trả **401** —
+đúng như thiết kế: middleware `auth` dùng session, mà yêu cầu dựng tay không có session. Muốn thử đường
+HTTP đầy đủ thì dùng `PromptAdminTest` (chạy qua HTTP kernel thật, có cả middleware `admin`).
+
+### 6. Còn lại
+- **Không có cron** trên máy chủ (việc của chủ dự án, cần hPanel).
+- **Sao lưu DB vẫn hỏng**: `mysqldump` báo `Access denied for user 'u310846799'@'localhost'` — thông tin
+  đăng nhập DB trong `.env` không dùng được cho `mysqldump` trực tiếp. Migration lần này là cột nullable
+  nên tôi tiến hành, nhưng **đây là nợ thật**: lần tới có migration phá huỷ thì không có đường lùi.
+- **Tìm kiếm web qua SDK** vẫn chưa bật: driver `openai-compatible` KHÔNG có `SupportsWebSearch`; đường
+  đúng là `driver='openai'` + `url` trỏ về gateway — chờ khoá/điều kiện tài khoản.
+- **Sinh ảnh/video qua SDK**: `openai-compatible` không có `ImageProvider` — giới hạn thật của SDK.
+
+---
+
 ## Phiên 2026-09-25 (Agent Studio: từ MODAL trong /studio thành MỘT TRANG riêng + nền tối giản · Material)
 
 ### Mục tiêu (yêu cầu chủ dự án)
