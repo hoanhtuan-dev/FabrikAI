@@ -5,6 +5,109 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 11) — ĐÓNG NỐT BA MỤC "CHƯA CÓ": màn hình TRÍ NHỚ · TIẾN ĐỘ SẢN XUẤT (#8) · TÌM THIẾT KẾ CŨ (#9)
+
+**Commit:** `2d73116` + `0e28d20` (bản sửa lô nhúng). **Trạng thái: đã commit + push + DEPLOY production** — hai migration đã chạy, cache dựng lại, chỉ mục đã lập cho tài khoản thật.
+
+### 1. Vì sao đợt này tồn tại
+Bản hướng dẫn tính năng (`HUONG_DAN_TINH_NANG_MOI.md`) có một mục **"Chưa có — nói thật để không chờ nhầm"**. Đợt này làm nốt đúng mục đó: xem lại **bài học agent đã rút** · **theo dõi tiến độ sản xuất** · **tìm thiết kế cũ**. Hai mục còn lại của danh sách đó cố ý KHÔNG làm, và lý do được ghi ở §7.
+
+### 2. (a) MÀN HÌNH TRÍ NHỚ ĐÃ HỌC
+Trí nhớ có tác dụng từ đợt 1 nhưng **không có chỗ nào cho thấy agent học được gì** — brief "tự nhiên" đổi giọng. Một trí nhớ không đọc lại được thì không sửa được.
+
+| Việc | Chi tiết |
+|---|---|
+| API | `GET /api/brand-memory` · `DELETE /api/brand-memory/{id}` — **của chính người dùng**, nằm ngoài công tắc gói (như `brand-dna` · `brand-rules`) |
+| Giao diện | Khối "Xem trí nhớ agent đã học" ngay trong bước **DNA shop** — cạnh chỗ khai báo, để thấy CẢ HAI loại trí nhớ: loại mình viết và loại agent tự học |
+| Xếp hạng | Theo **độ mạnh** rồi id — đúng thứ tự brief đọc, màn hình không nói khác thứ agent dùng |
+| Quên | Xoá bằng **hai nhịp** (không hộp thoại: danh sách dài, thao tác lặp lại). Sửa bài học sai = **xoá nó**, không phải viết bài ngược lại để hai cái đánh nhau trong prompt |
+| Dọn bản sao | `App\Support\Vocabulary` là **một chỗ** cho phép tách từ tiếng Việt + bảng từ đệm; `BrandLearningService::similarity()` nay uỷ quyền cho nó (việc #9 cần đúng phép tách đó) |
+
+### 3. (b) TIẾN ĐỘ SẢN XUẤT — việc #8
+Kế hoạch sản xuất đã có từ lâu nhưng nó là **KẾ HOẠCH** — một tờ giấy đúng ở thời điểm lập. Thiếu đúng một thứ: **SỐ THẬT mỗi ngày**, và từ đó là câu trả lời cho câu hỏi duy nhất chủ xưởng cần: *có kịp không, lệch bao nhiêu?*
+
+| # | Thay đổi | Tệp |
+|---|---|---|
+| 1 | Bảng `production_logs` — **một dòng một ngày** (ghi lại cùng ngày là SỬA, không cộng thêm) | `database/migrations/2026_09_26_000008_...` · `app/Models/ProductionLog.php` |
+| 2 | Tiến độ · nhịp · ngày dự kiến xong · số ngày chậm · cảnh báo — **tất cả là SỐ TÍNH**, không lưu sẵn | `app/Services/ProductionTrackingService.php` |
+| 3 | 3 đường API + bảng giao diện | `app/Http/Controllers/ProductionController.php` · `resources/js/studio/components/ProductionTracking.vue` |
+| 4 | 13 test | `tests/Feature/ProductionTrackingTest.php` |
+
+Ba luật: **một dòng một ngày** (ghi hai lần trong ngày mà cộng dồn là ra gấp đôi) · **không ghi ngày chưa tới** (con số đó chưa xảy ra) · **chặn số vô lý** (một ngày gấp hơn 20 lần cả kế hoạch ⇒ nhiều khả năng gõ thừa số 0).
+
+Điểm nối với tầng giá thành: `units_defect` là **số lỗi THẬT trên sản lượng**, đối chiếu trực tiếp với `@@defect_pct@@` mà chủ xưởng tự đoán trong kế hoạch — cùng vai trò với biên bản QC nhưng ở tầng sản lượng thay vì tầng lấy mẫu.
+
+### 4. (c) TÌM THIẾT KẾ CŨ — việc #9 (FileSearch)
+Trước đợt này "tìm thiết kế cũ" là **đếm + dò từ khoá cứng** trong 120 prompt gần nhất: gõ "áo khoác màu be mùa trước" thì không tìm được prompt viết "khoác dạ be" vì hai câu không dùng chung một từ nào.
+
+| # | Thay đổi | Tệp |
+|---|---|---|
+| 1 | Đo TRƯỚC khi viết: nhà cung cấp nào nhúng được | (xem §5) |
+| 2 | `EmbeddingGateway` — chọn nhà cung cấp theo (địa chỉ + khoá), KHÔNG phụ thuộc Model Registry; **thử lại từng văn bản** khi cả lô hỏng | `app/Ai/EmbeddingGateway.php` |
+| 3 | Bảng `design_embeddings`: vec-tơ **float32 nhị phân** (6 KB thay vì ~15 KB JSON), `text_hash` để chỉ nhúng lại khi chữ đổi | `database/migrations/2026_09_26_000009_...` |
+| 4 | `DesignSearchService` — hai chế độ: **embedding** (cosine) và **keyword** (BM25), **nói rõ đang chạy chế độ nào** | `app/Services/DesignSearchService.php` |
+| 5 | Lệnh `studio:search:index` (04:30 hằng ngày) + 3 đường API + bảng giao diện trong bước DNA shop | `app/Console/Commands/IndexDesignSearch.php` · `app/Http/Controllers/DesignSearchController.php` · `resources/js/studio/components/DesignSearchPanel.vue` |
+| 6 | 14 test | `tests/Feature/DesignSearchTest.php` |
+
+**Giới hạn khai ra, không giấu:** máy chủ chạy **MariaDB 11.8** — không có kiểu vec-tơ, không có chỉ mục ANN. Việc so điểm nằm ở PHP và **chỉ quét 2.000 tài liệu mới nhất** mỗi lượt; response trả về `scanned` + `capped` để màn hình nói ra khi chạm trần, thay vì để người dùng tin nhầm là đã tìm hết.
+
+### 5. ĐO NHÀ CUNG CẤP NHÚNG TRƯỚC KHI VIẾT (2026-09-26, trên production)
+| Nhà cung cấp | /embeddings | Kết quả đo |
+|---|---|---|
+| deepseek (api.deepseek.com) | **404** | DeepSeek KHÔNG có dịch vụ nhúng |
+| ckey (api.xah.io/v1) | **200** | `text-embedding-3-small` · **1536 chiều** |
+| qwen-paygo (maas.qwencloudapi.com) | **200** | `text-embedding-v3` · **1024 chiều** |
+| fal.ai | — | tạo ảnh, không có nhúng |
+
+Kết luận dùng để thiết kế: **embeddings không phải câu hỏi lý thuyết** — nó phụ thuộc nhà cung cấp đang có khoá, nên hệ thống phải có **đường lùi thật** (tìm theo từ khoá) và phải **nói ra** đang chạy chế độ nào.
+
+### 6. MỘT LỖI ĐO ĐƯỢC Ở PRODUCTION — và cách sửa
+| Hiện tượng | Nguyên nhân | Sửa |
+|---|---|---|
+| `studio:search:index` báo **"đã nhúng 0 · còn 39"** cho tài khoản có 49 tài liệu, dù chạy với trần 5 thì nhúng được 5 | Lô **16 văn bản** làm nhà cung cấp trả lỗi cho **cả lô**; hàm nhúng trả `null` cho toàn bộ lượt ⇒ 0 tài liệu | Hạ lô xuống **8** + **thử lại từng văn bản** khi lô hỏng; văn bản nào vẫn hỏng thì **đếm riêng** (`skipped`) và **giữ trong hàng chờ** để lượt sau thử lại — không im lặng bỏ |
+
+Sau khi sửa: `--user=1 --limit=60` → **đã nhúng 39 · còn 0**. Test khoá lại hành vi này (`test_a_broken_batch_falls_back_to_one_text_at_a_time`).
+
+### 7. Kiểm chứng sau deploy (chạy trên production)
+| Kiểm tra | Kết quả |
+|---|---|
+| Sao lưu TRƯỚC khi migrate | `fabrikai-20260922-085938.sql.gz` · 588K · **45 bảng · kết thúc hợp lệ** |
+| HEAD máy chủ | `2d73116` → `0e28d20` — khớp local = origin |
+| Migration | `2026_09_26_000008_create_production_logs_table` **DONE** (151,67 ms) · `..._000009_create_design_embeddings_table` **DONE** (126,05 ms) |
+| Cột | `production_logs`: 9 cột · `design_embeddings`: 13 cột (có `vector` nhị phân + `text_hash`) |
+| Đường mới | **8** đường (`production` ×3 · `design-search` ×3 · `brand-memory` ×2) |
+| Nhà cung cấp nhúng | ứng viên **3**: `qwen-paygo`, `ckey`, `deepseek` ⇒ chọn **qwen-paygo · text-embedding-v3** (đo được **1024 chiều**) |
+| Lập chỉ mục | 49 tài liệu ⇒ **49/49 (100%)**; toàn kho: **50 ảnh + 2 brief** (chưa có bài học/phiếu kỹ thuật: `brand_learning` = 0 và chưa ai lập phiếu) |
+| Tìm thật (3 câu) | đều ở chế độ **embedding** · quét 49 tài liệu · **115–180 ms** · 10 kết quả/câu |
+| Tiến độ (đo trong GIAO DỊCH BỊ HUỶ) | kế hoạch 1.200 cái · đã ghi 2 ngày × 100 ⇒ **"Đúng tiến độ" · 16,7% · nhịp 100/ngày · cần 100/ngày · dự kiến xong 02/10/2026 · lỗi thật 2,5% (giả định 3%)** |
+| Chặn ngày tương lai | **OK**: *"Không ghi sản lượng cho ngày CHƯA TỚI — con số đó chưa xảy ra."* |
+| Sau rollback | `production_logs = 0` · dự án tạm **không còn** (đo xong không để lại dữ liệu) |
+| Trí nhớ | 0 ký ức — đúng: chưa có ảnh nào được duyệt/loại trên production |
+| HTTP | `/` **200** · 3 đường mới đều **401** với khách (đường sống, chặn đúng) |
+| Lịch | `studio:search:index` có trong `schedule:list` (04:30, sau `memory:consolidate` 04:00) |
+| Test | **1230 XANH / 9.156 assertion** (trước: 1196 / 8.973) |
+
+> **ĐÍNH CHÍNH MỘT BUG CỦA CHÍNH BỘ TEST:** `StaticIntegrityTest` báo động giả vì `App\Models\Product` là
+> **tiền tố** của `App\Models\ProductionLog` (việc #8) — `str_contains` khớp chuỗi con. Đã đổi sang khớp
+> **trọn tên** (`preg_quote(...).'(?![A-Za-z0-9_])'`): một rào chắn hay báo động giả sẽ bị tắt đi, lúc đó
+> nó không chặn được gì nữa.
+
+### 8. HAI MỤC CỐ Ý KHÔNG LÀM (và vì sao)
+| Mục | Vì sao không |
+|---|---|
+| **Duyệt GIÁ tách riêng khỏi kế hoạch** | Giá nằm TRONG cùng bản kế hoạch; tách ra là hai nút cho một tờ giấy. Cổng "Chốt kế hoạch sản xuất & giá" đã phủ mục "duyệt giá" của bảng 6 điểm kiểm soát |
+| **Sản xuất: chia line · đặt hàng · tồn kho NPL** | Cần dữ liệu NHÀ MÁY thật (line, tồn kho, nhà cung cấp) mà FabrikAI chưa có connector — cùng hạng với "connector TMĐT/POS/ERP" đã ghi rõ là chưa chạy. Làm trước khi có dữ liệu là dựng một màn hình để trống |
+
+### 9. Lộ trình: 9/9 việc đã xong
+| # | Việc | Trạng thái |
+|---|---|---|
+| 1–6 | lesson · `brand_rules` · tech pack · mẫu vật lý · củng cố trí nhớ · QC | ✅ đợt 1 · 2 · 3 · 4 · 8 · 9 |
+| 7 | Ba cổng duyệt | ✅ đợt 10 |
+| 8 | Theo dõi sản xuất | ✅ **đợt này** |
+| 9 | FileSearch (tìm thiết kế cũ) | ✅ **đợt này** (embedding khi có nhà cung cấp · từ khoá khi không) |
+| — | Gán model cho vai "Agent Studio — Rút kinh nghiệm" | **chủ dự án** (bỏ trống thì rơi về nhóm suy luận) |
+
+---
 ## Phiên 2026-09-26 (đợt 10) — BA CỔNG DUYỆT (việc #7): CHỐT THÔNG SỐ · CHỐT TIỀN · NGHIỆM THU
 
 **Commit:** `02457a5`. **Trạng thái: đã commit + push + DEPLOY production** — migration `2026_09_26_000007` đã chạy (192,33 ms), cache dựng lại, asset đã build và phục vụ.
