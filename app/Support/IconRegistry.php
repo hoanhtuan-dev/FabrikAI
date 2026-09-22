@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\HtmlString;
+
 /**
  * [Single source of truth — 2026-09-17] REGISTRY ICON dùng chung cho toàn hệ thống.
  *
@@ -62,6 +64,22 @@ class IconRegistry
     public static function svg(string $name): string
     {
         return (string) (self::all()[$name]['svg'] ?? '');
+    }
+
+    /**
+     * [2026-09-26 · đợt 24] THẺ <svg> HOÀN CHỈNH cho Blade.
+     *
+     * Vì sao trả HtmlString thay vì để blade tự viết `{!! !!}`: tests/Feature/StudioXssSinksTest.php
+     * CẤM mọi lối ra thô trong blade (đúng — đó là cách chặn XSS). Ở đây nội dung SVG đến từ
+     * resources/js/studio/icons.json (hằng số trong mã nguồn, không phải dữ liệu người dùng), và
+     * `{{ }}` của Blade in HtmlString NGUYÊN VĂN nên vẫn an toàn mà không phải mở lại lối ra thô.
+     */
+    public static function svgTag(string $name, string $class = 'h-4 w-4'): HtmlString
+    {
+        return new HtmlString(
+            '<svg class="'.e($class).'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            .self::svg($name).'</svg>'
+        );
     }
 
     /** @return array<int, array{name: string, note: string|null}> Danh sách kèm tài liệu ngắn. */

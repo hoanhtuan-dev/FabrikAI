@@ -5,6 +5,103 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 24) — TRẢ HẾT NỢ CỦA ĐỢT GỘP TRANG: hai trang con vào khu chung · đổi khu TẠI CHỖ · xoá mã chết · danh sách khu về MỘT nguồn
+
+**Commit:** `e5d3ee7`. **Trạng thái: đã commit + push + DEPLOY production.** Bốn món nợ ghi ở §5 của đợt 23, làm hết.
+
+### 1. Nợ 1 — hai trang con (`/he-thong-thiet-ke` · `/bao-cao-nhom`) vào khu chung
+
+| Trước | Sau |
+|---|---|
+| Hai trang đứng riêng, mở ra là mất thanh chung, không có lối sang khu khác | Cả hai `@include('studio.partials.hub-bar', ['area' => …])` — **cùng thanh, cùng bộ chuyển khu, cùng biểu tượng** |
+| Trang tự có `<h1>` riêng và kicker riêng | Tiêu đề khu do thanh chung render ⇒ mỗi trang còn **đúng MỘT `<h1>`** (đo bằng `substr_count($html, '<h1') === 1`) |
+| Hai trang không nằm trong bộ chuyển khu | Nay là hai khu `design` · `costs` — bấm từ bất kỳ khu nào cũng tới được |
+
+**Vì sao hai trang này KHÔNG chuyển thành Vue** (dù nợ ghi là nên thành khu thứ tư): chính mã nguồn của
+chúng đã ghi lý do — trang xem token đọc `App\Support\ThemePalette`, CÙNG lớp mà `ThemeSystemTest` dùng
+(nên trang và test không thể nói hai con số khác nhau), và form import theme là **form POST thật** chạy được
+kể cả khi bundle JS hỏng. Chuyển sang Vue sẽ phá cả hai tính chất đó. Nên: giữ máy chủ render, hợp nhất KHUNG
+NHÌN.
+
+### 2. Nợ 2 — đổi khu TẠI CHỖ (không nạp lại trang)
+
+Thanh chung nay là liên kết THẬT nhưng có `@click`: khu SPA thì `preventDefault` + `pushState` + đổi
+component; khu máy chủ render thì để trình duyệt điều hướng (đúng, vì thanh của chúng là HTML tĩnh).
+Giữ được cả hai thói quen: bấm thường = đổi tại chỗ, **Ctrl/Cmd/Shift-click = mở tab mới** như liên kết thường.
+
+**Đo được (Chrome headless + CDP, owner thật, 1440×900):**
+
+| Chỉ số | Trước khi bấm | Sau khi bấm Quản trị |
+|---|---|---|
+| `location.pathname` | `/cai-dat` | **`/admin`** (URL vẫn sâu) |
+| `<h1>` | Cài đặt của tôi | **Quản trị** |
+| Dấu `window.__noReload` đặt trước khi bấm | — | **còn nguyên ⇒ trang KHÔNG nạp lại** |
+| Thanh tiêu đề nhìn thấy | 1 | **1** (app con vẫn ẩn thanh riêng) |
+| Card render trong khu Quản trị | — | 27 |
+| Số khu trên thanh | 3 | **5** (Cài đặt của tôi · Cài đặt hệ thống · Quản trị · Hệ thống thiết kế · Chi phí theo nhóm) |
+
+`popstate` cũng được nối: nút Back/Forward đưa về đúng khu vừa xem.
+
+### 3. Nợ 3 — xoá mã chết
+
+| Đã xoá | Vì sao chắc chắn không cần |
+|---|---|
+| `resources/js/studio/settings.js` · `admin.js` · `my-settings.js` | Không còn blade nào nạp; vite.config.js đã bỏ khỏi danh sách entry |
+| `resources/views/studio/settings.blade.php` · `admin.blade.php` · `my-settings.blade.php` | Ba controller (`settingsPage` · `mySettingsPage` · `adminPage`) đều trả `view('studio.hub')`; grep trong `app/` = 0 tham chiếu |
+
+Bốn bài test cũ trỏ vào ba file đã xoá **đã được cập nhật** (không nới lỏng, mà trỏ sang chỗ mới):
+`UserCatalogTest` (blade nhúng `data-user-id`/`data-user-admin`/`data-section` → nay là `hub.blade.php`),
+`ThemeSystemTest` (hai danh sách shell → `hub.blade.php`), `TechnicalLeakTest` (bỏ 3 file khỏi danh sách miễn
+trừ), `StaticIntegrityTest` + `ClientErrorReportTest` (danh sách entry nay là `main.js` · `hub.js` · `collections.js`).
+
+### 4. Nợ 4 — danh sách khu về ĐÚNG MỘT NGUỒN
+
+Trước: mỗi trang tự khai khu của nó (Vue một danh sách, Blade một danh sách). Nay:
+
+| Nơi | Vai trò |
+|---|---|
+| `app/Support/SettingsAreas.php` (mới) | **Nguồn duy nhất**: id · nhãn · đường dẫn · biểu tượng · mô tả · `ownerOnly` · `spa` |
+| `resources/views/studio/partials/hub-bar.blade.php` (mới) | Thanh HTML thật cho hai trang máy chủ render — đọc `SettingsAreas::visibleFor(auth()->user())` |
+| `SettingsHubApp.vue` | Thanh của SPA — đọc **cùng danh sách** qua `data-areas` (JSON do máy chủ lọc theo quyền) |
+| Biểu tượng | `IconRegistry::svgTag()` đọc `resources/js/studio/icons.json` — đúng file `<StudioIcon>` dùng, nên hai thanh không thể lệch hình |
+
+### 5. Một bài học thật: rào chắn XSS bắt được tôi
+
+Bản đầu của thanh Blade dùng cú pháp in thô để in SVG ⇒ `StudioXssSinksTest` **ĐỎ** (Blade dùng lối ra thô).
+Tôi KHÔNG nới rào chắn đó. Cách sửa đúng: `IconRegistry::svgTag()` trả `HtmlString` — Blade in `HtmlString`
+nguyên văn bằng `{{ }}`, còn nội dung SVG đến từ hằng số trong mã nguồn (`icons.json`), nên vẫn không có lối
+ra thô nào trong blade mà hình vẫn hiện.
+
+### 6. Khoá bằng test
+
+`tests/Feature/SettingsHubTest.php` (mới, 5 bài):
+
+| Bài | Khoá điều gì |
+|---|---|
+| `test_every_area_in_the_list_opens_for_the_owner` | Mọi khu trong `SettingsAreas` trả 200 và tự khai đúng `data-area` — không khu nào là liên kết chết |
+| `test_the_server_rendered_pages_use_the_shared_bar` | Hai trang con có bộ chuyển khu + `aria-current` + **đúng một `<h1>`** |
+| `test_the_bar_only_offers_the_areas_the_user_may_open` | Owner thấy 5 khu, tài khoản thường chỉ thấy `mine` — kiểm cả ở lớp PHP lẫn `data-areas` trong HTML thật |
+| `test_the_old_pages_and_entries_are_gone` | 6 file đã xoá không được quay lại; `vite.config.js` không còn khai entry đã xoá |
+| `test_the_area_list_lives_in_exactly_one_place` | `SettingsHubApp.vue` **không được** tự khai lại các đường dẫn `/settings` · `/admin` · `/he-thong-thiet-ke` · `/bao-cao-nhom` |
+
+Toàn bộ: **1238 test XANH** (9395 assertions) — trước đợt này 1233.
+
+### 7. Deploy + kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Sao lưu DB trước khi pull | có (script `fabrikai-backup.sh`, thư mục `~/db-backups`) |
+| HEAD máy chủ | **`e5d3ee7`** — khớp local |
+| Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` đều chạy lại |
+| Trang trên máy chủ | `/cai-dat` · `/he-thong-thiet-ke` · `/bao-cao-nhom` = 200; hai trang con có thanh chung + `aria-current` + **1 `<h1>`** |
+| Log lỗi | không phát sinh dòng ERROR/CRITICAL nào sau deploy (các dòng cũ là cron tín hiệu thị trường đã biết) |
+
+### 8. Nợ còn lại
+
+Không còn món nào trong bốn món của đợt 23. Việc ĐÁNG làm tiếp (không phải nợ): hợp nhất ba store của ba khu
+SPA để dữ liệu dùng chung (ví dụ đổi tên người dùng ở khu Quản trị thì khu khác thấy ngay mà không cần tải lại).
+
+---
 ## Phiên 2026-09-26 (đợt 23) — GỘP "QUẢN TRỊ" + "CÀI ĐẶT" THÀNH MỘT TRANG: ba khu, MỘT thanh tiêu đề, MỘT bộ chuyển khu
 
 **Commit:** `e058ade`. **Trạng thái: đã commit + push + DEPLOY production.** Việc thứ ba và là việc CUỐI của loạt
