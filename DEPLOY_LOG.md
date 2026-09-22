@@ -5,6 +5,83 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 10) — BA CỔNG DUYỆT (việc #7): CHỐT THÔNG SỐ · CHỐT TIỀN · NGHIỆM THU
+
+**Commit:** `02457a5`. **Trạng thái: đã commit + push + DEPLOY production** — migration `2026_09_26_000007` đã chạy (192,33 ms), cache dựng lại, asset đã build và phục vụ.
+
+### 1. Vì sao
+Ba công cụ đi ra nhà máy đã có (phiếu kỹ thuật · kế hoạch SX & giá · biên bản QC) nhưng **không có chỗ nào nói "phần này đã được ai đó CHỐT"**. Trạng thái bộ sưu tập (`draft→review→approved`) là duyệt **BẢN THIẾT KẾ** — duyệt ảnh KHÔNG có nghĩa là đã ký thông số, đã chốt tiền và đã nghiệm thu chất lượng. Gộp ba thứ đó vào một trạng thái duy nhất là để một lần duyệt ảnh âm thầm ký luôn cả phiếu kỹ thuật.
+
+### 2. Đã làm
+| # | Thay đổi | Tệp |
+|---|---|---|
+| 1 | Lõi ba cổng: thứ tự bắt buộc · điều kiện dữ liệu · vân tay chống "duyệt rồi dữ liệu đổi" · cascade | `app/Services/ProjectGateService.php` |
+| 2 | Bảng `project_gates` (ai · khi nào · vì sao · vân tay lúc duyệt) | `database/migrations/2026_09_26_000007_...php` · `app/Models/ProjectGate.php` |
+| 3 | 2 đường API (`GET /gates`, `POST /gates/{gate}`) | `app/Http/Controllers/ProjectGateController.php` · `routes/web.php` |
+| 4 | Bảng cổng trên giao diện + nút mở ở cả hai chỗ của trang Bộ sưu tập | `resources/js/studio/components/GatePanel.vue` · `CollectionsCard.vue` · `pages/CollectionsPage.vue` · `store/` |
+| 5 | 16 test | `tests/Feature/ProjectGateTest.php` |
+| 6 | **Dọn một bản sao**: `Project::settingsArray()` là chỗ DUY NHẤT đọc cột JSON `settings` (trước đó `AgentSessionController` tự viết một bản, bản thứ ba sắp được viết cho cổng duyệt) | `app/Models/Project.php` · `app/Http/Controllers/AgentSessionController.php` |
+
+### 3. Ba luật — mỗi luật có test
+| Luật | Nội dung | Vì sao |
+|---|---|---|
+| **1. Thứ tự** | Cổng sau chỉ mở khi cổng trước ĐÃ DUYỆT và CÒN HIỆU LỰC | Duyệt QC trước khi chốt thông số là duyệt một thứ chưa tồn tại |
+| **2. Duyệt trên DỮ LIỆU** | Máy chủ từ chối kèm danh sách còn thiếu (chưa có phiếu · kế hoạch 0 cái · còn lô KHÔNG ĐẠT) | Một quyết định rỗng vẫn là một chữ ký |
+| **3. Dữ liệu đổi ⇒ mất hiệu lực** | Mỗi lần duyệt lưu VÂN TAY dữ liệu nguồn; dữ liệu đổi ⇒ cổng thành "cần duyệt lại". **Quyết định cũ KHÔNG bị xoá** | Vết kiểm toán giữ nguyên, chỉ hiệu lực bị treo — nếu xoá thì không còn biết ai đã từng ký gì |
+
+Hệ quả của luật 3 (cascade): **rút cổng trước ⇒ cổng sau thành "hết hiệu lực"** — chúng được duyệt DỰA TRÊN một thứ nay không còn đúng.
+
+Vân tay bám vào thứ NGƯỜI DÙNG SỬA ĐƯỢC và ĐÁNG phải duyệt lại, **không** bám `updated_at`: sửa lỗi chính tả trong ghi chú QC không làm mất hiệu lực nghiệm thu, còn đổi kết quả một lô thì có (vân tay QC = danh sách `id:kết quả` của các biên bản đã kiểm).
+
+### 4. Hai kiểu "gần đúng" đã bị loại khi viết test
+| Kiểu sai | Cách nó lộ ra |
+|---|---|
+| "2.5%" trong một CÂU tiếng Việt | Test bắt chuỗi `2,5%` — số trong JSON thì vẫn là số, nhưng câu cho người duyệt đọc phải viết theo cách người Việt đọc (`pct()`: phẩy thập phân, bỏ số 0 vô nghĩa) |
+| nút **Duyệt** bị khoá mà lý do nằm cách xa 2 nút khác | `DesignSystemTest` (luật §4.4) đỏ ngay: dòng `↳ lý do` phải nằm NGAY dưới nút chính ⇒ đảo thứ tự nút (phụ trước, chính sau) |
+
+### 5. Kiểm chứng sau deploy (chạy trên production)
+| Kiểm tra | Kết quả |
+|---|---|
+| Sao lưu TRƯỚC khi migrate | `fabrikai-20260922-081717.sql.gz` · 576K · **44 bảng · kết thúc hợp lệ** |
+| HEAD máy chủ | `02457a5` — khớp local = origin |
+| Migration | `2026_09_26_000007_create_project_gates_table` → **DONE** (192,33 ms) |
+| Bảng | `id, project_id, gate, decision, note, decided_by, decided_at, fingerprint, created_at, updated_at` · 0 dòng |
+| Container | resolve được `ProjectGateService` ✅ (đúng lớp lỗi đã gặp ở đợt 1) |
+| Đường API | **2** đường `api/projects/{project}/gates` + `…/gates/{gate}` |
+| Asset | manifest **52 mục · 0 tệp thiếu** · `assets/GatePanel-BXYBNiz6.js` → **HTTP 200** |
+| HTTP | `/` **200** · `GET …/gates` **401** (chặn khách) · `POST …/gates/tech_pack` **419** (CSRF đang bật — đúng) |
+| Cron | `seKYAPOwkS` nhảy lúc **08:17** · `studio_scheduler_alive()` **true** |
+| Test | **1196 XANH / 8.973 assertion** (trước: 1180 / 8.873) |
+
+**Đường GHI được đo trên chính production, trong một giao dịch BỊ HỦY** (không để lại dữ liệu — đã kiểm lại sau rollback: `project_gates = 0`, dự án tạm không còn):
+```
+(1) duyệt khi chưa có phiếu kỹ thuật  → CHẶN: "Chưa duyệt được: Chưa lập phiếu kỹ thuật cho bộ sưu tập này."
+(2) có phiếu rồi duyệt cổng 1          → OK, hiệu lực = approved
+(3) nhảy cóc lên cổng 3 (QC)           → CHẶN: "Phải duyệt xong cổng \"Chốt kế hoạch sản xuất & giá\" trước…"
+(4) sửa phiếu kỹ thuật sau khi duyệt   → hiệu lực = stale · quyết định cũ = approved · sẵn sàng = false
+```
+
+### 6. Sáu điểm kiểm soát — nay đã đủ
+| Điểm kiểm soát | Cơ chế | Trạng thái |
+|---|---|---|
+| Duyệt concept | `ProjectWorkflowService` (draft→review→approved) | ✅ có từ trước |
+| Duyệt mẫu ảnh | `Generation::SHOT_TRANSITIONS` | ✅ có từ trước |
+| Duyệt giá | `CollectionPlanService` + **cổng "Chốt kế hoạch sản xuất & giá"** | ✅ **đợt này** |
+| Duyệt kế hoạch SX | (cùng cổng trên — giá nằm TRONG bản kế hoạch) | ✅ **đợt này** |
+| Tech pack sign-off | cổng "Chốt phiếu kỹ thuật" | ✅ **đợt này** |
+| Duyệt QC | cổng "Nghiệm thu chất lượng" | ✅ **đợt này** |
+
+> Ghi chú thiết kế: cổng duyệt **cố ý KHÔNG chặn** trạng thái bộ sưu tập. Duyệt bản thiết kế (status) và duyệt ba thứ đi ra nhà máy (gates) là hai lớp khác nhau; buộc bộ phải có phiếu kỹ thuật mới được `approved` sẽ khoá luôn những bộ chỉ để làm ảnh. Giao diện nói cả hai: nhãn `n/3` cạnh nút, viền xanh khi đủ ba cổng.
+
+### 7. Nợ còn lại của lộ trình
+| # | Việc | Ghi chú |
+|---|---|---|
+| ~~7~~ | ~~Ba cổng duyệt~~ | ✅ **đợt này** |
+| 8 | Theo dõi sản xuất (so thực tế vs kế hoạch, cảnh báo chậm) | Sau khi có kế hoạch + mẫu + QC (đã có đủ) |
+| 9 | `FileSearch` = vector retrieval | Đắt nhất; để cuối |
+| — | Gán model cho vai "Agent Studio — Rút kinh nghiệm" | chủ dự án |
+
+---
 ## Phiên 2026-09-26 (đợt 9) — QC TOOL (việc #6): BIÊN BẢN KIỂM TRA CHẤT LƯỢNG + KẾ HOẠCH LẤY MẪU AQL
 
 **Commit:** `db890ef`. **Trạng thái: đã commit + push + DEPLOY production** — migration `2026_09_26_000006` đã chạy, cache dựng lại, asset đã build và phục vụ.
