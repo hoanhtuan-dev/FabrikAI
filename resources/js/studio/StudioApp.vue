@@ -1021,7 +1021,7 @@ function onTouchEnd(e) {
 
         <!-- Bộ sưu tập + quick-apply gộp 1 tool-btn -->
         <div class="relative">
-          <button @click="openApplyPopover" class="tool-btn" title="Bộ sưu tập — áp dụng nhanh hoặc mở bảng thiết kế quản lý"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Bộ sưu tập</span> <StudioIcon name="chevronDown" size="h-3 w-3" /></button>
+          <button @click="openApplyPopover" class="tool-btn" title="Bộ sưu tập — áp dụng nhanh hoặc mở bảng thiết kế quản lý"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> <span class="hidden xl:inline">Bộ sưu tập</span> <StudioIcon name="chevronDown" size="h-3 w-3" /></button>
           <div v-if="applyOpen" class="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border border-ink-700 bg-ink-900 shadow-xl">
             <div class="p-2.5">
               <p class="mb-2 text-body font-semibold text-cream-200">Áp dụng bộ sưu tập cho phiên tạo ảnh</p>
@@ -1076,7 +1076,7 @@ function onTouchEnd(e) {
                   @click="store.togglePlanPopover()">
             <StudioIcon name="coins" size="h-3.5 w-3.5" />
             {{ store.creditsLeft }}
-            <span v-if="store.planName" class="hidden text-label text-cream-300 xl:inline">{{ store.planName }}</span>
+            <span v-if="store.planName" class="hidden max-w-[8rem] truncate text-label text-cream-300 2xl:inline">{{ store.planName }}</span>
             <StudioIcon name="chevronDown" size="h-3 w-3" />
           </button>
 
