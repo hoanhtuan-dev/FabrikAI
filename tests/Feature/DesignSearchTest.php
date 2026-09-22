@@ -215,6 +215,40 @@ class DesignSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(0, count($res->json('items')));
     }
 
+    /**
+     * BÀI HỌC ĐO ĐƯỢC Ở PRODUCTION (2026-09-26): lô 16 văn bản làm nhà cung cấp trả lỗi cho CẢ LÔ ⇒ lập chỉ
+     * mục ra 0 tài liệu, dù 15 văn bản kia hoàn toàn nhúng được. Nay lô hỏng thì thử lại TỪNG văn bản.
+     */
+    public function test_a_broken_batch_falls_back_to_one_text_at_a_time(): void
+    {
+        $u = $this->customer();
+        $p = $this->project($u);
+        $this->generation($u, $p, 'đầm linen trắng ngà');
+        $this->generation($u, $p, 'áo sơ mi cotton');
+        $this->generation($u, $p, 'văn bản hỏng');
+        $this->withEmbeddingProvider();
+
+        Http::fake(function ($request) {
+            $body = json_decode($request->body(), true) ?: [];
+            $input = $body['input'] ?? '';
+            if (is_array($input)) {
+                return Http::response(['error' => ['message' => 'batch too large']], 400);
+            }
+            if (str_contains((string) $input, 'hỏng')) {
+                return Http::response(['error' => ['message' => 'bad text']], 400);
+            }
+
+            return Http::response(['data' => [['embedding' => [1.0, 0.0]]]], 200);
+        });
+
+        $res = $this->actingAs($u)->postJson('/api/design-search/index', ['limit' => 50])->assertStatus(200);
+
+        $this->assertSame(2, $res->json('result.indexed'), 'Hai văn bản nhúng được vẫn phải vào chỉ mục.');
+        $this->assertSame(1, $res->json('result.skipped'), 'Văn bản hỏng bị đếm riêng, không im lặng bỏ.');
+        $this->assertSame(1, $res->json('result.pending'), 'Văn bản bỏ qua vẫn nằm trong hàng chờ để thử lại.');
+        $this->assertSame(2, DesignEmbedding::query()->where('user_id', $u->id)->count());
+    }
+
     // ── (e)(f) LẬP CHỈ MỤC ──────────────────────────────────────────────────────────────────
 
     public function test_indexing_twice_does_not_embed_again(): void

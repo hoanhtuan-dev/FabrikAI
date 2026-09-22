@@ -48,6 +48,10 @@ class IndexDesignSearch extends Command
                 (int) $result['pending'],
             );
 
+            if (! empty($result['skipped'])) {
+                $line .= ' · BỎ QUA '.$result['skipped'].' văn bản (nhà cung cấp từ chối riêng chúng) — sẽ thử lại lượt sau';
+            }
+
             if (! empty($result['unavailable'])) {
                 // NÓI THẬT: không có nhà cung cấp nhúng ⇒ chỉ mục đứng yên, và tìm kiếm sẽ chạy chế độ từ khoá.
                 $line .= ' · KHÔNG nhúng được (chưa có nhà cung cấp /embeddings) — tìm kiếm sẽ dùng chế độ từ khoá';

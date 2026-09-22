@@ -201,7 +201,7 @@ class DesignSearchService
 
         $todo = array_slice($todo, 0, $limit);
         $embedded = $this->embeddings->embed(array_map(fn ($d) => $d['text'], $todo));
-        if ($embedded === null || count($embedded['vectors']) !== count($todo)) {
+        if ($embedded === null) {
             return [
                 'total' => count($docs),
                 'indexed' => 0,
@@ -211,9 +211,14 @@ class DesignSearchService
             ];
         }
 
+        // Một văn bản hỏng KHÔNG được làm mất cả lượt: ghi được bao nhiêu thì ghi, và ĐẾM số bỏ qua để
+        // lần sau còn thử lại (bỏ qua im lặng là tài liệu không bao giờ được tìm thấy).
+        $skipped = 0;
         foreach ($todo as $i => $doc) {
             $vector = $embedded['vectors'][$i] ?? [];
             if ($vector === []) {
+                $skipped++;
+
                 continue;
             }
             DesignEmbedding::updateOrCreate(
@@ -232,8 +237,10 @@ class DesignSearchService
 
         return [
             'total' => count($docs),
-            'indexed' => count($todo),
-            'pending' => max(0, $pending - count($todo)),
+            'indexed' => count($todo) - $skipped,
+            'skipped' => $skipped,
+            // Văn bản bị bỏ qua vẫn nằm trong `pending` để lượt sau thử lại — không mất dấu.
+            'pending' => max(0, $pending - count($todo)) + $skipped,
             'provider' => ['provider' => $embedded['provider'], 'model' => $embedded['model'], 'dims' => $embedded['dims']],
         ];
     }

@@ -45,8 +45,16 @@ class EmbeddingGateway
 
     private const CACHE_SECONDS = 3600;
 
-    /** Trần số văn bản cho MỘT lời gọi — nhà cung cấp thường nhận tối đa 10–25 input. */
-    public const BATCH = 16;
+    /**
+     * Trần số văn bản cho MỘT lời gọi.
+     *
+     * ĐO TRÊN PRODUCTION (2026-09-26): lô **16** làm nhà cung cấp (qwen-paygo) trả lỗi cho CẢ LÔ ⇒ lập chỉ
+     * mục ra 0 tài liệu dù chỉ MỘT lô hỏng. Hạ xuống 8 và thêm đường thử lại từng văn bản (xem embed()).
+     */
+    public const BATCH = 8;
+
+    /** Cắt văn bản trước khi nhúng: văn bản quá dài làm hỏng cả lô, và phần đuôi hiếm khi mang nghĩa. */
+    public const TEXT_MAX = 2000;
 
     /** Có nhà cung cấp nào nhúng được không — để giao diện NÓI THẬT trước khi người dùng bấm. */
     public function available(): bool
@@ -71,8 +79,14 @@ class EmbeddingGateway
      */
     public function embed(array $texts): ?array
     {
-        $texts = array_values(array_filter($texts, fn ($t) => trim((string) $t) !== ''));
-        if ($texts === []) {
+        $clean = [];
+        foreach ($texts as $index => $text) {
+            $text = trim((string) $text);
+            if ($text !== '') {
+                $clean[$index] = mb_substr($text, 0, self::TEXT_MAX);
+            }
+        }
+        if ($clean === []) {
             return null;
         }
 
@@ -81,27 +95,51 @@ class EmbeddingGateway
             return null;
         }
 
-        $out = [];
-        foreach (array_chunk($texts, self::BATCH) as $chunk) {
-            $vectors = $this->call($resolved, $chunk);
-            if ($vectors === null || count($vectors) !== count($chunk)) {
-                // Thiếu vec-tơ ⇒ tài liệu lặng lẽ không bao giờ được tìm thấy. Trả null và bỏ ghi nhớ để
-                // lượt sau dò lại nhà cung cấp từ đầu.
-                Cache::forget(self::CACHE_KEY);
+        // KHOÁ LÀ CHỈ SỐ ĐẦU VÀO, không phải thứ tự trong kết quả: một văn bản hỏng bị bỏ qua thì các văn
+        // bản còn lại vẫn phải gắn đúng vào tài liệu của nó.
+        $vectors = [];
+        $failed = 0;
+        $dims = 0;
 
-                return null;
+        foreach (array_chunk($clean, self::BATCH, true) as $chunk) {
+            $batch = $this->call($resolved, array_values($chunk));
+            if ($batch !== null && count($batch) === count($chunk)) {
+                $keys = array_keys($chunk);
+                foreach ($batch as $n => $vector) {
+                    $vectors[$keys[$n]] = $vector;
+                    $dims = max($dims, count($vector));
+                }
+
+                continue;
             }
-            foreach ($vectors as $vector) {
-                $out[] = $vector;
+
+            // LÔ HỎNG ⇒ THỬ LẠI TỪNG VĂN BẢN. Đây là bài học ĐO ĐƯỢC ở production: một lô 16 văn bản hỏng
+            // làm cả lượt lập chỉ mục ra 0 tài liệu, trong khi 15 văn bản kia hoàn toàn nhúng được.
+            foreach ($chunk as $key => $text) {
+                $one = $this->call($resolved, [$text]);
+                if ($one !== null && isset($one[0])) {
+                    $vectors[$key] = $one[0];
+                    $dims = max($dims, count($one[0]));
+                } else {
+                    $failed++;
+                }
             }
         }
 
+        if ($vectors === []) {
+            // Không nhúng được văn bản nào ⇒ nhà cung cấp hỏng thật. Bỏ ghi nhớ để lượt sau dò lại.
+            Cache::forget(self::CACHE_KEY);
+
+            return null;
+        }
+
         return [
-            'vectors' => $out,
+            'vectors' => $vectors,
             'provider' => $resolved['provider'],
             'model' => $resolved['model'],
-            // Số chiều ĐO TỪ KẾT QUẢ, không lấy từ tài liệu nhà cung cấp: đó là cách duy nhất biết chắc.
-            'dims' => count($out[0] ?? []),
+            // Số chiều ĐO TỪ KẾT QUẢ, không lấy từ tài liệu nhà cung cấp: cách duy nhất biết chắc.
+            'dims' => $dims,
+            'failed' => $failed,
         ];
     }
 
