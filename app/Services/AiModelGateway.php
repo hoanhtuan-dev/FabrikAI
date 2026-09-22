@@ -202,6 +202,9 @@ class AiModelGateway
                         'tool_calls' => (int) ($result['tool_calls'] ?? 0),
                         'tool_queries' => array_values((array) ($result['tool_queries'] ?? [])),
                         'tool_results' => (int) ($result['tool_results'] ?? 0),
+                        // Số lời gọi model xin bằng MARKUP riêng của DeepSeek (không phải \`tool_calls\` chuẩn).
+                        // Phải đi ra ngoài: đây là dấu hiệu provider dùng định dạng riêng, không phải chuyện nội bộ.
+                        'tool_markup_calls' => (int) ($result['tool_markup_calls'] ?? 0),
                         // CÔNG CỤ CỦA NHÀ CUNG CẤP qua /responses: số lượt tìm THẬT (0 = nhận tham số mà
                         // không tìm — model không hỗ trợ). Ba khoá này luôn có mặt để nơi gọi không phải đoán.
                         'hosted_calls' => (int) ($result['hosted_calls'] ?? 0),
@@ -350,9 +353,19 @@ class AiModelGateway
         $streamed = false;
         $toolsAccepted = null;
         $finish = null;
+        // Số lời gọi công cụ mà model xin bằng MARKUP của DeepSeek (không phải trường \`tool_calls\` chuẩn) —
+        // con số này phải đi ra ngoài để biết provider đang dùng định dạng riêng, không phải im lặng chịu đựng.
+        $markupCalls = 0;
 
-        for ($round = 1; $round <= $maxRounds + 1; $round++) {
-            $offerTools = $round <= $maxRounds && $tools !== [];
+        // VÒNG GIA HẠN: nếu lượt CUỐI (không khai công cụ) model lại xin gọi công cụ bằng markup, ta cho nó
+        // MỘT vòng nữa CÓ công cụ — vì đó đúng là điều nó đang đòi. Trần cứng để không quay vô hạn: tổng số
+        // vòng không quá maxRounds + 2, và trần lời gọi của từng công cụ vẫn chặn ở phía công cụ.
+        $extraRounds = 0;
+
+        // Vòng GIA HẠN tốn HAI vòng: một vòng khai công cụ (điều model đang đòi) + một vòng chốt trả lời.
+        for ($round = 1; $round <= $maxRounds + 1 + 2 * $extraRounds; $round++) {
+            // Vòng thường: 1..maxRounds có công cụ, vòng maxRounds+1 là vòng CUỐI không công cụ (luật cũ).
+            $offerTools = ($round <= $maxRounds + 2 * $extraRounds) && $tools !== [];
 
             $round1 = $this->streamOnce($candidate, $key, $conversation, $options, $offerTools ? $tools : [], $maxTokens, $timeout, $onDelta);
 
@@ -381,19 +394,45 @@ class AiModelGateway
             }
 
             $streamed = $streamed || (bool) $round1['streamed'];
-            $text .= (string) $round1['text'];
+            // Tích luỹ chữ ĐÃ GỠ markup (chữ trả cho người dùng), còn việc đọc markup thì dùng bản thô bên dưới.
+            $text .= $this->stripToolMarkup((string) $round1['text']);
             $finish = $round1['finish_reason'] ?? $finish;
             if ($offerTools) {
                 $toolsAccepted = true;
             }
 
             $toolCalls = (array) $round1['tool_calls'];
+
+            // DEEPSEEK GỌI CÔNG CỤ BẰNG MARKUP: đo thật — provider trả \`tool_calls\` CHUẨN *và* viết thêm khối
+            // markup vào chữ hiển thị; lượt cuối (không khai công cụ) thì chỉ còn markup. Vòng này CÓ khai
+            // công cụ ⇒ đọc markup thành lời gọi thật để vòng lặp chạy tiếp, thay vì coi đó là câu trả lời.
+            if ($toolCalls === [] && $offerTools) {
+                $toolCalls = $this->parseToolMarkup((string) $round1['text']);
+                if ($toolCalls !== []) {
+                    $markupCalls += count($toolCalls);
+                }
+            }
+
+            // LƯỢT CUỐI mà model vẫn XIN GỌI CÔNG CỤ (bằng markup) ⇒ cho MỘT vòng gia hạn CÓ công cụ.
+            // Không có bước này thì câu trả lời là một khối markup rỗng nghĩa, và người dùng nhận đúng con số
+            // không: model muốn tra tiếp mà ta không cho. Trần: tối đa MỘT lần gia hạn.
+            if ($toolCalls === [] && ! $offerTools && $extraRounds < 1) {
+                $markup = $this->parseToolMarkup((string) $round1['text']);
+                if ($markup !== []) {
+                    $extraRounds = 1;
+                    $markupCalls += count($markup);
+                    $text = '';            // chữ của lượt "xin công cụ" KHÔNG phải câu trả lời — bỏ, không hiển thị
+                    $toolCalls = $markup;
+                }
+            }
+
             if ($toolCalls === []) {
                 return [
-                    'text' => $text, 'finish_reason' => $finish, 'reasoning_only' => false,
+                    // CHỮ RA NGOÀI LUÔN ĐÃ GỠ MARKUP — người dùng không bao giờ đọc thấy mã kỹ thuật.
+                    'text' => $this->stripToolMarkup($text), 'finish_reason' => $finish, 'reasoning_only' => false,
                     'streamed' => $streamed, 'tools_accepted' => $toolsAccepted,
                     'tool_calls' => $calls, 'tool_queries' => $queries, 'tool_results' => $results,
-                    'rounds' => $round, 'truncated_rounds' => false,
+                    'rounds' => $round, 'truncated_rounds' => false, 'tool_markup_calls' => $markupCalls,
                 ];
             }
 
@@ -401,7 +440,9 @@ class AiModelGateway
             // từ chối vì thấy role "tool" không có lời gọi tương ứng.
             $conversation[] = [
                 'role' => 'assistant',
-                'content' => (string) ($round1['text'] ?? ''),
+                // GỠ markup khỏi chữ gửi LẠI cho provider: gửi nguyên khối markup vào hội thoại là dạy nó
+                // tiếp tục trả bằng định dạng đó ở các vòng sau (đo được: lượt sau càng nhiều markup).
+                'content' => $this->stripToolMarkup((string) ($round1['text'] ?? '')),
                 'tool_calls' => array_values($toolCalls),
             ];
 
@@ -508,8 +549,12 @@ class AiModelGateway
             if ($text === '') {
                 return null;
             }
-            if ($onDelta !== null) {
-                $onDelta('token', ['text' => $text]);
+
+            // Chỉ phát phần CHỮ THẬT: provider bỏ qua \`stream: true\` mà chữ lại là khối markup gọi công cụ thì
+            // đẩy nguyên cục lên màn hình là để lộ mã kỹ thuật.
+            $clean = $this->stripToolMarkup($text);
+            if ($clean !== '' && $onDelta !== null) {
+                $onDelta('token', ['text' => $clean]);
             }
 
             return [
@@ -528,9 +573,17 @@ class AiModelGateway
         /** @var array<int, array<string, mixed>> $toolCalls */
         $toolCalls = [];
 
+        // CHỐNG RÒ MARKUP RA MÀN HÌNH: chữ chảy về theo từng mảnh, mà markup gọi công cụ của DeepSeek lại
+        // BẮT ĐẦU bằng một chuỗi cố định — nếu đẩy thẳng từng mảnh thì người dùng thấy mã kỹ thuật trước khi
+        // ta kịp nhận ra. Nên GIỮ LẠI 32 ký tự đầu của mỗi vòng: đủ để nhận diện markup, mà với câu trả lời
+        // thường thì chỉ chậm vài chục mili-giây không ai thấy. Khi đã chắc là chữ thường thì chảy tự do.
+        $hold = '';
+        $released = false;
+        $muted = false;
+
         // Một dòng SSE xử lý ở MỘT chỗ: dòng cuối của luồng có thể không có ký tự xuống dòng, nên phải gọi
         // được hàm này cho cả phần dư sau khi luồng kết thúc (bỏ sót là mất mảnh chữ cuối cùng).
-        $handleLine = function (string $line) use (&$text, &$toolCalls, &$finished, &$finish, $onDelta): void {
+        $handleLine = function (string $line) use (&$text, &$toolCalls, &$finished, &$finish, &$hold, &$released, &$muted, $onDelta): void {
             $line = trim($line);
             if ($line === '' || ! str_starts_with($line, 'data:')) {
                 return;
@@ -552,8 +605,31 @@ class AiModelGateway
             $chunk = (string) ($delta['content'] ?? '');
             if ($chunk !== '') {
                 $text .= $chunk;
-                if ($onDelta !== null) {
-                    $onDelta('token', ['text' => $chunk]);
+
+                if (! $muted) {
+                    if (! $released) {
+                        $hold .= $chunk;
+                        if ($this->hasToolMarkup($hold)) {
+                            // Vòng này model XIN GỌI CÔNG CỤ bằng markup ⇒ KHÔNG phát gì cả; nó không phải
+                            // câu trả lời. Vòng lặp phía trên sẽ đọc markup thành lời gọi thật.
+                            $muted = true;
+                            $hold = '';
+                        } elseif (! $this->couldBeToolMarkup($hold)) {
+                            // Đã CHẮC không phải markup (khác ký tự đầu) ⇒ phát ngay, không giữ thêm. Giữ
+                            // theo số ký tự cố định là gộp các mảnh đầu thành một cục — đo được: câu trả lời
+                            // hai mảnh bị dồn thành MỘT sự kiện, tức là làm hỏng đúng thứ đang muốn có.
+                            if ($onDelta !== null) {
+                                $onDelta('token', ['text' => $hold]);
+                            }
+                            $released = true;
+                            $hold = '';
+                        }
+                    } elseif ($this->hasToolMarkup($chunk)) {
+                        // Markup xuất hiện SAU khi đã chảy chữ (hiếm): cắt từ đây, không phát thêm mảnh nào.
+                        $muted = true;
+                    } elseif ($onDelta !== null) {
+                        $onDelta('token', ['text' => $chunk]);
+                    }
                 }
             }
 
@@ -590,16 +666,159 @@ class AiModelGateway
             $handleLine($buffer);
         }
 
+        // Nhả nốt phần đang giữ (câu trả lời ngắn hơn 32 ký tự thì chưa lần nào được phát).
+        if (! $muted && ! $released && $hold !== '' && $onDelta !== null) {
+            $onDelta('token', ['text' => $hold]);
+        }
+
         if ($text === '' && $toolCalls === []) {
             return null;   // luồng rỗng ⇒ để tầng trên rơi về đường blocking
         }
 
         return [
+            // CHỮ THÔ: tầng gọi cần bản thô để ĐỌC markup thành lời gọi công cụ, và tự gỡ khi tích luỹ chữ
+            // trả lời. Gỡ ở đây rồi thì tầng trên không còn gì để đọc (đã dính lỗi đó khi viết test).
             'text' => $text,
             'tool_calls' => array_values($toolCalls),
             'finish_reason' => $finish ?? null,
             'streamed' => true,
         ];
+    }
+
+    /**
+     * MARKUP GỌI CÔNG CỤ CỦA DEEPSEEK — đo thật trên production 2026-09-23 (bắt đầu từ chữ U+FF5C).
+     *
+     * Vì sao phải có lớp này: DeepSeek có ĐỊNH DẠNG RIÊNG để xin gọi hàm, và nó KHÔNG chỉ dùng trường
+     * \`tool_calls\` của giao thức — đo được hai hành vi (cùng một lượt, công cụ có được khai):
+     *   1. trả \`tool_calls\` CHUẨN (máy chủ chạy được công cụ — phần này vẫn tốt), VÀ
+     *   2. viết THÊM cả khối markup vào \`content\` — tức là chữ HIỂN THỊ CHO NGƯỜI DÙNG.
+     * Lượt cuối (không khai công cụ) thì nó chỉ còn cách (2): câu trả lời là một khối markup, KHÔNG có lời văn.
+     * Đo được: \`tool_calls=2, tools_accepted=true\` nhưng chữ trả về dài 332 ký tự và bắt đầu bằng markup.
+     *
+     * Không có lớp này thì người dùng đọc thấy mã kỹ thuật trên màn hình, và các lượt radar/brief thì hỏng
+     * JSON vì chữ bắt đầu bằng thẻ. Hai việc được làm, KHÔNG chọn một:
+     *   · KHAI THÁC: markup có tên hàm + tham số ⇒ đọc ra lời gọi công cụ thật, để vòng lặp chạy tiếp đúng
+     *     như khi provider trả \`tool_calls\` chuẩn;
+     *   · DỌN: mọi chữ trả ra ngoài đều đã gỡ khối markup — không bao giờ tới màn hình người dùng.
+     */
+    private const TOOL_MARKUP = "\u{FF5C}\u{FF5C}DSML\u{FF5C}\u{FF5C}";
+
+    /** Chữ này có chứa markup gọi công cụ của DeepSeek không? */
+    protected function hasToolMarkup(string $text): bool
+    {
+        return str_contains($text, self::TOOL_MARKUP);
+    }
+
+    /**
+     * Phần chữ đang giữ có THỂ vẫn là đầu của markup không? (dùng cho đường CHẢY CHỮ)
+     *
+     * Vì sao không giữ theo số ký tự cố định: chữ chảy về từng mảnh, giữ 32 ký tự đầu là GỘP các mảnh đầu
+     * thành một sự kiện — đo được bằng test: câu trả lời hai mảnh bị dồn thành MỘT mảnh, tức là làm hỏng
+     * đúng thứ đang muốn có ("chat mượt"). Ở đây chỉ giữ khi chuỗi đang giữ còn KHỚP ĐẦU của markup; lệch
+     * một ký tự là phát ngay.
+     */
+    protected function couldBeToolMarkup(string $held): bool
+    {
+        $held = (string) $held;
+        if ($held === '') {
+            return true;
+        }
+
+        return str_starts_with(self::TOOL_MARKUP, $held)
+            || str_starts_with($held, mb_substr(self::TOOL_MARKUP, 0, mb_strlen($held)));
+    }
+
+    /**
+     * GỠ khối markup khỏi chữ hiển thị.
+     *
+     * Cách làm theo DÒNG: đo được mỗi thẻ markup nằm TRỌN trên một dòng, nên bỏ dòng chứa thẻ là đủ và
+     * không cần bộ phân tích HTML. Giới hạn đã biết: nếu model viết lời văn CHUNG một dòng với thẻ thì dòng
+     * đó bị bỏ luôn — chấp nhận, vì giữ lại là để lộ mã kỹ thuật cho người dùng.
+     */
+    protected function stripToolMarkup(string $text): string
+    {
+        if (! $this->hasToolMarkup($text)) {
+            return $text;
+        }
+
+        $kept = [];
+        foreach ((array) preg_split('/\R/u', $text) as $line) {
+            if (! str_contains((string) $line, self::TOOL_MARKUP)) {
+                $kept[] = (string) $line;
+            }
+        }
+
+        return trim(implode("\n", $kept));
+    }
+
+    /**
+     * ĐỌC markup thành LỜI GỌI CÔNG CỤ thật (tên hàm + tham số), để vòng lặp công cụ chạy tiếp.
+     *
+     * Định dạng đo được (rút gọn, mỗi thẻ một dòng):
+     *   <…DSML… calls>
+     *   <…DSML… invoke name="web_search">
+     *   <…DSML… parameter name="query" string="true">từ khoá</…DSML… parameter>
+     *   </…DSML… invoke>
+     *   </…DSML… calls>
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function parseToolMarkup(string $text): array
+    {
+        if (! $this->hasToolMarkup($text)) {
+            return [];
+        }
+
+        $calls = [];
+        $current = null;
+
+        foreach ((array) preg_split('/\R/u', $text) as $line) {
+            $line = trim((string) $line);
+            if ($line === '' || ! str_contains($line, self::TOOL_MARKUP)) {
+                continue;
+            }
+
+            if (preg_match('/invoke\s+name="([^"]+)"/u', $line, $m) === 1) {
+                if ($current !== null) {
+                    $calls[] = $current;   // lời gọi trước không có thẻ đóng — vẫn nhận, đừng mất dữ liệu
+                }
+                $current = ['name' => $m[1], 'arguments' => []];
+                continue;
+            }
+
+            if ($current !== null && preg_match('/parameter\s+name="([^"]+)"[^>]*>(.*)$/u', $line, $m) === 1) {
+                $value = preg_replace('#</.*$#u', '', $m[2]);   // bỏ thẻ đóng cùng dòng nếu có
+                $current['arguments'][$m[1]] = trim(strip_tags((string) $value));
+                continue;
+            }
+
+            if ($current !== null && str_contains($line, '/invoke')) {
+                $calls[] = $current;
+                $current = null;
+            }
+        }
+
+        if ($current !== null) {
+            $calls[] = $current;
+        }
+
+        $out = [];
+        foreach ($calls as $index => $call) {
+            $name = trim((string) ($call['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $out[] = [
+                'id' => 'markup_'.($index + 1),
+                'type' => 'function',
+                'function' => [
+                    'name' => $name,
+                    'arguments' => (string) json_encode((array) $call['arguments'], JSON_UNESCAPED_UNICODE),
+                ],
+            ];
+        }
+
+        return $out;
     }
 
     /**
@@ -923,9 +1142,14 @@ class AiModelGateway
         $queries = [];
         $calls = 0;
         $results = 0;
+        // Lời gọi công cụ mà model xin bằng MARKUP của DeepSeek (không phải trường \`tool_calls\` chuẩn).
+        $markupCalls = 0;
+        // Vòng GIA HẠN (tối đa MỘT): dùng khi lượt CUỐI không khai công cụ mà model vẫn xin gọi công cụ.
+        $extraRounds = 0;
 
-        for ($round = 1; $round <= $maxRounds + 1; $round++) {
-            $offerTools = $round <= $maxRounds;
+        // Vòng GIA HẠN tốn HAI vòng: một vòng khai công cụ + một vòng chốt trả lời.
+        for ($round = 1; $round <= $maxRounds + 1 + 2 * $extraRounds; $round++) {
+            $offerTools = $round <= $maxRounds + 2 * $extraRounds;
 
             $body = ['model' => $candidate['model'], 'messages' => $conversation, 'max_tokens' => $maxTokens];
             if (($options['response_format'] ?? '') === 'json_object') {
@@ -955,19 +1179,41 @@ class AiModelGateway
 
             $json = $response->json();
             $toolCalls = data_get($json, 'choices.0.message.tool_calls');
+            $content = (string) data_get($json, 'choices.0.message.content', '');
+            $toolCalls = is_array($toolCalls) ? $toolCalls : [];
 
-            if (! is_array($toolCalls) || $toolCalls === [] || ! $offerTools) {
+            // (A) Vòng CÓ khai công cụ mà provider KHÔNG trả trường \`tool_calls\` — nhưng chữ có markup ⇒ đọc
+            // markup thành lời gọi thật. Không có bước này thì radar/brief coi khối markup là "câu trả lời".
+            if ($toolCalls === [] && $offerTools) {
+                $toolCalls = $this->parseToolMarkup($content);
+                $markupCalls += count($toolCalls);
+            }
+
+            // (B) Lượt CUỐI (không khai công cụ) mà model vẫn xin gọi công cụ ⇒ cho MỘT vòng gia hạn CÓ công cụ.
+            if ($toolCalls === [] && ! $offerTools && $extraRounds < 1) {
+                $markup = $this->parseToolMarkup($content);
+                if ($markup !== []) {
+                    $extraRounds = 1;
+                    $markupCalls += count($markup);
+                    $toolCalls = $markup;
+                    $content = '';   // chữ của lượt "xin công cụ" không phải câu trả lời
+                }
+            }
+
+            if ($toolCalls === []) {
                 return $this->textResult($json) + [
-                    'tools_accepted' => true, 'tool_calls' => $calls, 'tool_queries' => $queries, 'tool_results' => $results,
+                    'tools_accepted' => true, 'tool_calls' => $calls, 'tool_queries' => $queries,
+                    'tool_results' => $results, 'tool_markup_calls' => $markupCalls,
                 ];
             }
 
             // Lời gọi công cụ phải được ghi lại NGUYÊN VẸN trong hội thoại: thiếu nó thì lượt sau provider
             // từ chối vì thấy role "tool" không có lời gọi tương ứng.
-            $assistant = (array) data_get($json, 'choices.0.message', []);
             $conversation[] = [
                 'role' => 'assistant',
-                'content' => (string) ($assistant['content'] ?? ''),
+                // GỠ markup khỏi chữ gửi LẠI cho provider: gửi nguyên khối markup là dạy nó tiếp tục trả bằng
+                // định dạng đó ở các vòng sau (đo được: càng về sau càng nhiều markup).
+                'content' => $this->stripToolMarkup($content),
                 'tool_calls' => array_values($toolCalls),
             ];
 
@@ -1375,6 +1621,12 @@ class AiModelGateway
     {
         $content = trim((string) data_get($json, 'choices.0.message.content'));
         $reasoning = trim((string) data_get($json, 'choices.0.message.reasoning_content'));
+
+        // CHỐT CUỐI CÙNG CỦA LỚP NÀY: mọi chữ đi ra khỏi gateway đều KHÔNG được chứa markup gọi công cụ của
+        // DeepSeek — người dùng không đọc mã kỹ thuật, và tầng đọc JSON không nhận được thẻ. Đặt ở đây là
+        // chốt DUY NHẤT dùng chung cho mọi nhánh, kể cả nhánh gọi lại đường thường khi provider từ chối tools.
+        $content = $this->stripToolMarkup($content);
+        $reasoning = $this->stripToolMarkup($reasoning);
 
         return [
             'text' => $content !== '' ? $content : $reasoning,
