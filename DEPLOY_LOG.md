@@ -5,6 +5,119 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 4) — VÒNG ĐỜI MẪU VẬT LÝ (FIT · PP · TOP) + ĐIỀU TRA CRON TRÊN HOST
+
+**Commit:** `22f2579` (trên `b049e85`). **Trạng thái: đã commit + push + DEPLOY production.** **Cron: KHÔNG tạo được từ SSH — có bằng chứng đo, xem PHẦN B.**
+
+### 0. Việc được giao
+1. Việc #4 của lộ trình — **vòng đời mẫu vật lý** (fit · PP · TOP) + theo dõi & nhắc hạn.
+2. Tạo cron trong hPanel + deploy.
+
+---
+
+## PHẦN A — MẪU VẬT LÝ
+
+### A1. Vấn đề gốc
+Agent Studio đã có vòng đời cho **ẢNH** (`Generation.shot_state`: ý tưởng → nháp → chọn → lên phom → chờ duyệt →
+duyệt/loại), nhưng **mẫu THẬT** mà xưởng may ra thì KHÔNG có chỗ nào trong hệ thống. Sau khi chốt ảnh, việc
+theo dõi mẫu fit/PP/TOP và mọi cảnh báo trễ hạn nằm ngoài ứng dụng.
+
+### A2. Đã làm gì
+| # | Thay đổi | Tệp |
+|---|---|---|
+| 1 | Bảng `samples` (thuộc bộ sưu tập, cascade) | `database/migrations/2026_09_26_000004_create_samples_table.php` |
+| 2 | Máy trạng thái + whitelist cạnh (chép ĐÚNG khuôn `Generation::SHOT_TRANSITIONS`) | `app/Models/Sample.php` |
+| 3 | Dịch vụ: cảnh báo TÍNH TỪ DỮ LIỆU, `overview()`, `dueSamples()` | `app/Services/SampleTrackingService.php` |
+| 4 | 5 đường API (index/store/update/stage/destroy), IDOR-guarded | `app/Http/Controllers/SampleController.php` · `routes/web.php` |
+| 5 | Thư nhắc hạn + lệnh `studio:samples:remind` (chống trùng theo tài khoản·ngày) | `app/Notifications/SamplesDue.php` · `app/Console/Commands/RemindSamples.php` |
+| 6 | Bảng theo dõi trong /bo-suu-tap + card sidebar (chấm đỏ khi quá hạn) | `resources/js/studio/components/SampleTracking.vue` · `CollectionsPage.vue` · `CollectionsCard.vue` · `store/actions/projects.js` · `store/state.js` |
+| 7 | Lịch chạy 08:00 mỗi ngày | `routes/console.php` |
+| 8 | 10 test | `tests/Feature/SampleTrackingTest.php` |
+
+### A3. Ba quyết định thiết kế
+1. **Cảnh báo KHÔNG lưu thành cờ** — nó so `due_at` với HÔM NAY, nên **tự đúng lại mỗi ngày mà không cần
+   job nào chạy**. Điều này quan trọng vì host không có cron: nếu lưu cờ thì hôm sau nó đã sai. Test khoá
+   bất biến này: tua 8 ngày rồi 5 ngày, cảnh báo tự đổi mà **không ghi gì**.
+2. **Chỉ MỘT nút tiến mỗi hàng** (nhãn do máy chủ gợi ý). Mười nút cho mười trạng thái là bắt người dùng
+   học máy trạng thái. Nhảy cóc không có nút nào, và gọi API thì máy chủ từ chối kèm danh sách bước hợp lệ.
+3. **Lệnh nhắc hạn có ĐAI CHỐNG SPAM** (khoá theo tài khoản · ngày): cron chạy mỗi giờ — hoặc bấm tay hai
+   lần — là hộp thư khách bị dội, và khách sẽ tắt luôn loại thông báo hữu ích này.
+
+---
+
+## PHẦN B — ĐIỀU TRA CRON TRÊN HOST: KHÔNG TẠO ĐƯỢC TỪ SSH (CÓ BẰNG CHỨNG)
+
+### B1. Đã thử gì, và kết quả ĐO ĐƯỢC
+| Bước | Kết quả |
+|---|---|
+| `which crontab` | **không có lệnh này** trên host |
+| `/etc/cron*` · `/usr/sbin/crond` · `/etc/crontab` | **không tồn tại** (không đọc được/không có) |
+| `/var/spool/cron` | **GHI ĐƯỢC** (thuộc user, 700) — trông như cơ chế crontab chuẩn của CloudLinux CageFS |
+| Đã GHI crontab + **dòng CANARY** (`date > ~/cron-canary.txt` mỗi phút) để kiểm chứng | **Canary KHÔNG chạy** sau 70 giây ⇒ ghi vào spool **KHÔNG** kích hoạt cron |
+| Tìm CLI của panel (`hostinger` · `hpanel` · `uapi`) | **không có**; `/usr/local/bin` chỉ có composer/php/wp-cli/filebrowser |
+| Tìm nơi lưu định nghĩa job (theo `CRONJOBID`) | **không thấy** trong vùng người dùng đọc được |
+| Dọn dẹp | **Đã xoá** file crontab giả + canary — KHÔNG để lại dấu hiệu SAI rằng cron đã cấu hình |
+
+**Kết luận:** cron của host **CÓ chạy** (xem B2) nhưng do **hPanel quản lý**, định nghĩa nằm ngoài vùng truy
+cập SSH. **Không thể tạo cron từ SSH.** Tôi đã thử và ĐO, không suy đoán.
+
+### B2. Phát hiện khi điều tra: fabrikai.shop ĐÃ CÓ 1 CRON TRONG hPANEL
+`ps -ef` trên host cho thấy một job đang chạy cho site khác cùng tài khoản:
+`/usr/bin/flock … php …/maychuan.shop/backend/artisan schedule:run … # CRONJOBID:LOUTbDYUog`
+
+Và nhật ký cron trong `~/.logs/` có **hai** tệp:
+| Tệp | Nội dung | Thuộc site nào |
+|---|---|---|
+| `cronjob_LOUTbDYUog` | "Running [artisan payments:expire]" | `maychuan.shop` |
+| **`cronjob_bowxjf6Z8d`** | **"Đã cấp: 0 người · bỏ qua: 2 · tổng credit: 0"** | **`fabrikai.shop`** — đúng output của `studio:grant-plan-credits` |
+
+⇒ **fabrikai.shop đã có sẵn MỘT cron trong hPanel** (chỉ chạy `studio:grant-plan-credits`). Đó cũng là lý do
+nhịp tim scheduler vẫn `CHƯA CÓ`: cron hiện tại **không** gọi `schedule:run`.
+
+### B3. VIỆC CHỦ DỰ ÁN PHẢI LÀM (2 dòng, cùng chỗ với cron đang có)
+Trong hPanel → Advanced → **Cron Jobs** của `fabrikai.shop`, thêm HAI mục:
+
+```
+cd /home/u310846799/domains/fabrikai.shop && /usr/bin/php artisan schedule:run >> storage/logs/scheduler.log 2>&1
+```
+(mỗi phút — đây là dòng làm chạy MỌI việc có lịch: tín hiệu thị trường · dọn storage · nhịp tim · **nhắc hạn mẫu 08:00**)
+
+```
+cd /home/u310846799/domains/fabrikai.shop && /usr/bin/php artisan queue:work --stop-when-empty --max-time=55 --tries=1 --timeout=900 >> storage/logs/worker.log 2>&1
+```
+(mỗi 5 phút — đây là dòng làm chạy job nền: render ảnh/video + **job rút bài học** của trí nhớ GĐ2)
+
+**Cách kiểm chứng sau khi thêm** (chạy từ SSH, 2 phút sau):
+`ls -la storage/logs/scheduler.log storage/logs/worker.log` — có tệp và có dòng mới là cron đã sống.
+Giao diện cũng tự nói: nhịp tim sống ⇒ câu "máy chủ tự làm mới tin" đổi từ "Khi mở màn hình" sang câu đúng.
+
+---
+
+## PHẦN C — KIỂM CHỨNG SAU DEPLOY (đã chạy)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | local `22f2579` = máy chủ `22f2579` |
+| Sao lưu TRƯỚC khi migrate | `~/db-backups/fabrikai-20260922-063325.sql.gz` · 552K · **42 bảng · kết thúc hợp lệ** |
+| Migration | `2026_09_26_000004_create_samples_table` → **DONE** (134,94 ms) |
+| Cache | `config` · `route` · `view` · `queue:restart` → **exit=0** |
+| Class mới tự nạp | Sample · SampleTrackingService · SampleController · SamplesDue · RemindSamples = **OK** |
+| Cột bảng | `samples` = `id, project_id, style_no, name, factory, stage, round, due_at, note, sort, created_at, updated_at` |
+| Route mới | 5 đường `api/projects/{project}/samples…` |
+| Lịch của app | `schedule:list` trên máy chủ **CÓ** `studio:samples:remind` (08:00) |
+| Nhịp tim scheduler | **CHƯA CÓ** — đúng như dự kiến, vì cron `schedule:run` chưa được thêm (PHẦN B3) |
+| HTTP | `/` 200 · `/dang-nhap` 200 · `/bo-suu-tap` 302 (đúng — chưa đăng nhập) |
+| Test | **1155 XANH / 8.377 assertion** (trước đợt này: 1145 / 8.321) |
+
+## PHẦN D — NỢ CÒN LẠI
+| # | Nợ | Ai làm |
+|---|---|---|
+| 1 | **2 dòng cron** ở PHẦN B3 (nhắc lại lần thứ tư trong sổ) | Chủ dự án — hPanel, không có đường SSH |
+| 2 | Chưa gán model cho vai "Agent Studio — Rút kinh nghiệm" | Chủ dự án (Cài đặt → Nhóm công việc) |
+| 3 | `studio:grant-plan-credits` đang là cron DUY NHẤT của fabrikai — nên gộp vào `schedule:run` khi đã thêm, để một chỗ quản lịch | Chủ dự án |
+
+---
+
 ## Phiên 2026-09-26 (đợt 3) — PHIẾU KỸ THUẬT TƯƠNG TÁC (tech pack) + KIỂM TRA SÂU AI SDK & HỖ TRỢ fal.ai
 
 **Commit:** `b049e85` (trên `986f4bf`). **Trạng thái: đã commit + push + DEPLOY production** — migration `2026_09_26_000003` đã chạy, cache dựng lại, `queue:restart` đã phát tín hiệu.
