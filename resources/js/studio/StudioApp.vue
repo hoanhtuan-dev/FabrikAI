@@ -259,6 +259,10 @@ watch(() => store.activeLayerId, (id) => { if (!id) store.exitCanvasTools(); });
 watch(() => !!store.viewer, (v) => { if (v) store.exitCanvasTools(); });
 watch(() => !!store.promptOpen, (v) => { if (v) store.exitCanvasTools(); });
 const applyOpen = ref(false);
+// [đợt 27] Menu tài khoản: mở bằng STATE (daisyUI .dropdown-open) thay vì chỉ dựa vào :focus-within —
+// cách đó không mở được khi bấm bằng bàn phím/chuột phải/một số trình duyệt nhúng, và cũng không đóng
+// được khi bấm ra ngoài. Đóng bằng lớp phủ trong suốt, cùng lối với các popover khác của Studio.
+const accountOpen = ref(false);
 function openApplyPopover() {
   applyOpen.value = !applyOpen.value;
   if (applyOpen.value && !store.projectLoaded) store.loadProjects();
@@ -646,7 +650,8 @@ const baseCommands = computed(() => ([
   { id: 'prompt', label: 'Mở Prompt Tạo Ảnh', hint: 'prompt', icon: 'sparkles', run: () => runToolbarAction('prompt') },
   { id: 'stylist', label: 'Mở Agent thiết kế', hint: 'stylist', icon: 'bot', run: () => runToolbarAction('stylist') },
   { id: 'source', label: 'Mở Nguồn ảnh', hint: 'source', icon: 'imagePlus', run: () => { store.sourcePickerOpen = true; } },
-  { id: 'settings', label: 'Mở Cài đặt', hint: 'settings', icon: 'gear', run: () => { window.location.href = '/settings'; } },
+  // [đợt 27] Mọi lối vào cài đặt đi qua /cai-dat — trang hợp nhất ba khu (khu chỉ owner do máy chủ tự ẩn).
+    { id: 'settings', label: 'Mở Cài đặt & quản trị', hint: 'settings', icon: 'gear', run: () => { window.location.href = '/cai-dat'; } },
   { id: 'presets', label: 'Mở Prompt Templates', hint: 'presets', icon: 'template', run: () => { window.location.href = '/presets'; } },
   { id: 'zoom-in', label: 'Phóng to canvas', hint: 'zoomIn', icon: 'zoomIn', run: () => store.zoomIn() },
   { id: 'zoom-out', label: 'Thu nhỏ canvas', hint: 'zoomOut', icon: 'zoomOut', run: () => store.zoomOut() },
@@ -982,30 +987,33 @@ function onTouchEnd(e) {
     <!-- [2026-09-26 · thiết kế lại] MỘT APP BAR DUY NHẤT cho mọi bề rộng. Trước đây điện thoại có HAI thanh
          xếp chồng (thanh tài khoản 53px + thanh Studio 57px = **110px** chỉ để nói tên và ba nút), trong khi
          màn chỉ cao 844px. Nay gộp làm một: nút menu · nhận diện · ngữ cảnh · credit · tài khoản. -->
-    <header class="elev-bar relative z-30 flex shrink-0 items-center gap-2 border-b border-ink-700 bg-ink-900/95 px-2 py-1.5 backdrop-blur sm:px-4 sm:py-2">
-      <!-- Nút menu công cụ: chỉ có ở điện thoại/máy tính bảng hẹp (thanh rail bên trái hiện từ lg). -->
-      <button type="button" class="icon-btn shrink-0 lg:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ" @click="menuOpen = true">
-        <StudioIcon name="sliders" size="h-4 w-4" />
-      </button>
+    <!-- [2026-09-26 · đợt 27] THANH TIÊU ĐỀ THEO CHUẨN daisyUI: `navbar` + hai nhóm `navbar-start`
+         (thương hiệu + bối cảnh đang làm việc) và `navbar-end` (công cụ · credit · tài khoản).
+         Danh tính người dùng KHÔNG còn nằm trơ ở mép trái: nó vào menu tài khoản (dropdown) cùng lối
+         đăng xuất — một chỗ cho mọi việc thuộc về tài khoản. -->
+    <header class="navbar elev-bar relative z-30 !min-h-0 shrink-0 gap-2 border-b border-ink-700 bg-ink-900/95 px-2 py-1.5 backdrop-blur sm:px-4 sm:py-2">
+      <div class="navbar-start min-w-0 flex-1 items-center gap-2">
+        <!-- Nút menu công cụ: chỉ có ở điện thoại/máy tính bảng hẹp (thanh rail bên trái hiện từ lg). -->
+        <button type="button" class="icon-btn shrink-0 lg:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ" @click="menuOpen = true">
+          <StudioIcon name="sliders" size="h-4 w-4" />
+        </button>
 
-      <div class="flex min-w-0 items-center gap-2.5">
-        <template v-if="store.user">
-          <img :src="store.user.avatar || '/images/placeholder.svg'" class="h-7 w-7 shrink-0 rounded-full bg-ink-700 object-cover ring-2 ring-brand-500/40" @error="$event.target.src = '/images/placeholder.svg'" alt="Ảnh đại diện">
-          <div class="min-w-0 leading-tight">
-            <p class="truncate text-body font-semibold text-cream-50 sm:text-sm">{{ store.user.name }}</p>
-            <p class="hidden"></p>
-            <p class="hidden truncate text-body text-cream-400 sm:block">{{ store.user.role_label || store.user.role }}<span class="hidden sm:inline"> · {{ store.user.email }}</span></p>
-          </div>
-        </template>
-        <template v-else>
-          <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-warn/20 text-warn"><StudioIcon name="lock" size="h-4 w-4" /></span>
-          <div class="leading-tight">
-            <p class="text-sm font-semibold text-cream-50">Chưa đăng nhập</p>
-            <p class="text-body text-cream-400">Đăng nhập để tạo ảnh/video &amp; lưu dữ liệu.</p>
-          </div>
-        </template>
+        <a href="/" class="flex shrink-0 items-center gap-2" title="FabrikAI Studio">
+          <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-4 w-4" /></span>
+          <span class="hidden font-display text-sm font-semibold text-cream-50 sm:inline">FabrikAI</span>
+        </a>
+
+        <span v-if="!store.user" class="flex min-w-0 items-center gap-1.5 rounded-lg bg-warn/15 px-2 py-1 text-label font-semibold text-warn">
+          <StudioIcon name="lock" size="h-3.5 w-3.5" /> Chưa đăng nhập
+        </span>
+
+        <span v-if="store.appliedProject" class="tool-btn is-active hidden max-w-[13rem] md:inline-flex" :title="'Bộ sưu tập hiện tại: ' + store.appliedProject.name + ' — ảnh/video tạo mới sẽ tự gắn vào bộ này'">
+          <button type="button" @click="projectsOpen = true" class="flex min-w-0 items-center gap-1.5 truncate hover:text-cream-50"><StudioIcon name="pin" size="h-3.5 w-3.5" /><span class="truncate">{{ store.appliedProject.name }}</span></button>
+          <button type="button" @click="store.unapplyProject()" class="shrink-0 text-brand-200/70 hover:text-cream-50" aria-label="Ngắt dự án hiện tại"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
+        </span>
       </div>
-      <div class="flex shrink-0 items-center gap-2">
+
+      <div class="navbar-end items-center gap-1.5 sm:gap-2">
         <!-- Hai lối vào hay dùng nhất trên ĐIỆN THOẠI (trước đây nằm ở thanh thứ hai, nay gộp vào đây):
              Bộ sưu tập và Kết quả. Từ lg trở lên chúng đã có ở rail/thanh trạng thái nên ẩn đi. -->
         <button type="button" class="icon-btn shrink-0 lg:hidden" :title="store.appliedProject ? 'Bộ sưu tập hiện tại: ' + store.appliedProject.name : 'Bộ sưu tập'" aria-label="Bộ sưu tập" @click="projectsOpen = true">
@@ -1043,10 +1051,6 @@ function onTouchEnd(e) {
           </div>
           <div v-if="applyOpen" class="fixed inset-0 z-40" @click="applyOpen = false"></div>
         </div>
-        <span v-if="store.appliedProject" class="tool-btn is-active hidden max-w-[13rem] md:inline-flex" :title="'Bộ sưu tập hiện tại: ' + store.appliedProject.name + ' — ảnh/video tạo mới sẽ tự gắn vào bộ này'">
-          <button type="button" @click="projectsOpen = true" class="flex min-w-0 items-center gap-1.5 truncate hover:text-cream-50"><StudioIcon name="pin" size="h-3.5 w-3.5" /><span class="truncate">{{ store.appliedProject.name }}</span></button>
-          <button type="button" @click="store.unapplyProject()" class="shrink-0 text-brand-200/70 hover:text-cream-50" aria-label="Ngắt dự án hiện tại"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
-        </span>
         <!-- [Đợt 1 — 2026-09-19] Badge credit cũ chỉ hiển thị con số (không biết gói, không có đường
              nâng cấp). Nay là nút mở popup "Gói & credit": gói hiện tại · credit còn lại · chi phí
              mỗi ảnh/video THEO GÓI · độ phân giải tối đa của gói · danh mục gói để đổi/nâng cấp. -->
@@ -1282,10 +1286,44 @@ function onTouchEnd(e) {
           </div>
           <div v-if="store.planOpen" class="fixed inset-0 z-40" @click="store.planOpen = false"></div>
         </div>
-        <!-- [Đợt 0.6] đã gỡ nút "Cài đặt FabrikAI" (PWA) — bỏ PWA hoàn toàn (Q4) -->
-        <a v-if="store.user && store.user.is_admin" href="/settings" class="tool-btn" title="Cài đặt AI Models & API Keys"><StudioIcon name="gear" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Cài đặt</span></a>
-        <button v-if="store.user" type="button" @click="logout" class="tool-btn" title="Đăng xuất khỏi tài khoản">Đăng xuất</button>
-        <a v-else href="/dang-nhap?redirect=/" class="rounded-full bg-warn px-3 py-1 text-xs font-semibold text-warn-content transition hover:bg-warn">Đăng nhập</a>
+        <!-- ══ TÀI KHOẢN — MỘT chỗ cho danh tính · cài đặt · đăng xuất (daisyUI dropdown + menu).
+             [2026-09-26 · đợt 27] Nút "Cài đặt" riêng và nút "Đăng xuất" riêng đã BỎ: cả hai nằm
+             trong menu này. Lối vào cài đặt nay là /cai-dat — trang hợp nhất có đủ ba khu, và máy chủ
+             vẫn tự ẩn khu chỉ owner, nên tài khoản thường không thấy mục nào họ không mở được. -->
+        <div v-if="store.user" class="dropdown dropdown-end" :class="accountOpen ? 'dropdown-open' : ''">
+          <button type="button" class="btn btn-ghost btn-circle" data-account-toggle title="Tài khoản" aria-label="Tài khoản"
+                  :aria-expanded="accountOpen ? 'true' : 'false'" @click="accountOpen = !accountOpen" @keydown.escape="accountOpen = false">
+            <span class="avatar">
+              <span class="w-8 rounded-full ring-2 ring-brand-500/40">
+                <img v-if="store.user.avatar" :src="store.user.avatar" alt="" @error="$event.target.style.visibility = 'hidden'">
+                <span v-else class="grid h-8 w-8 place-items-center bg-ink-700 text-body font-bold text-cream-100">{{ (store.user.name || '?').charAt(0).toUpperCase() }}</span>
+              </span>
+            </span>
+          </button>
+          <div v-if="accountOpen" class="fixed inset-0 z-40" @click="accountOpen = false"></div>
+          <ul data-account-menu class="menu dropdown-content z-50 mt-2 w-64 rounded-box border border-ink-700 bg-ink-900 p-2 shadow-2xl">
+            <li class="menu-title !flex-col !items-start gap-0.5">
+              <span class="text-sm font-semibold text-cream-50">{{ store.user.name }}</span>
+              <span class="text-label text-cream-400">{{ store.user.role_label || store.user.role }} · {{ store.user.email }}</span>
+            </li>
+            <li>
+              <a href="/cai-dat" @click="accountOpen = false" title="Preset · khuôn mặt · dáng pose · trợ lý thiết kế · giao diện">
+                <StudioIcon name="gear" size="h-3.5 w-3.5" /> Cài đặt &amp; quản trị
+              </a>
+            </li>
+            <li>
+              <a href="/agent-studio" @click="accountOpen = false" title="Dựng hướng đi từ tín hiệu thị trường">
+                <StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Agent Studio
+              </a>
+            </li>
+            <li>
+              <button type="button" @click="accountOpen = false; logout()" title="Đăng xuất khỏi tài khoản">
+                <StudioIcon name="logout" size="h-3.5 w-3.5" /> Đăng xuất
+              </button>
+            </li>
+          </ul>
+        </div>
+        <a v-else href="/dang-nhap?redirect=/" class="btn btn-warn btn-sm">Đăng nhập</a>
       </div>
     </header>
     <!-- [Trục 2 — 2026-09-20] Trung tâm thông báo kiểu VSCode (thay ô flashMsg đơn lẻ):
@@ -1391,7 +1429,7 @@ function onTouchEnd(e) {
             <template v-if="store.user && store.user.is_admin">
               <div class="my-1 border-t border-ink-700"></div>
               <p class="px-2.5 py-1.5 text-label font-semibold uppercase tracking-wide text-cream-400">Quản trị</p>
-              <a href="/settings" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="gear" size="h-4 w-4" class="text-warn" /> Cài đặt hệ thống (API key · model)</a>
+              <a href="/cai-dat" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="gear" size="h-4 w-4" class="text-warn" /> Cài đặt hệ thống (API key · model)</a>
               <a href="/admin" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="coins" size="h-4 w-4" class="text-warn" /> Quản trị Owner (người dùng · gói cước)</a>
               <a href="/bao-cao-nhom" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-cream-200 hover:bg-ink-800" role="menuitem"><StudioIcon name="receipt" size="h-4 w-4" class="text-warn" /> Chi phí theo nhóm (báo cáo)</a>
               <!-- [2026-09-25] Đường vào THƯ VIỆN THEME. Bài học của chính khối này (xem ghi chú ở mục
