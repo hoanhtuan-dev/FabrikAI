@@ -1336,7 +1336,19 @@ html[data-theme='light'] {
     body button[class*='h-8'][class*='w-8'] {
         min-width: 2.5rem;
     }
+
+    /* LIÊN KẾT ĐÓNG VAI NÚT cũng phải theo sàn chạm. ĐO ĐƯỢC trên trang Agent Studio ở 390px: nút
+       "Về Studio" và vài liên kết cùng loại là thẻ <a> (điều hướng thật, không phải nút) nên luật chỉ
+       áp cho button đã bỏ sót chúng — còn 32px và 24px. Chỉ nhắm <a> MANG LỚP CỦA NÚT (btn* / icon-btn);
+       liên kết nằm trong câu văn (lớp link) KHÔNG bị đụng tới, vì kéo giãn chúng sẽ làm vỡ dòng chữ. */
+    body a[class*='btn'],
+    body a[class*='icon-btn'] {
+        min-height: 2.5rem;
+        display: inline-flex;
+        align-items: center;
+    }
 }
+
 /* [2026-09-26] Nhãn của dock điều hướng dưới: daisyUI khai 0,6875rem (~10px) — đo trên production là
    ĐÚNG 10px, dưới ngưỡng đọc của thang chữ mới. Nhãn này là chữ người dùng phải đọc để chọn đúng mục,
    không phải chú thích trang trí, nên theo token --text-tiny của dự án. */

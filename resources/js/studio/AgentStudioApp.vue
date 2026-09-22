@@ -104,6 +104,15 @@ const planLocked = computed(() => store.moduleLocked('stylist'));
 
 const CONTEXT_LABEL = { done: 'Xong', ready: 'Sẵn sàng', loading: 'Đang đọc…', locked: 'Cần brief' };
 function readinessLabel(id) { return CONTEXT_LABEL[readiness.value[id]] || ''; }
+
+/**
+ * SỐ BƯỚC ĐÃ XONG — cho dải tiến trình (2026-09-26 · thiết kế lại).
+ *
+ * Vì sao cần: bốn bước là một CHUỖI, nhưng giao diện chỉ nói "đang ở bước nào". Người dùng phải tự
+ * đếm xem còn mấy bước, và tự nhớ bước nào đã xong. Một dải tiến trình trả lời cả hai câu đó bằng một
+ * cái liếc mắt — đúng vai của stepper trong Material.
+ */
+const doneCount = computed(() => STEPS.filter((s) => readiness.value[s.id] === 'done').length);
 function stepNeeds(id) { return STEPS.find((s) => s.id === id)?.need || ''; }
 
 /** Nhãn nút chính của từng bước — MỘT hành động chính tại một thời điểm (§4 luật 3). */
@@ -177,7 +186,14 @@ const primaryLabel = computed(() => {
     <div class="flex min-h-0 flex-1">
       <!-- ══ RAIL BƯỚC (Material navigation rail) — tiến trình ở lại trên màn hình rộng ══ -->
       <nav class="hidden w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-ink-700/60 bg-ink-900 px-2 py-3 lg:flex" aria-label="Tiến trình thiết kế">
-        <p class="px-2 pb-1.5 text-label font-semibold uppercase tracking-[0.14em] text-cream-400">Tiến trình</p>
+        <p class="px-2 text-label font-semibold uppercase tracking-[0.14em] text-cream-400">Tiến trình</p>
+
+        <!-- Dải tiến trình: trả lời "còn mấy bước" bằng một cái liếc mắt thay vì để người dùng tự đếm. -->
+        <div class="px-2 pb-2 pt-1.5">
+          <p class="text-tiny text-cream-400">{{ doneCount }}/{{ STEPS.length }} bước xong</p>
+          <progress class="progress progress-primary mt-1 h-1.5 w-full" :value="doneCount" :max="STEPS.length"
+                    :aria-label="doneCount + '/' + STEPS.length + ' bước đã xong'"></progress>
+        </div>
 
         <button
           v-for="(item, index) in STEPS"
@@ -240,6 +256,19 @@ const primaryLabel = computed(() => {
 
       <div class="flex min-w-0 flex-1 flex-col">
         <!-- ══ DẢI BƯỚC cho màn hẹp — pill tiến trình, không phải nút hành động ══ -->
+        <div class="shrink-0 border-b border-ink-700/60 bg-ink-900 px-2 pb-1.5 pt-2 lg:hidden">
+          <!-- Bước đang làm in ra bằng CHỮ trước, rồi mới tới dãy pill: trên điện thoại dãy pill phải cuộn
+               ngang nên pill đang chọn có thể nằm ngoài tầm nhìn — câu chữ thì luôn thấy. -->
+          <div class="flex items-center justify-between gap-2 pb-1.5">
+            <p class="min-w-0 truncate text-label font-semibold text-cream-200">
+              Bước {{ stepIndex + 1 }}: {{ STEPS[stepIndex].label }}
+            </p>
+            <p class="shrink-0 text-tiny text-cream-400">{{ doneCount }}/{{ STEPS.length }} xong</p>
+          </div>
+          <progress class="progress progress-primary h-1 w-full" :value="doneCount" :max="STEPS.length"
+                    :aria-label="doneCount + '/' + STEPS.length + ' bước đã xong'"></progress>
+        </div>
+
         <div class="scrollbar-hide shrink-0 overflow-x-auto border-b border-ink-700/60 bg-ink-900 px-2 py-1.5 lg:hidden">
           <div class="flex w-max items-center gap-1">
             <button
