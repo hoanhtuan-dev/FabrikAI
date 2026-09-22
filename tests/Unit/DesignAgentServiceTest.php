@@ -20,7 +20,10 @@ class DesignAgentServiceTest extends TestCase
         // Tham số 3 = trình kết nối nguồn ngoài. Test đơn vị thuần PHPUnit không có DB/HTTP ⇒ truyền null
         // tường minh; nhánh "không có nguồn ngoài" vẫn phải cho ra contract y hệt.
         // Tham số 4 = bộ ĐO TÍN HIỆU THỊ TRƯỜNG (cũng cần DB/mạng) ⇒ null tường minh, cùng lý do.
-        $this->agents = new DesignAgentService(null, new BrandDnaService(), null, null);
+        // Tham số 5 = TRÍ NHỚ DÀI HẠN (GĐ1/GĐ2) và tham số 6 = TRÍ NHỚ THỦ TỤC. Cả hai là
+        // BẮT BUỘC-kiểu-nullable (không default) — xem chú thích ở DesignAgentService::__construct:
+        // có default thì container LUÔN truyền null và trí nhớ không bao giờ tới được prompt.
+        $this->agents = new DesignAgentService(null, new BrandDnaService(), null, null, null, null);
     }
 
     public function test_catalog_has_stable_data_backed_directions(): void

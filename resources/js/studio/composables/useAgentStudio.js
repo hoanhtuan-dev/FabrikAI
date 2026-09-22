@@ -89,6 +89,9 @@ export function useAgentStudio() {
     dna: [
       { id: 'positioning', label: 'Định vị', hint: 'Bạn bán cho ai, ở tầm giá nào' },
       { id: 'style', label: 'Phong cách', hint: 'Phong cách · màu · chất liệu · nhóm hàng · thứ KHÔNG làm' },
+      // Việc con thứ ba (GĐ2 trí nhớ thủ tục): DNA nói shop LÀ AI, mục này nói agent phải LÀM THẾ NÀO
+      // khi rơi vào một tình huống cụ thể — quan hệ điều kiện mà danh sách sở thích không diễn đạt được.
+      { id: 'rules', label: 'Quy tắc làm việc', hint: 'Khi nào thì làm thế nào — quy trình agent phải theo' },
     ],
     radar: [
       { id: 'signals', label: 'Nguồn & số đo', hint: 'Tin thật đang có và những gì đo được từ tin' },
@@ -370,6 +373,40 @@ export function useAgentStudio() {
     store.brandDnaDraft = { ...dnaDraft.value, [key]: items };
   }
   const dnaDirty = computed(() => JSON.stringify(dnaDraft.value) !== JSON.stringify(dna.value?.dna || {}));
+
+  // ── QUY TẮC LÀM VIỆC = TRÍ NHỚ THỦ TỤC (GĐ2) ─────────────────────────────────────────────────
+  const brandRules = computed(() => store.brandRules || null);
+  const rulesDraft = computed(() => store.brandRulesDraft || []);
+  const rulesLimits = computed(() => brandRules.value?.limits || {});
+  const RULES_MAX = computed(() => Number(rulesLimits.value.max_rules || 20));
+  const RULES_TRIGGER_MAX = computed(() => Number(rulesLimits.value.trigger_max || 120));
+  const RULES_ACTION_MAX = computed(() => Number(rulesLimits.value.action_max || 240));
+  /** Hàng chỉ có một vế = chưa dùng được. Đếm để nút Lưu nói được VÌ SAO nó khoá. */
+  const rulesHalfFilled = computed(() => rulesDraft.value.filter((row) => {
+    const t = String(row?.trigger || '').trim();
+    const a = String(row?.action || '').trim();
+    return (t === '') !== (a === '');
+  }).length);
+  const rulesDirty = computed(() => JSON.stringify(rulesDraft.value) !== JSON.stringify(brandRules.value?.rules || []));
+  function addRule() {
+    if (rulesDraft.value.length >= RULES_MAX.value) return;
+    store.brandRulesDraft = [...rulesDraft.value, { trigger: '', action: '', weight: Number(rulesLimits.value.weight?.default || 5), source: 'owner', is_active: true }];
+  }
+  function removeRule(index) { store.brandRulesDraft = rulesDraft.value.filter((_, i) => i !== index); }
+  function setRuleField(index, key, value) {
+    store.brandRulesDraft = rulesDraft.value.map((row, i) => (i === index ? { ...row, [key]: value } : row));
+  }
+  /**
+   * Vì sao nút "Lưu quy tắc" đang bị khoá — MỘT nguồn cho cả điều kiện khoá lẫn câu giải thích
+   * (docs/DESIGN_SYSTEM.md §4 quy tắc 4). Cờ đang-lưu không tính là lý do (nhãn nút đã đổi).
+   */
+  const rulesBlockReason = computed(() => {
+    if (store.brandRulesSaving) return '';
+    if (rulesHalfFilled.value > 0) return 'Còn ' + rulesHalfFilled.value + ' dòng mới điền một vế — điền nốt hoặc xoá dòng đó.';
+    if (!rulesDirty.value) return 'Chưa có thay đổi nào để lưu.';
+    return '';
+  });
+  const rulesEmpty = computed(() => (brandRules.value?.rules || []).length === 0);
 
   // ── VAI ĐỌC ẢNH: ảnh mẫu để AI bám phong cách (tối đa 3) ──────────────────────────────────────
   const refPickerOpen = ref(false);
@@ -1243,6 +1280,8 @@ export function useAgentStudio() {
    */
   function bootstrap() {
     if (!store.brandDna) store.loadBrandDna();
+    // Quy tắc làm việc (trí nhớ thủ tục) là hồ sơ RIÊNG với DNA — tải song song, không chặn nhau.
+    if (!store.brandRules) store.loadBrandRules();
     if (!store.webAccess) store.loadWebAccess();
     if (!store.webSources) store.loadWebSources(false, selectedRegion.value);
     if (!store.trendRadar) loadRadar(selectedRegion.value);
@@ -1617,6 +1656,18 @@ export function useAgentStudio() {
     provide('dnaDirty', dnaDirty);
     provide('dnaBlockReason', dnaBlockReason);
     provide('dnaEmpty', dnaEmpty);
+    provide('brandRules', brandRules);
+    provide('rulesDraft', rulesDraft);
+    provide('rulesLimits', rulesLimits);
+    provide('rulesDirty', rulesDirty);
+    provide('rulesBlockReason', rulesBlockReason);
+    provide('rulesEmpty', rulesEmpty);
+    provide('RULES_MAX', RULES_MAX);
+    provide('RULES_TRIGGER_MAX', RULES_TRIGGER_MAX);
+    provide('RULES_ACTION_MAX', RULES_ACTION_MAX);
+    provide('addRule', addRule);
+    provide('removeRule', removeRule);
+    provide('setRuleField', setRuleField);
     provide('refImages', refImages);
     provide('referenceNote', referenceNote);
     provide('liveSources', liveSources);
@@ -1894,6 +1945,18 @@ export function useAgentStudio() {
     dnaDirty,
     dnaBlockReason,
     dnaEmpty,
+    brandRules,
+    rulesDraft,
+    rulesLimits,
+    rulesDirty,
+    rulesBlockReason,
+    rulesEmpty,
+    RULES_MAX,
+    RULES_TRIGGER_MAX,
+    RULES_ACTION_MAX,
+    addRule,
+    removeRule,
+    setRuleField,
     refImages,
     referenceNote,
     liveSources,

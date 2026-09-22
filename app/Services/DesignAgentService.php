@@ -112,7 +112,19 @@ class DesignAgentService
         // TÍN HIỆU THỊ TRƯỜNG đo từ nguồn ngoài (thuật toán, không AI). Bắt buộc-kiểu-nullable vì lý do y
         // như ba tham số trên: có default null thì container luôn truyền null và agent mất hẳn tầng dữ liệu.
         private readonly ?MarketSignalService $market,
-        private readonly ?BrandLearningService $learning = null,
+        // TRÍ NHỚ DÀI HẠN (GĐ1 · GĐ2) — BẮT BUỘC-kiểu-nullable, KHÔNG có default.
+        //
+        // [LỖI THẬT — đo được 2026-09-26] Bản trước viết `?BrandLearningService $learning = null`, và
+        // điều đó TẮT HẲN tính năng: Container::resolveClass() (vendor/laravel/framework/.../Container.php
+        // :1351-1358) TRẢ VỀ GIÁ TRỊ DEFAULT khi tham số có default và class không có binding ⇒ container
+        // LUÔN truyền null ⇒ `internal_brand_signal.brand_memory` luôn RỖNG, gu đã học không bao giờ tới
+        // được prompt. Đo bằng `app(DesignAgentService::class)`: 4 tham số kia đều được inject, riêng
+        // tham số này = NULL. Bộ test cũ không bắt được vì mọi bài đều gọi BrandLearningService TRỰC TIẾP.
+        // Test tất định thuần PHPUnit truyền null tường minh (xem DesignAgentServiceTest).
+        private readonly ?BrandLearningService $learning,
+        // TRÍ NHỚ THỦ TỤC (GĐ2): quy tắc "khi <tình huống> thì <cách làm>" do chủ shop tự đặt. Cùng lý do
+        // BẮT BUỘC-kiểu-nullable như trên — thêm `= null` là tự tay tắt tính năng mà không ai thấy.
+        private readonly ?BrandRuleService $rules,
     ) {}
 
 
@@ -2570,6 +2582,8 @@ class DesignAgentService
             // TRÍ NHỚ DÀI HẠN (GĐ1): khối internal_brand_signal.brand_memory ghi prompt ảnh chủ shop ĐÃ DUYỆT và ĐÃ LOẠI.
             .'brand_memory.approved là các prompt ảnh chủ shop đã DUYỆT, rejected là đã LOẠI: bám phong cách đã duyệt, TRÁNH phong cách đã loại — đó là gu thật của shop. '
             .'brand_memory.lessons.approved và brand_memory.lessons.rejected là các BÀI HỌC đã khái quát từ những prompt đó (tín hiệu cao hơn): ưu tiên đúng bài học đã duyệt, tránh đúng bài học đã loại. '
+            // TRÍ NHỚ THỦ TỤC (GĐ2): khối brand_rules là QUY TRÌNH chủ shop tự đặt — khác hẳn sở thích.
+            .'brand_rules là QUY TẮC LÀM VIỆC chủ shop tự đặt dạng {trigger: "khi nào", action: "làm thế nào"}: khi bộ sưu tập/brief rơi vào ĐÚNG tình huống (trigger) thì phải làm theo đúng cách (action) — coi như chỉ thị của chủ shop, không phải gợi ý. Quy tắc có weight cao hơn thì ưu tiên hơn khi hai quy tắc xung đột. '
             // GĐ2 — học từ bán hàng thật.
             .'shop_data.best_sellers là món shop đang BÁN CHẠY: ưu tiên phong cách/nhóm hàng của chúng; slow_movers là bán chậm — tránh đề xuất quá nhiều; category_demand là nhóm đang được cầu. '
             // GĐ3 — dự báo từ thị trường.
@@ -3492,6 +3506,10 @@ class DesignAgentService
                 'dna_updated_at' => null,
                 'dna_source' => 'default',
                 'dna_source_label' => 'Mặc định của hệ thống',
+                // Hai khối TRÍ NHỚ cũng phải có mặt (rỗng) ở đây: chúng là một phần HỢP ĐỒNG của
+                // internal_brand_signal, không phải phần thưởng cho người đã đăng nhập.
+                'brand_memory' => ['approved' => [], 'rejected' => [], 'lessons' => ['approved' => [], 'rejected' => []]],
+                'brand_rules' => [],
             ];
         }
 
@@ -3563,8 +3581,11 @@ class DesignAgentService
                 'derived' => 'Suy ra từ mô tả ảnh đã tạo',
                 'default' => 'Mặc định của hệ thống',
             ][$dnaSource],
-            // TRÍ NHỚ DÀI HẠN (GĐ1): prompt đã DUYỆT và đã LOẠI gần nhất — đưa vào brief để AI bám gu thật.
-            'brand_memory' => $this->learning?->preferences($user) ?? ['approved' => [], 'rejected' => []],
+            // TRÍ NHỚ DÀI HẠN (GĐ1 · GĐ2): prompt đã DUYỆT/đã LOẠI gần nhất + BÀI HỌC đã rút từ chúng.
+            'brand_memory' => $this->learning?->preferences($user) ?? ['approved' => [], 'rejected' => [], 'lessons' => ['approved' => [], 'rejected' => []]],
+            // TRÍ NHỚ THỦ TỤC (GĐ2): quy tắc "khi <tình huống> thì <cách làm>" do chủ shop đặt — thứ
+            // brand_dna (sở thích phẳng) KHÔNG diễn đạt được.
+            'brand_rules' => $this->rules?->active($user) ?? [],
         ];
     }
 

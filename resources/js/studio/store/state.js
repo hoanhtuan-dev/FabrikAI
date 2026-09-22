@@ -306,6 +306,14 @@ export function studioState() {
     brandDnaSaving: false,
     brandDnaError: '',
     brandDnaDraft: null,     // bản đang sửa (chỉ ghi vào DB khi bấm Lưu)
+    // ── QUY TẮC LÀM VIỆC = TRÍ NHỚ THỦ TỤC (GĐ2 — 2026-09-26) ────────────────────────────
+    // "Khi <tình huống> thì <cách làm>" do chủ shop đặt. Khác DNA: DNA là SỞ THÍCH phẳng, còn
+    // đây là QUAN HỆ ĐIỀU KIỆN — thứ DNA không diễn đạt được.
+    brandRules: null,        // { rules: [...], limits: {...} }
+    brandRulesLoading: false,
+    brandRulesSaving: false,
+    brandRulesError: '',
+    brandRulesDraft: [],     // bản đang sửa (mảng hàng; chỉ ghi vào DB khi bấm Lưu)
     // Khả năng truy cập internet của agent — ĐO THẬT, không phải câu văn tĩnh.
     webAccess: null,
     webAccessLoading: false,

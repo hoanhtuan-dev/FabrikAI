@@ -53,6 +53,10 @@ class ModuleRegistryTest extends TestCase
         // Cùng lý do với 'appearance': không phải tính năng bán theo gói, và công tắc gói không được
         // làm người dùng mất dữ liệu hay không sửa được hồ sơ của chính mình.
         'brand-dna',
+        // 'brand-rules' (2026-09-26): QUY TẮC LÀM VIỆC của chính người dùng (trí nhớ thủ tục).
+        // Cùng lý do với 'brand-dna' ở trên — đây là dữ liệu người dùng TỰ VIẾT, không phải tính năng
+        // bán theo gói: công tắc gói không được làm họ mất quy tắc đã soạn hay không sửa được nó.
+        'brand-rules',
     ];
 
     protected function setUp(): void

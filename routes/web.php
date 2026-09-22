@@ -7,6 +7,7 @@ use App\Http\Controllers\AgentSessionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\BrandDnaController;
+use App\Http\Controllers\BrandRuleController;
 use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectShareController;
@@ -156,6 +157,13 @@ Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
     Route::get('/brand-dna', [BrandDnaController::class, 'show'])->name('brand-dna.show');
     Route::put('/brand-dna', [BrandDnaController::class, 'update'])->name('brand-dna.update');
     Route::delete('/brand-dna', [BrandDnaController::class, 'destroy'])->name('brand-dna.destroy');
+
+    // ── QUY TẮC LÀM VIỆC của chính người dùng (trí nhớ THỦ TỤC — GĐ2, 2026-09-26) ───────────
+    // Cùng nhóm và cùng lý do như /brand-dna ở trên: đây là dữ liệu CỦA người dùng, không phải
+    // tính năng bán theo gói — công tắc gói không được làm họ mất quy tắc đã viết.
+    Route::get('/brand-rules', [BrandRuleController::class, 'show'])->name('brand-rules.show');
+    Route::put('/brand-rules', [BrandRuleController::class, 'update'])->name('brand-rules.update');
+    Route::delete('/brand-rules', [BrandRuleController::class, 'destroy'])->name('brand-rules.destroy');
 });
 
 // ── BÁO LỖI TỪ TRÌNH DUYỆT (Đợt 21 — 2026-09-23) ────────────────────────────────

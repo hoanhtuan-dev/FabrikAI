@@ -203,6 +203,88 @@ export const agentStudioActions = {
     discardBrandDnaDraft() {
       this.brandDnaDraft = JSON.parse(JSON.stringify(this.brandDna?.dna || {}));
     },
+    // ══════════════════ QUY TẮC LÀM VIỆC — TRÍ NHỚ THỦ TỤC (GĐ2 — 2026-09-26) ══════════════════
+    /**
+     * Nạp quy tắc của chính người dùng. Gọi MỘT lần khi mở Agent Studio.
+     *
+     * Vì sao không cache ở client: đây là dữ liệu người dùng vừa sửa — hiện bản cũ sau khi lưu là
+     * lỗi tệ nhất của loại màn hình này (người dùng tin là chưa lưu rồi nhập lại).
+     */
+    async loadBrandRules() {
+      this.brandRulesLoading = true;
+      this.brandRulesError = '';
+      try {
+        const res = await fetch('/api/brand-rules', { headers: { Accept: 'application/json' } });
+        if (!res.ok) throw apiError(await res.json().catch(() => ({})), 'Không tải được quy tắc làm việc.');
+        const d = await res.json();
+        this.brandRules = d;
+        this.brandRulesDraft = JSON.parse(JSON.stringify(d.rules || []));
+        return d;
+      } catch (e) {
+        this.brandRulesError = userFacingError(e, 'Không tải được quy tắc làm việc.');
+        return null;
+      } finally {
+        this.brandRulesLoading = false;
+      }
+    },
+    /**
+     * Lưu danh sách quy tắc. Trả { saved, dropped, truncated } để giao diện NÓI THẬT số hàng bị bỏ —
+     * im lặng bỏ là ghi đè công sức người ta gõ mà không ai biết.
+     */
+    async saveBrandRules() {
+      this.brandRulesSaving = true;
+      this.brandRulesError = '';
+      try {
+        const res = await fetch('/api/brand-rules', {
+          method: 'PUT',
+          headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ rules: this.brandRulesDraft || [] }),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(d, 'Không lưu được quy tắc làm việc.');
+        this.brandRules = { rules: d.rules || [], limits: d.limits || this.brandRules?.limits };
+        this.brandRulesDraft = JSON.parse(JSON.stringify(d.rules || []));
+        const dropped = Number(d.dropped) || 0;
+        const truncated = Number(d.truncated) || 0;
+        let note = 'Đã lưu ' + (d.rules || []).length + ' quy tắc — agent sẽ theo đúng khi brief rơi vào tình huống đó.';
+        if (dropped) note += ' Bỏ ' + dropped + ' dòng thiếu một vế hoặc trùng.';
+        if (truncated) note += ' Bỏ ' + truncated + ' dòng vượt trần cho phép.';
+        this.toast(note, dropped || truncated ? 'warn' : 'success');
+        return d;
+      } catch (e) {
+        this.brandRulesError = userFacingError(e, 'Không lưu được quy tắc làm việc.');
+        this.toast(this.brandRulesError, 'error');
+        return null;
+      } finally {
+        this.brandRulesSaving = false;
+      }
+    },
+    /** Xoá hết quy tắc — KHÔNG đụng DNA hay trí nhớ sự kiện (hai loại trí nhớ khác nhau). */
+    async resetBrandRules() {
+      this.brandRulesSaving = true;
+      this.brandRulesError = '';
+      try {
+        const res = await fetch('/api/brand-rules', {
+          method: 'DELETE',
+          headers: { 'X-XSRF-TOKEN': CSRF(), Accept: 'application/json' },
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(d, 'Không xoá được quy tắc làm việc.');
+        this.brandRules = d;
+        this.brandRulesDraft = [];
+        this.toast('Đã xoá hết quy tắc làm việc.', 'info');
+        return true;
+      } catch (e) {
+        this.brandRulesError = userFacingError(e, 'Không xoá được quy tắc làm việc.');
+        return false;
+      } finally {
+        this.brandRulesSaving = false;
+      }
+    },
+    /** Bỏ thay đổi chưa lưu: quay về đúng bản đang có trên máy chủ. */
+    discardBrandRulesDraft() {
+      this.brandRulesDraft = JSON.parse(JSON.stringify(this.brandRules?.rules || []));
+    },
     /**
      * Nạp DANH SÁCH NGUỒN NGOÀI + tin đang được đưa vào prompt. `force = true` khi bấm "Làm mới nguồn".
      *
