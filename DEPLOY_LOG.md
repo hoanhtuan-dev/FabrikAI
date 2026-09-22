@@ -5,6 +5,81 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 25) — MỘT STORE PHIÊN DÙNG CHUNG: đổi tên ở Quản trị là mọi khu thấy NGAY, không cần nạp lại trang
+
+**Commit:** `8a4b2af`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Điều tra trước khi làm: KHÔNG có "ba store" để hợp nhất
+
+Yêu cầu là "hợp nhất ba store của ba khu". Kiểm tra thật thì repo chỉ có MỘT store (`useStudioStore` — của
+xưởng thiết kế `/studio`); ba khu của trang hợp nhất KHÔNG dùng store nào, mỗi khu tự lo danh tính theo một
+kiểu riêng:
+
+| Khu | Trước đây lấy danh tính từ đâu |
+|---|---|
+| Quản trị (`AdminApp`) | gọi `/api/boot` rồi giữ trong `const me = ref(null)` của riêng nó |
+| Cài đặt của tôi (`MySettingsApp`) | đọc thuộc tính DOM `data-user-id` / `data-user-admin` do blade render |
+| Thanh chung (`SettingsHubApp`) | **không biết người dùng là ai** |
+
+**Hệ quả thật (đo được trước khi sửa):** sửa TÊN của chính mình ở khu Quản trị xong, thanh chung và khu khác
+vẫn hiện tên CŨ cho tới khi nạp lại cả trang — vì tên đã nằm sẵn trong HTML mà máy chủ render lúc mở trang.
+
+### 2. Cách làm
+
+| Thành phần | Vai trò |
+|---|---|
+| `app/Support/SessionIdentity.php` (mới) | **Hình dạng danh tính duy nhất**: id · name · email · role · role_label · avatar · credits_balance · is_admin · is_super_admin |
+| `StudioController::boot()` | `/api/boot` nay lấy danh tính từ lớp đó (`array_merge(SessionIdentity::for(...), [gói · nhóm · module])`) |
+| `studio/hub.blade.php` | nhúng sẵn `data-me` cho store — cùng lớp, nên **không tốn thêm request nào** |
+| `resources/js/studio/store/session.js` (mới) | Pinia store dùng chung: `hydrate()` · `load()` (chia sẻ đúng MỘT request nếu phải gọi `/api/boot`) · **`applyUser()`** |
+| `SettingsHubApp.vue` | nhúng danh tính vào store TRƯỚC khi tạo các khu con; thanh chung thêm chip danh tính + số credit |
+| `AdminApp.vue` | `me` nay là `computed(() => session.me)`; hàm lưu người dùng gọi `session.applyUser(...)` |
+| `MySettingsApp.vue` | `USER` lấy từ store (vẫn giữ đường dự phòng đọc DOM khi app được mount lẻ); sidebar thêm dòng danh tính |
+
+`applyUser()` chỉ áp khi người được sửa **chính là** người của phiên này — sửa người khác thì bỏ qua (đúng nghiệp vụ).
+
+### 3. Đo được — kịch bản thật, chạy bằng Chrome headless + CDP (owner thật)
+
+| Bước | Kết quả đo |
+|---|---|
+| 1. Mở `/admin`, tên trên thanh chung | `FabrikAI Owner` |
+| 2. Vào mục Người dùng → Sửa DÒNG CỦA CHÍNH MÌNH → đổi tên → Lưu | thanh chung hiện **`Owner Đổi Tên`** ngay |
+| 3. Bấm sang khu "Cài đặt của tôi" (đổi khu TẠI CHỖ) | sidebar khu ấy hiện **`Owner Đổi Tên`** |
+| 4. Trạng thái trang ở cả hai bước | `path=/admin` → `/cai-dat`, **`noReload=yes`** (không nạp lại trang) |
+| 5. Đổi tên trả lại như cũ | thanh chung về `FabrikAI Owner` (dữ liệu dev sạch) |
+
+Trên điện thoại (390×844), sau khi thêm chip danh tính: thanh chung **137px** (trước khi thêm chip: 115px),
+**tràn ngang 0px**, **nút dưới 40px: 0**, vẫn đủ 5 khu. Tiêu đề khu hạ xuống `text-base` trên màn hình hẹp vì
+đo được tiêu đề dài bị xuống 2 dòng khi có chip.
+
+### 4. Khoá bằng test
+
+| Bài | Khoá điều gì |
+|---|---|
+| `SharedSessionTest::test_the_hub_identity_and_boot_agree` | `data-me` và `/api/boot` trả **cùng giá trị** cho 8 trường danh tính (đối chiếu thẳng với `SessionIdentity`) |
+| `...::test_the_identity_shape_has_exactly_one_source` | `StudioController` không còn tự dựng lại danh tính; cả hai đường đều gọi `SessionIdentity::for()` |
+| `...::test_the_three_areas_read_identity_from_the_shared_store` | cả ba app dùng `useSessionStore`; `AdminApp` không còn `const me = ref(null)`; `saveUser()` **phải** gọi `session.applyUser()` |
+| `...::test_the_session_store_passes_its_node_self_check` | `node scripts/check-session-store.mjs` — 9 mục: hydrate · getter · **applyUser bỏ qua người khác** · gộp một phần · `load()` chia sẻ đúng một request |
+| `StaticIntegrityTest::test_vue_files_never_use_blade_comment_syntax` (mới) | File `.vue` không được chứa `{{--` — lỗi này đã làm đỏ `vite build` **ba lần** trong repo |
+
+Toàn bộ: **1243 test XANH** (9435 assertions) — trước đợt này 1238.
+
+### 5. Deploy + kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD máy chủ | **`8a4b2af`** — khớp local |
+| Sao lưu DB trước khi pull · cache | có sao lưu; `config:cache` · `route:cache` · `view:cache` · `queue:restart` chạy lại |
+| Log lỗi | không phát sinh dòng ERROR/CRITICAL nào sau deploy |
+
+### 6. Chưa dùng chung (nói thẳng, không phải nợ ẩn)
+
+- Hai khu **máy chủ render** (`/he-thong-thiet-ke` · `/bao-cao-nhom`) vẫn đọc danh tính lúc render: chúng là
+  tài liệu HTML riêng (lý do đã ghi ở đợt 24), nên đổi tên xong phải ĐIỀU HƯỚNG tới chúng mới thấy tên mới —
+  điều hướng thì luôn nạp lại tài liệu, nên hành vi vẫn đúng, chỉ là không "tức thì" như ba khu SPA.
+- `/studio` (xưởng thiết kế) là app riêng, có store riêng — ngoài phạm vi trang hợp nhất.
+
+---
 ## Phiên 2026-09-26 (đợt 24) — TRẢ HẾT NỢ CỦA ĐỢT GỘP TRANG: hai trang con vào khu chung · đổi khu TẠI CHỖ · xoá mã chết · danh sách khu về MỘT nguồn
 
 **Commit:** `e5d3ee7`. **Trạng thái: đã commit + push + DEPLOY production.** Bốn món nợ ghi ở §5 của đợt 23, làm hết.
