@@ -5,6 +5,80 @@
 
 ---
 
+## Phiên 2026-09-26 (Trí nhớ dài hạn GĐ2 — rút "bài học" từ quyết định duyệt/loại ảnh)
+
+**Commit:** `acab2cd` (trên `4a2fca6`). **Trạng thái: đã commit + push + DEPLOY production `fabrikai.shop`** — migration `2026_09_26_000001` đã chạy, cache đã dựng lại.
+
+### Mục tiêu
+Chủ dự án hỏi "làm gì tiếp theo" sau khi rà soát Agent Studio; chọn **việc #1 của lộ trình**: biến
+"ghi nhớ" thành **"rút kinh nghiệm"** (ReasoningBank) — mắt xích duy nhất khiến hệ tự thông minh dần.
+
+### 0. Vì sao làm việc này (bối cảnh — không phải "thêm tính năng cho vui")
+Trí nhớ dài hạn GĐ1 (`brand_learning`) ghi **prompt THÔ** khi chủ shop duyệt/loại ảnh:
+*"đầm linen trắng ngà dáng suông"*. Đó là **SỰ KIỆN**, chưa phải **BÀI HỌC**. ReasoningBank nói rõ khác
+biệt: sau hành động phải trích ra bài học KHÁI QUÁT (*"shop chuộng linen trắng ngà, dáng suông; TRÁNH
+bóng hoạ tiết to"*). Thiếu bước đó thì trí nhớ chỉ **chồng thêm dữ liệu**, không **thông minh lên** —
+đúng kết luận §1.4 của `STUDIO_AGENT_LEARNING.md`.
+
+### 1. Đã làm gì
+| # | Thay đổi | Tệp |
+|---|---|---|
+| 1 | Cột `lesson` (text) + `context` (json, nullable) — bài học TÁCH khỏi prompt thô | `database/migrations/2026_09_26_000001_add_lesson_to_brand_learning_table.php` |
+| 2 | `record()` ghi xong thì đẩy job; `reflectRecord()` gọi model rút bài học; `preferences()` trả thêm `lessons` | `app/Services/BrandLearningService.php` |
+| 3 | Job NỀN, idempotent, bỏ qua nhẹ nhàng khi chưa có model | `app/Jobs/ReflectBrandMemoryJob.php` |
+| 4 | Vai thứ tư `agent_reflect` (nhóm công việc + chuỗi dự phòng) | `DesignAgentService::REFLECT_GROUP` · `RegistryProviders::chainFor()` · `helpers.php` |
+| 5 | Chỉ dẫn brief đọc thêm `brand_memory.lessons` | `app/Services/DesignAgentService.php` |
+| 6 | Vai mới hiện trong Model Registry (UI, icon `lightbulb`) | `resources/js/studio/SettingsApp.vue` |
+| 7 | 4 test mới + mở rộng guard vai từ 3 → 4 | `tests/Feature/ReflectBrandMemoryTest.php` · `tests/Feature/AgentRolesTest.php` |
+
+### 2. Bốn quyết định thiết kế (và lý do)
+1. **Job NỀN, KHÔNG chạy trong request duyệt ảnh:** gọi model mất ~8–30 s; chặn request là biến một cú
+   bấm thành một lần chờ. `record()` chỉ dispatch.
+2. **Thoái lui an toàn:** không có model ⇒ `lesson` giữ `null`, brief vẫn dùng prompt thô (hành vi
+   GĐ1). Không có đường nào để "thiếu bài học" làm vỡ brief.
+3. **Idempotent:** hàng đã có `lesson` thì không gọi lại — một quyết định chỉ rút một lần, kể cả khi
+   job bị chạy lại.
+4. **Nhóm vai mới rơi về `agent_reason` → `prompt`** đúng như ba vai kia ⇒ cấu hình cũ không vỡ và
+   chủ shop không bắt buộc phải khai thêm nhóm.
+
+### 3. Khoá bằng test
+| Bài | Khoá điều gì |
+|---|---|
+| `test_record_dispatches_the_reflect_job` | `record()` PHẢI đẩy job — không có job thì prompt thô không bao giờ thành bài học |
+| `test_reflect_writes_a_lesson_distinct_from_the_raw_prompt` | có model ⇒ `lesson` KHÁC prompt thô (dấu hiệu đã khái quát) |
+| `test_reflect_noops_gracefully_when_no_model_is_configured` | không model ⇒ bỏ qua nhẹ nhàng, `lesson` null, không ném |
+| `test_preferences_includes_lessons_alongside_raw_prompts` | `preferences()` trả cả `lessons` lẫn `approved/rejected` (tương thích ngược) |
+| (siết) `AgentRolesTest` | vai thứ tư phải có mặt ở CẢ BA nơi: `studio_task_groups` · `studio_model_group_slugs` · `SettingsApp.vue` |
+
+**1111 test XANH / 8.162 assertion** (trước đợt này: 1107).
+
+### 4. Kiểm chứng sau deploy
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | local `acab2cd` = máy chủ `acab2cd` (15 file, +355/−19) |
+| Sao lưu TRƯỚC khi migrate | `~/db-backups/fabrikai-20260922-050903.sql.gz` · 476K · **40 bảng · kết thúc hợp lệ** |
+| Migration | `2026_09_26_000001_add_lesson_to_brand_learning_table` → **Ran [26]** (16,34 ms) |
+| Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` → **exit=0** cả bốn |
+| Cột trên máy chủ | `brand_learning` = `…,prompt,lesson,context,source,…` |
+| Class mới | `class_exists(App\Jobs\ReflectBrandMemoryJob)` = **true** · `agent_reflect` có trong `studio_task_groups()` = **true** |
+| HTTP | `/` 200 · `/dang-nhap` 200 · `/agent-studio` 302 (đúng — chưa đăng nhập) |
+| Log | KHÔNG có dòng nào nhắc `ReflectBrandMemoryJob`/`brand_learning`/`lesson`; lỗi còn lại là nợ cũ (model `qwen3.8-omni-flash` 404 · radar 504) |
+
+### 5. Nợ còn lại — ĐỌC KỸ: feature đã deploy nhưng CHƯA chạy được trên production
+| # | Nợ | Vì sao | Ai làm |
+|---|---|---|---|
+| 1 | **Máy chủ KHÔNG có queue worker** (đo được: `no worker process` · `jobs_pending=11`) | Host không có lệnh `crontab` (cron do hPanel quản) ⇒ không tạo được từ SSH. Job reflect sẽ **nằm trong hàng đợi, chưa rút được bài học** | Chủ dự án: thêm 2 dòng cron hPanel — xem mục C của phiên 2026-09-21 |
+| 2 | Chưa gán model cho vai "Agent Studio — Rút kinh nghiệm" | Bỏ trống thì rơi về `agent_reason` → `prompt` (vẫn chạy được), nhưng chưa tách vai riêng | Chủ dự án: Cài đặt → Nhóm công việc |
+
+> **Thoái lui an toàn đã kiểm:** thiếu worker ⇒ `lesson` null, brief dùng prompt thô (hành vi GĐ1 cũ).
+> Không có ca nào "duyệt ảnh rồi hỏng".
+
+### 6. Tài liệu phân tích kèm phiên (bản CỤC BỘ — không đưa vào git)
+- `STUDIO_AGENT_LEARNING.md` — phân tích sâu Agent Studio theo trục "tự học" (Domain Index + Long-Term Memory).
+- `STUDIO_AGENT_WORKFLOW.md` — bản đồ 8 giai đoạn quy trình sản xuất + điểm ngọt + lộ trình mở rộng.
+
+---
+
 ## Phiên 2026-09-25 (đợt 4) — BẢN CHỈ DẪN MẶC ĐỊNH VÀO CSDL + SỬA ĐƯỜNG SAO LƯU
 
 ### Mục tiêu (yêu cầu chủ dự án)
