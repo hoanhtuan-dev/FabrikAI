@@ -1019,9 +1019,12 @@ function onTouchEnd(e) {
           <StudioIcon name="grid" size="h-4 w-4" />
         </button>
 
-        <!-- Bộ sưu tập + quick-apply gộp 1 tool-btn -->
+        <!-- ══ CỤM 1 · ĐIỀU HƯỚNG KHÔNG GIAN LÀM VIỆC (desktop): MỘT khay gom mọi lối vào, nhóm theo
+             chức năng — Bộ sưu tập (chọn bối cảnh) → Nguồn ảnh · Thư viện · Bảng lệnh · Outputs.
+             Vạch mảnh phân tách hai nhóm con cho mắt dễ quét. Điện thoại vẫn dùng dock dưới. -->
+        <div class="hidden shrink-0 items-center gap-1 rounded-xl border border-ink-700 bg-ink-800/60 p-1 lg:flex" data-header-workspace>
         <div class="relative">
-          <button @click="openApplyPopover" class="tool-btn" title="Bộ sưu tập — áp dụng nhanh hoặc mở bảng thiết kế quản lý"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> <span class="hidden xl:inline">Bộ sưu tập</span> <StudioIcon name="chevronDown" size="h-3 w-3" /></button>
+          <button @click="openApplyPopover" class="icon-btn !h-8 !w-8" title="Bộ sưu tập — áp dụng nhanh hoặc mở bảng thiết kế quản lý"><StudioIcon name="kanban" size="h-4 w-4" /></button>
           <div v-if="applyOpen" class="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border border-ink-700 bg-ink-900 shadow-xl">
             <div class="p-2.5">
               <p class="mb-2 text-body font-semibold text-cream-200">Áp dụng bộ sưu tập cho phiên tạo ảnh</p>
@@ -1046,6 +1049,9 @@ function onTouchEnd(e) {
           </div>
           <div v-if="applyOpen" class="fixed inset-0 z-40" @click="applyOpen = false"></div>
         </div>
+
+        <span class="h-5 w-px shrink-0 bg-ink-700" aria-hidden="true"></span>
+
         <!-- [Đợt 1 — 2026-09-19] Badge credit cũ chỉ hiển thị con số (không biết gói, không có đường
              nâng cấp). Nay là nút mở popup "Gói & credit": gói hiện tại · credit còn lại · chi phí
              mỗi ảnh/video THEO GÓI · độ phân giải tối đa của gói · danh mục gói để đổi/nâng cấp. -->
@@ -1054,7 +1060,7 @@ function onTouchEnd(e) {
              bề ngang canvas mà bốn nút này thừa chỗ trên thanh tiêu đề. Nay là bốn nút icon cùng
              hàng với Bộ sưu tập & credit — cùng hành vi, cùng trạng thái, không còn cột riêng.
              Điện thoại vẫn dùng dock dưới + menu (rail phải vốn đã ẩn dưới lg). -->
-        <div class="hidden shrink-0 items-center gap-0.5 pr-0.5 lg:flex" data-header-actions>
+        <!-- Bốn nút dưới đây nằm thẳng trong CỤM 1 (data-header-workspace). -->
           <button type="button" class="icon-btn !h-8 !w-8" data-header-action="source" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm" aria-label="Nguồn ảnh" @click="store.sourcePickerOpen = true">
             <StudioIcon name="imagePlus" size="h-4 w-4" />
           </button>
