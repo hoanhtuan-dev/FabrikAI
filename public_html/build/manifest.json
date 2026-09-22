@@ -162,7 +162,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-B6DHgqgG.css",
+    "file": "assets/app-BKSFictO.css",
     "name": "app",
     "names": [
       "app.css"
@@ -211,7 +211,7 @@
     ]
   },
   "resources/js/studio/collections.js": {
-    "file": "assets/collections-DFz34MYY.js",
+    "file": "assets/collections-BP7dGUYJ.js",
     "name": "collections",
     "src": "resources/js/studio/collections.js",
     "isEntry": true,
@@ -225,7 +225,7 @@
       "_ProjectDesignView-BNc6pEjg.js"
     ],
     "css": [
-      "assets/collections-CjqxZZXG.css"
+      "assets/collections-BxqAfuIQ.css"
     ]
   },
   "resources/js/studio/components/CollectionsCard.vue": {

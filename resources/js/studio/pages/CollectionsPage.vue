@@ -64,6 +64,60 @@ const qcOpen = ref(false);
 const gatesOpen = ref(false);
 // Tiến độ sản xuất (Việc #8): sản lượng THẬT theo ngày, so với kế hoạch.
 const productionOpen = ref(false);
+
+/**
+ * NĂM VIỆC PHỤ của bộ sưu tập — MỘT nguồn cho cả hai cách hiển thị (2026-09-26).
+ *
+ * Vì sao gom vào mảng: trước đây chúng là năm nút nằm cạnh nhau trên một hàng; nay desktop hiện trong
+ * menu "Thêm" còn điện thoại hiện trong TẤM TRƯỢT ĐÁY (bottom sheet — mẫu điều hướng chuẩn của Material
+ * cho màn hình nhỏ). Viết hai lần thì hai bên sẽ lệch nhau ngay lần sửa đầu tiên.
+ *
+ * `hint` là câu HƯỚNG DẪN, không phải mô tả suông: nó nói tình trạng hiện tại (còn mấy mẫu quá hạn ·
+ * mấy lô không đạt · chậm mấy ngày) để người dùng biết nên mở mục nào trước.
+ */
+const moreActions = computed(() => {
+  const mine = (id) => Number(id) === Number(applied?.value?.id);
+  const overdue = store.samples && mine(store.samplesProjectId) ? Number(store.samples.alerts?.overdue || 0) : 0;
+  const qcFail = store.qc && mine(store.qcProjectId) ? Number(store.qc.counts?.fail || 0) : 0;
+
+  return [
+    {
+      id: 'share', icon: 'link', label: 'Chia sẻ cho khách',
+      hint: 'Gửi link để khách duyệt ảnh, có hạn', alert: false,
+      run: () => openShare(),
+    },
+    {
+      id: 'samples', icon: 'scissors', label: 'Mẫu vật lý',
+      hint: overdue ? (overdue + ' mẫu quá hạn — mở để xử lý') : 'Theo dõi FIT · PP · TOP và hạn chót của xưởng',
+      alert: overdue > 0,
+      run: () => { samplesOpen.value = true; },
+    },
+    {
+      id: 'qc', icon: 'shieldCheck', label: 'Kiểm tra chất lượng',
+      hint: qcFail ? (qcFail + ' lô không đạt — cần xử lý') : 'Biên bản QC, checklist và mức AQL',
+      alert: qcFail > 0,
+      run: () => { qcOpen.value = true; },
+    },
+    {
+      id: 'production', icon: 'clock', label: 'Tiến độ sản xuất',
+      hint: productionProgress.value && productionProgress.value.behind
+        ? ('Chậm ' + productionProgress.value.behind + ' ngày so với hạn')
+        : (productionProgress.value ? ('Đã xong ' + productionProgress.value.pct + '% kế hoạch') : 'Ghi sản lượng mỗi ngày, so với kế hoạch'),
+      alert: !!(productionProgress.value && productionProgress.value.behind),
+      run: () => { productionOpen.value = true; },
+    },
+    {
+      id: 'gates', icon: 'checkSquare', label: 'Ba cổng duyệt',
+      hint: gateProgress.value && gateProgress.value.ready
+        ? 'Đã đủ ba cổng — sẵn sàng bàn giao'
+        : (gateProgress.value ? (gateProgress.value.approved + '/' + gateProgress.value.total + ' cổng đã duyệt') : 'Chốt thông số · chốt tiền · nghiệm thu'),
+      alert: false,
+      run: () => { gatesOpen.value = true; },
+    },
+  ];
+});
+/** Tấm trượt đáy đang mở hay không (chỉ dùng ở màn hình hẹp). */
+const moreSheetOpen = ref(false);
 const statusFilter = ref('all');
 let refreshTimer = null;
 
@@ -544,43 +598,84 @@ onBeforeUnmount(() => {
                 <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-600/15 text-brand-300">
                   <StudioIcon :name="nextStep.icon" size="h-4.5 w-4.5" />
                 </span>
-                <p class="min-w-0 flex-1 text-sm leading-relaxed text-cream-200">{{ nextStep.text }}</p>
+                <p class="min-w-0 flex-1 text-body leading-relaxed text-cream-200">{{ nextStep.text }}</p>
                 <button v-if="nextStep.action" class="btn-brand btn-sm shrink-0" @click="handleNextStep()">
                   {{ nextStep.label }} <StudioIcon name="chevronRight" size="h-3.5 w-3.5" />
                 </button>
               </div>
 
-              <!-- HÀNH ĐỘNG NHANH -->
-              <div class="mt-4 flex flex-wrap gap-2">
-                <button class="tool-btn btn-sm" :class="awaiting.length ? '!border-warn/40 !bg-warn/10 !text-warn' : ''" @click="openReview()">
-                  <StudioIcon name="checkSquare" size="h-4 w-4" /> Duyệt mẫu<span v-if="awaiting.length"> · {{ awaiting.length }} chờ</span>
+              <!-- ══ HÀNH ĐỘNG — hai việc CHÍNH đứng riêng, phần còn lại vào menu ══════════════════════
+                   [2026-09-26 · thiết kế lại] Trước đây bảy nút cùng cỡ nằm cạnh nhau nên không nút nào
+                   nói được đâu là việc chính, và trên điện thoại chúng chiếm ba hàng. Nay theo đúng thứ tự
+                   ưu tiên của Material: MỘT nút đặc (việc chính) · MỘT nút viền (việc phụ tần suất cao) ·
+                   phần còn lại nằm trong "Thêm".
+
+                   HAI CÁCH HIỂN THỊ cho cùng một danh sách (moreActions):
+                     · màn hình rộng → dropdown của daisyUI ngay dưới nút;
+                     · điện thoại     → TẤM TRƯỢT ĐÁY (bottom sheet) — đúng mẫu của Material, và tránh hẳn
+                       cảnh menu bung xuống dưới đáy màn hình rồi bị cắt (đã đo được: nút nằm ở y≈800/844
+                       nên menu mở xuống là NGOÀI khung nhìn). -->
+              <div class="mt-4 flex flex-wrap items-center gap-2">
+                <button class="btn-brand btn-sm" @click="openReview()">
+                  <StudioIcon name="checkSquare" size="h-4 w-4" /> Duyệt mẫu
+                  <span v-if="awaiting.length" class="ml-1 rounded-full bg-warn px-1.5 text-label font-bold text-on-accent">{{ awaiting.length }}</span>
                 </button>
-                <button class="tool-btn btn-sm" @click="openShare()">
-                  <StudioIcon name="link" size="h-4 w-4" /> Chia sẻ cho khách
-                </button>
-                <button class="tool-btn btn-sm" @click="openExport()">
+                <button class="btn-outline btn-sm" @click="openExport()">
                   <StudioIcon name="download" size="h-4 w-4" /> Xuất gói xưởng
                 </button>
-                <!-- MẪU VẬT LÝ: vòng đời do xưởng làm ra (FIT · PP · TOP) — nối tiếp việc duyệt ảnh. -->
-                <button class="tool-btn btn-sm" @click="samplesOpen = true">
-                  <StudioIcon name="scissors" size="h-4 w-4" /> Mẫu vật lý<span v-if="store.samples && store.samplesProjectId === applied?.id && (store.samples.alerts?.overdue || 0) > 0"> · {{ store.samples.alerts.overdue }} quá hạn</span>
-                </button>
-                <!-- KIỂM TRA CHẤT LƯỢNG: mắt cuối của chuỗi — ghi lỗi THẬT để đối chiếu với tỉ lệ lỗi giả định ở tầng giá thành. -->
-                <button class="tool-btn btn-sm" @click="qcOpen = true">
-                  <StudioIcon name="shieldCheck" size="h-4 w-4" /> Kiểm tra chất lượng<span v-if="store.qc && store.qcProjectId === applied?.id && (store.qc.counts?.fail || 0) > 0"> · {{ store.qc.counts.fail }} lô không đạt</span>
-                </button>
-                <!-- TIẾN ĐỘ SẢN XUẤT (Việc #8): sản lượng thật theo ngày — chấm đỏ khi chậm tiến độ. -->
-                <button class="tool-btn btn-sm" :class="productionProgress && productionProgress.behind ? '!border-danger/40 !text-danger' : ''" @click="productionOpen = true">
-                  <StudioIcon name="clock" size="h-4 w-4" /> Tiến độ SX
-                  <span v-if="productionProgress"> · {{ productionProgress.behind ? 'chậm ' + productionProgress.behind + ' ngày' : productionProgress.pct + '%' }}</span>
-                </button>
-                <!-- BA CỔNG DUYỆT: duyệt ba thứ ĐI RA NHÀ MÁY (thông số · tiền · chất lượng), khác trạng thái bộ (duyệt bản thiết kế). -->
-                <button class="tool-btn btn-sm" :class="gateProgress && gateProgress.ready ? '!border-ok/40 !text-ok' : ''" @click="gatesOpen = true">
-                  <StudioIcon name="checkSquare" size="h-4 w-4" /> Ba cổng duyệt
-                  <span v-if="gateProgress"> · {{ gateProgress.ready ? 'sẵn sàng bàn giao' : gateProgress.approved + '/' + gateProgress.total }}</span>
+
+                <!-- Màn hình rộng: menu thả xuống của daisyUI -->
+                <div class="dropdown dropdown-end hidden lg:block">
+                  <div tabindex="0" role="button" class="tool-btn btn-sm">
+                    <StudioIcon name="sliders" size="h-4 w-4" /> Thêm
+                    <StudioIcon name="chevronDown" size="h-3.5 w-3.5" />
+                  </div>
+                  <ul tabindex="0" class="menu dropdown-content z-50 mt-1 w-72 rounded-box border border-ink-700 bg-ink-800 p-2 shadow-xl">
+                    <li v-for="a in moreActions" :key="a.id">
+                      <button @click="a.run()">
+                        <StudioIcon :name="a.icon" size="h-4 w-4" :class="a.alert ? 'text-warn' : ''" />
+                        <span><b>{{ a.label }}</b><br><span class="text-label" :class="a.alert ? 'text-warn' : 'text-cream-400'">{{ a.hint }}</span></span>
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+
+                <!-- Điện thoại: mở tấm trượt đáy -->
+                <button class="tool-btn btn-sm lg:hidden" @click="moreSheetOpen = true">
+                  <StudioIcon name="sliders" size="h-4 w-4" /> Thêm
                 </button>
               </div>
+              <p class="mt-2 text-label leading-5 text-cream-400">
+                Thứ tự công việc: <b class="text-cream-200">duyệt ảnh</b> → <b class="text-cream-200">xuất gói xưởng</b> (phiếu kỹ thuật đi kèm)
+                → <b class="text-cream-200">mẫu vật lý</b> → <b class="text-cream-200">kiểm tra chất lượng</b> khi hàng về → <b class="text-cream-200">ba cổng duyệt</b> để bàn giao.
+              </p>
 
+
+              <!-- TẤM TRƯỢT ĐÁY (điện thoại) — cùng danh sách moreActions, không chép nội dung -->
+              <div v-if="moreSheetOpen" class="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Việc khác của bộ sưu tập">
+                <div class="absolute inset-0 bg-scrim/70" @click="moreSheetOpen = false"></div>
+                <div class="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-ink-700 bg-ink-800 pb-[env(safe-area-inset-bottom)] shadow-2xl">
+                  <div class="flex items-center justify-between px-4 pb-2 pt-3">
+                    <p class="text-title font-semibold text-cream-100">Việc khác</p>
+                    <button type="button" class="icon-btn" aria-label="Đóng" @click="moreSheetOpen = false">
+                      <StudioIcon name="x" size="h-4 w-4" />
+                    </button>
+                  </div>
+                  <ul class="pb-3">
+                    <li v-for="a in moreActions" :key="a.id">
+                      <button type="button" class="flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-ink-700"
+                              @click="moreSheetOpen = false; a.run()">
+                        <StudioIcon :name="a.icon" size="h-5 w-5" class="mt-0.5 shrink-0" :class="a.alert ? 'text-warn' : 'text-brand-300'" />
+                        <span class="min-w-0">
+                          <b class="block text-body text-cream-100">{{ a.label }}</b>
+                          <span class="mt-0.5 block text-label leading-5" :class="a.alert ? 'text-warn' : 'text-cream-400'">{{ a.hint }}</span>
+                        </span>
+                        <StudioIcon name="chevronRight" size="h-4 w-4" class="ml-auto mt-0.5 shrink-0 text-cream-400" />
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
               <!-- SỐ LIỆU (chi phí · phản hồi khách) -->
               <div v-if="stats" class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <div class="rounded-xl border border-ink-700/60 bg-ink-900/50 p-3">
