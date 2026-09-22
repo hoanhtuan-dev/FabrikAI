@@ -3,6 +3,8 @@
 > Ghi lại các lần deploy, thay đổi phiên làm việc, và công lao từng phiên chat.
 > Mục tiêu: khi có nhiều phiên song song, ai cũng đọc được ai đã làm gì, deploy khi nào, cần làm gì tiếp theo.
 
+---
+
 ## Phiên 2026-09-26 (đợt 9) — QC TOOL (việc #6): BIÊN BẢN KIỂM TRA CHẤT LƯỢNG + KẾ HOẠCH LẤY MẪU AQL
 
 **Commit:** `db890ef`. **Trạng thái: đã commit + push + DEPLOY production** — migration `2026_09_26_000006` đã chạy, cache dựng lại, asset đã build và phục vụ.
