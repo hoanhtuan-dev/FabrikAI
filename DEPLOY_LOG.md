@@ -5,6 +5,70 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 13) — HOÀN THIỆN STUDIO CHO MOBILE + CHẶN RÒ RỈ THÔNG TIN KỸ THUẬT
+
+**Commit:** `c2baf45` · `6e86f8b`. **Trạng thái: đã commit + push + DEPLOY production.** (Không có migration.)
+
+### 1. "Đáp ứng mobile mode" — nay là SỐ ĐO, không phải lời hứa
+| Bề mặt | Trước | Sau |
+|---|---|---|
+| Studio (`/`) ở 390px | **38** phần tử bấm được dưới 40px | **0** |
+| Bộ sưu tập (`/bo-suu-tap`) ở 390px | **11/11** dưới 40px (trang này KHÔNG nằm trong `.studio-shell` nên luật cũ bỏ sót cả một nửa giao diện) | **1** (một liên kết văn bản 36px) |
+| Tràn ngang | 0px | 0px |
+| Máy tính (1440px) | 43 phần tử dày đặc | **43 — KHÔNG ĐỔI** (mật độ dày là đặc điểm khi có chuột) |
+| Dock điều hướng dưới | — | 4 tab, mỗi tab **47px** |
+
+**Cách làm:** một luật duy nhất cho màn hình ≤1023px — nút/role=button/select cao ≥40px, và nút chỉ-có-icon rộng ≥40px. KHÔNG sửa hơn 40 tệp dùng `h-5/h-6/h-7/h-8`: sửa từng tệp vừa mất mật độ desktop vừa để lọt chỗ thêm sau này.
+
+### 2. Chặn rò rỉ tên nhà cung cấp / model AI
+Bộ lọc cũ (`store/helpers.js` — `TECH_LEAK` + `safeMessage`) chỉ chặn được thông báo LỖI đi qua nó. Chữ VIẾT THẲNG trong giao diện thì không đi qua bộ lọc nào. Ba chỗ rò rỉ THẬT đã sửa:
+
+| Chỗ | Rò rỉ | Sửa |
+|---|---|---|
+| `DesignSearchPanel.vue` | chip hiện `qwen-paygo · text-embedding-v3` | chỉ nói **"Tìm theo ngữ nghĩa: đã bật / chưa bật"** |
+| `DesignSearchService` (câu lý do) | *"…cần nhà cung cấp có endpoint /embeddings (đã đo: ckey và qwen-paygo có, deepseek không)"* | *"Tìm theo ngữ nghĩa chưa được bật cho tài khoản này…"*; chi tiết kỹ thuật đẩy vào **log** (`Log::info`) |
+| `BrandMemoryPanel.vue` | cột `source` của ký ức = *"nhà cung cấp · model · thời điểm"* | bỏ khỏi giao diện (dữ liệu vẫn trả về cho kỹ thuật) |
+| `useAgentStudio.js` | nhãn *"Chưa cấu hình AI cho nhóm công việc"* (khái niệm của trang quản trị) | *"AI chưa được bật cho tài khoản này."* |
+
+**RÀO CHẮN MỚI:** `tests/Feature/TechnicalLeakTest.php` — hai luật ở tầng mã nguồn:
+1. **Chữ hiển thị** ở mọi bề mặt KHÁCH HÀNG không được chứa tên nhà cung cấp/model (quét nội dung giữa hai thẻ · `title`/`placeholder`/`aria-label` · chuỗi trong `toast()` · **và mọi chuỗi ký tự trông như câu chữ**).
+2. **Không đường lỗi nào in exception thô** ra giao diện (`xxxError = e.message` mà thiếu `safeMessage`).
+
+Trang **quản trị và Cài đặt được MIỄN** — ở đó chủ dự án phải thấy tên nhà cung cấp thì mới cấu hình được; đó là thông tin của chính họ.
+
+### 3. Rào chắn đã được KIỂM CHỨNG là CÓ THỂ ĐỎ (quan trọng hơn việc nó xanh)
+| Lần đo | Kết quả |
+|---|---|
+| Cắm một vi phạm vào `aria-label` | **ĐỎ**, chỉ đúng tệp + đúng câu: `ProductionTracking.vue → Tiến độ sản xuất qua qwen-image-3.0-pro` |
+| Cắm một vi phạm kiểu chuỗi ký tự (`'Ghi bằng Gemini Flash'`) | **ĐỎ** — đây là lỗ hổng của bản đầu: luật cũ bỏ qua chữ nằm trong `{{ … }}`, mà `InpaintCard.vue` có đúng kiểu đó (`'Qwen Edit'`) |
+| Gỡ vi phạm | **XANH** (2 test) |
+
+Hai lần chỉnh luật để KHÔNG báo động oan (một rào chắn hay báo oan sẽ bị tắt đi, lúc đó nó không chặn được gì):
+· thêm **biên từ** cho từ khoá — `veo` từng khớp vào chữ `li**veO**nly`;
+· **bỏ bình luận** trước khi soi — hai "vi phạm" đầu tiên thực ra chỉ là bình luận giải thích trong mã;
+· chuỗi kỹ thuật thuần trong payload (`provider: d.provider || 'qwen'`) không tính là chữ hiển thị.
+
+### 4. Còn lại — hướng dẫn cho chủ dự án (yêu cầu "hướng người dùng tránh lộ provider/model")
+Bộ chọn model trên các card (`ConceptCard` · `RefImageCard` · `DirectorCard` · `InpaintCard`) hiện nhãn bằng **tên model do chủ dự án đặt** (`StudioModel.name`), và chỉ hiện khi nhóm đó có **≥2 model**. Nghĩa là: **đặt tên model theo CHẤT LƯỢNG, đừng đặt theo mã model** — ví dụ *"Chất lượng cao"* / *"Nhanh & rẻ"* thay vì *"qwen-image-3.0-pro"*. Rào chắn không chặn được đường này vì nhãn đến từ DỮ LIỆU, không nằm trong mã.
+
+### 5. Kiểm chứng sau deploy
+| Kiểm tra | Kết quả |
+|---|---|
+| Sao lưu TRƯỚC khi deploy | `fabrikai-20260922-094109.sql.gz` · kết thúc hợp lệ · đã dọn bản cũ |
+| HEAD máy chủ | `c2baf45` → `6e86f8b` — khớp local = origin |
+| HTTP | `/` · `/dang-nhap` · `/dang-ky` **200** |
+| Test | **1233 XANH / 9.291 assertion** |
+| Đo lại ở 390px | tràn ngang **0px** · chữ <11px **0 chỗ** · sàn chạm áp đúng |
+
+> **GHI CHÚ ĐO:** số đo cho các trang TRONG studio (cần đăng nhập) lấy ở máy cục bộ trên **đúng bản build đã commit**; tài khoản trên production khác tài khoản seed ở máy nên không đăng nhập được bằng thông tin cục bộ. CSS là cùng một tệp (`app-z5ZGc8oe.css` → `app-…`), nên kết luận chuyển được; phần đo trực tiếp trên production là các trang công khai.
+
+### 6. Hai việc tiếp theo (theo yêu cầu, đúng thứ tự)
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Hoàn thiện sâu rộng studio** (tiếp) | Còn: bố cục lại `CollectionsPage` (953 dòng) · Agent Studio 4 bước · thư viện; và **gộp thanh công cụ dày đặc** trong studio thành cụm nút lớn + menu "thêm" cho mobile |
+| 2 | **Gộp trang quản trị + Cài đặt thành MỘT SPA** | Hiện có 3 entry riêng: `AdminApp.vue` · `SettingsApp.vue` · `MySettingsApp.vue` (cộng các trang blade rời `/admin`, `/settings`, `/cai-dat/*`, `/he-thong-thiet-ke`, `/bao-reo-nhom`) |
+
+---
 ## Phiên 2026-09-26 (đợt 12) — THIẾT KẾ LẠI GUI THEO daisyUI 5 (minimalist + Material, mobile-first)
 
 **Commit:** `3f6d84e` · `180a58c` · `61b0da8`. **Trạng thái: đã commit + push + DEPLOY production.**
