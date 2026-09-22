@@ -3,7 +3,7 @@
 namespace App\Ai;
 
 use App\Models\PromptTemplate;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -20,11 +20,14 @@ use Illuminate\Support\Facades\DB;
  */
 final class PromptCatalog
 {
-    /** Tiền tố cache giữ bản mặc định gần nhất ĐÃ THỰC SỰ chạy cho mỗi khoá. */
-    public const CACHE_PREFIX = 'studio.prompt.default.';
-
-    /** Không giữ lâu hơn mức này: bản mặc định đổi theo mã nguồn, giữ mãi sẽ hiển thị bản cũ. */
-    private const DEFAULT_TTL_DAYS = 30;
+    /**
+     * PHIÊN BẢN DÀNH RIÊNG cho ảnh chụp bản mặc định trong mã.
+     *
+     * Vì sao nằm ở version 0 chứ không phải cache: cache bị `cache:clear`/hết hạn là mất, và mất
+     * đúng lúc owner cần đối chiếu nhất. Version 0 KHÔNG BAO GIỜ được bật (`is_active = false`) nên
+     * resolver `studio_prompt_template()` không bao giờ chọn nó, và `versions()` lọc nó ra khỏi lịch sử.
+     */
+    public const BASELINE_VERSION = 0;
 
     /**
      * Khoá => mô tả cho NGƯỜI ĐỌC. Thứ tự ở đây là thứ tự hiển thị.
@@ -121,6 +124,7 @@ final class PromptCatalog
     {
         return PromptTemplate::query()
             ->where('key', $key)
+            ->where('version', '>', self::BASELINE_VERSION) // version 0 = ảnh chụp mặc định, không phải phiên bản của owner
             ->orderByDesc('version')
             ->limit($limit)
             ->get()
@@ -144,31 +148,48 @@ final class PromptCatalog
     public static function rememberDefault(string $key, string $built): void
     {
         $built = (string) $built;
-        if (trim($built) === '') {
+        if (trim($built) === '' || ! self::has($key)) {
             return;
         }
 
-        $cached = Cache::get(self::CACHE_PREFIX.$key);
-        if (is_array($cached) && ($cached['body'] ?? null) === $built) {
+        $row = PromptTemplate::query()
+            ->where('key', $key)
+            ->where('version', self::BASELINE_VERSION)
+            ->first();
+
+        // Chỉ GHI khi nội dung đổi: đường chạy thật gọi hàm này mỗi lượt, ghi vô ích là bắn UPDATE
+        // xuống CSDL mỗi lượt quét.
+        if ($row !== null && (string) $row->body === $built) {
             return;
         }
 
-        // Giá trị đã thay placeholder theo lượt chạy — chỉ là ẢNH CHỤP để tham chiếu, không phải nguồn chạy.
-        Cache::put(self::CACHE_PREFIX.$key, ['body' => $built, 'at' => now()->format('d/m/Y H:i')], now()->addDays(self::DEFAULT_TTL_DAYS));
+        // Giá trị đã thay placeholder theo lượt chạy — đây là ẢNH CHỤP để tham chiếu, KHÔNG phải nguồn chạy.
+        PromptTemplate::updateOrCreate(
+            ['key' => $key, 'version' => self::BASELINE_VERSION],
+            [
+                'body' => $built,
+                'is_active' => false,
+                'label' => 'Bản mặc định trong mã (ghi nhận '.now()->format('d/m/Y H:i').')',
+            ],
+        );
     }
 
     public static function defaultBody(string $key): ?string
     {
-        $cached = Cache::get(self::CACHE_PREFIX.$key);
-
-        return is_array($cached) ? ($cached['body'] ?? null) : null;
+        return PromptTemplate::query()
+            ->where('key', $key)
+            ->where('version', self::BASELINE_VERSION)
+            ->value('body');
     }
 
     public static function defaultAt(string $key): ?string
     {
-        $cached = Cache::get(self::CACHE_PREFIX.$key);
+        $at = PromptTemplate::query()
+            ->where('key', $key)
+            ->where('version', self::BASELINE_VERSION)
+            ->value('updated_at');
 
-        return is_array($cached) ? ($cached['at'] ?? null) : null;
+        return $at !== null ? Carbon::parse($at)->format('d/m/Y H:i') : null;
     }
 
     /**
@@ -223,12 +244,7 @@ final class PromptCatalog
     /** Tắt MỌI bản của khoá ⇒ hệ thống quay về chuỗi mặc định trong mã. Trả về số bản đã tắt. */
     public static function turnOff(string $key): int
     {
-        $n = PromptTemplate::query()->where('key', $key)->where('is_active', true)->update(['is_active' => false]);
-
-        // Quên ảnh chụp của CHÍNH khoá này: lượt chạy kế tiếp sẽ ghi lại bản mặc định hiện hành.
-        // KHÔNG quên ảnh chụp của các khoá khác — chúng vẫn đang chạy đúng bản cũ.
-        Cache::forget(self::CACHE_PREFIX.$key);
-
-        return $n;
+        // Ảnh chụp mặc định (version 0) KHÔNG bị xoá: nó là bản trong mã, không phải bản của owner.
+        return PromptTemplate::query()->where('key', $key)->where('is_active', true)->update(['is_active' => false]);
     }
 }

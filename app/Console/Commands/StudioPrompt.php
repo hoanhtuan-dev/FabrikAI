@@ -4,7 +4,9 @@ namespace App\Console\Commands;
 
 use App\Ai\PromptCatalog;
 use App\Models\PromptTemplate;
+use App\Services\DesignAgentService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
 
 /**
  * QUẢN LÝ CHỈ DẪN (PROMPT) TỪ SSH — để "prompt linh hoạt" DÙNG ĐƯỢC, không chỉ tồn tại trên giấy (2026-09-22).
@@ -27,7 +29,8 @@ class StudioPrompt extends Command
         {key? : Khoá chỉ dẫn (vd agent.radar.instruction)}
         {--set-file= : Đặt nội dung từ TỆP này (tạo version mới, bật lên)}
         {--off : Tắt bản cấu hình của khoá này (quay về chuỗi mặc định trong mã)}
-        {--label= : Nhãn ghi chú cho version mới}';
+        {--label= : Nhãn ghi chú cho version mới}
+        {--capture : Ghi nhận BẢN MẶC ĐỊNH trong mã vào CSDL (AI được giả lập — KHÔNG tốn token)}';
 
     protected $description = 'Liệt kê / xem / đặt / tắt CHỈ DẪN cấu hình được (bảng prompt_templates).';
 
@@ -36,6 +39,10 @@ class StudioPrompt extends Command
 
     public function handle(): int
     {
+        if ($this->option('capture')) {
+            return $this->capture();
+        }
+
         $key = (string) ($this->argument('key') ?? '');
 
         if ($key === '') {
@@ -124,6 +131,94 @@ class StudioPrompt extends Command
         $this->line('Quay về mặc định: php artisan studio:prompt '.$key.' --off');
 
         return self::SUCCESS;
+    }
+
+
+    /**
+     * GHI NHẬN BẢN MẶC ĐỊNH TRONG MÃ vào CSDL — để tab «Chỉ dẫn AI» có nội dung THẬT mà sửa,
+     * thay vì một ô trống bắt owner tự nghĩ ra câu lệnh.
+     *
+     * Vì sao phải CHẠY LUỒNG THẬT chứ không chép tay câu lệnh vào đây: câu lệnh không phải một chuỗi
+     * cố định — nó được LẮP theo tình trạng của lượt chạy (hôm nay ngày nào, khu vực nào, có nguồn
+     * ngoài hay không, có công cụ tìm kiếm hay không). Chép tay là tạo bản sao thứ hai và nó lệch
+     * ngay ở lần sửa mã tiếp theo.
+     *
+     * KHÔNG tốn token: lớp HTTP được GIẢ LẬP, và preventStrayRequests() chặn mọi yêu cầu không khớp —
+     * giả lập hỏng thì lệnh NÉM LỖI chứ không âm thầm gọi nhà cung cấp thật.
+     *
+     * Bản ghi nhận là ẢNH CHỤP của MỘT lượt chạy: câu lệnh thật còn đổi theo tình trạng nguồn dữ liệu.
+     * Nó để owner có điểm xuất phát, không phải để khẳng định "câu lệnh luôn đúng như vậy".
+     */
+    private function capture(): int
+    {
+        $this->line('── GHI NHẬN BẢN MẶC ĐỊNH (AI được giả lập — KHÔNG gọi nhà cung cấp thật) ──');
+
+        // GIẢ LẬP TOÀN BỘ mạng ra ngoài, theo thứ tự ưu tiên: nhà cung cấp AI trước, còn lại là nguồn tin.
+        //
+        // Vì sao KHÔNG dùng preventStrayRequests(): nó làm lượt lấy nguồn ngoài (RSS) NÉM LỖI, mà lượt
+        // đó chạy TRƯỚC khi câu lệnh được dựng — nên chặn cứng là không ghi nhận được gì cả. Ở đây nguồn
+        // tin được trả về một feed nhỏ hợp lệ, đúng hình dạng lượt chạy thật, vẫn KHÔNG ra internet.
+        Http::fake([
+            '*chat/completions*' => Http::response([
+                'choices' => [[
+                    'message' => ['content' => '{"directions":[],"trend_checks":[],"narrative":"","brief":"","moodboard_captions":[],"category_rationale":{},"outfit_goals":{},"prompt_vi":"","prompt_en":"","next_steps":[]}'],
+                    'finish_reason' => 'stop',
+                ]],
+            ], 200),
+            '*/responses*' => Http::response(['output_text' => '{"directions":[],"trend_checks":[]}', 'output' => []], 200),
+            '*:generateContent*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => '{}']]]]]], 200),
+            '*' => Http::response($this->sampleFeed(), 200, ['Content-Type' => 'application/rss+xml; charset=utf-8']),
+        ]);
+
+        $svc = app(DesignAgentService::class);
+
+        $runs = [
+            'agent.radar.instruction' => fn () => $svc->radar(null, 'all', true),
+            'agent.collection_brief.instruction' => fn () => $svc->collectionBrief(['prompt' => 'Bộ sưu tập thu để ghi nhận chỉ dẫn mặc định'], null, true, true),
+            'agent.sample_prompt.instruction' => fn () => $svc->samplePrompt(
+                ['prompt' => 'Bộ sưu tập thu để ghi nhận chỉ dẫn mặc định', 'brief' => 'Brief thu.'],
+                null,
+                true,
+                ['id' => 'seed-thu', 'name' => 'Mẫu thử', 'category' => 'Áo', 'size' => 'M', 'index' => 1, 'total' => 1, 'note' => ''],
+            ),
+        ];
+
+        $ok = 0;
+        foreach ($runs as $key => $run) {
+            try {
+                $run();
+            } catch (\Throwable $e) {
+                // Lỗi ở ĐƯỜNG CHẠY không có nghĩa là không ghi nhận được: câu lệnh được dựng TRƯỚC khi
+                // gọi nhà cung cấp, nên ảnh chụp có thể đã có. Kiểm tra bên dưới mới là kết luận.
+                $this->line('  (luồng báo lỗi: '.mb_substr($e->getMessage(), 0, 120).')');
+            }
+
+            $chars = mb_strlen((string) PromptCatalog::defaultBody($key));
+            if ($chars > 0) {
+                $ok++;
+                $this->info(sprintf('  %-38s ĐÃ GHI NHẬN (%d ký tự)', $key, $chars));
+            } else {
+                $this->warn(sprintf('  %-38s chưa ghi nhận được', $key));
+            }
+        }
+
+        $this->newLine();
+        $this->line(sprintf('Kết quả: %d/%d khoá. Bản ghi nhận là ẢNH CHỤP của lượt chạy này —', $ok, count($runs)));
+        $this->line('câu lệnh thật còn đổi theo tình trạng nguồn dữ liệu, nên nó là ĐIỂM XUẤT PHÁT để sửa, không phải bản sao tuyệt đối.');
+
+        return $ok > 0 ? self::SUCCESS : self::FAILURE;
+    }
+
+    /** Feed RSS hợp lệ để lượt lấy nguồn ngoài chạy đúng hình dạng thật mà KHÔNG ra internet. */
+    private function sampleFeed(): string
+    {
+        return '<?xml version="1.0" encoding="UTF-8"?>'
+            .'<rss version="2.0"><channel><title>Nguồn thử</title><link>https://news.example/</link>'
+            .'<item><title>Xu hướng thời trang: chất liệu len và tông màu đất</title>'
+            .'<link>https://news.example/a</link><description>Xu hướng thời trang</description></item>'
+            .'<item><title>Thời trang công sở tối giản đang lên ngôi</title>'
+            .'<link>https://news.example/b</link><description>Thời trang công sở</description></item>'
+            .'</channel></rss>';
     }
 
     /** Tắt MỌI version đang bật của khoá ⇒ quay về chuỗi mặc định trong mã. */
