@@ -2581,6 +2581,9 @@ class DesignAgentService
             .'Không đổi bất kỳ con số nào — cơ cấu SKU, size và dải giá là do hệ thống quyết định. '
             // TRÍ NHỚ DÀI HẠN (GĐ1): khối internal_brand_signal.brand_memory ghi prompt ảnh chủ shop ĐÃ DUYỆT và ĐÃ LOẠI.
             .'brand_memory.approved là các prompt ảnh chủ shop đã DUYỆT, rejected là đã LOẠI: bám phong cách đã duyệt, TRÁNH phong cách đã loại — đó là gu thật của shop. '
+            // CỦNG CỐ (GĐ3): danh sách nay xếp theo ĐỘ MẠNH của ký ức, không theo thời gian — nên thứ tự
+            // mang thông tin, và model phải biết điều đó để không coi mọi mục là ngang nhau.
+            .'Các danh sách trong brand_memory đã xếp theo ĐỘ MẠNH của ký ức (mạnh nhất TRƯỚC): mục đầu là gu đã được chủ shop xác nhận nhiều lần — bám sát nhất; các mục sau nhạt dần. '
             .'brand_memory.lessons.approved và brand_memory.lessons.rejected là các BÀI HỌC đã khái quát từ những prompt đó (tín hiệu cao hơn): ưu tiên đúng bài học đã duyệt, tránh đúng bài học đã loại. '
             // TRÍ NHỚ THỦ TỤC (GĐ2): khối brand_rules là QUY TRÌNH chủ shop tự đặt — khác hẳn sở thích.
             .'brand_rules là QUY TẮC LÀM VIỆC chủ shop tự đặt dạng {trigger: "khi nào", action: "làm thế nào"}: khi bộ sưu tập/brief rơi vào ĐÚNG tình huống (trigger) thì phải làm theo đúng cách (action) — coi như chỉ thị của chủ shop, không phải gợi ý. Quy tắc có weight cao hơn thì ưu tiên hơn khi hai quy tắc xung đột. '

@@ -48,3 +48,10 @@ Schedule::command('studio:samples:remind')->dailyAt('08:00')->onOneServer()->wit
 // Lệnh tự idempotent (PlanService dùng CAS + transaction) nên nếu entry cũ còn sót lại thì chạy hai lần
 // cũng KHÔNG cấp trùng — nhưng vẫn nên xoá để chỉ còn một nguồn sự thật.
 Schedule::command('studio:grant-plan-credits')->dailyAt('00:30')->onOneServer()->withoutOverlapping();
+
+// [Việc #5 — 2026-09-26] CỦNG CỐ TRÍ NHỚ: suy yếu ký ức lâu không dùng + quên ký ức đã yếu và đã cũ.
+//
+// Vì sao phải theo LỊCH: "suy yếu" và "quên" là việc chỉ THỜI GIAN làm được. Không có lượt chạy này thì
+// mọi ký ức nặng mãi như nhau, cửa sổ prompt bị lấp bởi ký ức cũ ⇒ trí nhớ DÀY lên nhưng không SẮC hơn.
+// 04:00 chạy sau hai việc dọn dẹp kia (03:00 storage · 03:30 prune tín hiệu) để không tranh nhau ghi DB.
+Schedule::command('studio:memory:consolidate')->dailyAt('04:00')->onOneServer()->withoutOverlapping();
