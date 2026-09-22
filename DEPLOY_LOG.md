@@ -5,6 +5,41 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 33) — Menu tài khoản định vị TƯỜNG MINH (bỏ anchor positioning của daisyUI)
+
+**Commit:** `f452830`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### Vấn đề
+
+Menu tài khoản dùng `dropdown dropdown-end` + `.dropdown-content` của daisyUI 5 — bộ class này định vị bằng
+**CSS anchor positioning** (`position-area` + `--anchor-*`). Trên trình duyệt không hỗ trợ đầy đủ, nội dung
+menu hiện SAI CHỖ và đè lên vùng nút Outputs. Đây là nguyên nhân thứ hai, khác với lỗi huy hiệu đếm ở đợt 32.
+
+### Fix — dùng đúng lối mọi popover khác của Studio
+
+| Trước | Sau |
+|---|---|
+| `div.dropdown.dropdown-end` + `ul.menu.dropdown-content` (anchor positioning) | `div.relative` + `ul.menu.absolute.right-0.top-full` với `v-if="accountOpen"` |
+| Menu luôn nằm trong DOM, ẩn bằng CSS của daisyUI | Menu chỉ vào DOM khi mở — không còn phần tử vô hình nằm đè |
+
+Đây cùng lối với popover Gói & credit, Bộ sưu tập, Nhóm làm việc — những popover chưa từng bị lỗi vị trí.
+
+### Đo được (CDP, menu MỞ, owner thật)
+
+| Bề ngang | `coversOutputs` | Nằm dưới nút tài khoản | Thẳng mép phải | Tràn ngang |
+|---|---|---|---|---|
+| 1024 · 1280 · 1440 | **false** (cả 3) | **true** | **true** | 0 |
+
+### Khoá bằng test
+
+`StudioHeaderAndPromptTest` nay khẳng định menu tài khoản có `absolute right-0 top-full` (không còn phụ thuộc
+anchor positioning). Toàn bộ: **1249 test XANH** (9484 assertions).
+
+### Deploy
+
+HEAD máy chủ **`f452830`** khớp local; sao lưu DB + cache đầy đủ; không lỗi mới trong log.
+
+---
 ## Phiên 2026-09-26 (đợt 32) — GỐC RỄ THẬT: nút tài khoản đè lên nút Outputs là do huy hiệu đếm neo SAI chỗ
 
 **Commit:** `8c848bc`. **Trạng thái: đã commit + push + DEPLOY production.**
