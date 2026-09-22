@@ -5,6 +5,44 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 14) — BỘ SƯU TẬP: THANH HÀNH ĐỘNG THEO MATERIAL + TẤM TRƯỢT ĐÁY
+
+**Commit:** `6039ad6`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Vì sao đổi
+Khối "HÀNH ĐỘNG NHANH" của bộ sưu tập là **bảy nút cùng cỡ** nằm cạnh nhau: không nút nào nói được đâu là việc chính, và trên điện thoại chúng chiếm **ba hàng**. Đây đúng chỗ mà mật độ dày (đặc điểm tốt của desktop) trở thành khó dùng trên điện thoại.
+
+### 2. Đã làm
+| Việc | Chi tiết |
+|---|---|
+| Thứ tự ưu tiên theo Material | **MỘT nút đặc** = *Duyệt mẫu* (kèm số ảnh đang chờ) · **MỘT nút viền** = *Xuất gói xưởng* (tần suất cao) · phần còn lại vào **"Thêm"** |
+| Menu có HƯỚNG DẪN | Mỗi dòng 2 tầng: **nhãn** + **tình trạng hiện tại** (*"3 mẫu quá hạn — mở để xử lý"* · *"1 lô không đạt — cần xử lý"* · *"Chậm 4 ngày so với hạn"* · *"2/3 cổng đã duyệt"*). Nhãn không nói gì thì người dùng phải mở từng mục để biết mục nào cần trước |
+| Câu nói rõ THỨ TỰ công việc | Một dòng dưới thanh: *duyệt ảnh → xuất gói xưởng (phiếu kỹ thuật đi kèm) → mẫu vật lý → kiểm tra chất lượng → ba cổng duyệt* |
+| **MỘT nguồn** cho 5 việc phụ | Mảng `moreActions` — desktop hiện trong dropdown của daisyUI, điện thoại hiện trong tấm trượt đáy. Chép hai lần thì hai bên lệch nhau ngay lần sửa đầu |
+| **Tấm trượt đáy** cho điện thoại | Lý do ĐO ĐƯỢC: nút "Thêm" nằm ở **y≈800/844** — menu thả xuống là **ngoài khung nhìn**. Nay mobile mở bottom sheet (đúng mẫu Material cho màn nhỏ), desktop vẫn dropdown |
+
+### 3. Đo trên trình duyệt (390×844, đăng nhập thật)
+| Kiểm tra | Kết quả |
+|---|---|
+| Thanh hành động | *Tạo bộ sưu tập* 40px · *Duyệt mẫu* 40px · *Xuất gói xưởng* 40px · *Thêm* 40px |
+| Menu (desktop) | 5 dòng, mỗi dòng 55–77px |
+| **Tấm trượt đáy (mobile)** | mở được bằng cú chạm thật · dán đáy màn hình (`bottomAligned: 0`) · **5 dòng × 67px** |
+| Tràn ngang | **0px** |
+| Phần tử chạm <40px | **1** (một liên kết văn bản 36px — cố ý, nằm trong câu) |
+| Test | **1233 XANH / 9.291 assertion** |
+
+### 4. Một lỗi tự gây ra và cách phát hiện
+Khi thay khối hành động, tôi cắt **quá tay** làm mất phần đóng thẻ của khối "Gợi ý bước tiếp theo" ⇒ build đỏ `Element is missing end tag` (không kèm số dòng). Cách tìm: chạy `@vue/compiler-sfc` bằng Node để lấy **đúng số dòng** (parse + compileTemplate) thay vì đoán theo thông báo của Vite — 30 giây thay vì mò. Đã ghi lại cách này để lần sau dùng ngay.
+
+### 5. Còn lại (thứ tự đã chốt với chủ dự án)
+| # | Việc |
+|---|---|
+| 1 | **Agent Studio**: bố cục lại 4 bước + rail bước bằng component `steps` của daisyUI |
+| 2 | **Studio**: gộp thanh công cụ dày đặc thành cụm nút lớn + menu "thêm" cho mobile (43 phần tử dày ở desktop là cố ý; việc cần làm là cách HIỂN THỊ trên điện thoại) |
+| 3 | **Thư viện** |
+| 4 | **Gộp trang quản trị + Cài đặt thành MỘT SPA** (hiện 3 entry rời: `AdminApp.vue` · `SettingsApp.vue` · `MySettingsApp.vue` + các blade `/admin`, `/settings`, `/cai-dat/*`, `/he-thong-thiet-ke`, `/bao-cao-nhom`) |
+
+---
 ## Phiên 2026-09-26 (đợt 13) — HOÀN THIỆN STUDIO CHO MOBILE + CHẶN RÒ RỈ THÔNG TIN KỸ THUẬT
 
 **Commit:** `c2baf45` · `6e86f8b`. **Trạng thái: đã commit + push + DEPLOY production.** (Không có migration.)
