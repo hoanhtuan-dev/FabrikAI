@@ -241,6 +241,43 @@ class WebFindingLoopTest extends TestCase
         $this->assertSame('live', $evidence['mode'], 'Có nguồn thật trong prompt ⇒ mode phải là live.');
     }
 
+    /**
+     * ƯU TIÊN TÌM KIẾM THỰC TRƯỚC (yêu cầu 2026-09-26): trong khối DỮ LIỆU, TIN VỪA LẤY phải đứng TRƯỚC
+     * nguồn trong sổ.
+     *
+     * Vì sao khoá bằng test: model đọc khối này từ TRÊN XUỐNG, và bản trước xếp nguồn ĐÃ LƯU lên đầu (ý cũ:
+     * "người dùng đã chọn thì quan trọng nhất"). Mở đầu bằng bản ghi CŨ là mở đầu bằng thứ dễ lỗi thời nhất
+     * trong khi thứ vừa lấy được nằm dưới — đúng thứ tự mà yêu cầu này muốn đảo lại.
+     */
+    public function test_fresh_sources_come_before_stored_ones_in_the_data_block(): void
+    {
+        // Feed sống: một nguồn RSS bình thường (không phải nguồn tìm kiếm).
+        WebSource::create([
+            'slug' => 'bao-nganh', 'name' => 'Báo Ngành', 'url' => 'https://feed.example/rss',
+            'kind' => 'rss', 'enabled' => true, 'priority' => 1, 'max_items' => 8,
+        ]);
+
+        Http::fake([
+            'feed.example/*' => Http::response($this->rss('Tin VỪA LẤY về vải linen', 'https://bao.example/tin-moi'), 200),
+        ]);
+
+        $customer = $this->customer();
+
+        // Sổ đã có một nguồn, và người dùng ĐÃ LƯU nó (trường hợp mạnh nhất của "bản cũ").
+        app(WebFindingService::class)->remember($customer, 'linen cũ', 'all', [[
+            'title' => 'Nguồn ĐÃ LƯU', 'url' => 'https://bao.example/da-luu', 'summary' => 's', 'source_name' => 'Báo Cũ',
+        ]]);
+        $row = WebFinding::query()->where('user_id', $customer->id)->firstOrFail();
+        app(WebFindingService::class)->markSaved($customer, (int) $row->id, true);
+
+        $items = app(DesignAgentService::class)->radar($customer, 'all', false)['external_evidence']['items'];
+
+        $this->assertGreaterThanOrEqual(2, count($items), 'Phải có CẢ tin vừa lấy lẫn nguồn trong sổ.');
+        $this->assertSame('https://bao.example/tin-moi', $items[0]['url'], 'Tin VỪA LẤY phải đứng ĐẦU khối DỮ LIỆU.');
+        $this->assertSame('https://bao.example/da-luu', $items[1]['url'], 'Nguồn trong sổ đứng SAU tin vừa lấy.');
+        $this->assertTrue($items[1]['saved'], 'Nguồn đó là nguồn người dùng đã lưu — vẫn phải giữ nhãn.');
+    }
+
     // ── (4)(5) ĐỌC TRANG: chỉ đọc địa chỉ có trong kết quả tìm kiếm ──────────
 
     public function test_read_page_refuses_an_address_that_is_not_in_the_search_results(): void

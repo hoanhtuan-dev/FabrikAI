@@ -236,7 +236,15 @@ class AgentChatStreamTest extends TestCase
         $this->assertNotEmpty($tools);
         $this->assertStringContainsString('Áo dạ tweed lên ngôi mùa thu', (string) $tools[0]['content']);
 
-        // (2) VÒNG KHÉP KÍN: nguồn chat tra được cũng vào SỔ NGUỒN của tài khoản (dùng chung với radar/brief).
+        // (2) CHỈ DẪN PHẢI ĐÒI TRA TRƯỚC (yêu cầu 2026-09-26 "ưu tiên tìm kiếm thực trước"): chỉ dẫn cũ
+        // viết "gọi khi cần" nên model tự quyết là không cần và trả lời bằng trí nhớ. Khoá ở đây để câu chữ
+        // không bị nới lỏng lần sau mà không ai biết.
+        $system = (string) ($sent[0]['messages'][0]['content'] ?? '');
+        $this->assertSame('system', (string) ($sent[0]['messages'][0]['role'] ?? ''));
+        $this->assertStringContainsString('ƯU TIÊN TÌM KIẾM THỰC TRƯỚC', $system, 'Chỉ dẫn phải nói rõ ưu tiên tra thật.');
+        $this->assertStringContainsString('TRƯỚC KHI trả lời', $system, 'Phải buộc tra TRƯỚC khi trả lời, không phải "khi cần".');
+
+        // (3) VÒNG KHÉP KÍN: nguồn chat tra được cũng vào SỔ NGUỒN của tài khoản (dùng chung với radar/brief).
         $this->assertSame(1, $result['tool_search']['stored']);
         $row = WebFinding::query()->where('user_id', $customer->id)->first();
         $this->assertNotNull($row, 'Nguồn chat tra được phải vào sổ nguồn — đó là vòng khép kín.');

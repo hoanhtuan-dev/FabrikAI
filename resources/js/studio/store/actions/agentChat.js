@@ -335,8 +335,19 @@ export function agentChatMetaLine(meta) {
   if (! meta) return '';
   const count = (value) => (Number.isFinite(Number(value)) ? new Intl.NumberFormat('vi-VN').format(Number(value)) : '—');
   const seconds = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(Number(meta.elapsed_ms || 0) / 1000);
+  const tools = meta.tool_search || {};
+  const calls = Number(tools.calls || 0);
+  const sources = Number(tools.results || 0);
+  const reused = Number(tools.reused || 0);
+  const pages = Number((tools.pages || {}).calls || 0);
   const parts = ['Trả lời trong ' + seconds + ' giây'];
-  const sources = Number((meta.tool_search || {}).results || 0);
-  if (sources) parts.push(count(sources) + ' nguồn đã tra');
+
+  // NÓI THẬT LƯỢT NÀY CÓ TRA HAY KHÔNG (2026-09-26). Bản trước chỉ hiện "N nguồn đã tra" KHI có nguồn —
+  // lượt không tra gì thì im lặng, nên người dùng không có cách nào phân biệt câu trả lời CÓ bằng chứng
+  // với câu trả lời từ trí nhớ của máy. Nay MỌI lượt đều nói rõ một trong hai.
+  parts.push(calls > 0 ? ('Đã tự tra ' + count(calls) + ' lượt · ' + count(sources) + ' nguồn') : 'Lượt này KHÔNG tra web');
+  if (pages) parts.push('đọc ' + count(pages) + ' trang');
+  if (reused) parts.push('dùng lại ' + count(reused) + ' nguồn đã tra trước đó');
+
   return parts.join(' · ');
 }

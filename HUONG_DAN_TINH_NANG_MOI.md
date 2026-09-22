@@ -304,7 +304,39 @@ thời gian, quy trình) thì AI được đọc nội dung trang — nhưng **c
 của chính lượt đó**, tối đa **3 trang** một lần chạy, và mỗi trang bị cắt ở **8.000 ký tự**. Đây là rào an toàn:
 AI không được tự nghĩ ra địa chỉ để đi đọc.
 
-### 11.5 Cần gì để tính năng chạy
+### 11.5 Ưu tiên tìm kiếm thực — và ĐO ĐƯỢC nó tra được gì
+Từ **2026-09-26**, chỉ dẫn của cả chat lẫn radar/brief đều **buộc tra TRƯỚC khi trả lời** với câu hỏi cần dữ kiện
+bên ngoài (xu hướng, thị trường, giá, chất liệu, sự kiện, tin tức, "hiện nay/năm nay"). Trước đó chỉ dẫn viết
+"gọi khi cần", và model tự quyết là *không cần* — nó trả lời bằng trí nhớ trong khi máy chủ có sẵn công cụ tra thật.
+Nay mỗi câu trả lời trên giao diện **nói rõ lượt đó có tra hay không** ("Đã tự tra N lượt · M nguồn" hoặc
+"Lượt này KHÔNG tra web"), và trong khối DỮ LIỆU thì **tin vừa lấy đứng TRƯỚC nguồn trong sổ**.
+
+⚠️ **Tra thật KHÔNG có nghĩa là tra được MỌI THỨ.** Đo trên production (2026-09-22, 5 nguồn đang khai đều là RSS
+tin tức, chỉ 1 nguồn tìm được theo từ khoá):
+
+| Câu hỏi | Kết quả ĐO |
+|---|---|
+| "xu hướng áo dạ tweed 2026" (tin tức) | **2 nguồn** |
+| "cách giặt vải linen" (web chung) | **0** — đọc được 16 tin nhưng đều quá cũ |
+| "giá vải linen" (web chung) | **0** — đọc được 23 tin nhưng đều quá cũ |
+
+Muốn đo lại bất cứ lúc nào: `php artisan studio:web-search-probe` (hoặc `--q="câu hỏi của bạn"`).
+
+### 11.6 Muốn AI tra được WEB CHUNG (không chỉ tin tức) — khai nguồn tìm kiếm
+RSS chỉ có tin tức, nên câu hỏi dạng "cách làm / giá / thông số" luôn trả 0 kết quả. Đường tra web chung là một
+**nguồn TÌM KIẾM** (kind = `search`) — đã có sẵn trong mã và đã có test; việc cần làm là **cấu hình**:
+
+| Bước | Việc |
+|---|---|
+| 1 | Lấy khoá **Google Programmable Search** (miễn phí 100 truy vấn/ngày) và **cx** (Search engine ID) trong Google Cloud Console |
+| 2 | Cài đặt → **API key**: thêm một khoá với `provider` = **slug của nguồn** bạn sắp khai (hoặc dùng đúng slot chung `google_cse`) |
+| 3 | Cài đặt → **Nguồn dữ liệu ngoài**: thêm nguồn kind **search** với URL `https://www.googleapis.com/customsearch/v1?cx=<CX>&num=10&q={query}`, và ánh xạ `items_path=items`, `title_field=title`, `link_field=link`, `summary_field=snippet` |
+| 4 | Bấm **Lấy thử** trong màn nguồn (gọi thật, KHÔNG dùng đệm) rồi chạy `php artisan studio:web-search-probe` để xác nhận đã có kết quả web chung |
+
+Khoá **không** nằm trong cột URL (cột đó hiện nguyên văn trên màn Cài đặt); nó được gắn vào URL **chỉ ở lời gọi HTTP
+thật**, đọc từ bảng API key theo slug của nguồn.
+
+### 11.7 Cần gì để tính năng chạy
 | Việc | Điều kiện |
 |---|---|
 | AI tra internet và ghi sổ | Một model được gán cho vai **"Agent Studio — Tìm kiếm nguồn ngoài"** (Cài đặt → Nhóm công việc). Bỏ trống ⇒ không có công cụ, lượt chạy vẫn xong bằng dữ liệu đã có |

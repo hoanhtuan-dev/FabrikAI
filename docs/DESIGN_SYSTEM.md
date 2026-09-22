@@ -573,7 +573,9 @@ nguồn** — nên có hai luật riêng; phần còn lại vẫn theo §6.1.
 | "Đang chuẩn bị câu hỏi…" · "Đang tra thông tin trên web…" · "Đang đọc nội dung một trang…" | Đang chờ VIỆC GÌ. Nhãn do máy chủ gửi nhưng LỌC LẠI ở biên bằng `safeMessage` (§6.3 tầng 2) | tên nhà cung cấp · tên model · mã trạng thái |
 | "Đang tra: «câu hỏi»" | Vì sao lượt này lâu — chính câu đang tra, không phải tên hàm công cụ | tên hàm · tham số kỹ thuật |
 | "Đã tra xong · N nguồn" · "Đã đọc xong · N nguồn" · "· N nguồn dùng lại" | SỐ ĐO của lượt: máy chủ đếm, giao diện KHÔNG đếm lại | "N kết quả trả về" (client tự đếm) |
-| "Trả lời trong X giây · N nguồn đã tra" | Thời gian là đồng hồ CỦA MÁY CHỦ, không phải đồng hồ trình duyệt | số mili-giây thô · lời khen "nhanh thật" |
+| "Trả lời trong X giây · Đã tự tra N lượt · M nguồn" | Thời gian là đồng hồ CỦA MÁY CHỦ, và lượt này CÓ tra thật | số mili-giây thô · lời khen "nhanh thật" |
+| "Trả lời trong X giây · **Lượt này KHÔNG tra web**" | Sự thật ngược lại: câu trả lời này từ trí nhớ của máy, KHÔNG có bằng chứng — thêm 2026-09-26 vì bản trước im lặng ở trường hợp này, khiến người dùng không phân biệt được hai loại câu trả lời | "không cần tra" · "đã dùng kiến thức sẵn có" (hai câu này giấu việc thiếu bằng chứng) |
+| "· đọc N trang" · "· dùng lại N nguồn đã tra trước đó" | Bằng chứng sâu tới đâu (đọc nội dung thật) và nguồn nào là bản CŨ | "read_page" · "cache hit" |
 | "Lượt này không hiện dần — câu trả lời hiện ra một lần." | Sự thật về cách hiện chữ ở LƯỢT ĐÓ | im lặng, để người dùng tưởng lượt nào cũng chảy |
 | "Có dùng lại nguồn đã tra trước đó — nguồn cũ có thể đã lỗi thời." | Nguồn cũ ⇒ phải kiểm lại trước khi tin | "nguồn lấy từ bộ đệm" |
 | "Phần tra cứu đã bị cắt bớt — câu trả lời có thể còn thiếu nguồn." | Nói TRƯỚC rằng câu trả lời có thể chưa đủ | "truncated" |
