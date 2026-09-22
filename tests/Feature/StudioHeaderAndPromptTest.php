@@ -132,28 +132,47 @@ class StudioHeaderAndPromptTest extends TestCase
         $this->assertStringContainsString('canvas-quick-prompt', $empty);
     }
 
-    /** 5. Tab Trò chuyện: lấy dữ liệu THẬT (radar + nguồn + kho thiết kế), không bịa. */
-    public function test_the_chat_tab_searches_trends_and_the_own_design_archive(): void
+    /**
+     * 5. Tab Trò chuyện: CHAT THẬT theo luồng, có nguồn để tự kiểm, KHÔNG bịa.
+     *
+     * [ĐỔI CHÍNH SÁCH 2026-09-26 — đọc trước khi "khôi phục" những khẳng định cũ]
+     * Bài này TRƯỚC ĐÂY khoá điều NGƯỢC LẠI: nó bắt tab Trò chuyện phải có `loadTrendRadar` +
+     * `/api/design-search` và phải hiện câu "Không thấy mục nào khớp đúng …". Đó là mô tả của một đường
+     * trả lời do TRÌNH DUYỆT ghép: tách từ khoá từ câu hỏi, chấm điểm khớp trên tín hiệu radar, rồi ghép
+     * câu trả lời từ dữ liệu đã có. Người dùng đọc khung mang tên "Trò chuyện" và TƯỞNG đang hỏi AI.
+     * Nay tab đó gọi endpoint chat thật của Agent Studio (NDJSON, chữ chảy từng mảnh, công cụ web dùng
+     * chung với radar/brief). Hai khẳng định cũ đã bị GỠ cùng đường ghép giả — giữ chúng lại là bắt sản
+     * phẩm phải có lại chỗ nói dối người dùng.
+     */
+    public function test_the_chat_tab_is_a_real_streamed_chat_with_checkable_sources(): void
     {
         $empty = $this->empty();
 
         $this->assertStringContainsString('data-tab="chat"', $empty, 'Thiếu tab Trò chuyện.');
         $this->assertStringContainsString('data-tab="compose"', $empty, 'Thiếu tab Tạo ảnh.');
-        $this->assertStringContainsString('loadTrendRadar', $empty,
-            'Tab Trò chuyện phải đọc tín hiệu thị trường qua store (dùng chung cache, không gọi lại máy chủ).'
-        );
-        $this->assertStringContainsString('/api/design-search', $empty,
-            'Tab Trò chuyện phải tìm được trong kho thiết kế cũ của chính người dùng.'
-        );
-        $this->assertStringContainsString('data-chat-suggestion', $empty, 'Thiếu câu hỏi gợi ý.');
-        $this->assertStringContainsString('data-use-trend', $empty, 'Thiếu nút đưa xu hướng vào ô mô tả (cầu nối chat - tạo ảnh).');
 
-        $this->assertStringContainsString('Không thấy mục nào khớp đúng', $empty,
-            'Không được để người dùng tưởng câu trả lời là kết quả khớp khi thực ra là xu hướng chung.'
+        // (1) Hỏi bằng LỜI tới endpoint chat thật, qua action dùng chung với bước «Hỏi đáp» của Agent Studio.
+        $this->assertStringContainsString('store.agentChatAsk(', $empty,
+            'Tab Trò chuyện phải hỏi trợ lý thật (action dùng chung), không được tự ghép câu trả lời ở trình duyệt.'
         );
-        $this->assertStringContainsString('Chưa có tín hiệu xu hướng nào để trả lời', $empty,
-            'Không có dữ liệu thì phải nói thẳng là không có.'
-        );
+        $this->assertStringContainsString('store.agentChatStreaming', $empty, 'Phải đọc trạng thái đang trả lời từ kho dữ liệu.');
+        $this->assertStringContainsString('store.agentChatStop()', $empty, 'Đang trả lời thì phải có đường DỪNG.');
+        $this->assertStringContainsString('data-chat-suggestion', $empty, 'Thiếu câu hỏi gợi ý.');
+
+        // (2) Nguồn là LINK THẬT — không bấm được thì người dùng không kiểm chứng được gì.
+        $this->assertStringContainsString('Nguồn để bạn tự kiểm', $empty, 'Thiếu khối trích dẫn.');
+        $this->assertStringContainsString('rel="noopener"', $empty, 'Link nguồn phải mở tab mới an toàn.');
+
+        // (3) Cầu nối "tìm hiểu → làm" vẫn phải còn: đưa CÂU TRẢ LỜI vào ô mô tả tạo ảnh.
+        $this->assertStringContainsString('data-use-answer', $empty, 'Thiếu nút đưa câu trả lời vào ô mô tả ảnh.');
+        $this->assertStringContainsString('useAnswer(', $empty, 'Nút cầu nối phải có hàm thật đứng sau.');
+
+        // (4) Đường ghép câu trả lời ở TRÌNH DUYỆT đã bị gỡ HẲN — còn sót là còn hai câu trả lời mâu thuẫn.
+        foreach (['matchScore', 'loadTrendRadar', '/api/design-search', 'Không thấy mục nào khớp đúng'] as $gone) {
+            $this->assertStringNotContainsString($gone, $empty,
+                'Tab Trò chuyện còn sót đường trả lời giả ở trình duyệt: '.$gone
+            );
+        }
     }
 
     /**

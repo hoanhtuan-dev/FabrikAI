@@ -122,10 +122,12 @@ export const agentStudioActions = {
         this.shopSaving = false;
       }
     },
-    /** Wizard Agent Studio: radar → brief → canvas. Giữ designAgentTab để tương thích code cũ. */
+    /** Wizard Agent Studio: dna → radar → brief → canvas → chat. Giữ designAgentTab để tương thích code cũ. */
     setDesignAgentStep(step) {
       // 'dna' là bước 0: khai hồ sơ shop TRƯỚC khi đọc xu hướng — mọi bước sau đều dùng nó.
-      const allowed = ['dna', 'radar', 'brief', 'canvas'];
+      // [2026-09-26] 'chat' là bước CUỐI (Hỏi đáp): thiếu nó trong danh sách này thì mở ?buoc=chat sẽ bị
+      // âm thầm rơi về 'radar' — người mở link tưởng link sai trong khi thật ra là danh sách thiếu.
+      const allowed = ['dna', 'radar', 'brief', 'canvas', 'chat'];
       this.designAgentStep = allowed.includes(step) ? step : 'radar';
       this.designAgentTab = this.designAgentStep === 'brief' ? 'collection' : 'trend';
     },
@@ -369,6 +371,90 @@ export const agentStudioActions = {
         return null;
       } finally {
         this.webAccessLoading = false;
+      }
+    },
+    /**
+     * NẠP SỔ NGUỒN AI ĐÃ TRA của chính tài khoản này (GET /api/design-agent/findings).
+     *
+     * Vì sao cần: công cụ tìm kiếm đã chạy thật và trả kết quả thật, nhưng màn hình chỉ có con số đếm —
+     * người dùng không bấm vào nguồn nào được và cũng không giữ lại được nguồn nào. Đây là chỗ biến
+     * "AI có tra" thành "tra được CÁI GÌ, để tôi tự kiểm".
+     *
+     * Hai chi tiết CÓ CHỦ Ý:
+     *  · cờ `force` là chốt chống gọi trùng: lúc mở trang (không force) mà đã có lượt nạp đang chạy thì
+     *    bỏ qua, còn nút "Tải lại" (force) luôn tạo lượt mới — bấm mà không thấy gì đổi là nói dối;
+     *  · lỗi mạng/phiên hết KHÔNG xoá danh sách đang xem (cùng luật với radar): một lần hỏng mạng mà
+     *    danh sách trắng ra thì người dùng tưởng sổ của mình rỗng.
+     */
+    async loadFindings(region = 'all', force = false) {
+      if (this.agentFindingsLoading && !force) return null;
+      this.agentFindingsLoading = true;
+      this.agentFindingsError = '';
+      try {
+        const q = new URLSearchParams({ region: String(region || 'all'), limit: '20' });
+        // Lọc "chỉ nguồn đã lưu" do SERVER làm: lọc ở client thì con số trên đầu khối và danh sách bên
+        // dưới sẽ nói hai chuyện khác nhau.
+        if (this.agentFindingsSavedOnly) q.set('saved', '1');
+        const res = await fetch('/api/design-agent/findings?' + q.toString(), { headers: { Accept: 'application/json' } });
+        const ct = res.headers.get('content-type') || '';
+        const data = await res.json().catch(() => ({}));
+        // Hết phiên: Laravel đá về trang đăng nhập và trả HTML 200 ⇒ nếu chỉ check res.ok thì HTML đó
+        // parse thành {} và sổ hiện ra RỖNG — người dùng đọc thành "chưa tra được nguồn nào".
+        if (!res.ok || res.redirected || !ct.includes('application/json')) {
+          if (res.redirected) this.setAuthStatus(401);
+          throw apiError(data, 'Không tải được sổ nguồn AI đã tra.', res);
+        }
+        this.agentFindings = Array.isArray(data.items) ? data.items : [];
+        // SỐ ĐO lấy nguyên từ server — giao diện không tự đếm rồi tự khoe một con số khác.
+        this.agentFindingsStats = data.stats || { total: 0, saved: 0, fresh: 0 };
+        return this.agentFindings;
+      } catch (e) {
+        this.agentFindingsError = userFacingError(e, 'Không tải được sổ nguồn AI đã tra.');
+        return null;
+      } finally {
+        this.agentFindingsLoading = false;
+      }
+    },
+    /**
+     * LƯU / BỎ LƯU một nguồn trong sổ — hành động DUY NHẤT trong sổ mà máy KHÔNG được tự làm.
+     *
+     * Vì sao nó quan trọng hơn một nút bấm: nguồn người dùng lưu được xếp TRƯỚC trong mọi lần dùng lại
+     * và trong khối DỮ LIỆU của lượt chạy sau — tức là cách chủ shop dạy agent "nguồn nào đáng tin cho
+     * ngành của tôi". Nên phải LƯU ĐƯỢC thật (máy chủ ghi `saved_at`), không phải chỉ đổi màu cái nút.
+     *
+     * PUT thật: this.api() chỉ gửi POST nên đi kèm `_method` — đúng cách các action khác trong store
+     * đang làm (Laravel đọc `_method` trong thân JSON và định tuyến sang PUT).
+     */
+    async toggleFindingSaved(id, saved) {
+      const findingId = Number(id) || 0;
+      if (!findingId) return false;
+      this.agentFindingBusyId = findingId;
+      this.agentFindingsError = '';
+      try {
+        const data = await this.api('/api/design-agent/findings/' + findingId, { saved: !!saved, _method: 'PUT' });
+        // Cập nhật ĐÚNG hàng vừa đổi bằng phản hồi của máy chủ: `saved_at` là mốc THẬT do máy chủ đặt,
+        // client tự lấy giờ máy mình thì hai máy lệch giờ sẽ hiện hai mốc khác nhau cho cùng một việc.
+        this.agentFindings = this.agentFindings.map((row) => (Number(row.id) === findingId
+          ? { ...row, saved: !!data.saved, saved_at: data.saved_at || null }
+          : row));
+        // SỐ ĐO lấy từ phản hồi (server đếm lại toàn sổ) chứ KHÔNG cộng/trừ ở client: bỏ lưu một nguồn
+        // đã lưu từ trước đó (không nằm trong danh sách đang xem) mà tự trừ thì con số sai ngay.
+        if (data.stats) this.agentFindingsStats = data.stats;
+        // Đang lọc "chỉ nguồn đã lưu" mà vừa BỎ lưu ⇒ hàng đó không còn thuộc bộ lọc, phải rời danh sách
+        // ngay; giữ lại là màn hình tự mâu thuẫn với chính bộ lọc đang bật.
+        if (this.agentFindingsSavedOnly && !data.saved) {
+          this.agentFindings = this.agentFindings.filter((row) => Number(row.id) !== findingId);
+        }
+        this.toast(data.saved
+          ? 'Đã lưu nguồn này — nguồn bạn lưu được ưu tiên dùng lại ở lượt chạy sau.'
+          : 'Đã bỏ lưu nguồn này.');
+        return true;
+      } catch (e) {
+        this.agentFindingsError = userFacingError(e, saved ? 'Không lưu được nguồn này.' : 'Không bỏ lưu được nguồn này.');
+        this.toast(this.agentFindingsError, 'error');
+        return false;
+      } finally {
+        this.agentFindingBusyId = 0;
       }
     },
     /** Bật/tắt suy luận AI của Agent Studio; đổi chế độ ⇒ bỏ cache radar (kết quả khác nhau). */

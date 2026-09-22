@@ -291,6 +291,20 @@ export function studioState() {
     suggestStartedAt: 0,         // mốc bắt đầu (ms) — card tự đếm giây, không cần server
     suggestLastMeta: null,       // { provider, model, elapsed_ms } của lần chạy xong gần nhất
     suggestError: '',            // lỗi gần nhất để card hiện khối lỗi có ngữ cảnh
+    // ── HỎI ĐÁP THEO LUỒNG (bước cuối của Agent Studio) — 2026-09-26 ──────────────────────
+    // Vì sao có khối này: bốn bước kia là SẢN XUẤT (ra bộ sưu tập → ra ảnh), nhưng trước đây KHÔNG có
+    // chỗ nào để HỎI. Muốn biết "vải linen 60 độ có co không" thì người dùng phải rời trang đi tra web
+    // rồi tự ghép câu trả lời với dữ liệu shop của mình — mất đúng lúc cần quyết.
+    //
+    // Hội thoại gửi NGUYÊN MẠCH lên máy chủ (máy chủ giữ trần số lượt và trần ký tự mỗi lượt): giao
+    // diện KHÔNG tự tóm tắt, không tự cắt lịch sử, chỉ bỏ những lượt RỖNG mà máy chủ sẽ từ chối.
+    agentChatMessages: [],       // [{ role:'user'|'assistant', text, citations: [], streaming, stopped, failed }]
+    agentChatStreaming: false,   // đang chảy chữ — quyết định nút «Dừng» và việc khoá nút «Hỏi»
+    agentChatPhase: '',          // key giai đoạn máy chủ gửi: prepare | context | thinking | searching | reading | done
+    agentChatPhaseLabel: '',     // NHÃN HIỂN THỊ — LUÔN qua safeMessage khi nhận từ máy chủ (xem §6.3 tầng 2)
+    agentChatToolLine: '',       // dòng "Đang tra… / Đang đọc…" + SỐ NGUỒN do máy chủ đếm (không tự đếm lại)
+    agentChatError: '',          // lỗi gần nhất — câu hướng người dùng, không bao giờ là e.message thô (§6.1 luật 4)
+    agentChatLastMeta: null,     // { streamed, elapsed_ms, tool_search } của lượt VỪA RỒI — SỐ ĐO CỦA MÁY CHỦ, KHÔNG tự đoán
     // ── Danh sách 10 gợi ý từ ảnh MỚI NHẤT (bảng suggest_results của chính người dùng) ──
     suggestRecent: [],           // danh sách HIỂN THỊ = lịch sử client + kết quả đã lưu (server)
     suggestRecentServer: [],     // kết quả ĐÃ LƯU trong bảng suggest_results
@@ -374,6 +388,17 @@ export function studioState() {
     webAccess: null,
     webAccessLoading: false,
     webAccessError: '',
+    // ── SỔ NGUỒN AI ĐÃ TRA (2026-09-26) ───────────────────────────────────────────────────
+    // Công cụ tìm kiếm của agent nay ghi MỌI nguồn tìm được vào sổ theo TÀI KHOẢN, và nguồn đó quay lại
+    // khối DỮ LIỆU ở lượt chạy sau. Trước đây màn hình chỉ có CON SỐ ĐẾM ("đã tự tra 2 lượt · 6 tin"):
+    // không bấm vào đâu được, không giữ lại được nguồn nào — nên người dùng không kiểm chứng được câu trả
+    // lời, và gu của họ (nguồn nào đáng tin cho ngành này) không quay lại nuôi lượt sau.
+    agentFindings: [],              // hàng của sổ — server đã xếp nguồn ĐÃ LƯU lên trước
+    agentFindingsStats: { total: 0, saved: 0, fresh: 0 }, // SỐ ĐO của sổ: LUÔN lấy từ server, không tự đoán
+    agentFindingsLoading: false,
+    agentFindingsError: '',         // lỗi gần nhất (câu hướng người dùng, xem §6)
+    agentFindingBusyId: 0,          // id nguồn đang lưu/bỏ lưu — khoá ĐÚNG nút đó, không khoá cả sổ
+    agentFindingsSavedOnly: false,  // lọc "chỉ nguồn bạn đã lưu" — server lọc, xem loadFindings()
     // ── NGUỒN DỮ LIỆU NGOÀI (Đợt 27) ──────────────────────────────────────────────────────
     // Máy chủ tự đi lấy tin RSS/JSON rồi đưa vào prompt kèm URL + thời điểm. Giao diện hiển thị NGUYÊN
     // TRẠNG thứ đang được dùng (nguồn nào chết, tin nào sắp vào prompt), không phải câu văn mô tả.

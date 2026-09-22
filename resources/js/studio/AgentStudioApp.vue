@@ -24,7 +24,7 @@
  *   KHÔNG thêm màu, không thêm biến thể nút: mọi thứ đọc token đã có nên theme Sáng/Tối vẫn đúng
  *   (docs/DESIGN_SYSTEM.md §1, §2, §5).
  *
- * Logic 4 bước nằm ở composables/useAgentStudio.js — trang này chỉ lo KHUNG.
+ * Logic các bước nằm ở composables/useAgentStudio.js — trang này chỉ lo KHUNG.
  */
 import { computed, onBeforeUnmount, onMounted, provide, watch } from 'vue';
 import { useAgentStudio } from './composables/useAgentStudio.js';
@@ -39,9 +39,12 @@ import AgentDnaStep from './components/agents/AgentDnaStep.vue';
 import AgentRadarStep from './components/agents/AgentRadarStep.vue';
 import AgentBriefStep from './components/agents/AgentBriefStep.vue';
 import AgentCanvasStep from './components/agents/AgentCanvasStep.vue';
+// [2026-09-26] Bước 5 — HỎI ĐÁP. Trang này chỉ cần biết nó TỒN TẠI và nằm CUỐI chuỗi; mọi thứ bên
+// trong (khung chat · luồng chữ · trích dẫn) nằm ở component riêng, đúng ranh giới của §21.4.
+import AgentChatStep from './components/agents/AgentChatStep.vue';
 
 const agent = useAgentStudio();
-// Hợp đồng provide()/inject() với 4 bước — giữ nguyên như bản modal, xem useAgentStudio.js.
+// Hợp đồng provide()/inject() với các bước — giữ nguyên như bản modal, xem useAgentStudio.js.
 agent.provideAll(provide);
 
 const {
@@ -80,9 +83,9 @@ watch(step, (id) => {
 }, { immediate: true });
 
 onMounted(() => {
-  // Cờ này vẫn là "Agent Studio đang mở" (phím tắt 1–4 · Ctrl+← → trong composable đọc nó).
+  // Cờ này vẫn là "Agent Studio đang mở" (phím tắt 1…N · Ctrl+← → trong composable đọc nó).
   store.designAgentOpen = true;
-  // QUYỀN THEO GÓI trước tiên: mở thẳng URL mà không biết mình có module hay không thì bốn bước sẽ
+  // QUYỀN THEO GÓI trước tiên: mở thẳng URL mà không biết mình có module hay không thì các bước sẽ
   // chạy rồi mỗi lượt gọi API trả về một dòng lỗi (xem guiConfig.js).
   fetchGuiConfig().then((cfg) => applyGuiConfig(store, cfg));
   // Dữ liệu của chính luồng này — không chờ /api/latest để màn hình có số ngay.
@@ -98,7 +101,7 @@ onBeforeUnmount(() => { store.designAgentOpen = false; });
  * đã biết khoá mục theo gói; nay đây là một TRANG nên mở thẳng URL vẫn tới được.
  *
  * Cách xử lý: nói thẳng + đề xuất nâng cấp NGAY TRÊN TRANG (§6 luật 1, §12 nguyên tắc 4) thay vì để
- * bốn bước chạy rồi mỗi lượt gọi API trả về một dòng lỗi — người dùng sẽ tưởng sản phẩm hỏng.
+ * các bước chạy rồi mỗi lượt gọi API trả về một dòng lỗi — người dùng sẽ tưởng sản phẩm hỏng.
  */
 const planLocked = computed(() => store.moduleLocked('stylist'));
 
@@ -108,7 +111,7 @@ function readinessLabel(id) { return CONTEXT_LABEL[readiness.value[id]] || ''; }
 /**
  * SỐ BƯỚC ĐÃ XONG — cho dải tiến trình (2026-09-26 · thiết kế lại).
  *
- * Vì sao cần: bốn bước là một CHUỖI, nhưng giao diện chỉ nói "đang ở bước nào". Người dùng phải tự
+ * Vì sao cần: các bước là một CHUỖI, nhưng giao diện chỉ nói "đang ở bước nào". Người dùng phải tự
  * đếm xem còn mấy bước, và tự nhớ bước nào đã xong. Một dải tiến trình trả lời cả hai câu đó bằng một
  * cái liếc mắt — đúng vai của stepper trong Material.
  */
@@ -248,7 +251,7 @@ const primaryLabel = computed(() => {
           <ul class="mt-1.5 space-y-1 leading-4">
             <li><b class="text-cream-100">Ctrl + →</b> bước kế</li>
             <li><b class="text-cream-100">Ctrl + ←</b> quay lại</li>
-            <li><b class="text-cream-100">1…4</b> nhảy tới bước</li>
+            <li><b class="text-cream-100">1…{{ STEPS.length }}</b> nhảy tới bước</li>
             <li><b class="text-cream-100">Ctrl+Enter</b> chốt bước</li>
           </ul>
         </details>
@@ -319,7 +322,7 @@ const primaryLabel = computed(() => {
               <p v-else class="mt-1 text-cream-300">Bấm «Tạo lại brief» (việc 7 của bước Định hướng) để dựng lại bằng AI.</p>
             </Notice>
 
-            <!-- Gói không có module: KHÔNG dựng bốn bước để chúng lần lượt báo lỗi. Một màn hình,
+            <!-- Gói không có module: KHÔNG dựng các bước để chúng lần lượt báo lỗi. Một màn hình,
                  một lời giải thích, một hành động — và vẫn để rail bên trái cho biết sẽ nhận gì. -->
             <div v-if="planLocked" class="card p-5 text-center sm:p-7">
               <span class="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-warn/15 text-warn">
@@ -327,10 +330,10 @@ const primaryLabel = computed(() => {
               </span>
               <h3 class="mt-3 font-display text-base font-semibold text-cream-100 sm:text-lg">Agent Studio chưa có trong gói của bạn</h3>
               <p class="mx-auto mt-2 max-w-lg text-body leading-5 text-cream-300 sm:leading-6">
-                Luồng 4 bước (DNA shop → Tín hiệu → Định hướng → Thực thi) thuộc gói <b class="text-cream-100">Pro · Studio · Xưởng</b>.
+                Luồng 5 bước (DNA shop → Tín hiệu → Định hướng → Thực thi → Hỏi đáp) thuộc gói <b class="text-cream-100">Pro · Studio · Xưởng</b>.
                 Xem từng bước ở cột bên trái; mở gói là dùng được ngay.
               </p>
-              <!-- Preview 4 bước để người dùng thấy họ sẽ nhận gì -->
+              <!-- Preview các bước để người dùng thấy họ sẽ nhận gì -->
               <div class="mx-auto mt-4 flex max-w-sm flex-wrap items-center justify-center gap-1.5 opacity-60">
                 <span v-for="(item, i) in STEPS" :key="item.id" class="flex items-center gap-1 text-tiny text-cream-400">
                   <span class="grid h-5 w-5 place-items-center rounded-full bg-ink-700 text-tiny font-bold">{{ i + 1 }}</span>
@@ -351,7 +354,9 @@ const primaryLabel = computed(() => {
                 <AgentDnaStep v-if="step === 'dna'" />
                 <AgentRadarStep v-else-if="step === 'radar'" />
                 <AgentBriefStep v-else-if="step === 'brief'" />
-                <AgentCanvasStep v-else />
+                <AgentCanvasStep v-else-if="step === 'canvas'" />
+                <!-- Bước CUỐI trong chuỗi STEPS (order theo STEPS, không theo thứ tự viết ở đây). -->
+                <AgentChatStep v-else />
               </div>
             </template>
           </div>
@@ -384,7 +389,7 @@ const primaryLabel = computed(() => {
             <StudioIcon name="coins" size="h-4 w-4" /> <span class="hidden sm:inline">Xem gói &amp; nâng cấp</span><span class="sm:hidden">Nâng cấp</span>
           </a>
           <button
-            v-else-if="step !== 'canvas'"
+            v-else-if="step !== 'canvas' && step !== 'chat'"
             v-ripple
             type="button"
             class="btn-brand state-layer flex items-center gap-2 !px-4 !py-2 text-sm sm:!px-5"
@@ -396,7 +401,7 @@ const primaryLabel = computed(() => {
             <StudioIcon name="arrowRight" size="h-4 w-4" />
           </button>
           <button
-            v-else
+            v-else-if="step === 'canvas'"
             v-ripple
             type="button"
             class="btn-brand state-layer flex items-center gap-2 !px-4 !py-2 text-sm sm:!px-5"
@@ -405,6 +410,10 @@ const primaryLabel = computed(() => {
           >
             <StudioIcon name="zap" size="h-4 w-4" /> {{ primaryLabel }}
           </button>
+          <!-- Bước Hỏi đáp là bước CUỐI: hành động chính của nó là nút «Hỏi» NẰM TRONG BƯỚC, ngay cạnh ô
+               nhập. Dựng thêm một nút chính ở thanh dưới là có HAI nút chính cùng lúc — đúng thứ §4 luật 3
+               cấm. Chỗ này chỉ còn một câu chỉ đường. -->
+          <span v-else class="text-tiny text-cream-400 sm:text-label">Gõ câu hỏi ở ô phía trên rồi nhấn Enter.</span>
         </footer>
       </div>
     </div>

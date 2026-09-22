@@ -542,6 +542,64 @@ chặn §6.3, còn `message` kỹ thuật chỉ đi vào log.
   mà bất biến số không thấy (chip trạng thái 2,7–3,0:1 · chip trên ảnh 2,9:1), nên nó vẫn là bước kiểm
   cuối đáng làm sau mỗi lần đổi bảng màu.
 
+### 6.7 Bảng nhãn — SỔ NGUỒN AI ĐÃ TRA (2026-09-26)
+
+Khối **"Nguồn AI đã tra được"** (bước *Tín hiệu*) là chỗ DUY NHẤT người dùng nhìn thấy những nguồn mà
+công cụ tìm kiếm của agent mang về. Nhãn ở đây giữ đúng §6.1: chỉ nói *chuyện gì đã xảy ra* và *tôi làm
+gì tiếp* — không tên model, không tên nhà cung cấp, không mã HTTP, không tên bảng dữ liệu.
+
+| Nhãn hiển thị | Nói với người dùng điều gì | KHÔNG được viết |
+|---|---|---|
+| "AI đã tra **N** nguồn · **M** nguồn bạn đã lưu" | Hai con số của SỔ, lấy NGUYÊN từ máy chủ | "N kết quả trả về" (client tự đếm) |
+| "Đang tải nguồn AI đã tra…" | Đang chờ việc gì — không nói AI nào đang chạy | tên model/nhà cung cấp |
+| "Chưa có nguồn nào — nguồn sẽ xuất hiện ở đây sau khi AI tự tra." | Trạng thái RỖNG nói thật: chưa tra được gì | "Không có dữ liệu." (không nói phải làm gì) |
+| "Câu hỏi đã tra: …" | Vì sao nguồn này nằm ở đây (chính câu model đã hỏi) | "truy vấn · query" |
+| "Lưu" · "Bỏ lưu" · "Đang lưu…" · "Đang bỏ lưu…" | Việc người dùng làm với nguồn; trạng thái chờ nằm NGAY trên nút đó | mã trạng thái · tên bảng dữ liệu |
+| "Đã lưu nguồn này — nguồn bạn lưu được ưu tiên dùng lại ở lượt chạy sau." | Vì sao nên bấm Lưu: lợi ích THẬT, không phải lời khen | "Đã ghi vào bảng …" |
+
+Ghi chú kỹ thuật (KHÔNG hiện ra giao diện): nguồn không thuộc tài khoản này trả **404** — với người
+dùng, câu "không có nguồn đó trong sổ của bạn" đúng hơn mọi lời giải thích về quyền truy cập. Nguồn
+cũ quá hạn lưu giữ tự rời khỏi sổ; giao diện KHÔNG viết cứng số ngày, nó chỉ hiện con số máy chủ đếm.
+
+### 6.8 Bảng nhãn — CHAT THEO LUỒNG (2026-09-26)
+
+Bước **Hỏi đáp** (bước cuối của luồng Agent Studio; khung ở `AgentChatStep.vue`, đọc/ghi qua
+`resources/js/studio/store/actions/agentChat.js`) là chỗ người dùng đọc câu trả lời của trợ lý NGAY
+TRONG lúc làm việc. Nó khác mọi màn khác ở hai điểm — **chữ chảy về từng mảnh** và **câu trả lời có
+nguồn** — nên có hai luật riêng; phần còn lại vẫn theo §6.1.
+
+| Nhãn hiển thị | Nói với người dùng điều gì | KHÔNG được viết |
+|---|---|---|
+| "Đang chuẩn bị câu hỏi…" · "Đang tra thông tin trên web…" · "Đang đọc nội dung một trang…" | Đang chờ VIỆC GÌ. Nhãn do máy chủ gửi nhưng LỌC LẠI ở biên bằng `safeMessage` (§6.3 tầng 2) | tên nhà cung cấp · tên model · mã trạng thái |
+| "Đang tra: «câu hỏi»" | Vì sao lượt này lâu — chính câu đang tra, không phải tên hàm công cụ | tên hàm · tham số kỹ thuật |
+| "Đã tra xong · N nguồn" · "Đã đọc xong · N nguồn" · "· N nguồn dùng lại" | SỐ ĐO của lượt: máy chủ đếm, giao diện KHÔNG đếm lại | "N kết quả trả về" (client tự đếm) |
+| "Trả lời trong X giây · N nguồn đã tra" | Thời gian là đồng hồ CỦA MÁY CHỦ, không phải đồng hồ trình duyệt | số mili-giây thô · lời khen "nhanh thật" |
+| "Lượt này không hiện dần — câu trả lời hiện ra một lần." | Sự thật về cách hiện chữ ở LƯỢT ĐÓ | im lặng, để người dùng tưởng lượt nào cũng chảy |
+| "Có dùng lại nguồn đã tra trước đó — nguồn cũ có thể đã lỗi thời." | Nguồn cũ ⇒ phải kiểm lại trước khi tin | "nguồn lấy từ bộ đệm" |
+| "Phần tra cứu đã bị cắt bớt — câu trả lời có thể còn thiếu nguồn." | Nói TRƯỚC rằng câu trả lời có thể chưa đủ | "truncated" |
+| "Nguồn để bạn tự kiểm" + tiêu đề nguồn (mở tab mới) | Cả bước này tồn tại để KIỂM CHỨNG | trích dẫn chết (không bấm được) |
+| "Bạn đã dừng lượt này." | Lượt đó do NGƯỜI DÙNG dừng, không phải hệ thống hỏng | "Đã huỷ yêu cầu" · mã lỗi |
+| "Lượt này chưa trả lời được — bạn hỏi lại giúp." | Việc làm tiếp; phần chữ đã nhận vẫn được GIỮ | tên ngoại lệ · chi tiết lỗi của máy chủ |
+| "Hội thoại đã đủ 12 lượt. Bấm «Hội thoại mới» rồi hỏi tiếp…" | Đường đi tiếp khi chạm trần hội thoại | "422" · "validation failed" |
+| "Nhập câu hỏi ở ô trên rồi bấm «Hỏi»…" (sau dấu ↳) | Vì sao nút chính đang bị khoá (§4 luật 4) | — |
+
+Năm ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
+
+1. **Sự kiện `provider` của luồng là KHỐI KỸ THUẬT: kho dữ liệu BỎ HẲN NÓ.** Nó không đi vào một state
+   hiển thị nào — không phải "ẩn bằng CSS", không phải "đặt ở cuối trang". Muốn chắc thì đọc
+   `_handleAgentChatEvent`: nhánh `provider` không gán gì cả. Chi tiết vẫn nằm trong log máy chủ.
+2. **Nhãn tiến trình của máy chủ đi qua `safeMessage` tại BIÊN** — cùng luật với luồng "Gợi ý từ ảnh"
+   (`suggestPhaseLabel`): không tin nội dung máy chủ gửi cho một chỗ HIỂN THỊ.
+3. **Tiêu đề · mô tả · địa chỉ · tên nguồn · ngày đăng của TRÍCH DẪN là DỮ LIỆU CỦA NGUỒN, không phải
+   nhãn giao diện** ⇒ giữ nguyên văn, và đây là chỗ luật "không có địa chỉ web trên màn hình" KHÔNG áp
+   dụng. Lý do rất cụ thể: cả bước này tồn tại để người dùng TỰ KIỂM CHỨNG, mà một trích dẫn không bấm
+   được thì không kiểm chứng được gì. Link mở tab mới kèm `rel="noopener"`.
+4. **Lỗi TRƯỚC khi mở luồng vẫn là JSON thường** (422 sai đầu vào · 401 hết phiên · 403 thiếu gói):
+   đọc `message`/`errors` rồi ném lỗi người dùng đọc được. TUYỆT ĐỐI không để lại một khung chat rỗng
+   trông như đã hỏi xong — đó là kiểu nói dối tệ nhất của loại màn hình này.
+5. **Không tự vẽ bộ chấm tiến trình**: dùng `LoadingSpinner.vue` dùng chung (§3). Khung chat chỉ đưa
+   CHỮ (nhãn giai đoạn + dòng đang tra) vào đó.
+
 ---
 
 ## 7. Bố cục & cuộn

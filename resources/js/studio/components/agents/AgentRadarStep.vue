@@ -2,10 +2,11 @@
 // TÁCH từ DesignAgents.vue (đợt tối ưu 2026-09-24) — BƯỚC RADAR.
 // Shell cung cấp toàn bộ trạng thái/logic qua provide(); component này chỉ inject đúng bề mặt nó dùng
 // rồi giữ NGUYÊN VĂN template của bước. Xem shell để biết định nghĩa gốc.
-import { inject } from 'vue';
+import { computed, inject, onMounted, watch } from 'vue';
 import { MOOD_COLOR } from '../../dataColors.js';
 import { useStudioStore } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
+import LoadingSpinner from '../LoadingSpinner.vue';
 import AgentSubSteps from './AgentSubSteps.vue';
 const store = useStudioStore();
 const sub = inject('sub');
@@ -71,6 +72,41 @@ const lifecycleLabel = inject('lifecycleLabel');
 const lifecycleClass = inject('lifecycleClass');
 const formatNumber = inject('formatNumber');
 const formatVnd = inject('formatVnd');
+
+// ── SỔ NGUỒN AI ĐÃ TRA (2026-09-26) ────────────────────────────────────────────────────────────
+// Khối này đọc THẲNG store (agentFindings*) thay vì qua provide(): nó là dữ liệu của MỘT khối trong
+// đúng bước này, không phải bề mặt dùng chung của cả 4 bước — thêm một tầng provide() chỉ để chuyển
+// tiếp thì bốn bước khác phải mang theo thứ chúng không dùng.
+//
+// Trần 6 nguồn là CÓ CHỦ Ý: khối này trả lời "AI tra được gì, tôi giữ cái nào", không phải một thư viện.
+// Sổ đầy hơn thì người dùng lọc «Chỉ nguồn đã lưu» (server lọc) thay vì cuộn một danh sách dài.
+const MAX_FINDINGS = 6;
+const findings = computed(() => store.agentFindings || []);
+const findingsStats = computed(() => store.agentFindingsStats || { total: 0, saved: 0, fresh: 0 });
+const visibleFindings = computed(() => findings.value.slice(0, MAX_FINDINGS));
+const findingsHidden = computed(() => Math.max(0, findings.value.length - MAX_FINDINGS));
+
+/** Nút "Tải lại": LUÔN gọi thật (force) — bấm mà không thấy gì đổi thì nút là đồ trang trí. */
+function reloadFindings() {
+  store.loadFindings(selectedRegion.value, true);
+}
+
+/** Đổi bộ lọc ⇒ nạp lại từ server: lọc ở client thì dòng số đo và danh sách sẽ nói hai chuyện khác nhau. */
+function toggleFindingsSavedOnly() {
+  store.agentFindingsSavedOnly = !store.agentFindingsSavedOnly;
+  store.loadFindings(selectedRegion.value, true);
+}
+
+// Nạp khi MỞ bước này. Không dùng "chỉ nạp khi rỗng" như khối nguồn ngoài: sổ này lớn lên theo MỖI lượt
+// agent tự tra (kể cả lượt chạy ở bước Định hướng), nên danh sách cũ là danh sách thiếu — và người dùng
+// vừa trả tiền cho lượt chạy đó. Một lượt GET nhỏ, có chốt chống gọi trùng trong action.
+onMounted(() => store.loadFindings(selectedRegion.value));
+
+// Đổi khu vực ⇒ sổ phải theo khu vực đó (server lọc theo vùng, vùng 'all' luôn được tính kèm).
+watch(selectedRegion, (region, previous) => {
+  if (region === previous) return;
+  store.loadFindings(region, true);
+});
 </script>
 
 <template>
@@ -346,6 +382,78 @@ const formatVnd = inject('formatVnd');
               <p v-else class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center text-xs text-cream-400">
                 {{ trends.length ? 'Không có xu hướng nào khớp bộ lọc hiện tại — bỏ bộ lọc để xem tất cả.' : 'Chưa đọc được xu hướng nào. Bấm «Tải lại»; nếu vẫn trống, kiểm tra nguồn tin ở khối «Nguồn dữ liệu cho phân tích».' }}
               </p>
+
+              <!-- SỔ NGUỒN AI ĐÃ TRA — mặt NHÌN THẤY của vòng khép kín: công cụ tìm kiếm của agent đã ghi
+                   mọi nguồn vào sổ theo tài khoản, nguồn đó quay lại khối DỮ LIỆU ở lượt chạy sau. Trước
+                   đây chỗ này chỉ có CON SỐ ĐẾM nên người dùng không bấm vào đâu được và không giữ lại
+                   được nguồn nào — không kiểm chứng được câu trả lời, và gu của họ không nuôi lượt sau.
+                   Nút «Lưu» KHÔNG phải trang trí: nguồn đã lưu được xếp trước khi agent dùng lại. -->
+              <div class="mt-4 rounded-xl border border-ink-700 bg-ink-900/70 p-3 sm:p-4">
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <p class="text-xs font-semibold text-cream-200">Nguồn AI đã tra được</p>
+                    <!-- Dòng SỐ ĐO lấy nguyên từ sổ của máy chủ — không tự đếm ở trình duyệt rồi khoe một
+                         con số khác với con số máy chủ đang dùng để xếp hạng nguồn. -->
+                    <p class="mt-0.5 text-label leading-4 text-cream-400">
+                      AI đã tra <b class="text-cream-100">{{ findingsStats.total }}</b> nguồn · <b class="text-cream-100">{{ findingsStats.saved }}</b> nguồn bạn đã lưu<template v-if="findingsStats.fresh !== findingsStats.total"> · {{ findingsStats.fresh }} còn dùng lại được</template>
+                    </p>
+                  </div>
+                  <div class="flex shrink-0 flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      class="tool-btn !px-2 !py-1.5 !text-tiny"
+                      :class="{ 'is-active': store.agentFindingsSavedOnly }"
+                      :aria-pressed="store.agentFindingsSavedOnly"
+                      title="Chỉ hiện những nguồn bạn đã bấm Lưu"
+                      @click="toggleFindingsSavedOnly"
+                    ><StudioIcon name="save" size="h-3.5 w-3.5" /> Chỉ nguồn đã lưu ({{ findingsStats.saved }})</button>
+                    <button type="button" class="tool-btn !px-2 !py-1.5 !text-tiny" :disabled="store.agentFindingsLoading" @click="reloadFindings">
+                      <StudioIcon name="refresh" size="h-3.5 w-3.5" :class="store.agentFindingsLoading ? 'animate-spin' : ''" /> Tải lại
+                    </button>
+                  </div>
+                </div>
+
+                <p v-if="store.agentFindingsError" role="alert" class="mt-2 text-body text-danger">{{ store.agentFindingsError }}</p>
+
+                <!-- Bộ đếm dùng CHUNG <LoadingSpinner> (§3) — không tự vẽ bộ chấm riêng cho khối này. -->
+                <LoadingSpinner v-if="store.agentFindingsLoading && !visibleFindings.length" size="sm" text="Đang tải nguồn AI đã tra…" />
+
+                <ul v-else-if="visibleFindings.length" class="mt-2 space-y-1.5">
+                  <li v-for="row in visibleFindings" :key="row.id" class="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-ink-700 bg-ink-900 px-2.5 py-2">
+                    <div class="min-w-0 flex-1">
+                      <a :href="row.url" target="_blank" rel="noopener" class="text-label font-semibold text-cream-100 underline decoration-dotted hover:text-brand-200">{{ row.title || row.url }}</a>
+                      <p class="mt-0.5 text-tiny leading-4 text-cream-400">
+                        {{ row.source_name || 'Nguồn trên internet' }}<template v-if="row.published_at"> · bài đăng {{ shortDate(row.published_at) }}</template><template v-else-if="row.last_seen_at"> · tra {{ shortDate(row.last_seen_at) }}</template><template v-if="Number(row.hits) > 1"> · gặp {{ row.hits }} lần</template><template v-if="row.saved"> · <span class="text-ok">bạn đã lưu</span></template>
+                      </p>
+                      <!-- CÂU HỎI ĐÃ TRA: thiếu nó thì người dùng chỉ thấy một dãy link rời rạc và không
+                           biết vì sao nguồn này lại nằm ở đây, cũng không biết hỏi lại thế nào. -->
+                      <p v-if="row.found_query" class="mt-0.5 text-tiny leading-4 text-cream-400">Câu hỏi đã tra: {{ row.found_query }}</p>
+                    </div>
+                    <button
+                      type="button"
+                      class="tool-btn !px-2 !py-1.5 !text-tiny"
+                      :disabled="store.agentFindingBusyId === row.id"
+                      :title="row.saved
+                        ? 'Bỏ lưu: nguồn này thôi được ưu tiên khi agent dùng lại ở lượt chạy sau'
+                        : 'Giữ nguồn này lại — nguồn bạn lưu được xếp trước khi agent dùng lại ở lượt chạy sau'"
+                      @click="store.toggleFindingSaved(row.id, !row.saved)"
+                    >
+                      <StudioIcon :name="row.saved ? 'x' : 'save'" size="h-3.5 w-3.5" />
+                      {{ store.agentFindingBusyId === row.id ? (row.saved ? 'Đang bỏ lưu…' : 'Đang lưu…') : (row.saved ? 'Bỏ lưu' : 'Lưu') }}
+                    </button>
+                  </li>
+                </ul>
+
+                <p v-else class="mt-2 text-body leading-5 text-cream-400">
+                  {{ store.agentFindingsSavedOnly
+                    ? 'Bạn chưa lưu nguồn nào — bỏ lọc «Chỉ nguồn đã lưu» để xem mọi nguồn AI đã tra.'
+                    : 'Chưa có nguồn nào — nguồn sẽ xuất hiện ở đây sau khi AI tự tra.' }}
+                </p>
+
+                <p v-if="findingsHidden" class="mt-2 text-tiny leading-4 text-cream-400">
+                  Còn {{ findingsHidden }} nguồn nữa trong sổ (khối này chỉ hiện {{ MAX_FINDINGS }} nguồn gần nhất) — nguồn bạn lưu luôn được xếp trước.
+                </p>
+              </div>
 
               <details class="mt-4 rounded-xl border border-ink-700 bg-ink-900/70 p-3 sm:p-4">
                 <summary class="cursor-pointer text-xs font-semibold text-cream-200">Nguồn dữ liệu cho phân tích</summary>

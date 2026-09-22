@@ -12,6 +12,7 @@ import { canvasViewActions } from './store/actions/canvasView.js';
 import { libraryActions } from './store/actions/library.js';
 import { projectsActions } from './store/actions/projects.js';
 import { agentStudioActions } from './store/actions/agentStudio.js';
+import { agentChatActions } from './store/actions/agentChat.js';
 import { layerCoreActions } from './store/actions/layerCore.js';
 import { brushesActions } from './store/actions/brushes.js';
 import { layerTransformActions } from './store/actions/layerTransform.js';
@@ -32,6 +33,7 @@ export const useStudioStore = defineStore('studio', {
     ...libraryActions,
     ...projectsActions,
     ...agentStudioActions,
+    ...agentChatActions,
     ...layerCoreActions,
     ...brushesActions,
     ...layerTransformActions,

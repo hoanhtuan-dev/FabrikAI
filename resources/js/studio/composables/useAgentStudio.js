@@ -1,14 +1,14 @@
 /**
- * LÕI CỦA AGENT STUDIO — trạng thái + hành động của luồng 4 bước, tách khỏi phần RENDER.
+ * LÕI CỦA AGENT STUDIO — trạng thái + hành động của luồng các bước, tách khỏi phần RENDER.
  *
  * [2026-09-25] Agent Studio chuyển từ MODAL trong /studio thành MỘT TRANG RIÊNG (/agent-studio).
  * Nếu để nguyên trong một file .vue thì bản trang phải chép lại ~950 dòng — đúng kiểu "hai bản sao
  * rồi lệch nhau" mà repo này đã trả giá nhiều lần. Nay: logic ở ĐÂY, khung hiển thị ở
- * AgentStudioApp.vue, còn 4 bước (components/agents/*.vue) nhận đúng bề mặt cũ qua provideAll()
+ * AgentStudioApp.vue, còn các bước (components/agents/*.vue) nhận đúng bề mặt cũ qua provideAll()
  * nên không phải sửa một dòng nào.
  *
- * Hợp đồng provide()/inject() với 4 bước được GIỮ NGUYÊN (đợt tách 2026-09-24): đổi sang props là
- * sửa cả 4 bước mà không đổi hành vi.
+ * Hợp đồng provide()/inject() với các bước được GIỮ NGUYÊN (đợt tách 2026-09-24): đổi sang props là
+ * sửa cả loạt bước mà không đổi hành vi.
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useStudioStore, userFacingError } from '../store.js';
@@ -17,6 +17,10 @@ import { CSRF } from '../store/helpers.js';
 // Đọc bảng dán từ Excel nằm ở MODULE RIÊNG để kiểm được bằng máy (scripts/check-shop-paste.mjs) —
 // logic tiền nằm trong file .vue thì không test nào chạm tới, và đó đúng là cách lỗi cũ lọt qua.
 import { parseShopRows } from '../shopPaste.js';
+// Câu chữ của khung chat (cảnh báo lượt vừa rồi + dòng số đo) là HÀM DÙNG CHUNG: tab «Trò chuyện» ở
+// màn hình canvas trống (components/CanvasEmptyState.vue) cũng đọc đúng hai hàm này ⇒ hai màn không
+// thể nói hai kiểu về CÙNG một lượt trả lời.
+import { agentChatNotes, agentChatMetaLine } from '../store/actions/agentChat.js';
 
 export function useAgentStudio() {
   const store = useStudioStore();
@@ -46,6 +50,12 @@ export function useAgentStudio() {
     { id: 'radar', label: 'Tín hiệu', hint: 'Chọn hướng thời trang đang lên → những hướng này sẽ đi vào brief', icon: 'scan', required: true, need: 'Đầu ra: 2–4 hướng đã chọn, kèm số đo từ tin thật khi có nguồn. Không chọn gì thì brief dùng nhóm mặc định.' },
     { id: 'brief', label: 'Định hướng', hint: 'Dựng bản thiết kế bộ sưu tập + kế hoạch sản xuất & lãi gộp', icon: 'briefcase', required: true, need: 'Đầu ra: brief · mood board · cơ cấu danh mục · phối & bảng size · giá bán và lãi gộp. Đây là thứ bước Thực thi biến thành ảnh.' },
     { id: 'canvas', label: 'Thực thi', hint: 'Biến brief thành ảnh thật để đăng bán', icon: 'wand', required: true, need: 'Đầu ra: prompt tiếng Việt/Anh + tỉ lệ + số biến thể, đưa thẳng sang ô Tạo Ảnh của Studio.' },
+    // Bước 5 — HỎI ĐÁP (2026-09-26). Bốn bước trên SẢN XUẤT (ra bộ sưu tập → ra ảnh); bước này để KIỂM
+    // CHỨNG và hỏi tiếp ngay trên dữ liệu vừa dựng, thay vì mở tab khác đi tra rồi tự ghép lại.
+    // Vì sao đặt CUỐI: nó không tạo ra thứ gì mới nên không được chặn người mới ở đầu luồng — mà người
+    // vừa có bộ sưu tập thì luôn thấy nó ngay đó. Vì sao KHÔNG chia bước con: hội thoại là MỘT việc liên
+    // tục, cắt nó thành "việc 1/3" là bịa ra ranh giới không có thật (khác hẳn Định hướng với 7 quyết định).
+    { id: 'chat', label: 'Hỏi đáp', hint: 'Hỏi thẳng về bộ sưu tập vừa dựng → trả lời kèm nguồn để bạn tự kiểm', icon: 'bot', required: false, need: 'Đầu ra: câu trả lời hiện dần theo từng mảnh, kèm danh sách nguồn bấm được và số đo của lượt (thời gian trả lời · số nguồn đã tra). Không hỏi gì cũng không sao — bốn bước trên đã đủ để ra ảnh.' },
   ];
   const BRIEF_TABS = [
     { id: 'overview', label: 'Tổng quan' },
@@ -670,6 +680,10 @@ export function useAgentStudio() {
     radar: radar.value ? 'done' : (store.trendRadarLoading ? 'loading' : 'ready'),
     brief: collection.value && !briefStale.value ? 'done' : (radar.value ? 'ready' : 'locked'),
     canvas: collection.value && !briefStale.value ? 'ready' : 'locked',
+    // Hỏi đáp: 'done' khi người dùng ĐÃ hỏi ít nhất một câu (đây là bước tuỳ chọn — đánh dấu xong theo
+    // VIỆC ĐÃ LÀM, không theo một cờ ai đó bật). Không bao giờ 'locked': câu hỏi không phụ thuộc brief,
+    // khoá nó lại là bắt người dùng đi hết bốn bước mới được hỏi một câu.
+    chat: (store.agentChatMessages || []).length ? 'done' : 'ready',
   }));
 
   // ── NHẬN BIẾT MODEL: hai agent chạy bằng AI hay bằng engine tất định? ──────────
@@ -1114,10 +1128,17 @@ export function useAgentStudio() {
       setStep('canvas');
       return;
     }
+    if (step.value === 'chat') {
+      // Bước Hỏi đáp là bước CUỐI và KHÔNG có bước kế: hành động chính của nó là nút «Hỏi» nằm ngay
+      // trong bước. Nhánh cuối của hàm này là applyCanvas() — để nguyên thì bấm Ctrl+→ giữa lúc đang
+      // hỏi sẽ ĐÁ người dùng sang /studio. Không làm gì là hành vi đúng ở đây.
+      return;
+    }
     applyCanvas();
   }
   function back() {
-    if (step.value === 'canvas') setStep('brief');
+    if (step.value === 'chat') setStep('canvas');
+    else if (step.value === 'canvas') setStep('brief');
     else if (step.value === 'brief') setStep('radar');
     else if (step.value === 'radar') setStep('dna');
   }
@@ -1180,7 +1201,7 @@ export function useAgentStudio() {
   // ── PHÍM TẮT (2026-09-24) ──────────────────────────────────────────────────────────────
   // Agent Studio là workspace nhiều bước — phím tắt điều hướng nhanh, không phá a11y:
   //   · Ctrl/Cmd + → / ←   chuyển bước tới/lui (dùng modifier để KHÔNG đụng mũi tên điều hướng con trỏ)
-  //   · phím 1–4            nhảy thẳng tới bước (chỉ khi KHÔNG đang gõ trong ô nhập)
+  //   · phím 1…N            nhảy thẳng tới bước (N = số bước đang có; chỉ khi KHÔNG đang gõ trong ô nhập)
   //   · Ctrl/Cmd + Enter    trong ô prompt = chốt/tiếp tục bước hiện tại (gọi advance)
   function isTypingTarget(target) {
     if (!target) return false;
@@ -1196,7 +1217,9 @@ export function useAgentStudio() {
     // Ctrl+Enter khi KHÔNG gõ trong ô prompt = tiếp tục bước (advance). Trong ô prompt, chính textarea
     // đã có @keydown.ctrl.enter="createBrief" nên phím này tạo brief mà KHÔNG nhảy bước — có chủ đích.
     if (mod && event.key === 'Enter' && !typing) { event.preventDefault(); advance(); return; }
-    if (!mod && !typing && /^[1-4]$/.test(event.key)) {
+    // Phím số nhảy tới bước: đọc ĐỘ DÀI của STEPS thay vì viết cứng "1–4" — thêm bước thứ năm mà quên
+    // chỗ này thì phím 5 im lặng không làm gì, và không ai đoán ra vì sao.
+    if (!mod && !typing && /^[1-9]$/.test(event.key) && Number(event.key) <= STEPS.length) {
       const id = STEPS[Number(event.key) - 1]?.id;
       if (id) { event.preventDefault(); setStep(id); }
     }
@@ -1622,12 +1645,63 @@ export function useAgentStudio() {
     if (!['prompt_vi', 'prompt_en', 'negative_prompt'].includes(field)) return;
     samples.value = samples.value.map((row) => (row.id === id ? { ...row, [field]: value } : row));
   }
+  // ── BƯỚC 5 · HỎI ĐÁP THEO LUỒNG (2026-09-26) ───────────────────────────────────────────
+  // Khung chat CHỈ đọc state của kho dữ liệu và gọi hai action của kho; nó KHÔNG tự gọi mạng và KHÔNG
+  // tự bấm giờ. Nhờ vậy mọi con số hiện ra (thời gian trả lời · số nguồn) đều là SỐ ĐO CỦA MÁY CHỦ —
+  // đúng luật §6: giao diện nói chuyện gì đã xảy ra, không tự dựng số.
+  const chatText = ref('');
+  const chatMessages = computed(() => store.agentChatMessages || []);
+  const chatStreaming = computed(() => !!store.agentChatStreaming);
+  const chatPhaseLabel = computed(() => store.agentChatPhaseLabel || '');
+  const chatToolLine = computed(() => store.agentChatToolLine || '');
+  const chatError = computed(() => store.agentChatError || '');
+  const chatLastMeta = computed(() => store.agentChatLastMeta || null);
+
   /**
-   * Cung cấp bề mặt dùng chung cho 4 bước (components/agents/*.vue) — NGUYÊN VĂN hợp đồng cũ.
+   * BA CÂU GỢI Ý cho trạng thái RỖNG — mỗi câu một VIỆC khác nhau (chất liệu · thị trường · nhịp xưởng),
+   * không phải ba cách hỏi cùng một thứ. Ô chat trống mà không có gợi ý thì người mới chỉ thấy một khung
+   * trắng và tự hỏi "hỏi được gì ở đây".
+   */
+  const CHAT_SUGGESTIONS = [
+    { text: 'Vải linen 60 độ có co nhiều không?', why: 'Kiểm chất liệu trước khi chốt đơn vải' },
+    { text: 'Mùa này khách miền Nam chuộng màu gì?', why: 'Đối chiếu hướng màu với tin thị trường' },
+    { text: 'Lô 30 cái mỗi mã thì xưởng bao lâu ra hàng?', why: 'Kiểm nhịp sản xuất trước khi hứa với khách' },
+  ];
+
+  /**
+   * CẢNH BÁO + SỐ ĐO của lượt vừa rồi — nay gọi HÀM DÙNG CHUNG ở store/actions/agentChat.js.
+   *
+   * Vì sao không viết thẳng ở đây nữa: CÙNG hội thoại này còn được tab «Trò chuyện» ở màn hình canvas
+   * trống đọc. Hai bản câu chữ là hai bản sẽ lệch nhau; lý do đầy đủ nằm ở khối chú thích của hai hàm.
+   */
+  const chatNotes = computed(() => agentChatNotes(chatLastMeta.value));
+  const chatMetaLine = computed(() => agentChatMetaLine(chatLastMeta.value));
+
+  /**
+   * GỬI câu hỏi đang gõ. Chỉ XOÁ ô nhập khi câu hỏi ĐÃ ĐI — giữ lại chữ người dùng vừa gõ là cách duy nhất
+   * để phiên hết hạn hoặc gói thiếu quyền không bắt họ gõ lại từ đầu.
+   */
+  async function askChat() {
+    const value = String(chatText.value || '').trim();
+    if (!value || chatStreaming.value) return false;
+    const sent = await store.agentChatAsk(value, selectedRegion.value);
+    if (sent) chatText.value = '';
+    return sent;
+  }
+  function stopChat() { return store.agentChatStop(); }
+  function resetChat() { store.agentChatReset(); chatText.value = ''; }
+  /** Bấm một câu gợi ý = ĐIỀN RỒI GỬI LUÔN (gợi ý là câu hỏi hoàn chỉnh, không phải mẫu để sửa). */
+  async function useChatSuggestion(text) {
+    chatText.value = String(text || '');
+    return askChat();
+  }
+
+  /**
+   * Cung cấp bề mặt dùng chung cho các bước (components/agents/*.vue) — NGUYÊN VĂN hợp đồng cũ.
    * Danh sách này và object trả về bên dưới cùng rút từ MỘT nguồn nên không thể lệch nhau.
    */
   function provideAll(provide) {
-    // ── CUNG CẤP bề mặt dùng chung cho 4 bước (tách 2026-09-24) ──
+    // ── CUNG CẤP bề mặt dùng chung cho các bước (tách 2026-09-24) ──
     // Mỗi bước inject() đúng tên cần dùng; ref/computed/hàm cung cấp nguyên bản nên hành vi y hệt file gốc.
     provide('prompt', prompt);
     provide('promptInput', promptInput);
@@ -1696,6 +1770,9 @@ export function useAgentStudio() {
     provide('collection', collection);
     provide('regions', regions);
     provide('selectedRegion', selectedRegion);
+    // regionName đã nằm trong return từ trước (khung trang dùng), nhưng CHƯA từng được provide() — thêm
+    // ở đây để khối nào cần in tên khu vực cũng lấy được ĐÚNG nguồn đó, không tự dựng bản thứ hai.
+    provide('regionName', regionName);
     provide('trends', trends);
     provide('sources', sources);
     provide('sourceMode', sourceMode);
@@ -1851,6 +1928,21 @@ export function useAgentStudio() {
     provide('applyCanvas', applyCanvas);
     provide('createCollection', createCollection);
     provide('copyText', copyText);
+    // ── Bước 5 · Hỏi đáp (2026-09-26) ──
+    provide('chatText', chatText);
+    provide('chatMessages', chatMessages);
+    provide('chatStreaming', chatStreaming);
+    provide('chatPhaseLabel', chatPhaseLabel);
+    provide('chatToolLine', chatToolLine);
+    provide('chatError', chatError);
+    provide('chatLastMeta', chatLastMeta);
+    provide('chatNotes', chatNotes);
+    provide('chatMetaLine', chatMetaLine);
+    provide('CHAT_SUGGESTIONS', CHAT_SUGGESTIONS);
+    provide('askChat', askChat);
+    provide('stopChat', stopChat);
+    provide('resetChat', resetChat);
+    provide('useChatSuggestion', useChatSuggestion);
 
   }
 
@@ -2081,6 +2173,20 @@ export function useAgentStudio() {
     applyCanvas,
     createCollection,
     copyText,
+    chatText,
+    chatMessages,
+    chatStreaming,
+    chatPhaseLabel,
+    chatToolLine,
+    chatError,
+    chatLastMeta,
+    chatNotes,
+    chatMetaLine,
+    CHAT_SUGGESTIONS,
+    askChat,
+    stopChat,
+    resetChat,
+    useChatSuggestion,
     provideAll,
   };
 }
