@@ -5,6 +5,43 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 15) — AGENT STUDIO: DẢI TIẾN TRÌNH KIỂU MATERIAL + SÀN CHẠM CHO LIÊN KẾT
+
+**Commit:** `c25b259`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Vì sao
+Agent Studio là một CHUỖI 4 bước, nhưng giao diện chỉ nói **đang ở bước nào** — người dùng phải tự đếm còn mấy bước và tự nhớ bước nào đã xong. Trên điện thoại còn thêm một vấn đề: dãy pill bước phải **cuộn ngang**, nên pill đang chọn có thể nằm ngoài tầm nhìn.
+
+### 2. Đã làm
+| Việc | Chi tiết |
+|---|---|
+| **Dải tiến trình** (daisyUI `progress`) | Màn hình rộng: ở đầu rail, ngay dưới chữ "Tiến trình". Điện thoại: phía trên dãy pill. Kèm câu **"x/4 bước xong"** |
+| **Bước đang làm in ra bằng CHỮ** (điện thoại) | *"Bước 2: Tín hiệu"* nằm TRÊN dãy pill — vì pill đang chọn có thể bị cuộn ra ngoài tầm nhìn, còn câu chữ thì luôn thấy |
+| **Sàn chạm cho liên kết đóng vai nút** | Xem §3 |
+
+### 3. Một lỗ hổng của luật sàn chạm — phát hiện bằng số đo
+Luật ở đợt 13 chỉ nhắm `button` / `[role=button]` / `select` / `input`. **ĐO ĐƯỢC trên trang Agent Studio ở 390px**: nút *"Về Studio"* và vài liên kết cùng loại là thẻ **`<a>`** (điều hướng thật, không phải nút) nên vẫn còn **32px và 24px** — dưới ngưỡng chạm.
+
+Nay luật phủ thêm `a` **mang lớp của nút** (`btn*` · `icon-btn`). Cố ý KHÔNG đụng liên kết nằm trong câu văn (lớp `link`): kéo giãn chúng sẽ làm vỡ dòng chữ. Luật vẫn nằm **trong** `@media (max-width: 1023px)` — máy tính không đổi một pixel nào.
+
+### 4. Đo lại (đăng nhập thật, cùng bản build đã commit)
+| Bề mặt | Trước | Sau |
+|---|---|---|
+| Agent Studio @390px | 2 phần tử <40px (32px · 24px) | **0** |
+| Agent Studio @390px — dải tiến trình | — | thanh **374px** rộng, 4px cao, giá trị 0/4 (đúng: tài khoản đo chưa khai DNA) |
+| Agent Studio @1440px | 3 phần tử dày | **3 — không đổi** · rail hiện, có dải tiến trình riêng (175px) |
+| Tràn ngang (cả hai bề rộng) | 0px | **0px** |
+| Chữ <11px | 0 | **0** |
+| Test | 1233 XANH / 9.291 | **1233 XANH / 9.300 assertion** |
+
+### 5. Bước tiếp theo trong chuỗi
+| # | Việc |
+|---|---|
+| 1 | **Studio**: cách HIỂN THỊ thanh công cụ dày đặc trên điện thoại (43 phần tử dày ở desktop là cố ý — giữ nguyên) |
+| 2 | **Thư viện** |
+| 3 | **Gộp trang quản trị + Cài đặt thành MỘT SPA** (hiện 3 entry rời + 5 blade) |
+
+---
 ## Phiên 2026-09-26 (đợt 14) — BỘ SƯU TẬP: THANH HÀNH ĐỘNG THEO MATERIAL + TẤM TRƯỢT ĐÁY
 
 **Commit:** `6039ad6`. **Trạng thái: đã commit + push + DEPLOY production.**
