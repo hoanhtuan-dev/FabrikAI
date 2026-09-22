@@ -5,6 +5,60 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 6) — CRON ĐÃ SỐNG: ĐÓNG MÓN NỢ ĐƯỢC NHẮC BỐN LẦN
+
+**Trạng thái: KHÔNG deploy code.** Đây là xác nhận hạ tầng — món nợ "máy chủ không có cron" đã được đóng.
+
+### 1. Chủ dự án thêm 2 entry bằng DẠNG LỆNH ĐÃ SỬA (xem đợt 5)
+```
+/usr/bin/php /home/u310846799/domains/fabrikai.shop/artisan schedule:run
+/usr/bin/php /home/u310846799/domains/fabrikai.shop/artisan queue:work --stop-when-empty --max-time=55 --tries=1 --timeout=900
+```
+
+### 2. Kiểm chứng — hai tệp log MỚI + nhịp tim
+| Bằng chứng | Nội dung |
+|---|---|
+| `~/.logs/cronjob_seKYAPOwkS` (mới) | `2026-09-22 14:10:03 Running [studio-scheduler-heartbeat] ....... 4.13ms DONE` |
+| `~/.logs/cronjob_3pc53LMYT5` (mới) | `2026-09-22 14:10:06 Worker STOPPED Queue empty` |
+| Nhịp tim scheduler | `2026-09-22T07:10:03` — còn **2,98 phút** lúc đo (TTL 30 phút) |
+| `studio_scheduler_alive()` | **TRUE** ⇒ giao diện nay nói ĐÚNG "máy chủ tự làm mới tin", không còn câu "Khi mở màn hình" |
+| Bắt tận mắt tiến trình (quét `ps -ef` mỗi 2 giây) | bắt được **2 lần** (07:11:02 · 07:12:02): `timeout -s 9 1800 /usr/bin/php /home/…/fabrikai.shop/artisan schedule:run` — **không `cd`, không `&&`**, đúng dạng đã sửa |
+
+### 3. Bốn cron job đang có trên tài khoản
+| Mã job | Site | Việc |
+|---|---|---|
+| `seKYAPOwkS` | fabrikai.shop | `schedule:run` (mỗi phút) — **MỚI** |
+| `3pc53LMYT5` | fabrikai.shop | `queue:work` (mỗi 5 phút) — **MỚI** |
+| `bowxjf6Z8d` | fabrikai.shop | `studio:grant-plan-credits` (có từ trước) |
+| `LOUTbDYUog` | maychuan.shop | `schedule:run` (có từ trước) |
+
+### 4. Từ giờ tự chạy (không cần ai mở màn hình)
+| Việc | Nhịp |
+|---|---|
+| Tín hiệu thị trường (đo tin thật) | 30 phút |
+| Nhịp tim scheduler | 5 phút |
+| Dọn storage | 03:00 hằng ngày |
+| Prune tín hiệu thị trường | 03:30 hằng ngày |
+| **Nhắc hạn mẫu vật lý** (việc #4) | **08:00 hằng ngày** |
+| **Job rút bài học** (trí nhớ GĐ2) + render ảnh/video | mỗi 5 phút, khi có job |
+
+### 5. Ghi chú vận hành cho phiên sau
+- **Đừng tìm log ở `storage/logs/scheduler.log`** — Hostinger tự hứng output vào `~/.logs/cronjob_<ID>`.
+  Hai dòng lệnh cũ trong sổ có `>> storage/logs/…` là **sai** và đã bị ghi đè.
+- **Đừng dùng `cd` và `&&`** trong lệnh cron: `timeout` của Hostinger không chạy được lệnh nội bộ shell
+  ⇒ job chết ngay, không tạo log (triệu chứng: có tệp `/tmp/cron_lock_*` mà không có `~/.logs/cronjob_*`).
+- Kiểm tra nhanh cron còn sống: `ls -la ~/.logs/ | grep cronjob` (phải thấy mtime trong vài phút gần đây) và
+  `php artisan tinker --execute="echo cache('studio:scheduler:heartbeat');"`.
+
+### 6. Việc còn lại (không còn nợ cron)
+| # | Nợ | Ai làm |
+|---|---|---|
+| 1 | Gán model cho vai "Agent Studio — Rút kinh nghiệm" | Chủ dự án (Cài đặt → Nhóm công việc) |
+| 2 | Gộp `grant-plan-credits` vào `schedule:run` để một chỗ quản lịch | Chủ dự án (tuỳ) |
+| 3 | Trí nhớ `learned` (agent tự rút quy tắc thủ tục) chưa nối | Việc sau |
+
+---
+
 ## Phiên 2026-09-26 (đợt 5) — ĐÍNH CHÍNH: LỆNH CRON TÔI ĐƯA SAI KHIẾN JOB CHẾT NGAY, VÀ CÁCH ĐÚNG
 
 **Trạng thái: KHÔNG deploy gì (chỉ điều tra + đính chính tài liệu).** Đây là bản sửa cho PHẦN B3 của đợt 4 —
