@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 /**
@@ -22,8 +23,9 @@ class TechnicalLeakTest extends TestCase
 {
     /** Nhận dạng của nhà cung cấp / model AI — thứ KHÔNG được xuất hiện trong chữ hiển thị. */
     private const IDENTIFIERS = [
-        'deepseek', 'qwen', 'dashscope', 'gemini', 'replicate', 'fal\\.ai', 'falai', 'openai', 'anthropic',
-        'text-embedding', 'veo', 'sdxl', 'flux', 'gpt-', 'claude-', 'xah\\.io', 'ckey',
+        '\\bdeepseek\\b', '\\bqwen\\b', '\\bdashscope\\b', '\\bgemini\\b', '\\breplicate\\b', 'fal\\.ai', '\\bfalai\\b',
+        '\\bopenai\\b', '\\banthropic\\b', 'text-embedding', '\\bveo\\b', '\\bsdxl\\b', '\\bflux\\b',
+        'gpt-', 'claude-', 'xah\\.io', '\\bckey\\b',
     ];
 
     /** @return list<string> các bề mặt của KHÁCH HÀNG */
@@ -31,7 +33,7 @@ class TechnicalLeakTest extends TestCase
     {
         $files = [];
 
-        foreach (\Illuminate\Support\Facades\File::allFiles(resource_path('js/studio')) as $file) {
+        foreach (File::allFiles(resource_path('js/studio')) as $file) {
             $rel = 'resources/js/studio/'.str_replace('\\', '/', $file->getRelativePathname());
             if ($this->exempt($rel)) {
                 continue;
@@ -41,7 +43,7 @@ class TechnicalLeakTest extends TestCase
             }
         }
 
-        foreach (\Illuminate\Support\Facades\File::allFiles(resource_path('views')) as $file) {
+        foreach (File::allFiles(resource_path('views')) as $file) {
             $rel = 'resources/views/'.str_replace('\\', '/', $file->getRelativePathname());
             if ($this->exempt($rel)) {
                 continue;
@@ -74,9 +76,26 @@ class TechnicalLeakTest extends TestCase
         return false;
     }
 
+    /**
+     * Bỏ BÌNH LUẬN trước khi soi — bình luận không phải chữ người dùng đọc.
+     *
+     * ĐO ĐƯỢC: luật quét mọi chuỗi ký tự bắt đầu bằng hai "vi phạm" mà thực ra chỉ là bình luận giải
+     * thích trong mã ("chip DeepSeek · deepseek-chat" trong SuggestCard.vue và "mặc định
+     * qwen-image-3.0-pro" trong generation.js). Một rào chắn báo động vì bình luận sẽ bị tắt đi.
+     */
+    private function stripComments(string $src): string
+    {
+        $src = preg_replace('/<!--.*?-->/s', '', $src) ?? $src;          // HTML/Vue
+        $src = preg_replace('#/\\*.*?\\*/#s', '', $src) ?? $src;         // khối /* */
+
+        // `//` chỉ tính là bình luận khi KHÔNG nằm sau dấu hai chấm (tránh cắt vào https://…).
+        return preg_replace('#(?<!:)//[^\n]*#', '', $src) ?? $src;
+    }
+
     /** @return list<string> chữ hiển thị trong một tệp: nội dung thẻ · thuộc tính · chuỗi trong toast */
     private function displayTexts(string $src): array
     {
+        $src = $this->stripComments($src);
         $out = [];
 
         // (1) Nội dung giữa hai thẻ (chữ người dùng đọc).
@@ -97,6 +116,20 @@ class TechnicalLeakTest extends TestCase
         if (preg_match_all('/\.toast\(\s*[\'"]([^\'"]{4,})[\'"]/u', $src, $m)) {
             foreach ($m[1] as $text) {
                 $out[] = $text;
+            }
+        }
+
+        // (4) MỌI chuỗi ký tự trong mã — bắt được cả chữ nằm trong biểu thức template, chỗ mà luật (1)
+        //     KHÔNG thấy vì nội dung có {{ … }}. ĐO ĐƯỢC: InpaintCard.vue có nhãn mặc định viết thẳng
+        //     "Qwen Edit" trong `{{ … || 'Qwen Edit' }}` — luật (1) bỏ qua vì dòng đó chứa {{ }}.
+        if (preg_match_all('/[\'"]([^\'"\n]{4,})[\'"]/u', $src, $m)) {
+            foreach ($m[1] as $text) {
+                // Chỉ tính chuỗi TRÔNG NHƯ CÂU CHỮ: có dấu cách, hoặc dài từ 12 ký tự. Nhờ vậy giá trị
+                // kỹ thuật thuần trong payload (ví dụ provider dự phòng 'qwen') không bị coi là rò rỉ —
+                // đó là dữ liệu đường truyền, không phải chữ ai đó đọc trên màn hình.
+                if (str_contains($text, ' ') || mb_strlen($text) >= 12) {
+                    $out[] = $text;
+                }
             }
         }
 

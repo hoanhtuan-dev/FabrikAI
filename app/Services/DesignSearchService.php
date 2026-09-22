@@ -11,6 +11,7 @@ use App\Models\TechPack;
 use App\Models\User;
 use App\Support\Vocabulary;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -284,7 +285,7 @@ class DesignSearchService
     /** Ghi chi tiết kỹ thuật ra log (chỉ lập trình viên đọc) — KHÔNG đưa vào câu trả lời cho giao diện. */
     private function logFallback(?array $provider): void
     {
-        \Illuminate\Support\Facades\Log::info('studio:search dùng chế độ từ khoá', [
+        Log::info('studio:search dùng chế độ từ khoá', [
             'provider' => $provider['provider'] ?? null,
             'model' => $provider['model'] ?? null,
         ]);
