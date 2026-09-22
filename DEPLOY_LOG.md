@@ -5,6 +5,26 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 35) — Hai nút bên trái ĐỒNG BỘ với khay công cụ bên phải
+
+**Commit:** `0c65d9e`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+| Trước | Sau |
+|---|---|
+| Nút tài khoản là `btn btn-circle` 40px (tròn, không viền) và nút credit là `tool-btn` 40px — đứng lẻ, khác hẳn cụm bên phải | **MỘT khay bên trái** `data-header-account` dùng ĐÚNG bộ lớp của khay phải: `rounded-xl border border-ink-700 bg-ink-800/60 p-1`, mục cao **32px**, có **vạch ngăn** giữa hai nhóm |
+| Avatar 36px trong nút 40px, ring dày | Avatar **24px** trong nút **32px**, ring mảnh — cân với các icon bên phải |
+| Nút credit: icon + số + chevron, cao 40px | Nút credit gọn 32px: icon + số (bỏ chevron thừa) |
+
+**Đo được (§1280):** khay trái `138–253` và khay phải `1073–1264` — **cùng** chiều cao 42px, cùng màu viền,
+cùng nền `ink-800/60`, cùng bo góc 16px. Thứ tự trong khay trái: **tài khoản `148–180` → credit `184–248`**
+(`dungThuTu = true`), avatar `24×24` trong nút `32×32`; tràn ngang 0.
+
+Ghi chú kỹ thuật: mã nguồn xếp khối credit TRƯỚC khối tài khoản, nên thứ tự trong khay do `order-1/2/3` quyết
+định — không phải bê khối mã lớn. `StudioHeaderAndPromptTest` khoá luôn việc hai khay phải dùng cùng bộ lớp.
+
+**1249 test XANH** (9489 assertions). Máy chủ `0c65d9e` khớp local; sao lưu + cache đầy đủ; không lỗi mới.
+
+---
 ## Phiên 2026-09-26 (đợt 34) — Header: avatar tròn đúng chuẩn + TÀI KHOẢN & GÓI·CREDIT chuyển sang TRÁI cạnh FabrikAI
 
 **Commit:** `51311b8`. **Trạng thái: đã commit + push + DEPLOY production.**
