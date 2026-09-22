@@ -5,6 +5,103 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 2) — TRÍ NHỚ THỦ TỤC (`brand_rules`) + VÁ LỖI INJECT khiến trí nhớ dài hạn không tới được prompt
+
+**Commit:** `deac094` (trên `acab2cd`). **Trạng thái: đã commit + push + DEPLOY production** — migration `2026_09_26_000002` đã chạy, cache đã dựng lại, `queue:restart` đã phát tín hiệu.
+
+### 0. Việc được giao
+Lộ trình §3 việc #2: **Procedural Memory** — lấp loại trí nhớ thứ ba còn thiếu ("khi <tình huống> thì <cách làm>").
+
+### 1. ⚠️ LỖI THẬT phát hiện trong lúc kiểm (quan trọng hơn cả tính năng mới)
+
+Trước khi viết dòng nào, tôi kiểm lại **cách container inject** `DesignAgentService` và thấy:
+
+| Tham số | Kết quả đo (`app(DesignAgentService::class)`) |
+|---|---|
+| `gateway` · `dna` · `sources` · `market` | được inject đủ |
+| **`learning` (trí nhớ dài hạn GĐ1)** | **NULL** |
+
+**Nguyên nhân nằm trong chính Laravel** — `Container::resolveClass()` (`vendor/laravel/framework/.../Container.php:1351-1358`):
+
+```php
+// If it has [a default], and no explicit binding exists, we should return it to avoid
+// overriding any of the developer specified defaults for the parameters.
+if ($parameter->isDefaultValueAvailable() && ! $this->bound($className) && ...) {
+    return $parameter->getDefaultValue();
+}
+```
+
+⇒ Khai `?BrandLearningService $learning = null` thì container **LUÔN** truyền `null`. Hệ quả thật:
+`internal_brand_signal.brand_memory` luôn **RỖNG** ⇒ **GĐ1 (trí nhớ dài hạn) chưa từng chạy thật trên
+production** — dù đã deploy, dù 1111 test đều xanh. Bộ test không bắt được vì mọi bài đều gọi
+`BrandLearningService` **TRỰC TIẾP**, không bài nào đi qua đường container.
+
+Đây đúng là lớp lỗi mà cả dự án này đang chống: **thành phần im lặng không chạy**, và lưới an toàn
+(tests) tự nó cũng đi vòng qua chỗ hỏng.
+
+**Đã vá:** bỏ default (đúng quy ước repo đã ghi cho 4 tham số kia) + **bài test đi qua CONTAINER** làm
+lưới chặn tái phát — xem §4.
+
+### 2. Đã làm gì
+| # | Thay đổi | Tệp |
+|---|---|---|
+| 1 | Bảng `brand_rules`: `trigger` · `action` · `weight` · `source` (owner/learned) · `is_active` · `sort` | `database/migrations/2026_09_26_000002_create_brand_rules_table.php` |
+| 2 | `normalizeRows()` THUẦN (bỏ dòng thiếu vế và ĐẾM, khử trùng, chặn trần 20) · `save()` ghi đè ĐÚNG tập hợp đang thấy · `active()` gọn cho prompt | `app/Services/BrandRuleService.php` |
+| 3 | Model + 3 endpoint `/api/brand-rules` (cùng nhóm `auth` với `/brand-dna`) | `app/Models/BrandRule.php` · `app/Http/Controllers/BrandRuleController.php` · `routes/web.php` |
+| 4 | Khối `internal_brand_signal.brand_rules` + chỉ dẫn "coi như CHỈ THỊ, không phải gợi ý" | `app/Services/DesignAgentService.php` |
+| 5 | Việc con thứ 3 **"Quy tắc làm việc"** trong bước DNA shop: thêm/xoá/bật-tắt/mức ưu tiên | `resources/js/studio/components/agents/AgentDnaStep.vue` · `useAgentStudio.js` · `store/actions/agentStudio.js` · `store/state.js` |
+| 6 | `brand-rules` vào `INFRA_PREFIXES` (không thuộc module gói — đổi gói không mất quy tắc) | `tests/Feature/ModuleRegistryTest.php` |
+| 7 | 12 test mới (gồm bài lưới inject) | `tests/Feature/BrandRuleTest.php` |
+
+### 3. Bốn quyết định thiết kế (và lý do)
+1. **Một hàng là một quy tắc, không phải JSON blob** — mỗi quy tắc có thuộc tính riêng (`weight` để
+   xếp hạng khi xung đột, `source` để phân biệt "chủ shop đặt" với "agent rút ra", `is_active` để tắt
+   tạm mà **không mất chữ đã viết**).
+2. **Ghi đè đúng tập hợp ĐANG THẤY** — hàng có `id` thì sửa TẠI CHỖ (giữ `created_at`), hàng mới thì
+   tạo, hàng vắng mặt thì xoá. Giao diện nạp ĐỦ danh sách trước khi sửa nên "không gửi lên" = "người
+   dùng đã xoá"; cách này không xoá oan hàng do đường khác ghi vào mà giao diện chưa từng thấy.
+3. **Bỏ dòng thiếu vế phải NÓI RA** — `save()` trả `dropped`/`truncated`, giao diện toast nói rõ.
+   Im lặng bỏ là ghi đè công sức người ta gõ mà không ai biết.
+4. **Không gộp vào `brand_dna`** — DNA là SỞ THÍCH PHẲNG, quy tắc là QUAN HỆ ĐIỀU KIỆN. Nhét câu
+   "khi công sở thì…" vào một hồ sơ danh sách là tạo dữ liệu mang hình dạng sai, không ai đọc được về sau.
+
+### 4. Khoá bằng test
+| Bài | Khoá điều gì |
+|---|---|
+| `test_rules_and_memory_reach_the_prompt_through_the_container` | ⚠️ **LƯỚI BẮT LỖI INJECT** — đi qua `app(DesignAgentService::class)` và assert CẢ `brand_memory.approved` LẪN `brand_rules` tới được prompt. Bài này ĐỎ nếu ai đó thêm lại `= null`. |
+| `test_anonymous_radar_still_carries_the_memory_keys` | Hợp đồng: hai khối trí nhớ phải CÓ MẶT (rỗng) cả khi chưa đăng nhập |
+| `test_normalize_drops_half_filled_rows_and_counts_them` | Bỏ dòng thiếu vế và ĐẾM lại, không nuốt im lặng |
+| `test_save_updates_in_place_creates_new_and_prunes_the_missing` | Ngữ nghĩa ghi đè: id giữ nguyên, hàng vắng mặt bị xoá |
+| `test_rules_are_scoped_to_the_owner` · `test_api_cannot_read_or_write_another_users_rules` | Quy tắc là CỦA RIÊNG một tài khoản |
+| `test_max_rules_cap_is_enforced_and_reported` | Trần 20 chặn và NÓI RA là đã chặn |
+| `test_active_returns_only_enabled_rules_ordered_by_weight` | Chỉ hàng đang bật, weight cao trước |
+
+**1123 test XANH / 8.211 assertion** (trước đợt này: 1111 / 8.162).
+
+### 5. Kiểm chứng sau deploy
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD | local `deac094` = máy chủ `deac094` (47 file, +1159/−190) |
+| Sao lưu TRƯỚC khi migrate | `~/db-backups/fabrikai-20260922-054641.sql.gz` · 492K · **40 bảng · kết thúc hợp lệ** |
+| Migration | `2026_09_26_000002_create_brand_rules_table` → **Ran [27]** (193,48 ms) |
+| Cache | `config:cache` · `route:cache` · `view:cache` · `queue:restart` → **exit=0** cả bốn |
+| **Container inject (bản vá)** | `learning = BrandLearningService` · `rules = BrandRuleService` — **trước deploy là NULL** |
+| Class mới tự nạp | `BrandRule` · `BrandRuleService` · `BrandRuleController` = **OK** (PSR-4 tự nạp; `dump-autoload` exit=1 vì host chặn `proc_open` — như đã ghi ở các phiên trước) |
+| Cột bảng | `id, user_id, trigger, action, weight, source, is_active, sort, created_at, updated_at` |
+| Route | 3 đường `api/brand-rules` (GET · PUT · DELETE) |
+| HTTP | `/` 200 · `/dang-nhap` 200 · `/agent-studio` 302 (đúng — chưa đăng nhập) |
+| Log | KHÔNG có dòng nào nhắc `BrandRule`/`brand_rules` |
+| Build | `npm run build` OK — `agent-studio` 180 → 187 kB (thêm trình biên tập quy tắc) |
+
+### 6. Nợ còn lại
+| # | Nợ | Vì sao | Ai làm |
+|---|---|---|---|
+| 1 | **Máy chủ vẫn KHÔNG có queue worker** | Như phiên trước: host không có `crontab`, cron do hPanel quản. Ảnh hưởng: job **rút bài học** (GĐ2, phiên trước) vẫn nằm hàng đợi. **Riêng `brand_rules` KHÔNG phụ thuộc worker** — quy tắc do người dùng lưu qua API, có hiệu lực ngay | Chủ dự án: 2 dòng cron hPanel (mục C, phiên 2026-09-21) |
+| 2 | Chưa gán model cho vai "Agent Studio — Rút kinh nghiệm" | Bỏ trống thì rơi về `agent_reason` → `prompt` | Chủ dự án: Cài đặt → Nhóm công việc |
+| 3 | Trí nhớ `learned` (agent tự rút ra quy tắc thủ tục) chưa nối | Cột `source` đã chừa sẵn chỗ phân biệt; đường học sẽ ghi vào đó | Việc sau |
+
+---
+
 ## Phiên 2026-09-26 (Trí nhớ dài hạn GĐ2 — rút "bài học" từ quyết định duyệt/loại ảnh)
 
 **Commit:** `acab2cd` (trên `4a2fca6`). **Trạng thái: đã commit + push + DEPLOY production `fabrikai.shop`** — migration `2026_09_26_000001` đã chạy, cache đã dựng lại.
