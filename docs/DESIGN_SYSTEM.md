@@ -313,7 +313,7 @@ npm run build                 # 4. CSS bán cho khách
 
 | Component | Thay cho |
 |---|---|
-| `StudioIcon.vue` (`icons.json` — **133 icon**, cũng là nguồn cho PHP `App\Support\IconRegistry`) | mọi `<svg>` chép tay, mọi emoji |
+| `StudioIcon.vue` (`icons.json` — **134 icon**, cũng là nguồn cho PHP `App\Support\IconRegistry`) | mọi `<svg>` chép tay, mọi emoji |
 | `LoadingSpinner.vue` (`text · subtext · progress`) | **mọi bộ tiến trình tự chế** (chấm · thanh · phần trăm) |
 | `ConfirmDialog.vue` | popup xác nhận tự viết (đã từng có 3 bản khác nhau) |
 | `BaseModal.vue` | khung modal tự viết |

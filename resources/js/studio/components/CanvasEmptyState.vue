@@ -15,7 +15,7 @@
  * Giữ nguyên: z-0 (dưới layer), hành vi generate, state store hiện có (imagePromptEn · imageRatio ·
  * variantCount · planCostImage · loadTrendRadar).
  */
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
 
@@ -83,6 +83,26 @@ function focusPrompt() {
 function useExample(example) {
   promptText.value = example.text;
   focusPrompt();
+}
+
+/** Thêm một dấu xuống dòng tại vị trí con trỏ — cho máy không có phím Shift+Enter tiện (điện thoại). */
+function insertNewline() {
+  const el = promptEl.value;
+  if (! el) return;
+  const start = el.selectionStart ?? promptText.value.length;
+  const end = el.selectionEnd ?? start;
+  promptText.value = promptText.value.slice(0, start) + '\n' + promptText.value.slice(end);
+  nextTick(() => {
+    el.selectionStart = el.selectionEnd = start + 1;
+    focusPrompt();
+  });
+}
+
+/** Nút "gọi lại canvas trống" trên thanh tiêu đề: mở lại ô mô tả + đặt con trỏ vào. */
+function recallFromHeader() {
+  collapsed.value = false;
+  remember(COLLAPSE_KEY, '0');
+  pickTab('compose');
 }
 
 function generate() {
@@ -259,12 +279,14 @@ function useTrend(trend) {
 }
 
 onMounted(() => {
+  window.addEventListener('fabrikai:recall-empty-prompt', recallFromHeader);
   tab.value = recall(TAB_KEY, 'compose') === 'chat' ? 'chat' : 'compose';
   collapsed.value = recall(COLLAPSE_KEY, '0') === '1';
   // [đợt 26] Tự đặt con trỏ — CHỈ trên thiết bị trỏ mịn: trên điện thoại, focus sẽ bật bàn phím ảo.
   const coarse = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   if (! coarse && ! collapsed.value && tab.value === 'compose') focusPrompt();
 });
+onBeforeUnmount(() => window.removeEventListener('fabrikai:recall-empty-prompt', recallFromHeader));
 </script>
 
 <template>
@@ -280,20 +302,8 @@ onMounted(() => {
     </div>
 
     <div v-else class="mx-auto flex w-full max-w-3xl flex-col gap-3 py-4 sm:py-8">
-      <header class="flex items-center gap-3">
-        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-brand-600/20 text-brand-300">
-          <StudioIcon name="imagePlus" size="h-5 w-5" />
-        </span>
-        <div class="min-w-0 flex-1">
-          <h2 class="font-display text-base font-semibold text-cream-50 sm:text-lg">Tạo ảnh đầu tiên</h2>
-          <p class="mt-0.5 text-body text-cream-400">Mô tả trang phục, phong cách, bối cảnh và ánh sáng.</p>
-        </div>
-        <!-- Thu gọn: ẩn ô mô tả, còn nút gọi lại (yêu cầu 2026-09-26). -->
-        <button type="button" class="icon-btn shrink-0" data-prompt-collapse title="Ẩn ô mô tả" aria-label="Ẩn ô mô tả" @click="toggleCollapse">
-          <StudioIcon name="chevronUp" size="h-4 w-4" />
-        </button>
-      </header>
-
+      <!-- [2026-09-26 · đợt 28] ĐÃ BỎ dòng tiêu đề mào đầu (icon + tựa + phụ đề): màn hình trống chỉ
+           còn đúng việc để làm. Nút thu gọn nay nằm trong hàng tab cho gọn. -->
       <!-- Hai tab: Tạo ảnh · Trò chuyện -->
       <div class="flex items-center gap-1 rounded-xl border border-ink-700 bg-ink-900/80 p-1" role="tablist" aria-label="Chế độ màn hình trống">
         <button type="button" role="tab" :aria-selected="tab === 'compose' ? 'true' : 'false'" data-tab="compose"
@@ -308,19 +318,28 @@ onMounted(() => {
                 @click="pickTab('chat')">
           <StudioIcon name="search" size="h-3.5 w-3.5" /> Trò chuyện
         </button>
+        <!-- Thu gọn: ẩn ô mô tả, còn nút gọi lại (yêu cầu 2026-09-26). -->
+        <button type="button" class="icon-btn !h-8 !w-8 shrink-0" data-prompt-collapse title="Ẩn ô mô tả" aria-label="Ẩn ô mô tả" @click="toggleCollapse">
+          <StudioIcon name="chevronUp" size="h-4 w-4" />
+        </button>
       </div>
 
       <section v-show="tab === 'compose'" class="rounded-2xl border border-ink-700 bg-ink-900/90 p-3 shadow-2xl sm:p-4" aria-label="Mô tả ảnh">
         <label for="canvas-quick-prompt" class="sr-only">Mô tả ảnh cần tạo</label>
-        <textarea
-          id="canvas-quick-prompt"
-          ref="promptEl"
-          v-model="promptText"
-          rows="6"
-          class="input max-h-[38vh] min-h-[7rem] w-full resize-none overflow-y-auto !rounded-xl !py-3 !text-base"
-          placeholder="Ví dụ: Bộ sưu tập linen pastel, nữ văn phòng, ánh sáng mềm, nền studio sáng…"
-          @keydown="onPromptKeydown"
-        ></textarea>
+        <div class="relative">
+          <textarea
+            id="canvas-quick-prompt"
+            ref="promptEl"
+            v-model="promptText"
+            rows="6"
+            class="input max-h-[38vh] min-h-[7rem] w-full resize-none overflow-y-auto !rounded-xl !py-3 !pr-11 !text-base"
+            placeholder="Ví dụ: Bộ sưu tập linen pastel, nữ văn phòng, ánh sáng mềm, nền studio sáng…"
+            @keydown="onPromptKeydown"
+          ></textarea>
+          <button type="button" class="icon-btn absolute bottom-2 right-2 !h-8 !w-8" data-prompt-newline title="Xuống dòng (thêm dòng mới)" aria-label="Xuống dòng" @click="insertNewline">
+            <StudioIcon name="cornerDownLeft" size="h-4 w-4" />
+          </button>
+        </div>
 
         <div class="mt-3 flex flex-wrap items-center gap-2">
           <div class="flex items-center gap-1 rounded-lg bg-ink-800 p-1" role="group" aria-label="Số biến thể">

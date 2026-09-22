@@ -49,6 +49,7 @@ class StudioHeaderAndPromptTest extends TestCase
     {
         $app = $this->app();
 
+        $this->assertStringContainsString('data-prompt-recall-header', $app, 'Thiếu nút gọi lại canvas trống trên thanh tiêu đề.');
         $this->assertStringContainsString('data-account-toggle', $app, 'Thiếu nút mở menu tài khoản.');
         $this->assertStringContainsString('data-account-menu', $app, 'Thiếu menu tài khoản.');
         $this->assertStringContainsString('dropdown dropdown-end', $app, 'Menu tài khoản phải là dropdown của daisyUI.');
@@ -92,6 +93,14 @@ class StudioHeaderAndPromptTest extends TestCase
         $this->assertStringContainsString('max-h-[38vh]', $empty, 'Ô mô tả phải có trần chiều cao.');
         $this->assertStringContainsString('overflow-y-auto', $empty, 'Ô mô tả phải tự cuộn khi mô tả dài.');
         $this->assertStringContainsString('absolute inset-0 z-0', $empty, 'Màn hình trống vẫn phải nằm dưới layer.');
+
+        // [đợt 28] Không còn dòng tiêu đề mào đầu — màn hình trống chỉ còn đúng việc để làm.
+        $this->assertStringNotContainsString('Tạo ảnh đầu tiên', $empty, 'Dòng tiêu đề phải bị xoá.');
+        $this->assertStringNotContainsString('Mô tả trang phục, phong cách, bối cảnh và ánh sáng', $empty, 'Dòng phụ đề phải bị xoá.');
+
+        // Nút xuống dòng cho ô nhập (máy không có Shift+Enter tiện).
+        $this->assertStringContainsString('data-prompt-newline', $empty, 'Thiếu nút xuống dòng.');
+        $this->assertStringContainsString('insertNewline', $empty, 'Thiếu hàm chèn dấu xuống dòng.');
 
         $this->assertStringContainsString('fabrikai:studio:prompt-collapsed', $empty, 'Trạng thái ẩn phải được nhớ (khoá fabrikai:).');
         $this->assertStringContainsString('data-prompt-collapse', $empty, 'Thiếu nút ẩn ô mô tả.');
