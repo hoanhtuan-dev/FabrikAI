@@ -321,6 +321,7 @@ npm run build                 # 4. CSS bán cho khách
 | `CompareSlider.vue` | tự làm trượt so sánh trước/sau |
 | `DockResizer.vue` (+ `useDockResize.js`) | tự làm vách ngăn kéo — dùng chung cho **cả ba** dock |
 | `CanvasEmptyState.vue` | màn hình canvas trống kiểu "một dòng chữ" |
+| `ChatModal.vue` | khung chat tự viết trong từng màn (trước 2026-09-26 là một TAB trong màn hình canvas trống) |
 | `NotificationCenter.vue` | khay thông báo tự chế (từng có 3 kiểu, 3 vị trí, 3 thời lượng) |
 | `SettingsSkeleton.vue` · `SettingsToasts.vue` | khung xương + khay thông báo tự chế ở khu Cài đặt |
 | `StylistSection.vue` | bản sao trình cài đặt Trợ lý thiết kế trong từng app |
@@ -601,6 +602,48 @@ Năm ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
    trông như đã hỏi xong — đó là kiểu nói dối tệ nhất của loại màn hình này.
 5. **Không tự vẽ bộ chấm tiến trình**: dùng `LoadingSpinner.vue` dùng chung (§3). Khung chat chỉ đưa
    CHỮ (nhãn giai đoạn + dòng đang tra) vào đó.
+
+### 6.9 Bảng nhãn — MODAL TRỢ LÝ (2026-09-26)
+
+**Chat nay là MỘT MODAL dùng chung cho cả `/studio`** (`resources/js/studio/components/ChatModal.vue`,
+mở bằng nút «Trợ lý» trên cụm công cụ header · mục trong menu mobile · một lệnh trong bảng lệnh · nút
+phụ «Hỏi trợ lý» ở màn hình canvas trống). Trước đây nó là một TAB trong màn hình canvas trống, và cách
+đó có hai hệ quả THẬT: chat chỉ mở được khi canvas TRỐNG (vừa có ảnh là khung chat biến mất, đúng lúc
+người dùng cần hỏi nhất), và màn hình chỉ để tạo ảnh lại phải mang thêm một thanh tab cùng một trạng
+thái đang-mở-tab nhớ trong `localStorage`.
+
+Bảng dưới đây là phần RIÊNG của modal; mọi nhãn của chính hội thoại (nhãn giai đoạn · số đo · cảnh báo
+· câu "Nguồn để bạn tự kiểm") vẫn theo §6.8 — chúng lấy từ CÙNG hàm dùng chung trong
+`store/actions/agentChat.js`, nên hai khung không thể nói hai kiểu về cùng một lượt trả lời.
+
+| Nhãn hiển thị | Nói với người dùng điều gì | KHÔNG được viết |
+|---|---|---|
+| "Trợ lý thiết kế" (tiêu đề modal) | Tên việc, không phải tên công nghệ | tên model · tên nhà cung cấp · "AI Chat" |
+| "Hỏi thẳng về bộ sưu tập bạn đang làm" (trạng thái rỗng) | Khung này trả lời được việc gì | "Xin chào! Tôi là trợ lý ảo…" (lời chào không nói được gì) |
+| "Trợ lý đọc hồ sơ thương hiệu của shop và tự tra internet khi cần — câu trả lời kèm nguồn bấm được để bạn tự kiểm." | Nói TRƯỚC nguồn gốc câu trả lời để người dùng biết đường kiểm | "câu trả lời chính xác 100%" · "AI thông minh nhất" |
+| Ba câu gợi ý (`CHAT_SUGGESTIONS` — MỘT hằng số ở `store/actions/agentChat.js`) | Mỗi câu một VIỆC khác nhau; bấm là gửi luôn vì gợi ý là câu hỏi HOÀN CHỈNH | câu mẫu chung chung ("Hỏi gì đó đi") · hai danh sách gợi ý ở hai nơi |
+| "Gõ câu hỏi rồi bấm nút gửi — ví dụ: «chất liệu nào đang lên?»" (sau dấu ↳) | Vì sao nút gửi đang bị khoá (§4 luật 4) | "disabled" · "invalid input" |
+| "Đang trả lời…" (khi lượt đó chưa có chữ nào) | Đang chờ việc gì | tên hàm công cụ · tên model |
+| "Đưa vào mô tả ảnh" | Cầu nối "tìm hiểu → làm": ghi câu trả lời vào `store.imagePromptEn` | "Áp dụng" · "Dùng" (không nói rõ đưa vào đâu) |
+| "Đã đưa câu trả lời vào ô mô tả ảnh — bấm «Tạo ảnh» khi bạn đã sửa lại cho vừa ý." | Việc đã xảy ra + bước tiếp theo | "Thành công!" (không có bước tiếp) |
+| "Bạn đã dừng lượt này — phần trả lời ở trên là phần đã nhận được." | Phần chữ đã nhận được GIỮ LẠI, không xoá đi | "Đã huỷ yêu cầu" · mã lỗi |
+| "Chưa trả lời được câu này. Bạn thử hỏi lại sau ít phút." (cho RIÊNG lượt đó) | Việc làm tiếp; lỗi của một lượt không phá cả hội thoại | tên ngoại lệ · chi tiết lỗi máy chủ |
+| "Hỏi trợ lý" (nút ở màn hình canvas trống) | Lối vào modal từ màn tạo ảnh | "Chat" · "Trò chuyện" (tên cũ của tab đã gỡ) |
+
+Bốn ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
+
+1. **MỘT hội thoại, MỘT kho dữ liệu.** Modal KHÔNG giữ bản sao tin nhắn: nó đọc/ghi
+   `store.agentChatMessages` cùng các action `agentChatAsk` · `agentChatStop` · `agentChatReset` của
+   `store/actions/agentChat.js` — đúng chỗ bước «Hỏi đáp» của Agent Studio đang dùng. Hai khung cùng
+   đọc một mảng thì không thể có hai lịch sử lệch nhau; và KHÔNG dựng khung chat thứ hai ở bất kỳ màn nào.
+2. **Khung modal là `BaseModal.vue` dùng chung** (§3): focus trap + Esc + lớp phủ + header 56px có sẵn.
+   Tự dựng lớp phủ là mất focus trap (Tab đi xuyên ra sau lớp phủ) — đúng lớp lỗi mà BaseModal sinh ra để chặn.
+3. **Cờ mở/đóng nằm ở kho dữ liệu (`store.chatOpen`)**, không ở component: ba lối vào (header · menu
+   mobile · canvas trống) ở ba component khác nhau, một biến cục bộ thì hai lối còn lại không mở được.
+   Modal được mount THƯỜNG TRỰC để câu đang gõ dở không mất khi đóng/mở lại.
+4. **Bộ gõ tiếng Việt**: Enter chỉ gửi khi `event.isComposing` là false — chặn Enter trong lúc đang
+   chốt dấu là gõ dấu nào cũng thành gửi. Ô nhập là `textarea` một dòng (không phải `input`) vì quy ước
+   "Shift+Enter xuống dòng" chỉ có nghĩa với `textarea`.
 
 ---
 

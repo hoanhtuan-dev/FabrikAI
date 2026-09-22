@@ -283,8 +283,10 @@ của sổ ở trên: một cái nói lượt này vừa tra gì, một cái nó
 Nguồn bạn đã lưu là **tín hiệu mạnh nhất** trong sổ, và nó được ưu tiên ở CẢ HAI đường:
 
 1. **Khi AI tra lại cùng câu đó** — nguồn đã lưu được trả về TRƯỚC, trước cả nguồn máy tự tìm thấy.
-2. **Trong khối DỮ LIỆU của mọi lượt radar/brief sau** — nguồn đã lưu được xếp trước tin mới lấy từ feed, và
-   trước nguồn AI tra mà bạn chưa lưu.
+2. **Trong khối DỮ LIỆU của mọi lượt radar/brief sau** — nguồn đã lưu được xếp **trước nguồn AI tra mà bạn
+   chưa lưu**, nhưng **sau TIN MÁY CHỦ VỪA LẤY**. Thứ tự này đã ĐỔI ngày 2026-09-26 theo nguyên tắc *"ưu tiên
+   tìm kiếm thực trước"*: model đọc khối dữ liệu từ trên xuống, nên mở đầu bằng bản ghi CŨ là mở đầu bằng thứ
+   dễ lỗi thời nhất (xem §11.5).
 
 Nói cách khác: lưu một nguồn là cách bạn dạy cho agent biết *"nguồn nào đáng tin cho ngành của tôi"* — và nó
 quay lại nuôi chính các lượt chạy sau của bạn. Bỏ lưu (bấm lại) thì nguồn vẫn nằm trong sổ, chỉ mất vị trí ưu tiên.
@@ -495,7 +497,25 @@ bấm kiểm chứng được ngay cả trong lúc câu trả lời còn đang c
 đo (`result.streamed` · `tool_search.reused` · `tool_search.truncated`) rồi mới nói — không tự suy ra, cũng không im
 lặng cho qua.
 
-### 12.7 Khi nào chat trả lời được, khi nào không
+### 12.7 Mở trợ lý ở ĐÂU — nay là một MODAL dùng chung (2026-09-26)
+Trợ lý **không còn là một tab nằm trong màn hình canvas trống** nữa. Lý do: tab đó chỉ mở được khi canvas
+TRỐNG (có ảnh trên canvas là mất lối vào), và nó trộn hai việc khác hẳn nhau vào một thẻ — *mô tả để tạo ảnh*
+và *hỏi đáp có nguồn*. Nay hai việc nằm ở hai chỗ:
+
+| Nơi | Mở bằng cách nào | Dùng để làm gì |
+|---|---|---|
+| **Modal «Trợ lý thiết kế»** | Nút **Trợ lý** (biểu tượng con bot) trong **cụm công cụ ở thanh trên** — mở được **từ bất kỳ lúc nào**, kể cả khi canvas đã có ảnh. Màn hẹp thì nằm trong **menu công cụ**; cũng có một lệnh trong **bảng lệnh** | Hỏi đáp có dẫn nguồn (đọc hồ sơ thương hiệu + tự tra internet), chữ hiện dần, nút **Dừng**, **Hội thoại mới** |
+| **Ô mô tả tạo ảnh** (canvas trống) | Không cần mở gì — hiện sẵn khi canvas trống | Viết mô tả để tạo ảnh; có nút phụ **«Hỏi trợ lý»** mở thẳng modal nếu bạn đang phân vân |
+
+Hai khung — modal ở Studio và bước **Hỏi đáp** trong Agent Studio — dùng **CHUNG một hội thoại** (cùng kho dữ
+liệu), nên không bao giờ có hai lịch sử lệch nhau. Gõ dở một câu rồi đóng modal thì chữ vẫn còn khi mở lại.
+Cầu nối *"tìm hiểu → làm"* vẫn nguyên: mỗi câu trả lời có nút **Đưa vào mô tả ảnh**, ghi **nối thêm** vào ô mô
+tả của Studio (không đè lên chữ bạn đã viết).
+
+**Nhãn của modal được khoá riêng** trong `docs/DESIGN_SYSTEM.md` §6.9 — cùng luật với §6.8: mọi câu hiển thị
+không nêu tên nhà cung cấp AI, tên model, mã HTTP hay chữ "json".
+
+### 12.8 Khi nào chat trả lời được, khi nào không
 | Tình huống | Máy chủ làm gì |
 |---|---|
 | Có model gán cho vai **"Agent Studio — Tìm kiếm nguồn ngoài"** | Dùng ĐÚNG model đó (vai này đã được chọn cho việc tra cứu và biết gọi hàm) — `AgentChatService.php:204-213` |
@@ -505,10 +525,12 @@ lặng cho qua.
 | Gói không có **CollectionBot** | Bị chặn ở BACKEND: **403** kèm `code: module_locked` (ẩn nút trên giao diện không phải là phân quyền) |
 | Chưa đăng nhập | **401** |
 
-> **Điều CHƯA kiểm chứng (2026-09-26):** mục này đọc từ **mã + test chạy tại máy**, KHÔNG phải từ production —
-> tính năng **chưa deploy**. Phiên viết tài liệu này KHÔNG mở trình duyệt (mọi câu về giao diện đọc từ
-> `agentChat.js` + `AgentChatStep.vue`) và KHÔNG gọi endpoint trên fabrikai.shop. Ba con số trần ở §12.3 lấy
-> NGUYÊN từ hằng số trong mã, không phải đo. Riêng **mốc thời gian của giao diện** là số ĐO THẬT: hai tệp tạo
-> lúc **01:00–01:01** và bản build lúc **01:02** ngày 2026-09-23 (`ls -la --time-style=long-iso`).
+> **Trạng thái (cập nhật 2026-09-23 sau khi deploy):** nội dung §12.1–§12.6 đọc từ **mã + test chạy tại máy**.
+> Tính năng **ĐÃ DEPLOY** production (commit `21e173c` · đợt 38) và **ĐÃ ĐO THẬT** trên máy chủ:
+> `php artisan studio:chat-check --live` → mảnh chữ đầu tiên **4.017 ms**, 103 mảnh, `streamed=CÓ`, 2 lượt công cụ,
+> 2 trích dẫn (câu hỏi tin tức); và **6.815 ms / 4 lượt công cụ / 0 kết quả** cho một câu hỏi web chung (nguồn hiện
+> chỉ có tin tức ⇒ trợ lý nói thẳng là chưa tra được). Ba con số trần ở §12.3 lấy NGUYÊN từ hằng số trong mã,
+> KHÔNG phải đo. **Điều vẫn CHƯA kiểm chứng:** chưa ai bấm tay trong trình duyệt (mở modal, xem chữ chảy, bấm
+> Dừng, bấm «Đưa vào mô tả ảnh»).
 
 ---

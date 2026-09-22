@@ -51,6 +51,10 @@ import { useDockResize, DOCK_PRESETS } from './composables/useDockResize.js';
 import CanvasStatusBar from './components/CanvasStatusBar.vue';
 import AuthNotice from './components/AuthNotice.vue';
 import CanvasEmptyState from './components/CanvasEmptyState.vue';
+// [2026-09-26] MODAL TRỢ LÝ — mount MỘT LẦN ở đây (không phải trong từng card): chat phải mở được từ
+// bất kỳ đâu trong /studio. Mount thường trực (component tự ẩn/hiện theo store.chatOpen) để câu đang
+// gõ dở không mất khi đóng modal — cùng lối với ConceptCard bên dưới.
+import ChatModal from './components/ChatModal.vue';
 import NotificationCenter from './components/NotificationCenter.vue';
 // [2026-09-20] Popup xác nhận DÙNG CHUNG — hành động xóa đối tượng đang chọn KẾ THỪA đúng popup
 // của " Dọn toàn bộ canvas?" (trước đây cờ confirmDeleteOpen không có popup nào render ⇒ bấm
@@ -184,6 +188,23 @@ function runToolbarAction(id) {
 
 function isToolbarActionActive(id) {
   return id === 'prompt' ? store.promptOpen : false;
+}
+
+/**
+ * MỞ MODAL TRỢ LÝ từ bất kỳ đâu trong /studio (nút «Trợ lý» ở header · mục trong menu mobile · bảng lệnh).
+ *
+ * Đóng các popover đang mở trước, ĐÚNG lối đang dùng trong file này (xem runToolbarAction): hai lớp phủ
+ * cùng lúc là hai thứ tranh nhau cú bấm, mà lớp phủ trên cùng lại không phải thứ người dùng vừa yêu cầu.
+ *
+ * KHÔNG gọi store.exitCanvasTools() như nhánh promptOpen: câu hỏi hay gặp nhất là hỏi về CHÍNH thứ đang
+ * làm trên canvas (ảnh vừa chọn, layer đang sửa) — thoát công cụ ở đây là xoá mất chỗ đang đứng của họ.
+ */
+function openChat() {
+  store.promptOpen = false;
+  outputOpen.value = false;
+  settingsOpen.value = false;
+  menuOpen.value = false;
+  store.chatOpen = true;
 }
 
 // Owner ẩn đúng mục đang mở ⇒ nhảy về mục hiển thị đầu tiên, tránh panel rỗng không lối thoát.
@@ -652,6 +673,9 @@ const baseCommands = computed(() => ([
   { id: 'prompt', label: 'Mở Prompt Tạo Ảnh', hint: 'prompt', icon: 'sparkles', run: () => runToolbarAction('prompt') },
   { id: 'stylist', label: 'Mở Agent thiết kế', hint: 'stylist', icon: 'bot', run: () => runToolbarAction('stylist') },
   { id: 'source', label: 'Mở Nguồn ảnh', hint: 'source', icon: 'imagePlus', run: () => { store.sourcePickerOpen = true; } },
+  // [2026-09-26] Trợ lý cũng phải mở được từ bảng lệnh: nó là modal dùng chung cả /studio, mà bảng lệnh
+  // là chỗ người dùng quen tìm mọi việc — thiếu ở đây là một lối vào nữa bị bỏ sót.
+  { id: 'chat', label: 'Mở Trợ lý (hỏi đáp & tra nguồn)', hint: 'chat', icon: 'bot', run: () => openChat() },
   // [đợt 27] Mọi lối vào cài đặt đi qua /cai-dat — trang hợp nhất ba khu (khu chỉ owner do máy chủ tự ẩn).
     { id: 'settings', label: 'Mở Cài đặt & quản trị', hint: 'settings', icon: 'gear', run: () => { window.location.href = '/cai-dat'; } },
   { id: 'presets', label: 'Mở Prompt Templates', hint: 'presets', icon: 'template', run: () => { window.location.href = '/presets'; } },
@@ -1075,6 +1099,13 @@ function onTouchEnd(e) {
           <button type="button" class="icon-btn !h-8 !w-8" data-header-action="outputs" data-dock-toggle="outputs" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách ảnh đã tạo" aria-label="Outputs" @click="store.toggleOutputDock()">
             <StudioIcon name="grid" size="h-4 w-4" />
             <span v-if="store.generations.length" class="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-micro font-bold leading-none text-primary-content">{{ store.generations.length }}</span>
+          </button>
+          <!-- [2026-09-26] TRỢ LÝ — nằm trong ĐÚNG cụm công cụ này (không phải chỗ khác): đây là nhóm
+               việc «mở một bảng/phòng làm việc», và thứ tự đã chốt của bốn nút kia không đổi.
+               Chat trước đây là một tab trong màn hình canvas trống ⇒ chỉ hỏi được khi canvas trống;
+               nay mở được ở mọi lúc, kể cả khi đang có ảnh trên canvas. -->
+          <button type="button" class="icon-btn !h-8 !w-8" data-header-action="chat" title="Trợ lý — hỏi đáp &amp; tra nguồn" aria-label="Trợ lý" @click="openChat()">
+            <StudioIcon name="bot" size="h-4 w-4" />
           </button>
         </div>
 
@@ -1737,6 +1768,11 @@ function onTouchEnd(e) {
           <button @click="menuOpen = false; goLibrary()" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors bg-ink-800 text-cream-300" title="Thư viện — xem ảnh đã tạo & file tải lên">
             <StudioIcon name="library" size="h-4 w-4" /> Thư viện
           </button>
+          <!-- [2026-09-26] Trợ lý: màn hẹp KHÔNG có cụm công cụ ở header (cụm đó ẩn dưới lg) nên nếu
+               thiếu mục này thì người dùng điện thoại không có lối nào mở modal chat. -->
+          <button @click="openChat()" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors" :class="store.chatOpen ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-300'" title="Trợ lý — hỏi đáp & tra nguồn">
+            <StudioIcon name="bot" size="h-4 w-4" /> Trợ lý
+          </button>
           <!-- [Yêu cầu 2026-09-17] Trên desktop là nút Cài đặt ở góc trái dưới; mobile phải có lối vào tương đương. -->
           <a v-if="settingsEntry" href="/presets" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-label font-semibold text-cream-300 transition-colors" :title="settingsEntry.label + ' — preset prompt của bạn'">
             <StudioIcon :name="settingsEntry.icon" size="h-4 w-4" /> {{ settingsEntry.label }}
@@ -1796,6 +1832,10 @@ function onTouchEnd(e) {
         </div>
       </div>
     </div>
+    <!-- ChatModal: MODAL TRỢ LÝ — mount thường trực (tự ẩn/hiện theo store.chatOpen) để câu đang gõ
+         dở và lịch sử hội thoại không mất khi đóng/mở lại. Mở được từ nút «Trợ lý» ở header, từ mục
+         trong menu mobile, từ bảng lệnh, và từ nút phụ ở màn hình canvas trống. -->
+    <ChatModal />
     <ConceptCard v-if="conceptPromptOpened" popup />
     <!-- [2026-09-25] Agent Studio KHÔNG còn mount ở đây: nó là trang riêng /agent-studio
          (AgentStudioApp.vue + agent-studio.js). Nút «Agent thiết kế» trên activity bar điều

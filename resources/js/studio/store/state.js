@@ -322,6 +322,15 @@ export function studioState() {
     suggestLibSelection: [],   // danh sách id đang được chọn (checkbox)
     suggestLibManage: false,   // bật chế độ quản lý (chọn/xóa hàng loạt)
     promptOpen: false,
+    /**
+     * MODAL TRỢ LÝ (chat hỏi đáp) — cờ MỞ/ĐÓNG nằm ở kho dữ liệu chứ không ở component, vì modal này
+     * phải mở được TỪ BẤT KỲ ĐÂU trong /studio: nút «Trợ lý» trên cụm công cụ header, mục trong menu
+     * mobile, nút phụ ở canvas trống. Ba lối vào ở ba component khác nhau — một biến cục bộ trong một
+     * component thì hai lối còn lại không mở được nó.
+     * [2026-09-26] Trước đây chat là một TAB trong màn hình canvas trống, chỉ hỏi được khi canvas trống;
+     * nay là modal dùng chung — xem components/ChatModal.vue.
+     */
+    chatOpen: false,
     // Agent thiết kế hợp nhất: TrendRadar → CollectionBot → Canvas.
     designAgentOpen: false,
     designAgentTab: 'trend',   // tương thích cũ: trend | collection

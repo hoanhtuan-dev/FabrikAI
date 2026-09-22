@@ -17,10 +17,12 @@ import { CSRF } from '../store/helpers.js';
 // Đọc bảng dán từ Excel nằm ở MODULE RIÊNG để kiểm được bằng máy (scripts/check-shop-paste.mjs) —
 // logic tiền nằm trong file .vue thì không test nào chạm tới, và đó đúng là cách lỗi cũ lọt qua.
 import { parseShopRows } from '../shopPaste.js';
-// Câu chữ của khung chat (cảnh báo lượt vừa rồi + dòng số đo) là HÀM DÙNG CHUNG: tab «Trò chuyện» ở
-// màn hình canvas trống (components/CanvasEmptyState.vue) cũng đọc đúng hai hàm này ⇒ hai màn không
-// thể nói hai kiểu về CÙNG một lượt trả lời.
-import { agentChatNotes, agentChatMetaLine } from '../store/actions/agentChat.js';
+// Câu chữ của khung chat (cảnh báo lượt vừa rồi + dòng số đo) VÀ ba câu gợi ý là HẰNG/HÀM DÙNG CHUNG:
+// MODAL TRỢ LÝ mở từ bất kỳ đâu trong /studio (components/ChatModal.vue) cũng đọc đúng ba thứ này ⇒
+// hai màn không thể nói hai kiểu về CÙNG một lượt trả lời, và danh sách gợi ý không có bản sao thứ hai.
+// [2026-09-26] CHAT_SUGGESTIONS chuyển từ file này về kho dữ liệu chat — lý do đầy đủ ở khối chú thích
+// của hằng số đó trong store/actions/agentChat.js.
+import { agentChatNotes, agentChatMetaLine, CHAT_SUGGESTIONS } from '../store/actions/agentChat.js';
 
 export function useAgentStudio() {
   const store = useStudioStore();
@@ -1657,22 +1659,15 @@ export function useAgentStudio() {
   const chatError = computed(() => store.agentChatError || '');
   const chatLastMeta = computed(() => store.agentChatLastMeta || null);
 
-  /**
-   * BA CÂU GỢI Ý cho trạng thái RỖNG — mỗi câu một VIỆC khác nhau (chất liệu · thị trường · nhịp xưởng),
-   * không phải ba cách hỏi cùng một thứ. Ô chat trống mà không có gợi ý thì người mới chỉ thấy một khung
-   * trắng và tự hỏi "hỏi được gì ở đây".
-   */
-  const CHAT_SUGGESTIONS = [
-    { text: 'Vải linen 60 độ có co nhiều không?', why: 'Kiểm chất liệu trước khi chốt đơn vải' },
-    { text: 'Mùa này khách miền Nam chuộng màu gì?', why: 'Đối chiếu hướng màu với tin thị trường' },
-    { text: 'Lô 30 cái mỗi mã thì xưởng bao lâu ra hàng?', why: 'Kiểm nhịp sản xuất trước khi hứa với khách' },
-  ];
+  // BA CÂU GỢI Ý cho trạng thái RỖNG nay là HẰNG SỐ DÙNG CHUNG — import ở đầu file, không khai lại ở
+  // đây. [2026-09-26] Lý do: ChatModal.vue (modal trợ lý dùng chung cả /studio) cũng hiện đúng ba câu
+  // này; hai danh sách là hai chỗ để lệch nhau, thêm một câu ở một bên thì bên kia vẫn hiện bản cũ.
 
   /**
    * CẢNH BÁO + SỐ ĐO của lượt vừa rồi — nay gọi HÀM DÙNG CHUNG ở store/actions/agentChat.js.
    *
-   * Vì sao không viết thẳng ở đây nữa: CÙNG hội thoại này còn được tab «Trò chuyện» ở màn hình canvas
-   * trống đọc. Hai bản câu chữ là hai bản sẽ lệch nhau; lý do đầy đủ nằm ở khối chú thích của hai hàm.
+   * Vì sao không viết thẳng ở đây nữa: CÙNG hội thoại này còn được MODAL TRỢ LÝ (components/ChatModal.vue)
+   * đọc. Hai bản câu chữ là hai bản sẽ lệch nhau; lý do đầy đủ nằm ở khối chú thích của hai hàm.
    */
   const chatNotes = computed(() => agentChatNotes(chatLastMeta.value));
   const chatMetaLine = computed(() => agentChatMetaLine(chatLastMeta.value));

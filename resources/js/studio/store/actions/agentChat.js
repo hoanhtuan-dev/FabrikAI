@@ -302,14 +302,32 @@ export const agentChatActions = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
-// HAI CÂU HIỂN THỊ DỰNG TỪ SỐ ĐO CỦA MÁY CHỦ — dùng CHUNG cho MỌI khung chat.
+// GỢI Ý + HAI CÂU HIỂN THỊ DỰNG TỪ SỐ ĐO CỦA MÁY CHỦ — dùng CHUNG cho MỌI khung chat.
 //
 // Vì sao để ở đây thay vì viết trong từng component: CÙNG một hội thoại nay có HAI khung đọc nó —
-// bước «Hỏi đáp» của Agent Studio (components/agents/AgentChatStep.vue) và tab «Trò chuyện» ở màn
-// hình canvas trống (components/CanvasEmptyState.vue). Chép câu chữ sang nơi thứ hai là mở đường cho
-// hai màn nói hai kiểu về CÙNG một lượt trả lời, rồi lần sau ai sửa một bên thì bên kia lệch mà
-// không ai biết. Nhãn đã ghi ở docs/DESIGN_SYSTEM.md §6.8 — sửa chữ ở đây thì sửa cả bảng đó.
+// bước «Hỏi đáp» của Agent Studio (components/agents/AgentChatStep.vue) và MODAL TRỢ LÝ mở được từ
+// bất kỳ đâu trong /studio (components/ChatModal.vue, thay cho tab «Trò chuyện» ở canvas trống đã gỡ
+// ngày 2026-09-26). Chép câu chữ sang nơi thứ hai là mở đường cho hai màn nói hai kiểu về CÙNG một
+// lượt trả lời, rồi lần sau ai sửa một bên thì bên kia lệch mà không ai biết. Nhãn đã ghi ở
+// docs/DESIGN_SYSTEM.md §6.8 và §6.9 — sửa chữ ở đây thì sửa cả hai bảng đó.
 // ═══════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * BA CÂU GỢI Ý cho trạng thái RỖNG — mỗi câu một VIỆC khác nhau (chất liệu · thị trường · nhịp xưởng),
+ * không phải ba cách hỏi cùng một thứ. Ô chat trống mà không có gợi ý thì người mới chỉ thấy một khung
+ * trắng và tự hỏi "hỏi được gì ở đây".
+ *
+ * [2026-09-26] CHUYỂN TỪ composables/useAgentStudio.js VỀ ĐÂY. Lý do: từ khi chat thành MODAL dùng
+ * chung, CÙNG danh sách này được hai nơi đọc — bước «Hỏi đáp» của Agent Studio (qua provide) và
+ * ChatModal.vue (import thẳng). Hai danh sách gợi ý là hai chỗ để lệch nhau: thêm một câu ở một bên
+ * thì bên kia vẫn hiện danh sách cũ, mà người dùng thì gặp cả hai. Nay chỉ còn MỘT hằng số, và
+ * useAgentStudio.js IMPORT chính nó — không chép lại.
+ */
+export const CHAT_SUGGESTIONS = [
+  { text: 'Vải linen 60 độ có co nhiều không?', why: 'Kiểm chất liệu trước khi chốt đơn vải' },
+  { text: 'Mùa này khách miền Nam chuộng màu gì?', why: 'Đối chiếu hướng màu với tin thị trường' },
+  { text: 'Lô 30 cái mỗi mã thì xưởng bao lâu ra hàng?', why: 'Kiểm nhịp sản xuất trước khi hứa với khách' },
+];
 
 /**
  * CẢNH BÁO CỦA LƯỢT VỪA RỒI — dựng từ SỐ ĐO máy chủ trả về, câu chữ nói đúng chuyện đã xảy ra:

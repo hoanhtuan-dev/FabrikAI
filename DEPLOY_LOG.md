@@ -5,6 +5,44 @@
 
 ---
 
+## Phiên 2026-09-23 (đợt 41) — TÁCH CHAT KHỎI CANVAS TRỐNG THÀNH MODAL «TRỢ LÝ THIẾT KẾ» (Material, tối giản)
+
+**Commit:** `<?>`. **Trạng thái: đã push + deploy.**
+
+### 1. Vì sao tách
+Hai việc khác hẳn nhau nằm chung một thẻ ở màn hình canvas trống: **mô tả để tạo ảnh** và **hỏi đáp có nguồn**.
+Hệ quả đo được: tab chat **chỉ mở được khi canvas TRỐNG** — có một ảnh trên canvas là mất luôn lối vào trợ lý,
+trong khi câu hỏi kiểu "chất liệu này có hợp không" lại nảy ra ĐÚNG LÚC đang có ảnh trên canvas.
+
+### 2. Đã làm
+
+| Việc | Chi tiết | File |
+|---|---|---|
+| Modal chat mới | `ChatModal.vue` — dựng trên **BaseModal** dùng chung (`wide`, `height="min(80vh, 720px)"`; giữ focus trap + Esc + scrim), thân chia ba tầng: dải đầu · danh sách tin (cuộn) · thanh soạn tin cố định dưới. Material + tối giản: tin người dùng = bong bóng đặc dồn phải; tin trợ lý = **chữ trần** + chấm tròn `bot`; nguồn là link thật `target="_blank" rel="noopener"`; ô nhập bo tròn + nút gửi hình tròn (`cornerDownLeft`), đang trả lời thì thành **Dừng** (`ban`) | `resources/js/studio/components/ChatModal.vue` (mới) |
+| Mở từ bất kỳ đâu | Nút `data-header-action="chat"` trong **cụm công cụ ở thanh trên** + mục «Trợ lý» trong **menu mobile** + một lệnh trong **bảng lệnh**; `openChat()` đóng các popover khác trước khi mở | `StudioApp.vue` · `store/state.js` (`chatOpen`) |
+| Canvas trống chỉ còn tạo ảnh | Bỏ HẲN tab Trò chuyện: xoá thanh tab, `TAB_KEY`, toàn bộ state/hàm chat; giữ nguyên ô mô tả (cuộn · ẩn/gọi lại · gợi ý nhanh · Tạo ảnh · Bảng đầy đủ) + MỘT nút phụ `data-chat-open` «Hỏi trợ lý». Tệp **448 → 192 dòng** | `CanvasEmptyState.vue` |
+| MỘT nguồn gợi ý | `CHAT_SUGGESTIONS` chuyển về kho dữ liệu chat, cả hai khung (modal ở Studio + bước «Hỏi đáp» ở Agent Studio) import chung | `store/actions/agentChat.js` · `useAgentStudio.js` |
+| Chặn phím tắt lọt qua lớp phủ | `store.chatOpen` vào `toolBusy()` — modal có ô nhập chữ, thiếu dòng này thì gõ s/n/a/r ngoài ô nhập sẽ kích hoạt phím tắt duyệt mẫu ở phía sau | `CollectionsCard.vue` |
+| Test viết lại, KHÔNG nới lỏng | `test_the_chat_tab_is_a_real_streamed_chat_with_checkable_sources` → `test_the_chat_is_a_shared_modal_and_the_empty_canvas_only_composes_images`, kèm khối "ĐỔI CHÍNH SÁCH 2026-09-26" + 5 nhóm khẳng định (canvas trống không còn chat · modal tồn tại và dùng BaseModal · nút header + `openChat()` · một nguồn gợi ý · cấm dấu vết đường trả lời giả ở CẢ HAI file) | `tests/Feature/StudioHeaderAndPromptTest.php` |
+| Nhãn | §3 thêm `ChatModal.vue` vào danh sách component dùng chung; **§6.9** mới — bảng nhãn của modal (12 hàng) theo đúng khuôn §6.8 | `docs/DESIGN_SYSTEM.md` |
+| Hướng dẫn người dùng | **§12.7** mới: "Mở trợ lý ở ĐÂU" (bảng hai lối vào) + nói rõ hai khung dùng CHUNG một hội thoại; sửa lại ghi chú trạng thái §12 (trước đó ghi "chưa deploy" — nay đã deploy + đã đo); **sửa drift §11.2**: khối DỮ LIỆU nay xếp TIN VỪA LẤY trước nguồn đã lưu (đổi từ đợt 39, tài liệu còn nói ngược) | `HUONG_DAN_TINH_NANG_MOI.md` |
+
+### 3. Kiểm chứng
+
+`vendor/bin/phpunit --no-coverage` ⇒ **OK (1273 tests, 9705 assertions)** · `npm run build` xanh.
+Bundle: `main-*.js` có `data-header-action":"chat"`, `data-chat-log/send/stop/reset/suggestion`, `data-use-answer`, `data-chat-open`, chuỗi «Trợ lý thiết kế»; `pageBoot-*.js` (chunk dùng chung của kho dữ liệu) có `chatOpen` + `CHAT_SUGGESTIONS`.
+
+### 4. Nợ còn lại — nói thẳng
+
+| # | Việc |
+|---|---|
+| 1 | **Chưa bấm tay trong trình duyệt**: bố cục thật của thân modal trong `height` của BaseModal, vị trí thanh soạn tin, focus trả về nút «Trợ lý» sau khi đóng, giao diện trên màn hẹp + theme Sáng/Tối — đều chưa xem bằng mắt |
+| 2 | Chưa thử luồng chat thật qua modal (gửi → chữ chảy → trích dẫn → Dừng → Hội thoại mới) trên trình duyệt; mới khoá bằng test tĩnh + build |
+| 3 | Bộ gõ tiếng Việt trên thiết bị thật (chỉ khoá bằng sự hiện diện của `isComposing`) |
+
+
+---
+
 ## Phiên 2026-09-23 (đợt 40) — DÙNG ĐỊA CHỈ WEB BÌNH THƯỜNG THAY VÌ RSS: làm được, nhưng ĐO RA thì chỉ đáng tin ở một số site
 
 **Commit:** `<?>` (một commit: loại nguồn `page` + lệnh thử + tài liệu). **Trạng thái: đã push + deploy; CHƯA khai nguồn `page` nào trên production — cố ý.**

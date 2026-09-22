@@ -290,7 +290,11 @@ function typingIn(el) {
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
 }
 function toolBusy() {
-  return !!(store.viewer || store.promptOpen || store.planOpen || store.sourcePickerOpen
+  // [2026-09-26] Thêm chatOpen: MODAL TRỢ LÝ cũng là một lớp phủ toàn màn hình, và nó CÓ ô nhập chữ.
+  // Thiếu nó ở đây thì gõ "s"/"n"/"a"/"r" trong lúc con trỏ không nằm trong ô nhập (vd đang Tab qua các
+  // liên kết nguồn) sẽ kích hoạt phím tắt duyệt mẫu Ở PHÍA SAU lớp phủ — đúng lớp lỗi mà danh sách này
+  // sinh ra để chặn (promptOpen đã nằm trong danh sách vì cùng lý do).
+  return !!(store.viewer || store.promptOpen || store.chatOpen || store.planOpen || store.sourcePickerOpen
     || store.confirmDeleteOpen || store.confirmClearCanvasOpen || store.reframeOpen || store.filmOpen
     || store.cropMode || store.inpaintMaskMode !== 'none' || store.drawMode || store.eraseMode
     || store.selectTool || store.panMode);

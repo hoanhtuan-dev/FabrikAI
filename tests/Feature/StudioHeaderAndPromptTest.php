@@ -10,8 +10,10 @@ use Tests\TestCase;
  * Ba yêu cầu của chủ dự án, khoá lại thành bất biến:
  *   1. header theo chuẩn daisyUI (navbar + hai nhóm start/end),
  *   2. mọi việc thuộc TÀI KHOẢN nằm trong MỘT menu (nút Cài đặt riêng đã bỏ, Đăng xuất gộp vào),
- *   3. ô mô tả ở màn hình trống cuộn được · ẩn được · gọi lại được, và có TAB TRÒ CHUYỆN lấy dữ liệu
- *      thật (TrendRadar của shop + kho thiết kế cũ) chứ không bịa câu trả lời.
+ *   3. ô mô tả ở màn hình trống cuộn được · ẩn được · gọi lại được.
+ *
+ * [ĐỔI CHÍNH SÁCH 2026-09-26] Điểm 3 TRƯỚC ĐÂY còn kèm "và có TAB TRÒ CHUYỆN lấy dữ liệu thật". Tab đó
+ * đã GỠ: chat nay là MODAL DÙNG CHUNG mở được từ bất kỳ đâu trong /studio (xem bài 5 bên dưới).
  */
 class StudioHeaderAndPromptTest extends TestCase
 {
@@ -133,45 +135,105 @@ class StudioHeaderAndPromptTest extends TestCase
     }
 
     /**
-     * 5. Tab Trò chuyện: CHAT THẬT theo luồng, có nguồn để tự kiểm, KHÔNG bịa.
+     * 5. [ĐỔI CHÍNH SÁCH 2026-09-26] Chat TÁCH khỏi màn hình canvas trống thành MODAL DÙNG CHUNG.
      *
-     * [ĐỔI CHÍNH SÁCH 2026-09-26 — đọc trước khi "khôi phục" những khẳng định cũ]
-     * Bài này TRƯỚC ĐÂY khoá điều NGƯỢC LẠI: nó bắt tab Trò chuyện phải có `loadTrendRadar` +
-     * `/api/design-search` và phải hiện câu "Không thấy mục nào khớp đúng …". Đó là mô tả của một đường
-     * trả lời do TRÌNH DUYỆT ghép: tách từ khoá từ câu hỏi, chấm điểm khớp trên tín hiệu radar, rồi ghép
-     * câu trả lời từ dữ liệu đã có. Người dùng đọc khung mang tên "Trò chuyện" và TƯỞNG đang hỏi AI.
-     * Nay tab đó gọi endpoint chat thật của Agent Studio (NDJSON, chữ chảy từng mảnh, công cụ web dùng
-     * chung với radar/brief). Hai khẳng định cũ đã bị GỠ cùng đường ghép giả — giữ chúng lại là bắt sản
-     * phẩm phải có lại chỗ nói dối người dùng.
+     * [ĐỔI CHÍNH SÁCH 2026-09-26 — ĐỌC KHỐI NÀY TRƯỚC KHI "KHÔI PHỤC LẠI" NHỮNG KHẲNG ĐỊNH CŨ]
+     * Bài này TRƯỚC ĐÂY khoá điều NGƯỢC LẠI: nó bắt màn hình canvas trống phải có `data-tab="chat"`,
+     * phải gọi `store.agentChatAsk(`, phải có `rel="noopener"` và `data-use-answer` — tức là bắt chat
+     * phải SỐNG TRONG màn hình đó. Cách đó có hai hệ quả THẬT, không phải chuyện thẩm mỹ:
+     *   · CHỖ SAI — chat chỉ mở được khi canvas TRỐNG: vừa có ảnh trên canvas là khung chat biến mất,
+     *     đúng lúc người dùng cần hỏi nhất;
+     *   · TRỘN VIỆC — một màn hình chỉ để TẠO ẢNH lại mang thêm một thanh tab và một trạng thái
+     *     đang-mở-tab phải nhớ trong localStorage; bấm nhầm tab là mất chỗ đang gõ.
+     * Chủ dự án yêu cầu tách ra: canvas trống GIỮ ô mô tả tạo ảnh, chat thành MODAL thực thụ mở được TỪ
+     * BẤT KỲ ĐÂU trong /studio. Bốn khẳng định dưới đây khoá ĐÚNG hành vi mới — chúng KHÔNG yếu hơn bộ
+     * cũ: chat vẫn phải là chat THẬT theo luồng (action dùng chung, nguồn bấm được, có đường DỪNG), chỉ
+     * khác là nó nằm ở một khung dùng chung thay vì nằm trong một tab.
+     *
+     * Đường trả lời GIẢ ở trình duyệt (tách từ khoá → chấm điểm khớp → ghép câu) vẫn bị cấm y như trước,
+     * và nay cấm ở CẢ HAI file: còn sót một đường thứ hai là còn hai câu trả lời có thể mâu thuẫn.
      */
-    public function test_the_chat_tab_is_a_real_streamed_chat_with_checkable_sources(): void
+    public function test_the_chat_is_a_shared_modal_and_the_empty_canvas_only_composes_images(): void
     {
         $empty = $this->empty();
+        $modal = (string) file_get_contents(resource_path('js/studio/components/ChatModal.vue'));
 
-        $this->assertStringContainsString('data-tab="chat"', $empty, 'Thiếu tab Trò chuyện.');
-        $this->assertStringContainsString('data-tab="compose"', $empty, 'Thiếu tab Tạo ảnh.');
-
-        // (1) Hỏi bằng LỜI tới endpoint chat thật, qua action dùng chung với bước «Hỏi đáp» của Agent Studio.
-        $this->assertStringContainsString('store.agentChatAsk(', $empty,
-            'Tab Trò chuyện phải hỏi trợ lý thật (action dùng chung), không được tự ghép câu trả lời ở trình duyệt.'
-        );
-        $this->assertStringContainsString('store.agentChatStreaming', $empty, 'Phải đọc trạng thái đang trả lời từ kho dữ liệu.');
-        $this->assertStringContainsString('store.agentChatStop()', $empty, 'Đang trả lời thì phải có đường DỪNG.');
-        $this->assertStringContainsString('data-chat-suggestion', $empty, 'Thiếu câu hỏi gợi ý.');
-
-        // (2) Nguồn là LINK THẬT — không bấm được thì người dùng không kiểm chứng được gì.
-        $this->assertStringContainsString('Nguồn để bạn tự kiểm', $empty, 'Thiếu khối trích dẫn.');
-        $this->assertStringContainsString('rel="noopener"', $empty, 'Link nguồn phải mở tab mới an toàn.');
-
-        // (3) Cầu nối "tìm hiểu → làm" vẫn phải còn: đưa CÂU TRẢ LỜI vào ô mô tả tạo ảnh.
-        $this->assertStringContainsString('data-use-answer', $empty, 'Thiếu nút đưa câu trả lời vào ô mô tả ảnh.');
-        $this->assertStringContainsString('useAnswer(', $empty, 'Nút cầu nối phải có hàm thật đứng sau.');
-
-        // (4) Đường ghép câu trả lời ở TRÌNH DUYỆT đã bị gỡ HẲN — còn sót là còn hai câu trả lời mâu thuẫn.
-        foreach (['matchScore', 'loadTrendRadar', '/api/design-search', 'Không thấy mục nào khớp đúng'] as $gone) {
+        // ── (a) MÀN HÌNH CANVAS TRỐNG: KHÔNG còn chat, nhưng PHẢI có đường mở modal ──
+        foreach (['store.agentChatAsk', 'agentChatStop', 'Nguồn để bạn tự kiểm', 'data-tab', 'data-chat-suggestion'] as $gone) {
             $this->assertStringNotContainsString($gone, $empty,
-                'Tab Trò chuyện còn sót đường trả lời giả ở trình duyệt: '.$gone
+                'Màn hình canvas trống còn sót chat ('.$gone.') — chat đã tách thành MODAL dùng chung, và hai '
+                .'khung chat là hai lịch sử mà người dùng không biết tin bản nào.'
             );
+        }
+        $this->assertStringContainsString('store.chatOpen = true', $empty,
+            'Canvas trống phải có nút mở MODAL trợ lý — nếu không thì người đang đứng ở màn này không có lối tới trợ lý.'
+        );
+        $this->assertStringContainsString('data-chat-open', $empty, 'Thiếu dấu nhận diện cho nút mở modal.');
+        // Phần TẠO ẢNH phải còn nguyên — đây mới là việc của màn hình này.
+        $this->assertStringContainsString('canvas-quick-prompt', $empty, 'Canvas trống phải giữ ô mô tả tạo ảnh.');
+        $this->assertStringContainsString('store.generateImage()', $empty, 'Canvas trống phải vẫn tạo ảnh được.');
+
+        // ── (b) MODAL TRỢ LÝ: có thật, dùng BaseModal dùng chung, và là chat THẬT theo luồng ──
+        $this->assertFileExists(resource_path('js/studio/components/ChatModal.vue'),
+            'Thiếu components/ChatModal.vue — modal trợ lý dùng chung cho cả /studio.');
+        $this->assertStringContainsString("import BaseModal from './BaseModal.vue'", $modal,
+            'Modal chat phải dùng BaseModal dùng chung (focus trap + Esc + lớp phủ), KHÔNG tự dựng lớp phủ.'
+        );
+        $this->assertStringContainsString('<BaseModal', $modal, 'Modal chat phải render bằng BaseModal.');
+        $this->assertStringContainsString('title="Trợ lý thiết kế"', $modal, 'Thiếu tiêu đề modal.');
+        $this->assertStringContainsString('height="min(80vh, 720px)"', $modal,
+            'Chiều cao modal phải chốt bằng prop height của BaseModal (header cố định + danh sách tin tự cuộn).'
+        );
+        $this->assertStringContainsString('store.agentChatAsk(', $modal,
+            'Modal chat phải hỏi trợ lý qua action dùng chung với bước «Hỏi đáp» của Agent Studio.'
+        );
+        $this->assertStringContainsString('agentChatStop', $modal, 'Đang trả lời thì phải có đường DỪNG.');
+        $this->assertStringContainsString('store.agentChatReset()', $modal, 'Thiếu đường mở hội thoại mới.');
+        $this->assertStringContainsString('agentChatNotes(', $modal,
+            'Cảnh báo của lượt vừa rồi phải lấy từ HÀM DÙNG CHUNG, không chép câu chữ sang bản thứ hai.'
+        );
+        $this->assertStringContainsString('agentChatMetaLine(', $modal, 'Dòng số đo phải lấy từ HÀM DÙNG CHUNG.');
+        $this->assertStringContainsString('isComposing', $modal,
+            'Phải tôn trọng bộ gõ tiếng Việt: Enter để CHỐT DẤU không được biến thành Enter để gửi.'
+        );
+
+        // Nguồn là LINK THẬT — không bấm được thì người dùng không kiểm chứng được gì.
+        $this->assertStringContainsString('rel="noopener"', $modal, 'Link nguồn phải mở tab mới an toàn.');
+        $this->assertStringContainsString('target="_blank"', $modal, 'Link nguồn phải mở tab mới.');
+        $this->assertStringContainsString('Nguồn để bạn tự kiểm', $modal, 'Thiếu khối trích dẫn.');
+
+        // Cầu nối "tìm hiểu → làm": đưa CÂU TRẢ LỜI vào ô mô tả tạo ảnh (cùng trường canvas trống bind vào).
+        $this->assertStringContainsString('data-use-answer', $modal, 'Thiếu nút đưa câu trả lời vào ô mô tả ảnh.');
+        $this->assertStringContainsString('store.imagePromptEn', $modal,
+            'Cầu nối phải ghi vào ĐÚNG trường ô mô tả của Studio (store.imagePromptEn).'
+        );
+
+        // ── (c) MỘT nguồn gợi ý: hằng số nằm ở kho dữ liệu chat, cả hai khung đọc chung ──
+        $actions = (string) file_get_contents(resource_path('js/studio/store/actions/agentChat.js'));
+        $this->assertStringContainsString('export const CHAT_SUGGESTIONS', $actions,
+            'Câu hỏi gợi ý phải nằm ở MỘT chỗ (kho dữ liệu chat) — hai danh sách là hai chỗ để lệch nhau.'
+        );
+        $this->assertStringContainsString('CHAT_SUGGESTIONS', $modal, 'Modal chat phải đọc danh sách gợi ý dùng chung.');
+        $this->assertStringNotContainsString('const CHAT_SUGGESTIONS = [',
+            (string) file_get_contents(resource_path('js/studio/composables/useAgentStudio.js')),
+            'useAgentStudio.js khai lại danh sách gợi ý — phải IMPORT từ store/actions/agentChat.js.'
+        );
+
+        // ── (d) StudioApp: nút mở chat nằm TRONG cụm công cụ header + modal được render ──
+        $app = $this->app();
+        $this->assertStringContainsString('data-header-action="chat"', $app,
+            'Thiếu nút «Trợ lý» trên cụm công cụ header — modal phải mở được từ mọi màn của /studio.'
+        );
+        $this->assertMatchesRegularExpression('/data-header-action="outputs"[\s\S]{0,1200}data-header-action="chat"/',
+            $app, 'Nút «Trợ lý» phải nằm TRONG cụm công cụ đã chốt (cạnh Nguồn ảnh · Thư viện · Bảng lệnh · Outputs).'
+        );
+        $this->assertStringContainsString('function openChat()', $app, 'Thiếu hàm mở modal trợ lý.');
+        $this->assertStringContainsString('<ChatModal />', $app, 'StudioApp phải render modal trợ lý.');
+
+        // ── (e) Đường trả lời GIẢ ở trình duyệt: cấm ở CẢ HAI file ──
+        foreach (['matchScore', 'loadTrendRadar', '/api/design-search', 'Không thấy mục nào khớp đúng'] as $gone) {
+            $this->assertStringNotContainsString($gone, $empty, 'Canvas trống còn sót đường trả lời giả: '.$gone);
+            $this->assertStringNotContainsString($gone, $modal, 'Modal chat còn sót đường trả lời giả: '.$gone);
         }
     }
 
