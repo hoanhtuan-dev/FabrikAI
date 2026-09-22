@@ -39,7 +39,20 @@ const toolHint = computed(() => {
   return '';
 });
 
-// Nút icon chuẩn (spec §4.2): h-7 hit-target, hover nền ink-700, disabled mờ 30%.
+/*
+ * [2026-09-26 · thiết kế lại] THANH TRẠNG THÁI CANVAS — chia theo TẦN SUẤT DÙNG.
+ *
+ * Trước đây MỘT hàng 36px nhồi 13 điều khiển (hoàn tác · zoom · bốn ô nền · bắt điểm + cỡ · nhãn trạng
+ * thái · sáng/tối · lưu · panel). Trên điện thoại hàng đó bị bóp lại và mọi thứ đều nhỏ như nhau ⇒
+ * không ai biết cái nào là việc chính.
+ *
+ * Nay theo mẫu Material: hành động THƯỜNG XUYÊN ở lại trên thanh (hoàn tác · làm lại · thu/phóng ·
+ * % · vừa khung), phần CÒN LẠI vào menu "⋯" ở điện thoại (nền canvas · bắt điểm · giao diện · lưu ·
+ * panel). Từ lg trở lên vẫn hiện đủ như cũ, chỉ cao hơn (36 → 40px) và thoáng hơn.
+ * Menu "⋯" KHÔNG mở đường tắt nào mới: nó gọi đúng những hàm mà thanh đang gọi.
+ */
+
+// Nút icon của thanh này: 32px trên máy tính, và sàn chạm 40px của mobile (app.css) tự nâng khi màn hẹp.
 const BTN = 'grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700 disabled:opacity-30';
 
 // Nền canvas — MỘT NGUỒN với chính vùng canvas.
@@ -58,50 +71,54 @@ const BG_OPTIONS = [
 </script>
 
 <template>
-  <div class="relative z-30 flex h-9 shrink-0 items-center gap-1 border-t border-ink-700 bg-ink-900/95 px-2">
-    <!-- 1. Undo / Redo -->
-    <button @click="store.undo()" :disabled="!store.undoStack.length" :class="BTN" title="Hoàn tác (Ctrl+Z)" aria-label="Hoàn tác (Ctrl+Z)"><StudioIcon name="undo" /></button>
-    <button @click="store.redo()" :disabled="!store.redoStack.length" :class="BTN" title="Làm lại (Ctrl+Y)" aria-label="Làm lại (Ctrl+Y)"><StudioIcon name="redo" /></button>
+  <div class="relative z-30 flex min-h-10 shrink-0 items-center gap-1 border-t border-ink-700 bg-ink-900/95 px-2">
+    <!-- 1. Hoàn tác / Làm lại -->
+    <button @click="store.undo()" :disabled="!store.undoStack.length" class="icon-btn !h-8 !w-8" title="Hoàn tác (Ctrl+Z)" aria-label="Hoàn tác (Ctrl+Z)"><StudioIcon name="undo" size="h-4 w-4" /></button>
+    <button @click="store.redo()" :disabled="!store.redoStack.length" class="icon-btn !h-8 !w-8" title="Làm lại (Ctrl+Y)" aria-label="Làm lại (Ctrl+Y)"><StudioIcon name="redo" size="h-4 w-4" /></button>
 
-    <!-- 2. Divider -->
-    <div class="h-4 w-px bg-ink-700" aria-hidden="true"></div>
+    <div class="h-5 w-px bg-ink-700" aria-hidden="true"></div>
 
-    <!-- 3. Zoom -->
-    <button @click="store.zoomOut()" :class="BTN" title="Thu nhỏ" aria-label="Thu nhỏ"><StudioIcon name="zoomOut" /></button>
-    <button @click="store.zoomFit()" class="min-w-12 rounded-lg px-1 py-1 text-center text-body tabular-nums text-cream-200 hover:bg-ink-700">{{ Math.round(store.zoom * 100) }}%</button>
-    <button @click="store.zoomIn()" :class="BTN" title="Phóng to" aria-label="Phóng to"><StudioIcon name="zoomIn" /></button>
-    <button @click="store.zoomFit()" :class="BTN" title="Vừa khung hình" aria-label="Vừa khung hình"><StudioIcon name="maximize" /></button>
+    <!-- 2. Zoom — nhóm hay dùng nhất sau hoàn tác -->
+    <button @click="store.zoomOut()" class="icon-btn !h-8 !w-8" title="Thu nhỏ" aria-label="Thu nhỏ"><StudioIcon name="zoomOut" size="h-4 w-4" /></button>
+    <button @click="store.zoomFit()" class="min-w-14 rounded-lg px-1 py-1 text-center text-body font-semibold tabular-nums text-cream-100 transition-colors hover:bg-ink-700"
+            title="Bấm để vừa khung hình">{{ Math.round(store.zoom * 100) }}%</button>
+    <button @click="store.zoomIn()" class="icon-btn !h-8 !w-8" title="Phóng to" aria-label="Phóng to"><StudioIcon name="zoomIn" size="h-4 w-4" /></button>
+    <button @click="store.zoomFit()" class="icon-btn !h-8 !w-8" title="Vừa khung hình" aria-label="Vừa khung hình"><StudioIcon name="maximize" size="h-4 w-4" /></button>
 
-    <!-- 4. Divider -->
-    <div class="h-4 w-px bg-ink-700" aria-hidden="true"></div>
+    <!-- 3. PHẦN CÒN LẠI — chỉ từ lg trở lên mới hiện thẳng trên thanh -->
+    <div class="hidden items-center gap-1 lg:flex">
+      <div class="h-5 w-px bg-ink-700" aria-hidden="true"></div>
 
-    <!-- 5. Nền canvas — ô màu dùng CHÍNH class nền của canvas -->
-    <button
-      v-for="b in BG_OPTIONS"
-      :key="b.id"
-      @click="store.canvasBg = b.id"
-      class="motion-ui h-5 w-5 rounded-full border border-ink-600"
-      :class="['canvas-bg-' + b.id, store.canvasBg === b.id ? 'ring-2 ring-brand-400' : '']"
-      :title="'Nền canvas: ' + b.label"
-      :aria-label="'Nền canvas: ' + b.label"
-      :aria-pressed="store.canvasBg === b.id"
-    ></button>
+      <!-- Nền canvas — ô màu dùng CHÍNH class nền của canvas -->
+      <button
+        v-for="b in BG_OPTIONS"
+        :key="b.id"
+        @click="store.canvasBg = b.id"
+        class="motion-ui h-6 w-6 rounded-full border border-ink-600"
+        :class="['canvas-bg-' + b.id, store.canvasBg === b.id ? 'ring-2 ring-brand-400' : '']"
+        :title="'Nền canvas: ' + b.label"
+        :aria-label="'Nền canvas: ' + b.label"
+        :aria-pressed="store.canvasBg === b.id"
+      ></button>
 
-    <!-- 6. Snap (bắt điểm) — mặc định BẬT 8px -->
-    <div class="h-4 w-px bg-ink-700" aria-hidden="true"></div>
-    <button @click="store.snapGrid = store.snapGrid ? 0 : 8" :class="[BTN, store.snapGrid ? 'text-brand-200' : '']" title="Bật/tắt bắt điểm (snap)" aria-label="Bật/tắt bắt điểm (snap)"><StudioIcon name="target" /></button>
-    <select v-if="store.snapGrid" :value="store.snapGrid" @change="store.snapGrid = Number($event.target.value)" class="h-6 rounded-md border border-ink-700 bg-ink-800 px-1 text-label tabular-nums text-cream-100 focus:outline-none" title="Khoảng cách bắt điểm (px)">
-      <option :value="8">8</option><option :value="16">16</option><option :value="24">24</option><option :value="32">32</option>
-    </select>
+      <!-- Snap (bắt điểm) — mặc định BẬT 8px -->
+      <div class="h-5 w-px bg-ink-700" aria-hidden="true"></div>
+      <button @click="store.snapGrid = store.snapGrid ? 0 : 8" class="icon-btn !h-8 !w-8" :class="store.snapGrid ? '!text-brand-200' : ''"
+              title="Bật/tắt bắt điểm (snap)" aria-label="Bật/tắt bắt điểm (snap)"><StudioIcon name="grid" size="h-4 w-4" /></button>
+      <select v-if="store.snapGrid" :value="store.snapGrid" @change="store.snapGrid = Number($event.target.value)"
+              class="h-8 rounded-lg border border-ink-600 bg-ink-800 px-1 text-body text-cream-100" title="Khoảng bắt điểm (px)" aria-label="Khoảng bắt điểm">
+        <option :value="8">8</option><option :value="16">16</option><option :value="24">24</option><option :value="32">32</option>
+      </select>
+    </div>
 
-    <!-- 7. Spacer + Gợi ý công cụ (Krita-style) -->
+    <!-- 4. Chỗ trống + gợi ý công cụ (Krita-style) -->
     <div class="flex-1"></div>
     <div v-if="toolHint" class="flex min-w-0 items-center gap-1.5 overflow-hidden px-1 text-label text-cream-400" title="Hướng dẫn công cụ">
       <StudioIcon name="info" size="h-3.5 w-3.5" class="shrink-0" />
       <span class="truncate">{{ toolHint }}</span>
     </div>
 
-    <!-- 7. Trạng thái (md+) -->
+    <!-- 5. Trạng thái lớp (md+) -->
     <div class="hidden items-center gap-1.5 text-label text-cream-400 md:flex">
       <StudioIcon name="layers" size="h-3.5 w-3.5" />
       <span>{{ store.canvasLayers.length }} lớp</span>
@@ -111,39 +128,84 @@ const BG_OPTIONS = [
       </template>
     </div>
 
-    <!-- 8. Giao diện Sáng/Tối (2026-09-23) — đổi ngay tại chỗ, không phải mở Cài đặt -->
-    <div class="h-4 w-px bg-ink-700" aria-hidden="true"></div>
-    <button
-      @click="toggleTheme"
-      class="motion-ui flex h-7 shrink-0 items-center gap-1 rounded-lg border border-ink-600 px-2 text-label font-semibold text-cream-200 hover:border-brand-400 hover:bg-ink-700"
-      :title="'Giao diện đang là ' + (themeResolved === 'light' ? 'Sáng' : 'Tối') + ' — bấm để đổi (muốn theo hệ điều hành: Cài đặt của tôi → Giao diện)'"
-      :aria-label="'Đổi giao diện Sáng/Tối, đang là ' + (themeResolved === 'light' ? 'Sáng' : 'Tối')"
-    >
-      <!-- Hai thẻ <StudioIcon> tách bằng v-if/v-else (KHÔNG dùng tam phân trong :name): test
-           quét mọi chuỗi trong thuộc tính name của <StudioIcon> và đòi chúng là icon có thật —
-           'light' trong biểu thức tam phân sẽ bị coi là một icon không tồn tại. -->
-      <StudioIcon v-if="themeResolved === 'light'" name="sun" size="h-3.5 w-3.5" />
-      <StudioIcon v-else name="moon" size="h-3.5 w-3.5" />
-      <span>{{ themeResolved === 'light' ? 'Sáng' : 'Tối' }}</span>
-    </button>
+    <!-- 6. Menu "⋯" của ĐIỆN THOẠI — cùng các việc trên, không mở đường tắt nào mới -->
+    <div class="dropdown dropdown-end dropdown-top lg:hidden">
+      <div tabindex="0" role="button" class="icon-btn !h-8 !w-8" title="Thêm tuỳ chọn hiển thị" aria-label="Thêm tuỳ chọn hiển thị">
+        <StudioIcon name="sliders" size="h-4 w-4" />
+      </div>
+      <ul tabindex="0" class="menu dropdown-content z-50 mb-1 w-60 rounded-box border border-ink-700 bg-ink-800 p-2 shadow-xl">
+        <li class="menu-title"><span>Nền canvas</span></li>
+        <li>
+          <div class="flex items-center gap-2 px-1 pb-1">
+            <button
+              v-for="b in BG_OPTIONS"
+              :key="'m-' + b.id"
+              @click="store.canvasBg = b.id"
+              class="motion-ui h-8 w-8 rounded-full border border-ink-600"
+              :class="['canvas-bg-' + b.id, store.canvasBg === b.id ? 'ring-2 ring-brand-400' : '']"
+              :title="'Nền canvas: ' + b.label"
+              :aria-label="'Nền canvas: ' + b.label"
+              :aria-pressed="store.canvasBg === b.id"
+            ></button>
+          </div>
+        </li>
+        <li>
+          <button @click="store.snapGrid = store.snapGrid ? 0 : 8">
+            <StudioIcon name="grid" size="h-4 w-4" />
+            <span>Bắt điểm (snap): <b>{{ store.snapGrid ? store.snapGrid + 'px' : 'tắt' }}</b></span>
+          </button>
+        </li>
+        <li v-if="store.snapGrid">
+          <div class="flex items-center gap-2 px-1 pb-1">
+            <button v-for="s in [8, 16, 24, 32]" :key="'s-' + s" @click="store.snapGrid = s"
+                    class="min-w-10 rounded-lg px-2 py-1 text-body font-semibold"
+                    :class="store.snapGrid === s ? 'bg-brand-600 text-primary-content' : 'bg-ink-700 text-cream-200'">{{ s }}</button>
+          </div>
+        </li>
+        <li>
+          <button @click="toggleTheme">
+            <StudioIcon v-if="themeResolved === 'light'" name="sun" size="h-4 w-4" />
+            <StudioIcon v-else name="moon" size="h-4 w-4" />
+            <span>Giao diện: <b>{{ themeResolved === 'light' ? 'Sáng' : 'Tối' }}</b></span>
+          </button>
+        </li>
+        <li>
+          <button @click="store.saveNow()">
+            <StudioIcon name="save" size="h-4 w-4" />
+            <span>Lưu trang</span>
+          </button>
+        </li>
+        <li>
+          <button @click="store.toggleInspector()">
+            <StudioIcon name="panelRight" size="h-4 w-4" />
+            <span>{{ store.inspectorOpen ? 'Ẩn' : 'Hiện' }} panel Layers</span>
+          </button>
+        </li>
+      </ul>
+    </div>
 
-    <!-- 9. Lưu vật lý -->
-    <button
-      @click="store.saveNow()"
-      class="grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700"
-      title="Lưu trang (Save)"
-      aria-label="Lưu trang"
-    ><StudioIcon name="save" /></button>
-
-    <!-- 9. Toggle inspector (lg+) — nút tải ảnh đang chọn ở thanh này đã bỏ theo yêu cầu: việc tải ảnh
-         đã có đường riêng ở bảng Lớp (Xuất PNG) và ở Kết quả/Thư viện, để đây chỉ gây trùng và bấm nhầm. -->
-    <button
-      data-dock-toggle="inspector"
-      @click="store.toggleInspector()"
-      class="grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700 disabled:opacity-30"
-      :class="store.inspectorOpen ? 'bg-brand-600/20 text-brand-300' : ''"
-      title="Bật/tắt panel Layers"
-      aria-label="Bật/tắt panel Layers"
-    ><StudioIcon name="panelRight" /></button>
+    <!-- 7. Máy tính: giao diện · lưu · panel (như cũ, nút to hơn) -->
+    <div class="hidden items-center gap-1 lg:flex">
+      <div class="h-5 w-px bg-ink-700" aria-hidden="true"></div>
+      <button
+        @click="toggleTheme"
+        class="motion-ui flex h-8 shrink-0 items-center gap-1 rounded-lg border border-ink-600 px-2 text-label font-semibold text-cream-200 transition-colors hover:border-ink-500 hover:text-cream-50"
+        :title="'Giao diện đang là ' + (themeResolved === 'light' ? 'Sáng' : 'Tối') + ' — bấm để đổi (muốn theo hệ điều hành: Cài đặt của tôi → Giao diện)'"
+        :aria-label="'Đổi giao diện Sáng/Tối, đang là ' + (themeResolved === 'light' ? 'Sáng' : 'Tối')"
+      >
+        <StudioIcon v-if="themeResolved === 'light'" name="sun" size="h-3.5 w-3.5" />
+        <StudioIcon v-else name="moon" size="h-3.5 w-3.5" />
+        <span>{{ themeResolved === 'light' ? 'Sáng' : 'Tối' }}</span>
+      </button>
+      <button @click="store.saveNow()" class="icon-btn !h-8 !w-8" title="Lưu trang (Save)" aria-label="Lưu trang"><StudioIcon name="save" size="h-4 w-4" /></button>
+      <button
+        data-dock-toggle="inspector"
+        @click="store.toggleInspector()"
+        class="icon-btn !h-8 !w-8"
+        :class="store.inspectorOpen ? '!bg-brand-600/20 !text-brand-300' : ''"
+        title="Bật/tắt panel Layers"
+        aria-label="Bật/tắt panel Layers"
+      ><StudioIcon name="panelRight" size="h-4 w-4" /></button>
+    </div>
   </div>
 </template>
