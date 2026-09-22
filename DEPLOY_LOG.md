@@ -5,6 +5,84 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 5) — ĐÍNH CHÍNH: LỆNH CRON TÔI ĐƯA SAI KHIẾN JOB CHẾT NGAY, VÀ CÁCH ĐÚNG
+
+**Trạng thái: KHÔNG deploy gì (chỉ điều tra + đính chính tài liệu).** Đây là bản sửa cho PHẦN B3 của đợt 4 —
+hướng dẫn ở đó **SAI** và là nguyên nhân trực tiếp khiến cron không chạy dù đã thêm nhiều lần.
+
+### 1. Triệu chứng chủ dự án báo
+"Đã thêm nhiều lần nhiều cách mà vẫn không được."
+
+### 2. Chẩn đoán — vì sao biết là chưa từng chạy
+| Bằng chứng | Ý nghĩa |
+|---|---|
+| Trong `~/.logs/` chỉ có **2` tệp `cronjob_*`** (maychuan + fabrikai grant-plan-credits) | Không có entry mới nào hoàn thành |
+| Nhưng trong `/tmp/` có **9 tệp `cron_lock_*`** — trong đó `3HI7KQRQD4` (06:43), `EZqWEzYcX1` (06:45), `e0phxMKfoF` (06:58) chạy HÔM NAY | `flock` **CÓ** được cấp khoá ⇒ job **CÓ khởi động**, rồi chết trước khi kịp tạo tệp log |
+| `timeout -s 9 5 cd /home/…` → `failed to run command 'cd': No such file or directory`, exit **127** | **ĐÂY LÀ NGUYÊN NHÂN** |
+
+### 3. NGUYÊN NHÂN GỐC
+Hostinger bọc MỌI lệnh cron trong khuôn này (đo được từ `ps -ef` của job đang chạy):
+
+```
+/bin/sh -c /usr/bin/flock -w 1 /tmp/cron_lock_<ID> timeout -s 9 1800 <LỆNH CỦA BẠN> >> /dev/null 2>&1 > ~/.logs/cronjob_<ID> 2>&1
+```
+
+`timeout` **chỉ chạy được TỆP THỰC THI**, không chạy được **lệnh nội bộ của shell**. `cd` là lệnh nội bộ ⇒
+`timeout … cd …` chết ngay với exit 127. Và vì lệnh tôi đưa có dạng `cd … && php artisan …`, phần sau
+`&&` không bao giờ chạy — mà **hai lần chuyển hướng ghi log của Hostinger lại được gắn vào đúng phần sau đó**,
+nên **không tệp log nào được tạo**. Khớp hoàn toàn với triệu chứng: có khoá, không có log.
+
+**Job đang chạy được của chính dự án (maychuan) không hề dùng `cd`** — nó gọi thẳng
+`/usr/bin/php /home/…/artisan schedule:run`. Đó là lý do nó chạy còn fabrikai thì không.
+
+> **Tự nhận lỗi:** dạng lệnh `cd … && …` đã nằm trong sổ này từ một phiên trước và tôi **chép lại nguyên
+> xi** ở đợt 4 mà không kiểm chứng. Tài liệu không kiểm chứng thì truyền lỗi y như mã không kiểm chứng.
+
+### 4. LỆNH ĐÚNG (đã đo qua CHÍNH khuôn bọc của Hostinger)
+
+Mục 1 — mỗi phút:
+```
+/usr/bin/php /home/u310846799/domains/fabrikai.shop/artisan schedule:run
+```
+
+Mục 2 — mỗi 5 phút:
+```
+/usr/bin/php /home/u310846799/domains/fabrikai.shop/artisan queue:work --stop-when-empty --max-time=55 --tries=1 --timeout=900
+```
+
+**HAI QUY TẮC:**
+1. **Không dùng `cd` và không dùng `&&`** — dùng ĐƯỜNG DẪN TUYỆT ĐỐI tới `artisan`. Laravel tự suy
+   base path từ vị trí tệp `artisan` nên chạy đúng từ bất kỳ thư mục nào (đã đo: chạy từ `/tmp` vẫn in đúng
+   `schedule:list`).
+2. **Không tự thêm `>> … 2>&1`** — Hostinger đã tự hứng output vào `~/.logs/cronjob_<ID>`; chuyển hướng của
+   mình sẽ bị chuyển hướng của họ ghi đè (cái sau thắng), nên thêm vào chỉ gây hiểu nhầm.
+
+### 5. Kiểm chứng hai lệnh đúng (chạy qua ĐÚNG khuôn bọc)
+| Thử | Kết quả |
+|---|---|
+| `… timeout … cd /home/… && php artisan schedule:run` (lệnh CŨ) | `timeout: failed to run command 'cd'` — **chết** |
+| `… timeout … /usr/bin/php /home/…/artisan schedule:run` (lệnh MỚI) | `INFO  No scheduled commands are ready to run.` — **CHẠY** |
+| `… timeout … /usr/bin/php /home/…/artisan queue:work --stop-when-empty …` (lệnh MỚI) | **Xử lý thật 12 job cũ** (`RenderImageJob … DONE` trong 1–27 ms) |
+
+### 6. Việc phụ đã xảy ra trong lúc đo (và đã kiểm tra an toàn)
+Thử nghiệm số 3 chạy thật một lượt `queue:work`, và nó **tiêu thụ 12 job cũ** đang nằm trong bảng `jobs` từ
+21/09. Đã kiểm ngay sau đó:
+| Kiểm tra | Kết quả |
+|---|---|
+| `jobs` · `failed_jobs` | **0 · 0** |
+| `generations` | `pending=0 · processing=0 · **completed=47**` (không suy suyển) |
+| Log lỗi trong giờ hiện tại | **0** dòng |
+
+**Không có hư hại:** 12 job đó là `RenderImageJob` của các generation đã `completed` từ trước (app đã xử lý
+inline), nên lượt CAS `pending→processing` trượt và job thoát ngay — đúng như thiết kế. Chúng vốn là **rác**
+đã được ghi nợ trong sổ từ phiên 2026-09-21; nay đã sạch.
+
+### 7. Còn lại
+Thêm 2 dòng ở §4 vào hPanel → nhịp tim + `scheduler.log`/`worker.log` (Hostinger ghi vào
+`~/.logs/cronjob_<ID>` chứ không phải `storage/logs/`) sẽ sống trong vòng 1 phút.
+
+---
+
 ## Phiên 2026-09-26 (đợt 4) — VÒNG ĐỜI MẪU VẬT LÝ (FIT · PP · TOP) + ĐIỀU TRA CRON TRÊN HOST
 
 **Commit:** `22f2579` (trên `b049e85`). **Trạng thái: đã commit + push + DEPLOY production.** **Cron: KHÔNG tạo được từ SSH — có bằng chứng đo, xem PHẦN B.**
