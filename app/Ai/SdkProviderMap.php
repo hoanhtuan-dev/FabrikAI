@@ -20,10 +20,27 @@ class SdkProviderMap
     public const PREFIX = 'fabrikai_';
 
     /**
+     * Driver fal.ai — do CHÍNH ỨNG DỤNG đăng ký qua AiManager::extend('fal', …).
+     *
+     * [2026-09-26] Trước đây mọi thứ không phải gemini đều bị coi là 'openai-compatible', kể cả fal —
+     * trong khi fal KHÔNG có endpoint chat kiểu OpenAI (API của nó là hàng đợi queue.fal.run). Hệ quả đo
+     * được: SdkTextEngine::supports() nói "chạy được" còn configFor() trả null ⇒ hai lớp nói hai chuyện
+     * khác nhau về cùng một candidate.
+     */
+    public const DRIVER_FAL = 'fal';
+
+    /** Candidate này có phải fal.ai không (theo TÊN provider, rồi tới transport). */
+    public static function isFal(array $candidate): bool
+    {
+        return (string) ($candidate['provider'] ?? '') === 'fal'
+            || (string) ($candidate['transport'] ?? '') === 'fal';
+    }
+
+    /**
      * Cấu hình provider SDK cho MỘT candidate + MỘT khoá. null = không dựng được (thiếu địa chỉ).
      *
      * @param  array<string, mixed>  $candidate  dòng đã giải của AiModelGateway::candidates()
-     * @return array{driver:string, key:string, url:string, models:array{text:array{default:string}}}|null
+     * @return array{driver:string, key:string, url:string, models:array<string, array{default:string}>}|null
      */
     public static function configFor(array $candidate, string $key): ?array
     {
@@ -32,13 +49,19 @@ class SdkProviderMap
             return null;
         }
 
+        $driver = self::driverFor($candidate);
+        $model = (string) ($candidate['model'] ?? '');
+
         return [
-            'driver' => self::driverFor($candidate),
+            'driver' => $driver,
             'key' => $key,
             'url' => $base,
-            // SDK đòi model mặc định cho đường openai-compatible. Ta luôn truyền model tường minh khi
-            // gọi, nhưng vẫn khai để provider dựng được mà không ném lỗi.
-            'models' => ['text' => ['default' => (string) ($candidate['model'] ?? '')]],
+            // KHOÁ `models` KHÁC NHAU THEO DRIVER: fal là nhà cung cấp TẠO ẢNH (FalProvider đọc
+            // models.image.default), còn đường openai-compatible là văn bản. Khai sai khoá thì provider
+            // dựng được nhưng model mặc định rỗng ⇒ lỗi chỉ lộ ra lúc chạy thật.
+            'models' => $driver === self::DRIVER_FAL
+                ? ['image' => ['default' => $model]]
+                : ['text' => ['default' => $model]],
         ];
     }
 
@@ -54,15 +77,26 @@ class SdkProviderMap
         return self::PREFIX.($candidate['provider'] ?? 'x').'_'.substr(md5($key), 0, 8);
     }
 
-    /** Gemini đi driver riêng; phần còn lại đi driver tổng quát. */
+    /** fal.ai đi driver riêng (tạo ảnh); Gemini đi driver riêng; phần còn lại đi driver tổng quát. */
     public static function driverFor(array $candidate): string
     {
+        if (self::isFal($candidate)) {
+            return self::DRIVER_FAL;
+        }
+
         return ($candidate['transport'] ?? '') === 'gemini' ? 'gemini' : 'openai-compatible';
     }
 
     /** Địa chỉ gọi thật — CÙNG luật với AiModelGateway (đừng để hai nơi lệch nhau). */
     public static function baseFor(array $candidate, string $key): string
     {
+        // fal: gốc API HÀNG ĐỢI, không phải địa chỉ chat. Trả về đây thì configFor() mới dựng được cấu
+        // hình (nó coi base rỗng là "không dựng được") — và cấu hình đó chính là thứ FalProvider đọc để
+        // biết gọi đâu, nên "Cài đặt nói gì" khớp "mã gọi đâu".
+        if (self::isFal($candidate)) {
+            return \App\Ai\Gateways\FalImageGateway::BASE;
+        }
+
         $transport = (string) ($candidate['transport'] ?? '');
         $base = rtrim((string) ($candidate['base'] ?? ''), '/');
 

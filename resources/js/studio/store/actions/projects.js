@@ -1,6 +1,6 @@
 // TÁCH NGUYÊN VĂN từ store.js (đợt tối ưu 2026-09-24) — miền: bộ sưu tập/dự án · chia sẻ · thống kê shots · mẫu việc · workspace.
 // Action dùng this.* trỏ cùng store instance ⇒ gọi chéo giữa các miền hoạt động y hệt file gốc.
-import { apiError } from '../helpers.js';
+import { apiError, userFacingError, CSRF } from '../helpers.js';
 export const projectsActions = {
     // ═══════════════════════════════════════════════════════════════════
     // Dự án thiết kế (Project Workspace) — CRUD + workflow cho Designer.
@@ -398,4 +398,107 @@ export const projectsActions = {
     },
     goEdit(g) { this.goEditor(g, 2); },
     goVideo(g) { this.goEditor(g, 3); },
-};
+
+    // ═══════════════════════════════════════════════════════════════════
+    // PHIẾU KỸ THUẬT (tech pack) — Việc #3, 2026-09-26
+    //
+    // Vì sao nằm cùng miền "bộ sưu tập": phiếu là THUỘC TÍNH CỦA MỘT BỘ (cùng một bộ thì cùng một vải,
+    // cùng một bảng thông số), không phải tài sản dùng chung như preset. Xoá bộ là mất phiếu theo (cascade).
+    // ═══════════════════════════════════════════════════════════════════
+    /**
+     * Nạp phiếu kỹ thuật của MỘT bộ sưu tập. Nhớ theo id để mở lại không phải gọi mạng lần nữa
+     * (trừ khi force = true, hoặc phiếu đang mở là của bộ KHÁC).
+     */
+    async loadTechPack(projectId, force = false) {
+      const id = Number(projectId) || 0;
+      if (!id) return null;
+      if (!force && this.techPack && this.techPackProjectId === id) return this.techPack;
+
+      this.techPackLoading = true;
+      this.techPackError = '';
+      try {
+        const res = await fetch('/api/projects/' + id + '/tech-pack', { headers: { Accept: 'application/json' } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, 'Không tải được phiếu kỹ thuật.');
+        this.techPack = data;
+        this.techPackProjectId = id;
+        this.techPackDraft = JSON.parse(JSON.stringify(data.tech_pack || null));
+        return data;
+      } catch (e) {
+        this.techPackError = userFacingError(e, 'Không tải được phiếu kỹ thuật.');
+        return null;
+      } finally {
+        this.techPackLoading = false;
+      }
+    },
+    /** Lưu phiếu của bộ đang mở. Không có bộ nào đang mở ⇒ không làm gì (và nói ra). */
+    async saveTechPack() {
+      const id = this.techPackProjectId;
+      if (!id || !this.techPackDraft) {
+        this.techPackError = 'Chưa chọn bộ sưu tập nào để lưu phiếu.';
+        return false;
+      }
+
+      this.techPackSaving = true;
+      this.techPackError = '';
+      try {
+        const res = await fetch('/api/projects/' + id + '/tech-pack', {
+          method: 'PUT',
+          headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(this.techPackDraft),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, 'Không lưu được phiếu kỹ thuật.');
+        this.techPack = data;
+        this.techPackDraft = JSON.parse(JSON.stringify(data.tech_pack || null));
+        const c = data.completeness || {};
+        this.toast(
+          c.ready
+            ? 'Đã lưu phiếu kỹ thuật — gói xuất cho xưởng sẽ dùng thông số này.'
+            : 'Đã lưu phiếu kỹ thuật. Còn thiếu: ' + ((c.missing || []).join(' · ') || '—'),
+          c.ready ? 'success' : 'info',
+        );
+        return true;
+      } catch (e) {
+        this.techPackError = userFacingError(e, 'Không lưu được phiếu kỹ thuật.');
+        this.toast(this.techPackError, 'error');
+        return false;
+      } finally {
+        this.techPackSaving = false;
+      }
+    },
+    /** Xoá phiếu (về "chưa lập") — KHÔNG đụng ảnh, bộ sưu tập hay dữ liệu khác. */
+    async resetTechPack() {
+      const id = this.techPackProjectId;
+      if (!id) return false;
+
+      this.techPackSaving = true;
+      this.techPackError = '';
+      try {
+        const res = await fetch('/api/projects/' + id + '/tech-pack', {
+          method: 'DELETE',
+          headers: { 'X-XSRF-TOKEN': CSRF(), Accept: 'application/json' },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, 'Không xoá được phiếu kỹ thuật.');
+        this.techPack = data;
+        this.techPackDraft = JSON.parse(JSON.stringify(data.tech_pack || null));
+        this.toast('Đã xoá phiếu kỹ thuật của bộ sưu tập.', 'info');
+        return true;
+      } catch (e) {
+        this.techPackError = userFacingError(e, 'Không xoá được phiếu kỹ thuật.');
+        return false;
+      } finally {
+        this.techPackSaving = false;
+      }
+    },
+    /** Bỏ thay đổi chưa lưu: quay về đúng bản đang có trên máy chủ. */
+    discardTechPackDraft() {
+      this.techPackDraft = JSON.parse(JSON.stringify(this.techPack?.tech_pack || null));
+    },
+    /** Có thay đổi chưa lưu không? (một nguồn cho cả trạng thái nút Lưu lẫn nhãn "Chưa lưu"). */
+    techPackDirty() {
+      if (!this.techPackDraft) return false;
+      return JSON.stringify(this.techPackDraft) !== JSON.stringify(this.techPack?.tech_pack || null);
+    },
+  };

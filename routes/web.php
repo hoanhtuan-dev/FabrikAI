@@ -18,6 +18,7 @@ use App\Http\Controllers\DesignAgentController;
 use App\Http\Controllers\StylistDataController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\ThemeController;
+use App\Http\Controllers\TechPackController;
 use App\Http\Controllers\ThemeLibraryController;
 use App\Http\Controllers\UserCatalogController;
 use Illuminate\Support\Facades\Route;
@@ -103,6 +104,11 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->group(function () {
     // Cấp quyền: auth + can-studio — ĐÚNG nhóm của /bo-suu-tap. Đây là dữ liệu và công việc CỦA
     // CHÍNH người dùng (DNA shop của họ, brief của họ), không phải công cụ quản trị.
     Route::get('/agent-studio', [StudioController::class, 'agentStudioPage'])->name('agent-studio.page');
+
+    // [Việc #3 — 2026-09-26] BẢN IN PHIẾU KỸ THUẬT (A4) — đường tạo PDF: trình duyệt In/Lưu thành PDF.
+    // Là TRANG chứ không phải endpoint trả file: xem chú thích ở TechPackController::print (host chặn
+    // proc_open nên thêm thư viện PDF qua composer là rủi ro thật lúc deploy).
+    Route::get('/du-an/{project}/phieu-ky-thuat', [TechPackController::class, 'print'])->name('projects.tech-pack.print');
 });
 // [Xác minh 2026-09-17] /admin là CONSOLE OWNER — KHÔNG được để chung nhóm shell công khai.
 // Trước đây ai cũng tải được vỏ quản trị (khách 200, customer 200), trái mô hình ở đầu file
@@ -197,6 +203,13 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     // [Đợt 4 — 2026-09-19] XUẤT GÓI CHO XƯỞNG: ảnh tham chiếu + phiếu kỹ thuật + bảng size + manifest,
     // đóng thành 1 file ZIP. Chủ xưởng may cần "gói đủ để cắt may", không chỉ một tấm ảnh.
     Route::get('/projects/{project}/export', [ProjectController::class, 'exportBundle'])->name('projects.export');
+
+    // [Việc #3 — 2026-09-26] PHIẾU KỸ THUẬT TƯƠNG TÁC (tech pack) của một bộ sưu tập.
+    // Trước đây "phiếu kỹ thuật" chỉ là tệp chữ có dòng chấm để xưởng tự điền — chủ shop không có chỗ
+    // nào GHI thông số trong ứng dụng. Ba đường dưới đây cho họ ghi, sửa và xoá.
+    Route::get('/projects/{project}/tech-pack', [TechPackController::class, 'show'])->name('projects.tech-pack.show');
+    Route::put('/projects/{project}/tech-pack', [TechPackController::class, 'update'])->name('projects.tech-pack.update');
+    Route::delete('/projects/{project}/tech-pack', [TechPackController::class, 'destroy'])->name('projects.tech-pack.destroy');
 
     // [Đợt 2 — 2026-09-19] Chi phí & tiến độ của MỘT bộ sưu tập (số ảnh xong/đang chạy/lỗi · credit đã
     // dùng · hạn còn lại · phản hồi mới nhất) — cho chủ doanh nghiệp kiểm soát chi phí theo bộ.

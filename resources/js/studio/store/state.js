@@ -35,6 +35,15 @@ export function studioState() {
     // [Đợt 2] Danh sách ẢNH của từng bộ sưu tập kèm trạng thái DUYỆT (shot_state) — phục vụ màn
     // "Duyệt mẫu theo lô". Nạp theo yêu cầu, nhớ theo id.
     projectShots: {},
+    // ── PHIẾU KỸ THUẬT (tech pack) — Việc #3, 2026-09-26 ───────────────────────────────────
+    // Thông số THẬT của một bộ sưu tập: vải, màu, đường may, bảng thông số theo size. Trước đây
+    // "phiếu kỹ thuật" chỉ là tệp chữ có dòng chấm trong gói ZIP — chủ shop không có chỗ nào ghi.
+    techPack: null,            // { tech_pack, is_set, updated_at, completeness, shape }
+    techPackProjectId: null,   // phiếu đang mở (mỗi bộ sưu tập một phiếu — không lẫn giữa các bộ)
+    techPackDraft: null,       // bản đang sửa (chỉ ghi DB khi bấm Lưu)
+    techPackLoading: false,
+    techPackSaving: false,
+    techPackError: '',
     planOpen: false,        // popup "Gói & credit" ở thanh công cụ
     planCatalogOpen: false, // mở danh mục gói bên trong popup
     planBusy: false,

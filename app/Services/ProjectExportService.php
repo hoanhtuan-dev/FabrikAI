@@ -24,6 +24,16 @@ use ZipArchive;
  */
 class ProjectExportService
 {
+    /**
+     * PHIẾU KỸ THUẬT (Việc #3 — 2026-09-26) — nguồn thông số THẬT của bộ sưu tập.
+     *
+     * BẮT BUỘC-kiểu-nullable, KHÔNG có default. Lý do đã đo được: Container::resolveClass()
+     * (vendor/laravel/framework/.../Container.php:1351-1358) TRẢ VỀ GIÁ TRỊ DEFAULT khi tham số có
+     * default và class không có binding ⇒ viết "?TechPackService $packs = null" là tự tay tắt tính năng
+     * trong im lặng. Đây là lỗi THẬT đã gặp ở DesignAgentService — xem DEPLOY_LOG, phiên 2026-09-26 đợt 2.
+     */
+    public function __construct(private readonly ?TechPackService $packs) {}
+
     /** Trần số ảnh mỗi gói — bảo vệ thời gian phản hồi và dung lượng tải. */
     public const MAX_IMAGES = 60;
 
@@ -121,12 +131,21 @@ class ProjectExportService
                 : null,
             'images' => $images,
             'skipped' => $skipped,
+            // PHIẾU KỸ THUẬT: hệ thống của xưởng đọc manifest là biết gói này có phiếu thật hay chỉ là
+            // mẫu trắng — thay vì phải mở tệp chữ ra đoán.
+            'tech_pack' => $this->techPackSummary($project),
             'disclaimer' => 'Ảnh do AI tạo — dùng làm ảnh THAM CHIẾU/ý tưởng. Vui lòng đối chiếu mẫu thật trước khi sản xuất hàng loạt.',
         ];
 
         $zip->addFromString('README.txt', $this->readme($project, count($images), count($skipped), $truncated ? $totalWithMedia : null));
         $zip->addFromString('thong-tin-bo-suu-tap.txt', $this->projectInfo($project, $note));
         $zip->addFromString('bang-size.csv', $this->sizeSheet((string) ($options['sizes'] ?? '')));
+        // BẢNG THÔNG SỐ của phiếu kỹ thuật (điểm đo × size) — chỉ có khi người dùng ĐÃ lập phiếu;
+        // gói vẫn xuất bình thường khi chưa có, chỉ là thiếu một tệp.
+        $pack = $this->packs?->get($project);
+        if (($pack['completeness']['has_measurements'] ?? false) === true) {
+            $zip->addFromString('bang-thong-so.csv', $this->packs->measurementsCsv($pack['data']));
+        }
         $zip->addFromString('phieu-ky-thuat.txt', $this->techSheet($project, $images, $note));
         $zip->addFromString('manifest.json', json_encode($manifest, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
@@ -335,15 +354,38 @@ class ProjectExportService
     }
 
     /**
-     * Phiếu kỹ thuật cho XƯỞNG: mỗi mẫu một khối, các ô cần xác nhận để trống cho xưởng điền.
+     * PHIẾU KỸ THUẬT cho XƯỞNG — Việc #3 (2026-09-26): nay dùng THÔNG SỐ THẬT của bộ sưu tập.
+     *
+     * HAI CHẾ ĐỘ, và lý do phải có cả hai:
+     *   · ĐÃ lập phiếu  ⇒ in thông số người dùng gõ (TechPackService::textSheet) và BỎ các dòng chấm
+     *     trống ở từng mẫu — phát mẫu trắng bên cạnh dữ liệu thật là mời xưởng điền lại thứ đã có.
+     *   · CHƯA lập phiếu ⇒ giữ nguyên hành vi cũ (mẫu trắng để xưởng điền cùng khách) kèm một câu
+     *     CHỈ ĐƯỜNG: lập phiếu trong FabrikAI thì lần xuất sau có sẵn. Bỏ hẳn mẫu trắng là làm gói xuất
+     *     mất chức năng với những người chưa dùng phiếu.
      *
      * @param  array<int, array<string, mixed>>  $images
      */
     private function techSheet(Project $project, array $images, string $note): string
     {
-        $out = ['PHIẾU KỸ THUẬT — '.$project->name, str_repeat('=', 60), ''];
-        if ($note !== '') {
-            $out[] = 'Ghi chú chung: '.$note;
+        $pack = $this->packs?->get($project);
+        $hasPack = (bool) ($pack['is_set'] ?? false);
+
+        if ($hasPack) {
+            $out = explode("\n", rtrim((string) $this->packs->textSheet($project, $pack['data'], $note), "\n"));
+        } else {
+            $out = ['PHIẾU KỸ THUẬT — '.$project->name, str_repeat('=', 60), ''];
+            if ($note !== '') {
+                $out[] = 'Ghi chú chung: '.$note;
+                $out[] = '';
+            }
+            $out[] = 'Bộ sưu tập này CHƯA lập phiếu kỹ thuật. Các ô dưới đây để xưởng điền cùng khách.';
+            $out[] = 'Mở bộ sưu tập trong FabrikAI → Phiếu kỹ thuật để ghi thông số; lần xuất sau sẽ có sẵn.';
+            $out[] = '';
+        }
+
+        if ($images) {
+            $out[] = 'DANH SÁCH MẪU TRONG GÓI';
+            $out[] = str_repeat('=', 60);
             $out[] = '';
         }
 
@@ -353,11 +395,16 @@ class ProjectExportService
             $out[] = 'Ảnh tham chiếu : '.$img['file'];
             $out[] = 'Mô tả (AI)     : '.Str::limit((string) $img['prompt'], 300);
             $out[] = 'Model đã dùng  : '.$img['provider'].' · '.$img['model'].' · '.$img['resolution'].' · '.$img['created_at'];
-            $out[] = 'Chất liệu      : ......................................';
-            $out[] = 'Màu / mã vải   : ......................................';
-            $out[] = 'Đường may      : ......................................';
-            $out[] = 'Chi tiết cần lưu ý: ...................................';
-            $out[] = 'Số đo theo size: xem bang-size.csv';
+            if (! $hasPack) {
+                // Chỉ phát mẫu trắng khi CHƯA có phiếu thật (xem chú thích ở đầu hàm).
+                $out[] = 'Chất liệu      : ......................................';
+                $out[] = 'Màu / mã vải   : ......................................';
+                $out[] = 'Đường may      : ......................................';
+                $out[] = 'Chi tiết cần lưu ý: ...................................';
+                $out[] = 'Số đo theo size: xem bang-size.csv';
+            } else {
+                $out[] = 'Thông số       : xem khối THÔNG SỐ + BẢNG THÔNG SỐ ở đầu phiếu này';
+            }
             $out[] = '';
         }
 
@@ -371,5 +418,25 @@ class ProjectExportService
         $out[] = 'Xưởng xác nhận : ....................  Ngày: ....../....../......';
 
         return implode("\n", $out)."\n";
+    }
+
+    /**
+     * Tóm tắt phiếu kỹ thuật để đưa vào manifest.json — hệ thống của xưởng đọc là biết gói này có phiếu
+     * THẬT hay chỉ là mẫu trắng, thay vì phải mở tệp chữ ra đoán.
+     */
+    private function techPackSummary(Project $project): array
+    {
+        $pack = $this->packs?->get($project);
+
+        return [
+            'is_set' => (bool) ($pack['is_set'] ?? false),
+            'ready' => (bool) ($pack['completeness']['ready'] ?? false),
+            'filled' => (int) ($pack['completeness']['filled'] ?? 0),
+            'total' => (int) ($pack['completeness']['total'] ?? 0),
+            'missing' => array_values((array) ($pack['completeness']['missing'] ?? [])),
+            'updated_at' => $pack['updated_at'] ?? null,
+            'measurement_rows' => count((array) ($pack['data']['measurements'] ?? [])),
+            'sizes' => array_values((array) ($pack['data']['sizes'] ?? [])),
+        ];
     }
 }

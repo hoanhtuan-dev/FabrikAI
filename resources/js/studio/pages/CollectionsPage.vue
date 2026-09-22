@@ -24,6 +24,8 @@ import { EXPORT_CHANNELS } from '../exportChannels.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import StudioIcon from '../components/StudioIcon.vue';
 import ProjectDesignView from '../components/ProjectDesignView.vue';
+import BaseModal from '../components/BaseModal.vue';
+import TechPackEditor from '../components/TechPackEditor.vue';
 import { STATUS_COLOR } from '../dataColors.js';
 
 // [Xem lại thiết kế] Bộ sưu tập đang xem bản thiết kế đã lưu.
@@ -48,6 +50,8 @@ const form = ref({ name: '', season: '', deadline: '', brief: '' });
 const shareDays = ref(30);
 const shareInfo = ref(null);
 const exportForm = ref({ sizes: '', note: '', channel: '' });
+// Phiếu kỹ thuật (Việc #3): hộp thoại riêng — bảng thông số cần chỗ rộng hơn hộp thoại xuất gói.
+const techPackOpen = ref(false);
 const statusFilter = ref('all');
 let refreshTimer = null;
 
@@ -852,6 +856,14 @@ onBeforeUnmount(() => {
             <label class="label" for="ex-note">Ghi chú kỹ thuật (chất liệu, màu, yêu cầu riêng)</label>
             <textarea id="ex-note" v-model="exportForm.note" rows="2" class="input" placeholder="VD: Vải linen 100%, màu trắng ngà, đường may 1cm"></textarea>
           </div>
+          <!-- PHIẾU KỸ THUẬT: thông số THẬT đi vào tệp gửi xưởng. Chưa lập thì gói vẫn xuất được (mẫu trắng). -->
+          <div class="rounded-lg border border-ink-700 bg-ink-900/60 px-3 py-2.5">
+            <p class="text-label font-semibold text-cream-200">Phiếu kỹ thuật</p>
+            <p class="mt-1 text-label leading-5 text-cream-400">Vải · màu · đường may · bảng thông số theo size. Phiếu này thay các dòng chấm trống trong tệp gửi xưởng.</p>
+            <button type="button" class="tool-btn btn-sm mt-2" @click="techPackOpen = true">
+              <StudioIcon name="briefcase" size="h-3.5 w-3.5" /> Mở phiếu kỹ thuật
+            </button>
+          </div>
           <div class="flex justify-end gap-3">
             <button class="btn-ghost" @click="exportOpen = false">Đóng</button>
             <button class="btn-brand" @click="startExport()"><StudioIcon name="download" size="h-4 w-4" /> Tải gói ZIP</button>
@@ -859,6 +871,10 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+
+    <BaseModal v-model="techPackOpen" wide :title="'Phiếu kỹ thuật — ' + (applied?.name || '')">
+      <TechPackEditor v-if="applied && techPackOpen" :project-id="applied.id" />
+    </BaseModal>
 
     <!-- store.toast() đã được gọi ở khắp trang này nhưng KHÔNG có chỗ render ⇒ thông báo (kèm mã tra cứu) vô hình. -->
     <NotificationCenter />

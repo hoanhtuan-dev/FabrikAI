@@ -54,5 +54,34 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('upgrade-request', function (Request $request) {
             return Limit::perHour(5)->by('upgrade:'.($request->user()?->id ?? $request->ip()));
         });
+
+        $this->registerFalDriver();
+    }
+
+    /**
+     * DRIVER fal.ai CHO LARAVEL AI SDK — đăng ký TỪ ỨNG DỤNG, không vá vendor (2026-09-26).
+     *
+     * Vì sao làm được mà không cần sửa package: AiManager kế thừa Illuminate\Support\MultipleInstanceManager,
+     * và lớp đó có extend($name, Closure) — cơ chế chính thức để ứng dụng thêm driver riêng. Resolve() ưu
+     * tiên customCreators TRƯỚC các method create*Driver dựng sẵn.
+     *
+     * Vì sao KHÔNG vá vendor: bản vá sẽ mất ở lần composer update kế tiếp, và máy chủ dùng chung đang chặn
+     * proc_open nên càng không nên tạo thêm phụ thuộc phải cài đặt lại.
+     *
+     * Chỉ khai cho NHÓM ẢNH: fal không có endpoint chat kiểu OpenAI (API của nó là hàng đợi
+     * queue.fal.run), nên đăng ký nó như provider văn bản là mở một đường gọi SAI.
+     */
+    private function registerFalDriver(): void
+    {
+        if (! class_exists(\Laravel\Ai\AiManager::class)) {
+            return;
+        }
+
+        app(\Laravel\Ai\AiManager::class)->extend('fal', function ($app, array $config) {
+            return new \App\Ai\Providers\FalProvider(
+                $config,
+                $app->make(\Illuminate\Contracts\Events\Dispatcher::class),
+            );
+        });
     }
 }

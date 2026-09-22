@@ -12,6 +12,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useStudioStore } from '../store.js';
 import { EXPORT_CHANNELS } from '../exportChannels.js';
 import StudioIcon from './StudioIcon.vue';
+import BaseModal from './BaseModal.vue';
+import TechPackEditor from './TechPackEditor.vue';
 
 const store = useStudioStore();
 
@@ -51,6 +53,8 @@ const shareDays = ref(30);
 
 const exportOpen = ref(false);
 const exportForm = ref({ sizes: '', note: '', channel: '' });
+// Phiếu kỹ thuật (Việc #3): mở trong hộp thoại vì card sidebar quá hẹp cho một bảng thông số.
+const techPackOpen = ref(false);
 
 const createOpen = ref(false);
 const saving = ref(false);
@@ -475,12 +479,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <label class="label mb-1 block text-label uppercase tracking-wide text-cream-400" for="ex-note">Ghi chú kỹ thuật</label>
           <textarea id="ex-note" v-model="exportForm.note" rows="1" class="input !py-1.5 text-label" placeholder="Vải linen 100%, màu trắng ngà, đường may 1cm"></textarea>
         </div>
+        <!-- PHIẾU KỸ THUẬT: thông số THẬT đi vào gói. Chưa lập phiếu thì gói vẫn xuất được (mẫu trắng). -->
+        <button type="button" class="tool-btn btn-sm w-full justify-start" @click="techPackOpen = true">
+          <StudioIcon name="briefcase" size="h-3.5 w-3.5" /> Phiếu kỹ thuật (vải · màu · đường may · bảng thông số)
+        </button>
         <div class="flex justify-end gap-2">
           <button class="tool-btn btn-sm" @click="exportOpen = false">Đóng</button>
           <button class="btn-brand btn-sm" @click="startExport()"><StudioIcon name="download" size="h-3.5 w-3.5" /> Tải ZIP</button>
         </div>
       </div>
     </div>
+
+    <BaseModal v-model="techPackOpen" wide :title="'Phiếu kỹ thuật — ' + (applied?.name || '')">
+      <TechPackEditor v-if="applied && techPackOpen" :project-id="applied.id" />
+    </BaseModal>
 
     <!-- ══ TẠO MỚI ══ -->
     <div v-if="createOpen" class="mx-3 mb-3 rounded-xl border border-ink-700 bg-ink-900/60 p-3">
