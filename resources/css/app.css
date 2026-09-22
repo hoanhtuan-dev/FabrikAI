@@ -754,7 +754,9 @@ html[data-theme='light'] {
     .tool-btn.is-active { @apply border-brand-500 bg-brand-600/20 text-brand-200 hover:bg-brand-600/30; }
     /* Nút icon vuông chuẩn (mọi chrome studio) */
     /* Nút icon: 36×36 là mức chạm tối thiểu thoải mái trên điện thoại (7×7 = 28px quá nhỏ cho ngón tay). */
-    .icon-btn { @apply grid h-10 w-10 shrink-0 place-items-center text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-30;
+    /* `relative`: huy hiệu đếm/trạng thái (absolute) neo ĐÚNG vào nút — thiếu nó thì absolute neo về
+       thẻ cha định vị gần nhất (header) và huy hiệu bay lên góc phải, đè lên nút tài khoản. */
+    .icon-btn { @apply relative grid h-10 w-10 shrink-0 place-items-center text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-30;
         border-radius: var(--radius-selector);
     }
     /* Header chuẩn của panel/card trong workspace */

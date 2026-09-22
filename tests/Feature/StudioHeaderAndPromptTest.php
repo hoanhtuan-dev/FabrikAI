@@ -133,4 +133,24 @@ class StudioHeaderAndPromptTest extends TestCase
             'Không có dữ liệu thì phải nói thẳng là không có.'
         );
     }
+
+    /**
+     * 6. [đợt 32 · LỖI THẬT] Nút icon phải là KHUNG ĐỊNH VỊ (position: relative).
+     *
+     * Lỗi gốc rễ: .icon-btn thiếu `relative`, còn huy hiệu đếm của nút Outputs là `absolute right-0
+     * top-0` ⇒ nó neo về thẻ cha định vị gần nhất (thẻ <header relative>) thay vì neo vào nút, nên bay
+     * lên góc phải header và bị nút tài khoản đè lên — đúng cái người dùng báo "nút tài khoản đè nút
+     * Outputs" dù đo bề rộng không thấy tràn. Khoá ở đây để lớp lỗi này không thể quay lại.
+     */
+    public function test_icon_buttons_anchor_their_badges_inside_the_button(): void
+    {
+        $css = (string) file_get_contents(resource_path('css/app.css'));
+
+        // Lấy ĐÚNG khối .icon-btn (không phải .icon-btn.is-active hay nơi khác).
+        preg_match('/\.icon-btn\s*\{[^}]*\}/s', $css, $m);
+        $this->assertNotEmpty($m, 'Thiếu quy tắc .icon-btn.');
+        $this->assertStringContainsString('relative', $m[0],
+            '.icon-btn phải là khung định vị — huy hiệu absolute phải neo vào nút, không được trôi về header.'
+        );
+    }
 }
