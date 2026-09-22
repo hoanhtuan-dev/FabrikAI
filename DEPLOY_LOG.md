@@ -5,6 +5,48 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 21) — STUDIO XONG: THANH CÔNG CỤ CANVAS GOM NHÓM CHO ĐIỆN THOẠI
+
+**Commit:** `07179fa`. **Trạng thái: đã commit + push + DEPLOY production.** Đây là việc CUỐI của bước "Studio".
+
+### 1. Vấn đề (đo trước khi sửa)
+Thanh công cụ nổi có **10 nút 32px** xếp ngang, phải **cuộn ngang** mới thấy hết; tất cả cùng một cỡ và **chỉ có icon** — không nút nào nói được nó là gì. Và bốn nút "vùng chọn" (chữ nhật · tự do · đường cong · magic) thực ra là **bốn biến thể của cùng một việc**.
+
+### 2. Đã làm — điện thoại 10 nút → **6 mục**
+| Nhóm | Nội dung |
+|---|---|
+| 4 việc ĐƠN | **Lựa chọn** · **Di chuyển canvas** · **Cắt khung** · **Film Look** |
+| 2 NHÓM có menu | **Vùng sửa** (4 biến thể, nút hiện icon của biến thể ĐANG dùng) · **Vẽ / Xoá** (vẽ tự do · xoá vùng) |
+
+Menu của nhóm có **NHÃN CHỮ + một câu hướng dẫn** cho từng lựa chọn (*"Vùng đường cong — bấm đặt điểm neo, quay lại điểm đầu để đóng"*) thay vì để người dùng đoán qua icon.
+
+Máy tính **giữ nguyên cột dọc 10 nút**: ở đó có chuột, mật độ dày là lợi thế, mọi icon đều có tooltip — gom nhóm trên desktop chỉ thêm một cú bấm cho người đã quen.
+
+### 3. Đo sau khi sửa (390px)
+| Kiểm tra | Kết quả |
+|---|---|
+| Mục trên thanh | **6** (4 nút đơn + 2 nhóm) — trước là 10 nút phải cuộn ngang |
+| Chiều cao nút | **40px** (trước 32px) |
+| Kích thước thanh | **270×50px**, **không còn cuộn ngang** (trước tràn quá bề ngang màn hình) |
+| Tràn ngang trang | **0** |
+| Máy tính | cột dọc **50px** rộng, đủ 10 nút như cũ |
+| Test | **1233 XANH / 9.357 assertion** |
+
+### 4. BƯỚC "STUDIO" — ĐÃ XONG (tổng kết 4 việc)
+| Việc | Kết quả đo |
+|---|---|
+| Gộp hai thanh trên thành MỘT app bar (đợt 18) | điện thoại **110px → 53px** chrome |
+| Thang bề mặt Material (đợt 19) | ba tầng cách nhau **4/255 → ~12–15** |
+| Thanh trạng thái canvas theo Material (đợt 20) | điện thoại **13 → 7** điều khiển, nút nhỏ nhất **40px** |
+| Thanh công cụ canvas gom nhóm (đợt 21) | điện thoại **10 → 6** mục, hết cuộn ngang |
+
+### 5. Việc còn lại của chuỗi
+| # | Việc |
+|---|---|
+| 1 | **Thư viện** — bố cục lưới ảnh · bộ lọc · trạng thái rỗng theo ngôn ngữ mới |
+| 2 | **Gộp quản trị + Cài đặt thành MỘT SPA** (kế hoạch đã khảo sát ở đợt 16) |
+
+---
 ## Phiên 2026-09-26 (đợt 20) — STUDIO: THANH TRẠNG THÁI CANVAS THEO MATERIAL
 
 **Commit:** `00a1041`. **Trạng thái: đã commit + push + DEPLOY production.**
