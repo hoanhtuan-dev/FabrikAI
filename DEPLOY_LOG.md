@@ -5,6 +5,50 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 7) — GỘP LỊCH VỀ MỘT CHỖ: `grant-plan-credits` vào `schedule:run`
+
+**Commit:** `6b46ef2`. **Trạng thái: đã commit + push + DEPLOY production** (không có migration).
+
+### 1. Vì sao
+Lệnh cấp credit theo chu kỳ gói vốn có **một entry cron RIÊNG** trong hPanel ⇒ lịch của hệ thống nằm ở
+**HAI nơi**: một phần trong mã (`routes/console.php`), một phần trong panel. Chính chỗ đó vừa gây ra sự cố
+đợt 5: entry trong panel được thêm lại bằng dạng lệnh **sai** (`cd … && …`) nên job chết ngay mà không ai thấy.
+
+Từ khi `schedule:run` chạy mỗi phút (đợt 6), **không còn lý do gì để giữ entry riêng**.
+
+### 2. Đã làm
+```php
+Schedule::command('studio:grant-plan-credits')->dailyAt('00:30')->onOneServer()->withoutOverlapping();
+```
+
+**00:30 giữ ĐÚNG giờ của entry cũ** ⇒ không đổi hành vi cấp credit của khách đang dùng (entry cũ ghi log lúc
+`00:30:02`). Lệnh tự idempotent (PlanService dùng CAS + transaction) nên nếu entry cũ còn sót thì chạy hai
+lần **không** cấp trùng — nhưng vẫn nên xoá để chỉ còn MỘT nguồn sự thật.
+
+### 3. Kiểm chứng trên máy chủ
+`php artisan schedule:list` (chạy trên production sau deploy):
+```
+ 30   0 * * *  php artisan studio:grant-plan-credits  Next Due: 10 hours from now
+```
+Cùng 5 mục cũ: clean-storage 03:00 · market-signals mỗi 30 phút · heartbeat mỗi 5 phút · prune 03:30 ·
+samples:remind 08:00.
+
+### 4. Việc chủ dự án cần làm — XOÁ entry cũ trong hPanel
+Job **`bowxjf6Z8d`** (`studio:grant-plan-credits`) trong hPanel → Cron Jobs: **xoá nó**. Không xoá cũng
+không hỏng (idempotent), nhưng mục tiêu của đợt này là **một chỗ quản lịch**.
+
+Sau khi xoá, hai entry cron **duy nhất** còn lại của fabrikai là:
+`seKYAPOwkS` (`schedule:run` mỗi phút) và `3pc53LMYT5` (`queue:work` mỗi 5 phút) — cả hai dùng dạng
+lệnh đã sửa (đợt 5): đường dẫn tuyệt đối tới `/usr/bin/php` và `artisan`, **không `cd`, không `&&`**.
+
+### 5. Cách kiểm chứng lần sau (không cần hỏi ai)
+```
+ls -la ~/.logs/ | grep cronjob          # phải thấy mtime trong vài phút gần đây
+php artisan tinker --execute="echo cache('studio:scheduler:heartbeat');"
+```
+
+---
+
 ## Phiên 2026-09-26 (đợt 6) — CRON ĐÃ SỐNG: ĐÓNG MÓN NỢ ĐƯỢC NHẮC BỐN LẦN
 
 **Trạng thái: KHÔNG deploy code.** Đây là xác nhận hạ tầng — món nợ "máy chủ không có cron" đã được đóng.
