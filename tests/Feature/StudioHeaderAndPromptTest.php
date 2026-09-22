@@ -51,8 +51,12 @@ class StudioHeaderAndPromptTest extends TestCase
 
         $this->assertStringContainsString('data-account-toggle', $app, 'Thiếu nút mở menu tài khoản.');
         $this->assertStringContainsString('data-account-menu', $app, 'Thiếu menu tài khoản.');
-        $this->assertStringContainsString('dropdown dropdown-end', $app, 'Menu tài khoản phải là dropdown của daisyUI.');
-        $this->assertStringContainsString('menu dropdown-content', $app, 'Nội dung menu phải dùng .menu của daisyUI.');
+        // [đợt 33] Menu tài khoản KHÔNG còn dùng anchor positioning của daisyUI (gây hiện sai chỗ và đè
+        // nút Outputs trên vài trình duyệt) — nay định vị TƯỜNG MINH như mọi popover khác của Studio.
+        $this->assertStringContainsString('absolute right-0 top-full', $app,
+            'Menu tài khoản phải định vị tường minh ngay dưới bên phải nút tài khoản.');
+        $this->assertStringContainsString('class="menu absolute right-0 top-full', $app,
+            'Nội dung menu vẫn dùng .menu của daisyUI nhưng đặt vị trí tuyệt đối rõ ràng.');
 
         // Đếm trong PHẠM VI MENU: chú thích trong mã cũng nhắc tới chữ này khi giải thích vì sao nút rời đã bỏ.
         $menu = substr($app, strpos($app, 'data-account-menu'));

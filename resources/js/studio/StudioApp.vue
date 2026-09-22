@@ -1291,8 +1291,8 @@ function onTouchEnd(e) {
              [2026-09-26 · đợt 27] Nút "Cài đặt" riêng và nút "Đăng xuất" riêng đã BỎ: cả hai nằm
              trong menu này. Lối vào cài đặt nay là /cai-dat — trang hợp nhất có đủ ba khu, và máy chủ
              vẫn tự ẩn khu chỉ owner, nên tài khoản thường không thấy mục nào họ không mở được. -->
-        <div v-if="store.user" class="dropdown dropdown-end" :class="accountOpen ? 'dropdown-open' : ''">
-          <button type="button" class="btn btn-ghost btn-circle" data-account-toggle title="Tài khoản" aria-label="Tài khoản"
+        <div v-if="store.user" class="relative">
+          <button type="button" class="btn btn-ghost btn-circle relative" data-account-toggle title="Tài khoản" aria-label="Tài khoản"
                   :aria-expanded="accountOpen ? 'true' : 'false'" @click="accountOpen = !accountOpen" @keydown.escape="accountOpen = false">
             <span class="avatar">
               <span class="w-8 rounded-full ring-2 ring-brand-500/40">
@@ -1302,7 +1302,10 @@ function onTouchEnd(e) {
             </span>
           </button>
           <div v-if="accountOpen" class="fixed inset-0 z-40" @click="accountOpen = false"></div>
-          <ul data-account-menu class="menu dropdown-content z-50 mt-2 w-64 rounded-box border border-ink-700 bg-ink-900 p-2 shadow-2xl">
+          <!-- [2026-09-26 · đợt 33] Menu tài khoản định vị TƯỜNG MINH (absolute right-0 top-full) — đúng lối
+               mọi popover khác của Studio. Bỏ CSS anchor positioning của daisyUI (dropdown/dropdown-
+               content): trên một số trình duyệt nó hiện sai chỗ và đè lên nút Outputs. -->
+          <ul v-if="accountOpen" data-account-menu class="menu absolute right-0 top-full z-50 mt-2 w-64 rounded-box border border-ink-700 bg-ink-900 p-2 shadow-2xl">
             <li class="menu-title !flex-col !items-start gap-0.5">
               <span class="text-sm font-semibold text-cream-50">{{ store.user.name }}</span>
               <span class="text-label text-cream-400">{{ store.user.role_label || store.user.role }} · {{ store.user.email }}</span>
