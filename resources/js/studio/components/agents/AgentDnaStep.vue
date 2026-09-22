@@ -14,10 +14,12 @@
  * Mỗi việc con có HÀNG NÚT LƯU RIÊNG: DNA lưu vào /api/brand-dna, quy tắc lưu vào /api/brand-rules —
  * hai hồ sơ độc lập, gộp nút là lưu cái này ghi đè cái kia.
  */
-import { inject } from 'vue';
+import { inject, ref } from 'vue';
 import { useStudioStore } from '../../store.js';
 import StudioIcon from '../StudioIcon.vue';
 import AgentSubSteps from './AgentSubSteps.vue';
+import BrandMemoryPanel from '../BrandMemoryPanel.vue';
+import DesignSearchPanel from '../DesignSearchPanel.vue';
 
 const store = useStudioStore();
 const sub = inject('sub');
@@ -25,6 +27,9 @@ const DNA_LISTS = inject('DNA_LISTS');
 const dna = inject('dna');
 const dnaDraft = inject('dnaDraft');
 const dnaDirty = inject('dnaDirty');
+/** Khối "Tìm thiết kế cũ" (việc #9) — mở theo yêu cầu, không gọi mạng lúc mở trang. */
+const searchOpen = ref(false);
+
 const dnaBlockReason = inject('dnaBlockReason');
 const dnaEmpty = inject('dnaEmpty');
 const dnaListMax = inject('dnaListMax');
@@ -92,6 +97,20 @@ const SUB_TITLE = {
                 <li>· <b class="text-cream-100">Danh mục xu hướng mẫu</b> — vẫn là dữ liệu MẪU, chưa nối sàn TMĐT.</li>
               </ul>
             </details>
+          </div>
+
+          <!-- TRÍ NHỚ ĐÃ HỌC: bài học agent tự rút từ ảnh bạn duyệt/loại. Đặt ngay cạnh phần khai báo
+               để người dùng thấy được CẢ HAI loại trí nhớ: loại mình viết (DNA · quy tắc) và loại
+               agent tự học. -->
+          <BrandMemoryPanel />
+
+          <!-- TÌM THIẾT KẾ CŨ (việc #9): kho tài liệu của chính tài khoản — dùng ngay lúc viết brief, khi câu
+               hỏi "mùa trước mình làm gì rồi" có ích nhất. -->
+          <button type="button" class="tool-btn btn-sm mt-2" :aria-expanded="searchOpen" @click="searchOpen = !searchOpen">
+            <StudioIcon name="search" size="h-3.5 w-3.5" /> {{ searchOpen ? 'Đóng tìm kiếm' : 'Tìm thiết kế cũ' }}
+          </button>
+          <div v-if="searchOpen" class="mt-2 rounded-lg border border-ink-700 bg-ink-900/40">
+            <DesignSearchPanel />
           </div>
         </div>
       </div>

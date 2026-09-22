@@ -29,6 +29,7 @@ import TechPackEditor from '../components/TechPackEditor.vue';
 import SampleTracking from '../components/SampleTracking.vue';
 import QcPanel from '../components/QcPanel.vue';
 import GatePanel from '../components/GatePanel.vue';
+import ProductionTracking from '../components/ProductionTracking.vue';
 import { STATUS_COLOR } from '../dataColors.js';
 
 // [Xem lại thiết kế] Bộ sưu tập đang xem bản thiết kế đã lưu.
@@ -61,6 +62,8 @@ const samplesOpen = ref(false);
 const qcOpen = ref(false);
 // Ba cổng duyệt (Việc #7): chốt phiếu kỹ thuật · chốt kế hoạch SX & giá · nghiệm thu QC.
 const gatesOpen = ref(false);
+// Tiến độ sản xuất (Việc #8): sản lượng THẬT theo ngày, so với kế hoạch.
+const productionOpen = ref(false);
 const statusFilter = ref('all');
 let refreshTimer = null;
 
@@ -110,6 +113,16 @@ const statuses = computed(() => store.projectStatuses || {});
 const stats = computed(() => (applied.value ? store.projectStats[applied.value.id] || null : null));
 // Tiến độ ba cổng của bộ ĐANG áp dụng — dùng cho nhãn trên nút. Chỉ đọc khi bảng trong store đúng là
 // của bộ này (bài học "số của người khác" đã ghi ở CollectionsCard: mở bộ A rồi xem bộ B).
+/**
+ * Tiến độ sản xuất của bộ ĐANG áp dụng — dùng cho nhãn trên nút. Cùng lớp lỗi "số của người khác" đã ghi
+ * ở các computed bên dưới: chỉ đọc khi bảng trong store ĐÚNG là của bộ này.
+ */
+const productionProgress = computed(() => {
+  if (!store.production || store.productionProjectId !== applied.value?.id) return null;
+  const p = store.production.progress || {};
+  if (p.pct === null || p.pct === undefined) return null;
+  return { pct: p.pct, behind: Number(p.behind_days || 0) };
+});
 const gateProgress = computed(() => {
   if (!store.gates || store.gatesProjectId !== applied?.value?.id) return null;
   const s = store.gates.summary || {};
@@ -556,6 +569,11 @@ onBeforeUnmount(() => {
                 <button class="tool-btn btn-sm" @click="qcOpen = true">
                   <StudioIcon name="shieldCheck" size="h-4 w-4" /> Kiểm tra chất lượng<span v-if="store.qc && store.qcProjectId === applied?.id && (store.qc.counts?.fail || 0) > 0"> · {{ store.qc.counts.fail }} lô không đạt</span>
                 </button>
+                <!-- TIẾN ĐỘ SẢN XUẤT (Việc #8): sản lượng thật theo ngày — chấm đỏ khi chậm tiến độ. -->
+                <button class="tool-btn btn-sm" :class="productionProgress && productionProgress.behind ? '!border-danger/40 !text-danger' : ''" @click="productionOpen = true">
+                  <StudioIcon name="clock" size="h-4 w-4" /> Tiến độ SX
+                  <span v-if="productionProgress"> · {{ productionProgress.behind ? 'chậm ' + productionProgress.behind + ' ngày' : productionProgress.pct + '%' }}</span>
+                </button>
                 <!-- BA CỔNG DUYỆT: duyệt ba thứ ĐI RA NHÀ MÁY (thông số · tiền · chất lượng), khác trạng thái bộ (duyệt bản thiết kế). -->
                 <button class="tool-btn btn-sm" :class="gateProgress && gateProgress.ready ? '!border-ok/40 !text-ok' : ''" @click="gatesOpen = true">
                   <StudioIcon name="checkSquare" size="h-4 w-4" /> Ba cổng duyệt
@@ -916,6 +934,10 @@ onBeforeUnmount(() => {
 
     <BaseModal v-model="gatesOpen" wide :title="'Ba cổng duyệt — ' + (applied?.name || '')">
       <GatePanel v-if="applied && gatesOpen" :project-id="applied.id" />
+    </BaseModal>
+
+    <BaseModal v-model="productionOpen" wide :title="'Tiến độ sản xuất — ' + (applied?.name || '')">
+      <ProductionTracking v-if="applied && productionOpen" :project-id="applied.id" />
     </BaseModal>
 
     <!-- store.toast() đã được gọi ở khắp trang này nhưng KHÔNG có chỗ render ⇒ thông báo (kèm mã tra cứu) vô hình. -->

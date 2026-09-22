@@ -32,6 +32,7 @@ class StaticIntegrityTest extends TestCase
 
             if (! class_exists($class)) {
                 $broken[] = $route->methods()[0].' '.$route->uri()." -> class không tồn tại: {$class}";
+
                 continue;
             }
             if (! method_exists($class, $method)) {
@@ -169,7 +170,7 @@ class StaticIntegrityTest extends TestCase
         // Nếu một trong các tên này quay lại app/Http, routes/ hoặc resources/views thì hoặc là
         // code chết vừa được nối lại, hoặc ai đó đang port storefront ngược vào app studio.
         $symbols = ['CustomPage', 'MenuItem', 'CartService', 'CheckoutService', 'App\\Support\\Seo',
-                    'menu_items(', 'seo()', 'cart_count(', 'App\\Models\\Product', 'App\\Models\\Order'];
+            'menu_items(', 'seo()', 'cart_count(', 'App\\Models\\Product', 'App\\Models\\Order'];
         $liveDirs = ['app/Http', 'routes', 'resources/views'];
 
         $leaks = [];
@@ -184,7 +185,10 @@ class StaticIntegrityTest extends TestCase
                 }
                 $src = (string) file_get_contents($f->getPathname());
                 foreach ($symbols as $sym) {
-                    if (str_contains($src, $sym)) {
+                    // KHỚP TRỌN TÊN, không phải khớp chuỗi con: `App\Models\Product` là tiền tố của
+                    // `App\Models\ProductionLog` (việc #8, 2026-09-26) ⇒ str_contains báo động giả và
+                    // một rào chắn hay báo động giả sẽ bị tắt đi — lúc đó nó không chặn được gì nữa.
+                    if (preg_match('/'.preg_quote($sym, '/').'(?![A-Za-z0-9_])/', $src) === 1) {
                         $leaks[] = $this->rel($f->getPathname()).' -> '.$sym;
                     }
                 }
@@ -226,6 +230,7 @@ class StaticIntegrityTest extends TestCase
             $rel = 'resources/js/studio/'.$entry;
             if (! is_file(base_path($rel))) {
                 $violations[] = "thiếu entry {$rel}";
+
                 continue;
             }
             $src = (string) file_get_contents(base_path($rel));
@@ -379,8 +384,8 @@ class StaticIntegrityTest extends TestCase
             'Menu mobile phải có "Nguồn ảnh" (sourcePickerOpen) và "Thư viện" (goLibrary).');
 
         // (c) Không còn import chết SourcePanel / LibraryCard.
-        $this->assertStringNotContainsString("import SourcePanel", $app, 'Import chết SourcePanel phải bị gỡ.');
-        $this->assertStringNotContainsString("import LibraryCard", $app, 'Import chết LibraryCard phải bị gỡ.');
+        $this->assertStringNotContainsString('import SourcePanel', $app, 'Import chết SourcePanel phải bị gỡ.');
+        $this->assertStringNotContainsString('import LibraryCard', $app, 'Import chết LibraryCard phải bị gỡ.');
     }
 
     public function test_dialogs_trap_focus_instead_of_letting_tab_escape(): void

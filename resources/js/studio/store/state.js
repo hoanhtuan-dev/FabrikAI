@@ -68,6 +68,22 @@ export function studioState() {
     gatesLoading: false,
     gatesSaving: false,
     gatesError: '',
+    // ── TIẾN ĐỘ SẢN XUẤT (Việc #8, 2026-09-26) ───────────────────────────────────────────
+    // Số THẬT theo ngày, do người dùng ghi. Mọi con số khác (tiến độ · nhịp · ngày dự kiến xong ·
+    // cảnh báo) do MÁY CHỦ tính từ bảng này + kế hoạch — giao diện không tự tính để hai bên không lệch.
+    production: null,          // { items, plan, actual, progress, alerts, summary, shape }
+    productionProjectId: null, // bộ đang xem
+    productionLoading: false,
+    productionSaving: false,
+    productionError: '',
+    // ── TÌM THIẾT KẾ CŨ (FileSearch — Việc #9, 2026-09-26) ────────────────────────────────
+    // Kết quả tìm KHÔNG lưu vào bộ sưu tập nào: đây là câu hỏi trên cả kho tài liệu của tài khoản.
+    // `mode` cho biết đang tìm theo NGỮ NGHĨA (vec-tơ) hay TỪ KHOÁ — giao diện phải hiện đúng con chữ đó.
+    search: null,              // { query, mode, mode_label, reason, items, scanned, capped, took_ms, shape }
+    searchLoading: false,
+    searchError: '',
+    searchBusy: false,         // đang lập chỉ mục
+    searchStatus: null,        // { stats: {...}, shape: {...} }
     planOpen: false,        // popup "Gói & credit" ở thanh công cụ
     planCatalogOpen: false, // mở danh mục gói bên trong popup
     planBusy: false,
@@ -347,6 +363,13 @@ export function studioState() {
     brandRulesSaving: false,
     brandRulesError: '',
     brandRulesDraft: [],     // bản đang sửa (mảng hàng; chỉ ghi vào DB khi bấm Lưu)
+    // ── TRÍ NHỚ ĐÃ HỌC (bài học agent tự rút) — 2026-09-26 ──────────────────────────────────
+    // Chỉ để ĐỌC LẠI và QUÊN: người dùng không viết được bài học ở đây (agent rút ra từ ảnh họ duyệt),
+    // nhưng phải xoá được một bài học sai — trí nhớ không sửa được là trí nhớ sẽ sai dần.
+    brandMemory: null,       // { items: [...], stats: {...}, limits: {...} }
+    brandMemoryLoading: false,
+    brandMemoryBusy: false,
+    brandMemoryError: '',
     // Khả năng truy cập internet của agent — ĐO THẬT, không phải câu văn tĩnh.
     webAccess: null,
     webAccessLoading: false,

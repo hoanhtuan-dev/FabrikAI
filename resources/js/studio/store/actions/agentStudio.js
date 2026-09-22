@@ -281,6 +281,51 @@ export const agentStudioActions = {
         this.brandRulesSaving = false;
       }
     },
+    // ══════════════════ TRÍ NHỚ ĐÃ HỌC — BÀI HỌC AGENT TỰ RÚT (2026-09-26) ══════════════════
+    /**
+     * Nạp danh sách ký ức + số liệu. Gọi khi người dùng mở khối "Trí nhớ" (không nạp sẵn lúc mở trang:
+     * danh sách này không cần cho bốn bước, và mỗi lần mở trang là một lời gọi mạng không ai xem).
+     */
+    async loadBrandMemory() {
+      this.brandMemoryLoading = true;
+      this.brandMemoryError = '';
+      try {
+        const res = await fetch('/api/brand-memory', { headers: { Accept: 'application/json' } });
+        if (!res.ok) throw apiError(await res.json().catch(() => ({})), 'Không tải được trí nhớ đã học.');
+        this.brandMemory = await res.json();
+        return this.brandMemory;
+      } catch (e) {
+        this.brandMemoryError = userFacingError(e, 'Không tải được trí nhớ đã học.');
+        return null;
+      } finally {
+        this.brandMemoryLoading = false;
+      }
+    },
+    /**
+     * QUÊN một ký ức. Máy chủ trả về CẢ danh sách mới nên giao diện không phải tự trừ số liệu —
+     * trừ tay ở máy khách là chỗ để số tổng lệch khỏi máy chủ ngay sau lần xoá đầu tiên.
+     */
+    async forgetBrandMemory(id) {
+      this.brandMemoryBusy = true;
+      this.brandMemoryError = '';
+      try {
+        const res = await fetch('/api/brand-memory/' + id, {
+          method: 'DELETE',
+          headers: { 'X-XSRF-TOKEN': CSRF(), Accept: 'application/json' },
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(d, 'Không xoá được ký ức này.');
+        this.brandMemory = d;
+        this.toast('Đã quên ký ức này — agent sẽ không dùng lại nữa.', 'info');
+        return true;
+      } catch (e) {
+        this.brandMemoryError = userFacingError(e, 'Không xoá được ký ức này.');
+        this.toast(this.brandMemoryError, 'error');
+        return false;
+      } finally {
+        this.brandMemoryBusy = false;
+      }
+    },
     /** Bỏ thay đổi chưa lưu: quay về đúng bản đang có trên máy chủ. */
     discardBrandRulesDraft() {
       this.brandRulesDraft = JSON.parse(JSON.stringify(this.brandRules?.rules || []));

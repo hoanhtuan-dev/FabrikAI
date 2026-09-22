@@ -7,21 +7,24 @@ use App\Http\Controllers\AgentSessionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\BrandDnaController;
+use App\Http\Controllers\BrandMemoryController;
 use App\Http\Controllers\BrandRuleController;
 use App\Http\Controllers\ClientErrorController;
+use App\Http\Controllers\DesignAgentController;
+use App\Http\Controllers\DesignSearchController;
+use App\Http\Controllers\ProductionController;
 use App\Http\Controllers\ProjectController;
-use App\Http\Controllers\ProjectShareController;
 use App\Http\Controllers\ProjectGateController;
+use App\Http\Controllers\ProjectShareController;
 use App\Http\Controllers\QcController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SampleController;
 use App\Http\Controllers\StudioController;
 use App\Http\Controllers\StudioSettingsController;
-use App\Http\Controllers\DesignAgentController;
 use App\Http\Controllers\StylistDataController;
 use App\Http\Controllers\TeamController;
-use App\Http\Controllers\ThemeController;
 use App\Http\Controllers\TechPackController;
+use App\Http\Controllers\ThemeController;
 use App\Http\Controllers\ThemeLibraryController;
 use App\Http\Controllers\UserCatalogController;
 use Illuminate\Support\Facades\Route;
@@ -173,6 +176,21 @@ Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
     Route::get('/brand-rules', [BrandRuleController::class, 'show'])->name('brand-rules.show');
     Route::put('/brand-rules', [BrandRuleController::class, 'update'])->name('brand-rules.update');
     Route::delete('/brand-rules', [BrandRuleController::class, 'destroy'])->name('brand-rules.destroy');
+
+    // ── TRÍ NHỚ ĐÃ HỌC của chính người dùng (bài học rút từ ảnh duyệt/loại · 2026-09-26) ────────
+    // Cùng nhóm và cùng lý do như /brand-dna và /brand-rules: đây là dữ liệu CỦA người dùng, không
+    // phải tính năng bán theo gói — công tắc gói không được làm họ mất trí nhớ hay không xoá được
+    // một bài học SAI mà agent đã rút ra.
+    Route::get('/brand-memory', [BrandMemoryController::class, 'index'])->name('brand-memory.index');
+    Route::delete('/brand-memory/{learning}', [BrandMemoryController::class, 'destroy'])->name('brand-memory.destroy');
+
+    // ── TÌM THIẾT KẾ CŨ — FileSearch (việc #9 · 2026-09-26) ────────────────────────────────────
+    // Cùng nhóm với /brand-dna · /brand-rules · /brand-memory: kho tài liệu là CỦA CHÍNH người dùng
+    // (ảnh họ tạo · brief · bài học · phiếu kỹ thuật), không phải tính năng bán theo gói — công tắc gói
+    // không được làm họ mất đường tìm lại việc mình đã làm.
+    Route::get('/design-search', [DesignSearchController::class, 'index'])->name('design-search.index');
+    Route::get('/design-search/status', [DesignSearchController::class, 'status'])->name('design-search.status');
+    Route::post('/design-search/index', [DesignSearchController::class, 'indexNow'])->name('design-search.index-now');
 });
 
 // ── BÁO LỖI TỪ TRÌNH DUYỆT (Đợt 21 — 2026-09-23) ────────────────────────────────
@@ -234,6 +252,11 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     // Khác trạng thái dự án (draft→review→approved = duyệt BẢN THIẾT KẾ): đây là duyệt ba thứ ĐI RA NHÀ MÁY.
     Route::get('/projects/{project}/gates', [ProjectGateController::class, 'index'])->name('projects.gates.index');
     Route::post('/projects/{project}/gates/{gate}', [ProjectGateController::class, 'decide'])->name('projects.gates.decide');
+
+    // [Việc #8 — 2026-09-26] TIẾN ĐỘ SẢN XUẤT: sản lượng THẬT theo ngày, so với kế hoạch trong bộ.
+    Route::get('/projects/{project}/production', [ProductionController::class, 'index'])->name('projects.production.index');
+    Route::post('/projects/{project}/production', [ProductionController::class, 'store'])->name('projects.production.store');
+    Route::delete('/projects/{project}/production/{log}', [ProductionController::class, 'destroy'])->name('projects.production.destroy');
 
     // [Đợt 2 — 2026-09-19] Chi phí & tiến độ của MỘT bộ sưu tập (số ảnh xong/đang chạy/lỗi · credit đã
     // dùng · hạn còn lại · phản hồi mới nhất) — cho chủ doanh nghiệp kiểm soát chi phí theo bộ.
@@ -402,18 +425,18 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     // ── Gói đăng ký: người dùng TỰ đăng ký một gói (auth + can-studio) ──
     Route::post('/billing/subscribe', [BillingController::class, 'subscribe'])->name('billing.subscribe');
 
-// [Q2 — 2026-09-19] YÊU CẦU NÂNG CẤP GÓI: khách chọn gói + số tháng + cách thanh toán (chuyển khoản
-// ngân hàng / VNPay khi mở / nhờ hỗ trợ), nhận MÃ THEO DÕI; chủ dự án kích hoạt sau khi nhận tiền.
-// throttle:upgrade-request — chống spam gửi yêu cầu (xem AppServiceProvider).
-Route::post('/billing/upgrade-request', [BillingController::class, 'upgradeRequest'])
-    ->middleware('throttle:upgrade-request')->name('billing.upgrade.request');
-Route::get('/billing/upgrade-request', [BillingController::class, 'upgradeStatus'])->name('billing.upgrade.status');
+    // [Q2 — 2026-09-19] YÊU CẦU NÂNG CẤP GÓI: khách chọn gói + số tháng + cách thanh toán (chuyển khoản
+    // ngân hàng / VNPay khi mở / nhờ hỗ trợ), nhận MÃ THEO DÕI; chủ dự án kích hoạt sau khi nhận tiền.
+    // throttle:upgrade-request — chống spam gửi yêu cầu (xem AppServiceProvider).
+    Route::post('/billing/upgrade-request', [BillingController::class, 'upgradeRequest'])
+        ->middleware('throttle:upgrade-request')->name('billing.upgrade.request');
+    Route::get('/billing/upgrade-request', [BillingController::class, 'upgradeStatus'])->name('billing.upgrade.status');
 
-// [Q4 — 2026-09-19] NHÓM LÀM VIỆC THEO SỐ GHẾ: chủ nhóm mời/bỏ thành viên; thành viên dùng chung gói,
-// credit và bộ sưu tập. Thành viên xem được nhóm mình nhưng không mời/xoá (controller trả 403).
-Route::get('/team', [TeamController::class, 'index'])->name('team.index');
-Route::post('/team/members', [TeamController::class, 'store'])->name('team.members.store');
-Route::delete('/team/members/{user}', [TeamController::class, 'destroy'])->name('team.members.destroy');
+    // [Q4 — 2026-09-19] NHÓM LÀM VIỆC THEO SỐ GHẾ: chủ nhóm mời/bỏ thành viên; thành viên dùng chung gói,
+    // credit và bộ sưu tập. Thành viên xem được nhóm mình nhưng không mời/xoá (controller trả 403).
+    Route::get('/team', [TeamController::class, 'index'])->name('team.index');
+    Route::post('/team/members', [TeamController::class, 'store'])->name('team.members.store');
+    Route::delete('/team/members/{user}', [TeamController::class, 'destroy'])->name('team.members.destroy');
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -440,7 +463,6 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api')->name('api.')->gr
     Route::post('/pose-presets', [StudioController::class, 'posePresetStore'])->name('pose-presets.store');
     Route::put('/pose-presets/{preset}', [StudioController::class, 'posePresetUpdate'])->name('pose-presets.update');
     Route::delete('/pose-presets/{preset}', [StudioController::class, 'posePresetDestroy'])->name('pose-presets.destroy');
-
 
     // ── DỌN file mồ côi: việc TOÀN CỤC ⇒ vẫn thuộc ADMIN ──
     // (endpoint liệt kê/xoá đã chuyển sang nhóm STUDIO ở mục 0.1b bên dưới.)

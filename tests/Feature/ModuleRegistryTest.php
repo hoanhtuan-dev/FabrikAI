@@ -57,6 +57,13 @@ class ModuleRegistryTest extends TestCase
         // Cùng lý do với 'brand-dna' ở trên — đây là dữ liệu người dùng TỰ VIẾT, không phải tính năng
         // bán theo gói: công tắc gói không được làm họ mất quy tắc đã soạn hay không sửa được nó.
         'brand-rules',
+        // 'brand-memory' (2026-09-26): TRÍ NHỚ ĐÃ HỌC của chính người dùng (đọc lại + quên một bài học).
+        // Cùng lý do với 'brand-dna'/'brand-rules': dữ liệu người dùng tự tạo qua việc duyệt ảnh của họ —
+        // công tắc gói không được làm họ không xem được hoặc không xoá được trí nhớ của chính mình.
+        'brand-memory',
+        // 'design-search' (2026-09-26): TÌM THIẾT KẾ CŨ trên chính kho tài liệu của người dùng. Cùng lý
+        // do: đây là đường ĐỌC LẠI việc họ đã làm, không phải tính năng bán theo gói.
+        'design-search',
     ];
 
     protected function setUp(): void

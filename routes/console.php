@@ -54,4 +54,8 @@ Schedule::command('studio:grant-plan-credits')->dailyAt('00:30')->onOneServer()-
 // Vì sao phải theo LỊCH: "suy yếu" và "quên" là việc chỉ THỜI GIAN làm được. Không có lượt chạy này thì
 // mọi ký ức nặng mãi như nhau, cửa sổ prompt bị lấp bởi ký ức cũ ⇒ trí nhớ DÀY lên nhưng không SẮC hơn.
 // 04:00 chạy sau hai việc dọn dẹp kia (03:00 storage · 03:30 prune tín hiệu) để không tranh nhau ghi DB.
+// [Việc #9 — 2026-09-26] Lập chỉ mục tìm kiếm thiết kế cũ. 04:30, sau khi trí nhớ đã củng cố xong (04:00)
+// để bài học mới rút trong đêm cũng được nhúng trong cùng lượt.
+Schedule::command('studio:search:index')->dailyAt('04:30')->onOneServer()->withoutOverlapping();
+
 Schedule::command('studio:memory:consolidate')->dailyAt('04:00')->onOneServer()->withoutOverlapping();

@@ -714,4 +714,140 @@ export const projectsActions = {
       }
       return data;
     },
+    // ═══════════════════════════════════════════════════════════════════
+    // TIẾN ĐỘ SẢN XUẤT — Việc #8, 2026-09-26
+    //
+    // Vì sao nằm cùng miền bộ sưu tập: sản lượng gắn với MỘT lô của MỘT bộ (cùng mã hàng, cùng kế
+    // hoạch, cùng hạn), và nó là thứ duy nhất đối chiếu được KẾ HOẠCH với THỰC TẾ.
+    // ═══════════════════════════════════════════════════════════════════
+    /** Nạp tiến độ của MỘT bộ. Nhớ theo id để mở lại không phải gọi mạng (trừ khi force). */
+    async loadProduction(projectId, force = false) {
+      const id = Number(projectId) || 0;
+      if (!id) return null;
+      if (!force && this.production && this.productionProjectId === id) return this.production;
+
+      this.productionLoading = true;
+      this.productionError = '';
+      try {
+        const res = await fetch('/api/projects/' + id + '/production', { headers: { Accept: 'application/json' } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, 'Không tải được tiến độ sản xuất.');
+        this.production = data;
+        this.productionProjectId = id;
+        return data;
+      } catch (e) {
+        this.productionError = userFacingError(e, 'Không tải được tiến độ sản xuất.');
+        return null;
+      } finally {
+        this.productionLoading = false;
+      }
+    },
+    /** Một đường GHI dùng chung — máy chủ trả về CẢ bảng mới nên số tổng luôn khớp máy chủ. */
+    async writeProduction(projectId, path, options, fallbackMessage) {
+      this.productionSaving = true;
+      this.productionError = '';
+      try {
+        const res = await fetch('/api/projects/' + projectId + '/production' + path, {
+          headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          ...options,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, fallbackMessage);
+        this.production = data;
+        this.productionProjectId = Number(projectId) || null;
+        return data;
+      } catch (e) {
+        this.productionError = userFacingError(e, fallbackMessage);
+        this.toast(this.productionError, 'error');
+        return null;
+      } finally {
+        this.productionSaving = false;
+      }
+    },
+    /** Ghi (hoặc sửa) sản lượng MỘT ngày — ghi lại cùng ngày là cập nhật, không cộng thêm. */
+    async logProduction(projectId, payload) {
+      const data = await this.writeProduction(projectId, '', { method: 'POST', body: JSON.stringify(payload) }, 'Không ghi được sản lượng.');
+      if (data) this.toast('Đã ghi sản lượng — tiến độ tính lại từ số vừa nhập.', 'success');
+      return data;
+    },
+    async deleteProduction(projectId, logId) {
+      const data = await this.writeProduction(projectId, '/' + logId, { method: 'DELETE' }, 'Không xoá được ngày sản lượng.');
+      if (data) this.toast('Đã xoá ngày sản lượng — mọi con số tính lại.', 'info');
+      return data;
+    },
+    // ═══════════════════════════════════════════════════════════════════
+    // TÌM THIẾT KẾ CŨ — FileSearch (Việc #9, 2026-09-26)
+    //
+    // Vì sao nằm ở tài khoản chứ không ở bộ sưu tập: câu hỏi hay gặp là "mùa trước mình làm gì rồi" —
+    // nó KHÔNG thuộc về một bộ nào, và kho tài liệu gồm cả ảnh · brief · bài học · phiếu kỹ thuật.
+    // ═══════════════════════════════════════════════════════════════════
+    /** Tìm trong kho của chính mình. Không cache kết quả: mỗi câu hỏi là một câu hỏi khác. */
+    async runDesignSearch(query) {
+      const q = String(query || '').trim();
+      if (!q) {
+        this.searchError = 'Nhập nội dung cần tìm — VD: áo khoác màu be mùa trước.';
+        return null;
+      }
+
+      this.searchLoading = true;
+      this.searchError = '';
+      try {
+        const res = await fetch('/api/design-search?q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, 'Không tìm được trong kho thiết kế cũ.');
+        this.search = data;
+        return data;
+      } catch (e) {
+        this.searchError = userFacingError(e, 'Không tìm được trong kho thiết kế cũ.');
+        return null;
+      } finally {
+        this.searchLoading = false;
+      }
+    },
+    /** Tình trạng chỉ mục: bao nhiêu tài liệu đã nhúng / tổng, và CÓ nhúng được hay không. */
+    async loadDesignSearchStatus() {
+      try {
+        const res = await fetch('/api/design-search/status', { headers: { Accept: 'application/json' } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, 'Không đọc được tình trạng chỉ mục.');
+        this.searchStatus = data;
+        return data;
+      } catch (e) {
+        this.searchError = userFacingError(e, 'Không đọc được tình trạng chỉ mục.');
+        return null;
+      }
+    },
+    /**
+     * LẬP CHỈ MỤC NGAY (có trần): mỗi tài liệu là một phần của một lời gọi ra NGOÀI nên không được chạy
+     * không giới hạn sau một cú bấm. Trả về số đã nhúng để giao diện nói thật là đã làm được gì.
+     */
+    async indexDesignSearch(limit = 50) {
+      this.searchBusy = true;
+      this.searchError = '';
+      try {
+        const res = await fetch('/api/design-search/index', {
+          method: 'POST',
+          headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ limit }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, 'Không lập được chỉ mục tìm kiếm.');
+        this.searchStatus = { stats: data.stats, shape: data.shape };
+        const indexed = Number(data.result?.indexed || 0);
+        if (data.result?.unavailable) {
+          this.toast('Chưa có nhà cung cấp nhúng được văn bản — tìm kiếm vẫn chạy ở chế độ từ khoá.', 'warn');
+        } else if (indexed === 0) {
+          this.toast('Chỉ mục đã đầy đủ — không có tài liệu nào cần nhúng thêm.', 'info');
+        } else {
+          this.toast('Đã nhúng ' + indexed + ' tài liệu' + (data.result?.pending ? ' · còn ' + data.result.pending + ' tài liệu chờ lượt sau.' : '.'), 'success');
+        }
+        return data;
+      } catch (e) {
+        this.searchError = userFacingError(e, 'Không lập được chỉ mục tìm kiếm.');
+        this.toast(this.searchError, 'error');
+        return null;
+      } finally {
+        this.searchBusy = false;
+      }
+    },
   };

@@ -6,6 +6,7 @@ use App\Jobs\ReflectBrandMemoryJob;
 use App\Models\BrandLearning;
 use App\Models\Generation;
 use App\Models\User;
+use App\Support\Vocabulary;
 use Illuminate\Support\Str;
 
 /**
@@ -55,6 +56,9 @@ class BrandLearningService
 
     /** Trần số ký ức xử lý mỗi lượt suy giảm — lệnh chạy hằng ngày, không cần dọn hết trong một lượt. */
     public const DECAY_BATCH = 500;
+
+    /** Trần số ký ức trả về màn hình "Trí nhớ" — bảng dài hơn thì không ai đọc, và không phải chỗ để xuất dữ liệu. */
+    public const MEMORY_MAX = 200;
 
     /**
      * Ghi một quyết định. Prompt rút gọn 500 ký tự; cùng generation + cùng quyết định chỉ ghi 1 lần.
@@ -227,49 +231,84 @@ class BrandLearningService
      */
     public static function similarity(string $a, string $b): float
     {
-        $ta = self::tokens($a);
-        $tb = self::tokens($b);
-        if ($ta === [] || $tb === []) {
-            return 0.0;
-        }
+        // [2026-09-26] Phép tách từ nay nằm ở App\Support\Vocabulary — một chỗ cho cả trí nhớ (ở đây) và
+        // việc #9 (tìm thiết kế cũ). Hai bản sao của một phép tách là hai tập từ khoá khác nhau.
+        return Vocabulary::jaccard($a, $b);
+    }
 
-        $union = array_unique(array_merge($ta, $tb));
-        if ($union === []) {
-            return 0.0;
-        }
-
-        return count(array_intersect($ta, $tb)) / count($union);
+    /** Tách từ khoá — luật nằm ở App\Support\Vocabulary (một chỗ cho cả trí nhớ và việc #9). */
+    private static function tokens(string $text): array
+    {
+        return Vocabulary::tokens($text);
     }
 
     /**
-     * TỪ ĐỆM tiếng Việt — bỏ trước khi so trùng, nếu không thì hai prompt khác hẳn nhau vẫn "trùng" chỉ vì
-     * cùng có chữ "và" hoặc "của". Danh sách NGẮN có chủ ý: chỉ những từ xuất hiện dày trong prompt thật.
+     * DANH SÁCH ký ức để NGƯỜI DÙNG đọc lại (Việc #7+ · 2026-09-26).
+     *
+     * Vì sao cần: trí nhớ đã có tác dụng từ đợt 1 nhưng KHÔNG có màn hình nào cho thấy agent đã học gì —
+     * người dùng chỉ thấy brief "tự nhiên" đổi giọng. Một trí nhớ không đọc lại được thì không sửa được,
+     * và một trí nhớ không sửa được là trí nhớ sẽ sai dần mà không ai biết.
+     *
+     * Xếp theo ĐỘ MẠNH (rồi id mới nhất) — đúng thứ tự mà brief đọc, để màn hình này nói cùng một chuyện
+     * với thứ agent thật sự dùng.
+     *
+     * @return array<string, mixed>
      */
-    private const STOP_WORDS = [
-        'và', 'của', 'cho', 'với', 'các', 'một', 'những', 'trên', 'dưới', 'trong', 'ngoài', 'là', 'có',
-        'được', 'theo', 'tại', 'về', 'để', 'khi', 'thì', 'như', 'hay', 'hoặc', 'rất', 'hơi', 'khá', 'này',
-        'kia', 'đó', 'mà', 'bằng', 'từ', 'đến', 'sẽ', 'đã', 'đang',
-    ];
+    public function memory(User $user, int $limit = 50): array
+    {
+        $take = max(1, min(self::MEMORY_MAX, $limit));
+        $rows = BrandLearning::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('weight')
+            ->orderByDesc('id')
+            ->limit($take)
+            ->get();
+
+        return [
+            'items' => $rows->map(fn (BrandLearning $row) => $this->presentMemory($row))->all(),
+            'stats' => $this->stats($user),
+            'limits' => [
+                'max' => self::MEMORY_MAX,
+                'limit' => $take,
+                'weight_min' => self::WEIGHT_MIN,
+                'weight_max' => self::WEIGHT_MAX,
+            ],
+        ];
+    }
 
     /**
-     * Tách từ khoá để so trùng: chữ thường, bỏ dấu câu, bỏ từ đệm và từ 1 ký tự.
+     * QUÊN một ký ức — quyền của người dùng, không phải của hệ thống.
      *
-     * ĐỘ DÀI TỐI THIỂU LÀ 2, không phải 3: tiếng Việt có từ ngắn nhưng MANG NGHĨA trong ngành — "áo",
-     * "mi", "ly", "ve". Cắt ở 3 sẽ làm "áo sơ mi linen" và "áo thun linen" thành hai ký ức khác nhau dù
-     * cùng là áo linen. Cái phải bỏ là TỪ ĐỆM (xem STOP_WORDS), không phải từ ngắn.
-     *
-     * @return list<string>
+     * Vì sao phải có: agent có thể rút ra một bài học SAI (một lần loại ảnh vì lỗi kỹ thuật lại bị đọc
+     * thành "shop không thích màu này"). Cách sửa duy nhất đúng là XOÁ ký ức đó — không phải thêm một
+     * ký ức ngược lại để hai cái đánh nhau trong prompt.
      */
-    private static function tokens(string $text): array
+    public function forget(BrandLearning $row): void
     {
-        $text = mb_strtolower($text);
-        $text = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text) ?? '';
-        $parts = preg_split('/\s+/u', trim($text)) ?: [];
+        $row->delete();
+    }
 
-        return array_values(array_unique(array_filter(
-            $parts,
-            fn (string $word) => mb_strlen($word) >= 2 && ! in_array($word, self::STOP_WORDS, true),
-        )));
+    /** Hình dạng trả ra giao diện cho MỘT ký ức — một nơi, không chép ở hai chỗ. */
+    private function presentMemory(BrandLearning $row): array
+    {
+        $weight = (int) $row->weight;
+
+        return [
+            'id' => (int) $row->id,
+            'decision' => (string) $row->decision,
+            'decision_label' => $row->decision === BrandLearning::DECISION_APPROVED ? 'Đã duyệt' : 'Đã loại',
+            'lesson' => (string) ($row->lesson ?? ''),
+            'prompt' => Str::limit((string) $row->prompt, 300, '…'),
+            'weight' => $weight,
+            'strength' => $weight >= 8 ? 'strong' : ($weight <= 3 ? 'weak' : 'normal'),
+            'strength_label' => $weight >= 8 ? 'Mạnh' : ($weight <= 3 ? 'Yếu' : 'Vừa'),
+            'hits' => (int) $row->hits,
+            'source' => (string) ($row->source ?? ''),
+            'created_at' => $row->created_at?->toISOString(),
+            'created_at_label' => $row->created_at?->format('d/m/Y'),
+            'refreshed_at_label' => $row->refreshed_at?->format('d/m/Y'),
+            'age_days' => $row->created_at !== null ? (int) $row->created_at->diffInDays(now()) : null,
+        ];
     }
 
     /**
