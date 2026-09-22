@@ -5,6 +5,40 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 19) — STUDIO: THANG BỀ MẶT MATERIAL (hết phẳng)
+
+**Commit:** `df3c1cd`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Đo được vấn đề "trông phẳng"
+Ba tầng bề mặt của studio chỉ lệch nhau **4/255**:
+`nền trang ink-950 #15191e` · `panel/thanh ink-900 #191e24` · `thẻ ink-800 #1d232a`.
+Độ lệch đó **dưới ngưỡng mắt phân biệt** trên màn hình thường ⇒ giao diện đúng cấu trúc nhưng không đọc ra "mặt nào nổi trên mặt nào".
+
+### 2. Cách sửa — KHÔNG đụng bảng màu (bảng màu bị test khoá từng ký tự)
+Bảng màu do `php artisan theme:sync` sinh và `ThemeImportTest` so khớp từng ký tự, nên KHÔNG sửa token trong đó. Thay vào đó phủ **lớp mờ rất nhẹ bằng `background-image`** (không phải `background-color`, nên không ghi đè màu nền sẵn có của từng khối):
+
+| Tầng | Lớp phủ | Kết quả đo trong trình duyệt |
+|---|---|---|
+| Mặt NỔI (thẻ · hộp thoại) | **+3% trắng** | thẻ `rgb(37,43,50)` + ánh sáng mặt trên + bóng |
+| Mặt CHÌM (thanh trên/dưới · rail · panel dock) | **−14% (phủ đen)** | thanh/panel `rgb(21,26,31)` |
+| Nền trang | vệt sáng thương hiệu | `rgb(25,30,36)` |
+
+Ba bậc nay cách nhau **~12–15 đơn vị** thay vì 4 ⇒ mắt đọc được ngay thứ tự nổi/chìm. Ở theme Sáng hai lớp này đảo vai đúng như mong đợi (thẻ trắng hơn nền xám, panel xám hơn nền).
+
+### 3. Kiểm chứng
+| Kiểm tra | Kết quả |
+|---|---|
+| Test | **1233 XANH / 9.357 assertion** |
+| HEAD máy chủ | `df3c1cd` — khớp local = origin |
+| Đo trong trình duyệt | thẻ/thanh/nền đúng ba bậc như bảng trên; `background-image` áp đúng chỗ, `background-color` không bị ghi đè |
+
+### 4. Còn lại của bước "Studio"
+| Việc |
+|---|
+| Gom thanh công cụ dày đặc thành cụm nút + menu "thêm" trên điện thoại (43 phần tử dày ở desktop là cố ý) |
+| Thanh trạng thái canvas dưới cùng (zoom · tỉ lệ · hoàn tác) |
+
+---
 ## Phiên 2026-09-26 (đợt 18) — STUDIO: GỘP HAI THANH THÀNH MỘT APP BAR
 
 **Commit:** `39d6198`. **Trạng thái: đã commit + push + DEPLOY production.**
