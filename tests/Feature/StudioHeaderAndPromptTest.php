@@ -39,13 +39,24 @@ class StudioHeaderAndPromptTest extends TestCase
         foreach ([
             'class="icon-btn shrink-0 lg:hidden order-1"' => 'nút menu',
             'class="order-2 flex shrink-0 items-center gap-2"' => 'thương hiệu FabrikAI',
-            'class="order-3 relative"' => 'nút + menu tài khoản',
-            'class="order-4 relative"' => 'nút Gói & credit',
+            // [đợt 35] Hai nút này nay nằm trong KHAY TRÁI (data-header-account) — thứ tự trong khay lo
+            // bằng order-1/order-3 vì mã nguồn xếp credit trước tài khoản.
+            'class="order-1 relative"' => 'nút + menu tài khoản',
+            'class="order-3 relative"' => 'nút Gói & credit',
             'class="order-5 ml-auto' => 'nút Bộ sưu tập (điện thoại)',
             'class="order-7 ml-auto hidden' => 'khay điều hướng không gian làm việc',
         ] as $needle => $what) {
             $this->assertStringContainsString($needle, $app, "Thiếu thứ tự cho {$what}.");
         }
+
+        // [đợt 35] Khay TRÁI phải dùng ĐÚNG bộ lớp của khay PHẢI ⇒ hai bên đồng bộ thị giác.
+        $this->assertStringContainsString(
+            'order-3 flex shrink-0 items-center gap-1 rounded-xl border border-ink-700 bg-ink-800/60 p-1" data-header-account',
+            $app,
+            'Khay trái (tài khoản · credit) chưa đồng bộ với khay công cụ bên phải.'
+        );
+        $this->assertStringContainsString('order-7 ml-auto hidden shrink-0 items-center gap-1 rounded-xl border border-ink-700 bg-ink-800/60 p-1 lg:flex" data-header-workspace', $app,
+            'Khay công cụ bên phải phải giữ nguyên bộ lớp đó.');
 
         $this->assertStringContainsString('>FabrikAI</span>', $app, 'Thương hiệu FabrikAI phải còn trong header.');
     }

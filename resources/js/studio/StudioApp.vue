@@ -1052,7 +1052,7 @@ function onTouchEnd(e) {
           <div v-if="applyOpen" class="fixed inset-0 z-40" @click="applyOpen = false"></div>
         </div>
 
-        <span class="h-5 w-px shrink-0 bg-ink-700" aria-hidden="true"></span>
+        <span class="order-2 h-5 w-px shrink-0 bg-ink-700" aria-hidden="true"></span>
 
         <!-- [Đợt 1 — 2026-09-19] Badge credit cũ chỉ hiển thị con số (không biết gói, không có đường
              nâng cấp). Nay là nút mở popup "Gói & credit": gói hiện tại · credit còn lại · chi phí
@@ -1078,8 +1078,11 @@ function onTouchEnd(e) {
           </button>
         </div>
 
-        <div v-if="store.user" class="order-4 relative">
-          <button type="button" class="tool-btn" :class="store.creditsLow ? 'is-active' : ''"
+        <!-- [đợt 35] KHAY TRÁI (tài khoản · gói & credit) — CÙNG ngôn ngữ thị giác với khay công cụ
+             bên phải: viền + nền + bo góc + mục cao 32px + vạch ngăn giữa hai nhóm. -->
+        <div class="order-3 flex shrink-0 items-center gap-1 rounded-xl border border-ink-700 bg-ink-800/60 p-1" data-header-account>
+        <div v-if="store.user" class="order-3 relative">
+          <button type="button" class="flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-label font-semibold text-cream-200 transition-colors hover:bg-ink-700" :class="store.creditsLow ? 'is-active' : ''"
                   :title="'Gói & credit — còn ' + store.creditsLeft + ' credit' + (store.planName ? ' · gói ' + store.planName : '')"
                   @click="store.togglePlanPopover()">
             <StudioIcon name="coins" size="h-3.5 w-3.5" />
@@ -1289,18 +1292,21 @@ function onTouchEnd(e) {
           </div>
           <div v-if="store.planOpen" class="fixed inset-0 z-40" @click="store.planOpen = false"></div>
         </div>
+
+        <span class="h-5 w-px shrink-0 bg-ink-700" aria-hidden="true"></span>
+
         <!-- ══ TÀI KHOẢN — MỘT chỗ cho danh tính · cài đặt · đăng xuất (daisyUI dropdown + menu).
              [2026-09-26 · đợt 27] Nút "Cài đặt" riêng và nút "Đăng xuất" riêng đã BỎ: cả hai nằm
              trong menu này. Lối vào cài đặt nay là /cai-dat — trang hợp nhất có đủ ba khu, và máy chủ
              vẫn tự ẩn khu chỉ owner, nên tài khoản thường không thấy mục nào họ không mở được. -->
-        <div v-if="store.user" class="order-3 relative">
-          <button type="button" class="btn btn-ghost btn-circle relative" data-account-toggle title="Tài khoản" aria-label="Tài khoản"
+        <div v-if="store.user" class="order-1 relative">
+          <button type="button" class="icon-btn !h-8 !w-8 relative" data-account-toggle title="Tài khoản" aria-label="Tài khoản"
                   :aria-expanded="accountOpen ? 'true' : 'false'" @click="accountOpen = !accountOpen" @keydown.escape="accountOpen = false">
             <!-- [đợt 34] MỘT vòng tròn 36px: overflow-hidden + ảnh đúng cỡ + object-cover ⇒ ảnh không
                  thể tràn ra ngoài vòng ring. Ảnh tải lỗi thì hiện chữ cái đầu thay vì để ô trống. -->
-            <span class="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-ink-700 ring-2 ring-brand-500/40">
-              <img v-if="store.user.avatar && !avatarFailed" :src="store.user.avatar" alt="" class="h-9 w-9 rounded-full object-cover" @error="avatarFailed = true">
-              <span v-else class="text-body font-bold text-cream-100">{{ (store.user.name || '?').charAt(0).toUpperCase() }}</span>
+            <span class="grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-full bg-ink-700 ring-1 ring-brand-500/60">
+              <img v-if="store.user.avatar && !avatarFailed" :src="store.user.avatar" alt="" class="h-6 w-6 rounded-full object-cover" @error="avatarFailed = true">
+              <span v-else class="text-tiny font-bold text-cream-100">{{ (store.user.name || '?').charAt(0).toUpperCase() }}</span>
             </span>
           </button>
           <div v-if="accountOpen" class="fixed inset-0 z-40" @click="accountOpen = false"></div>
@@ -1329,7 +1335,8 @@ function onTouchEnd(e) {
             </li>
           </ul>
         </div>
-        <a v-else href="/dang-nhap?redirect=/" class="btn btn-warn btn-sm order-4">Đăng nhập</a>
+        <a v-else href="/dang-nhap?redirect=/" class="btn btn-warn btn-sm">Đăng nhập</a>
+        </div>
       </div>
     </header>
     <!-- [Trục 2 — 2026-09-20] Trung tâm thông báo kiểu VSCode (thay ô flashMsg đơn lẻ):
