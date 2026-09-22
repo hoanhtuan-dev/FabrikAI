@@ -171,7 +171,8 @@ class ClientErrorReportTest extends TestCase
         $this->assertStringContainsString('/api/client-errors', $client);
 
         // 6 entry SPA: nạp pageBoot ⇒ bộ bắt lỗi có mặt ở tất cả.
-        foreach (['main.js', 'settings.js', 'my-settings.js', 'admin.js', 'collections.js'] as $entry) {
+        // [2026-09-26 · đợt 24] Các entry cũ settings.js · my-settings.js · admin.js đã gộp thành hub.js.
+        foreach (['main.js', 'hub.js', 'collections.js'] as $entry) {
             $this->assertMatchesRegularExpression('/from \'\.\/pageBoot\.js\'/', $this->js($entry),
                 $entry.' không nạp pageBoot.js ⇒ lỗi trình duyệt ở shell này sẽ không có mã tra cứu.');
         }

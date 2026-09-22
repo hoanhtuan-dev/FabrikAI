@@ -14,11 +14,13 @@
     trang ĐỌC; muốn đổi gói/ghế thì vào trang Quản trị.
 --}}
 <div class="studio-shell min-h-screen">
+    {{-- Thanh chung của trang hợp nhất (Cài đặt & Quản trị): cùng danh sách khu, cùng biểu tượng.
+         Xem resources/views/studio/partials/hub-bar.blade.php. --}}
+    @include('studio.partials.hub-bar', ['area' => 'costs'])
     <div class="container-x py-8">
         <header class="mb-6">
-            <p class="kicker">FabrikAI · vận hành</p>
-            <h1 class="mt-1 font-display text-2xl font-semibold text-cream-50">Chi phí theo nhóm</h1>
-            <p class="mt-2 max-w-3xl text-body leading-relaxed text-cream-200">
+            {{-- Tiêu đề khu do thanh chung render (partials/hub-bar) — ở đây chỉ còn phần GIẢI THÍCH. --}}
+            <p class="max-w-3xl text-body leading-relaxed text-cream-200">
                 Mỗi dòng là MỘT NHÓM (chủ nhóm + các ghế thành viên dùng chung gói). Số ảnh và credit được
                 cộng từ chính bảng <span class="font-mono">generations</span> trong
                 <b class="text-cream-100">{{ $days }} ngày</b> gần nhất (từ {{ $since->format('d/m/Y') }}) — cùng nguồn

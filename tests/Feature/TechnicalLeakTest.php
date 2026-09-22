@@ -64,8 +64,8 @@ class TechnicalLeakTest extends TestCase
     {
         foreach ([
             'SettingsApp.vue', 'AdminApp.vue', 'components/settings/', 'MySettingsApp.vue',
-            'views/studio/admin.blade.php', 'views/studio/settings.blade.php',
-            'views/studio/design-tokens.blade.php', 'views/studio/my-settings.blade.php',
+            // [2026-09-26 · đợt 24] admin/settings/my-settings.blade.php đã xoá (gộp vào hub.blade.php).
+            'views/studio/design-tokens.blade.php',
             'store/helpers.js', 'clientErrors.js',
         ] as $skip) {
             if (str_contains($rel, $skip)) {

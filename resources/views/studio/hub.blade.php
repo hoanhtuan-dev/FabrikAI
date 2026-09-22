@@ -6,7 +6,7 @@
     <meta name="theme-color" content="{{ theme_color() }}">
     <meta name="color-scheme" content="dark light">
     @include('partials.theme')
-    <title>FabrikAI · {{ ['mine' => 'Cài đặt của tôi', 'system' => 'Cài đặt hệ thống', 'admin' => 'Quản trị'][$area] ?? 'Cài đặt' }}</title>
+    <title>FabrikAI · {{ \App\Support\SettingsAreas::find($area)['label'] ?? 'Cài đặt' }}</title>
     @vite(['resources/css/app.css', 'resources/js/studio/hub.js'])
 </head>
 <body class="min-h-screen bg-ink-900 text-cream-100 antialiased">
@@ -35,6 +35,9 @@
     <div id="hub-root"
          class="w-full"
          data-area="{{ $area }}"
+         {{-- Danh sách khu do MÁY CHỦ lọc theo quyền rồi truyền xuống: App\Support\SettingsAreas
+              là nguồn duy nhất — thanh trong Vue và thanh ở partials/hub-bar.blade.php cùng đọc nó. --}}
+         data-areas='@json(\App\Support\SettingsAreas::visibleFor(auth()->user()))'
          data-section="{{ $section ?? 'presets' }}"
          data-user-id="{{ auth()->id() }}"
          data-user-admin="{{ auth()->user()?->isAdmin() ? '1' : '0' }}"></div>

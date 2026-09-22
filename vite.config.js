@@ -13,14 +13,10 @@ export default defineConfig({
                 // (T8) Đã bỏ 'resources/js/app.js' — entry Alpine 574 dòng của storefront, KHÔNG
                 // view nào nạp (grep "@vite" chỉ ra app.css; grep "x-data" trong resources/views = 0).
                 'resources/js/studio/main.js',
-                'resources/js/studio/settings.js',
-                // [Yêu cầu 2026-09-20] KHU "CÀI ĐẶT CỦA TÔI" HỢP NHẤT — thay 3 entry rời rạc
-                // (presets.js · stylist-data.js · model-settings.js). Một app duy nhất phục vụ cả
-                // 4 lối vào: /cai-dat/<mục> cùng các URL cũ /presets · /stylist-data · /model-settings.
-                'resources/js/studio/my-settings.js',
-                'resources/js/studio/admin.js',
-                // [Yêu cầu 2026-09-26] TRANG HỢP NHẤT "Cài đặt & Quản trị" — thay khung nhìn của
-                // settings.js · admin.js · my-settings.js bằng một thanh tiêu đề và một bộ chuyển khu.
+                // [Yêu cầu 2026-09-26 · đợt 24] TRANG HỢP NHẤT "Cài đặt & Quản trị": MỘT entry duy nhất.
+                // Ba entry cũ (settings.js · my-settings.js · admin.js) đã XOÁ cùng ba blade của chúng —
+                // mọi URL cũ (/settings, /admin, /cai-dat, /presets, /model-settings, /stylist-data) nay
+                // cùng trả view studio.hub.
                 'resources/js/studio/hub.js',
                 'resources/js/studio/collections.js',
                 // [Yêu cầu 2026-09-25] TRANG AGENT STUDIO — luồng 4 bước tách khỏi modal trong

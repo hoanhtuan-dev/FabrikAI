@@ -92,13 +92,14 @@ class UserCatalogTest extends TestCase
 
     public function test_blade_template_exposes_the_user_identity(): void
     {
-        // [2026-09-20] Ba blade cũ (presets · stylist-data · model-settings) đã gộp thành MỘT:
-        // cả 4 lối vào cùng render studio/my-settings.blade.php.
-        $src = (string) file_get_contents(resource_path('views/studio/my-settings.blade.php'));
-        $this->assertStringContainsString('data-user-id', $src, 'my-settings.blade.php thiếu data-user-id.');
-        $this->assertStringContainsString('data-user-admin', $src, 'my-settings.blade.php thiếu data-user-admin.');
+        // [2026-09-20] Ba blade cũ (presets · stylist-data · model-settings) đã gộp thành MỘT.
+        // [2026-09-26 · đợt 24] Và nay cả ba khu (Cài đặt của tôi · Hệ thống · Quản trị) dùng CHUNG
+        // một blade: studio/hub.blade.php — nơi duy nhất còn nhúng danh tính người dùng xuống app.
+        $src = (string) file_get_contents(resource_path('views/studio/hub.blade.php'));
+        $this->assertStringContainsString('data-user-id', $src, 'hub.blade.php thiếu data-user-id.');
+        $this->assertStringContainsString('data-user-admin', $src, 'hub.blade.php thiếu data-user-admin.');
         $this->assertStringContainsString('data-section', $src,
-            'my-settings.blade.php thiếu data-section — server phải nói cho app biết mở MỤC nào.');
+            'hub.blade.php thiếu data-section — server phải nói cho app biết mở MỤC nào.');
     }
 
     // ── (e) app dùng lớp lưu trữ cục bộ, không ghi thẳng bảng toàn cục ───

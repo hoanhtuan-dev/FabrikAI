@@ -188,9 +188,8 @@ class ThemeSystemTest extends TestCase
     {
         $blades = [
             'resources/views/studio/index.blade.php',
-            'resources/views/studio/settings.blade.php',
-            'resources/views/studio/my-settings.blade.php',
-            'resources/views/studio/admin.blade.php',
+            // [2026-09-26 · đợt 24] Ba shell settings/admin/my-settings đã gộp thành MỘT: hub.blade.php.
+            'resources/views/studio/hub.blade.php',
             'resources/views/studio/collections.blade.php',
             'resources/views/layouts/app.blade.php',
         ];
@@ -361,7 +360,7 @@ class ThemeSystemTest extends TestCase
         // Mọi shell render sẵn hệ số ⇒ không nháy cỡ chữ khi tải trang.
         foreach ([
             'resources/views/studio/index.blade.php',
-            'resources/views/studio/my-settings.blade.php',
+            'resources/views/studio/hub.blade.php',
             'resources/views/layouts/app.blade.php',
         ] as $rel) {
             $this->assertStringContainsString('--font-scale: {{ font_scale_ratio() }}', (string) file_get_contents(base_path($rel)),

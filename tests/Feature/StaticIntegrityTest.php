@@ -210,7 +210,9 @@ class StaticIntegrityTest extends TestCase
         // Bất biến: việc khởi động SPA chỉ được định nghĩa ở ĐÚNG MỘT file (pageBoot.js).
         // [2026-09-20] presets.js · stylist-data.js · model-settings.js đã gộp thành MỘT entry
         // my-settings.js (khu "Cài đặt của tôi" hợp nhất, phục vụ cả 4 lối vào cũ lẫn /cai-dat).
-        $entries = ['main.js', 'settings.js', 'my-settings.js', 'admin.js'];
+        // [2026-09-26 · đợt 24] Ba entry của khu Cài đặt/Quản trị đã gộp thành MỘT entry hub.js
+        // (xem SettingsHubTest::test_the_old_pages_and_entries_are_gone).
+        $entries = ['main.js', 'hub.js', 'collections.js'];
         $jsFiles = $this->jsFiles();
         $violations = [];
 

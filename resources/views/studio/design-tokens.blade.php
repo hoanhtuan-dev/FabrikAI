@@ -16,11 +16,14 @@
     thứ hai để lệch).
 --}}
 <div class="studio-shell min-h-screen">
+    {{-- Thanh chung của trang hợp nhất (Cài đặt & Quản trị): cùng danh sách khu, cùng biểu tượng.
+         Xem resources/views/studio/partials/hub-bar.blade.php. --}}
+    @include('studio.partials.hub-bar', ['area' => 'design'])
     <div class="container-x py-8">
         <header class="mb-6">
-            <p class="kicker">FabrikAI · dành cho người thiết kế</p>
-            <h1 class="mt-1 font-display text-2xl font-semibold text-cream-50">Thư viện theme &amp; bảng token</h1>
-            <p class="mt-2 max-w-3xl text-sm leading-relaxed text-cream-200">
+            {{-- Tiêu đề khu do thanh chung render (partials/hub-bar) — ở đây chỉ còn phần GIẢI THÍCH,
+                 để trang chỉ có MỘT <h1>. --}}
+            <p class="max-w-3xl text-sm leading-relaxed text-cream-200">
                 Mọi con số dưới đây được TÍNH từ <b class="text-cream-100">resources/css/app.css</b> bằng công thức
                 tương phản WCAG 2.1 (độ chói tương đối), không phải ước lượng bằng mắt. Ngưỡng AA cho chữ
                 thường là <b class="text-cream-100">{{ $aa }}:1</b>. Bậc nào không đạt sẽ hiện ĐỎ — và bộ test
