@@ -258,8 +258,28 @@ class AiModelGateway
 
         foreach ($this->candidates($group) as $candidate) {
             foreach ($candidate['keys'] as $key) {
+                // ĐỘNG CƠ SDK cho việc ĐỌC ẢNH (2026-09-22) — ĐO TRƯỚC RỒI MỚI ĐỔI, đúng yêu cầu.
+                //
+                // Số đo trên production trước khi đổi: nhà cung cấp thật của dự án qua driver
+                // openai-compatible, ảnh cục bộ 84 KB ⇒ 2.302 ms và mô tả ĐÚNG nội dung ảnh (áo halter,
+                // váy midi satin kem, thêu hoa viền tím, clutch tua rua, giày mule trắng, nền studio xám).
+                // Cùng lưới an toàn như đường text: SDK lỗi/rỗng ⇒ rơi về đường HTTP tự viết cho CHÍNH
+                // candidate đó, nên đổi động cơ không thể làm mất khả năng đọc ảnh.
+                $text = null;
+
+                if ($this->sdkEngineEnabled() && ($engine = $this->sdkEngine()) !== null && $engine->supports($candidate)) {
+                    try {
+                        $text = $engine->runVision($candidate, $key, $instruction, $parts, $options);
+                    } catch (\Throwable $e) {
+                        logger()->warning('AiModelGateway vision qua SDK lỗi, quay về đường HTTP tự viết ('
+                            .$candidate['provider'].':'.$candidate['model'].'): '.$e->getMessage());
+                    }
+                }
+
                 try {
-                    $text = $this->callVision($candidate, $key, $instruction, $parts, $options);
+                    $text = ($text !== null && trim($text) !== '')
+                        ? $text
+                        : $this->callVision($candidate, $key, $instruction, $parts, $options);
                 } catch (\Throwable $e) {
                     logger()->warning('AiModelGateway vision lỗi ('.$candidate['provider'].':'.$candidate['model'].'): '.$e->getMessage());
                     continue;

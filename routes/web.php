@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminPromptController;
 use App\Http\Controllers\AdminWebSourceController;
 use App\Http\Controllers\AgentSessionController;
 use App\Http\Controllers\AuthController;
@@ -485,6 +486,14 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api/admin')->name('api.
     Route::get('/gui', [AdminController::class, 'guiShow'])->name('gui.show');
     Route::put('/gui/activity-bar', [AdminController::class, 'guiActivityBarSave'])->name('gui.activity-bar.save');
     Route::post('/gui/activity-bar/reset', [AdminController::class, 'guiActivityBarReset'])->name('gui.activity-bar.reset');
+
+    // ── [2026-09-22] CHỈ DẪN AI (prompt) SỬA TỪ GIAO DIỆN — thay cho việc phải SSH ──
+    // Cùng bảng prompt_templates và cùng danh mục khoá với lệnh artisan studio:prompt
+    // (App\Ai\PromptCatalog) — một nguồn sự thật, không có bản sao thứ hai.
+    Route::get('/prompts', [AdminPromptController::class, 'index'])->name('prompts.index');
+    Route::post('/prompts', [AdminPromptController::class, 'save'])->name('prompts.save');
+    Route::post('/prompts/off', [AdminPromptController::class, 'off'])->name('prompts.off');
+    Route::post('/prompts/activate', [AdminPromptController::class, 'activate'])->name('prompts.activate');
 });
 
 Route::middleware(['auth', 'superadmin', 'nostore'])->prefix('api/admin')->name('api.admin.')->group(function () {

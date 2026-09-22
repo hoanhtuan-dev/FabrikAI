@@ -50,6 +50,8 @@ const SECTIONS = [
   { id: 'gui',       group: 'Hệ thống',       label: 'Giao diện Studio', icon: 'palette',  superOnly: false },
   // [Modules 2026-09-19] Công tắc tính năng: bật/tắt toàn cục + cấp module theo GÓI (gói = công tắc).
   { id: 'modules',   group: 'Hệ thống',       label: 'Tính năng & gói',  icon: 'puzzle',   superOnly: false },
+  // [2026-09-22] CHỈ DẪN AI: sửa prompt của agent ngay trên web — trước đây phải SSH + studio:prompt.
+  { id: 'prompts',   group: 'Hệ thống',       label: 'Chỉ dẫn AI',       icon: 'sparkles', superOnly: false },
 ];
 const SECTION_GROUPS = ['Bắt đầu', 'Người & credit', 'Hệ thống'];
 
@@ -385,6 +387,104 @@ function ensureLoaded(id) {
   if (id === 'plans' && !plansData.value.length) loadPlans();
   if (id === 'upgrades' && !upgradesData.value.requests.length) loadUpgrades();
   if (id === 'modules' && !modulesData.value.modules.length) loadModules();
+  if (id === 'prompts' && !promptsData.value.length) loadPrompts();
+}
+
+
+// ─────────────────────── CHỈ DẪN AI (prompt) — thay cho việc phải SSH ───────────────────────
+// [2026-09-22] DANH MỤC KHOÁ do App\Ai\PromptCatalog (PHP) quyết định; giao diện KHÔNG tự khai
+// khoá nào — khai lại là mở đường cho hai bên lệch nhau (sửa trên web mà hệ thống không dùng).
+const promptsData = ref([]);
+const promptLoading = ref(false);
+const promptBusy = ref('');
+const promptDraft = ref({});
+const promptNote = ref({});
+const promptHistory = ref('');
+
+// Bản "đang chạy": bản cấu hình nếu có, không thì bản mặc định trong mã (hệ thống ghi nhớ khi chạy).
+function promptBaseline(p) { return p.active_body || p.default_body || ''; }
+function promptIsDirty(p) { return (promptDraft.value[p.key] || '') !== promptBaseline(p); }
+const promptConfiguredCount = computed(() => promptsData.value.filter((p) => p.configured).length);
+
+async function loadPrompts(force = false) {
+  promptLoading.value = true;
+  try {
+    const d = await api('/prompts');
+    promptsData.value = d.prompts || [];
+    for (const p of promptsData.value) {
+      // Không đè lên bản đang sửa dở, TRỪ khi người dùng bấm Tải lại.
+      if (force || promptDraft.value[p.key] === undefined) promptDraft.value[p.key] = promptBaseline(p);
+    }
+  } catch (e) {
+    flash(e.message || 'Không tải được danh mục chỉ dẫn', false);
+  } finally {
+    promptLoading.value = false;
+  }
+}
+
+function applyPrompt(p) {
+  const i = promptsData.value.findIndex((x) => x.key === p.key);
+  if (i !== -1) promptsData.value[i] = p;
+  promptDraft.value[p.key] = promptBaseline(p);
+  promptNote.value[p.key] = '';
+}
+
+function useDefaultPrompt(p) {
+  if (!p.default_body) {
+    flash('Chưa ghi nhận bản mặc định cho khoá này — chạy luồng dùng nó một lần rồi bấm Tải lại.', false);
+    return;
+  }
+  promptDraft.value[p.key] = p.default_body;
+}
+
+async function savePrompt(p) {
+  const body = promptDraft.value[p.key] || '';
+  if (!body.trim()) {
+    flash('Chỉ dẫn rỗng — muốn bỏ bản cấu hình thì dùng nút «Quay về mặc định».', false);
+    return;
+  }
+  promptBusy.value = p.key;
+  try {
+    const d = await api('/prompts', 'POST', { key: p.key, body, note: promptNote.value[p.key] || '' });
+    applyPrompt(d.prompt);
+    flash(d.message || 'Đã lưu chỉ dẫn.');
+  } catch (e) {
+    flash(e.message || 'Không lưu được chỉ dẫn', false);
+  } finally {
+    promptBusy.value = '';
+  }
+}
+
+function confirmTurnOffPrompt(p) {
+  askConfirm('Quay về mặc định trong mã?',
+    'Khoá «' + p.label + '» sẽ dùng lại chuỗi mặc định trong mã nguồn. Bản cấu hình hiện tại KHÔNG bị xoá — vẫn khôi phục lại được ở phần Lịch sử.',
+    'Quay về mặc định', () => turnOffPrompt(p));
+}
+
+async function turnOffPrompt(p) {
+  promptBusy.value = p.key;
+  try {
+    const d = await api('/prompts/off', 'POST', { key: p.key });
+    applyPrompt(d.prompt);
+    flash(d.message || 'Đã quay về mặc định.');
+  } catch (e) {
+    flash(e.message || 'Không tắt được bản cấu hình', false);
+  } finally {
+    promptBusy.value = '';
+  }
+}
+
+async function activatePromptVersion(p, v) {
+  promptBusy.value = p.key;
+  try {
+    const d = await api('/prompts/activate', 'POST', { key: p.key, version: v });
+    applyPrompt(d.prompt);
+    flash(d.message || 'Đã khôi phục phiên bản.');
+  } catch (e) {
+    flash(e.message || 'Không khôi phục được phiên bản', false);
+  } finally {
+    promptBusy.value = '';
+  }
 }
 
 // ─────────────────────────── Việc cần xử lý (tổng quan) ───────────────────────────
@@ -1505,6 +1605,107 @@ onMounted(async () => {
                   </div>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <!-- [2026-09-22] CHỈ DẪN AI — sửa prompt của agent ngay trên web (trước đây phải SSH). -->
+          <section v-show="section === 'prompts'" class="space-y-5">
+            <div class="card p-5">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="flex flex-wrap items-center gap-2 font-display text-base font-semibold text-cream-50">
+                    <StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-300" /> Chỉ dẫn AI (prompt)
+                    <span :class="[BADGE, BADGE_TONE.neutral]">{{ promptsData.length }} khoá</span>
+                    <span v-if="promptConfiguredCount" :class="[BADGE, BADGE_TONE.brand]">{{ promptConfiguredCount }} đang cấu hình</span>
+                  </h2>
+                  <p class="mt-1 max-w-3xl text-xs text-cream-300">
+                    Đây là câu lệnh thật gửi cho model ở từng bước của Agent Studio. Sửa xong bấm Lưu là
+                    <strong class="text-cream-100">lượt chạy kế tiếp</strong> dùng ngay — không cần deploy.
+                    Mỗi lần lưu tạo một <strong class="text-cream-100">phiên bản mới</strong>, bản cũ vẫn còn để khôi phục.
+                  </p>
+                </div>
+                <button class="tool-btn" :disabled="promptLoading" @click="loadPrompts(true)">
+                  <StudioIcon name="refresh" size="h-3.5 w-3.5" /> {{ promptLoading ? 'Đang tải…' : 'Tải lại' }}
+                </button>
+              </div>
+              <p class="mt-3 flex items-start gap-1.5 rounded-lg border border-ink-700 bg-ink-900/60 p-2.5 text-xs text-cream-300">
+                <StudioIcon name="alertTriangle" size="h-3.5 w-3.5 shrink-0 text-warn" class="mt-px" />
+                <span>Chỉ dẫn là toàn cục — áp dụng cho MỌI tài khoản. Ô trống không được lưu: muốn bỏ bản cấu hình thì dùng «Quay về mặc định».</span>
+              </p>
+            </div>
+
+            <div v-for="p in promptsData" :key="p.key" class="card p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h3 class="flex flex-wrap items-center gap-2 font-display text-sm font-semibold text-cream-50">
+                    {{ p.label }}
+                    <span :class="[BADGE, BADGE_TONE.neutral]">{{ p.flow }}</span>
+                    <span v-if="p.configured" :class="[BADGE, BADGE_TONE.brand]">v{{ p.active_version }} đang chạy</span>
+                    <span v-else :class="[BADGE, BADGE_TONE.info]">mặc định trong mã</span>
+                    <span v-if="promptIsDirty(p)" :class="[BADGE, BADGE_TONE.warn]">có thay đổi chưa lưu</span>
+                  </h3>
+                  <p class="mt-1 max-w-3xl text-xs text-cream-300">{{ p.what }}</p>
+                  <p class="mt-1.5 flex flex-wrap items-center gap-1.5 text-label text-cream-300">
+                    <span class="font-mono">{{ p.key }}</span>
+                    <span v-if="p.vars.length" class="opacity-70">· chèn được:</span>
+                    <span v-for="v in p.vars" :key="v" class="rounded bg-ink-700 px-1.5 py-0.5 font-mono text-cream-200">{{ '{' + v + '}' }}</span>
+                  </p>
+                </div>
+                <div class="text-right text-label text-cream-300">
+                  <div v-if="p.active_at">sửa lần cuối {{ p.active_at }}</div>
+                  <div v-if="p.default_at" class="opacity-70">mặc định ghi nhận {{ p.default_at }}</div>
+                </div>
+              </div>
+
+              <textarea v-model="promptDraft[p.key]" rows="12" spellcheck="false"
+                        :aria-label="'Chỉ dẫn: ' + p.label"
+                        class="input mt-3 w-full font-mono text-xs leading-relaxed"
+                        :placeholder="p.configured ? 'Nội dung chỉ dẫn…' : 'Chưa cấu hình — hệ thống đang chạy bản mặc định trong mã. Bấm «Chép bản mặc định» để bắt đầu từ đó.'"></textarea>
+
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <input v-model="promptNote[p.key]" type="text" maxlength="120"
+                       :aria-label="'Ghi chú cho phiên bản mới của ' + p.label"
+                       class="input min-w-[12rem] flex-1 !py-2 text-xs" placeholder="Ghi chú phiên bản (vì sao đổi) — không bắt buộc">
+                <span class="text-label text-cream-300">{{ (promptDraft[p.key] || '').length }} ký tự</span>
+              </div>
+
+              <div class="mt-3 flex flex-wrap gap-1.5">
+                <button class="btn-brand btn-sm" :disabled="promptBusy === p.key || !promptIsDirty(p)" @click="savePrompt(p)">
+                  <StudioIcon name="save" size="h-3.5 w-3.5" /> {{ promptBusy === p.key ? 'Đang lưu…' : 'Lưu thành phiên bản mới' }}
+                </button>
+                <button class="tool-btn" :disabled="promptBusy === p.key || !p.default_body" @click="useDefaultPrompt(p)">
+                  <StudioIcon name="copy" size="h-3.5 w-3.5" /> Chép bản mặc định vào ô
+                </button>
+                <button class="tool-btn" :disabled="promptBusy === p.key || !p.configured" @click="confirmTurnOffPrompt(p)">
+                  <StudioIcon name="undo" size="h-3.5 w-3.5" /> Quay về mặc định
+                </button>
+                <button class="tool-btn" :disabled="!p.versions.length" @click="promptHistory = promptHistory === p.key ? '' : p.key">
+                  <StudioIcon name="history" size="h-3.5 w-3.5" /> Lịch sử ({{ p.versions.length }})
+                </button>
+              </div>
+
+              <div v-if="promptHistory === p.key" class="mt-3 rounded-lg border border-ink-700 bg-ink-900/60 p-3">
+                <p class="mb-2 text-label font-semibold uppercase tracking-wide text-cream-300">Phiên bản đã lưu</p>
+                <ul class="space-y-1.5">
+                  <li v-for="v in p.versions" :key="v.version" class="flex flex-wrap items-center gap-2 text-xs">
+                    <span :class="[BADGE, v.is_active ? BADGE_TONE.ok : BADGE_TONE.neutral]">v{{ v.version }}</span>
+                    <span class="text-cream-300">{{ v.created_at }} · {{ v.chars }} ký tự</span>
+                    <span v-if="v.note" class="min-w-0 flex-1 truncate text-cream-300">{{ v.note }}</span>
+                    <span v-else class="min-w-0 flex-1"></span>
+                    <button v-if="v.is_active" class="tool-btn" disabled>đang chạy</button>
+                    <button v-else class="tool-btn" :disabled="promptBusy === p.key" @click="activatePromptVersion(p, v.version)">
+                      <StudioIcon name="undo" size="h-3 w-3" /> Khôi phục
+                    </button>
+                    <button class="tool-btn" @click="promptDraft[p.key] = v.body">
+                      <StudioIcon name="copy" size="h-3 w-3" /> Chép vào ô
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div v-if="!promptLoading && !promptsData.length" class="card p-5 text-xs text-cream-300">
+              Chưa tải được danh mục chỉ dẫn. Bấm «Tải lại» để thử lại.
             </div>
           </section>
 

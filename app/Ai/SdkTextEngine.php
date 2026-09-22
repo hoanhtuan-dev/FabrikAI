@@ -177,6 +177,85 @@ class SdkTextEngine
         return $out;
     }
 
+
+    /**
+     * Chạy MỘT lượt ĐỌC ẢNH qua SDK cho một candidate + khoá. null = không chạy được.
+     *
+     * [ĐO THẬT TRÊN PRODUCTION 2026-09-22 — đo TRƯỚC khi đổi, đúng yêu cầu]
+     *   · provider qwen-paygo/deepseek qua driver openai-compatible, ảnh cục bộ 84 KB;
+     *   · 2.302 ms, mô tả ĐÚNG nội dung: "áo halter cổ thắt nút và chân váy midi dáng suông, satin bóng
+     *     màu kem, thêu hoa viền tím, clutch tua rua, giày mule trắng, nền studio xám".
+     * Nghĩa là SDK đọc ảnh được với CHÍNH nhà cung cấp của dự án, không cần lab riêng.
+     *
+     * Vì sao vẫn giữ đường HTTP tự viết làm đường dự phòng: nó xử lý thêm ca ảnh qua URL và hình dạng
+     * riêng của Gemini — chưa đo hai ca đó trên SDK nên chưa bỏ.
+     *
+     * @param  list<string>  $images  đường dẫn tệp cục bộ HOẶC data URI
+     * @return string|null  văn bản mô tả, null = không chạy được
+     */
+    public function runVision(array $candidate, string $key, string $instruction, array $images, array $options = []): ?string
+    {
+        $config = SdkProviderMap::configFor($candidate, $key);
+        if ($config === null || $images === []) {
+            return null;
+        }
+
+        $attachments = [];
+        foreach ($images as $image) {
+            $attachment = $this->attachmentFor((string) $image);
+            if ($attachment !== null) {
+                $attachments[] = $attachment;
+            }
+        }
+
+        if ($attachments === []) {
+            return null;   // không đọc được ảnh nào ⇒ để đường cũ thử, đừng gửi lượt rỗng
+        }
+
+        $name = SdkProviderMap::nameForKey($candidate, $key);
+        config(['ai.providers.'.$name => $config]);
+
+        try {
+            Ai::forgetInstance($name);
+        } catch (\Throwable) {
+            // Chưa dựng instance thì không có gì để quên.
+        }
+
+        $agent = new RegistryAgent($instruction, [], $this->providerOptions($candidate, $options));
+
+        $response = $agent->prompt(
+            (string) ($options['prompt'] ?? 'Hãy mô tả ảnh này theo đúng yêu cầu trong phần chỉ dẫn.'),
+            $attachments,
+            provider: [$name => (string) $candidate['model']],
+            timeout: max(1, (int) ($options['timeout'] ?? 120)),
+        );
+
+        $text = trim((string) $response->text);
+
+        return $text === '' ? null : $text;
+    }
+
+    /** Đường dẫn cục bộ hoặc data URI → tệp đính kèm của SDK. null = không đọc được. */
+    private function attachmentFor(string $image): ?object
+    {
+        if (! class_exists(\Laravel\Ai\Files\Image::class)) {
+            return null;
+        }
+
+        try {
+            if (str_starts_with($image, 'data:')) {
+                if (preg_match('#^data:([^;]+);base64,(.*)$#s', $image, $m) !== 1) {
+                    return null;
+                }
+
+                return \Laravel\Ai\Files\Image::fromBase64($m[2], $m[1]);
+            }
+
+            return is_file($image) ? \Laravel\Ai\Files\Image::fromPath($image) : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
     /** finish_reason best-effort từ bước cuối của SDK — chỉ để ghi nhật ký chẩn đoán. */
     private function finishReasonOf(object $response): ?string
     {

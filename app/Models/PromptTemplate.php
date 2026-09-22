@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class PromptTemplate extends Model
 {
-    protected $fillable = ['key', 'scope', 'version', 'body', 'is_active'];
+    // 'label' = ghi chú của phiên bản (migration 2026_09_22). Trước đây thiếu ở đây nên
+    // studio:prompt --label bị nuốt im lặng.
+    protected $fillable = ['key', 'scope', 'version', 'body', 'label', 'is_active'];
 
     protected function casts(): array
     {

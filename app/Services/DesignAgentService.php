@@ -142,12 +142,39 @@ class DesignAgentService
         } catch (\Throwable $e) {
             // Bảng chưa migrate / DB lỗi ⇒ chạy bằng chuỗi trong mã. Một lớp cấu hình KHÔNG được phép làm
             // hỏng lượt chạy chỉ vì nó không đọc được.
+            $this->rememberDefaultInstruction($key, $built);
+
             return $built;
         }
 
-        // Bản cấu hình rỗng cũng bị coi như "chưa cấu hình": một hàng rỗng làm lượt chạy mất hết chỉ dẫn
-        // mà không ai thấy lỗi.
-        return trim($configured) === '' ? $built : $configured;
+        // "Đang chạy bản trong mã" nhận biết bằng SO SÁNH, không phải bằng chuỗi rỗng:
+        // studio_prompt_template() trả về chính $built khi không có hàng nào đang bật, nên nhánh
+        // rỗng không bao giờ chạy và ảnh chụp mặc định không bao giờ được ghi (đã dính thật).
+        if (trim($configured) === '' || $configured === $built) {
+            $this->rememberDefaultInstruction($key, $built);
+
+            return $built;
+        }
+
+        return $configured;
+    }
+
+    /**
+     * [2026-09-22] GHI NHỚ bản chỉ dẫn MẶC ĐỊNH trong mã mà lượt chạy này vừa dùng.
+     *
+     * Chỉ dẫn radar dài hơn 3.000 ký tự và được lắp từ nhiều mảnh ngay trong lớp này — chủ dự án mở
+     * giao diện quản trị mà không thấy bản gốc thì chỉ có thể sửa trong bóng tối. Ghi lại ảnh chụp này
+     * để giao diện hiển thị "bản đang chạy" và cho nhân bản rồi sửa.
+     *
+     * Chỉ ghi khi khoá CHƯA được cấu hình (đúng lúc cần nhất), và KHÔNG bao giờ được làm hỏng lượt chạy.
+     */
+    private function rememberDefaultInstruction(string $key, string $built): void
+    {
+        try {
+            \App\Ai\PromptCatalog::rememberDefault($key, $built);
+        } catch (\Throwable $e) {
+            // Ghi nhớ chỉ để HIỂN THỊ. Hỏng thì im lặng bỏ qua, không được ảnh hưởng lượt chạy.
+        }
     }
 
     public function radar(?User $user, string $region = 'all', bool $useAi = true): array

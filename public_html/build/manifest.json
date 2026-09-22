@@ -172,7 +172,7 @@
     ]
   },
   "resources/js/studio/admin.js": {
-    "file": "assets/admin-D5hUAuv8.js",
+    "file": "assets/admin-C2k9nC5D.js",
     "name": "admin",
     "src": "resources/js/studio/admin.js",
     "isEntry": true,
@@ -182,7 +182,7 @@
       "_BaseModal-DXQC9f4C.js"
     ],
     "css": [
-      "assets/admin-FJbyok1O.css"
+      "assets/admin-t9Zwvt9t.css"
     ]
   },
   "resources/js/studio/agent-studio.js": {

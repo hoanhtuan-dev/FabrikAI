@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Ai\PromptCatalog;
 use App\Models\PromptTemplate;
 use Illuminate\Console\Command;
 
@@ -30,12 +31,8 @@ class StudioPrompt extends Command
 
     protected $description = 'Liệt kê / xem / đặt / tắt CHỈ DẪN cấu hình được (bảng prompt_templates).';
 
-    /** Các khoá Agent Studio đi qua mốc cấu hình. */
-    private const AGENT_KEYS = [
-        'agent.radar.instruction',
-        'agent.collection_brief.instruction',
-        'agent.sample_prompt.instruction',
-    ];
+    // Danh mục khoá nằm ở PromptCatalog — GIAO DIỆN QUẢN TRỊ đọc đúng danh mục đó.
+    // Khai báo lại ở đây là mở đường cho hai bên lệch nhau.
 
     public function handle(): int
     {
@@ -60,7 +57,7 @@ class StudioPrompt extends Command
     private function listAll(): int
     {
         $this->line('── CHỈ DẪN AGENT STUDIO ĐI QUA MỐC CẤU HÌNH ──');
-        foreach (self::AGENT_KEYS as $key) {
+        foreach (PromptCatalog::keys() as $key) {
             $row = PromptTemplate::query()->where('key', $key)->where('is_active', true)->orderByDesc('version')->first();
             $this->line(sprintf('  %-42s %s', $key, $row
                 ? 'ĐANG CẤU HÌNH (v'.$row->version.', '.mb_strlen((string) $row->body).' ký tự)'
@@ -68,7 +65,7 @@ class StudioPrompt extends Command
         }
 
         $others = PromptTemplate::query()->select('key')->distinct()->pluck('key')->all();
-        $extra = array_values(array_diff($others, self::AGENT_KEYS));
+        $extra = array_values(array_diff($others, PromptCatalog::keys()));
         if ($extra !== []) {
             $this->newLine();
             $this->line('  Khoá khác đang có trong bảng: '.implode(', ', $extra));
@@ -111,18 +108,19 @@ class StudioPrompt extends Command
             return self::FAILURE;
         }
 
+        if (! PromptCatalog::has($key)) {
+            $this->error('Khoá không có trong danh mục: '.$key);
+            $this->line('Khoá hợp lệ: '.implode(', ', PromptCatalog::keys()));
+
+            return self::FAILURE;
+        }
+
         // Version MỚI mỗi lần đặt: giữ bản cũ để đối chiếu/khôi phục, đúng cách bảng này được thiết kế.
-        $next = (int) PromptTemplate::query()->where('key', $key)->max('version') + 1;
+        // Đi qua PromptCatalog để lệnh và GIAO DIỆN ghi dữ liệu y hệt nhau.
+        $note = trim((string) ($this->option('label') ?? ''));
+        $row = PromptCatalog::put($key, $body, $note !== '' ? $note : 'Đặt từ SSH '.now()->format('d/m/Y H:i'));
 
-        PromptTemplate::create([
-            'key' => $key,
-            'body' => $body,
-            'version' => $next,
-            'is_active' => true,
-            'label' => (string) ($this->option('label') ?? 'đặt từ SSH '.now()->format('d/m/Y H:i')),
-        ]);
-
-        $this->info(sprintf('Đã đặt %s = v%d (%d ký tự). Lượt chạy KẾ TIẾP dùng bản này.', $key, $next, mb_strlen($body)));
+        $this->info(sprintf('Đã đặt %s = v%d (%d ký tự). Lượt chạy KẾ TIẾP dùng bản này.', $key, $row->version, mb_strlen($body)));
         $this->line('Quay về mặc định: php artisan studio:prompt '.$key.' --off');
 
         return self::SUCCESS;
@@ -131,7 +129,7 @@ class StudioPrompt extends Command
     /** Tắt MỌI version đang bật của khoá ⇒ quay về chuỗi mặc định trong mã. */
     private function turnOff(string $key): int
     {
-        $n = PromptTemplate::query()->where('key', $key)->where('is_active', true)->update(['is_active' => false]);
+        $n = PromptCatalog::turnOff($key);
 
         $this->info($n > 0
             ? sprintf('Đã tắt %d bản cấu hình của %s — quay về mặc định trong mã.', $n, $key)
