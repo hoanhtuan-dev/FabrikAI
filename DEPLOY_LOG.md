@@ -3,8 +3,76 @@
 > Ghi lại các lần deploy, thay đổi phiên làm việc, và công lao từng phiên chat.
 > Mục tiêu: khi có nhiều phiên song song, ai cũng đọc được ai đã làm gì, deploy khi nào, cần làm gì tiếp theo.
 
----
+## Phiên 2026-09-26 (đợt 9) — QC TOOL (việc #6): BIÊN BẢN KIỂM TRA CHẤT LƯỢNG + KẾ HOẠCH LẤY MẪU AQL
 
+**Commit:** `db890ef`. **Trạng thái: đã commit + push + DEPLOY production** — migration `2026_09_26_000006` đã chạy, cache dựng lại, asset đã build và phục vụ.
+
+### 1. Vì sao
+Chuỗi của một bộ sưu tập đang **dừng ở chỗ GỬI xưởng** (gói ZIP + phiếu kỹ thuật). Hàng về thì **không có chỗ nào ghi lô đó có bao nhiêu lỗi** — trong khi tầng giá thành vẫn đang nhân với `@@defect_pct@@`, một con số chủ xưởng **TỰ ĐOÁN**. Đợt này dựng mắt cuối của chuỗi: nơi ghi **lỗi THẬT** để đối chiếu lại giả định đó.
+
+### 2. Đã làm
+| # | Thay đổi | Tệp |
+|---|---|---|
+| 1 | Lõi QC: bảng tra cỡ lô → mã cỡ mẫu → (n · Ac · Re) · kết luận tính từ số · checklist theo nhóm hàng | `app/Services/QcService.php` |
+| 2 | Bảng `qc_inspections` (kế hoạch lấy mẫu **chốt vào biên bản**, không tính lại hồi tố) | `database/migrations/2026_09_26_000006_create_qc_inspections_table.php` · `app/Models/QcInspection.php` |
+| 3 | 4 đường API của dự án (mở · ghi kết quả · xoá · đọc bảng) | `app/Http/Controllers/QcController.php` · `routes/web.php` |
+| 4 | Bảng QC trên giao diện + nút mở ở cả hai chỗ của trang Bộ sưu tập | `resources/js/studio/components/QcPanel.vue` · `CollectionsCard.vue` · `pages/CollectionsPage.vue` · `store/` |
+| 5 | 13 test | `tests/Feature/QcInspectionTest.php` |
+
+### 3. Ba quyết định kỹ thuật đáng ghi
+| Quyết định | Vì sao |
+|---|---|
+| **Kết luận là CON SỐ, không phải nút bấm** | Đạt/không đạt do `verdict()` tính: có lỗi **nghiêm trọng** ⇒ không đạt (mức này không có số chấp nhận); lỗi **nặng** ≤ Ac ⇒ đạt; **chưa ghi ngày kiểm ⇒ "chưa kết luận"** (mặc định-đạt là tự ký nghiệm thu hộ khách). Giao diện không gửi kết luận lên. |
+| **Kế hoạch lấy mẫu được CHỐT vào biên bản** | Một biên bản đã lập không được đổi số hồi tố khi bảng tham chiếu của hệ thống cập nhật — cùng nguyên tắc đã dùng cho bảng size. |
+| **Bảng tra ghi rõ là THAM CHIẾU** | Cỡ mẫu/Ac theo kế hoạch lấy mẫu đơn · kiểm tra thường (họ ISO 2859-1 · ANSI/ASQ Z1.4 · MIL-STD-105E). Đây **không phải bản sao có chứng thực**; câu này hiện ngay trên giao diện, không chỉ trong mã. |
+
+### 4. Nguyên tắc MŨI TÊN — chỗ dễ sai nhất của bảng AQL
+Ô trống trong bảng gốc nghĩa là *"dùng kế hoạch ở cỡ mẫu LỚN HƠN đầu tiên có số"* — và **cỡ mẫu cũng đổi theo**. Quên đổi cỡ mẫu là **lấy mẫu thiếu rồi kết luận sai**. Ví dụ đo trên production: lô 5 cái ở AQL 1.5 ⇒ mã A, nhưng mã A không có kế hoạch ở mức AQL đó ⇒ theo mũi tên phải kiểm **3 cái**, không phải 2.
+
+Ô trống ở **đáy cột** (lô rất lớn ở mức AQL chặt, ví dụ lô 200.000 cái ở AQL 2.5) không còn kế hoạch nào lớn hơn để trỏ tới. Ở đây **KHÔNG lùi về cỡ mẫu nhỏ hơn** — như thế lô to hơn lại lấy mẫu ít hơn, đúng theo hướng có lợi cho người bán. Giữ cỡ mẫu theo mã lô và dùng **số chấp nhận cao nhất của cột** (chặt hơn bảng gốc = siết, không nới), kèm câu nói rõ trong `note`.
+
+### 5. Hai lỗi TỰ PHÁT HIỆN khi viết test (không phải lỗi được báo)
+| Lỗi | Triệu chứng đo được | Sửa |
+|---|---|---|
+| **Đọc trước khi ghi** | `overview() + ['created' => create()]`: trong `A + B` PHP tính hạng **TRÁI** trước ⇒ bảng trả về là ảnh chụp **TRƯỚC** khi thêm biên bản ⇒ giao diện hiện thiếu đúng dòng vừa tạo | Ghi trước, dựng bảng sau (`[mutation] + overview()`) |
+| **Trộn hai tập dữ liệu vào một tỉ lệ** | Biên bản NHÁP có ghi lỗi (9 nghiêm trọng + 500 nặng) nhưng chưa kiểm ⇒ tỉ lệ lỗi ra **638,75%** vì tử số lấy cả biên bản nháp còn mẫu số chỉ lấy biên bản đã kiểm | Tử số và mẫu số lấy từ **cùng một tập** (biên bản đã kiểm); tỉ lệ trả kèm `defect_rate_basis {defects, units}` để đối chiếu được; số lỗi theo dõi vẫn đếm đủ ở khoá riêng |
+
+> Cả hai đều là loại lỗi **không làm test nào đỏ** nếu chỉ kiểm tra "API trả 200". Chúng lộ ra vì test kiểm **con số cụ thể** (dòng vừa tạo có mặt trong bảng; tỉ lệ = 2/80 = 2,5%).
+
+### 6. Kiểm chứng sau deploy (chạy trên production)
+| Kiểm tra | Kết quả |
+|---|---|
+| Sao lưu TRƯỚC khi migrate | `fabrikai-20260922-074949.sql.gz` · 572K · **43 bảng · kết thúc hợp lệ** |
+| HEAD máy chủ | `db890ef` — khớp local = origin |
+| Migration | `2026_09_26_000006_create_qc_inspections_table` → **DONE** (160,88 ms) |
+| Bảng | 17 cột: `id, project_id, sample_id, style_no, stage, lot_size, aql, plan, critical, major, minor, checklist, result, notes, inspected_at, created_at, updated_at` · **0 dòng** (chưa ai dùng — số thật, không phải số giả) |
+| Container resolve được `QcService` | ✅ `App\Services\QcService` — **kiểm tra đúng lớp lỗi đã gặp ở đợt 1** (tham số có giá trị mặc định bị tiêm `null`) |
+| Bảng tra trên mã đang chạy | lô 1.200 · AQL 2.5 ⇒ **mã J · n=80 · Ac=5 · Re=6** · lô 5 · AQL 1.5 ⇒ **mã A · n=3** (mũi tên) · lô 1 ⇒ **n=1 · kiểm 100%** · lô 200.000 · AQL 2.5 ⇒ **mã P · n=800 · Ac=21** (ngoài phạm vi bảng) |
+| Khớp nhóm hàng | `đầm dạ hội` ⇒ **Váy** (10 điểm kiểm) · `Bàn ghế` ⇒ **NULL** ⇒ rơi về 7 điểm kiểm chung |
+| Đường API | **4** đường `api/projects/{project}/qc-inspections*` có trong bảng định tuyến |
+| Asset đã phục vụ | manifest **52 mục · 0 tệp thiếu** · `assets/QcPanel-uWfLRMUZ.js` (**28.787 byte**) trả **HTTP 200** |
+| HTTP | `/` **200** · `/bo-suu-tap` **302** (khách ⇒ về đăng nhập, đúng) · `api/projects/1/qc-inspections` **401** (đường sống, chặn khách) |
+| Cron | `seKYAPOwkS` · `3pc53LMYT5` nhảy lúc **07:50** · nhịp tim `2026-09-22T07:50:03Z` · `studio_scheduler_alive()` **true** |
+| Test | **1180 XANH / 8.873 assertion** (trước: 1167 / 8.422) |
+
+### 7. Cách dùng (một lượt thật)
+1. Mở một bộ sưu tập → **Kiểm tra chất lượng**. Nút hiện chấm đỏ khi bộ đó có lô không đạt.
+2. **Mở biên bản**: ghi cỡ lô (bắt buộc) + mức AQL (mặc định 2.5) + điểm kiểm (trong chuyền · cuối chuyền · trước khi giao). Hệ thống chốt ngay **số cái phải kiểm** và **số lỗi được phép**.
+3. **Ghi kết quả**: 3 ô lỗi (nghiêm trọng · nặng · nhẹ) + ngày kiểm + tick từng điểm kiểm (đạt / không đạt / không áp dụng). Kết luận tự hiện kèm phép tính.
+4. Đối chiếu: `tỉ lệ lỗi` ở đầu bảng là **số lỗi thật** — so với `@@defect_pct@@` đang dùng ở tầng giá thành.
+
+### 8. Nợ còn lại của lộ trình
+| # | Việc | Ghi chú |
+|---|---|---|
+| ~~6~~ | ~~QC tool~~ | ✅ **đợt này** |
+| 7 | **3 gate còn thiếu** (tech pack sign-off · duyệt kế hoạch SX · duyệt QC) | rẻ — dùng lại mẫu whitelist đã chạy |
+| 8 | Theo dõi sản xuất (so thực tế vs kế hoạch) | cần sau khi có mẫu + kế hoạch (đã có) |
+| 9 | `FileSearch` = vector retrieval | đắt nhất; để cuối |
+| — | Gán model cho vai "Agent Studio — Rút kinh nghiệm" | chủ dự án (bỏ trống thì rơi về nhóm suy luận) |
+
+**Còn nợ nhỏ của riêng QC:** bảng tra 4 mức AQL hiện là dữ liệu tham chiếu viết trong mã. Ngày nào đối chiếu được với bản tiêu chuẩn hai bên thoả thuận thì sửa **một chỗ** (`ACCEPT`/`LOT_RANGES`) — biên bản cũ **không đổi** vì kế hoạch đã chốt trong từng dòng.
+
+---
 ## Phiên 2026-09-26 (đợt 8) — CỦNG CỐ TRÍ NHỚ (GĐ3): vòng lặp tự học KHÉP KÍN
 
 **Commit:** `83d2192` (+ đính chính số đo). **Trạng thái: đã commit + push + DEPLOY production** — migration `2026_09_26_000005` đã chạy, cache dựng lại.
