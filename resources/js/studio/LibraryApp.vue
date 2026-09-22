@@ -161,6 +161,22 @@ function refresh() {
   else { store.loadLibrary(true); store.refreshLibraryScan(); }
 }
 
+/*
+ * BA CỜ MỞ/ĐÓNG CHO ĐIỆN THOẠI (2026-09-26 · thiết kế lại).
+ *
+ * VẤN ĐỀ ĐO ĐƯỢC trên màn 390px: trước khi thấy tấm ảnh ĐẦU TIÊN, người dùng phải đi qua 5 khối xếp
+ * chồng — đầu trang · 3 tab · hàng sắp xếp/hiển thị/cỡ lưới · **7 ô thống kê** (2 cột ⇒ 4 hàng) · khối bộ
+ * lọc 4 ô. Tổng cộng khoảng 700px chrome, gần trọn một màn hình điện thoại, mà phần lớn là thứ chỉnh một
+ * lần rồi thôi.
+ *
+ * Nay trên điện thoại: mặc định CHỈ còn đầu trang · 3 tab · một hàng chip số liệu gọn · ô tìm kiếm — ba
+ * khối còn lại nằm sau ba nút bật/tắt ngay trên hàng đó. Từ sm trở lên giữ nguyên như cũ (đủ chỗ thì hiện
+ * hết là tiện hơn).
+ */
+const libStatsOpen = ref(false);
+const libOptionsOpen = ref(false);
+const libFiltersOpen = ref(false);
+
 // ── Sắp xếp / hiển thị / cỡ lưới (dùng chung 3 tab) ──
 const sortOptions = computed(() => {
   if (store.libraryTab === 'uploads') return [
@@ -312,8 +328,31 @@ onMounted(async () => {
         </button>
       </div>
 
-      <!-- ══ Thanh sắp xếp / hiển thị / cỡ lưới (dùng chung cho cả 3 tab) ══ -->
-      <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-ink-700 bg-ink-800 p-3">
+      <!-- ══ HÀNG ĐIỀU KHIỂN GỌN CHO ĐIỆN THOẠI (2026-09-26 · thiết kế lại) ══════════════════════════
+           Ba khối nặng (thống kê · hiển thị/sắp xếp · bộ lọc) mặc định ĐÓNG trên điện thoại để tấm ảnh đầu
+           tiên hiện ra sớm; từ sm trở lên chúng luôn mở như cũ. Chip số liệu ở đây là bản GỌN của khối
+           thống kê — vẫn là cùng con số, chỉ bỏ các ô ít dùng. -->
+      <div class="mb-3 flex items-center gap-2 sm:hidden">
+        <div class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+          <span class="shrink-0 rounded-full bg-ink-800 px-2.5 py-1 text-label font-semibold text-cream-200">{{ fmtNum(stats.total ?? store.libraryTotal) }} mục</span>
+          <span class="shrink-0 rounded-full bg-ok/15 px-2.5 py-1 text-label font-semibold text-ok">{{ fmtNum(stats.completed ?? 0) }} xong</span>
+          <span v-if="stats.junk_count" class="shrink-0 rounded-full bg-warn/15 px-2.5 py-1 text-label font-semibold text-warn">{{ fmtNum(stats.junk_count) }} rác</span>
+        </div>
+        <button type="button" class="tool-btn shrink-0" :class="libFiltersOpen ? 'is-active' : ''" :aria-expanded="libFiltersOpen" @click="libFiltersOpen = !libFiltersOpen">
+          <StudioIcon name="search" size="h-4 w-4" /> Lọc
+        </button>
+        <button type="button" class="tool-btn shrink-0" :class="libOptionsOpen ? 'is-active' : ''" :aria-expanded="libOptionsOpen" @click="libOptionsOpen = !libOptionsOpen">
+          <StudioIcon name="sliders" size="h-4 w-4" /> Hiển thị
+        </button>
+        <button type="button" class="tool-btn shrink-0" :class="libStatsOpen ? 'is-active' : ''" :aria-expanded="libStatsOpen" @click="libStatsOpen = !libStatsOpen">
+          <StudioIcon name="grid" size="h-4 w-4" /> Số liệu
+        </button>
+      </div>
+
+      <!-- ══ Thanh sắp xếp / hiển thị / cỡ lưới (dùng chung cho cả 3 tab) ══
+           Điện thoại: mặc định ĐÓNG (nút "Hiển thị" ở hàng trên), từ sm luôn mở. -->
+      <div class="mb-4 flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-ink-700 bg-ink-800 p-3"
+           :class="libOptionsOpen ? 'flex' : 'hidden sm:flex'">
         <div class="flex items-center gap-1.5">
           <label class="text-label font-semibold uppercase tracking-wide text-cream-300">Sắp xếp theo</label>
           <select v-model="activeSort" class="rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-cream-100 focus:border-brand-400 focus:outline-none">
@@ -338,8 +377,9 @@ onMounted(async () => {
       </div>
 
       <template v-if="store.libraryTab === 'generations'">
-      <!-- ══ Thống kê ══ -->
-      <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+      <!-- ══ Thống kê — 7 ô, chỉ mở sẵn từ sm trở lên (điện thoại dùng chip gọn ở hàng trên) ══ -->
+      <div class="mb-4 grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7"
+           :class="libStatsOpen ? 'grid' : 'hidden sm:grid'">
         <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
           <p class="text-label uppercase tracking-wide text-cream-400">Tổng mục</p>
           <p class="text-lg font-semibold text-cream-100">{{ fmtNum(stats.total ?? store.libraryTotal) }}</p>
@@ -377,8 +417,9 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- ══ Bộ lọc ══ -->
-      <div class="mb-4 flex flex-wrap items-end gap-2 rounded-lg border border-ink-700 bg-ink-800 p-3">
+      <!-- ══ Bộ lọc — điện thoại: mặc định ĐÓNG (nút "Lọc"), từ sm luôn mở ══ -->
+      <div class="mb-4 flex-wrap items-end gap-2 rounded-lg border border-ink-700 bg-ink-800 p-3"
+           :class="libFiltersOpen ? 'flex' : 'hidden sm:flex'">
         <div class="w-36">
           <label class="mb-1 block text-label font-semibold uppercase tracking-wide text-cream-300">Loại</label>
           <select @change="onChangeType" class="w-full rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-cream-100 focus:border-brand-400 focus:outline-none">
