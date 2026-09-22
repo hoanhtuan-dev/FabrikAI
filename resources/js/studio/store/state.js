@@ -52,6 +52,14 @@ export function studioState() {
     samplesLoading: false,
     samplesSaving: false,
     samplesError: '',
+    // ── KIỂM TRA CHẤT LƯỢNG (QC) — Việc #6, 2026-09-26 ─────────────────────────────────────
+    // Đây là chỗ ghi LỖI THẬT của lô đã may. Tầng giá thành đang dùng @@defect_pct@@ là GIẢ ĐỊNH của
+    // chủ xưởng; bảng này là chỗ duy nhất đối chiếu được giả định đó với thực tế.
+    qc: null,                  // { items, counts, defects, summary, shape }
+    qcProjectId: null,         // biên bản đang xem (mỗi bộ một bảng — không lẫn giữa các bộ)
+    qcLoading: false,
+    qcSaving: false,
+    qcError: '',
     planOpen: false,        // popup "Gói & credit" ở thanh công cụ
     planCatalogOpen: false, // mở danh mục gói bên trong popup
     planBusy: false,

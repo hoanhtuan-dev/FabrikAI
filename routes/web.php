@@ -11,6 +11,7 @@ use App\Http\Controllers\BrandRuleController;
 use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectShareController;
+use App\Http\Controllers\QcController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SampleController;
 use App\Http\Controllers\StudioController;
@@ -220,6 +221,13 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::patch('/projects/{project}/samples/{sample}', [SampleController::class, 'update'])->name('projects.samples.update');
     Route::post('/projects/{project}/samples/{sample}/stage', [SampleController::class, 'stage'])->name('projects.samples.stage');
     Route::delete('/projects/{project}/samples/{sample}', [SampleController::class, 'destroy'])->name('projects.samples.destroy');
+
+    // [Việc #6 — 2026-09-26] KIỂM TRA CHẤT LƯỢNG (biên bản QC · checklist · AQL).
+    // Đây là chỗ GHI lỗi THẬT — đối chiếu được với `defect_pct` (giả định) ở tầng giá thành.
+    Route::get('/projects/{project}/qc-inspections', [QcController::class, 'index'])->name('projects.qc.index');
+    Route::post('/projects/{project}/qc-inspections', [QcController::class, 'store'])->name('projects.qc.store');
+    Route::patch('/projects/{project}/qc-inspections/{inspection}', [QcController::class, 'update'])->name('projects.qc.update');
+    Route::delete('/projects/{project}/qc-inspections/{inspection}', [QcController::class, 'destroy'])->name('projects.qc.destroy');
 
     // [Đợt 2 — 2026-09-19] Chi phí & tiến độ của MỘT bộ sưu tập (số ảnh xong/đang chạy/lỗi · credit đã
     // dùng · hạn còn lại · phản hồi mới nhất) — cho chủ doanh nghiệp kiểm soát chi phí theo bộ.

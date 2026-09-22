@@ -27,6 +27,7 @@ import ProjectDesignView from '../components/ProjectDesignView.vue';
 import BaseModal from '../components/BaseModal.vue';
 import TechPackEditor from '../components/TechPackEditor.vue';
 import SampleTracking from '../components/SampleTracking.vue';
+import QcPanel from '../components/QcPanel.vue';
 import { STATUS_COLOR } from '../dataColors.js';
 
 // [Xem lại thiết kế] Bộ sưu tập đang xem bản thiết kế đã lưu.
@@ -55,6 +56,8 @@ const exportForm = ref({ sizes: '', note: '', channel: '' });
 const techPackOpen = ref(false);
 // Mẫu vật lý (Việc #4): bảng theo dõi FIT · PP · TOP — mở trong hộp thoại vì cần chỗ cho bảng.
 const samplesOpen = ref(false);
+// Kiểm tra chất lượng (Việc #6): biên bản QC của bộ đang áp dụng — nơi ghi LỖI THẬT của lô đã may.
+const qcOpen = ref(false);
 const statusFilter = ref('all');
 let refreshTimer = null;
 
@@ -538,6 +541,10 @@ onBeforeUnmount(() => {
                 <button class="tool-btn btn-sm" @click="samplesOpen = true">
                   <StudioIcon name="scissors" size="h-4 w-4" /> Mẫu vật lý<span v-if="store.samples && store.samplesProjectId === applied?.id && (store.samples.alerts?.overdue || 0) > 0"> · {{ store.samples.alerts.overdue }} quá hạn</span>
                 </button>
+                <!-- KIỂM TRA CHẤT LƯỢNG: mắt cuối của chuỗi — ghi lỗi THẬT để đối chiếu với tỉ lệ lỗi giả định ở tầng giá thành. -->
+                <button class="tool-btn btn-sm" @click="qcOpen = true">
+                  <StudioIcon name="shieldCheck" size="h-4 w-4" /> Kiểm tra chất lượng<span v-if="store.qc && store.qcProjectId === applied?.id && (store.qc.counts?.fail || 0) > 0"> · {{ store.qc.counts.fail }} lô không đạt</span>
+                </button>
               </div>
 
               <!-- SỐ LIỆU (chi phí · phản hồi khách) -->
@@ -885,6 +892,10 @@ onBeforeUnmount(() => {
 
     <BaseModal v-model="samplesOpen" wide :title="'Mẫu vật lý — ' + (applied?.name || '')">
       <SampleTracking v-if="applied && samplesOpen" :project-id="applied.id" />
+    </BaseModal>
+
+    <BaseModal v-model="qcOpen" wide :title="'Kiểm tra chất lượng — ' + (applied?.name || '')">
+      <QcPanel v-if="applied && qcOpen" :project-id="applied.id" />
     </BaseModal>
 
     <!-- store.toast() đã được gọi ở khắp trang này nhưng KHÔNG có chỗ render ⇒ thông báo (kèm mã tra cứu) vô hình. -->

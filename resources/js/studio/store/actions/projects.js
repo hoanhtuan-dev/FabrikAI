@@ -579,4 +579,72 @@ export const projectsActions = {
       if (data) this.toast('Đã xoá mẫu khỏi bảng theo dõi.', 'info');
       return data;
     },
+
+    // ═══════════════════════════════════════════════════════════════════
+    // KIỂM TRA CHẤT LƯỢNG (QC) — Việc #6, 2026-09-26
+    //
+    // Vì sao nằm cùng miền bộ sưu tập: biên bản QC gắn với MỘT lô của MỘT bộ (cùng mã hàng, cùng
+    // phiếu kỹ thuật), và nó là mắt cuối của chuỗi: thiết kế → mẫu → sản xuất → KIỂM → giao.
+    // ═══════════════════════════════════════════════════════════════════
+    /** Nạp bảng biên bản của MỘT bộ. Nhớ theo id để mở lại không phải gọi mạng (trừ khi force). */
+    async loadQc(projectId, force = false) {
+      const id = Number(projectId) || 0;
+      if (!id) return null;
+      if (!force && this.qc && this.qcProjectId === id) return this.qc;
+
+      this.qcLoading = true;
+      this.qcError = '';
+      try {
+        const res = await fetch('/api/projects/' + id + '/qc-inspections', { headers: { Accept: 'application/json' } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, 'Không tải được biên bản kiểm tra chất lượng.');
+        this.qc = data;
+        this.qcProjectId = id;
+        return data;
+      } catch (e) {
+        this.qcError = userFacingError(e, 'Không tải được biên bản kiểm tra chất lượng.');
+        return null;
+      } finally {
+        this.qcLoading = false;
+      }
+    },
+    /**
+     * Một đường GHI dùng chung cho bốn thao tác — máy chủ trả về CẢ bảng mới sau mỗi lần ghi, nên
+     * giao diện không phải tự đoán lại số tổng (đoán là chỗ để số liệu lệch khỏi máy chủ).
+     */
+    async writeQc(projectId, path, options, fallbackMessage) {
+      this.qcSaving = true;
+      this.qcError = '';
+      try {
+        const res = await fetch('/api/projects/' + projectId + path, {
+          headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          ...options,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, fallbackMessage);
+        this.qc = data;
+        this.qcProjectId = Number(projectId) || null;
+        return data;
+      } catch (e) {
+        this.qcError = userFacingError(e, fallbackMessage);
+        this.toast(this.qcError, 'error');
+        return null;
+      } finally {
+        this.qcSaving = false;
+      }
+    },
+    async createQcInspection(projectId, payload) {
+      const data = await this.writeQc(projectId, '/qc-inspections', { method: 'POST', body: JSON.stringify(payload) }, 'Không mở được biên bản kiểm tra.');
+      if (data) this.toast('Đã mở biên bản và chốt kế hoạch lấy mẫu.', 'success');
+      return data;
+    },
+    /** Ghi kết quả kiểm. Máy chủ TÍNH LẠI kết luận (đạt/không đạt) — giao diện không gửi kết luận lên. */
+    async updateQcInspection(projectId, inspectionId, payload) {
+      return this.writeQc(projectId, '/qc-inspections/' + inspectionId, { method: 'PATCH', body: JSON.stringify(payload) }, 'Không lưu được kết quả kiểm.');
+    },
+    async deleteQcInspection(projectId, inspectionId) {
+      const data = await this.writeQc(projectId, '/qc-inspections/' + inspectionId, { method: 'DELETE' }, 'Không xoá được biên bản.');
+      if (data) this.toast('Đã xoá biên bản kiểm tra.', 'info');
+      return data;
+    },
   };

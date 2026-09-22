@@ -15,6 +15,7 @@ import StudioIcon from './StudioIcon.vue';
 import BaseModal from './BaseModal.vue';
 import TechPackEditor from './TechPackEditor.vue';
 import SampleTracking from './SampleTracking.vue';
+import QcPanel from './QcPanel.vue';
 
 const store = useStudioStore();
 
@@ -46,6 +47,15 @@ const overdueSamples = computed(() => (
     ? Number(store.samples.alerts?.overdue || 0)
     : 0
 ));
+/**
+ * Số lô KHÔNG ĐẠT của bộ đang áp dụng — cùng lớp lỗi "số của người khác" đã ghi ở trên: chỉ đọc khi
+ * bảng QC trong store ĐÚNG là của bộ này, nếu không thì mở bộ A rồi xem bộ B sẽ thấy số của A.
+ */
+const failedQc = computed(() => (
+  store.qc && store.qcProjectId === applied.value?.id
+    ? Number(store.qc.counts?.fail || 0)
+    : 0
+));
 const stats = computed(() => (applied.value ? store.projectStats[applied.value.id] || null : null));
 const shots = computed(() => (applied.value ? (store.projectShots[applied.value.id]?.items || []) : []));
 const awaiting = computed(() => shots.value.filter((s) => s.shot_state === 'campaign_ready'));
@@ -70,6 +80,8 @@ const exportForm = ref({ sizes: '', note: '', channel: '' });
 const techPackOpen = ref(false);
 // Mẫu vật lý (Việc #4): bảng theo dõi FIT · PP · TOP của bộ đang áp dụng.
 const samplesOpen = ref(false);
+// Kiểm tra chất lượng (Việc #6): biên bản QC của bộ đang áp dụng.
+const qcOpen = ref(false);
 
 const createOpen = ref(false);
 const saving = ref(false);
@@ -364,6 +376,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <StudioIcon name="scissors" size="h-3.5 w-3.5" />
           <span v-if="overdueSamples" class="absolute -right-0.5 -top-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-danger text-[9px] font-bold text-cream-50">{{ overdueSamples }}</span>
         </button>
+        <!-- KIỂM TRA CHẤT LƯỢNG (Việc #6): biên bản QC của lô đã may — chấm đỏ khi có lô không đạt. -->
+        <button class="tool-btn btn-sm relative" :class="failedQc ? '!border-danger/40 !text-danger' : ''" title="Kiểm tra chất lượng (biên bản QC · AQL)" @click="qcOpen = true">
+          <StudioIcon name="shieldCheck" size="h-3.5 w-3.5" />
+          <span v-if="failedQc" class="absolute -right-0.5 -top-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-danger text-[9px] font-bold text-cream-50">{{ failedQc }}</span>
+        </button>
         <button class="tool-btn btn-sm" @click="goToStudio(applied)" title="Mở Studio để làm việc trên bộ này">
           <StudioIcon name="arrowRight" size="h-3.5 w-3.5" />
         </button>
@@ -516,6 +533,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 
     <BaseModal v-model="samplesOpen" wide :title="'Mẫu vật lý — ' + (applied?.name || '')">
       <SampleTracking v-if="applied && samplesOpen" :project-id="applied.id" />
+    </BaseModal>
+
+    <BaseModal v-model="qcOpen" wide :title="'Kiểm tra chất lượng — ' + (applied?.name || '')">
+      <QcPanel v-if="applied && qcOpen" :project-id="applied.id" />
     </BaseModal>
 
     <!-- ══ TẠO MỚI ══ -->

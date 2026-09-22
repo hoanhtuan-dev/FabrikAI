@@ -141,6 +141,12 @@ class Project extends Model
         return $this->hasMany(Sample::class);
     }
 
+    /** BIÊN BẢN KIỂM TRA CHẤT LƯỢNG của bộ sưu tập (Việc #6, 2026-09-26) — xem QcService. */
+    public function qcInspections(): HasMany
+    {
+        return $this->hasMany(QcInspection::class);
+    }
+
     /**
      * Generation mới nhất CÓ media_url — eager-load (`with('latestGeneration')`)
      * cho accessor thumbnail để tránh N+1 khi serialize danh sách dự án.
