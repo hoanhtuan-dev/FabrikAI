@@ -47,6 +47,7 @@ class RegistryProviders
             'search' => [DesignAgentService::SEARCH_GROUP, DesignAgentService::REASON_GROUP, DesignAgentService::AI_GROUP],
             'reason' => [DesignAgentService::REASON_GROUP, DesignAgentService::AI_GROUP],
             'vision' => [DesignAgentService::VISION_GROUP, 'vision'],
+            'reflect' => [DesignAgentService::REFLECT_GROUP, DesignAgentService::REASON_GROUP, DesignAgentService::AI_GROUP],
             default => [$role],
         };
     }

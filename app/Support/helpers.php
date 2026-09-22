@@ -2259,6 +2259,7 @@ if (! function_exists('studio_task_groups')) {
             'agent_reason' => ['label' => 'Agent Studio — Suy luận & viết nội dung', 'legacy_default' => fn () => ''],
             'agent_vision' => ['label' => 'Agent Studio — Đọc ảnh mẫu (bám phong cách)', 'legacy_default' => fn () => ''],
             'agent_search' => ['label' => 'Agent Studio — Tìm kiếm nguồn ngoài', 'legacy_default' => fn () => ''],
+            'agent_reflect' => ['label' => 'Agent Studio — Rút kinh nghiệm (trí nhớ dài hạn)', 'legacy_default' => fn () => ''],
         ];
     }
 }

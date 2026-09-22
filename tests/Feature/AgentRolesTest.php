@@ -79,12 +79,12 @@ class AgentRolesTest extends TestCase
 
     // ── (A) NHÓM ĐƯỢC KHAI ─────────────────────────────────────────────────
 
-    /** Ba nhóm vai phải có trong danh sách nhóm công việc (Settings đọc từ đây để hiện ra). */
-    public function test_the_three_agent_roles_are_registered(): void
+    /** Bốn nhóm vai phải có trong danh sách nhóm công việc (Settings đọc từ đây để hiện ra). */
+    public function test_the_agent_roles_are_registered(): void
     {
         $groups = studio_task_groups();
 
-        foreach ([DesignAgentService::REASON_GROUP, DesignAgentService::VISION_GROUP, DesignAgentService::SEARCH_GROUP] as $key) {
+        foreach ([DesignAgentService::REASON_GROUP, DesignAgentService::VISION_GROUP, DesignAgentService::SEARCH_GROUP, DesignAgentService::REFLECT_GROUP] as $key) {
             $this->assertArrayHasKey($key, $groups, 'Thiếu nhóm '.$key);
             $this->assertStringContainsString('Agent Studio', (string) $groups[$key]['label']);
         }
@@ -92,14 +92,14 @@ class AgentRolesTest extends TestCase
         // Model Registry nhận nhóm qua studio_model_group_slugs() — ba vai Agent Studio phải nằm trong đó
         // (kèm hai vai cũ inference/text để cấu hình cũ không vỡ), không để mỗi nơi chép một danh sách rồi lệch.
         $slugs = studio_model_group_slugs();
-        foreach ([DesignAgentService::REASON_GROUP, DesignAgentService::VISION_GROUP, DesignAgentService::SEARCH_GROUP, 'inference', 'text'] as $key) {
+        foreach ([DesignAgentService::REASON_GROUP, DesignAgentService::VISION_GROUP, DesignAgentService::SEARCH_GROUP, DesignAgentService::REFLECT_GROUP, 'inference', 'text'] as $key) {
             $this->assertContains($key, $slugs, 'studio_model_group_slugs() thiếu nhóm '.$key);
         }
 
         // Model Registry UI (SettingsApp.vue) cũng phải liệt kê 3 vai trong dropdown "Vai trò" — chỉ backend
         // nhận mà UI thiếu thì chủ shop vẫn không thêm được model.
         $view = (string) file_get_contents(resource_path('js/studio/SettingsApp.vue'));
-        foreach ([DesignAgentService::REASON_GROUP, DesignAgentService::VISION_GROUP, DesignAgentService::SEARCH_GROUP] as $key) {
+        foreach ([DesignAgentService::REASON_GROUP, DesignAgentService::VISION_GROUP, DesignAgentService::SEARCH_GROUP, DesignAgentService::REFLECT_GROUP] as $key) {
             $this->assertStringContainsString("'".$key."'", $view, 'SettingsApp.vue (Model Registry) thiếu vai '.$key);
         }
     }

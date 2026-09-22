@@ -48,6 +48,9 @@ class DesignAgentService
 
     public const SEARCH_GROUP = 'agent_search';
 
+    /** Vai RÚT KINH NGHIỆM (2026-09-26): biến quyết định duyệt/loại thành bài học — xem ReflectBrandMemoryJob. */
+    public const REFLECT_GROUP = 'agent_reflect';
+
     /** Cache định hướng radar theo vùng + model đang cấu hình (tránh gọi lại mỗi lần mở). */
     private const RADAR_CACHE_SECONDS = 600;
 
@@ -2566,6 +2569,7 @@ class DesignAgentService
             .'Không đổi bất kỳ con số nào — cơ cấu SKU, size và dải giá là do hệ thống quyết định. '
             // TRÍ NHỚ DÀI HẠN (GĐ1): khối internal_brand_signal.brand_memory ghi prompt ảnh chủ shop ĐÃ DUYỆT và ĐÃ LOẠI.
             .'brand_memory.approved là các prompt ảnh chủ shop đã DUYỆT, rejected là đã LOẠI: bám phong cách đã duyệt, TRÁNH phong cách đã loại — đó là gu thật của shop. '
+            .'brand_memory.lessons.approved và brand_memory.lessons.rejected là các BÀI HỌC đã khái quát từ những prompt đó (tín hiệu cao hơn): ưu tiên đúng bài học đã duyệt, tránh đúng bài học đã loại. '
             // GĐ2 — học từ bán hàng thật.
             .'shop_data.best_sellers là món shop đang BÁN CHẠY: ưu tiên phong cách/nhóm hàng của chúng; slow_movers là bán chậm — tránh đề xuất quá nhiều; category_demand là nhóm đang được cầu. '
             // GĐ3 — dự báo từ thị trường.
