@@ -501,4 +501,82 @@ export const projectsActions = {
       if (!this.techPackDraft) return false;
       return JSON.stringify(this.techPackDraft) !== JSON.stringify(this.techPack?.tech_pack || null);
     },
+
+    // ═══════════════════════════════════════════════════════════════════
+    // MẪU VẬT LÝ (fit · PP · TOP) — Việc #4, 2026-09-26
+    //
+    // Vì sao nằm cùng miền bộ sưu tập: mẫu là con của MỘT bộ (cùng bộ thì cùng xưởng, cùng mã hàng),
+    // và vòng đời của nó NỐI TIẾP vòng đời ảnh — duyệt ảnh xong mới đặt xưởng làm mẫu thật.
+    // ═══════════════════════════════════════════════════════════════════
+    /** Nạp bảng theo dõi của MỘT bộ. Nhớ theo id để mở lại không phải gọi mạng (trừ khi force). */
+    async loadSamples(projectId, force = false) {
+      const id = Number(projectId) || 0;
+      if (!id) return null;
+      if (!force && this.samples && this.samplesProjectId === id) return this.samples;
+
+      this.samplesLoading = true;
+      this.samplesError = '';
+      try {
+        const res = await fetch('/api/projects/' + id + '/samples', { headers: { Accept: 'application/json' } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, 'Không tải được bảng theo dõi mẫu.');
+        this.samples = data;
+        this.samplesProjectId = id;
+        return data;
+      } catch (e) {
+        this.samplesError = userFacingError(e, 'Không tải được bảng theo dõi mẫu.');
+        return null;
+      } finally {
+        this.samplesLoading = false;
+      }
+    },
+    /**
+     * Gọi một đường GHI rồi cất bảng mới vào store — bốn thao tác dùng CHUNG một đường.
+     *
+     * Vì sao không chép bốn lần: mỗi lần chép là một chỗ để quên cập nhật cờ đang-lưu hoặc quên đọc
+     * lỗi từ máy chủ — và bảng theo dõi sẽ hiện số cũ trong khi máy chủ đã đổi.
+     */
+    async writeSample(projectId, path, options, fallbackMessage) {
+      this.samplesSaving = true;
+      this.samplesError = '';
+      try {
+        const res = await fetch('/api/projects/' + projectId + path, {
+          headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          ...options,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, fallbackMessage);
+        this.samples = data;
+        this.samplesProjectId = Number(projectId) || null;
+        return data;
+      } catch (e) {
+        this.samplesError = userFacingError(e, fallbackMessage);
+        this.toast(this.samplesError, 'error');
+        return null;
+      } finally {
+        this.samplesSaving = false;
+      }
+    },
+    async createSample(projectId, payload) {
+      const data = await this.writeSample(projectId, '/samples', { method: 'POST', body: JSON.stringify(payload) }, 'Không thêm được mẫu.');
+      if (data) this.toast('Đã thêm mẫu vào bảng theo dõi.', 'success');
+      return data;
+    },
+    async updateSample(projectId, sampleId, payload) {
+      return this.writeSample(projectId, '/samples/' + sampleId, { method: 'PATCH', body: JSON.stringify(payload) }, 'Không lưu được thông tin mẫu.');
+    },
+    /** Chuyển giai đoạn — máy chủ TỪ CHỐI bước nhảy cóc và trả 422 kèm các bước được phép. */
+    async transitionSample(projectId, sampleId, stage, note = '') {
+      return this.writeSample(
+        projectId,
+        '/samples/' + sampleId + '/stage',
+        { method: 'POST', body: JSON.stringify(note ? { stage, note } : { stage }) },
+        'Không chuyển được giai đoạn của mẫu.',
+      );
+    },
+    async deleteSample(projectId, sampleId) {
+      const data = await this.writeSample(projectId, '/samples/' + sampleId, { method: 'DELETE' }, 'Không xoá được mẫu.');
+      if (data) this.toast('Đã xoá mẫu khỏi bảng theo dõi.', 'info');
+      return data;
+    },
   };

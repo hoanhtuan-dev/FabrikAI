@@ -133,6 +133,15 @@ class Project extends Model
     }
 
     /**
+     * MẪU VẬT LÝ của bộ sưu tập (Việc #4, 2026-09-26) — vòng đời do XƯỞNG làm ra, khác vòng đời ẢNH.
+     * Một mã hàng có thể có nhiều vòng mẫu (fit lần 1, fit lần 2, PP, TOP) nên đây là hasMany.
+     */
+    public function samples(): HasMany
+    {
+        return $this->hasMany(Sample::class);
+    }
+
+    /**
      * Generation mới nhất CÓ media_url — eager-load (`with('latestGeneration')`)
      * cho accessor thumbnail để tránh N+1 khi serialize danh sách dự án.
      *

@@ -29,3 +29,10 @@ Schedule::call(function () {
 })->everyFiveMinutes()->name('studio-scheduler-heartbeat')->onOneServer();
 // Dọn lần đo cũ mỗi ngày để bảng tín hiệu không phình mãi.
 Schedule::command('studio:market-signals --prune')->dailyAt('03:30')->onOneServer();
+
+// [Việc #4 — 2026-09-26] NHẮC HẠN MẪU VẬT LÝ, mỗi sáng.
+//
+// Vì sao 08:00 chứ không phải nửa đêm: đây là thư cho NGƯỜI, không phải việc dọn dẹp máy. Gửi lúc 3 giờ
+// sáng thì thư nằm đáy hộp thư lúc họ mở máy — và công dụng duy nhất của nó là để người ta LÀM gì đó
+// trong ngày. Chính lệnh tự chống trùng theo (tài khoản · ngày) nên chạy lại cũng không dội hộp thư.
+Schedule::command('studio:samples:remind')->dailyAt('08:00')->onOneServer()->withoutOverlapping();

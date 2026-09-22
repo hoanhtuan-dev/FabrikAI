@@ -44,6 +44,14 @@ export function studioState() {
     techPackLoading: false,
     techPackSaving: false,
     techPackError: '',
+    // ── MẪU VẬT LÝ (fit · PP · TOP) — Việc #4, 2026-09-26 ──────────────────────────────────
+    // Vòng đời do XƯỞNG làm ra, khác vòng đời ẢNH (projectShots). Cảnh báo trễ hạn TÍNH TỪ DỮ LIỆU ở
+    // máy chủ nên nó tự đúng lại mỗi ngày — không có cờ nào phải làm mới.
+    samples: null,             // { items, counts, alerts, summary, shape }
+    samplesProjectId: null,    // bảng đang mở (mỗi bộ một bảng — không lẫn giữa các bộ)
+    samplesLoading: false,
+    samplesSaving: false,
+    samplesError: '',
     planOpen: false,        // popup "Gói & credit" ở thanh công cụ
     planCatalogOpen: false, // mở danh mục gói bên trong popup
     planBusy: false,

@@ -12,6 +12,7 @@ use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectShareController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SampleController;
 use App\Http\Controllers\StudioController;
 use App\Http\Controllers\StudioSettingsController;
 use App\Http\Controllers\DesignAgentController;
@@ -210,6 +211,15 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::get('/projects/{project}/tech-pack', [TechPackController::class, 'show'])->name('projects.tech-pack.show');
     Route::put('/projects/{project}/tech-pack', [TechPackController::class, 'update'])->name('projects.tech-pack.update');
     Route::delete('/projects/{project}/tech-pack', [TechPackController::class, 'destroy'])->name('projects.tech-pack.destroy');
+
+    // [Việc #4 — 2026-09-26] THEO DÕI MẪU VẬT LÝ (fit · PP · TOP) của một bộ sưu tập.
+    // Vòng đời ẢNH đã có (Generation.shot_state); mẫu THẬT thì chưa có chỗ nào — nên việc theo dõi mẫu
+    // và mọi cảnh báo trễ hạn nằm ngoài ứng dụng. Năm đường dưới đây cho nó một chỗ trong hệ thống.
+    Route::get('/projects/{project}/samples', [SampleController::class, 'index'])->name('projects.samples.index');
+    Route::post('/projects/{project}/samples', [SampleController::class, 'store'])->name('projects.samples.store');
+    Route::patch('/projects/{project}/samples/{sample}', [SampleController::class, 'update'])->name('projects.samples.update');
+    Route::post('/projects/{project}/samples/{sample}/stage', [SampleController::class, 'stage'])->name('projects.samples.stage');
+    Route::delete('/projects/{project}/samples/{sample}', [SampleController::class, 'destroy'])->name('projects.samples.destroy');
 
     // [Đợt 2 — 2026-09-19] Chi phí & tiến độ của MỘT bộ sưu tập (số ảnh xong/đang chạy/lỗi · credit đã
     // dùng · hạn còn lại · phản hồi mới nhất) — cho chủ doanh nghiệp kiểm soát chi phí theo bộ.

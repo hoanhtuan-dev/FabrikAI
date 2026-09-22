@@ -26,6 +26,7 @@ import StudioIcon from '../components/StudioIcon.vue';
 import ProjectDesignView from '../components/ProjectDesignView.vue';
 import BaseModal from '../components/BaseModal.vue';
 import TechPackEditor from '../components/TechPackEditor.vue';
+import SampleTracking from '../components/SampleTracking.vue';
 import { STATUS_COLOR } from '../dataColors.js';
 
 // [Xem lại thiết kế] Bộ sưu tập đang xem bản thiết kế đã lưu.
@@ -52,6 +53,8 @@ const shareInfo = ref(null);
 const exportForm = ref({ sizes: '', note: '', channel: '' });
 // Phiếu kỹ thuật (Việc #3): hộp thoại riêng — bảng thông số cần chỗ rộng hơn hộp thoại xuất gói.
 const techPackOpen = ref(false);
+// Mẫu vật lý (Việc #4): bảng theo dõi FIT · PP · TOP — mở trong hộp thoại vì cần chỗ cho bảng.
+const samplesOpen = ref(false);
 const statusFilter = ref('all');
 let refreshTimer = null;
 
@@ -531,6 +534,10 @@ onBeforeUnmount(() => {
                 <button class="tool-btn btn-sm" @click="openExport()">
                   <StudioIcon name="download" size="h-4 w-4" /> Xuất gói xưởng
                 </button>
+                <!-- MẪU VẬT LÝ: vòng đời do xưởng làm ra (FIT · PP · TOP) — nối tiếp việc duyệt ảnh. -->
+                <button class="tool-btn btn-sm" @click="samplesOpen = true">
+                  <StudioIcon name="scissors" size="h-4 w-4" /> Mẫu vật lý<span v-if="store.samples && store.samplesProjectId === applied?.id && (store.samples.alerts?.overdue || 0) > 0"> · {{ store.samples.alerts.overdue }} quá hạn</span>
+                </button>
               </div>
 
               <!-- SỐ LIỆU (chi phí · phản hồi khách) -->
@@ -874,6 +881,10 @@ onBeforeUnmount(() => {
 
     <BaseModal v-model="techPackOpen" wide :title="'Phiếu kỹ thuật — ' + (applied?.name || '')">
       <TechPackEditor v-if="applied && techPackOpen" :project-id="applied.id" />
+    </BaseModal>
+
+    <BaseModal v-model="samplesOpen" wide :title="'Mẫu vật lý — ' + (applied?.name || '')">
+      <SampleTracking v-if="applied && samplesOpen" :project-id="applied.id" />
     </BaseModal>
 
     <!-- store.toast() đã được gọi ở khắp trang này nhưng KHÔNG có chỗ render ⇒ thông báo (kèm mã tra cứu) vô hình. -->

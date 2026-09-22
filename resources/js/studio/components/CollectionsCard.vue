@@ -14,6 +14,7 @@ import { EXPORT_CHANNELS } from '../exportChannels.js';
 import StudioIcon from './StudioIcon.vue';
 import BaseModal from './BaseModal.vue';
 import TechPackEditor from './TechPackEditor.vue';
+import SampleTracking from './SampleTracking.vue';
 
 const store = useStudioStore();
 
@@ -33,6 +34,18 @@ onMounted(() => {
 });
 
 const applied = computed(() => store.appliedProject || null);
+/**
+ * Số mẫu QUÁ HẠN của bộ đang áp dụng.
+ *
+ * Chỉ tin con số khi bảng trong store là của ĐÚNG bộ này — store giữ bảng gần nhất đã nạp, nên nếu
+ * không kiểm thì mở bộ A rồi xem bộ B sẽ thấy cảnh báo của A. Đây đúng là lớp lỗi "số của người khác"
+ * mà repo này đã gặp ở nhiều chỗ khác.
+ */
+const overdueSamples = computed(() => (
+  store.samples && store.samplesProjectId === applied.value?.id
+    ? Number(store.samples.alerts?.overdue || 0)
+    : 0
+));
 const stats = computed(() => (applied.value ? store.projectStats[applied.value.id] || null : null));
 const shots = computed(() => (applied.value ? (store.projectShots[applied.value.id]?.items || []) : []));
 const awaiting = computed(() => shots.value.filter((s) => s.shot_state === 'campaign_ready'));
@@ -55,6 +68,8 @@ const exportOpen = ref(false);
 const exportForm = ref({ sizes: '', note: '', channel: '' });
 // Phiếu kỹ thuật (Việc #3): mở trong hộp thoại vì card sidebar quá hẹp cho một bảng thông số.
 const techPackOpen = ref(false);
+// Mẫu vật lý (Việc #4): bảng theo dõi FIT · PP · TOP của bộ đang áp dụng.
+const samplesOpen = ref(false);
 
 const createOpen = ref(false);
 const saving = ref(false);
@@ -344,6 +359,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
         <button class="tool-btn btn-sm" @click="openExport()">
           <StudioIcon name="download" size="h-3.5 w-3.5" />
         </button>
+        <!-- MẪU VẬT LÝ: vòng đời do xưởng làm ra (FIT · PP · TOP). Chấm đỏ khi có mẫu quá hạn. -->
+        <button class="tool-btn btn-sm relative" :class="overdueSamples ? '!border-danger/40 !text-danger' : ''" title="Theo dõi mẫu vật lý (FIT · PP · TOP)" @click="samplesOpen = true">
+          <StudioIcon name="scissors" size="h-3.5 w-3.5" />
+          <span v-if="overdueSamples" class="absolute -right-0.5 -top-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-danger text-[9px] font-bold text-cream-50">{{ overdueSamples }}</span>
+        </button>
         <button class="tool-btn btn-sm" @click="goToStudio(applied)" title="Mở Studio để làm việc trên bộ này">
           <StudioIcon name="arrowRight" size="h-3.5 w-3.5" />
         </button>
@@ -492,6 +512,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 
     <BaseModal v-model="techPackOpen" wide :title="'Phiếu kỹ thuật — ' + (applied?.name || '')">
       <TechPackEditor v-if="applied && techPackOpen" :project-id="applied.id" />
+    </BaseModal>
+
+    <BaseModal v-model="samplesOpen" wide :title="'Mẫu vật lý — ' + (applied?.name || '')">
+      <SampleTracking v-if="applied && samplesOpen" :project-id="applied.id" />
     </BaseModal>
 
     <!-- ══ TẠO MỚI ══ -->
