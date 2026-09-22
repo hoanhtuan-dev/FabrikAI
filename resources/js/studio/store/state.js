@@ -60,6 +60,14 @@ export function studioState() {
     qcLoading: false,
     qcSaving: false,
     qcError: '',
+    // ── BA CỔNG DUYỆT (Việc #7, 2026-09-26) ───────────────────────────────────────────────
+    // Duyệt BA THỨ ĐI RA NHÀ MÁY (thông số · tiền · chất lượng) — khác trạng thái bộ sưu tập, vốn là
+    // duyệt BẢN THIẾT KẾ. Quyết định duyệt là dữ liệu có vết (ai · khi nào), không phải cờ trên máy khách.
+    gates: null,               // { items, summary, shape }
+    gatesProjectId: null,      // cổng đang xem (mỗi bộ một bảng — không lẫn giữa các bộ)
+    gatesLoading: false,
+    gatesSaving: false,
+    gatesError: '',
     planOpen: false,        // popup "Gói & credit" ở thanh công cụ
     planCatalogOpen: false, // mở danh mục gói bên trong popup
     planBusy: false,

@@ -16,6 +16,7 @@ import BaseModal from './BaseModal.vue';
 import TechPackEditor from './TechPackEditor.vue';
 import SampleTracking from './SampleTracking.vue';
 import QcPanel from './QcPanel.vue';
+import GatePanel from './GatePanel.vue';
 
 const store = useStudioStore();
 
@@ -56,6 +57,15 @@ const failedQc = computed(() => (
     ? Number(store.qc.counts?.fail || 0)
     : 0
 ));
+/**
+ * Tiến độ ba cổng của bộ đang áp dụng. Cùng lớp lỗi "số của người khác" đã ghi ở trên: chỉ đọc khi bảng
+ * trong store ĐÚNG là của bộ này, nếu không mở bộ A rồi xem bộ B sẽ thấy tiến độ của A.
+ */
+const gateProgress = computed(() => {
+  if (!store.gates || store.gatesProjectId !== applied.value?.id) return null;
+  const s = store.gates.summary || {};
+  return { approved: Number(s.approved || 0), total: Number(s.total || 0), ready: !!s.ready };
+});
 const stats = computed(() => (applied.value ? store.projectStats[applied.value.id] || null : null));
 const shots = computed(() => (applied.value ? (store.projectShots[applied.value.id]?.items || []) : []));
 const awaiting = computed(() => shots.value.filter((s) => s.shot_state === 'campaign_ready'));
@@ -82,6 +92,8 @@ const techPackOpen = ref(false);
 const samplesOpen = ref(false);
 // Kiểm tra chất lượng (Việc #6): biên bản QC của bộ đang áp dụng.
 const qcOpen = ref(false);
+// Ba cổng duyệt (Việc #7): chốt phiếu kỹ thuật · chốt kế hoạch SX & giá · nghiệm thu QC.
+const gatesOpen = ref(false);
 
 const createOpen = ref(false);
 const saving = ref(false);
@@ -381,6 +393,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
           <StudioIcon name="shieldCheck" size="h-3.5 w-3.5" />
           <span v-if="failedQc" class="absolute -right-0.5 -top-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-danger text-[9px] font-bold text-cream-50">{{ failedQc }}</span>
         </button>
+        <!-- BA CỔNG DUYỆT (Việc #7): nhãn hiện tiến độ khi đã nạp; viền xanh khi đủ ba cổng. -->
+        <button class="tool-btn btn-sm" :class="gateProgress && gateProgress.ready ? '!border-ok/40 !text-ok' : ''"
+                :title="'Ba cổng duyệt (thông số · tiền · chất lượng)' + (gateProgress ? ' — ' + gateProgress.approved + '/' + gateProgress.total + ' đã duyệt' : '')"
+                @click="gatesOpen = true">
+          <StudioIcon name="checkSquare" size="h-3.5 w-3.5" />
+          <span v-if="gateProgress && !gateProgress.ready" class="text-[10px] font-semibold">{{ gateProgress.approved }}/{{ gateProgress.total }}</span>
+        </button>
         <button class="tool-btn btn-sm" @click="goToStudio(applied)" title="Mở Studio để làm việc trên bộ này">
           <StudioIcon name="arrowRight" size="h-3.5 w-3.5" />
         </button>
@@ -537,6 +556,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onReviewKey));
 
     <BaseModal v-model="qcOpen" wide :title="'Kiểm tra chất lượng — ' + (applied?.name || '')">
       <QcPanel v-if="applied && qcOpen" :project-id="applied.id" />
+    </BaseModal>
+
+    <BaseModal v-model="gatesOpen" wide :title="'Ba cổng duyệt — ' + (applied?.name || '')">
+      <GatePanel v-if="applied && gatesOpen" :project-id="applied.id" />
     </BaseModal>
 
     <!-- ══ TẠO MỚI ══ -->

@@ -11,6 +11,7 @@ use App\Http\Controllers\BrandRuleController;
 use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectShareController;
+use App\Http\Controllers\ProjectGateController;
 use App\Http\Controllers\QcController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SampleController;
@@ -228,6 +229,11 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->prefix('api')->name('api.'
     Route::post('/projects/{project}/qc-inspections', [QcController::class, 'store'])->name('projects.qc.store');
     Route::patch('/projects/{project}/qc-inspections/{inspection}', [QcController::class, 'update'])->name('projects.qc.update');
     Route::delete('/projects/{project}/qc-inspections/{inspection}', [QcController::class, 'destroy'])->name('projects.qc.destroy');
+
+    // [Việc #7 — 2026-09-26] BA CỔNG DUYỆT: chốt phiếu kỹ thuật · chốt kế hoạch SX & giá · nghiệm thu QC.
+    // Khác trạng thái dự án (draft→review→approved = duyệt BẢN THIẾT KẾ): đây là duyệt ba thứ ĐI RA NHÀ MÁY.
+    Route::get('/projects/{project}/gates', [ProjectGateController::class, 'index'])->name('projects.gates.index');
+    Route::post('/projects/{project}/gates/{gate}', [ProjectGateController::class, 'decide'])->name('projects.gates.decide');
 
     // [Đợt 2 — 2026-09-19] Chi phí & tiến độ của MỘT bộ sưu tập (số ảnh xong/đang chạy/lỗi · credit đã
     // dùng · hạn còn lại · phản hồi mới nhất) — cho chủ doanh nghiệp kiểm soát chi phí theo bộ.

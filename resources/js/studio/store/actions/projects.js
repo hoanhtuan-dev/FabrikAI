@@ -647,4 +647,71 @@ export const projectsActions = {
       if (data) this.toast('Đã xoá biên bản kiểm tra.', 'info');
       return data;
     },
+    // ═══════════════════════════════════════════════════════════════════
+    // BA CỔNG DUYỆT — Việc #7, 2026-09-26
+    //
+    // Vì sao nằm cùng miền bộ sưu tập: cổng duyệt là quyết định TRÊN một bộ sưu tập (thông số đi ra
+    // xưởng · tiền · chất lượng), có vết ai-khi-nao, và cả ba cổng đều nằm trong hồ sơ của bộ đó.
+    // ═══════════════════════════════════════════════════════════════════
+    /** Nạp ba cổng của MỘT bộ. Nhớ theo id để mở lại không phải gọi mạng (trừ khi force). */
+    async loadGates(projectId, force = false) {
+      const id = Number(projectId) || 0;
+      if (!id) return null;
+      if (!force && this.gates && this.gatesProjectId === id) return this.gates;
+
+      this.gatesLoading = true;
+      this.gatesError = '';
+      try {
+        const res = await fetch('/api/projects/' + id + '/gates', { headers: { Accept: 'application/json' } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, 'Không tải được ba cổng duyệt.');
+        this.gates = data;
+        this.gatesProjectId = id;
+        return data;
+      } catch (e) {
+        this.gatesError = userFacingError(e, 'Không tải được ba cổng duyệt.');
+        return null;
+      } finally {
+        this.gatesLoading = false;
+      }
+    },
+    /**
+     * Ghi MỘT quyết định duyệt. Máy chủ trả về CẢ bảng mới (đã tính lại hiệu lực + cascade) nên giao
+     * diện không phải tự suy ra cổng nào vừa mất hiệu lực — đó là chỗ dễ sai nhất của luật cascade.
+     */
+    async writeGate(projectId, gate, payload, fallbackMessage) {
+      this.gatesSaving = true;
+      this.gatesError = '';
+      try {
+        const res = await fetch('/api/projects/' + projectId + '/gates/' + gate, {
+          headers: { 'X-XSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw apiError(data, fallbackMessage);
+        this.gates = data;
+        this.gatesProjectId = Number(projectId) || null;
+        return data;
+      } catch (e) {
+        this.gatesError = userFacingError(e, fallbackMessage);
+        this.toast(this.gatesError, 'error');
+        return null;
+      } finally {
+        this.gatesSaving = false;
+      }
+    },
+    async decideGate(projectId, gate, decision, note = '') {
+      const labels = { approved: 'duyệt', rejected: 'không duyệt', pending: 'rút lại' };
+      const message = 'Không ghi được quyết định ' + (labels[decision] || decision) + '.';
+      const data = await this.writeGate(projectId, gate, { decision, note }, message);
+      if (data) {
+        this.toast(
+          decision === 'approved' ? 'Đã duyệt cổng này.'
+            : (decision === 'rejected' ? 'Đã ghi không duyệt — kèm lý do.' : 'Đã rút lại quyết định.'),
+          decision === 'rejected' ? 'info' : 'success',
+        );
+      }
+      return data;
+    },
   };

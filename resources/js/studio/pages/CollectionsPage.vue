@@ -28,6 +28,7 @@ import BaseModal from '../components/BaseModal.vue';
 import TechPackEditor from '../components/TechPackEditor.vue';
 import SampleTracking from '../components/SampleTracking.vue';
 import QcPanel from '../components/QcPanel.vue';
+import GatePanel from '../components/GatePanel.vue';
 import { STATUS_COLOR } from '../dataColors.js';
 
 // [Xem lại thiết kế] Bộ sưu tập đang xem bản thiết kế đã lưu.
@@ -58,6 +59,8 @@ const techPackOpen = ref(false);
 const samplesOpen = ref(false);
 // Kiểm tra chất lượng (Việc #6): biên bản QC của bộ đang áp dụng — nơi ghi LỖI THẬT của lô đã may.
 const qcOpen = ref(false);
+// Ba cổng duyệt (Việc #7): chốt phiếu kỹ thuật · chốt kế hoạch SX & giá · nghiệm thu QC.
+const gatesOpen = ref(false);
 const statusFilter = ref('all');
 let refreshTimer = null;
 
@@ -105,6 +108,14 @@ const isNewUser = computed(() => !initialLoading.value && projects.value.length 
 const isSuperAdmin = computed(() => !!user.value?.is_super_admin);
 const statuses = computed(() => store.projectStatuses || {});
 const stats = computed(() => (applied.value ? store.projectStats[applied.value.id] || null : null));
+// Tiến độ ba cổng của bộ ĐANG áp dụng — dùng cho nhãn trên nút. Chỉ đọc khi bảng trong store đúng là
+// của bộ này (bài học "số của người khác" đã ghi ở CollectionsCard: mở bộ A rồi xem bộ B).
+const gateProgress = computed(() => {
+  if (!store.gates || store.gatesProjectId !== applied?.value?.id) return null;
+  const s = store.gates.summary || {};
+  return { approved: Number(s.approved || 0), total: Number(s.total || 0), ready: !!s.ready };
+});
+
 
 // Ảnh của bộ đang áp dụng + các chỉ số duyệt mẫu
 const shots = computed(() => (applied.value ? (store.projectShots[applied.value.id]?.items || []) : []));
@@ -545,6 +556,11 @@ onBeforeUnmount(() => {
                 <button class="tool-btn btn-sm" @click="qcOpen = true">
                   <StudioIcon name="shieldCheck" size="h-4 w-4" /> Kiểm tra chất lượng<span v-if="store.qc && store.qcProjectId === applied?.id && (store.qc.counts?.fail || 0) > 0"> · {{ store.qc.counts.fail }} lô không đạt</span>
                 </button>
+                <!-- BA CỔNG DUYỆT: duyệt ba thứ ĐI RA NHÀ MÁY (thông số · tiền · chất lượng), khác trạng thái bộ (duyệt bản thiết kế). -->
+                <button class="tool-btn btn-sm" :class="gateProgress && gateProgress.ready ? '!border-ok/40 !text-ok' : ''" @click="gatesOpen = true">
+                  <StudioIcon name="checkSquare" size="h-4 w-4" /> Ba cổng duyệt
+                  <span v-if="gateProgress"> · {{ gateProgress.ready ? 'sẵn sàng bàn giao' : gateProgress.approved + '/' + gateProgress.total }}</span>
+                </button>
               </div>
 
               <!-- SỐ LIỆU (chi phí · phản hồi khách) -->
@@ -896,6 +912,10 @@ onBeforeUnmount(() => {
 
     <BaseModal v-model="qcOpen" wide :title="'Kiểm tra chất lượng — ' + (applied?.name || '')">
       <QcPanel v-if="applied && qcOpen" :project-id="applied.id" />
+    </BaseModal>
+
+    <BaseModal v-model="gatesOpen" wide :title="'Ba cổng duyệt — ' + (applied?.name || '')">
+      <GatePanel v-if="applied && gatesOpen" :project-id="applied.id" />
     </BaseModal>
 
     <!-- store.toast() đã được gọi ở khắp trang này nhưng KHÔNG có chỗ render ⇒ thông báo (kèm mã tra cứu) vô hình. -->

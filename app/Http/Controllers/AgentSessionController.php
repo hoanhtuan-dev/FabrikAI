@@ -203,20 +203,9 @@ class AgentSessionController extends Controller
      */
     private function settingsOf(Project $project): array
     {
-        $raw = $project->getRawOriginal('settings');
-        $decoded = is_string($raw) ? json_decode($raw, true) : null;
-        if (is_array($decoded)) {
-            return $decoded;
-        }
-        $value = $project->settings;
-        if (is_array($value)) {
-            return $value;
-        }
-        if ($value instanceof \ArrayObject) {
-            return $value->getArrayCopy();
-        }
-
-        return [];
+        // [Việc #7] Phép đọc này nay nằm ở Project::settingsArray() — một chỗ duy nhất cho cả phiên làm việc,
+        // cổng duyệt và mọi thứ đọc settings sau này. Giữ tên hàm cũ để không phải sửa 6 chỗ gọi.
+        return $project->settingsArray();
     }
 
     /** Phiên để GHI: có project_id thì dùng (kiểm quyền sở hữu), không thì lấy phiên đang mở hoặc tạo mới. */

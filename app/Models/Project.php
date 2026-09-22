@@ -148,6 +148,44 @@ class Project extends Model
     }
 
     /**
+     * BA CỔNG DUYỆT của bộ sưu tập (Việc #7 · 2026-09-26) — xem ProjectGateService.
+     * Quyết định duyệt là dữ liệu CÓ VẾT (ai · khi nào), không phải một cờ trong settings.
+     */
+    public function gates(): HasMany
+    {
+        return $this->hasMany(ProjectGate::class);
+    }
+
+    /**
+     * Đọc cột JSON `settings` thành MẢNG — MỘT chỗ duy nhất.
+     *
+     * Vì sao không dùng thẳng $project->settings: cột này cast sang ArrayObject, mà (array) $arrayObject cho
+     * ra kết quả tuỳ phiên bản PHP (vẫn bọc khoá). Đọc JSON gốc là cách duy nhất chắc chắn đúng.
+     * [Việc #7] Gom về đây sau khi có bản sao thứ ba — trước đó AgentSessionController tự viết một bản, và
+     * bản thứ ba sắp được viết cho cổng duyệt. Ba bản sao của một phép đọc là ba chỗ để lệch nhau.
+     *
+     * @return array<string, mixed>
+     */
+    public function settingsArray(): array
+    {
+        $raw = $this->getRawOriginal('settings');
+        $decoded = is_string($raw) ? json_decode($raw, true) : null;
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        $value = $this->settings;
+        if (is_array($value)) {
+            return $value;
+        }
+        if ($value instanceof \ArrayObject) {
+            return $value->getArrayCopy();
+        }
+
+        return [];
+    }
+
+    /**
      * Generation mới nhất CÓ media_url — eager-load (`with('latestGeneration')`)
      * cho accessor thumbnail để tránh N+1 khi serialize danh sách dự án.
      *
