@@ -5,6 +5,41 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 28) — Studio: bỏ dòng mào đầu ở màn hình trống · nút xuống dòng · nút gọi lại canvas trống · gom lại nhóm header
+
+**Commit:** `fa19123`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Bốn yêu cầu, làm đủ
+
+| Yêu cầu | Cách làm | Đo được |
+|---|---|---|
+| Xoá dòng "Tạo ảnh đầu tiên / Mô tả trang phục, phong cách, bối cảnh và ánh sáng." | Bỏ cả khối `<header>` (icon + tựa + phụ đề); màn hình trống chỉ còn tab + ô mô tả | `headingGone: true`; test khoá `Not to contain` cả hai câu |
+| Ô nhập prompt cuộn được | Giữ `max-h-[38vh] overflow-y-auto` + `!pr-11` nhường chỗ nút mới | mô tả 2.560 ký tự tự cuộn, nút Tạo ảnh vẫn trong tầm mắt |
+| Nút **xuống dòng** | `cornerDownLeft` (icon mới, từ `icons.json`) chèn `\n` tại con trỏ; dùng được cả trên điện thoại (không cần Shift+Enter) | bấm nút → giá trị `dòng một\n`, con trỏ đúng vị trí |
+| Nút **gọi lại canvas trống** | Nút trên thanh tiêu đề: canvas trống → xoá trạng thái thu gọn + mở lại ô + đặt con trỏ; đang có layer → mở bảng Prompt Tạo Ảnh đầy đủ | bấm → ô trở lại + `focused: canvas-quick-prompt` + khoá = `0` |
+
+### 2. Gom lại nhóm trong header cho đúng
+
+- **navbar-start** giờ CHỈ còn: nút menu (điện thoại) · thương hiệu · chip "Chưa đăng nhập" — không còn trộn chip bộ sưu tập vào nhóm thương hiệu.
+- **navbar-end** gom thành cụm hợp lý: [Bộ sưu tập (menu thả) + chip bộ sưu tập đang áp dụng] → [Nút gọi lại canvas + 4 công cụ: Nguồn ảnh · Thư viện · Bảng lệnh · Outputs] → [credit] → [tài khoản].
+
+Đo lại overflow sau khi thêm nút thứ 5: **0** ở 1024 · 1280 · 1440 · 390; nhóm công cụ **170px** (5 nút).
+
+### 3. Khoá bằng test
+
+`StudioHeaderAndPromptTest` mở rộng: không còn hai dòng mào đầu · có `data-prompt-newline` + `insertNewline` ·
+có `data-prompt-recall-header`. `DesignSystemTest` vẫn canh số icon — thêm `cornerDownLeft` ⇒ hướng dẫn đổi
+133 → **134 icon**. Toàn bộ: **1248 test XANH** (9482 assertions).
+
+### 4. Deploy + kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD máy chủ | **`fa19123`** — khớp local |
+| Sao lưu DB · cache | có sao lưu; `config/route/view:cache` + `queue:restart` chạy lại |
+| Log lỗi | không phát sinh dòng ERROR/CRITICAL nào sau deploy |
+
+---
 ## Phiên 2026-09-26 (đợt 27) — HEADER THEO CHUẨN daisyUI + Ô MÔ TẢ CUỘN/ẨN/GỌI LẠI + TAB TRÒ CHUYỆN TÌM XU HƯỚNG
 
 **Commit:** `2052aa9`. **Trạng thái: đã commit + push + DEPLOY production.**
