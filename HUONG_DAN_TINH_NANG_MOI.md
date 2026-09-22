@@ -336,6 +336,33 @@ RSS chỉ có tin tức, nên câu hỏi dạng "cách làm / giá / thông số
 Khoá **không** nằm trong cột URL (cột đó hiện nguyên văn trên màn Cài đặt); nó được gắn vào URL **chỉ ở lời gọi HTTP
 thật**, đọc từ bảng API key theo slug của nguồn.
 
+#### Còn `WebSearch` / `WebFetch` của Laravel AI SDK thì sao?
+SDK **có** hai công cụ đó (`Laravel\Ai\Providers\Tools\WebSearch` · `WebFetch`), nhưng chúng là **ProviderTool** —
+tức **nhà cung cấp AI tự chạy**, SDK chỉ gửi *khai báo* cho nhà cung cấp. Đã đọc mã trong `vendor/laravel/ai`:
+
+| Điều kiện để dùng | Thực tế của hạ tầng này |
+|---|---|
+| Agent phải `implements HasTools` và trả về tool trong `tools()` | `App\Ai\RegistryAgent` chưa (và không cần) implement |
+| Nhà cung cấp phải thuộc nhóm SDK map được: **OpenAI · Azure · Anthropic · Gemini · xAI · OpenRouter** | Nhà cung cấp đang cấu hình đi driver **`openai-compatible`** (`ckey` · `qwen-paygo`) — `OpenAiCompatibleProvider` và `DeepSeekProvider` **KHÔNG** implements `SupportsWebSearch` |
+| Gửi `tools:[{type:"web_search"}]` vào `/chat/completions` | **Đã đo: HTTP 422 `unknown variant web_search`** trên giao thức này |
+
+⇒ Với hạ tầng hiện tại, trả `WebSearch` trong `tools()` **không tạo ra tìm kiếm thật**. Đó là lý do đường tìm kiếm
+nằm ở lớp tự viết (`app/Ai/RegistryProviders.php` đã ghi lại phép đo này từ trước), và **cơ chế tương đương đang chạy
+thật**:
+
+1. **Công cụ `web_search` do MÁY CHỦ chạy** — chạy được với **mọi** model biết gọi hàm (kể cả DeepSeek/qwen trên
+   openai-compatible), có trần lượt gọi, có sổ nguồn, có trích dẫn.
+2. **Làn `/responses` + `tools:[{type:"web_search"}]`** — đúng *cơ chế* mà SDK WebSearch gọi tới, chỉ khác là mình
+   gọi thẳng HTTP. Đo trên production 2026-09-22: model `qwen3.8-flash` / `qwen3.8-omni-flash` → nhãn
+   **[CÔNG CỤ NCC]** và lượt chạy thật ghi `mode=hosted · calls=1` (có `web_search_call`).
+3. `read_page` là bản tương đương `WebFetch` **có rào**: chỉ đọc URL **đã có trong kết quả tìm kiếm**, qua rào
+   chặn địa chỉ nội bộ (SSRF) và trần 8.000 ký tự. `WebFetch` của SDK nhận URL do model đưa và fetch thẳng — dùng
+   nó là **mất hai rào** đó.
+
+Chạy `php artisan studio:web-access --force` để xem máy chủ này đang ở làn nào: lệnh in thẳng kết luận
+"LÀN CÔNG CỤ CỦA LARAVEL AI SDK" (áp dụng hay không, và vì sao).
+
+
 ### 11.7 Dùng ĐỊA CHỈ WEB BÌNH THƯỜNG thay vì RSS (loại nguồn `page`)
 Từ **2026-09-26** có thêm loại nguồn thứ tư: **`page`** — bạn khai một **trang chuyên mục** (trang danh sách bài)
 của site không có RSS, máy chủ đọc các liên kết bài trên trang đó. Nếu URL có chỗ điền `{query}` thì nó trở thành
