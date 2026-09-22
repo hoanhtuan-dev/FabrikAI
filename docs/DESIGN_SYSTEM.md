@@ -322,6 +322,7 @@ npm run build                 # 4. CSS bán cho khách
 | `DockResizer.vue` (+ `useDockResize.js`) | tự làm vách ngăn kéo — dùng chung cho **cả ba** dock |
 | `CanvasEmptyState.vue` | màn hình canvas trống kiểu "một dòng chữ" |
 | `ChatModal.vue` | khung chat tự viết trong từng màn (trước 2026-09-26 là một TAB trong màn hình canvas trống) |
+| `ChatFab.vue` | **nút nổi (FAB)** tự vẽ ở từng màn — nút Material tròn, neo vào VÙNG NỘI DUNG, ẩn khi hộp thoại của chính nó mở (luật đầy đủ ở §3.1) |
 | `NotificationCenter.vue` | khay thông báo tự chế (từng có 3 kiểu, 3 vị trí, 3 thời lượng) |
 | `SettingsSkeleton.vue` · `SettingsToasts.vue` | khung xương + khay thông báo tự chế ở khu Cài đặt |
 | `StylistSection.vue` | bản sao trình cài đặt Trợ lý thiết kế trong từng app |
@@ -331,6 +332,30 @@ npm run build                 # 4. CSS bán cho khách
 
 > **Luật:** nếu hành vi đã có người làm rồi thì **dùng lại**; chỉ tạo mới khi bài toán KHÁC về bản
 > chất, và khi đó viết vào file này một dòng để người sau biết nó tồn tại.
+
+### 3.1 Nút nổi (FAB) — luật riêng (2026-09-26)
+
+> Hiện có ĐÚNG MỘT nút nổi trong sản phẩm: nút mở TRỢ LÝ THIẾT KẾ (`components/ChatFab.vue`), render
+> bên trong vùng canvas của `StudioApp.vue`. Luật dưới đây viết ra để nút thứ hai — nếu có ngày nào
+> đó — không lặp lại ba lỗi đã gặp thật: đặt ở **góc MÀN HÌNH** (bị dock che), đặt trong **thanh công
+> cụ** (biến mất ở màn hẹp), và dùng cho **hành động phụ** (FAB mất hết ý nghĩa "việc chính").
+
+| Điều | Luật | Vì sao |
+|---|---|---|
+| Hình dạng | TRÒN (`rounded-full`), icon lấy từ `StudioIcon` đặt giữa nút | FAB là hình dạng đã được người dùng học sẵn; bo góc kiểu khác đọc thành "một cái nút lạ" |
+| Kích thước | **56px** (`h-14 w-14`) từ `lg` · **48px** (`h-12 w-12`) dưới `lg` | Chuẩn Material (56 · 48–56); 48px vẫn trên ngưỡng chạm 24×24 của §8 |
+| Vị trí | Góc **DƯỚI–PHẢI của VÙNG NỘI DUNG** mà nó phục vụ (ở Studio: khối `relative flex-1 overflow-hidden` mang nền `.canvas-bg-*`) — **KHÔNG** phải góc màn hình, **KHÔNG** phải thanh công cụ | `position: fixed` ở góc màn hình thì dock Outputs (`store.outputDockOpen`) · bảng Layers · dock điều hướng dưới che mất; còn để trong thanh công cụ thì nút ẩn hẳn ở màn hẹp — đúng hai lỗi mà nút «Trợ lý» cũ đã mắc |
+| Khoảng cách mép | `bottom-4 right-4` (16px) khi vùng nội dung ĐỦ RỘNG; **trên màn hẹp phải NÂNG LÊN trên mọi thanh nổi ở đáy** (đo từ MÃ, không đoán) và thu nhỏ nút | Ở Studio, tính từ ĐÁY vùng canvas, ba lớp nổi chiếm: thanh ngữ cảnh mobile **8–52px** · dải biến thể **56–116px** · dải công cụ canvas (RegionTools) **64–112px** — mà dưới `lg` RegionTools LUÔN hiện và rộng ~268px trên máy 320–375px. Nên nút dùng `bottom-32` (128px): mốc thấp nhất còn trống. Từ `lg` hai dải ở đáy nằm GIỮA và RegionTools thành cột dọc bên trái ⇒ góc dưới–phải trống, nút về đúng 16px |
+| Tầng nổi & trạng thái | `shadow-2xl` + `.state-layer` (§2). **KHÔNG** tự viết `box-shadow`, **KHÔNG** dùng `hover:bg-*` chồng lên nền đã có nghĩa | Lớp trạng thái Material chạy đúng ở CẢ HAI theme; `bg-brand-500` đổi sắc theo theme (ở theme tối nó tối HƠN `brand-600`) nên hover bằng nền là hover "chìm" |
+| Ẩn/hiện | **ẨN khi hộp thoại của CHÍNH nó đang mở** (`v-if="!store.chatOpen"`); ngoài ra **LUÔN hiện** trong màn hình của nó | Nút nổi nằm chồng lên lớp phủ của chính modal là một cái nút vô nghĩa; còn ẩn theo bề rộng màn hình là lỗi cũ đã trả giá |
+| Trợ năng | `aria-label` nói TÊN VIỆC ("Trợ lý thiết kế") + `title` nói mở ra CÁI GÌ (có dẫn nguồn để tự kiểm) | §8 — nút chỉ có icon phải có nhãn; `title` là chỗ nói kết quả sẽ tới |
+| CẤM | Không dùng FAB cho **hành động phụ**; không có HAI FAB trên một màn hình; không dùng FAB làm khay **speed-dial** bung nhiều mục | FAB là "MỘT hành động chính của vùng nội dung"; việc phụ thuộc `.dock` · `.tool-btn` · bảng lệnh |
+| Một nguồn | Nút **không** tự ghi cờ mở modal: nó `emit('open')` rồi để chủ màn hình gọi hàm mở DUY NHẤT (ở Studio: `openChat()` trong `StudioApp.vue`) | Việc mở modal còn phải ĐÓNG các lớp phủ đang mở (chúng là state cục bộ của màn hình) — hai chỗ cùng ghi một cờ là hai chỗ để lệch nhau |
+
+> **KHÔNG dùng thành phần `.fab` có sẵn của daisyUI** (dù `resources/css/app.css` có nạp nó trong
+> danh sách thành phần). Đọc `node_modules/daisyui/components/fab.css`: `.fab` là `position: fixed`
+> ở góc **MÀN HÌNH** và là khay **speed-dial** cho các nút con BUNG RA khi hover/focus — ngược cả hai
+> yêu cầu ở bảng trên ("góc vùng nội dung" và "một hành động, không bung menu").
 
 ---
 
@@ -605,12 +630,20 @@ Năm ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
 
 ### 6.9 Bảng nhãn — MODAL TRỢ LÝ (2026-09-26)
 
-**Chat nay là MỘT MODAL dùng chung cho cả `/studio`** (`resources/js/studio/components/ChatModal.vue`,
-mở bằng nút «Trợ lý» trên cụm công cụ header · mục trong menu mobile · một lệnh trong bảng lệnh · nút
-phụ «Hỏi trợ lý» ở màn hình canvas trống). Trước đây nó là một TAB trong màn hình canvas trống, và cách
-đó có hai hệ quả THẬT: chat chỉ mở được khi canvas TRỐNG (vừa có ảnh là khung chat biến mất, đúng lúc
-người dùng cần hỏi nhất), và màn hình chỉ để tạo ảnh lại phải mang thêm một thanh tab cùng một trạng
-thái đang-mở-tab nhớ trong `localStorage`.
+**Chat nay là MỘT MODAL dùng chung cho cả `/studio`** (`resources/js/studio/components/ChatModal.vue`).
+Trước đây nó là một TAB trong màn hình canvas trống, và cách đó có hai hệ quả THẬT: chat chỉ mở được
+khi canvas TRỐNG (vừa có ảnh là khung chat biến mất, đúng lúc người dùng cần hỏi nhất), và màn hình
+chỉ để tạo ảnh lại phải mang thêm một thanh tab cùng một trạng thái đang-mở-tab nhớ trong `localStorage`.
+
+Ba lối vào, TẤT CẢ đi qua cùng một hàm mở (`openChat()` trong `StudioApp.vue`): **NÚT NỔI ở góc
+dưới–phải vùng canvas** (`components/ChatFab.vue` — lối vào CHÍNH, xem §3.1) · một lệnh trong bảng lệnh
+(đường dành cho bàn phím) · nút phụ «Hỏi trợ lý» ở màn hình canvas trống.
+
+**[2026-09-26 · lần 2] Hai lối vào CŨ đã GỠ**: nút icon trong cụm công cụ ở thanh tiêu đề và mục «Trợ
+lý» trong menu mobile. Lý do: cụm công cụ đó ẩn hẳn dưới `lg` nên trên điện thoại nút ấy KHÔNG TỒN TẠI
+(phải bù bằng mục thứ hai trong menu) — tức là cùng một việc có hai lối vào, mỗi lối chỉ đúng ở một bề
+rộng màn hình, và người dùng phải nhớ hai chỗ. Nút nổi hiện ở MỌI bề rộng nên giao diện chỉ còn MỘT
+lối vào; bảng lệnh vẫn giữ lệnh vì đó là đường bàn phím.
 
 Bảng dưới đây là phần RIÊNG của modal; mọi nhãn của chính hội thoại (nhãn giai đoạn · số đo · cảnh báo
 · câu "Nguồn để bạn tự kiểm") vẫn theo §6.8 — chúng lấy từ CÙNG hàm dùng chung trong
@@ -638,8 +671,10 @@ Bốn ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
    đọc một mảng thì không thể có hai lịch sử lệch nhau; và KHÔNG dựng khung chat thứ hai ở bất kỳ màn nào.
 2. **Khung modal là `BaseModal.vue` dùng chung** (§3): focus trap + Esc + lớp phủ + header 56px có sẵn.
    Tự dựng lớp phủ là mất focus trap (Tab đi xuyên ra sau lớp phủ) — đúng lớp lỗi mà BaseModal sinh ra để chặn.
-3. **Cờ mở/đóng nằm ở kho dữ liệu (`store.chatOpen`)**, không ở component: ba lối vào (header · menu
-   mobile · canvas trống) ở ba component khác nhau, một biến cục bộ thì hai lối còn lại không mở được.
+3. **Cờ mở/đóng nằm ở kho dữ liệu (`store.chatOpen`)**, không ở component: ba lối vào (nút nổi ·
+   bảng lệnh · canvas trống) ở ba component khác nhau, một biến cục bộ thì hai lối còn lại không mở
+   được. `ChatFab.vue` vì thế KHÔNG tự ghi cờ — nó `emit('open')` để `StudioApp.vue` gọi `openChat()`
+   (hàm DUY NHẤT mở modal, đồng thời đóng các lớp phủ đang mở).
    Modal được mount THƯỜNG TRỰC để câu đang gõ dở không mất khi đóng/mở lại.
 4. **Bộ gõ tiếng Việt**: Enter chỉ gửi khi `event.isComposing` là false — chặn Enter trong lúc đang
    chốt dấu là gõ dấu nào cũng thành gửi. Ô nhập là `textarea` một dòng (không phải `input`) vì quy ước
@@ -719,6 +754,8 @@ Bốn ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
 - [ ] **Thông báo/tiến trình không rò rỉ chi tiết kỹ thuật** (§6): không tên model/nhà cung cấp,
       không `e.message` thô — dùng `userFacingError()` / `studio_fail()`.
 - [ ] Nút chỉ-icon có `aria-label`; tiến trình `role="status"`, lỗi `role="alert"`.
+- [ ] Nếu thêm NÚT NỔI (FAB): theo đúng §3.1 — tròn · 56px/48px · neo vào **vùng nội dung** (không phải
+      góc màn hình) · ẩn khi hộp thoại của chính nó mở · **không** dùng cho hành động phụ.
 - [ ] **Đúng ở CẢ HAI theme**: mở màn hình vừa sửa ở theme Sáng **và** Tối (nút đổi nhanh ở thanh
       trạng thái Studio, hoặc Cài đặt của tôi → Giao diện) — không chỉ theme đang dùng để code.
 - [ ] Chữ dùng **bậc nội dung** (`text-cream-100/200/300/400`), **không** dùng `text-cream-*/NN` (§1.1).

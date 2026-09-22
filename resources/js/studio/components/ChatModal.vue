@@ -9,8 +9,11 @@
  *     lại đúng lúc cần hỏi nhất («chất liệu này có co không?», «màu này hợp bộ Thu Đông chứ?»);
  *   · hai việc khác hẳn nhau (tạo ảnh · hỏi đáp) tranh nhau MỘT chỗ, kèm một thanh tab và một trạng
  *     thái đang-mở-tab phải nhớ trong localStorage — bấm nhầm tab là mất chỗ đang gõ dở.
- * Nay chat tách hẳn thành MODAL: MỘT nút «Trợ lý» trên cụm công cụ header + MỘT mục trong menu mobile
- * mở nó từ bất kỳ đâu (StudioApp.vue gọi openChat()). Canvas trống chỉ còn đúng việc tạo ảnh.
+ * Nay chat tách hẳn thành MODAL, mở từ bất kỳ đâu qua StudioApp.vue → openChat(). Lối vào CHÍNH là
+ * NÚT NỔI ở góc dưới–phải vùng canvas (components/ChatFab.vue, [2026-09-26 · lần 2]): nút icon trong
+ * cụm công cụ header và mục «Trợ lý» trong menu mobile đã GỠ vì cả hai đều là lối vào phụ thuộc bề
+ * rộng màn hình, còn nút nổi thì hiện ở mọi bề rộng. Bảng lệnh (Ctrl+K) vẫn giữ lệnh mở trợ lý —
+ * đó là đường dành cho bàn phím. Canvas trống chỉ còn đúng việc tạo ảnh.
  *
  * KHUNG: dùng BaseModal dùng chung — KHÔNG tự dựng lớp phủ. Lý do rất cụ thể: BaseModal đã có FOCUS
  * TRAP + Esc + lớp phủ + header 56px, và đó là những thứ một bản tự viết sẽ thiếu (bàn phím Tab đi

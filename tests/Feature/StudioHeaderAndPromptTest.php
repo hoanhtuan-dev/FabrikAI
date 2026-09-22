@@ -14,6 +14,11 @@ use Tests\TestCase;
  *
  * [ĐỔI CHÍNH SÁCH 2026-09-26] Điểm 3 TRƯỚC ĐÂY còn kèm "và có TAB TRÒ CHUYỆN lấy dữ liệu thật". Tab đó
  * đã GỠ: chat nay là MODAL DÙNG CHUNG mở được từ bất kỳ đâu trong /studio (xem bài 5 bên dưới).
+ *
+ * [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 2] Lối vào modal trợ lý lại đổi một lần nữa, và bài 5 bên dưới được
+ * viết lại theo ĐÚNG sự thật mới: nút icon trong cụm công cụ ở thanh tiêu đề (data-header-action="chat")
+ * và mục «Trợ lý» trong menu mobile đã GỠ, thay bằng NÚT NỔI (components/ChatFab.vue) nằm trong VÙNG
+ * CANVAS. Bộ khẳng định KHÔNG bị nới lỏng — xem khối (d) trong bài 5.
  */
 class StudioHeaderAndPromptTest extends TestCase
 {
@@ -150,6 +155,21 @@ class StudioHeaderAndPromptTest extends TestCase
      * cũ: chat vẫn phải là chat THẬT theo luồng (action dùng chung, nguồn bấm được, có đường DỪNG), chỉ
      * khác là nó nằm ở một khung dùng chung thay vì nằm trong một tab.
      *
+     * [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 2 — LỐI VÀO MODAL: TỪ NÚT Ở THANH TIÊU ĐỀ → NÚT NỔI (FAB)]
+     * Khẳng định (d) TRƯỚC ĐÂY bắt StudioApp phải có `data-header-action="chat"` nằm trong cụm công cụ
+     * của thanh tiêu đề. Khẳng định đó nay SAI theo thiết kế, và được thay bằng bộ khẳng định mới (d.1)
+     * …(d.6) — KHÔNG phải bỏ khoá, mà khoá vào sự thật mới. Vì sao chuyển (đo được, không phải thẩm mỹ):
+     *   · cụm công cụ ở thanh tiêu đề ẩn HẲN dưới `lg` (`hidden … lg:flex`) ⇒ trên điện thoại nút
+     *     «Trợ lý» VỐN KHÔNG TỒN TẠI, nên đợt trước phải bù bằng một mục thứ hai trong menu mobile —
+     *     hai lối vào cho cùng một việc, mỗi lối chỉ đúng ở một bề rộng màn hình;
+     *   · chat là việc dùng LIÊN TỤC khi đang làm trên canvas (canvas đã có ảnh vẫn phải hỏi được — đó
+     *     chính là lý do chat rời khỏi màn hình trống), nên lối vào phải NỔI và có mặt ở mọi bề rộng.
+     * Bất biến mới, khoá bằng máy: nút nổi TỒN TẠI và đúng chuẩn FAB (tròn · 48px/56px · lớp trạng thái
+     * Material · aria-label · KHÔNG CSS riêng), nó nằm TRONG vùng canvas (không phải trong thanh tiêu
+     * đề), nó gọi ĐÚNG hàm mở modal dùng chung (`openChat()` — một nguồn, không hai bản logic), nó ẩn
+     * khi chính modal của nó đang mở, nút cũ ở thanh tiêu đề KHÔNG được quay lại, menu mobile KHÔNG
+     * giữ mục thứ hai, và bảng lệnh VẪN giữ lệnh mở trợ lý (đường dành cho bàn phím).
+     *
      * Đường trả lời GIẢ ở trình duyệt (tách từ khoá → chấm điểm khớp → ghép câu) vẫn bị cấm y như trước,
      * và nay cấm ở CẢ HAI file: còn sót một đường thứ hai là còn hai câu trả lời có thể mâu thuẫn.
      */
@@ -219,15 +239,123 @@ class StudioHeaderAndPromptTest extends TestCase
             'useAgentStudio.js khai lại danh sách gợi ý — phải IMPORT từ store/actions/agentChat.js.'
         );
 
-        // ── (d) StudioApp: nút mở chat nằm TRONG cụm công cụ header + modal được render ──
+        // ── (d) StudioApp: nút mở chat nay là NÚT NỔI (FAB) trong VÙNG CANVAS + modal được render ──
+        //
+        // [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 2] Xem khối chú thích dài ở docblock của bài này: nút icon
+        // trong cụm công cụ ở thanh tiêu đề đã được CHUYỂN thành nút nổi (không phải "thêm bản thứ
+        // hai"). SÁU khẳng định dưới đây thay cho hai khẳng định cũ về `data-header-action="chat"`,
+        // và chúng KHÔNG yếu hơn: chúng khoá cả HÌNH DẠNG nút, VỊ TRÍ của nó trong cây DOM, ĐƯỜNG gọi
+        // hàm mở modal, và cả hai lối vào CŨ phải biến mất.
         $app = $this->app();
-        $this->assertStringContainsString('data-header-action="chat"', $app,
-            'Thiếu nút «Trợ lý» trên cụm công cụ header — modal phải mở được từ mọi màn của /studio.'
+        $fabPath = resource_path('js/studio/components/ChatFab.vue');
+        $this->assertFileExists($fabPath, 'Thiếu components/ChatFab.vue — nút nổi mở trợ lý thiết kế.');
+        $fab = (string) file_get_contents($fabPath);
+
+        // (d.1) HÌNH DẠNG: đúng chuẩn FAB Material + nhãn cho trình đọc màn hình (§3.1 · §8 · §9).
+        $this->assertStringContainsString('rounded-full', $fab, 'Nút nổi phải TRÒN (chuẩn Material).');
+        $this->assertMatchesRegularExpression('/\bh-12 w-12\b/', $fab, 'Nút nổi phải 48px trên màn hẹp (chuẩn Material: 48–56).');
+        $this->assertMatchesRegularExpression('/\blg:h-14 lg:w-14\b/', $fab, 'Nút nổi phải 56px từ lg (chuẩn FAB Material).');
+        $this->assertStringContainsString('shadow-2xl', $fab, 'Nút nổi phải có tầng nổi (§2) — không tự viết box-shadow.');
+        $this->assertStringContainsString('state-layer', $fab, 'Trạng thái trỏ/bấm phải dùng lớp trạng thái Material (§2), không hover:bg-* chồng nền.');
+        $this->assertStringContainsString('aria-label="Trợ lý thiết kế"', $fab,
+            'Nút CHỈ CÓ ICON thì bắt buộc phải có aria-label (§8) — và phải là TÊN VIỆC, không phải "chat".'
         );
-        $this->assertMatchesRegularExpression('/data-header-action="outputs"[\s\S]{0,1200}data-header-action="chat"/',
-            $app, 'Nút «Trợ lý» phải nằm TRONG cụm công cụ đã chốt (cạnh Nguồn ảnh · Thư viện · Bảng lệnh · Outputs).'
+        $this->assertMatchesRegularExpression('/title="[^"]*nguồn[^"]*"/u', $fab,
+            'Thiếu title nói rõ mở chat có DẪN NGUỒN để người dùng tự kiểm — đó là lời hứa của tính năng, phải nói trước khi bấm.'
+        );
+        $this->assertStringContainsString('name="bot"', $fab, 'Icon phải lấy từ icons.json qua StudioIcon (§9), không svg chép tay, không emoji.');
+        $this->assertStringContainsString("import StudioIcon from './StudioIcon.vue'", $fab, 'Import icon dùng chung rồi mà không dùng thì vô nghĩa.');
+        $this->assertStringNotContainsString('<style', $fab, 'Nút nổi KHÔNG được thêm khối CSS riêng — vị trí/hiệu ứng phải bằng class dùng chung (§2 · §10).');
+        $this->assertStringNotContainsString(':style=', $fab, 'Không sơn nút nổi bằng style inline — vị trí lấy từ class tiện dụng (§2).');
+
+        // (d.2) ẨN/HIỆN: luôn hiện trong /studio, CHỈ ẩn khi hộp thoại của CHÍNH nó đang mở (§3.1).
+        //       (Không được ẩn theo bề rộng màn hình — đó chính là lỗi của nút cũ.)
+        $this->assertStringContainsString('v-if="!store.chatOpen"', $fab,
+            'Nút nổi phải ẩn khi modal trợ lý đang mở, và KHÔNG được ẩn theo bề rộng màn hình.'
+        );
+
+        // (d.2b) KHOẢNG CÁCH MÉP: trên màn hẹp phải NẰM TRÊN mọi dải nổi ở đáy vùng canvas.
+        //        Ba dải đó (đo từ mã, mốc 0 = đáy vùng canvas): thanh ngữ cảnh mobile 8–52px · dải biến
+        //        thể 56–116px · dải công cụ canvas (RegionTools) 64–112px — mà trên máy 320–375px
+        //        RegionTools rộng ~268px nên gần hết bề ngang. Vì vậy 128px (bottom-32) là mốc thấp
+        //        nhất còn trống; hạ xuống bottom-24/bottom-16 là nút chồng lên dải công cụ.
+        $this->assertStringContainsString('bottom-32 right-3', $fab,
+            'Nút nổi phải nằm TRÊN ba dải nổi ở đáy vùng canvas (bottom-32 · right-3 ở màn hẹp) — '
+            .'hạ thấp hơn là đè lên dải công cụ canvas/thanh ngữ cảnh của mobile.'
+        );
+        $this->assertStringContainsString('lg:bottom-4 lg:right-4', $fab,
+            'Từ lg, góc dưới–phải vùng canvas trống (hai dải ở đáy nằm GIỮA, RegionTools thành cột dọc bên '
+            .'trái) nên nút phải về đúng 16px cho hợp chuẩn FAB Material.'
+        );
+
+        // (d.3) VỊ TRÍ: FAB phải nằm TRONG VÙNG CANVAS của StudioApp, không phải trong <header>.
+        //       Đây là bất biến khó thấy bằng mắt nhất nên khoá bằng CẤU TRÚC: thanh tiêu đề không được
+        //       chứa nó, và nó phải nằm giữa dòng đánh dấu vùng canvas và bảng Layers (inspector).
+        $headerStart = strpos($app, 'class="navbar elev-bar');
+        $canvasStart = strpos($app, '<!-- Center canvas -->');
+        $this->assertNotFalse($headerStart, 'Không đọc được thanh tiêu đề để kiểm vị trí nút nổi.');
+        $this->assertNotFalse($canvasStart, 'Không đọc được dấu "Center canvas" để kiểm vị trí nút nổi.');
+        $header = substr($app, (int) $headerStart, (int) $canvasStart - (int) $headerStart);
+        $this->assertStringNotContainsString('<ChatFab', $header,
+            'Nút nổi lại được render TRONG thanh tiêu đề — nút nổi phải neo vào vùng canvas, nếu không nó '
+            .'bị dock Outputs/bảng Layers che và lại ẩn mất trên màn hẹp.'
+        );
+        $this->assertMatchesRegularExpression(
+            '/Vùng canvas \(trái, flex-1\)[\s\S]*<ChatFab[\s\S]*id="dock-inspector"/',
+            $app,
+            'Nút nổi phải nằm TRONG khối vùng canvas (tổ tiên định vị: <div class="relative flex-1 '
+            .'overflow-hidden" :class="bgClass">), tức là phải xuất hiện SAU dòng đánh dấu vùng canvas và '
+            .'TRƯỚC bảng Layers — không phải ở góc màn hình, không phải trong thanh trạng thái.'
+        );
+
+        // (d.3b) Nút phải là CON TRỰC TIẾP của khối vùng canvas — KHÔNG nằm trong <div ref="canvasZoom">
+        //        (khối absolute inset-0 ngay trong vùng canvas). Đây là lỗi THẬT đã suýt xảy ra lúc đặt
+        //        nút: khối đó mang @pointerdown="onCanvasBgDown" và cursor-grab/cursor-crosshair, nên nút
+        //        nằm trong nó sẽ (a) hiện con trỏ "bàn tay" thay vì con trỏ bấm, và (b) MỖI cú bấm nút
+        //        kéo theo xử lý nền canvas (bỏ chọn layer, bắt đầu quét chọn).
+        //        Cách kiểm: từ thẻ MỞ canvasZoom tới ngay trước <ChatFab>, số thẻ <div> phải CÂN BẰNG với
+        //        số </div> — nghĩa là canvasZoom (và mọi khối con của nó) đã đóng trước khi nút xuất
+        //        hiện. Bỏ chú thích trước khi đếm, vì chú thích giải thích lựa chọn CÓ nhắc tên các khối.
+        $code = (string) preg_replace('/<!--.*?-->/s', '', $app);
+        $zoomStart = strpos($code, '<div ref="canvasZoom"');
+        $fabStart = strpos($code, '<ChatFab');
+        $this->assertNotFalse($zoomStart, 'Không đọc được khối canvasZoom để kiểm cha của nút nổi.');
+        $this->assertNotFalse($fabStart, 'Không đọc được <ChatFab> để kiểm cha của nút nổi.');
+        $inside = substr($code, (int) $zoomStart, (int) $fabStart - (int) $zoomStart);
+        $this->assertSame(substr_count($inside, '<div'), substr_count($inside, '</div>'),
+            'Nút nổi đang nằm BÊN TRONG canvasZoom (hoặc một khối con của nó): nút sẽ thừa hưởng '
+            .'cursor-grab và mỗi cú bấm lại chạy onCanvasBgDown của nền canvas. Nút phải là con TRỰC TIẾP '
+            .'của khối vùng canvas, đứng ngay sau thẻ đóng của canvasZoom.'
+        );
+
+        // (d.4) ĐƯỜNG MỞ MODAL: chỉ MỘT bản logic. Nút nổi phát 'open' → StudioApp gọi openChat()
+        //       (hàm DUY NHẤT đóng các lớp phủ rồi bật store.chatOpen).
+        $this->assertStringContainsString('@open="openChat"', $app,
+            'Nút nổi phải gọi ĐÚNG hàm mở modal dùng chung — dựng logic mở thứ hai là hai chỗ để lệch nhau.'
         );
         $this->assertStringContainsString('function openChat()', $app, 'Thiếu hàm mở modal trợ lý.');
+        $this->assertMatchesRegularExpression('/function openChat\(\)\s*\{[^}]*store\.chatOpen = true/s', $app,
+            'openChat() phải là chỗ DUY NHẤT bật cờ mở modal (cùng chỗ đóng các lớp phủ đang mở).'
+        );
+
+        // (d.5) HAI LỐI VÀO CŨ PHẢI BIẾN MẤT (đây là "CHUYỂN", không phải "thêm bản thứ hai")…
+        $this->assertStringNotContainsString('data-header-action="chat"', $app,
+            'Nút «Trợ lý» cũ VẪN CÒN trong cụm công cụ ở thanh tiêu đề — nút nổi là để CHUYỂN, không phải thêm bản thứ hai.'
+        );
+        $drawerStart = strpos($app, 'aria-label="Menu Studio"');
+        $this->assertNotFalse($drawerStart, 'Không đọc được menu mobile để kiểm lối vào trùng.');
+        $drawerEnd = strpos($app, 'Mobile outputs overlay', (int) $drawerStart);
+        $this->assertNotFalse($drawerEnd, 'Không đọc được cuối menu mobile để kiểm lối vào trùng.');
+        $drawer = substr($app, (int) $drawerStart, (int) $drawerEnd - (int) $drawerStart);
+        $this->assertStringNotContainsString('openChat()', $drawer,
+            'Menu mobile vẫn còn lối vào thứ hai mở trợ lý — nút nổi đã hiện trên MỌI bề rộng nên mục đó '
+            .'chỉ là bản sao (người dùng phải nhớ hai chỗ cho cùng một việc).'
+        );
+
+        // …(d.6) NHƯNG LỆNH TRONG BẢNG LỆNH THÌ GIỮ: bảng lệnh là đường dành cho BÀN PHÍM (§3.1).
+        $this->assertStringContainsString('run: () => openChat()', $app,
+            'Bảng lệnh phải GIỮ lệnh mở trợ lý — gỡ nút trên giao diện không có nghĩa là gỡ đường bàn phím.'
+        );
         $this->assertStringContainsString('<ChatModal />', $app, 'StudioApp phải render modal trợ lý.');
 
         // ── (e) Đường trả lời GIẢ ở trình duyệt: cấm ở CẢ HAI file ──

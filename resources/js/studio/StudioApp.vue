@@ -55,6 +55,9 @@ import CanvasEmptyState from './components/CanvasEmptyState.vue';
 // bất kỳ đâu trong /studio. Mount thường trực (component tự ẩn/hiện theo store.chatOpen) để câu đang
 // gõ dở không mất khi đóng modal — cùng lối với ConceptCard bên dưới.
 import ChatModal from './components/ChatModal.vue';
+// [2026-09-26 · lần 2] NÚT NỔI (FAB) mở modal trợ lý — render NGAY TRONG vùng canvas, không phải
+// trong <header> (xem chú thích dài ở chỗ render, phía dưới, giải thích vì sao chọn tổ tiên định vị đó).
+import ChatFab from './components/ChatFab.vue';
 import NotificationCenter from './components/NotificationCenter.vue';
 // [2026-09-20] Popup xác nhận DÙNG CHUNG — hành động xóa đối tượng đang chọn KẾ THỪA đúng popup
 // của " Dọn toàn bộ canvas?" (trước đây cờ confirmDeleteOpen không có popup nào render ⇒ bấm
@@ -191,7 +194,14 @@ function isToolbarActionActive(id) {
 }
 
 /**
- * MỞ MODAL TRỢ LÝ từ bất kỳ đâu trong /studio (nút «Trợ lý» ở header · mục trong menu mobile · bảng lệnh).
+ * MỞ MODAL TRỢ LÝ từ bất kỳ đâu trong /studio — HÀM DUY NHẤT làm việc đó.
+ *
+ * [ĐỔI CHÍNH SÁCH 2026-09-26 · lần 2] Hai lối vào cũ (nút icon trong cụm công cụ ở <header> và mục
+ * «Trợ lý» trong menu mobile) đã GỠ: chúng thay bằng MỘT NÚT NỔI (components/ChatFab.vue) nằm trong
+ * vùng canvas và hiện ở MỌI bề rộng. Nút đó KHÔNG tự ghi store.chatOpen — nó phát 'open' rồi gọi
+ * CHÍNH hàm này, để "mở chat" chỉ có MỘT bản logic (đóng các lớp phủ rồi bật cờ), không phải hai.
+ * Lệnh trong BẢNG LỆNH (Ctrl+K) vẫn gọi hàm này: bảng lệnh là đường dành cho bàn phím, không phải
+ * một bản sao của nút.
  *
  * Đóng các popover đang mở trước, ĐÚNG lối đang dùng trong file này (xem runToolbarAction): hai lớp phủ
  * cùng lúc là hai thứ tranh nhau cú bấm, mà lớp phủ trên cùng lại không phải thứ người dùng vừa yêu cầu.
@@ -1100,13 +1110,15 @@ function onTouchEnd(e) {
             <StudioIcon name="grid" size="h-4 w-4" />
             <span v-if="store.generations.length" class="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-micro font-bold leading-none text-primary-content">{{ store.generations.length }}</span>
           </button>
-          <!-- [2026-09-26] TRỢ LÝ — nằm trong ĐÚNG cụm công cụ này (không phải chỗ khác): đây là nhóm
-               việc «mở một bảng/phòng làm việc», và thứ tự đã chốt của bốn nút kia không đổi.
-               Chat trước đây là một tab trong màn hình canvas trống ⇒ chỉ hỏi được khi canvas trống;
-               nay mở được ở mọi lúc, kể cả khi đang có ảnh trên canvas. -->
-          <button type="button" class="icon-btn !h-8 !w-8" data-header-action="chat" title="Trợ lý — hỏi đáp &amp; tra nguồn" aria-label="Trợ lý" @click="openChat()">
-            <StudioIcon name="bot" size="h-4 w-4" />
-          </button>
+          <!-- [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 2] NÚT «TRỢ LÝ» Ở ĐÂY ĐÃ GỠ — không phải bị bỏ tính
+               năng, mà CHUYỂN thành NÚT NỔI (components/ChatFab.vue) ở góc dưới–phải VÙNG CANVAS.
+               Vì sao KHÔNG giữ cả hai chỗ: (a) cụm này ẩn hẳn dưới lg ⇒ trên điện thoại nút đó vốn
+               không tồn tại, muốn có thì phải thêm mục thứ hai trong menu mobile — hai lối vào cho
+               cùng một việc, ở hai nơi khác nhau, và một trong hai luôn sai theo bề rộng màn hình;
+               (b) chat là việc dùng LIÊN TỤC khi đang làm trên canvas, không phải một mục trong khay
+               tiện ích. Nút nổi hiện ở MỌI bề rộng nên nó là lối vào DUY NHẤT trên giao diện; lệnh
+               trong BẢNG LỆNH (Ctrl+K) vẫn còn — đó là đường dành cho bàn phím, không phải bản sao
+               của nút. Cụm này vì thế trở lại ĐÚNG bốn nút như đã chốt ở đợt 26. -->
         </div>
 
         <!-- [đợt 35] KHAY TRÁI (tài khoản · gói & credit) — CÙNG ngôn ngữ thị giác với khay công cụ
@@ -1652,6 +1664,38 @@ function onTouchEnd(e) {
             </div>
 
           </div>
+
+          <!-- ══ NÚT NỔI (FAB) MỞ TRỢ LÝ — [2026-09-26 · lần 2] ════════════════════════════════════
+               ĐẶT Ở ĐÂY là QUYẾT ĐỊNH, không phải tiện tay. Hai điều phải đúng CÙNG LÚC:
+               (1) TỔ TIÊN ĐỊNH VỊ phải là khối vùng canvas —
+                       <div class="relative flex-1 overflow-hidden" :class="bgClass" …>
+                   (khối mang nền canvas .canvas-bg-*, ngay dưới dòng "══ Vùng canvas (trái, flex-1) ══").
+                   VÌ SAO KHÔNG chọn ba khối `relative` còn lại trên đường từ <main> xuống đây:
+                     · <header class="navbar … relative"> — nút ở thanh trên là đúng chỗ vừa BỎ, và nó
+                       không "nổi trên vùng đang làm việc";
+                     · <main class="relative flex-1 min-w-0 p-3"> — bao CẢ khung canvas lẫn phần đệm p-3,
+                       nên nút rơi vào khe 12px giữa khung và mép, đè lên viền khung;
+                     · <div class="relative flex h-full flex-col overflow-hidden …"> (khung canvas) — bao
+                       CẢ thanh trạng thái canvas (CanvasStatusBar, min-h-10) và thanh ngữ cảnh mobile,
+                       nên nút sẽ đè lên thanh trạng thái.
+                   Neo vào khối vùng canvas thì dock TRÁI · dock OUTPUTS (store.outputDockOpen) · bảng
+                   LAYERS KHÔNG THỂ che nút: chúng là anh/em hoặc lớp phủ NGOÀI khối này. Bảng Layers lúc
+                   đóng có bề rộng 0px; lúc mở trên desktop nó là CỘT RIÊNG làm hẹp chính khối canvas nên
+                   nút đi theo khối. Trên màn hẹp bảng Layers là ngăn kéo ĐÈ LÊN canvas (z-50): khi người
+                   dùng cố ý mở nó thì nó che nút — đúng như nó che mọi thứ khác trên canvas, và nút hiện
+                   lại ngay khi đóng. Cố tình KHÔNG nâng z của nút lên trên ngăn kéo: nút nổi trên mặt
+                   ngăn kéo là thứ dễ bấm nhầm.
+               (2) Nút phải là CON TRỰC TIẾP của khối đó — KHÔNG nằm trong khối bên trong
+                   <div ref="canvasZoom" class="absolute inset-0" …>: khối ấy mang @pointerdown
+                   (onCanvasBgDown) và cursor-grab, nên nút nằm trong nó sẽ (a) hiện con trỏ "bàn tay"
+                   thay vì con trỏ bấm, và (b) MỖI cú bấm nút kéo theo xử lý nền canvas (bỏ chọn layer,
+                   bắt đầu quét chọn). Vì thế nút đứng NGAY SAU thẻ đóng của canvasZoom, ngang hàng với
+                   RegionTools và dải biến thể — cũng là những lớp nổi của khối canvas này.
+               overflow-hidden của khối canvas là thứ ta MUỐN: nút không thể trôi ra ngoài vùng làm việc.
+               Vị trí bottom/right + số đo từng mốc: xem chú thích đầu components/ChatFab.vue.
+               KHÔNG có bản sao thứ hai: nút trong cụm công cụ header và mục «Trợ lý» trong menu mobile
+               đã gỡ cùng lúc — nút này hiện ở MỌI bề rộng, nên menu mobile không cần mục trùng. -->
+          <ChatFab @open="openChat" />
           <!-- Mobile: strip chip layer mini (desktop dùng LayersPanel dock phải) -->
           <div v-if="store.canvasLayers.length && !store.inspectorOpen" class="absolute right-3 top-3 z-30 flex flex-col gap-1 lg:hidden">
             <button v-for="l in store.layersFrontFirst" :key="l.id" @click="store.selectLayer(l)" class="h-7 w-7 shrink-0 overflow-hidden rounded-md transition" :class="store.activeLayerId === l.id ? 'ring-2 ring-brand-400' : 'opacity-60 hover:opacity-100'" :title="l.name">
@@ -1768,11 +1812,12 @@ function onTouchEnd(e) {
           <button @click="menuOpen = false; goLibrary()" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors bg-ink-800 text-cream-300" title="Thư viện — xem ảnh đã tạo & file tải lên">
             <StudioIcon name="library" size="h-4 w-4" /> Thư viện
           </button>
-          <!-- [2026-09-26] Trợ lý: màn hẹp KHÔNG có cụm công cụ ở header (cụm đó ẩn dưới lg) nên nếu
-               thiếu mục này thì người dùng điện thoại không có lối nào mở modal chat. -->
-          <button @click="openChat()" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors" :class="store.chatOpen ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-300'" title="Trợ lý — hỏi đáp & tra nguồn">
-            <StudioIcon name="bot" size="h-4 w-4" /> Trợ lý
-          </button>
+          <!-- [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 2] MỤC «TRỢ LÝ» TRONG MENU MOBILE ĐÃ GỠ.
+               Lý do: nút nổi (components/ChatFab.vue) hiện ở MỌI bề rộng, kể cả màn hẹp — nên mục này
+               không còn là "lối duy nhất của điện thoại" nữa, mà chỉ là bản sao thứ hai của cùng một
+               việc (đúng thứ §3 cấm). Người dùng điện thoại vẫn tới được trợ lý bằng nút nổi, và bằng
+               lệnh trong BẢNG LỆNH (Ctrl+K) — bảng lệnh là đường dành cho bàn phím nên nó KHÔNG bị gỡ. -->
+
           <!-- [Yêu cầu 2026-09-17] Trên desktop là nút Cài đặt ở góc trái dưới; mobile phải có lối vào tương đương. -->
           <a v-if="settingsEntry" href="/presets" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-label font-semibold text-cream-300 transition-colors" :title="settingsEntry.label + ' — preset prompt của bạn'">
             <StudioIcon :name="settingsEntry.icon" size="h-4 w-4" /> {{ settingsEntry.label }}
@@ -1833,8 +1878,10 @@ function onTouchEnd(e) {
       </div>
     </div>
     <!-- ChatModal: MODAL TRỢ LÝ — mount thường trực (tự ẩn/hiện theo store.chatOpen) để câu đang gõ
-         dở và lịch sử hội thoại không mất khi đóng/mở lại. Mở được từ nút «Trợ lý» ở header, từ mục
-         trong menu mobile, từ bảng lệnh, và từ nút phụ ở màn hình canvas trống. -->
+         dở và lịch sử hội thoại không mất khi đóng/mở lại. Ba lối vào, TẤT CẢ đều đi qua openChat()
+         ở trên: NÚT NỔI trong vùng canvas (components/ChatFab.vue — lối vào chính, hiện ở mọi bề
+         rộng), lệnh trong bảng lệnh, và nút phụ «Hỏi trợ lý» ở màn hình canvas trống. -->
+
     <ChatModal />
     <ConceptCard v-if="conceptPromptOpened" popup />
     <!-- [2026-09-25] Agent Studio KHÔNG còn mount ở đây: nó là trang riêng /agent-studio

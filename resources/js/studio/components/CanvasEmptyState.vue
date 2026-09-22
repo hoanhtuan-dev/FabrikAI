@@ -9,9 +9,10 @@
  *     lúc người dùng cần hỏi nhất («chất liệu này có co không?»);
  *   · TRỘN VIỆC — một màn hình chỉ để TẠO ẢNH lại mang thêm một thanh tab và một trạng thái
  *     đang-mở-tab phải nhớ trong localStorage; bấm nhầm tab là mất chỗ đang gõ dở.
- * Chat nay là MODAL DÙNG CHUNG mở được từ bất kỳ đâu trong /studio (components/ChatModal.vue, mở bằng
- * nút «Trợ lý» ở cụm công cụ header · mục trong menu mobile · bảng lệnh). Ở đây chỉ còn MỘT nút phụ
- * «Hỏi trợ lý» để người đang đứng ở canvas trống vẫn tới được nó. KHÔNG có bản chat thứ hai ở đây:
+ * Chat nay là MODAL DÙNG CHUNG mở được từ bất kỳ đâu trong /studio (components/ChatModal.vue; lối vào
+ * chính là NÚT NỔI ở góc dưới–phải vùng canvas — components/ChatFab.vue — cộng một lệnh trong bảng
+ * lệnh). Ở đây chỉ còn MỘT nút phụ «Hỏi trợ lý» để người đang đứng ở canvas trống vẫn tới được nó.
+ * KHÔNG có bản chat thứ hai ở đây:
  * hai khung chat là hai lịch sử, và hai câu trả lời có thể mâu thuẫn mà người dùng không biết tin bản nào.
  *
  * Giữ nguyên: z-0 (dưới layer), hành vi generate, state store hiện có (imagePromptEn · imageRatio ·
