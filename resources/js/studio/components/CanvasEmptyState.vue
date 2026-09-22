@@ -15,7 +15,7 @@
  * Giữ nguyên: z-0 (dưới layer), hành vi generate, state store hiện có (imagePromptEn · imageRatio ·
  * variantCount · planCostImage · loadTrendRadar).
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
 
@@ -96,13 +96,6 @@ function insertNewline() {
     el.selectionStart = el.selectionEnd = start + 1;
     focusPrompt();
   });
-}
-
-/** Nút "gọi lại canvas trống" trên thanh tiêu đề: mở lại ô mô tả + đặt con trỏ vào. */
-function recallFromHeader() {
-  collapsed.value = false;
-  remember(COLLAPSE_KEY, '0');
-  pickTab('compose');
 }
 
 function generate() {
@@ -279,14 +272,12 @@ function useTrend(trend) {
 }
 
 onMounted(() => {
-  window.addEventListener('fabrikai:recall-empty-prompt', recallFromHeader);
   tab.value = recall(TAB_KEY, 'compose') === 'chat' ? 'chat' : 'compose';
   collapsed.value = recall(COLLAPSE_KEY, '0') === '1';
   // [đợt 26] Tự đặt con trỏ — CHỈ trên thiết bị trỏ mịn: trên điện thoại, focus sẽ bật bàn phím ảo.
   const coarse = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   if (! coarse && ! collapsed.value && tab.value === 'compose') focusPrompt();
 });
-onBeforeUnmount(() => window.removeEventListener('fabrikai:recall-empty-prompt', recallFromHeader));
 </script>
 
 <template>

@@ -722,20 +722,6 @@ const paletteGroups = computed(() => {
 function runCommand(cmd) { paletteOpen.value = false; paletteQuery.value = ''; cmd.run(); }
 /** Mở Bảng lệnh từ NÚT BẤM (không chỉ phím tắt) — xoá từ khoá cũ để lần mở nào cũng bắt đầu sạch. */
 function openPalette() { paletteQuery.value = ''; paletteOpen.value = true; }
-
-/**
- * [đợt 28] Nút "gọi lại canvas trống" trên thanh tiêu đề.
- * Khi canvas đang trống: xoá trạng thái thu gọn và báo cho ô mô tả mở lại + đặt con trỏ.
- * Khi đang có layer: mở bảng Prompt Tạo Ảnh đầy đủ (không có "màn hình trống" để gọi lại khi đang sửa ảnh).
- */
-function recallPrompt() {
-  if (store.visibleLayers && store.visibleLayers.length) {
-    store.promptOpen = true;
-    return;
-  }
-  try { localStorage.removeItem('fabrikai:studio:prompt-collapsed'); } catch (e) { /* chế độ riêng tư */ }
-  window.dispatchEvent(new CustomEvent('fabrikai:recall-empty-prompt'));
-}
 function onGlobalKey(e) {
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.shiftKey && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); paletteOpen.value = !paletteOpen.value; paletteQuery.value = ''; return; }
@@ -1060,10 +1046,6 @@ function onTouchEnd(e) {
           </div>
           <div v-if="applyOpen" class="fixed inset-0 z-40" @click="applyOpen = false"></div>
         </div>
-        <span v-if="store.appliedProject" class="tool-btn is-active hidden max-w-[13rem] md:inline-flex" :title="'Bộ sưu tập hiện tại: ' + store.appliedProject.name + ' — ảnh/video tạo mới sẽ tự gắn vào bộ này'">
-          <button type="button" @click="projectsOpen = true" class="flex min-w-0 items-center gap-1.5 truncate hover:text-cream-50"><StudioIcon name="pin" size="h-3.5 w-3.5" /><span class="truncate">{{ store.appliedProject.name }}</span></button>
-          <button type="button" @click="store.unapplyProject()" class="shrink-0 text-brand-200/70 hover:text-cream-50" aria-label="Ngắt dự án hiện tại"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
-        </span>
         <!-- [Đợt 1 — 2026-09-19] Badge credit cũ chỉ hiển thị con số (không biết gói, không có đường
              nâng cấp). Nay là nút mở popup "Gói & credit": gói hiện tại · credit còn lại · chi phí
              mỗi ảnh/video THEO GÓI · độ phân giải tối đa của gói · danh mục gói để đổi/nâng cấp. -->
@@ -1073,9 +1055,6 @@ function onTouchEnd(e) {
              hàng với Bộ sưu tập & credit — cùng hành vi, cùng trạng thái, không còn cột riêng.
              Điện thoại vẫn dùng dock dưới + menu (rail phải vốn đã ẩn dưới lg). -->
         <div class="hidden shrink-0 items-center gap-0.5 pr-0.5 lg:flex" data-header-actions>
-          <button type="button" class="icon-btn !h-8 !w-8" data-prompt-recall-header title="Mở ô tạo ảnh / gọi lại canvas trống" aria-label="Mở ô tạo ảnh" @click="recallPrompt">
-            <StudioIcon name="imagePlus" size="h-4 w-4" />
-          </button>
           <button type="button" class="icon-btn !h-8 !w-8" data-header-action="source" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm" aria-label="Nguồn ảnh" @click="store.sourcePickerOpen = true">
             <StudioIcon name="imagePlus" size="h-4 w-4" />
           </button>

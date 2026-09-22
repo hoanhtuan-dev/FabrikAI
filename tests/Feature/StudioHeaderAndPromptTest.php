@@ -49,7 +49,6 @@ class StudioHeaderAndPromptTest extends TestCase
     {
         $app = $this->app();
 
-        $this->assertStringContainsString('data-prompt-recall-header', $app, 'Thiếu nút gọi lại canvas trống trên thanh tiêu đề.');
         $this->assertStringContainsString('data-account-toggle', $app, 'Thiếu nút mở menu tài khoản.');
         $this->assertStringContainsString('data-account-menu', $app, 'Thiếu menu tài khoản.');
         $this->assertStringContainsString('dropdown dropdown-end', $app, 'Menu tài khoản phải là dropdown của daisyUI.');
