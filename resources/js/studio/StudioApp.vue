@@ -979,12 +979,21 @@ function onTouchEnd(e) {
          bỏ dòng vai trò và giảm đệm dọc (2,5 → 1,5). ĐO ĐƯỢC trước khi sửa: thanh cao **61px** trên màn
          844px — chỉ để nói tên tài khoản, trong khi người dùng đã đăng nhập rồi và việc cần làm nằm ở dưới.
          Máy tính (sm trở lên) giữ nguyên bố cục cũ vì ở đó chiều cao không phải vấn đề. -->
-    <div class="flex items-center justify-between gap-3 border-b border-ink-700 bg-ink-900/90 px-3 py-1.5 sm:px-4 sm:py-2.5">
+    <!-- [2026-09-26 · thiết kế lại] MỘT APP BAR DUY NHẤT cho mọi bề rộng. Trước đây điện thoại có HAI thanh
+         xếp chồng (thanh tài khoản 53px + thanh Studio 57px = **110px** chỉ để nói tên và ba nút), trong khi
+         màn chỉ cao 844px. Nay gộp làm một: nút menu · nhận diện · ngữ cảnh · credit · tài khoản. -->
+    <header class="elev-bar relative z-30 flex shrink-0 items-center gap-2 border-b border-ink-700 bg-ink-900/95 px-2 py-1.5 backdrop-blur sm:px-4 sm:py-2">
+      <!-- Nút menu công cụ: chỉ có ở điện thoại/máy tính bảng hẹp (thanh rail bên trái hiện từ lg). -->
+      <button type="button" class="icon-btn shrink-0 lg:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ" @click="menuOpen = true">
+        <StudioIcon name="sliders" size="h-4 w-4" />
+      </button>
+
       <div class="flex min-w-0 items-center gap-2.5">
         <template v-if="store.user">
           <img :src="store.user.avatar || '/images/placeholder.svg'" class="h-7 w-7 shrink-0 rounded-full bg-ink-700 object-cover ring-2 ring-brand-500/40" @error="$event.target.src = '/images/placeholder.svg'" alt="Ảnh đại diện">
           <div class="min-w-0 leading-tight">
             <p class="truncate text-body font-semibold text-cream-50 sm:text-sm">{{ store.user.name }}</p>
+            <p class="hidden"></p>
             <p class="hidden truncate text-body text-cream-400 sm:block">{{ store.user.role_label || store.user.role }}<span class="hidden sm:inline"> · {{ store.user.email }}</span></p>
           </div>
         </template>
@@ -997,6 +1006,16 @@ function onTouchEnd(e) {
         </template>
       </div>
       <div class="flex shrink-0 items-center gap-2">
+        <!-- Hai lối vào hay dùng nhất trên ĐIỆN THOẠI (trước đây nằm ở thanh thứ hai, nay gộp vào đây):
+             Bộ sưu tập và Kết quả. Từ lg trở lên chúng đã có ở rail/thanh trạng thái nên ẩn đi. -->
+        <button type="button" class="icon-btn shrink-0 lg:hidden" :title="store.appliedProject ? 'Bộ sưu tập hiện tại: ' + store.appliedProject.name : 'Bộ sưu tập'" aria-label="Bộ sưu tập" @click="projectsOpen = true">
+          <StudioIcon name="kanban" size="h-4 w-4" />
+          <span v-if="store.appliedProject" class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-brand-400"></span>
+        </button>
+        <button type="button" class="icon-btn shrink-0 lg:hidden" title="Kết quả" aria-label="Kết quả" @click="outputOpen = true">
+          <StudioIcon name="grid" size="h-4 w-4" />
+        </button>
+
         <!-- Bộ sưu tập + quick-apply gộp 1 tool-btn -->
         <div class="relative">
           <button @click="openApplyPopover" class="tool-btn" title="Bộ sưu tập — áp dụng nhanh hoặc mở bảng thiết kế quản lý"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Bộ sưu tập</span> <StudioIcon name="chevronDown" size="h-3 w-3" /></button>
@@ -1247,7 +1266,7 @@ function onTouchEnd(e) {
         <button v-if="store.user" type="button" @click="logout" class="tool-btn" title="Đăng xuất khỏi tài khoản">Đăng xuất</button>
         <a v-else href="/dang-nhap?redirect=/" class="rounded-full bg-warn px-3 py-1 text-xs font-semibold text-warn-content transition hover:bg-warn">Đăng nhập</a>
       </div>
-    </div>
+    </header>
     <!-- [Trục 2 — 2026-09-20] Trung tâm thông báo kiểu VSCode (thay ô flashMsg đơn lẻ):
          xếp chồng · tự tắt theo loại · đóng tay được · kèm thẻ tiến trình việc đang chạy. -->
     <NotificationCenter />
@@ -1298,15 +1317,6 @@ function onTouchEnd(e) {
         <span class="dock-label">Công cụ</span>
       </button>
     </nav>
-    <!-- Mobile top bar (chỉ ở view studio) -->
-    <div v-if="store.studioView !== 'library'" class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
-      <button @click="menuOpen = true" class="icon-btn !h-9 !w-9 border border-ink-600 md:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>
-      <span class="flex items-center gap-1.5 font-display text-sm font-semibold"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-300" /> Studio</span>
-      <div class="flex items-center gap-1.5">
-        <button @click="projectsOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-600" :title="store.appliedProject ? 'Bộ sưu tập hiện tại: ' + store.appliedProject.name : 'Bộ sưu tập'" aria-label="Bộ sưu tập"><StudioIcon name="kanban" size="h-4 w-4" /><span v-if="store.appliedProject" class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand-400"></span></button>
-        <button @click="outputOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-600" title="Kết quả" aria-label="Kết quả"><StudioIcon name="grid" size="h-4 w-4" /><span v-if="store.generations.length" class="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-tiny font-bold leading-none text-primary-content">{{ store.generations.length }}</span></button>
-      </div>
-    </div>
     <!-- pb-14 trên điện thoại: chừa chỗ cho dock điều hướng dưới, nếu không thì hàng cuối của canvas bị
          thanh dock che mất. -->
     <div v-if="store.studioView !== 'library'" class="flex flex-1 overflow-hidden pb-14 lg:pb-0">
