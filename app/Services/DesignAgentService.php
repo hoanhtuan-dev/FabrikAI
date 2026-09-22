@@ -1678,8 +1678,32 @@ class DesignAgentService
      * (Đường chạy tất định thuần PHPUnit không có container ⇒ `Cache` không tồn tại; nếu để lỗi nổi lên
      * thì "tối ưu tốc độ" lại làm hỏng chính hàm nó muốn tăng tốc.)
      */
+    /**
+     * [2026-09-25] BẬT khi GHI NHẬN chỉ dẫn mặc định (lệnh `studio:prompt --capture`).
+     *
+     * Vì sao cần: đường radar TRẢ VỀ TỪ BỘ ĐỆM trước khi dựng câu lệnh — nên một lượt chạy trúng bộ đệm
+     * sẽ không bao giờ đi qua mốc cấu hình, và lệnh ghi nhận im lặng không ghi được gì (đã dính thật:
+     * 2/3 khoá). Chế độ này bỏ qua bộ đệm để câu lệnh THẬT SỰ được dựng.
+     *
+     * Bỏ luôn ĐƯỜNG GHI: lượt ghi nhận chạy với nhà cung cấp GIẢ LẬP, ghi kết quả giả vào bộ đệm dùng
+     * chung là biến một lượt quét thật của khách thành câu trả lời rỗng.
+     */
+    private bool $captureMode = false;
+
+    /** Bật chế độ ghi nhận chỉ dẫn mặc định (xem `$captureMode`). */
+    public function captureMode(bool $on = true): static
+    {
+        $this->captureMode = $on;
+
+        return $this;
+    }
+
     private function readBriefCache(string $key): ?array
     {
+        if ($this->captureMode) {
+            return null;
+        }
+
         try {
             $hit = Cache::get($key);
 
@@ -1692,6 +1716,10 @@ class DesignAgentService
     /** Ghi bộ đệm (kèm `cached_at`) — nuốt lỗi: bộ đệm hỏng KHÔNG được làm hỏng phản hồi. */
     private function cacheBrief(string $key, array $response): void
     {
+        if ($this->captureMode) {
+            return;
+        }
+
         try {
             Cache::put($key, $response + ['cached_at' => now()->toISOString()], self::BRIEF_CACHE_SECONDS);
         } catch (\Throwable $e) {

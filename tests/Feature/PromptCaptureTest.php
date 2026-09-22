@@ -133,6 +133,33 @@ class PromptCaptureTest extends TestCase
             'Chạy thật khi chưa cấu hình phải tự ghi nhận — không phụ thuộc việc nhớ chạy lệnh.');
     }
 
+    // ── CHẾ ĐỘ GHI NHẬN PHẢI BỎ QUA BỘ ĐỆM ──────────────────────────────
+    // LỖI THẬT trên production (2026-09-25): lệnh ghi nhận chỉ được 2/3 khoá. Nguyên nhân: đường radar
+    // TRẢ VỀ TỪ BỘ ĐỆM trước khi dựng câu lệnh, nên lượt ghi nhận trúng bộ đệm thì không bao giờ đi qua
+    // mốc cấu hình. Bài này khoá đúng cơ chế đó — không phụ thuộc việc dựng được một bộ đệm thật.
+
+    public function test_capture_mode_bypasses_and_never_writes_the_cache(): void
+    {
+        Cache::put('radar-thu', ['directions' => [['title' => 'x']]], 600);
+
+        $svc = app(DesignAgentService::class);
+
+        $read = new \ReflectionMethod($svc, 'readBriefCache');
+        $write = new \ReflectionMethod($svc, 'cacheBrief');
+
+        $this->assertNotNull($read->invoke($svc, 'radar-thu'), 'Chế độ thường vẫn phải đọc bộ đệm.');
+
+        $svc->captureMode();
+
+        $this->assertNull($read->invoke($svc, 'radar-thu'),
+            'Chế độ ghi nhận PHẢI bỏ qua bộ đệm — trúng bộ đệm là câu lệnh không được dựng và không ghi nhận được gì.');
+
+        // Và KHÔNG được ghi: lượt ghi nhận chạy bằng nhà cung cấp giả, ghi vào bộ đệm dùng chung là
+        // biến lượt quét thật của khách thành câu trả lời rỗng.
+        $write->invoke($svc, 'radar-thu-2', ['directions' => [['title' => 'gia lap']]]);
+        $this->assertNull($read->invoke(app(DesignAgentService::class), 'radar-thu-2'));
+    }
+
     // ── Ảnh chụp KHÔNG được cản trở việc đặt chỉ dẫn thật ────────────────
 
     public function test_saving_a_version_still_works_alongside_a_baseline(): void

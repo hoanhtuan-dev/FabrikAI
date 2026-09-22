@@ -170,7 +170,9 @@ class StudioPrompt extends Command
             '*' => Http::response($this->sampleFeed(), 200, ['Content-Type' => 'application/rss+xml; charset=utf-8']),
         ]);
 
-        $svc = app(DesignAgentService::class);
+        // BẮT BUỘC: đường radar trả về từ bộ đệm TRƯỚC khi dựng câu lệnh, nên không bật chế độ này thì
+        // lượt ghi nhận trúng bộ đệm và im lặng không ghi được gì.
+        $svc = app(DesignAgentService::class)->captureMode();
 
         $runs = [
             'agent.radar.instruction' => fn () => $svc->radar(null, 'all', true),
