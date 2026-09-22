@@ -5,6 +5,48 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 29) — SỬA nút tài khoản đè lên nút Outputs + bỏ hai nút thừa ở header
+
+**Commit:** `47917ac`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### Vấn đề (do chính đợt 28 gây ra)
+
+Sau khi thêm nút "Mở ô tạo ảnh" và dời chip "Bộ sưu tập hiện tại" vào `navbar-end`, header ở 1024px
+hết chỗ: nút tài khoản (cuối cùng) **đè lên nút Outputs**.
+
+### Cách sửa
+
+| Việc | Chi tiết |
+|---|---|
+| Xoá nút "Bộ sưu tập hiện tại" (chip `store.appliedProject`) khỏi header | Tên bộ sưu tập đang áp dụng vẫn thấy ở menu Bộ sưu tập và bảng thiết kế — không mất thông tin |
+| Xoá nút "Mở ô tạo ảnh" (`data-prompt-recall-header`) | Việc ẩn/gọi lại ô mô tả vẫn còn nguyên bằng nút trong màn hình trống (pill "Mở ô tạo ảnh" khi thu gọn) |
+| Dọn mã chết | `recallPrompt()` trong StudioApp + `recallFromHeader`/listener trong CanvasEmptyState + import `onBeforeUnmount` thừa |
+
+### Đo lại (Chrome headless + CDP, owner thật, sau khi nạp lại trang)
+
+| Bề ngang | Nút account (left–right) | Nút Outputs (left–right) | Đè nhau | Tràn ngang |
+|---|---|---|---|---|
+| 1024 | 968–1008 | 838–870 | **không** | 0 |
+| 1152 | 1096–1136 | 966–998 | **không** | 0 |
+| 1280 | 1224–1264 | 1094–1126 | **không** | 0 |
+| 1440 | 1384–1424 | 1254–1286 | **không** | 0 |
+
+Khoảng cách account ↔ Outputs ở 1024 còn **98px** — đủ chỗ, không còn chen lấn.
+
+### Khoá bằng test
+
+`StudioHeaderAndPromptTest` bỏ kỳ vọng `data-prompt-recall-header` (nút đã xoá). Toàn bộ: **1248 test XANH**
+(9481 assertions).
+
+### Deploy + kiểm chứng
+
+| Kiểm tra | Kết quả |
+|---|---|
+| HEAD máy chủ | **`47917ac`** — khớp local |
+| Sao lưu DB · cache | có sao lưu; `config/route/view:cache` + `queue:restart` chạy lại |
+| Log lỗi | không phát sinh dòng ERROR/CRITICAL nào sau deploy |
+
+---
 ## Phiên 2026-09-26 (đợt 28) — Studio: bỏ dòng mào đầu ở màn hình trống · nút xuống dòng · nút gọi lại canvas trống · gom lại nhóm header
 
 **Commit:** `fa19123`. **Trạng thái: đã commit + push + DEPLOY production.**
