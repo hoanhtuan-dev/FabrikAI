@@ -5,6 +5,51 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 34) — Header: avatar tròn đúng chuẩn + TÀI KHOẢN & GÓI·CREDIT chuyển sang TRÁI cạnh FabrikAI
+
+**Commit:** `51311b8`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### 1. Avatar: hết tràn ra ngoài hình tròn
+
+| Trước | Sau |
+|---|---|
+| `<span class="avatar">` của daisyUI (có sẵn `border:4px`) bọc một vòng `w-8` + ảnh KHÔNG có kích thước ⇒ ảnh vẽ theo cỡ gốc và tràn khỏi vòng ring | MỘT vòng tròn `h-9 w-9` với `overflow-hidden` + ảnh `h-9 w-9 rounded-full object-cover` ⇒ ảnh bị cắt đúng trong vòng |
+| Ảnh tải lỗi ⇒ chỉ ẩn ảnh, còn ô trống | Ảnh lỗi ⇒ hiện **chữ cái đầu** của tên (thêm state `avatarFailed`) |
+
+**Đo được:** avatar **36×36** nằm gọn trong nút **40×40**, `overflow: hidden`, `fitsInBtn = true` ở 1024 · 1280 · 1440.
+
+### 2. Bố cục: tài khoản + gói & credit sang TRÁI, khay công cụ sang PHẢI
+
+Yêu cầu: nút tài khoản đứng ngay cạnh FabrikAI, nút Gói & credit đứng cạnh nút tài khoản.
+
+**Cách làm (không bê khối mã lớn):** hai nhóm `navbar-start`/`navbar-end` trở thành khung trong suốt
+(`display: contents`) và mọi mục được xếp thứ tự bằng `order` — nhờ vậy giữ nguyên toàn bộ popover khổng lồ
+(Gói & credit · nhóm làm việc · nâng cấp) mà vẫn đổi được vị trí.
+
+| Thứ tự | Mục |
+|---|---|
+| 1 · 2 | nút menu (điện thoại) · **thương hiệu FabrikAI** |
+| 3 | **nút + menu tài khoản** (ngay cạnh FabrikAI) |
+| 4 | **nút Gói & credit** (ngay cạnh nút tài khoản) |
+| 5 · 6 · 7 | nút Bộ sưu tập / Kết quả (điện thoại) · **khay điều hướng** (Bộ sưu tập · Nguồn ảnh · Thư viện · Bảng lệnh · Outputs) đẩy sát phải |
+
+Popover đi theo nút: menu tài khoản và popover credit nay mở sang **PHẢI** (`left-0`).
+
+**Đo được (CDP, 1440):** thương hiệu `16–130` → **tài khoản `138–178`** → **credit `186–266`** → khay công cụ
+`1233–1424` (sát phải). `brandTruocAccount = true`, `accountTruocCredit = true`, `khayOSatPhai = true`;
+menu tài khoản mở sang phải (`138–394`) và nằm trong màn hình; tràn ngang **0** ở 1024 · 1280 · 1440.
+
+### 3. Khoá bằng test
+
+`StudioHeaderAndPromptTest` nay khoá **thứ tự thị giác** (order-1…order-7) thay cho cấu trúc `navbar-start/end`
+cũ, và vẫn khoá menu tài khoản định vị tường minh (`absolute left-0 top-full`).
+Toàn bộ: **1249 test XANH** (9487 assertions).
+
+### 4. Deploy
+
+HEAD máy chủ **`51311b8`** khớp local; sao lưu DB + cache đầy đủ; không lỗi mới trong log.
+
+---
 ## Phiên 2026-09-26 (đợt 33) — Menu tài khoản định vị TƯỜNG MINH (bỏ anchor positioning của daisyUI)
 
 **Commit:** `f452830`. **Trạng thái: đã commit + push + DEPLOY production.**
