@@ -772,8 +772,8 @@ html[data-theme='light'] {
     }
     /* Activity bar (VSCode-style) — thanh icon cố định bên trái, mỗi icon mở 1 card */
     .activity-bar { @apply flex w-14 shrink-0 flex-col items-center gap-2 border-r border-ink-700 bg-ink-900 py-2.5; }
-    .activity-bar.right { @apply border-l border-r-0; }
-    .activity-bar.right .activity-btn.is-active::before { left: auto; right: 0; }
+    /* [2026-09-26 · đợt 26] Đã gỡ RAIL PHẢI: bốn nút của nó nay nằm trên thanh tiêu đề Studio
+       (data-header-actions) ⇒ không còn nơi nào dùng hai quy tắc viền/chỉ báo bên phải. */
     .activity-btn { @apply relative grid h-11 w-11 shrink-0 place-items-center rounded-lg text-cream-400 transition-colors hover:bg-ink-700 hover:text-cream-100; }
     .activity-btn.is-active { @apply bg-ink-800 text-brand-200; }
     .activity-btn.is-active::before {

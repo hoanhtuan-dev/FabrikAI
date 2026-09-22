@@ -80,12 +80,13 @@ class AgentStudioPageTest extends TestCase
         $this->assertStringContainsString("id === 'stylist'", $studio,
             'Thiếu nhánh điều hướng cho mục stylist trên activity bar.');
 
-        // Lối vào từ màn hình canvas trống cũng phải đi theo URL có bước.
+        // [2026-09-26 · đợt 26] Màn hình canvas trống KHÔNG còn là lối vào Agent Studio — nó chỉ còn
+        // ô mô tả tạo ảnh. Lối vào duy nhất là rail công cụ của Studio, đã khoá ngay trên (nhánh
+        // id === 'stylist' phải điều hướng sang /agent-studio). Ghi lại ở đây để không ai thêm lối vào
+        // thứ hai đi đường vòng (popup / state store) mà bỏ qua hợp đồng URL có bước.
         $empty = $this->src('resources/js/studio/components/CanvasEmptyState.vue');
-        $this->assertStringContainsString("'/agent-studio'", $empty,
-            'Canvas trống vẫn mở Agent Studio kiểu popup — nay phải điều hướng sang trang.');
-        $this->assertStringContainsString("'?buoc='", $empty,
-            'Lối vào phải mang theo BƯỚC muốn mở, nếu không thì mọi lối vào đều rơi về bước đầu.');
+        $this->assertStringNotContainsString("'/agent-studio'", $empty,
+            'Canvas trống không còn mở Agent Studio — lối vào nằm ở rail công cụ của Studio.');
     }
 
     public function test_the_open_step_is_addressable_from_the_url(): void

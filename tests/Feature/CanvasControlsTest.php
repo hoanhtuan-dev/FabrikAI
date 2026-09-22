@@ -534,14 +534,21 @@ class CanvasControlsTest extends TestCase
     }
 
     /**
-     * Canvas trống là "command center" mới: composer + Agent Studio + đi nhanh.
+     * Canvas trống CHỈ CÒN ô mô tả tạo ảnh (2026-09-26 · đợt 26).
      *
-     * [Yêu cầu 2026-09-20] ĐÃ XÓA hai khối khỏi màn hình này:
+     * Trước đây màn hình này là "command center": ô mô tả + ba thẻ Agent Studio + cột "Đi nhanh"
+     * (Prompt đầy đủ · Nguồn ảnh · Thư viện · Bộ sưu tập · Gói) + khối phím tắt — người mở Studio lần
+     * đầu phải đọc bốn khối trước khi gõ được chữ nào.
+     *
+     * [Yêu cầu 2026-09-20] ĐÃ XÓA hai khối khác khỏi màn hình này (vẫn phải giữ nguyên trạng thái xoá):
      *   · "Bắt đầu từ mẫu việc" (job templates) — vẫn còn trong tab Hàng loạt của ConceptCard,
      *   · "Ảnh gần đây" — ảnh cũ vẫn nằm ở Thư viện/Outputs.
-     * Test này khoá cả hai việc: KHÔNG quay lại Canvas, VÀ vẫn còn lối vào Agent Studio + generate.
+     *
+     * Bài này khoá BA việc: (1) màn hình trống vẫn nằm dưới layer và vẫn tạo ảnh được; (2) nó CHỈ còn
+     * phần tạo ảnh, không còn khối menu nào; (3) những gì bị gỡ KHÔNG biến mất khỏi sản phẩm — bốn nút
+     * của rail phải đã lên thanh tiêu đề (data-header-actions) và rail phải không được quay lại.
      */
-    public function test_canvas_empty_state_is_a_command_center_without_template_or_recent_blocks(): void
+    public function test_canvas_empty_state_is_only_the_prompt_composer(): void
     {
         $empty = $this->vue('CanvasEmptyState.vue');
 
@@ -560,19 +567,27 @@ class CanvasControlsTest extends TestCase
         $this->assertStringNotContainsString('recentGens', $empty,
             'Canvas trống không được giữ danh sách recentGens nữa.');
 
-        // Lối vào mới: Agent Studio + đi nhanh.
-        $this->assertStringContainsString('Agent Studio', $empty, 'Canvas trống phải mời mở Agent Studio.');
-        // [2026-09-25] Đổi CƠ CHẾ, giữ nguyên LUẬT ("mở ĐÚNG bước wizard"): trước đây Agent Studio
-        // là modal nên bước đi qua store; nay nó là TRANG riêng nên bước phải đi qua URL — store là
-        // bộ nhớ trong trang và bị xoá ngay khi trình duyệt tải trang mới, nên ghi vào đó chỉ tạo cảm
-        // giác "đã đặt bước" mà trang bên kia không nhận được gì.
-        $this->assertStringContainsString("'/agent-studio'", $empty,
-            'Nút Agent Studio phải ĐIỀU HƯỚNG sang trang riêng (/agent-studio).');
-        $this->assertStringContainsString("'?buoc='", $empty,
-            'Nút Agent Studio phải mở đúng bước wizard — nay qua tham số ?buoc= trên URL.');
-        $this->assertStringContainsString('Prompt Tạo Ảnh', $empty, 'Phải có lối vào bảng Prompt Tạo Ảnh đầy đủ.');
-        $this->assertStringContainsString('Nguồn ảnh', $empty, 'Phải có đi nhanh tới Nguồn ảnh.');
-        $this->assertStringContainsString('Thư viện', $empty, 'Phải có đi nhanh tới Thư viện.');
-        $this->assertStringContainsString('Bộ sưu tập', $empty, 'Phải có đi nhanh tới Bộ sưu tập.');
+        // (3) Chỉ còn phần TẠO ẢNH: ô mô tả + biến thể + tỉ lệ + chi phí + nút + gợi ý điền nhanh.
+        foreach ([
+            'canvas-quick-prompt', 'store.imagePromptEn', 'store.imageRatio', 'variantCount',
+            'creditEstimate', 'Prompt Tạo Ảnh',
+        ] as $needle) {
+            $this->assertStringContainsString($needle, $empty, "Canvas trống thiếu phần tạo ảnh: {$needle}.");
+        }
+
+        // Các khối đã GỠ — không được quay lại dưới bất kỳ hình thức nào.
+        foreach (['AGENT_STEPS', 'quickActions', 'Đi nhanh', 'Mở Agent Studio', 'shortcuts', 'Phím tắt'] as $gone) {
+            $this->assertStringNotContainsString($gone, $empty,
+                "Canvas trống còn khối menu ({$gone}) — màn hình này chỉ để tạo ảnh.");
+        }
+
+        // (4) KHÔNG mất tính năng: bốn nút cũ của rail phải nay nằm trên thanh tiêu đề Studio.
+        $app = $this->src('js/studio/StudioApp.vue');
+        foreach (['source', 'library', 'palette', 'outputs'] as $id) {
+            $this->assertStringContainsString('data-header-action="'.$id.'"', $app,
+                "Nút {$id} của rail phải chưa được gộp lên thanh tiêu đề.");
+        }
+        $this->assertStringNotContainsString('activity-bar right', $app,
+            'Rail phải đã gỡ — gộp lên header rồi thì không được dựng lại cột dọc.');
     }
 }

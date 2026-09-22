@@ -1050,13 +1050,34 @@ function onTouchEnd(e) {
         <!-- [Đợt 1 — 2026-09-19] Badge credit cũ chỉ hiển thị con số (không biết gói, không có đường
              nâng cấp). Nay là nút mở popup "Gói & credit": gói hiện tại · credit còn lại · chi phí
              mỗi ảnh/video THEO GÓI · độ phân giải tối đa của gói · danh mục gói để đổi/nâng cấp. -->
+        <!-- ══ Nguồn ảnh · Thư viện · Bảng lệnh · Outputs — GỘP TỪ RAIL PHẢI LÊN HEADER (2026-09-26 ·
+             đợt 26). Trước đây là một cột dọc 56px sát mép phải, chỉ có ở desktop: nó ăn mất 56px
+             bề ngang canvas mà bốn nút này thừa chỗ trên thanh tiêu đề. Nay là bốn nút icon cùng
+             hàng với Bộ sưu tập & credit — cùng hành vi, cùng trạng thái, không còn cột riêng.
+             Điện thoại vẫn dùng dock dưới + menu (rail phải vốn đã ẩn dưới lg). -->
+        <div class="hidden shrink-0 items-center gap-0.5 pr-0.5 lg:flex" data-header-actions>
+          <button type="button" class="icon-btn !h-8 !w-8" data-header-action="source" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm" aria-label="Nguồn ảnh" @click="store.sourcePickerOpen = true">
+            <StudioIcon name="imagePlus" size="h-4 w-4" />
+          </button>
+          <button type="button" class="icon-btn !h-8 !w-8" data-header-action="library" title="Thư viện — xem ảnh đã tạo & file tải lên" aria-label="Thư viện" @click="goLibrary">
+            <StudioIcon name="library" size="h-4 w-4" />
+          </button>
+          <button type="button" class="icon-btn !h-8 !w-8" data-header-action="palette" title="Bảng lệnh (Ctrl+K) — tìm lệnh, bộ sưu tập, mẫu việc, ảnh" aria-keyshortcuts="Control+K" aria-label="Bảng lệnh" @click="openPalette()">
+            <StudioIcon name="search" size="h-4 w-4" />
+          </button>
+          <button type="button" class="icon-btn !h-8 !w-8" data-header-action="outputs" data-dock-toggle="outputs" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách ảnh đã tạo" aria-label="Outputs" @click="store.toggleOutputDock()">
+            <StudioIcon name="grid" size="h-4 w-4" />
+            <span v-if="store.generations.length" class="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-micro font-bold leading-none text-primary-content">{{ store.generations.length }}</span>
+          </button>
+        </div>
+
         <div v-if="store.user" class="relative">
           <button type="button" class="tool-btn" :class="store.creditsLow ? 'is-active' : ''"
                   :title="'Gói & credit — còn ' + store.creditsLeft + ' credit' + (store.planName ? ' · gói ' + store.planName : '')"
                   @click="store.togglePlanPopover()">
             <StudioIcon name="coins" size="h-3.5 w-3.5" />
             {{ store.creditsLeft }}
-            <span v-if="store.planName" class="hidden text-label text-cream-300 lg:inline">{{ store.planName }}</span>
+            <span v-if="store.planName" class="hidden text-label text-cream-300 xl:inline">{{ store.planName }}</span>
             <StudioIcon name="chevronDown" size="h-3 w-3" />
           </button>
 
@@ -1630,26 +1651,9 @@ function onTouchEnd(e) {
           <OutputModule />
         </div>
       </aside>
-      <nav class="activity-bar right hidden lg:flex" aria-label="Nguồn · Thư viện · Bảng lệnh · Outputs">
-        <button @click="store.sourcePickerOpen = true" class="activity-btn" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm" aria-label="Nguồn ảnh">
-          <StudioIcon name="imagePlus" size="h-5 w-5" />
-        </button>
-        <button @click="goLibrary" class="activity-btn" title="Thư viện — xem ảnh đã tạo & file tải lên" aria-label="Thư viện">
-          <StudioIcon name="library" size="h-5 w-5" />
-        </button>
-        <!-- [Yêu cầu 2026-09-20 — bố cục cuối] mt-auto nằm ở nút ĐẦU của nhóm dưới, ghim cả nhóm xuống
-             đáy rail; Outputs đặt CUỐI CÙNG nên nằm sát đáy và được ghim ở đáy đúng yêu cầu.
-             Thứ tự từ trên xuống: Nguồn ảnh · Thư viện · …khoảng trống… · Bảng lệnh · Outputs. -->
-        <!-- Bảng lệnh (Ctrl+K / Ctrl+Shift+P / F1): nút hiện diện để người dùng KHÔNG cần biết phím tắt.
-             aria-keyshortcuts để trình đọc màn hình đọc được phím tắt kèm nút. -->
-        <button @click="openPalette()" class="activity-btn mt-auto" aria-keyshortcuts="Control+K" title="Bảng lệnh (Ctrl+K) — tìm lệnh, bộ sưu tập, mẫu việc, ảnh" aria-label="Bảng lệnh">
-          <StudioIcon name="search" size="h-5 w-5" />
-        </button>
-        <button @click="store.toggleOutputDock()" data-dock-toggle="outputs" class="activity-btn" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">
-          <StudioIcon name="grid" size="h-5 w-5" />
-          <span v-if="store.generations.length" class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-micro font-bold leading-none text-primary-content">{{ store.generations.length }}</span>
-        </button>
-      </nav>
+      <!-- [2026-09-26 · đợt 26] RAIL PHẢI ĐÃ GỠ HẲN.
+           Bốn nút của nó (Nguồn ảnh · Thư viện · Bảng lệnh · Outputs) nay nằm trên thanh tiêu đề —
+           xem khối data-header-actions ở <header>. Không còn cột dọc 56px nào chiếm bề ngang canvas. -->
     </div>
 
     <!-- Mobile menu overlay -->
