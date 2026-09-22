@@ -5,6 +5,39 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 30) — Header KHÔNG THỂ đè nhau nữa (nút tài khoản ↔ Outputs)
+
+**Commit:** `80dc145`. **Trạng thái: đã commit + push + DEPLOY production.**
+
+### Vấn đề
+
+Người dùng vẫn gặp nút tài khoản đè lên nút Outputs. Đo lại bằng CDP với dữ liệu hiện tại thì KHÔNG thấy đè
+(account 968–1008, Outputs 838–870 ở 1024), nên nguyên nhân nằm ở **dữ liệu làm nút phình to** (tên gói dài ở
+mốc `xl`, số credit lớn) — trạng thái tôi chưa tái hiện được bằng tài khoản owner (owner hiện tại: không gói,
+credit -120, nên các nút nhỏ).
+
+### Cách sửa — chặn tận gốc, không để dữ liệu nào thổi phồng header
+
+| Thay đổi | Hiệu quả |
+|---|---|
+| Nhãn "Bộ sưu tập" chỉ hiện từ **xl** (dưới xl chỉ còn biểu tượng) | Nhường ~120px ở 1024–1279 — chỗ trước đây có thể hết |
+| Tên gói trong nút credit chỉ hiện từ **2xl** và bị cắt ngắn `max-w-[8rem] truncate` | Một tên gói dài không thể đẩy nút credit — và kéo theo nút tài khoản — sang phải |
+
+### Đo lại (kể cả trường hợp xấu nhất)
+
+Ngoài đo ở dữ liệu thật, tôi **mô phỏng trường hợp xấu nhất**: nhét thẳng một tên gói rất dài vào nút credit
+rồi đo lại — vẫn không đè, không tràn:
+
+| Bề ngang | Đè nhau | Tràn ngang |
+|---|---|---|
+| 1024 · 1280 · 1536 · 1920 | **không** (cả 4) | **0** (cả 4) |
+
+### Khoá bằng test · Deploy
+
+Toàn bộ: **1248 test XANH** (9481 assertions). HEAD máy chủ **`80dc145`** khớp local; sao lưu DB + cache đầy đủ;
+không lỗi mới trong log sau deploy.
+
+---
 ## Phiên 2026-09-26 (đợt 29) — SỬA nút tài khoản đè lên nút Outputs + bỏ hai nút thừa ở header
 
 **Commit:** `47917ac`. **Trạng thái: đã commit + push + DEPLOY production.**
