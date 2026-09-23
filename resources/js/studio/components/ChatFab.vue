@@ -73,7 +73,7 @@ const emit = defineEmits(['open']);
     data-chat-fab
     class="state-layer absolute bottom-32 right-3 z-40 grid h-12 w-12 place-items-center rounded-full bg-brand-600 text-primary-content shadow-2xl lg:bottom-4 lg:right-4 lg:h-14 lg:w-14"
     aria-label="Trợ lý thiết kế"
-    title="Trợ lý thiết kế — mở khung chat: hỏi đáp về bộ sưu tập đang làm, câu trả lời kèm nguồn bấm được để bạn tự kiểm"
+    title="Trợ lý thiết kế — mở khung chat: hỏi đáp về bộ sưu tập đang làm, câu trả lời dựa trên hồ sơ shop và thông tin trợ lý tự tra"
     @click="emit('open')"
   >
     <!-- Icon `bot` lấy từ icons.json qua StudioIcon (§9) — không svg chép tay, không emoji.

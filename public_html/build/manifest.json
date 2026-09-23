@@ -43,12 +43,12 @@
       "_BaseModal-Ji6H1g56.js"
     ]
   },
-  "_RefImageCard-Dt6ZxjkD.js": {
-    "file": "assets/RefImageCard-Dt6ZxjkD.js",
+  "_RefImageCard-CGdOSkXc.js": {
+    "file": "assets/RefImageCard-CGdOSkXc.js",
     "name": "RefImageCard",
     "imports": [
       "_pageBoot-DNaXg2es.js",
-      "_boot-W5Nm5JYj.js"
+      "_boot-DGgcgh7G.js"
     ]
   },
   "_SourceLibraryPicker-DIIZHXsM.js": {
@@ -59,8 +59,8 @@
       "_NotificationCenter-D7ho7fpk.js"
     ]
   },
-  "_boot-W5Nm5JYj.js": {
-    "file": "assets/boot-W5Nm5JYj.js",
+  "_boot-DGgcgh7G.js": {
+    "file": "assets/boot-DGgcgh7G.js",
     "name": "boot",
     "imports": [
       "_pageBoot-DNaXg2es.js"
@@ -160,7 +160,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-Czp1owXf.css",
+    "file": "assets/app-DZRtvblQ.css",
     "name": "app",
     "names": [
       "app.css"
@@ -180,13 +180,13 @@
     ]
   },
   "resources/js/studio/agent-studio.js": {
-    "file": "assets/agent-studio-CugBsy8c.js",
+    "file": "assets/agent-studio-BoKCTj1g.js",
     "name": "agent-studio",
     "src": "resources/js/studio/agent-studio.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-DNaXg2es.js",
-      "_boot-W5Nm5JYj.js",
+      "_boot-DGgcgh7G.js",
       "_NotificationCenter-D7ho7fpk.js",
       "_useTheme-BW9YUajG.js",
       "_SourceLibraryPicker-DIIZHXsM.js"
@@ -255,26 +255,26 @@
     ]
   },
   "resources/js/studio/components/InpaintCard.vue": {
-    "file": "assets/InpaintCard-BDQgdqhA.js",
+    "file": "assets/InpaintCard-BhSTYWsD.js",
     "name": "InpaintCard",
     "src": "resources/js/studio/components/InpaintCard.vue",
     "isDynamicEntry": true,
     "imports": [
       "_pageBoot-DNaXg2es.js",
-      "_boot-W5Nm5JYj.js",
+      "_boot-DGgcgh7G.js",
       "_BaseModal-Ji6H1g56.js",
       "_useJobTicker-D_rG7Xgo.js",
       "_CompareSlider-CO6SFZQ8.js"
     ]
   },
   "resources/js/studio/components/OutfitComposeCard.vue": {
-    "file": "assets/OutfitComposeCard-k4lHyB9A.js",
+    "file": "assets/OutfitComposeCard-BzNTU0i0.js",
     "name": "OutfitComposeCard",
     "src": "resources/js/studio/components/OutfitComposeCard.vue",
     "isDynamicEntry": true,
     "imports": [
       "_pageBoot-DNaXg2es.js",
-      "_boot-W5Nm5JYj.js",
+      "_boot-DGgcgh7G.js",
       "_SourceLibraryPicker-DIIZHXsM.js",
       "_useJobTicker-D_rG7Xgo.js",
       "_CompareSlider-CO6SFZQ8.js"
@@ -306,26 +306,26 @@
     ]
   },
   "resources/js/studio/components/StudioCard.vue": {
-    "file": "assets/StudioCard-HPKOXU3v.js",
+    "file": "assets/StudioCard-Cq-aVNEO.js",
     "name": "StudioCard",
     "src": "resources/js/studio/components/StudioCard.vue",
     "isDynamicEntry": true,
     "imports": [
       "_pageBoot-DNaXg2es.js",
-      "_boot-W5Nm5JYj.js",
+      "_boot-DGgcgh7G.js",
       "_SourceLibraryPicker-DIIZHXsM.js",
       "_useJobTicker-D_rG7Xgo.js",
       "_CompareSlider-CO6SFZQ8.js"
     ]
   },
   "resources/js/studio/components/SuggestCard.vue": {
-    "file": "assets/SuggestCard-BZta584V.js",
+    "file": "assets/SuggestCard-CutS7q56.js",
     "name": "SuggestCard",
     "src": "resources/js/studio/components/SuggestCard.vue",
     "isDynamicEntry": true,
     "imports": [
       "_pageBoot-DNaXg2es.js",
-      "_boot-W5Nm5JYj.js",
+      "_boot-DGgcgh7G.js",
       "_SourceLibraryPicker-DIIZHXsM.js"
     ],
     "css": [
@@ -333,13 +333,13 @@
     ]
   },
   "resources/js/studio/components/TryOnCard.vue": {
-    "file": "assets/TryOnCard-CPHmXUgl.js",
+    "file": "assets/TryOnCard-CzDWJa4f.js",
     "name": "TryOnCard",
     "src": "resources/js/studio/components/TryOnCard.vue",
     "isDynamicEntry": true,
     "imports": [
       "_pageBoot-DNaXg2es.js",
-      "_RefImageCard-Dt6ZxjkD.js"
+      "_RefImageCard-CGdOSkXc.js"
     ]
   },
   "resources/js/studio/components/UpscaleCard.vue": {
@@ -353,13 +353,13 @@
     ]
   },
   "resources/js/studio/components/VariationCard.vue": {
-    "file": "assets/VariationCard-CGVeN2CI.js",
+    "file": "assets/VariationCard-DFCDEDhx.js",
     "name": "VariationCard",
     "src": "resources/js/studio/components/VariationCard.vue",
     "isDynamicEntry": true,
     "imports": [
       "_pageBoot-DNaXg2es.js",
-      "_RefImageCard-Dt6ZxjkD.js"
+      "_RefImageCard-CGdOSkXc.js"
     ]
   },
   "resources/js/studio/hub.js": {
@@ -377,13 +377,13 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-af9GKeyV.js",
+    "file": "assets/main-CYL5WlK7.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
     "imports": [
       "_pageBoot-DNaXg2es.js",
-      "_boot-W5Nm5JYj.js",
+      "_boot-DGgcgh7G.js",
       "_NotificationCenter-D7ho7fpk.js",
       "_ConfirmDialog-CO6rnx5S.js",
       "_useTheme-BW9YUajG.js",

@@ -24,8 +24,20 @@
  * action trong store/actions/agentChat.js) — ĐÚNG chỗ bước «Hỏi đáp» của Agent Studio đang dùng
  * (components/agents/AgentChatStep.vue). MỘT trợ lý, MỘT hội thoại: hai màn cùng đọc/ghi một mảng
  * tin nhắn thì không thể có hai lịch sử lệch nhau. Cách HIỂN THỊ cũng theo đúng khung đó (một quy
- * ước, hai nơi hiển thị — không phải hai bản sao): chữ chảy từng mảnh · nguồn là LINK THẬT mở tab mới
- * kèm rel="noopener" · số đo lấy từ MÁY CHỦ (giao diện KHÔNG tự bấm giờ, KHÔNG tự đếm nguồn).
+ * ước, hai nơi hiển thị — không phải hai bản sao): chữ chảy từng mảnh · chữ của trợ lý đi qua
+ * components/ChatMessageText.vue (một cách trang trí, hai khung dùng) · số đo lấy từ MÁY CHỦ (giao
+ * diện KHÔNG tự bấm giờ, KHÔNG tự đếm nguồn).
+ *
+ * [2026-09-26 · ĐỔI CHÍNH SÁCH — KHỐI "NGUỒN ĐỂ BẠN TỰ KIỂM" ĐÃ GỠ HẲN KHỎI DOM]
+ * Yêu cầu của chủ dự án: khối nguồn làm rối khung chat ⇒ ẩn VĨNH VIỄN khỏi người dùng. Cách làm ở
+ * đây là XOÁ HẲN khối khỏi template, KHÔNG phải ẩn bằng CSS và KHÔNG để lại một nút nào mở lại: một
+ * khối "ẩn" vẫn còn trong DOM thì vẫn đọc được bằng trình đọc màn hình, vẫn tìm thấy bằng Ctrl+F và
+ * vẫn quay lại nguyên trạng khi ai đó gỡ một class — đó không phải "ẩn vĩnh viễn".
+ * DỮ LIỆU THÌ KHÔNG BỊ XOÁ: m.citations vẫn nằm nguyên trong kho dữ liệu dùng chung
+ * (store/actions/agentChat.js) — chỉ không hiển thị nữa. Nếu sau này cần trả lại, nó phải là một hành
+ * động NGƯỜI DÙNG CHỦ ĐỘNG (bấm mới hiện), KHÔNG được tự hiện lại như trước.
+ * Cùng lúc đó khung này nhận ba việc của cùng đợt: nút COPY cho từng tin nhắn · chữ của trợ lý hiện
+ * dưới dạng VĂN BẢN ĐÃ TRANG TRÍ (không còn nhìn thấy ký tự định dạng) · nút XUỐNG DÒNG trong ô nhập.
  *
  * TÊN NHÀ CUNG CẤP / TÊN MODEL KHÔNG ĐƯỢC XUẤT HIỆN Ở BẤT KỲ ĐÂU (§6.1 luật 2): sự kiện provider của
  * luồng bị kho dữ liệu BỎ HẲN nên nó không chảy vào state hiển thị nào.
@@ -38,7 +50,13 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 // Gợi ý + cảnh báo + dòng số đo: HÀM/HẰNG DÙNG CHUNG với bước «Hỏi đáp» của Agent Studio, không chép lại.
 import { agentChatMetaLine, agentChatNotes, CHAT_SUGGESTIONS } from '../store/actions/agentChat.js';
+// Chữ của trợ lý: ĐỊNH DẠNG ở module thuần chatFormat.js, HIỆN ở components/ChatMessageText.vue.
+// Cả hai khung chat dùng CHUNG hai file đó — hai bản sao là hai chỗ để lệch nhau.
+import { assistantPlainText } from '../chatFormat.js';
+// Copy vào bộ nhớ tạm: MỘT bản dùng chung (clipboard + đường dự phòng cho trình duyệt chặn clipboard).
+import { copyPlainText } from '../chatCopy.js';
 import BaseModal from './BaseModal.vue';
+import ChatMessageText from './ChatMessageText.vue';
 import StudioIcon from './StudioIcon.vue';
 
 const store = useStudioStore();
@@ -121,6 +139,57 @@ function stopAsking() { return store.agentChatStop(); }
 function resetChat() { store.agentChatReset(); nextTick(scrollToEnd); }
 
 /**
+ * COPY MỘT TIN NHẮN (yêu cầu chủ dự án 2026-09-26) — nút Copy có ở TỪNG tin, cả hai vai.
+ *
+ * Vì sao hai vai copy HAI KIỂU chữ khác nhau: câu hỏi của người dùng là chữ của CHÍNH HỌ nên chép
+ * nguyên văn; còn câu trả lời của trợ lý thì chép bản CHỮ SẠCH (assistantPlainText) — người dùng dán
+ * vào tài liệu · email · ô mô tả ảnh, dán kèm dấu sao và backtick là mang ký tự của máy sang chỗ khác.
+ *
+ * Vì sao thất bại phải thành CÂU CHỮ: trình duyệt chặn clipboard khi trang không phải HTTPS hoặc khi
+ * cú bấm không phải thao tác trực tiếp. Nuốt lỗi vào console thì người dùng chỉ thấy nút KHÔNG LÀM GÌ
+ * — im lặng là kiểu nói dối tệ nhất của một nút bấm.
+ */
+async function copyMessage(message) {
+  const isUser = message.role === 'user';
+  const text = isUser ? String(message.text || '') : assistantPlainText(message.text);
+  const ok = await copyPlainText(text);
+  if (ok) {
+    store.toast(isUser ? 'Đã copy câu hỏi của bạn vào bộ nhớ tạm.' : 'Đã copy câu trả lời vào bộ nhớ tạm.');
+    return;
+  }
+  store.toast('Trình duyệt chặn việc copy — bạn bôi đen chữ rồi copy tay giúp.', 'error');
+}
+
+/** Nhãn nút Copy nói rõ COPY CÁI GÌ — khung này có hai loại tin nhắn nên "Copy" trống là nhập nhằng. */
+function copyTitle(message) {
+  return message.role === 'user' ? 'Copy câu hỏi này' : 'Copy câu trả lời này';
+}
+
+/**
+ * Thêm một dấu xuống dòng tại ĐÚNG VỊ TRÍ CON TRỎ (yêu cầu chủ dự án 2026-09-26).
+ *
+ * Vì sao cần nút này: trên ĐIỆN THOẠI, Enter là GỬI (không có phím Shift), nên người đang gõ giữa câu
+ * không có cách nào xuống dòng. Cách làm ở đây chép ĐÚNG nút data-prompt-newline của ô mô tả tạo ảnh
+ * (components/CanvasEmptyState.vue — insertNewline): cùng icon cornerDownLeft, cùng lối xử lý con trỏ.
+ * Lý do phải giống nhau: hai ô nhập trong CÙNG một sản phẩm mà hành xử khác nhau thì người dùng học
+ * một lần rồi bấm sai ở ô kia.
+ *
+ * Con trỏ được đặt LẠI ngay SAU ký tự vừa chèn (start + 1), không nhảy về cuối: người đang sửa giữa
+ * câu mà bị đẩy về cuối là mất chỗ đang gõ.
+ */
+function insertNewline() {
+  const el = inputEl.value;
+  if (! el) return;
+  const start = el.selectionStart ?? question.value.length;
+  const end = el.selectionEnd ?? start;
+  question.value = question.value.slice(0, start) + '\n' + question.value.slice(end);
+  nextTick(() => {
+    el.selectionStart = el.selectionEnd = start + 1;
+    el.focus();
+  });
+}
+
+/**
  * CẦU NỐI "tìm hiểu → làm": đưa CÂU TRẢ LỜI của trợ lý vào ô mô tả tạo ảnh của Studio (store.imagePromptEn
  * — cũng chính là trường ô mô tả ở canvas trống bind vào).
  *
@@ -129,7 +198,9 @@ function resetChat() { store.agentChatReset(); nextTick(scrollToEnd); }
  * thấy được; đóng lại + một dòng xác nhận là cách nói thật rằng việc đó đã xảy ra.
  */
 function useAnswer(text) {
-  const line = String(text || '').trim();
+  // CHỮ SẠCH, không phải nguyên văn: câu trả lời đi thẳng vào ô mô tả tạo ảnh, mà ký tự định dạng
+  // (** · backtick) trong một câu lệnh tạo ảnh là rác — máy tạo ảnh đọc nó như chữ thật.
+  const line = assistantPlainText(text).trim();
   if (! line) return;
   store.imagePromptEn = (store.imagePromptEn ? store.imagePromptEn + ' ' : '') + line;
   store.chatOpen = false;
@@ -156,8 +227,11 @@ function onKeydown(event) {
     <!-- MỘT bề mặt phẳng: thân modal chia ba tầng — dải đầu · danh sách tin (cuộn) · thanh soạn tin. -->
     <div class="flex h-full flex-col">
       <div class="flex items-center gap-2 px-4 pb-2 pt-3">
+        <!-- [2026-09-26] Câu này TRƯỚC ĐÂY hứa "câu trả lời kèm nguồn bấm được để bạn tự kiểm" — khối
+             nguồn đã gỡ hẳn khỏi giao diện theo yêu cầu chủ dự án, nên giữ nguyên lời hứa đó là nói sai
+             với người dùng. Nay câu chỉ còn nói việc trợ lý THẬT SỰ làm. -->
         <p class="min-w-0 flex-1 text-tiny leading-4 text-cream-400">
-          Trợ lý đọc hồ sơ thương hiệu của shop và tự tra internet khi cần — câu trả lời kèm nguồn bấm được để bạn tự kiểm.
+          Trợ lý đọc hồ sơ thương hiệu của shop và tự tra internet khi cần để trả lời.
         </p>
         <button v-if="messages.length" type="button" data-chat-reset
                 class="tool-btn !px-2 !py-1 shrink-0 !text-tiny"
@@ -172,7 +246,7 @@ function onKeydown(event) {
           <p class="text-sm font-semibold text-cream-100">Hỏi thẳng về bộ sưu tập bạn đang làm</p>
           <p class="mt-1 max-w-xl text-body leading-relaxed text-cream-300">
             Trợ lý đọc hồ sơ thương hiệu và quy tắc làm việc bạn đã khai, tự tra internet khi cần dữ kiện,
-            rồi trả lời kèm NGUỒN BẤM ĐƯỢC để bạn tự kiểm. Chưa có dữ liệu thì nói thẳng là chưa có — không bịa.
+            rồi trả lời. Chưa có dữ liệu thì nói thẳng là chưa có — không bịa.
           </p>
           <div class="mt-3 flex flex-wrap gap-1.5">
             <button v-for="item in CHAT_SUGGESTIONS" :key="item.text" type="button" data-chat-suggestion
@@ -182,8 +256,15 @@ function onKeydown(event) {
         </div>
 
         <div v-for="(m, i) in messages" :key="i">
-          <!-- TIN CỦA NGƯỜI DÙNG: bong bóng ĐẶC, dồn phải — đọc ra ngay ai đang nói. -->
-          <div v-if="m.role === 'user'" class="flex justify-end">
+          <!-- TIN CỦA NGƯỜI DÙNG: bong bóng ĐẶC, dồn phải — đọc ra ngay ai đang nói.
+               Nút Copy đứng BÊN TRÁI bong bóng (không phải trên nó): đặt trên bong bóng là che mất chữ
+               của chính tin nhắn đó, còn đặt bên phải là đẩy bong bóng lệch khỏi mép phải. -->
+          <div v-if="m.role === 'user'" class="flex items-center justify-end gap-1.5">
+            <button type="button" data-chat-copy class="icon-btn !h-7 !w-7 shrink-0"
+                    :title="copyTitle(m)" :aria-label="copyTitle(m)" @click="copyMessage(m)">
+              <StudioIcon name="copy" size="h-3 w-3" />
+            </button>
+            <!-- Chữ của NGƯỜI DÙNG hiện NGUYÊN VĂN (whitespace-pre-wrap): đây là chữ họ tự gõ. -->
             <div class="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-brand-600 px-3.5 py-2 text-body text-primary-content">{{ m.text }}</div>
           </div>
 
@@ -196,30 +277,36 @@ function onKeydown(event) {
               <!-- Lỗi của RIÊNG lượt này: câu hướng dẫn đã qua userFacingError ở kho dữ liệu (§6.1 luật 5). -->
               <p v-if="m.failed" class="text-body text-warn">Chưa trả lời được câu này. Bạn thử hỏi lại sau ít phút.</p>
               <template v-else>
-                <p v-if="m.text" class="whitespace-pre-wrap text-body leading-relaxed text-cream-100">{{ m.text }}</p>
+                <!-- CHỮ CỦA TRỢ LÝ đi qua ChatMessageText dùng chung ⇒ đậm · nghiêng · mã · link là thẻ
+                     THẬT, người dùng KHÔNG còn nhìn thấy dấu sao, dấu gạch đầu dòng hay [chữ](địa chỉ). -->
+                <ChatMessageText v-if="m.text" :text="m.text" />
                 <p v-else class="text-body text-cream-400">Đang trả lời…</p>
 
                 <!-- NÓI THẬT khi người dùng bấm Dừng: phần chữ đã nhận được GIỮ LẠI, không xoá đi. -->
                 <p v-if="m.stopped" class="mt-1 text-tiny text-cream-400">Bạn đã dừng lượt này — phần trả lời ở trên là phần đã nhận được.</p>
 
-                <!-- NGUỒN LÀ LINK THẬT: cả khung này tồn tại để người dùng KIỂM, không phải để tin suông. -->
-                <div v-if="m.citations && m.citations.length" class="mt-2 border-t border-ink-700/70 pt-2" data-chat-sources>
-                  <p class="text-tiny font-semibold text-cream-400">Nguồn để bạn tự kiểm</p>
-                  <ul class="mt-1 space-y-1">
-                    <li v-for="(c, ci) in m.citations" :key="c.ref || ci" class="text-body leading-snug">
-                      <a v-if="c.url" :href="c.url" target="_blank" rel="noopener"
-                         class="text-brand-200 underline decoration-dotted hover:text-cream-50">{{ c.title || c.url }}</a>
-                      <span v-else class="text-cream-200">{{ c.title }}</span>
-                      <span v-if="c.source_name" class="text-cream-400"> — {{ c.source_name }}</span>
-                    </li>
-                  </ul>
-                </div>
+                <!-- [2026-09-26 · GỠ HẲN KHỐI "NGUỒN ĐỂ BẠN TỰ KIỂM" — ĐỌC TRƯỚC KHI ĐỊNH THÊM LẠI]
+                     Chủ dự án yêu cầu ẩn VĨNH VIỄN khối này khỏi người dùng vì nó làm rối khung chat.
+                     Cách làm: XOÁ HẲN khỏi template — KHÔNG ẩn bằng CSS, KHÔNG để lại nút mở lại. Lý do
+                     phải xoá hẳn chứ không ẩn: khối còn trong DOM thì trình đọc màn hình vẫn đọc, Ctrl+F
+                     vẫn tìm thấy, và nó tự quay lại ngay khi ai đó gỡ một class.
+                     DỮ LIỆU KHÔNG BỊ XOÁ: m.citations vẫn nguyên trong kho dữ liệu dùng chung
+                     (store/actions/agentChat.js) — chỉ không hiển thị. Nếu sau này cần trả lại thì phải
+                     là hành động NGƯỜI DÙNG CHỦ ĐỘNG (bấm mới hiện), KHÔNG tự hiện như trước. -->
 
-                <!-- CẦU NỐI "tìm hiểu → làm": câu trả lời đi thẳng vào ô mô tả tạo ảnh của Studio. -->
-                <button v-if="m.text && ! m.streaming" type="button" class="tool-btn mt-2 !px-2 !py-1 !text-tiny" data-use-answer
-                        title="Đưa câu trả lời này vào ô mô tả tạo ảnh" @click="useAnswer(m.text)">
-                  <StudioIcon name="wand" size="h-3 w-3" /> Đưa vào mô tả ảnh
-                </button>
+                <!-- COPY: dùng cho CẢ HAI vai, tin của trợ lý copy bản CHỮ SẠCH (copyMessage). -->
+                <div v-if="m.text" class="mt-2 flex flex-wrap items-center gap-1.5">
+                  <button type="button" data-chat-copy class="tool-btn !px-2 !py-1 !text-tiny"
+                          :title="copyTitle(m)" :aria-label="copyTitle(m)" @click="copyMessage(m)">
+                    <StudioIcon name="copy" size="h-3 w-3" /> Copy
+                  </button>
+
+                  <!-- CẦU NỐI "tìm hiểu → làm": câu trả lời đi thẳng vào ô mô tả tạo ảnh của Studio. -->
+                  <button v-if="! m.streaming" type="button" class="tool-btn !px-2 !py-1 !text-tiny" data-use-answer
+                          title="Đưa câu trả lời này vào ô mô tả tạo ảnh" @click="useAnswer(m.text)">
+                    <StudioIcon name="wand" size="h-3 w-3" /> Đưa vào mô tả ảnh
+                  </button>
+                </div>
               </template>
             </div>
           </div>
@@ -245,9 +332,21 @@ function onKeydown(event) {
           <!-- Ô nhập là <textarea> MỘT DÒNG chứ không phải <input>: quy ước «Shift+Enter xuống dòng» chỉ
                có nghĩa với textarea — hứa một phím tắt rồi không làm được là nói dối ngay trên giao diện. -->
           <textarea id="chat-modal-input" ref="inputEl" v-model="question" rows="1" :maxlength="MAX_TURN_CHARS"
-                    class="input max-h-[28vh] w-full resize-none overflow-y-auto !rounded-full !py-2.5 !text-body"
+                    class="input max-h-[28vh] min-w-0 flex-1 resize-none overflow-y-auto !rounded-full !py-2.5 !text-body"
                     placeholder="Hỏi: chất liệu nào đang lên? màu nào hợp bộ Thu Đông?"
                     @keydown="onKeydown"></textarea>
+
+          <!-- XUỐNG DÒNG (yêu cầu chủ dự án 2026-09-26): trên ĐIỆN THOẠI Enter là GỬI nên không có
+               cách nào xuống dòng giữa câu. Cùng icon cornerDownLeft và cùng lối xử lý con trỏ với nút
+               data-prompt-newline của ô mô tả tạo ảnh (components/CanvasEmptyState.vue).
+               type="button" là BẮT BUỘC: nút nằm trong <form>, thiếu type thì trình duyệt coi nó là nút
+               GỬI và mỗi cú bấm xuống dòng lại gửi luôn câu đang gõ dở. -->
+          <button type="button" data-chat-newline
+                  class="icon-btn !h-10 !w-10 shrink-0"
+                  title="Xuống dòng (thêm dòng mới)" aria-label="Xuống dòng" @click="insertNewline">
+            <StudioIcon name="cornerDownLeft" size="h-4 w-4" />
+          </button>
+
           <!-- Đang trả lời thì nút chính là DỪNG: người dùng phải luôn có đường thoát khỏi lượt đang chạy. -->
           <button v-if="streaming" type="button" data-chat-stop
                   class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink-700 text-cream-100 transition-colors hover:bg-danger hover:text-cream-50"

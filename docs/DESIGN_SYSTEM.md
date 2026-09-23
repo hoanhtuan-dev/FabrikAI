@@ -348,7 +348,7 @@ npm run build                 # 4. CSS bán cho khách
 | Khoảng cách mép | `bottom-4 right-4` (16px) khi vùng nội dung ĐỦ RỘNG; **trên màn hẹp phải NÂNG LÊN trên mọi thanh nổi ở đáy** (đo từ MÃ, không đoán) và thu nhỏ nút | Ở Studio, tính từ ĐÁY vùng canvas, ba lớp nổi chiếm: thanh ngữ cảnh mobile **8–52px** · dải biến thể **56–116px** · dải công cụ canvas (RegionTools) **64–112px** — mà dưới `lg` RegionTools LUÔN hiện và rộng ~268px trên máy 320–375px. Nên nút dùng `bottom-32` (128px): mốc thấp nhất còn trống. Từ `lg` hai dải ở đáy nằm GIỮA và RegionTools thành cột dọc bên trái ⇒ góc dưới–phải trống, nút về đúng 16px |
 | Tầng nổi & trạng thái | `shadow-2xl` + `.state-layer` (§2). **KHÔNG** tự viết `box-shadow`, **KHÔNG** dùng `hover:bg-*` chồng lên nền đã có nghĩa | Lớp trạng thái Material chạy đúng ở CẢ HAI theme; `bg-brand-500` đổi sắc theo theme (ở theme tối nó tối HƠN `brand-600`) nên hover bằng nền là hover "chìm" |
 | Ẩn/hiện | **ẨN khi hộp thoại của CHÍNH nó đang mở** (`v-if="!store.chatOpen"`); ngoài ra **LUÔN hiện** trong màn hình của nó | Nút nổi nằm chồng lên lớp phủ của chính modal là một cái nút vô nghĩa; còn ẩn theo bề rộng màn hình là lỗi cũ đã trả giá |
-| Trợ năng | `aria-label` nói TÊN VIỆC ("Trợ lý thiết kế") + `title` nói mở ra CÁI GÌ (có dẫn nguồn để tự kiểm) | §8 — nút chỉ có icon phải có nhãn; `title` là chỗ nói kết quả sẽ tới |
+| Trợ năng | `aria-label` nói TÊN VIỆC ("Trợ lý thiết kế") + `title` nói mở ra CÁI GÌ (**hỏi đáp về bộ sưu tập đang làm · câu trả lời dựa trên hồ sơ shop và thông tin trợ lý tự tra**) | §8 — nút chỉ có icon phải có nhãn; `title` là chỗ nói kết quả sẽ tới. **[2026-09-26] Lời hứa cũ "câu trả lời kèm nguồn bấm được để bạn tự kiểm" đã GỠ** cùng lúc với khối nguồn trong khung chat — nút vẫn phải nói TRƯỚC kết quả, nhưng là kết quả THẬT |
 | CẤM | Không dùng FAB cho **hành động phụ**; không có HAI FAB trên một màn hình; không dùng FAB làm khay **speed-dial** bung nhiều mục | FAB là "MỘT hành động chính của vùng nội dung"; việc phụ thuộc `.dock` · `.tool-btn` · bảng lệnh |
 | Một nguồn | Nút **không** tự ghi cờ mở modal: nó `emit('open')` rồi để chủ màn hình gọi hàm mở DUY NHẤT (ở Studio: `openChat()` trong `StudioApp.vue`) | Việc mở modal còn phải ĐÓNG các lớp phủ đang mở (chúng là state cục bộ của màn hình) — hai chỗ cùng ghi một cờ là hai chỗ để lệch nhau |
 
@@ -591,8 +591,13 @@ cũ quá hạn lưu giữ tự rời khỏi sổ; giao diện KHÔNG viết cứ
 
 Bước **Hỏi đáp** (bước cuối của luồng Agent Studio; khung ở `AgentChatStep.vue`, đọc/ghi qua
 `resources/js/studio/store/actions/agentChat.js`) là chỗ người dùng đọc câu trả lời của trợ lý NGAY
-TRONG lúc làm việc. Nó khác mọi màn khác ở hai điểm — **chữ chảy về từng mảnh** và **câu trả lời có
-nguồn** — nên có hai luật riêng; phần còn lại vẫn theo §6.1.
+TRONG lúc làm việc. Nó khác mọi màn khác ở ba điểm — **chữ chảy về từng mảnh** · **câu trả lời hiện ra
+dưới dạng văn bản ĐÃ TRANG TRÍ** (không hiện ký tự định dạng của máy) · **copy được TỪNG tin nhắn** —
+nên có luật riêng; phần còn lại vẫn theo §6.1.
+
+Bảng này áp cho **CẢ HAI khung chat** (bước «Hỏi đáp» của Agent Studio và modal trợ lý ở §6.9): hai
+khung dùng CHUNG một kho dữ liệu và chung một cách hiển thị, nên một nhãn ở đây là nhãn của cả hai —
+không có bản thứ hai để lệch.
 
 | Nhãn hiển thị | Nói với người dùng điều gì | KHÔNG được viết |
 |---|---|---|
@@ -605,28 +610,45 @@ nguồn** — nên có hai luật riêng; phần còn lại vẫn theo §6.1.
 | "Lượt này không hiện dần — câu trả lời hiện ra một lần." | Sự thật về cách hiện chữ ở LƯỢT ĐÓ | im lặng, để người dùng tưởng lượt nào cũng chảy |
 | "Có dùng lại nguồn đã tra trước đó — nguồn cũ có thể đã lỗi thời." | Nguồn cũ ⇒ phải kiểm lại trước khi tin | "nguồn lấy từ bộ đệm" |
 | "Phần tra cứu đã bị cắt bớt — câu trả lời có thể còn thiếu nguồn." | Nói TRƯỚC rằng câu trả lời có thể chưa đủ | "truncated" |
-| "Nguồn để bạn tự kiểm" + tiêu đề nguồn (mở tab mới) | Cả bước này tồn tại để KIỂM CHỨNG | trích dẫn chết (không bấm được) |
+| ~~"Nguồn để bạn tự kiểm" + danh sách trích dẫn (mở tab mới)~~ — **ĐÃ GỠ 2026-09-26** | Nhãn này **KHÔNG còn hiện ra** ở bất kỳ đâu: chủ dự án yêu cầu ẩn VĨNH VIỄN khối nguồn (nó làm rối khung chat) ⇒ khối bị **xoá hẳn khỏi DOM** ở CẢ HAI khung, không ẩn bằng CSS, không còn nút nào mở lại. Dữ liệu `citations` vẫn nguyên trong kho dữ liệu (`store/actions/agentChat.js`) — chỉ không hiển thị. Muốn trả lại thì phải là **hành động NGƯỜI DÙNG CHỦ ĐỘNG**, không tự hiện | "thu gọn nguồn này…" (câu của thẻ gấp cũ) — đã gỡ cùng khối |
+| "Copy câu hỏi này" · "Copy câu trả lời này" (nút Copy ở TỪNG tin nhắn, cả hai vai) | Bấm là chép vào bộ nhớ tạm. Nhãn nói rõ **COPY CÁI GÌ** vì khung có hai loại tin nhắn | "Copy" trống · "Sao chép nội dung" (không nói chép cái gì) |
+| "Đã copy câu hỏi của bạn vào bộ nhớ tạm." · "Đã copy câu trả lời vào bộ nhớ tạm." | Việc **đã XẢY RA** — bấm copy mà không có phản hồi thì người dùng không biết đã chép được chưa | "Thành công!" (không nói đã chép được gì) |
+| "Trình duyệt chặn việc copy — bạn bôi đen chữ rồi copy tay giúp." | Đường đi tiếp khi clipboard bị chặn (trang không phải HTTPS, hoặc cú bấm không phải thao tác trực tiếp) | "Lỗi!" · mã lỗi · tên ngoại lệ của trình duyệt |
+| "Xuống dòng (thêm dòng mới)" (nút trong ô nhập của chat) | Trên **ĐIỆN THOẠI** Enter là GỬI nên không có Shift+Enter; nhãn nói đúng việc nút làm | "Enter" · "Shift+Enter" (hai phím không có trên bàn phím điện thoại) |
 | "Bạn đã dừng lượt này." | Lượt đó do NGƯỜI DÙNG dừng, không phải hệ thống hỏng | "Đã huỷ yêu cầu" · mã lỗi |
 | "Lượt này chưa trả lời được — bạn hỏi lại giúp." | Việc làm tiếp; phần chữ đã nhận vẫn được GIỮ | tên ngoại lệ · chi tiết lỗi của máy chủ |
 | "Hội thoại đã đủ 12 lượt. Bấm «Hội thoại mới» rồi hỏi tiếp…" | Đường đi tiếp khi chạm trần hội thoại | "422" · "validation failed" |
 | "Nhập câu hỏi ở ô trên rồi bấm «Hỏi»…" (sau dấu ↳) | Vì sao nút chính đang bị khoá (§4 luật 4) | — |
 
-Năm ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
+Sáu ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
 
 1. **Sự kiện `provider` của luồng là KHỐI KỸ THUẬT: kho dữ liệu BỎ HẲN NÓ.** Nó không đi vào một state
    hiển thị nào — không phải "ẩn bằng CSS", không phải "đặt ở cuối trang". Muốn chắc thì đọc
    `_handleAgentChatEvent`: nhánh `provider` không gán gì cả. Chi tiết vẫn nằm trong log máy chủ.
 2. **Nhãn tiến trình của máy chủ đi qua `safeMessage` tại BIÊN** — cùng luật với luồng "Gợi ý từ ảnh"
    (`suggestPhaseLabel`): không tin nội dung máy chủ gửi cho một chỗ HIỂN THỊ.
-3. **Tiêu đề · mô tả · địa chỉ · tên nguồn · ngày đăng của TRÍCH DẪN là DỮ LIỆU CỦA NGUỒN, không phải
-   nhãn giao diện** ⇒ giữ nguyên văn, và đây là chỗ luật "không có địa chỉ web trên màn hình" KHÔNG áp
-   dụng. Lý do rất cụ thể: cả bước này tồn tại để người dùng TỰ KIỂM CHỨNG, mà một trích dẫn không bấm
-   được thì không kiểm chứng được gì. Link mở tab mới kèm `rel="noopener"`.
+3. **Link trong câu trả lời là LINK THẬT**: chữ của trợ lý đi qua `components/ChatMessageText.vue`,
+   nơi `[chữ](địa chỉ)` và URL trần được render thành thẻ `<a>` mở tab mới kèm `rel="noopener"` —
+   và **chỉ nhận `http`/`https`**, nên `javascript:`/`data:` không bao giờ thành chỗ bấm được.
+   Ghi chú lịch sử: **tiêu đề · mô tả · địa chỉ · tên nguồn · ngày đăng của TRÍCH DẪN là DỮ LIỆU CỦA
+   NGUỒN, không phải nhãn giao diện** ⇒ hồi khối nguồn còn hiện (trước 2026-09-26) đây là chỗ luật
+   "không có địa chỉ web trên màn hình" KHÔNG áp dụng, vì cả bước này tồn tại để người dùng TỰ KIỂM
+   CHỨNG. Khối đó nay đã gỡ hẳn theo yêu cầu chủ dự án (xem hàng gạch đầu bảng trên); luật này giữ
+   nguyên cho lúc nó quay lại — dưới dạng hành động NGƯỜI DÙNG CHỦ ĐỘNG.
 4. **Lỗi TRƯỚC khi mở luồng vẫn là JSON thường** (422 sai đầu vào · 401 hết phiên · 403 thiếu gói):
    đọc `message`/`errors` rồi ném lỗi người dùng đọc được. TUYỆT ĐỐI không để lại một khung chat rỗng
    trông như đã hỏi xong — đó là kiểu nói dối tệ nhất của loại màn hình này.
 5. **Không tự vẽ bộ chấm tiến trình**: dùng `LoadingSpinner.vue` dùng chung (§3). Khung chat chỉ đưa
    CHỮ (nhãn giai đoạn + dòng đang tra) vào đó.
+6. **[2026-09-26] Chữ của trợ lý KHÔNG hiện markdown thô — và KHÔNG dựng HTML.** Bộ nhận dạng nằm ở
+   `resources/js/studio/chatFormat.js` (module THUẦN — không DOM, tự kiểm bằng Node qua
+   `scripts/check-chat-format.mjs`, ghép vào PHPUnit ở `StudioHeaderAndPromptTest`), phần hiển thị nằm
+   ở `components/ChatMessageText.vue`. Cả HAI khung chat dùng CHUNG hai file đó: `**đậm**` →
+   `<strong>`, `*nghiêng*` → `<em>`, mã trong backtick → `<code>`, `[chữ](url)` và URL trần →
+   `<a>`; `- ` · `* ` · `1. ` → danh sách, `#` → tiêu đề. **Không có sink HTML thô ở bất kỳ đâu**
+   (§9 · `tests/Feature/StudioXssSinksTest.php`): câu trả lời của MÁY là văn bản, không bao giờ là mã,
+   nên mọi thứ hiện ra bằng `v-for` + thẻ thật. Bản COPY dùng `assistantPlainText()` của cùng module:
+   bỏ hết ký tự định dạng, link thành `chữ (địa chỉ)`, giữ nguyên dấu đầu dòng và số thứ tự.
 
 ### 6.9b Bảng nhãn — HƯỚNG MẪU BỊ ẨN (2026-09-26)
 
@@ -654,14 +676,17 @@ rộng màn hình, và người dùng phải nhớ hai chỗ. Nút nổi hiện 
 lối vào; bảng lệnh vẫn giữ lệnh vì đó là đường bàn phím.
 
 Bảng dưới đây là phần RIÊNG của modal; mọi nhãn của chính hội thoại (nhãn giai đoạn · số đo · cảnh báo
-· câu "Nguồn để bạn tự kiểm") vẫn theo §6.8 — chúng lấy từ CÙNG hàm dùng chung trong
-`store/actions/agentChat.js`, nên hai khung không thể nói hai kiểu về cùng một lượt trả lời.
+· nút Copy · nút Xuống dòng · câu xác nhận copy) vẫn theo §6.8 — chúng lấy từ CÙNG hàm/hằng dùng chung
+(`store/actions/agentChat.js` · `chatCopy.js` · `chatFormat.js`), nên hai khung không thể nói hai kiểu
+về cùng một lượt trả lời. **[2026-09-26] Khối nguồn đã GỠ HẲN khỏi cả hai khung** (xem hàng gạch đầu
+bảng §6.8): ba hàng cuối bảng dưới đây được nhắc lại y nguyên vì bảng này đọc độc lập, còn CHỮ thật
+vẫn chỉ có MỘT nguồn trong mã.
 
 | Nhãn hiển thị | Nói với người dùng điều gì | KHÔNG được viết |
 |---|---|---|
 | "Trợ lý thiết kế" (tiêu đề modal) | Tên việc, không phải tên công nghệ | tên model · tên nhà cung cấp · "AI Chat" |
 | "Hỏi thẳng về bộ sưu tập bạn đang làm" (trạng thái rỗng) | Khung này trả lời được việc gì | "Xin chào! Tôi là trợ lý ảo…" (lời chào không nói được gì) |
-| "Trợ lý đọc hồ sơ thương hiệu của shop và tự tra internet khi cần — câu trả lời kèm nguồn bấm được để bạn tự kiểm." | Nói TRƯỚC nguồn gốc câu trả lời để người dùng biết đường kiểm | "câu trả lời chính xác 100%" · "AI thông minh nhất" |
+| "Trợ lý đọc hồ sơ thương hiệu của shop và tự tra internet khi cần để trả lời." (dòng mô tả đầu modal) | Nói TRƯỚC nguồn gốc câu trả lời để người dùng biết mức độ tin | "câu trả lời chính xác 100%" · "AI thông minh nhất". **[2026-09-26]** câu cũ hứa "câu trả lời kèm nguồn bấm được để bạn tự kiểm" — khối nguồn đã gỡ hẳn nên lời hứa đó bị SỬA, không giữ lại |
 | Ba câu gợi ý (`CHAT_SUGGESTIONS` — MỘT hằng số ở `store/actions/agentChat.js`) | Mỗi câu một VIỆC khác nhau; bấm là gửi luôn vì gợi ý là câu hỏi HOÀN CHỈNH | câu mẫu chung chung ("Hỏi gì đó đi") · hai danh sách gợi ý ở hai nơi |
 | "Gõ câu hỏi rồi bấm nút gửi — ví dụ: «chất liệu nào đang lên?»" (sau dấu ↳) | Vì sao nút gửi đang bị khoá (§4 luật 4) | "disabled" · "invalid input" |
 | "Đang trả lời…" (khi lượt đó chưa có chữ nào) | Đang chờ việc gì | tên hàm công cụ · tên model |
@@ -670,6 +695,9 @@ Bảng dưới đây là phần RIÊNG của modal; mọi nhãn của chính h�
 | "Bạn đã dừng lượt này — phần trả lời ở trên là phần đã nhận được." | Phần chữ đã nhận được GIỮ LẠI, không xoá đi | "Đã huỷ yêu cầu" · mã lỗi |
 | "Chưa trả lời được câu này. Bạn thử hỏi lại sau ít phút." (cho RIÊNG lượt đó) | Việc làm tiếp; lỗi của một lượt không phá cả hội thoại | tên ngoại lệ · chi tiết lỗi máy chủ |
 | "Hỏi trợ lý" (nút ở màn hình canvas trống) | Lối vào modal từ màn tạo ảnh | "Chat" · "Trò chuyện" (tên cũ của tab đã gỡ) |
+| "Copy câu hỏi này" · "Copy câu trả lời này" (nút Copy của TỪNG tin nhắn — nhắc lại từ §6.8 [2026-09-26]) | Nhãn nói rõ **COPY CÁI GÌ**; tin của trợ lý chép bản CHỮ SẠCH (bỏ dấu định dạng, link thành "chữ (địa chỉ)") | "Copy" trống · "Sao chép nội dung" |
+| "Đã copy … vào bộ nhớ tạm." · "Trình duyệt chặn việc copy — bạn bôi đen chữ rồi copy tay giúp." (nhắc lại từ §6.8) | Việc ĐÃ xảy ra, và đường đi tiếp khi clipboard bị chặn (không HTTPS hoặc không phải thao tác trực tiếp) | "Thành công!" · chi tiết lỗi của trình duyệt |
+| "Xuống dòng (thêm dòng mới)" (nút trong ô hỏi của modal — nhắc lại từ §6.8) | Trên ĐIỆN THOẠI Enter là GỬI; nút chèn dòng mới tại ĐÚNG VỊ TRÍ CON TRỎ | "Enter" · "Shift+Enter" (hai phím không có trên điện thoại) |
 
 Bốn ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
 

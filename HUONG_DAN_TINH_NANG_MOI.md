@@ -510,10 +510,14 @@ cuối lượt (`AgentChatService.php:127-134`). Mỗi sự kiện mang `ref` d�
 URL trùng thì dùng lại mã cũ) kèm `title`, `url`, `source_name`, `published_at`. Khối `result` ở cuối lượt mang
 **cùng danh sách** đó trong `citations[]`.
 
-**Trên màn hình, mỗi câu trả lời có khối «Nguồn để bạn tự kiểm»** — từng nguồn là một **link THẬT** mở tab mới
-(`target="_blank" rel="noopener"`), kèm tên nguồn · ngày đăng, và nhãn **"nguồn đã tra trước đó"** nếu nguồn đó
-lấy từ SỔ NGUỒN chứ không phải vừa tra mới (`AgentChatStep.vue:156-179`). Trích dẫn không bấm được thì không
-kiểm chứng được — mà cả bước này tồn tại chính vì việc kiểm chứng.
+**TRÊN MÀN HÌNH KHÔNG CÒN KHỐI «Nguồn để bạn tự kiểm»** — chủ dự án yêu cầu gỡ hẳn ngày **2026-09-26** (khối đó
+làm rối khung chat), nên nó **đã bị xoá khỏi cả hai khung** (modal «Trợ lý thiết kế» và bước «Hỏi đáp»), không
+phải ẩn bằng CSS và không có nút nào mở lại. Dữ liệu `citations` **vẫn được giữ trong kho dữ liệu** (không xoá),
+chỉ không hiển thị; muốn trả lại thì phải là **hành động người dùng chủ động**, không tự hiện.
+
+Đổi lại, mỗi câu trả lời nay có **nút Copy** (copy văn bản SẠCH, không kèm ký tự định dạng) và chữ của trợ lý được
+**trang trí để đọc** thay vì hiện markdown thô: `**đậm**` thành chữ đậm, `- ` thành gạch đầu dòng thật, `#` thành
+tiêu đề, `[chữ](địa chỉ)` thành link mở tab mới. Ô nhập có thêm **nút Xuống dòng** (vì trên điện thoại Enter là GỬI).
 
 **Vì sao nguồn hiện ra NGAY, không đợi hết lượt:** máy chủ phát một sự kiện `citation` mỗi khi công cụ trả kết quả
 (`AgentChatService.php:127-134`); khung chat nhận và gắn vào lượt đang trả lời (`agentChat.js:224-228`), nên bạn

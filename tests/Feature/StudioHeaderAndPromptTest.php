@@ -19,6 +19,17 @@ use Tests\TestCase;
  * viết lại theo ĐÚNG sự thật mới: nút icon trong cụm công cụ ở thanh tiêu đề (data-header-action="chat")
  * và mục «Trợ lý» trong menu mobile đã GỠ, thay bằng NÚT NỔI (components/ChatFab.vue) nằm trong VÙNG
  * CANVAS. Bộ khẳng định KHÔNG bị nới lỏng — xem khối (d) trong bài 5.
+ *
+ * [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 3 — BỐN YÊU CẦU MỚI CỦA CHỦ DỰ ÁN, KHOÁ Ở KHỐI (f) CỦA BÀI 5]
+ *   1. KHỐI "NGUỒN ĐỂ BẠN TỰ KIỂM" BỊ GỠ HẲN khỏi CẢ HAI khung chat (không ẩn bằng CSS, không để lại
+ *      nút mở lại) — dữ liệu citations vẫn nguyên trong kho dữ liệu, chỉ không hiển thị;
+ *   2. mỗi tin nhắn (cả hai vai) có NÚT COPY;
+ *   3. chữ của trợ lý hiện dưới dạng VĂN BẢN ĐÃ TRANG TRÍ, không phải markdown thô;
+ *   4. ô nhập của chat có NÚT XUỐNG DÒNG (cho điện thoại, nơi Enter là GỬI).
+ * Hai khẳng định CŨ của bài 5 đi ngược lại yêu cầu 1 và 3 — chúng bắt modal PHẢI có chuỗi "Nguồn để bạn
+ * tự kiểm" và PHẢI có link nguồn trong chính file khung chat. Chúng KHÔNG bị bỏ: chúng được CHUYỂN sang
+ * đúng chỗ mới (khối (f.3) — link thật giờ nằm ở components/ChatMessageText.vue), và bất biến "link mở
+ * tab mới phải an toàn" vẫn được khoá y như trước.
  */
 class StudioHeaderAndPromptTest extends TestCase
 {
@@ -217,10 +228,9 @@ class StudioHeaderAndPromptTest extends TestCase
             'Phải tôn trọng bộ gõ tiếng Việt: Enter để CHỐT DẤU không được biến thành Enter để gửi.'
         );
 
-        // Nguồn là LINK THẬT — không bấm được thì người dùng không kiểm chứng được gì.
-        $this->assertStringContainsString('rel="noopener"', $modal, 'Link nguồn phải mở tab mới an toàn.');
-        $this->assertStringContainsString('target="_blank"', $modal, 'Link nguồn phải mở tab mới.');
-        $this->assertStringContainsString('Nguồn để bạn tự kiểm', $modal, 'Thiếu khối trích dẫn.');
+        // [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 3] Hai khẳng định về khối nguồn TRONG CHÍNH file khung chat đã
+        // được CHUYỂN sang khối (f.3) bên dưới — nơi link thật đang sống (components/ChatMessageText.vue)
+        // — chứ KHÔNG bị xoá. Lý do đầy đủ ở docblock của bài này.
 
         // Cầu nối "tìm hiểu → làm": đưa CÂU TRẢ LỜI vào ô mô tả tạo ảnh (cùng trường canvas trống bind vào).
         $this->assertStringContainsString('data-use-answer', $modal, 'Thiếu nút đưa câu trả lời vào ô mô tả ảnh.');
@@ -260,8 +270,18 @@ class StudioHeaderAndPromptTest extends TestCase
         $this->assertStringContainsString('aria-label="Trợ lý thiết kế"', $fab,
             'Nút CHỈ CÓ ICON thì bắt buộc phải có aria-label (§8) — và phải là TÊN VIỆC, không phải "chat".'
         );
-        $this->assertMatchesRegularExpression('/title="[^"]*nguồn[^"]*"/u', $fab,
-            'Thiếu title nói rõ mở chat có DẪN NGUỒN để người dùng tự kiểm — đó là lời hứa của tính năng, phải nói trước khi bấm.'
+        // [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 3] Lời hứa CŨ trong title ("câu trả lời kèm nguồn bấm được để
+        // bạn tự kiểm") nay SAI theo thiết kế: khối nguồn đã bị gỡ hẳn khỏi giao diện (xem khối (f.1)).
+        // Bất biến KHÔNG bị nới lỏng — nó vẫn đòi title nói TRƯỚC kết quả người dùng sẽ nhận được, chỉ
+        // đổi sang ĐÚNG sự thật mới: mở ra việc gì (hỏi đáp) và câu trả lời dựa trên cái gì (tự tra).
+        $this->assertMatchesRegularExpression('/title="[^"]*hỏi đáp[^"]*"/u', $fab,
+            'Thiếu title nói rõ nút mở ra VIỆC GÌ — lời hứa của tính năng phải nói trước khi bấm.'
+        );
+        $this->assertMatchesRegularExpression('/title="[^"]*tự tra[^"]*"/u', $fab,
+            'Thiếu title nói TRƯỚC nguồn gốc câu trả lời (trợ lý tự tra internet khi cần) để người dùng biết mức độ tin.'
+        );
+        $this->assertStringNotContainsString('nguồn bấm được', $fab,
+            'Title còn hứa "nguồn bấm được" — khối nguồn đã gỡ hẳn khỏi giao diện (2026-09-26), giữ lời hứa đó là nói sai với người dùng.'
         );
         $this->assertStringContainsString('name="bot"', $fab, 'Icon phải lấy từ icons.json qua StudioIcon (§9), không svg chép tay, không emoji.');
         $this->assertStringContainsString("import StudioIcon from './StudioIcon.vue'", $fab, 'Import icon dùng chung rồi mà không dùng thì vô nghĩa.');
@@ -363,6 +383,155 @@ class StudioHeaderAndPromptTest extends TestCase
             $this->assertStringNotContainsString($gone, $empty, 'Canvas trống còn sót đường trả lời giả: '.$gone);
             $this->assertStringNotContainsString($gone, $modal, 'Modal chat còn sót đường trả lời giả: '.$gone);
         }
+
+        // ── (f) BỐN YÊU CẦU CỦA CHỦ DỰ ÁN [2026-09-26] ────────────────────────────────────────────
+        //
+        // [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 3 — ĐỌC KHỐI NÀY TRƯỚC KHI "KHÔI PHỤC LẠI" HAI KHẲNG ĐỊNH CŨ]
+        // Hai khẳng định cũ của bài này (và của CẢ HAI khung chat) đi NGƯỢC lại yêu cầu mới: chúng bắt
+        // khung chat PHẢI có chuỗi "Nguồn để bạn tự kiểm" và PHẢI có link nguồn trong chính file khung.
+        // Chủ dự án yêu cầu ẩn VĨNH VIỄN khối đó khỏi người dùng (nó làm rối khung chat) ⇒ khối phải bị
+        // XOÁ HẲN khỏi DOM, KHÔNG phải ẩn bằng CSS và KHÔNG để lại nút mở lại. Vì sao phải xoá hẳn chứ
+        // không ẩn: khối còn trong DOM thì trình đọc màn hình vẫn đọc, Ctrl+F vẫn tìm thấy, và nó tự
+        // quay lại nguyên trạng khi ai đó gỡ một class — đó không phải "ẩn vĩnh viễn".
+        // DỮ LIỆU KHÔNG BỊ XOÁ: citations vẫn nằm nguyên trong kho dữ liệu dùng chung
+        // (store/actions/agentChat.js) — chỉ không hiển thị. Muốn trả lại thì phải là hành động NGƯỜI
+        // DÙNG CHỦ ĐỘNG (bấm mới hiện), KHÔNG tự hiện như trước.
+        // Bất biến "link mở tab mới phải an toàn" KHÔNG mất: nó CHUYỂN sang components/ChatMessageText.vue
+        // (khối f.3) — nơi link thật giờ được render. Không có khẳng định nào bị nới lỏng.
+        $chatStep = (string) file_get_contents(resource_path('js/studio/components/agents/AgentChatStep.vue'));
+        $frames = [
+            'Modal trợ lý (ChatModal.vue)' => $modal,
+            'Bước «Hỏi đáp» (AgentChatStep.vue)' => $chatStep,
+        ];
+
+        // (f.1) KHÔNG khung nào còn khối nguồn — kể cả tiêu đề của nó và câu của thẻ gấp.
+        foreach ($frames as $name => $frame) {
+            // Bỏ CHÚ THÍCH trước khi soi: cả hai file đều có khối "ĐỔI CHÍNH SÁCH 2026-09-26" KỂ LẠI
+            // việc đã gỡ (đúng quy ước của repo), mà chú thích thì không bao giờ nằm trong DOM.
+            $code = $this->withoutComments($frame);
+            foreach (['Nguồn để bạn tự kiểm', 'thu gọn nguồn này', 'data-chat-sources'] as $gone) {
+                $this->assertStringNotContainsString($gone, $code,
+                    $name.' còn sót khối nguồn ('.$gone.') — chủ dự án yêu cầu GỠ HẲN khỏi giao diện, và '
+                    .'một khối "ẩn bằng CSS" thì vẫn đọc được bằng trình đọc màn hình, vẫn tìm thấy bằng Ctrl+F.'
+                );
+            }
+        }
+
+        // (f.2) NÚT COPY cho TỪNG tin nhắn, ở CẢ HAI khung.
+        $copier = (string) file_get_contents(resource_path('js/studio/chatCopy.js'));
+        foreach ($frames as $name => $frame) {
+            $this->assertStringContainsString('data-chat-copy', $frame,
+                $name.' thiếu nút Copy — chủ dự án yêu cầu copy được TỪNG tin nhắn, cả câu hỏi lẫn câu trả lời.'
+            );
+            $this->assertStringContainsString('copyPlainText(', $frame,
+                $name.' phải copy qua ĐƯỜNG DÙNG CHUNG (chatCopy.js), không tự viết một bản clipboard riêng.'
+            );
+            // Nhãn nói rõ COPY CÁI GÌ: khung có hai loại tin nhắn nên một chữ "Copy" trống là nhập nhằng.
+            $this->assertStringContainsString('Copy câu hỏi này', $frame, $name.' thiếu nhãn copy câu hỏi.');
+            $this->assertStringContainsString('Copy câu trả lời này', $frame, $name.' thiếu nhãn copy câu trả lời.');
+            $this->assertStringContainsString('store.toast(', $frame,
+                $name.' phải XÁC NHẬN bằng toast — bấm copy mà không có phản hồi thì người dùng không biết đã copy chưa.'
+            );
+            // Tin của trợ lý copy bản CHỮ SẠCH, không phải nguyên văn còn dấu định dạng.
+            $this->assertStringContainsString('assistantPlainText(', $frame,
+                $name.' phải copy bản chữ sạch của câu trả lời (không copy dấu sao/backtick của máy).'
+            );
+        }
+        // Đường copy dùng navigator.clipboard VÀ có đường dự phòng: navigator.clipboard CHỈ có khi trang
+        // chạy HTTPS/localhost, nên máy khách mở bằng http://<ip> sẽ không có nó — thiếu đường dự phòng
+        // là nút bấm không làm gì mà cũng không nói gì. Khẳng định này nằm ở MODULE DÙNG CHUNG vì repo có
+        // luật MỘT CHỖ CHO MỘT VIỆC (xem khối (c): CHAT_SUGGESTIONS), và hai bản copy trong hai khung là
+        // hai chỗ để lệch nhau (một bên có dự phòng, bên kia không).
+        $this->assertStringContainsString('navigator.clipboard', $copier,
+            'Đường copy phải dùng navigator.clipboard.writeText.'
+        );
+        $this->assertStringContainsString('document.execCommand(', $copier,
+            'Đường copy thiếu bản DỰ PHÒNG cho trình duyệt chặn clipboard (không HTTPS / không phải thao tác trực tiếp).'
+        );
+        $this->assertStringContainsString('Đã copy câu trả lời vào bộ nhớ tạm.', $copier.$modal.$chatStep,
+            'Thiếu câu xác nhận đã copy câu trả lời.'
+        );
+        $this->assertStringContainsString('Trình duyệt chặn việc copy', $copier.$modal.$chatStep,
+            'Lỗi copy phải thành CÂU người dùng đọc được — không được ném ra console (trình duyệt chặn clipboard).'
+        );
+
+        // (f.3) CHỮ CỦA TRỢ LÝ: văn bản ĐÃ TRANG TRÍ qua module + component DÙNG CHUNG, không markdown thô.
+        $renderer = (string) file_get_contents(resource_path('js/studio/components/ChatMessageText.vue'));
+        $formatter = (string) file_get_contents(resource_path('js/studio/chatFormat.js'));
+        $this->assertStringContainsString('export function formatAssistantText', $formatter,
+            'chatFormat.js thiếu formatAssistantText — bộ nhận dạng phải là MODULE THUẦN để tự kiểm bằng Node.'
+        );
+        $this->assertStringContainsString('export function assistantPlainText', $formatter,
+            'chatFormat.js thiếu assistantPlainText — bản CHỮ SẠCH dùng cho nút Copy.'
+        );
+        // Bộ nhận dạng phải có ĐỦ bốn thứ chủ dự án yêu cầu: đậm · gạch đầu dòng · link · URL trần.
+        foreach (['\\*\\*', 'li', 'href', 'https?'] as $needle) {
+            $this->assertStringContainsString($needle, $formatter,
+                'chatFormat.js thiếu phần nhận dạng: '.$needle
+            );
+        }
+        foreach ($frames as $name => $frame) {
+            $this->assertStringContainsString("import ChatMessageText from", $frame,
+                $name.' phải dùng component hiển thị DÙNG CHUNG — hai bản render là hai chỗ để lệch nhau.'
+            );
+            $this->assertStringContainsString('<ChatMessageText', $frame, $name.' chưa render chữ của trợ lý qua ChatMessageText.');
+            $this->assertStringContainsString('chatFormat.js', $frame, $name.' phải đọc bộ định dạng dùng chung.');
+            // KHÔNG sink HTML thô ở bất kỳ đâu: chữ trong khung chat là VĂN BẢN DO MÁY TRẢ LỜI.
+            $this->assertStringNotContainsString('v-html', $frame.$renderer,
+                $name.' hoặc ChatMessageText.vue dùng sink HTML thô — xem tests/Feature/StudioXssSinksTest.php.'
+            );
+        }
+        $this->assertStringNotContainsString('v-html', $renderer, 'ChatMessageText.vue không được có sink HTML thô.');
+        $this->assertStringNotContainsString('innerHTML', $renderer, 'ChatMessageText.vue không được dựng chuỗi HTML.');
+        // Đậm · nghiêng · mã là THẺ THẬT; link mở tab mới an toàn (bất biến CŨ, nay ở đúng chỗ mới).
+        foreach (['<strong', '<em', '<code'] as $tag) {
+            $this->assertStringContainsString($tag, $renderer, 'ChatMessageText.vue thiếu thẻ thật: '.$tag);
+        }
+        $this->assertStringContainsString('rel="noopener"', $renderer, 'Link trong câu trả lời phải mở tab mới an toàn.');
+        $this->assertStringContainsString('target="_blank"', $renderer, 'Link trong câu trả lời phải mở tab mới.');
+
+        // (f.4) NÚT XUỐNG DÒNG trong ô nhập của CẢ HAI khung (trên điện thoại Enter là GỬI).
+        foreach ($frames as $name => $frame) {
+            $this->assertStringContainsString('data-chat-newline', $frame, $name.' thiếu nút xuống dòng.');
+            $this->assertStringContainsString('insertNewline', $frame, $name.' thiếu hàm chèn dấu xuống dòng.');
+            $this->assertStringContainsString('selectionStart', $frame,
+                $name.' phải chèn tại ĐÚNG VỊ TRÍ CON TRỎ, không phải nối vào cuối ô.'
+            );
+            $this->assertStringContainsString('el.selectionStart = el.selectionEnd = start + 1', $frame,
+                $name.' phải đặt lại con trỏ NGAY SAU ký tự vừa chèn — nhảy về cuối là làm mất chỗ đang gõ.'
+            );
+            // Cùng icon với nút xuống dòng của ô mô tả tạo ảnh: hai ô nhập trong CÙNG một sản phẩm không
+            // được hành xử (và trông) khác nhau.
+            $this->assertStringContainsString('cornerDownLeft', $frame,
+                $name.' phải dùng CÙNG icon với nút data-prompt-newline của ô mô tả tạo ảnh.'
+            );
+        }
+        $this->assertStringContainsString('data-prompt-newline', $empty,
+            'Nút xuống dòng của ô mô tả tạo ảnh biến mất — đó là bản gốc mà nút của khung chat chép theo.'
+        );
+
+        // (f.5) Biểu tượng copy lấy từ nguồn icon duy nhất (icons.json) — không svg chép tay, không emoji.
+        $icons = (string) file_get_contents(resource_path('js/studio/icons.json'));
+        $this->assertStringContainsString('"copy"', $icons, 'icons.json thiếu biểu tượng copy.');
+        foreach ($frames as $name => $frame) {
+            $this->assertStringContainsString('name="copy"', $frame, $name.' phải dùng biểu tượng copy dùng chung.');
+        }
+    }
+
+    /**
+     * Bỏ CHÚ THÍCH khỏi mã trước khi soi chuỗi.
+     *
+     * Vì sao cần: quy ước của repo là chú thích KỂ LẠI việc đã gỡ và nói rõ VÌ SAO — nên chính những
+     * khối "ĐỔI CHÍNH SÁCH" đó có nhắc tới chuỗi vừa bị cấm. Một rào chắn báo động vì chú thích sẽ bị
+     * tắt đi, và lúc đó nó không chặn được gì nữa (cùng lý do đã dùng ở DesignSystemTest).
+     */
+    private function withoutComments(string $src): string
+    {
+        return (string) preg_replace(
+            ['/<!--.*?-->/s', '#/\\*.*?\\*/#s', '/^[ \\t]*\\/\\/[^\\n]*$/m'],
+            '',
+            $src
+        );
     }
 
     /**
@@ -383,5 +552,32 @@ class StudioHeaderAndPromptTest extends TestCase
         $this->assertStringContainsString('relative', $m[0],
             '.icon-btn phải là khung định vị — huy hiệu absolute phải neo vào nút, không được trôi về header.'
         );
+    }
+
+    /**
+     * 7. [2026-09-26] BỘ ĐỊNH DẠNG CHỮ CỦA TRỢ LÝ được kiểm bằng Node.
+     *
+     * Vì sao bằng Node chứ không bằng PHP: bộ nhận dạng (đậm · nghiêng · mã · link · URL trần · gạch
+     * đầu dòng · tiêu đề) là JavaScript, và nó là phần DỄ SAI NHẤT của việc "hiện câu trả lời cho đọc
+     * được" — sai một chỗ thì người dùng đọc thấy ký tự của máy, hoặc tệ hơn: một chuỗi không phải địa
+     * chỉ web bị biến thành chỗ bấm được. Repo không có JS test runner (chỉ vite build), nên dùng ĐÚNG
+     * lối đã có: scripts/check-chat-format.mjs chạy bằng Node thuần, bài này gọi nó và đòi exit code 0
+     * (cùng cách SharedSessionTest gọi scripts/check-session-store.mjs).
+     */
+    public function test_the_chat_format_module_passes_its_node_self_check(): void
+    {
+        $node = @shell_exec('command -v node 2>/dev/null');
+        if (! is_string($node) || trim($node) === '') {
+            $this->markTestSkipped('Không có node trong PATH — bỏ qua self-check JS.');
+        }
+
+        $script = base_path('scripts/check-chat-format.mjs');
+        $this->assertFileExists($script, 'Thiếu scripts/check-chat-format.mjs — bộ định dạng chữ không được kiểm bằng gì.');
+
+        $out = [];
+        $rc = 1;
+        @exec(escapeshellcmd(trim($node)).' '.escapeshellarg($script).' 2>&1', $out, $rc);
+
+        $this->assertSame(0, $rc, "check-chat-format.mjs thất bại:\n".implode("\n", $out));
     }
 }
