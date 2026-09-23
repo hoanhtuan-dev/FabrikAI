@@ -48,8 +48,13 @@ class PricingMarginTest extends TestCase
 
         foreach (Plan::all() as $plan) {
             $credits = (int) $plan->credits_per_month;
-            if ($credits <= 0) {
-                continue; // gói Miễn phí: không bán credit, cổng chặn là credit tặng lúc đăng ký.
+            // ⚠️ GÓI KHÔNG BÁN (giá 0) KHÔNG ĐO ĐƯỢC BẰNG ₫/credit — chia cho doanh thu bằng 0
+            // là vô nghĩa. Bắt được trên production 2026-09-26: gói `free` có 50 credit/tháng,
+            // giá 0 ⇒ phép kiểm báo "0 ₫/credit, cần ≥ 1.200" — ĐÚNG SỐ nhưng SAI VIỆC.
+            // Gói tặng không có biên lợi nhuận để bảo vệ; thứ đo được là CHI PHÍ PHƠI NHIỄM
+            // (bài `test_the_free_plan_exposure_is_bounded` ngay dưới).
+            if ($credits <= 0 || (int) $plan->price_vnd <= 0) {
+                continue;
             }
 
             $rate = (int) $plan->price_vnd / $credits;
@@ -414,5 +419,45 @@ class PricingMarginTest extends TestCase
         // Giá PHẲNG (first_unit_price_usd = NULL) giữ nguyên hành vi cũ — không được đổi.
         $flat = $cost->quote('fal', 'fal-ai/flux-pro/v1/fill', ['width' => 1024, 'height' => 768]);
         $this->assertEqualsWithDelta(0.05, (float) $flat['cost_usd'], 0.000001);
+    }
+
+    public function test_the_free_plan_exposure_is_bounded(): void
+    {
+        // Gói TẶNG không có biên để bảo vệ — nhưng nó KHÔNG được là lỗ vô hạn. Hai thứ chặn nó:
+        //   · số credit cấp (credits_per_month + bonus lúc đăng ký),
+        //   · TRẦN ẢNH/NGÀY (daily_image_limit).
+        // Bài này khoá cả hai, để một lần sửa form gói không âm thầm mở đường đốt tiền.
+        $cost = app(ProviderCostService::class);
+
+        // Giá vốn cao nhất trên mỗi credit trong toàn bảng — mức tệ nhất khách có thể tiêu.
+        $worstPerCredit = 0.0;
+        foreach (ModelCreditCost::all() as $m) {
+            [$w, $h] = ($m->resolution !== '' && $m->ratio !== '')
+                ? $cost->imageDimensions($m->resolution, $m->ratio)
+                : $cost->imageDimensions('1K', '1:1');
+            $q = $cost->quote($m->provider, $m->model, ['width' => $w, 'height' => $h, 'seconds' => 5]);
+            if ($q['known'] && $m->credits >= 1) {
+                $worstPerCredit = max($worstPerCredit, (float) $q['cost_vnd'] / (int) $m->credits);
+            }
+        }
+        $this->assertGreaterThan(0, $worstPerCredit, 'Phải có ít nhất một dòng giá để đo.');
+
+        foreach (Plan::where('price_vnd', 0)->get() as $free) {
+            // Trần ảnh/ngày là BẮT BUỘC với gói tặng — không có nó thì một tài khoản đốt hết
+            // credit trong một phiên, và không có gì chặn việc tạo lại tài khoản.
+            $this->assertGreaterThan(
+                0,
+                (int) $free->daily_image_limit,
+                'Gói tặng '.$free->slug.' PHẢI có trần ảnh/ngày — nếu không, chi phí không bị chặn.',
+            );
+
+            // Và phơi nhiễm tối đa mỗi tài khoản phải nằm ở mức chấp nhận được (dưới 200.000 ₫).
+            $exposure = (int) $free->credits_per_month * $worstPerCredit;
+            $this->assertLessThan(
+                200000,
+                $exposure,
+                'Gói tặng '.$free->slug.' có thể đốt tới '.number_format($exposure).'₫ mỗi tài khoản.',
+            );
+        }
     }
 }

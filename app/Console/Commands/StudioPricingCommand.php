@@ -102,10 +102,37 @@ class StudioPricingCommand extends Command
         // ── Bất biến của GÓI ─────────────────────────────────────────────────────────────
         $this->line('  <options=bold>BẤT BIẾN: mọi gói phải giữ ₫/credit ≥ '
             .number_format(ProviderCostService::MIN_VND_PER_CREDIT).'</>');
+        // ⚠️ GÓI KHÔNG BÁN (giá 0) KHÔNG ĐO ĐƯỢC BẰNG ₫/credit — chia cho doanh thu bằng 0 là vô nghĩa.
+        // Lỗi thật gặp trên production 2026-09-26: gói `free` có 50 credit/tháng, giá 0 ⇒ phép kiểm
+        // báo '0 ₫/credit, cần ≥ 1.200' — ĐÚNG SỐ nhưng SAI VIỆC. Gói miễn phí không có biên lợi
+        // nhuận để mà bảo vệ; thứ cần đo là CHI PHÍ PHƠI NHIỄM (trần thiệt hại mỗi tài khoản).
+        //
+        // Nên: gói bán ⇒ kiểm ₫/credit; gói tặng ⇒ in chi phí tối đa, và chi phí đó bị CHẶN bởi
+        // credit/tháng + trần ảnh/ngày (hai thứ sửa được trong Quản trị).
         $planRows = [];
         foreach (Plan::orderBy('sort')->get() as $p) {
-            $rate = (int) $p->credits_per_month > 0 ? $p->price_vnd / (int) $p->credits_per_month : null;
-            $ok = $rate === null || $rate >= ProviderCostService::MIN_VND_PER_CREDIT;
+            $credits = (int) $p->credits_per_month;
+            $price = (int) $p->price_vnd;
+            $isSold = $price > 0 && $credits > 0;
+
+            if (! $isSold) {
+                // Chi phí phơi nhiễm = toàn bộ credit × mức giá vốn TỆ NHẤT trên mỗi credit.
+                $exposure = $credits * $this->worstCostPerCredit();
+                $planRows[] = [
+                    '·',
+                    $p->slug.' (tặng)',
+                    number_format($price).'₫',
+                    number_format($credits),
+                    $credits > 0 ? '≤ '.number_format($exposure).'₫' : '—',
+                    $p->resolution_cap,
+                    (int) $p->daily_image_limit ?: 'không giới hạn',
+                ];
+
+                continue;
+            }
+
+            $rate = $price / $credits;
+            $ok = $rate >= ProviderCostService::MIN_VND_PER_CREDIT;
             if (! $ok) {
                 $problems[] = 'Gói '.$p->slug.' — '.number_format($rate, 1).' ₫/credit (cần ≥ '
                     .number_format(ProviderCostService::MIN_VND_PER_CREDIT).')';
@@ -113,15 +140,15 @@ class StudioPricingCommand extends Command
             $planRows[] = [
                 $ok ? '✓' : '❗',
                 $p->slug,
-                number_format((int) $p->price_vnd).'₫',
-                number_format((int) $p->credits_per_month),
-                $rate !== null ? number_format($rate, 1) : '—',
+                number_format($price).'₫',
+                number_format($credits),
+                number_format($rate, 1),
                 $p->resolution_cap,
                 (int) $p->daily_image_limit ?: 'không giới hạn',
             ];
         }
-        $this->table(['', 'Gói', 'Giá', 'credit/th', '₫/credit', 'Cỡ tối đa', 'Trần ảnh/ngày'], $planRows);
 
+        $this->table(['', 'Gói', 'Giá', 'credit/th', '₫/credit (hoặc chi phí tối đa)', 'Cỡ tối đa', 'Trần ảnh/ngày'], $planRows);
         if ($problems) {
             $this->newLine();
             $this->error('  CÓ '.count($problems).' CHỖ KHÔNG ĐẠT:');
@@ -244,6 +271,35 @@ class StudioPricingCommand extends Command
         );
 
         return 1;
+    }
+
+    /**
+     * GIÁ VỐN CAO NHẤT TRÊN MỘT CREDIT trong toàn bộ bảng giá.
+     *
+     * Đây là con số quyết định NGƯỠNG ĐƠN GIÁ TỐI THIỂU của mọi gói bán: để biên ≥ 40 % ở dòng
+     * tệ nhất thì ₫/credit ≥ max ÷ 0,60. Với bảng hiện tại max ≈ 700 ₫ (video kling).
+     *
+     * Dùng luôn cho gói TẶNG: chi phí phơi nhiễm = credit × con số này.
+     */
+    protected function worstCostPerCredit(): float
+    {
+        $cost = app(ProviderCostService::class);
+        $worst = 0.0;
+
+        foreach (ModelCreditCost::all() as $m) {
+            [$w, $h] = ($m->resolution !== '' && $m->ratio !== '')
+                ? $cost->imageDimensions($m->resolution, $m->ratio)
+                : $cost->imageDimensions('1K', '1:1');
+
+            $q = $cost->quote($m->provider, $m->model, ['width' => $w, 'height' => $h, 'seconds' => 5]);
+            if (! $q['known'] || $m->credits < 1) {
+                continue;
+            }
+
+            $worst = max($worst, (float) $q['cost_vnd'] / (int) $m->credits);
+        }
+
+        return $worst > 0 ? $worst : (float) ProviderCostService::MIN_VND_PER_CREDIT * 0.6;
     }
 
     /** @return array<string,float> slug gói ⇒ ₫/credit */
