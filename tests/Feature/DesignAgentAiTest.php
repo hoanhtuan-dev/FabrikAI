@@ -252,10 +252,14 @@ class DesignAgentAiTest extends TestCase
 
         $response = $this->actingAs($this->customer())->postJson('/api/design-agent/radar')->assertOk();
 
+        // [ĐỔI CHÍNH SÁCH 2026-09-26] `active_trends` nay đếm hướng CÓ BẰNG CHỨNG THẬT; lượt này không có
+        // nguồn tìm kiếm nên = 0, và bộ có sẵn nằm ở trends_demo (KHÔNG được cộng vào số đang theo dõi).
+        // Phép thử "AI không được nhét số" vẫn nguyên: mọi con số đều do máy chủ quyết định.
         $response->assertJsonPath('source_mode', 'demo')
             ->assertJsonPath('summary.images_analyzed_monthly', 0)
-            ->assertJsonPath('summary.active_trends', 8);
-        $this->assertSame('demo', $response->json('trends.0.evidence_mode'));
+            ->assertJsonPath('summary.active_trends', 0)
+            ->assertJsonPath('demo_hidden', 8);
+        $this->assertSame('demo', $response->json('trends_demo.0.evidence_mode'));
     }
 
     public function test_ai_directions_are_topped_up_to_the_minimum_five(): void

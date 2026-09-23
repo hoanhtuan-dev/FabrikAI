@@ -40,6 +40,21 @@ class SchedulerHonestyTest extends TestCase
         ]);
     }
 
+    /**
+     * Nguồn TÌM KIẾM — bảng nguồn của radar (chỗ giao diện đọc câu chu kỳ) nay nói về NGUỒN TÌM KIẾM.
+     *
+     * [ĐỔI CHÍNH SÁCH 2026-09-26] Trước đây dòng đó là nguồn kind=rss đã khai; nay khối dữ liệu của bước 2
+     * lấy từ kết quả tìm kiếm nên bảng nguồn cũng phải là bảng của lượt tra. Luật được kiểm thì KHÔNG đổi:
+     * câu chu kỳ vẫn phải đọc từ nhịp tim của lịch chạy nền, không được viết cứng.
+     */
+    private function searchSource(): WebSource
+    {
+        return WebSource::create([
+            'slug' => 'nguon-tim', 'name' => 'Nguồn tìm kiếm', 'url' => 'https://feed.example/rss?q={query}',
+            'kind' => 'rss', 'enabled' => true, 'priority' => 2, 'max_items' => 5,
+        ]);
+    }
+
     private function fakeFeed(): void
     {
         Http::fake(['feed.example/*' => Http::response(
@@ -62,9 +77,10 @@ class SchedulerHonestyTest extends TestCase
         $this->assertStringContainsString('Cập nhật tin', $evidence['auto_refresh']['label']);
 
         // Câu chu kỳ nằm ở báo cáo nguồn của radar (chỗ giao diện đọc), không phải ở mỗi dòng trạng thái.
+        $this->searchSource();
         $this->fakeFeed();
         $radar = app(DesignAgentService::class)->radar(null, 'all', false);
-        $this->assertSame('Khi mở màn hình', collect($radar['sources'])->firstWhere('id', 'nguon-tin')['frequency']);
+        $this->assertSame('Khi mở màn hình', collect($radar['sources'])->firstWhere('id', 'nguon-tim')['frequency']);
     }
 
     /** Có nhịp tim (cron đang chạy) ⇒ được nói "tự động mỗi 30 phút". */
@@ -79,18 +95,20 @@ class SchedulerHonestyTest extends TestCase
         $this->assertTrue($evidence['auto_refresh']['alive']);
         $this->assertStringContainsString('30 phút', $evidence['auto_refresh']['label']);
 
+        $this->searchSource();
         $radar = app(DesignAgentService::class)->radar(null, 'all', false);
-        $this->assertSame('Tự động mỗi 30 phút', collect($radar['sources'])->firstWhere('id', 'nguon-tin')['frequency']);
+        $this->assertSame('Tự động mỗi 30 phút', collect($radar['sources'])->firstWhere('id', 'nguon-tim')['frequency']);
     }
 
     /** Radar cũng phải dùng cùng một câu (không có chỗ nào hứa khác chỗ nào). */
     public function test_the_radar_source_report_uses_the_same_measured_claim(): void
     {
-        $this->source();
+        // Bảng nguồn của radar nay là bảng của LƯỢT TRA (nguồn tìm kiếm) — xem chú thích ở searchSource().
+        $this->searchSource();
         $this->fakeFeed();
 
         $radar = app(DesignAgentService::class)->radar(null, 'all', false);
-        $report = collect($radar['sources'])->firstWhere('id', 'nguon-tin');
+        $report = collect($radar['sources'])->firstWhere('id', 'nguon-tim');
 
         $this->assertNotNull($report);
         $this->assertSame('Khi mở màn hình', $report['frequency']);

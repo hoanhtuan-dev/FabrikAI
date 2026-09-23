@@ -55,12 +55,19 @@ class DesignAgentControllerTest extends TestCase
             ->assertJsonPath('source_mode', 'demo')
             ->assertJsonPath('region', 'hcm')
             ->assertJsonPath('summary.images_analyzed_monthly', 0);
-        $this->assertCount(8, $response->json('trends'));
-        $this->assertSame('demo', $response->json('trends.0.evidence_mode'));
-        // BÁO CÁO NGUỒN nay nói ĐÚNG cái đang dùng: chưa khai nguồn nào ⇒ chỉ còn MỘT dòng nói rõ các kênh
-        // chưa kết nối (trước đây là 5 dòng tĩnh, 4 dòng ghi "Dữ liệu mẫu" gây hiểu sai khi đã nối nguồn thật).
+        // [ĐỔI CHÍNH SÁCH 2026-09-26 — KHÔNG DỮ LIỆU MẪU Ở BƯỚC 2] Chưa có nguồn tìm kiếm ⇒ KHÔNG tra được
+        // hướng nào ⇒ trends RỖNG. Bộ có sẵn bị TÁCH sang khoá riêng (không bị xoá) và số đã tách phải
+        // đếm được để giao diện nói ra. Assert cũ ("8 hướng, hướng đầu là demo") bị VIẾT LẠI theo luật mới
+        // chứ không bị bỏ: dữ liệu mẫu vẫn phải TRA ĐƯỢC, chỉ là không được đứng trong danh sách hướng.
+        $this->assertCount(0, $response->json('trends'), 'Tra không ra tin ⇒ trends không được chứa hướng của bộ có sẵn.');
+        $this->assertCount(8, $response->json('trends_demo'), 'Bộ có sẵn vẫn còn nguyên trong trends_demo.');
+        $this->assertSame(8, $response->json('demo_hidden'));
+        $this->assertSame('demo', $response->json('trends_demo.0.evidence_mode'));
+        // BÁO CÁO NGUỒN nay nói về NGUỒN TÌM KIẾM: chưa khai nguồn tìm kiếm ⇒ MỘT dòng nói thẳng việc cần
+        // làm, cộng MỘT dòng cho các kênh chưa kết nối (bảng tĩnh 5 dòng cũ đã bỏ từ 2026-09-23).
         $sources = collect($response->json('sources'));
-        $this->assertSame(1, $sources->count());
+        $this->assertSame(2, $sources->count());
+        $this->assertSame('Chưa có nguồn tìm kiếm', $sources->firstWhere('id', 'no_search_source')['name']);
         $this->assertSame('not_connected', $sources->firstWhere('id', 'not_connected')['status']);
         $this->assertStringContainsString('Shopee', (string) $sources->firstWhere('id', 'not_connected')['channels']);
     }

@@ -64,8 +64,13 @@ class DesignAgentController extends Controller
 
         $evidence = $sources->evidence($region, WebSourceService::EVIDENCE_LIMIT, $force);
 
-        // TÍN HIỆU THỊ TRƯỜNG đi kèm chính lời gọi này: người dùng bấm "Cập nhật tin" thì cả phần ĐO từ tin
-        // cũng phải mới, nếu không màn hình hiện tin mới mà số liệu vẫn của lần đo cũ.
+        // TÍN HIỆU THỊ TRƯỜNG đi kèm chính lời gọi này: người dùng bấm "Cập nhật tin" thì phần ĐO cũng phải
+        // mới, nếu không màn hình hiện số liệu của lần đo cũ.
+        //
+        // [ĐỔI CHÍNH SÁCH 2026-09-26] Phần đo KHÔNG còn lấy tin từ $evidence ở trên (nguồn kind=rss/page đã
+        // khai): nó tự chạy bộ TRUY VẤN CHỦ ĐỀ CHUNG rồi đo trên kết quả tra — cùng một phép đo với đường
+        // radar và đường cron. Vì sao phải nói rõ ở đây: hai biến cạnh nhau mà hiểu nhầm là "đo từ $evidence"
+        // thì lần sau sẽ có người "sửa" cho khớp và RSS lại chảy vào số liệu thị trường.
         $evidence['market'] = $market->capture($region, $force);
 
         return response()->json($evidence);

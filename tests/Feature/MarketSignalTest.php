@@ -69,6 +69,20 @@ class MarketSignalTest extends TestCase
         return $body.'</channel></rss>';
     }
 
+    /**
+     * Một nguồn TÌM KIẾM đã bật: URL có chỗ điền từ khoá ({query}) nên nó TRẢ LỜI ĐƯỢC các truy vấn chủ
+     * đề chung, thay vì chỉ đọc một chuyên mục cố định.
+     *
+     * VÌ SAO các bài ĐO nay dùng nguồn này: [ĐỔI CHÍNH SÁCH 2026-09-26] nguồn đo của tín hiệu thị trường đã
+     * đổi từ nguồn kind=rss/page sang KẾT QUẢ TÌM KIẾM (MarketSignalService::topicQueries). Phần thân bài
+     * giữ nguyên — cùng một feed trả về cho MỌI truy vấn — nên các assert cũ vẫn đo đúng thứ chúng vẫn đo,
+     * chỉ khác ĐƯỜNG đi của dữ liệu.
+     */
+    private function searchSource(array $overrides = []): WebSource
+    {
+        return $this->source(array_merge(['url' => 'https://feed.example/rss?q={query}'], $overrides));
+    }
+
     private function market(): MarketSignalService
     {
         return app(MarketSignalService::class);
@@ -79,7 +93,8 @@ class MarketSignalTest extends TestCase
     /** Đo từ tin: có từ khoá, nhóm hàng, số tin, số nguồn và TIN LÀM BẰNG CHỨNG để người dùng tự kiểm. */
     public function test_it_measures_terms_categories_and_evidence_from_news(): void
     {
-        $this->source();
+        // ĐO TỪ KẾT QUẢ TÌM KIẾM (2026-09-26): nguồn phải TRẢ LỜI ĐƯỢC truy vấn chủ đề chung.
+        $this->searchSource();
         Http::fake(['feed.example/*' => Http::response($this->feed([
             ['Đầm linen lên ngôi mùa hè', 'Chất liệu linen thoáng mát cho công sở'],
             ['Linen và cotton chiếm sóng', 'Vải linen được các thương hiệu chọn'],
@@ -152,7 +167,7 @@ class MarketSignalTest extends TestCase
     /** Dải giá trong báo cáo dùng TRUNG VỊ (một tin siêu đắt không được kéo lệch cả thị trường). */
     public function test_price_summary_uses_median(): void
     {
-        $this->source();
+        $this->searchSource();
         Http::fake(['feed.example/*' => Http::response($this->feed([
             ['Đầm giá 300.000đ', 'áo'],
             ['Đầm giá 400.000đ', 'áo'],
@@ -173,7 +188,7 @@ class MarketSignalTest extends TestCase
     /** Cùng một bộ tin ⇒ không ghi thêm lần đo (bảng không phình vì người dùng mở màn hình liên tục). */
     public function test_capturing_the_same_news_does_not_write_a_second_snapshot(): void
     {
-        $this->source();
+        $this->searchSource();
         Http::fake(['feed.example/*' => Http::response($this->feed([['Đầm linen mới', 'vải linen']]), 200)]);
 
         $this->market()->capture('all');
@@ -211,7 +226,7 @@ class MarketSignalTest extends TestCase
             'prices' => ['count' => 0, 'min_vnd' => null, 'median_vnd' => null, 'max_vnd' => null, 'samples' => []],
         ]);
 
-        $this->source();
+        $this->searchSource();
         Http::fake(['feed.example/*' => Http::response($this->feed([
             ['Linen', 'vải linen'],
             ['Linen trở lại', 'linen'],
@@ -231,7 +246,7 @@ class MarketSignalTest extends TestCase
     /** Radar: hướng có tin thật mang SỐ ĐO + link; hướng không có tin vẫn gắn nhãn "bộ có sẵn". */
     public function test_radar_carries_measured_signals_and_labelled_demo_trends(): void
     {
-        $this->source();
+        $this->searchSource();
         Http::fake(['feed.example/*' => Http::response($this->feed([
             ['Đầm linen lên ngôi', 'chất liệu linen thoáng'],
             ['Linen được ưa chuộng', 'vải linen'],
@@ -249,11 +264,19 @@ class MarketSignalTest extends TestCase
         $this->assertGreaterThanOrEqual(2, $live['live']['mentions']);
         $this->assertNotEmpty($live['live']['articles'], 'Hướng có tin thật phải kèm link bài viết.');
 
-        $demo = collect($radar['trends'])->firstWhere('evidence_mode', 'demo');
-        if ($demo !== null) {
-            $this->assertSame('catalog', $demo['momentum_source']);
-            $this->assertNull($demo['live']);
-        }
+        // [ĐỔI CHÍNH SÁCH 2026-09-26 — KHÔNG DỮ LIỆU MẪU Ở BƯỚC 2] Hướng của BỘ CÓ SẴN không còn nằm chung
+        // với hướng có bằng chứng: nó LUÔN bị tách sang trends_demo và đếm vào demo_hidden. Assert cũ
+        // ("tìm hướng demo trong trends, nếu có thì kiểm tiếp") nay yếu và dễ bỏ sót — thay bằng hai assert
+        // CHẶT HƠN: trends sạch hẳn hướng mẫu, và bộ có sẵn vẫn còn nguyên trong khoá riêng.
+        $this->assertEmpty(
+            array_filter((array) $radar['trends'], fn (array $t) => ($t['evidence_mode'] ?? 'demo') !== 'live'),
+            'Lượt đã có hướng THẬT thì trends KHÔNG được còn hướng nào của bộ có sẵn.'
+        );
+        $demo = collect($radar['trends_demo'])->firstWhere('evidence_mode', 'demo');
+        $this->assertNotNull($demo, 'Bộ có sẵn bị TÁCH RA chứ không bị xoá — phải còn trong trends_demo.');
+        $this->assertSame('catalog', $demo['momentum_source']);
+        $this->assertNull($demo['live']);
+        $this->assertSame(count($radar['trends_demo']), $radar['demo_hidden']);
     }
 
     /**
@@ -262,7 +285,7 @@ class MarketSignalTest extends TestCase
      */
     public function test_without_any_model_the_deterministic_engine_uses_measured_numbers(): void
     {
-        $this->source();
+        $this->searchSource();
         Http::fake(['feed.example/*' => Http::response($this->feed([
             ['Đầm linen lên ngôi', 'linen'],
             ['Linen trở lại', 'linen'],
@@ -283,7 +306,7 @@ class MarketSignalTest extends TestCase
     /** Hướng CHỈ có trong tin phải chọn được ở bước Định hướng (nếu không, giao diện hiện mà bấm là 422). */
     public function test_trends_born_from_news_can_be_selected(): void
     {
-        $this->source();
+        $this->searchSource();
         Http::fake(['feed.example/*' => Http::response($this->feed([
             ['Xu hướng áo khoác dạ', 'áo khoác dạ'],
             ['Áo khoác dạ mùa đông', 'áo khoác dạ'],
@@ -306,7 +329,7 @@ class MarketSignalTest extends TestCase
     /** Brief cũng phải mang khối tín hiệu + nói rõ số liệu nào đo từ tin. */
     public function test_brief_exposes_the_measured_signals(): void
     {
-        $this->source();
+        $this->searchSource();
         Http::fake(['feed.example/*' => Http::response($this->feed([
             ['Đầm linen lên ngôi', 'linen'],
             ['Linen trở lại', 'linen'],
@@ -322,18 +345,27 @@ class MarketSignalTest extends TestCase
         $this->assertNotEmpty($brief['market']['signals']);
     }
 
-    /** Nguồn ngoài hỏng KHÔNG được làm hỏng radar: vẫn trả hợp đồng đầy đủ, chỉ là mode=empty. */
+    /**
+     * Nguồn TÌM KIẾM hỏng KHÔNG được làm hỏng radar: vẫn trả hợp đồng đầy đủ, chỉ là mode=empty.
+     *
+     * [ĐỔI CHÍNH SÁCH 2026-09-26] Assert cũ đòi `trends` KHÁC RỖNG khi nguồn chết — điều đó chỉ đúng khi
+     * bước 2 còn lấp chỗ trống bằng BỘ CÓ SẴN. Nay luật là "không dữ liệu mẫu ở bước 2", nên hợp đồng mới
+     * được khoá CHẶT HƠN: trends RỖNG, bộ có sẵn nằm nguyên trong trends_demo, và lượt chạy vẫn trả đủ
+     * định hướng + lý do để giao diện nói thật. Không assert nào bị bỏ — chúng được viết lại theo luật mới.
+     */
     public function test_radar_survives_a_broken_source(): void
     {
-        $this->source();
+        $this->searchSource();
         Http::fake(['feed.example/*' => Http::response('hỏng', 500)]);
 
         $radar = app(DesignAgentService::class)->radar($this->customer(), 'all', false);
 
         $this->assertSame('empty', $radar['market']['mode']);
         $this->assertSame([], $radar['market']['signals']);
-        $this->assertNotEmpty($radar['trends']);
-        $this->assertNotEmpty($radar['directions']);
+        $this->assertSame([], $radar['trends'], 'Tra không ra tin ⇒ KHÔNG hướng nào có bằng chứng ⇒ trends rỗng.');
+        $this->assertNotEmpty($radar['trends_demo'], 'Bộ có sẵn vẫn còn nguyên (tách ra, không xoá).');
+        $this->assertSame(count($radar['trends_demo']), $radar['demo_hidden'], 'Số đã tách phải đếm được để giao diện nói ra.');
+        $this->assertNotEmpty($radar['directions'], 'Lượt chạy vẫn phải trả định hướng để người dùng còn việc làm.');
     }
 
     // ── (6) ĐỌC NGUỒN: NHỮNG LỖI THẬT ĐÃ SỬA ─────────────────────────────────
@@ -471,7 +503,10 @@ class MarketSignalTest extends TestCase
     {
         $view = static::designAgentsSource();
 
-        foreach (['Tín hiệu đo từ tin thật', 'tin thật nhắc tới', 'có tin thật', 'bộ có sẵn', 'Kiểm tra lại'] as $needle) {
+        // [ĐỔI CHÍNH SÁCH 2026-09-26] Nhãn khối đo nay nói đúng NGUỒN của số liệu: kết quả TÌM KIẾM trên
+        // web, không phải "tin từ nguồn đã nối". Assert được VIẾT LẠI theo nhãn mới (không bỏ assert nào):
+        // vẫn đòi đủ ba thứ — nhãn khối đo, nhãn phân biệt số đo với bộ có sẵn, và nút kiểm tra lại.
+        foreach (['Tín hiệu đo từ kết quả tìm kiếm', 'tin thật nhắc tới', 'không phải AI đoán', 'bộ có sẵn', 'Kiểm tra lại'] as $needle) {
             $this->assertStringContainsString($needle, $view, 'Thiếu chữ bắt buộc trên màn hình: '.$needle);
         }
 

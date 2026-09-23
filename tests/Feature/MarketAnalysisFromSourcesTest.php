@@ -54,6 +54,18 @@ class MarketAnalysisFromSourcesTest extends TestCase
         ], $overrides));
     }
 
+    /**
+     * Một nguồn TÌM KIẾM đã bật — URL có chỗ điền từ khoá nên nó trả lời được TRUY VẤN CHỦ ĐỀ CHUNG.
+     *
+     * [ĐỔI CHÍNH SÁCH 2026-09-26] Máy ĐO tín hiệu thị trường (và khối dữ liệu của bước 2) nay lấy tin từ
+     * KẾT QUẢ TÌM KIẾM, không đọc nguồn kind=rss/page nữa. Các bài ở đây vốn kiểm việc ĐO và việc SINH
+     * HƯỚNG TỪ CHÍNH CÂU CHỮ TRONG TIN — chúng vẫn đo đúng thứ đó, chỉ đổi đường dữ liệu đi vào.
+     */
+    private function searchSource(array $overrides = []): WebSource
+    {
+        return $this->source(array_merge(['url' => 'https://feed.example/rss?q={query}'], $overrides));
+    }
+
     // ── (1) ĐO TRÊN BẢN RỘNG, KHÔNG DÙNG TRẦN CỦA PROMPT ────────────────────
     /** Trần 4 tin/nguồn cho prompt KHÔNG được chặn việc đo — máy đo phải nhận bản rộng. */
     public function test_measurement_uses_a_wider_base_than_the_prompt(): void
@@ -76,7 +88,7 @@ class MarketAnalysisFromSourcesTest extends TestCase
     /** Cụm từ lặp lại trong tin thành CHỦ ĐỀ, kể cả khi tôi chưa từng khai từ khoá đó. */
     public function test_topics_come_from_the_news_language_itself(): void
     {
-        $this->source(['max_items' => 20]);
+        $this->searchSource(['max_items' => 20]);
         Http::fake(['feed.example/*' => Http::response($this->feed(6, 'Tuần lễ thời trang Hàn Quốc lần %d'), 200)]);
 
         $report = app(MarketSignalService::class)->capture('all');
@@ -90,7 +102,10 @@ class MarketAnalysisFromSourcesTest extends TestCase
     /** Tên toà soạn không được thành "chủ đề thị trường" (nguồn tổng hợp nhét vào tiêu đề + mô tả). */
     public function test_publisher_names_are_not_topics(): void
     {
-        $this->source(['max_items' => 20]);
+        // HAI nguồn, hai việc — có chủ ý: capture() đo trên KẾT QUẢ TÌM KIẾM (nguồn có {query}), còn phần
+        // kiểm "bỏ tên toà soạn" đọc thẳng đường evidence() của nguồn RSS cố định.
+        $this->searchSource(['max_items' => 20]);
+        $this->source(['slug' => 'nguon-rss', 'max_items' => 20, 'priority' => 2]);
         Http::fake(['feed.example/*' => Http::response($this->feed(5, 'Đầm linen mùa hè số %d - Kenh14.vn'), 200)]);
 
         $report = app(MarketSignalService::class)->capture('all');
@@ -122,7 +137,7 @@ class MarketAnalysisFromSourcesTest extends TestCase
     /** Có chủ đề lặp lại ⇒ radar có hướng sinh từ tin, và KHÔNG hiện trùng thẻ. */
     public function test_news_topics_become_trends_without_duplicates(): void
     {
-        $this->source(['max_items' => 20]);
+        $this->searchSource(['max_items' => 20]);
         Http::fake(['feed.example/*' => Http::response($this->feed(6, 'Tuần lễ thời trang Hàn Quốc lần %d'), 200)]);
 
         $radar = app(DesignAgentService::class)->radar(null, 'all', false);
@@ -139,7 +154,7 @@ class MarketAnalysisFromSourcesTest extends TestCase
     /** Nhóm chủ đề phải có nhãn và việc-nên-làm riêng, không rơi vào nhánh mặc định của nhóm khác. */
     public function test_topic_trends_have_their_own_label_and_action(): void
     {
-        $this->source(['max_items' => 20]);
+        $this->searchSource(['max_items' => 20]);
         Http::fake(['feed.example/*' => Http::response($this->feed(6, 'Tuần lễ thời trang Hàn Quốc lần %d'), 200)]);
 
         $radar = app(DesignAgentService::class)->radar(null, 'all', false);

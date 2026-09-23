@@ -9,11 +9,16 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
- * TÍN HIỆU THỊ TRƯỜNG ĐO TỪ NGUỒN NGOÀI — biến TIN thành DỮ LIỆU, không cần model tìm kiếm web (2026-09-23).
+ * TÍN HIỆU THỊ TRƯỜNG ĐO TỪ KẾT QUẢ TÌM KIẾM — biến TIN thành DỮ LIỆU, không cần model suy luận (2026-09-23).
  *
- * Vì sao có lớp này: model đang chạy trên production KHÔNG có tìm kiếm web thật (đo: tham số tìm kiếm bị
- * bỏ qua). Trình kết nối nguồn ngoài đã đưa được TIN vào prompt, nhưng tin vẫn chỉ là CHỮ do model đọc —
- * hết model thì hết phân tích, và mọi con số vẫn là số mẫu của bộ xu hướng có sẵn.
+ * Vì sao có lớp này: model đang chạy trên production KHÔNG tự ra internet, nên nếu chỉ đưa TIN vào prompt
+ * thì hết model là hết phân tích, và mọi con số vẫn là số mẫu của bộ xu hướng có sẵn.
+ *
+ * [ĐỔI CHÍNH SÁCH 2026-09-26] Nguồn đo nay là KẾT QUẢ TÌM KIẾM trên web (WebSourceService::search với bộ
+ * truy vấn chủ đề chung ở topicQueries) — KHÔNG còn là nguồn kind=rss/page đã khai. Vì sao: số đo cũ chỉ
+ * phản ánh chuyên mục mà chủ shop khai, và khi chưa khai nguồn nào thì bước 2 hiện danh mục MẪU như thể
+ * là số liệu thị trường. Bảng market_signals là ảnh chụp DÙNG CHUNG theo vùng, nên phần đo chỉ được dùng
+ * tin của TRUY VẤN CHUNG — tuyệt đối không trộn sổ nguồn riêng của một tài khoản vào đây.
  *
  * Lớp này ĐO bằng thuật toán (không gọi model, không tốn token, tái lập được 100%):
  *   · từ khoá ngành nào đang được nhắc tới, bao nhiêu tin, từ bao nhiêu nguồn, tin nào;
@@ -30,6 +35,15 @@ class MarketSignalService
 {
     /** Số tin tối đa dùng để ĐO (rộng hơn số tin đưa vào prompt: đo cần mẫu lớn hơn để đỡ nhiễu). */
     public const MARKET_LIMIT = 40;
+
+    /**
+     * Trần số TRUY VẤN CHỦ ĐỀ của một lần tự đi tra (đường cron / artisan) — 2026-09-26.
+     *
+     * Sáu truy vấn = đúng trần của lượt tra chung ở bước 2 (DesignAgentService::AI_QUERY_LIMIT). Giữ HAI con
+     * số bằng nhau là có chủ ý: số đo của cron và số đo của radar phải là CÙNG một phép đo, nếu không thì
+     * cùng một vùng mà hai màn hình lại ra hai bộ số khác nhau.
+     */
+    public const SEARCH_QUERY_LIMIT = 6;
 
     /** Cửa sổ lịch sử dùng để tính tăng/giảm. */
     public const HISTORY_DAYS = 14;
@@ -141,6 +155,61 @@ class MarketSignalService
     private const PRICE_MAX_VND = 500000000;
 
     /**
+     * VÙNG DIỄN GIẢI THEO TRUY VẤN — mã vùng của máy ('hcm') không phải chữ để đi hỏi internet.
+     *
+     * @var array<string, string>
+     */
+    private const REGION_PHRASES = [
+        'all' => 'Việt Nam',
+        'hcm' => 'TP.HCM',
+        'hanoi' => 'Hà Nội',
+        'danang' => 'Đà Nẵng',
+    ];
+
+    /**
+     * TRUY VẤN CHỦ ĐỀ CHUNG — nguồn DUY NHẤT của "lượt tra chung" nuôi cả bước 2 (2026-09-26).
+     *
+     * [ĐỔI CHÍNH SÁCH 2026-09-26] Từ đây, MỌI con số của "Tín hiệu thị trường" được ĐO TỪ KẾT QUẢ TÌM
+     * KIẾM TRÊN WEB, không còn đếm từ nguồn kind=rss/page đã khai.
+     *
+     * VÌ SAO ĐỔI: máy đo cũ đọc tin của các nguồn đã khai (RSS chuyên mục + trang báo). Hệ quả:
+     *   · số đo chỉ phản ánh CHUYÊN MỤC mà chủ shop đã khai, không phải thứ đang được nói trên web;
+     *   · chưa khai nguồn nào (hoặc nguồn chết) thì không có gì để đo ⇒ danh mục MẪU hiện ra ở bước 2 và
+     *     người dùng đọc nó như số liệu thị trường;
+     *   · câu trên giao diện ("đọc tin từ các nguồn đã nối") mô tả SAI việc máy chủ đang làm.
+     *
+     * BA LUẬT CỦA BỘ TRUY VẤN NÀY — vi phạm một luật là hỏng cả bước 2:
+     *   1. CHUNG, KHÔNG CỦA RIÊNG AI: đây là câu hỏi về NGÀNH, không chứa sản phẩm/khách hàng/DNA của một
+     *      tài khoản nào. Bảng market_signals là ảnh chụp THEO VÙNG, DÙNG CHUNG giữa các tài khoản, nên dữ
+     *      liệu riêng của một shop lọt vào đây là RÒ RỈ sang tài khoản khác — dự án đã dính đúng kiểu lỗi
+     *      này ở bộ đệm radar (xem chú thích ở DesignAgentService::mergeFindings).
+     *   2. CÓ VÙNG + MỐC THỜI GIAN: xu hướng màu sắc ở TP.HCM khác Hà Nội, và năm ngoái khác năm nay;
+     *      thiếu hai thứ đó thì truy vấn trả về bài viết không dùng được cho việc chọn hướng.
+     *   3. BÁM DANH MỤC NGÀNH ĐANG CÓ (CATEGORY_LABELS): mỗi truy vấn là một nhóm hàng mà máy đo biết
+     *      đếm, nên kết quả tra về là thứ ĐO ĐƯỢC chứ không phải một mớ bài viết rời rạc.
+     *
+     * @return list<string>
+     */
+    public static function topicQueries(string $region = 'all'): array
+    {
+        $where = self::REGION_PHRASES[$region] ?? self::REGION_PHRASES['all'];
+        $year = now()->format('Y');
+
+        // SÁU truy vấn, đúng trần AI_QUERY_LIMIT của lượt tra chung trong Agent Studio. Mỗi truy vấn là một
+        // lần đi mạng (có đệm 15 phút theo nguồn · từ khoá) nên trần này không được nới thêm mà không đo lại.
+        $topics = [
+            'xu hướng thời trang',
+            'màu sắc thời trang đang thịnh hành',
+            'kiểu dáng trang phục đang thịnh hành',
+            'chất liệu vải được ưa chuộng',
+            'chi tiết trang phục đang được chú ý',
+            'phong cách thời trang đang lên',
+        ];
+
+        return array_map(fn (string $topic) => $topic.' '.$where.' '.$year, $topics);
+    }
+
+    /**
      * Tham số BẮT BUỘC-kiểu-nullable (không có default): container Laravel không tự inject tham số nullable
      * có default, nên "?WebSourceService $sources = null" sẽ khiến lớp này LUÔN chạy không có nguồn.
      * Test thuần PHPUnit truyền null tường minh.
@@ -152,32 +221,45 @@ class MarketSignalService
     // ─────────────────────────────────────────────────────────────────────────────
 
     /**
-     * Đo tín hiệu từ nguồn ngoài rồi LƯU một snapshot (nếu dữ liệu đã đổi hoặc đã cũ).
+     * Đo tín hiệu từ KẾT QUẢ TÌM KIẾM rồi LƯU một snapshot (nếu dữ liệu đã đổi hoặc đã cũ).
      *
+     * ĐỔI CHÍNH SÁCH 2026-09-26 — XEM CHÚ THÍCH Ở topicQueries(): nguồn đo nay là KẾT QUẢ TÌM KIẾM; tuyệt
+     * đối KHÔNG quay lại WebSourceService::evidence() (RSS/trang báo). Vì sao phải nói rõ: đường cũ vừa cho
+     * ra số liệu lệch với thứ người dùng thấy ở bước 2, vừa biến "chưa khai nguồn" thành "không có số".
+     *
+     * HAI ĐƯỜNG, MỘT NGUỒN SỐ:
+     *   · $items ĐƯỢC TRUYỀN (đường radar): đo thẳng trên danh sách đó — nó là kết quả của CHÍNH lượt tra
+     *     chung mà bước 2 vừa hiển thị, nên số đo và danh sách nguồn luôn khớp nhau;
+     *   · $items = null (đường cron studio:market-signals): lớp này TỰ chạy tìm kiếm bằng đúng bộ truy vấn
+     *     chủ đề chung ở topicQueries() — không ra tin thì báo RỖNG và nói thật, không bịa số.
+     *
+     * @param  list<array<string, mixed>>|null  $items  tin để đo; null = tự đi tra bằng truy vấn chung
      * @return array<string, mixed> báo cáo đọc được ngay (cùng dạng với report())
      */
-    public function capture(string $region = 'all', bool $force = false): array
+    public function capture(string $region = 'all', bool $force = false, ?array $items = null): array
     {
-        if ($this->sources === null) {
-            return $this->emptyReport();
+        $search = ['queries' => [], 'sources' => [], 'error' => null];
+
+        if ($items === null) {
+            if ($this->sources === null) {
+                return $this->emptyReport($region, ['queries' => [], 'sources' => [], 'error' => 'chưa có trình kết nối nguồn ngoài']);
+            }
+
+            [$items, $search] = $this->searchItems($region);
         }
 
-        try {
-            // $wide = true: đo trên BẢN RỘNG (trần riêng cho việc đo), không dùng trần 5–8 tin của prompt.
-            $evidence = $this->sources->evidence($region, self::MARKET_LIMIT, $force, WebSourceService::MEASURE_PER_SOURCE);
-        } catch (\Throwable $e) {
-            // Nguồn ngoài hỏng KHÔNG được làm hỏng lượt phân tích: dữ liệu cũ vẫn dùng được.
-            $this->warn('không lấy được tin để đo', $e);
-
-            return $this->report($region);
+        // KHÔNG RA TIN NÀO ⇒ BÁO CÁO RỖNG. Ba việc CỐ Ý không làm ở đây, mỗi việc là một cách nói dối:
+        //   · KHÔNG ghi một ảnh chụp rỗng vào lịch sử — nó thành "lần đo trước có 0 tin" và làm con số
+        //     tăng/giảm của lần sau sai;
+        //   · KHÔNG rơi về số của bộ xu hướng có sẵn (số mẫu đội lốt số đo — đúng thứ chủ dự án phàn nàn);
+        //   · KHÔNG trả về ảnh chụp CŨ như thể vừa đo (tuổi ảnh chụp nằm trong captured_at).
+        if ($items === []) {
+            return $this->emptyReport($region, $search);
         }
 
-        $items = (array) ($evidence['items'] ?? []);
         $measured = $this->extract($items);
-        $fingerprint = (string) ($evidence['fingerprint'] ?? '');
-        if ($fingerprint === '') {
-            $fingerprint = md5(json_encode(array_column($items, 'url')) ?: '');
-        }
+        // Vân tay tính trên ĐÚNG bộ tin đã đo: cùng bộ tin ⇒ không ghi thêm ảnh chụp (bảng không phình).
+        $fingerprint = md5(json_encode(array_column($items, 'url')) ?: '');
 
         try {
             $previous = $this->query($region)->first();
@@ -207,7 +289,74 @@ class MarketSignalService
             return $this->reportFrom($measured, Carbon::now(), $region);
         }
 
-        return $this->report($region);
+        $report = $this->report($region);
+        // LƯỢT TRA ĐI KÈM BÁO CÁO (2026-09-26): người vận hành cần biết lần đo này HỎI GÌ và nguồn tìm kiếm
+        // nào trả lời — thiếu nó thì "số tụt" không phân biệt được với "truy vấn hỏng". Ảnh chụp trong DB
+        // không lưu câu hỏi (chúng đổi theo thời gian), nên khối này chỉ có ở báo cáo VỪA ĐO.
+        $report['search'] = [
+            'queries' => array_values((array) ($search['queries'] ?? [])),
+            'sources' => array_values((array) ($search['sources'] ?? [])),
+            'error' => $search['error'] ?? null,
+        ];
+
+        return $report;
+    }
+
+    /**
+     * TỰ ĐI TRA rồi gom tin để đo — đường dùng khi KHÔNG có ai đưa sẵn danh sách tin (cron · artisan).
+     *
+     * ĐỔI CHÍNH SÁCH 2026-09-26: trước đây hàm tương ứng gọi WebSourceService::evidence() (đọc RSS/trang
+     * báo đã khai). Nay đi bằng ĐÚNG bộ truy vấn chủ đề chung ở topicQueries() — cùng bộ mà bước 2 dùng —
+     * nên số đo của cron và số đo của radar là CÙNG MỘT phép đo, không phải hai phép đo lệch nhau.
+     *
+     * KHỬ TRÙNG THEO URL giữa các truy vấn: cùng một bài có thể khớp hai truy vấn, đếm hai lần là thổi
+     * phồng số "bao nhiêu tin nhắc tới" của mọi từ khoá trong bài đó.
+     *
+     * @return array{0: list<array<string, mixed>>, 1: array{queries: list<string>, sources: list<array<string, mixed>>, error: ?string}}
+     */
+    private function searchItems(string $region): array
+    {
+        $queries = array_slice(self::topicQueries($region), 0, self::SEARCH_QUERY_LIMIT);
+        $items = [];
+        $seen = [];
+        $sources = [];
+        $error = null;
+
+        foreach ($queries as $query) {
+            try {
+                $found = $this->sources->search($query, $region);
+            } catch (\Throwable $e) {
+                // Một truy vấn hỏng KHÔNG được giết cả lần đo: các truy vấn còn lại vẫn có thể ra tin.
+                $this->warn('không tra được tin để đo', $e);
+                $error = 'lỗi khi tra: '.class_basename($e);
+                continue;
+            }
+
+            if (($found['error'] ?? null) !== null) {
+                $error = (string) $found['error'];
+            }
+
+            foreach ((array) ($found['items'] ?? []) as $item) {
+                $url = (string) ($item['url'] ?? '');
+                if ($url !== '' && isset($seen[$url])) {
+                    continue;
+                }
+                if ($url !== '') {
+                    $seen[$url] = true;
+                }
+                $items[] = $item;
+                if (count($items) >= self::MARKET_LIMIT) {
+                    // Trần của việc ĐO: quá trần thì mẫu to hơn không làm con số chắc hơn, chỉ tốn CPU.
+                    break 2;
+                }
+            }
+
+            foreach ((array) ($found['sources'] ?? []) as $row) {
+                $sources[(string) ($row['slug'] ?? '')] = $row;
+            }
+        }
+
+        return [$items, ['queries' => $queries, 'sources' => array_values($sources), 'error' => $error]];
     }
 
     /**
@@ -216,9 +365,14 @@ class MarketSignalService
      * Vì sao cần: cron có thể chưa được bật ở nơi triển khai mới. Khi đó lần mở Agent Studio đầu tiên phải
      * tự đo, còn các lần sau thì đọc thẳng bản đã lưu (không thêm việc gì cho máy chủ).
      *
+     * $items (2026-09-26): đường radar ĐƯA SẴN kết quả của lượt tra chung để đo — nhờ vậy việc đo không đi
+     * mạng lần thứ hai và số đo chính là số của danh sách vừa hiện cho người dùng. Đường không truyền thì
+     * capture() tự đi tra (xem chú thích ở capture()).
+     *
+     * @param  list<array<string, mixed>>|null  $items
      * @return array<string, mixed>
      */
-    public function ensureFresh(string $region = 'all', int $maxAgeHours = self::SNAPSHOT_MAX_AGE_HOURS): array
+    public function ensureFresh(string $region = 'all', int $maxAgeHours = self::SNAPSHOT_MAX_AGE_HOURS, ?array $items = null): array
     {
         try {
             $latest = $this->query($region)->first();
@@ -229,7 +383,7 @@ class MarketSignalService
         }
 
         if ($latest === null || $latest->captured_at === null || $latest->captured_at->lt(Carbon::now()->subHours($maxAgeHours))) {
-            return $this->capture($region);
+            return $this->capture($region, false, $items);
         }
 
         return $this->report($region);
@@ -759,9 +913,9 @@ class MarketSignalService
             'prices' => $prices,
             // Câu cho giao diện: nói ĐÚNG cái đã đo, không hứa gì thêm.
             'note' => $rows === []
-                ? 'Chưa đo được tín hiệu nào từ tin thị trường.'
+                ? 'Chưa đo được tín hiệu nào từ tin tra được trên web.'
                 : sprintf(
-                    'Đo từ %d tin của %d nguồn: %d từ khoá ngành và %d chủ đề trong tin%s.',
+                    'Đo từ %d tin tra được trên web (%d nguồn): %d từ khoá ngành và %d chủ đề trong tin%s.',
                     $itemCount,
                     $sourceCount,
                     count($vocab),
@@ -784,8 +938,17 @@ class MarketSignalService
         return 0;
     }
 
-    /** Báo cáo rỗng nhưng ĐỦ KHOÁ — nơi gọi không phải rẽ nhánh, và "không có dữ liệu" luôn nói được. */
-    public function emptyReport(string $region = 'all'): array
+    /**
+     * Báo cáo rỗng nhưng ĐỦ KHOÁ — nơi gọi không phải rẽ nhánh, và "không có dữ liệu" luôn nói được.
+     *
+     * CÂU NÓI THẬT (đổi 2026-09-26): "Chưa tra được tin nào để đo tín hiệu thị trường." Bản cũ nói "chưa có
+     * tin thật nào" — đúng nhưng không nói được VÌ SAO, trong khi nay nguyên nhân thường gặp nhất là CHƯA
+     * KHAI NGUỒN TÌM KIẾM. Lý do cụ thể (nếu có) đi kèm ở khối tra cứu, giao diện đọc để chỉ đúng việc cần làm.
+     *
+     * @param  array{queries?: list<string>, sources?: list<array<string, mixed>>, error?: ?string}  $search
+     * @return array<string, mixed>
+     */
+    public function emptyReport(string $region = 'all', array $search = []): array
     {
         return [
             'mode' => 'empty',
@@ -802,7 +965,15 @@ class MarketSignalService
             'signals' => [],
             'topics' => [],
             'prices' => ['count' => 0, 'min_vnd' => null, 'median_vnd' => null, 'max_vnd' => null, 'samples' => []],
-            'note' => 'Chưa có tin thật nào để đo tín hiệu thị trường.',
+            'note' => 'Chưa tra được tin nào để đo tín hiệu thị trường.',
+            // KHỐI TRA CỨU: hỏi gì, nguồn tìm kiếm nào trả lời, lỗi gì — đủ để người dùng (và test) phân
+            // biệt "chưa khai nguồn tìm kiếm" với "đã tra mà không ra tin". Thiếu khối này thì cả hai cảnh
+            // huống đều hiện đúng một câu như nhau và không ai biết phải sửa gì.
+            'search' => [
+                'queries' => array_values((array) ($search['queries'] ?? [])),
+                'sources' => array_values((array) ($search['sources'] ?? [])),
+                'error' => $search['error'] ?? null,
+            ],
             'label' => 'Tín hiệu thị trường',
         ];
     }

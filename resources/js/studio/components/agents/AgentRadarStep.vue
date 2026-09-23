@@ -46,6 +46,20 @@ const radar = inject('radar');
 // thật, và bỏ các hướng của BỘ CÓ SẴN sang khoá riêng. Giao diện phải NÓI RA số đã ẩn — nếu không, người
 // dùng thấy danh sách ngắn đi mà không hiểu vì sao.
 const demoHidden = computed(() => Number(radar.value?.demo_hidden || 0));
+
+// ── NÓI THẬT KHI LƯỢT NÀY KHÔNG TRA ĐƯỢC HƯỚNG NÀO (2026-09-26) ────────────────────────────────
+// [ĐỔI CHÍNH SÁCH 2026-09-26] Trước đây lượt không tra được gì vẫn hiện đủ bộ hướng MẪU, nên màn hình
+// không bao giờ trống và người dùng đọc dữ liệu mẫu như số liệu thị trường. Nay trends chỉ có hướng có
+// bằng chứng thật ⇒ có thể RỖNG, và khi rỗng thì phải NÓI RA: tra bằng gì, vì sao không ra, làm gì tiếp.
+// Lý do cụ thể lấy từ MÁY CHỦ (radar.external_evidence.search_error) — giao diện không tự đoán.
+const emptyTrendNote = computed(() => {
+  const reason = String(radar.value?.external_evidence?.search_error || '');
+  const hidden = demoHidden.value ? ' (' + demoHidden.value + ' hướng mẫu đã được tách ra)' : '';
+  const why = reason ? ' Lý do: ' + reason + '.' : '';
+  return 'Lượt này chưa tra được hướng nào có bằng chứng thật trên web.'
+    + ' FabrikAI không lấp chỗ trống bằng danh mục có sẵn' + hidden + '.' + why
+    + ' Bấm «Tải lại» để tra lại, hoặc kiểm tra nguồn tìm kiếm ở khối «Nguồn dữ liệu cho phân tích» bên dưới.';
+});
 const regions = inject('regions');
 const selectedRegion = inject('selectedRegion');
 const trends = inject('trends');
@@ -147,11 +161,14 @@ watch(selectedRegion, (region, previous) => {
               <!-- Nguồn của con số phải nằm NGAY DƯỚI số, không gấp trong khối khác (§18.2). -->
               <p class="mt-1 text-tiny leading-4 text-cream-400 sm:text-label sm:leading-5">
                 {{ marketLive
-                  ? 'Số đầu tiên là số ĐO từ tin thật; các hướng còn lại ghi rõ hướng nào có tin thật, hướng nào thuộc bộ có sẵn.'
-                  : 'Chưa có tin thật: các hướng hiển thị thuộc BỘ XU HƯỚNG CÓ SẴN của FabrikAI, không phải số liệu thị trường.' }}
+                  ? 'Số đầu tiên là số ĐO từ kết quả máy chủ tra trên web; mỗi hướng ghi rõ nó có bằng chứng thật hay không.'
+                  : 'Lượt này chưa tra được tin nào trên web, nên chưa có số liệu thị trường nào để hiển thị.' }}
               </p>
+              <!-- [ĐỔI CHÍNH SÁCH 2026-09-26 — KHÔNG DỮ LIỆU MẪU Ở BƯỚC 2] Bộ có sẵn LUÔN bị tách khỏi danh
+                   sách hướng (nằm ở khoá riêng, không bị xoá), không chỉ khi lượt này có hướng thật. Nói RA
+                   số đã tách: nếu im lặng thì người dùng chỉ thấy danh sách ngắn đi mà không hiểu vì sao. -->
               <p v-if="demoHidden" class="mt-1 text-tiny leading-4 text-cream-400 sm:text-label sm:leading-5">
-                Đã ẩn {{ demoHidden }} hướng thuộc bộ có sẵn của FabrikAI — lượt này đã có hướng kèm dữ liệu thật, nên chỉ hiện những hướng có bằng chứng.
+                Đã tách {{ demoHidden }} hướng thuộc bộ có sẵn của FabrikAI ra khỏi danh sách — lượt này chỉ hiện hướng có bằng chứng thật, không lấp chỗ trống bằng dữ liệu mẫu.
               </p>
               <!-- CÁCH DỮ LIỆU ĐƯỢC LƯU · QUẢN LÝ · TÁI SỬ DỤNG — trả lời "lưu ở đâu, ai lưu, dùng lại ra sao". -->
               <details class="mt-1">
@@ -181,13 +198,13 @@ watch(selectedRegion, (region, previous) => {
                 <summary class="cursor-pointer select-none px-4 py-3">
                   <span class="flex flex-wrap items-center gap-2">
                     <StudioIcon name="scan" size="h-4 w-4" class="text-ok" />
-                    <span class="font-display text-base font-semibold text-cream-50">Tín hiệu đo từ tin thật ({{ marketSignals.length }})</span>
+                    <span class="font-display text-base font-semibold text-cream-50">Tín hiệu đo từ kết quả tìm kiếm ({{ marketSignals.length }})</span>
                     <!-- Nhãn cũ "đo tự động · không cần AI" đọc lên thành "agent không dùng AI" — trong khi
                          lượt chạy có thể đang dùng công cụ tìm kiếm của model. Nhãn này nói ĐÚNG phạm vi của
                          nó: CON SỐ ở khối này do thuật toán đo, không phải AI đoán. -->
-                    <span class="rounded-full bg-ok/15 px-2 py-0.5 text-label font-semibold text-ok" title="Các con số trong khối này do thuật toán đếm từ bài báo, không phải AI viết ra">số đo từ tin thật · không phải AI đoán</span>
+                    <span class="rounded-full bg-ok/15 px-2 py-0.5 text-label font-semibold text-ok" title="Các con số trong khối này do thuật toán đếm từ bài viết tra được trên web, không phải AI viết ra">số đo từ kết quả tìm kiếm · không phải AI đoán</span>
                   </span>
-                  <span class="mt-1 block text-label leading-4 text-cream-400">Máy chủ đọc tin từ các nguồn đã nối rồi đếm từ khoá đang được nhắc tới — số liệu THẬT kèm nguồn, không phải dự đoán của AI.{{ marketAgeLabel ? ' · đo ' + marketAgeLabel : '' }}</span>
+                  <span class="mt-1 block text-label leading-4 text-cream-400">Máy chủ tự tra trên web bằng các câu hỏi chung về ngành, rồi đếm từ khoá đang được nhắc tới trong chính kết quả tra được — số liệu THẬT kèm nguồn, không phải dự đoán của AI.{{ marketAgeLabel ? ' · đo ' + marketAgeLabel : '' }}</span>
                 </summary>
                 <div class="border-t border-ink-700 px-4 pb-3 pt-2.5">
                   <div class="flex flex-wrap gap-1.5">
@@ -320,7 +337,7 @@ watch(selectedRegion, (region, previous) => {
                   :title="liveTrendCount ? 'Chỉ hiện các hướng máy chủ đo được từ tin thật' : 'Chưa có hướng nào gắn với tin thật — hãy cập nhật tin hoặc kiểm tra nguồn'"
                   @click="liveOnly = !liveOnly"
                 >Có tin thật ({{ liveTrendCount }})</button>
-                <span v-if="!liveTrendCount" class="text-label text-cream-400">↳ Chưa có hướng nào từ tin thật — bấm «Cập nhật tin» ở khối nguồn bên dưới.</span>
+                <span v-if="!liveTrendCount" class="text-label text-cream-400">↳ Lượt này chưa tra được hướng nào có bằng chứng — xem khối «Nguồn dữ liệu cho phân tích» bên dưới.</span>
                 <button type="button" class="tool-btn" :class="{ 'is-active': trendCategory === 'all' && !liveOnly }" :aria-pressed="trendCategory === 'all' && !liveOnly" @click="trendCategory = 'all'; liveOnly = false">Tất cả ({{ trends.length }})</button>
                 <button v-for="category in trendCategories" :key="category.id" type="button" class="tool-btn" :class="{ 'is-active': trendCategory === category.id }" @click="trendCategory = category.id">{{ category.label }} ({{ category.count }})</button>
                 <button v-for="row in lifecycles" :key="row.id" type="button" class="tool-btn" :class="{ 'is-active': lifecycleFilter === row.id }" @click="lifecycleFilter = lifecycleFilter === row.id ? 'all' : row.id">{{ row.label }} ({{ row.count }})</button>
@@ -342,11 +359,11 @@ watch(selectedRegion, (region, previous) => {
                 <span v-if="aiCheckedCount" class="inline-flex items-center gap-1.5 rounded-full bg-ink-700 px-2 py-0.5 font-semibold text-cream-200" title="AI đã tra hướng này trong lượt chạy (máy chủ chạy lại đúng câu hỏi của model) nhưng không có tin nào nhắc tới — số liệu vẫn là số mẫu">
                   <span class="h-1.5 w-1.5 rounded-full bg-cream-400"></span>{{ aiCheckedCount }} AI đã tra, chưa có tin
                 </span>
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-warn/15 px-2 py-0.5 font-semibold text-warn"><span class="h-1.5 w-1.5 rounded-full bg-warn"></span>{{ trends.length - liveTrendCount - aiCheckedCount }} bộ có sẵn</span>
+                <span v-if="demoHidden" class="inline-flex items-center gap-1.5 rounded-full bg-warn/15 px-2 py-0.5 font-semibold text-warn" title="Hướng mẫu của FabrikAI — đã tách khỏi danh sách vì lượt này chỉ hiện hướng có bằng chứng thật"><span class="h-1.5 w-1.5 rounded-full bg-warn"></span>{{ demoHidden }} bộ có sẵn (đã tách)</span>
                 <details class="ml-auto">
                   <summary class="cursor-pointer text-tiny text-cream-400 underline decoration-dotted">Giải thích</summary>
                   <p class="mt-1 max-w-md rounded-lg bg-ink-900 px-2.5 py-2 text-tiny leading-4 text-cream-300">
-                    <b class="text-cream-200">Đo từ tin thật</b> = hướng xuất hiện trong bài báo máy chủ vừa lấy (kèm nguồn) — tin của các nguồn bạn cấu hình. <b class="text-cream-200">AI tìm thấy</b> = hướng khớp tin mà AI tự tra trong lượt này: model quyết định hỏi gì, máy chủ chạy lại đúng câu hỏi đó trên nguồn tìm kiếm thật rồi đếm — cũng có nguồn để bấm vào kiểm. <b class="text-cream-200">AI đã tra, chưa có tin</b> = lượt chạy NÀY đã hỏi thẳng về hướng đó nhưng không nguồn nào nhắc tới — số liệu vẫn là số mẫu, đừng đọc như số đo. <b class="text-cream-200">Bộ có sẵn</b> = hướng mẫu của FabrikAI, lượt này chưa tra tới.
+                    <b class="text-cream-200">Đo từ kết quả tìm kiếm</b> = hướng xuất hiện trong những bài máy chủ tự tra trên web bằng các câu hỏi chung về ngành (kèm nguồn để bạn bấm vào kiểm). <b class="text-cream-200">AI tìm thấy</b> = hướng khớp tin mà AI tự tra trong lượt này: model quyết định hỏi gì, máy chủ chạy lại đúng câu hỏi đó trên nguồn tìm kiếm thật rồi đếm — cũng có nguồn để bấm vào kiểm. <b class="text-cream-200">AI đã tra, chưa có tin</b> = lượt chạy NÀY đã hỏi thẳng về hướng đó nhưng không nguồn nào nhắc tới — số liệu vẫn là số mẫu, đừng đọc như số đo. <b class="text-cream-200">Bộ có sẵn</b> = hướng mẫu của FabrikAI, lượt này chưa tra tới.
                   </p>
                 </details>
               </div>
@@ -387,7 +404,7 @@ watch(selectedRegion, (region, previous) => {
                 </button>
               </div>
               <p v-else class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-6 text-center text-xs text-cream-400">
-                {{ trends.length ? 'Không có xu hướng nào khớp bộ lọc hiện tại — bỏ bộ lọc để xem tất cả.' : 'Chưa đọc được xu hướng nào. Bấm «Tải lại»; nếu vẫn trống, kiểm tra nguồn tin ở khối «Nguồn dữ liệu cho phân tích».' }}
+                {{ trends.length ? 'Không có xu hướng nào khớp bộ lọc hiện tại — bỏ bộ lọc để xem tất cả.' : emptyTrendNote }}
               </p>
 
               <!-- SỔ NGUỒN AI ĐÃ TRA — mặt NHÌN THẤY của vòng khép kín: công cụ tìm kiếm của agent đã ghi
@@ -470,10 +487,10 @@ watch(selectedRegion, (region, previous) => {
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <p class="text-body leading-5 text-cream-100">
                       <template v-if="liveSources">
-                        Đang đọc <b class="text-ok">{{ newsItems.length }} tin thật</b> từ {{ activeSourceCount }} nguồn · cập nhật {{ fetchedAtLabel }}.
+                        Đang có <b class="text-ok">{{ newsItems.length }} tin thật</b> từ {{ activeSourceCount }} nguồn · cập nhật {{ fetchedAtLabel }}.
                       </template>
                       <template v-else>
-                        Chưa có tin thật nào — phần phân tích đang dựa trên dữ liệu của bạn và bộ xu hướng mẫu.
+                        Chưa tra được tin nào trên web cho lượt này — phần phân tích đang dựa trên dữ liệu của chính bạn.
                       </template>
                     </p>
                     <button type="button" class="tool-btn" :disabled="store.webSourcesLoading" @click="store.loadWebSources(true, selectedRegion)">
@@ -491,7 +508,11 @@ watch(selectedRegion, (region, previous) => {
                   </ul>
 
                   <details v-if="store.webSources" class="mt-2">
-                    <summary class="cursor-pointer text-label text-cream-400">Danh sách nguồn &amp; cách hoạt động</summary>
+                    <!-- [ĐỔI CHÍNH SÁCH 2026-09-26] Bảng dưới đây là DANH SÁCH CẤU HÌNH (nguồn nào đã khai
+                         trong Cài đặt, nguồn nào đang chết), KHÔNG phải nguồn của những con số phía trên:
+                         từ nay số liệu của bước này đo trên KẾT QUẢ TÌM KIẾM. Ghi rõ ngay ở nhãn mở/đóng —
+                         để trống thì người đọc tự hiểu là "RSS đang nuôi phân tích", đúng thứ vừa bị bỏ. -->
+                    <summary class="cursor-pointer text-label text-cream-400">Nguồn đã khai trong Cài đặt &amp; cách hoạt động <span class="text-cream-400">(cấu hình — không phải nguồn của số liệu ở trên)</span></summary>
                     <div class="mt-1.5 overflow-x-auto">
                       <table class="w-full min-w-[26rem] text-left text-label">
                         <thead><tr class="border-b border-ink-700 text-cream-400"><th scope="col" class="pb-1.5 pr-2 font-semibold">Nguồn</th><th scope="col" class="pb-1.5 pr-2 font-semibold">Trạng thái</th><th scope="col" class="pb-1.5 font-semibold">Tin dùng được</th></tr></thead>
@@ -512,11 +533,13 @@ watch(selectedRegion, (region, previous) => {
                     </div>
                     <!-- Số ĐO, không phải lời hứa: câu này đổi theo nhịp tim của lịch chạy nền trên máy chủ.
                          Bản trước viết cứng "tự lấy tin mỗi 30 phút" trong khi host KHÔNG có cron nào. -->
-                    <!-- HAI KÊNH, NÓI RÕ KÊNH NÀO RA CÁI GÌ: tin máy chủ lấy sẵn theo nguồn cấu hình (nuôi cả phần đo
-                         tín hiệu thị trường), và tin AI tự tìm trong lượt này (ảnh hưởng phần chữ AI viết). -->
+                    <!-- HAI LƯỢT TRA, NÓI RÕ LƯỢT NÀO RA CÁI GÌ: lượt tra CHUNG của máy chủ (nuôi khối dữ
+                         liệu và cả phần đo tín hiệu thị trường), và lượt AI tự tìm trong lượt này (ảnh
+                         hưởng phần chữ AI viết). [ĐỔI CHÍNH SÁCH 2026-09-26]: bỏ chữ "nguồn cấu hình" —
+                         nguồn kind=rss/page không còn nuôi bước này. -->
                     <p v-if="aiSearchOn" class="mt-2 rounded-lg border border-ink-700 bg-ink-900 p-2.5 text-label leading-5 text-cream-300">
-                      <b class="text-cream-100">Hai nguồn tin khác nhau:</b>
-                      danh sách trên là tin <b class="text-cream-100">máy chủ lấy sẵn</b> theo nguồn bạn cấu hình (cũng là số liệu cho khối tín hiệu thị trường);
+                      <b class="text-cream-100">Hai lượt tra khác nhau:</b>
+                      danh sách trên là kết quả <b class="text-cream-100">máy chủ tự tra trên web</b> bằng các câu hỏi chung về ngành (cũng chính là số liệu của khối tín hiệu thị trường);
                       <template v-if="aiSearchQueries.length">
                         còn AI <b class="text-cream-100">tự tìm trên internet {{ aiSearchQueries.length }} truy vấn</b> trong lượt này:
                         <span v-for="(q, i) in aiSearchQueries" :key="q">{{ q }}<span v-if="i < aiSearchQueries.length - 1"> · </span></span>

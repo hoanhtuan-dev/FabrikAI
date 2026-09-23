@@ -437,10 +437,13 @@ export function useAgentStudio() {
     return row && row.used ? String(row.note || '') : '';
   });
   // ── Nguồn dữ liệu: nhãn TIẾNG NGƯỜI DÙNG (không để chữ kỹ thuật trong template) ──────────────
-  /** Có tin thật để AI đọc? (máy chủ tự lấy, không phải model tự tìm kiếm).
+  /** Có tin thật để AI đọc? (máy chủ tự tra trên web, không phải model tự tìm kiếm).
    *  [BUG ĐÃ SỬA] Trước đây chỉ đọc webSources.mode ⇒ radar ĐÃ chạy bằng tin thật (source_mode=live) mà
-   *  giao diện vẫn báo "Chưa có tin thật nào" — hai tầng lệch nhau. Nay ưu tiên trạng thái THẬT của radar. */
-  const liveSources = computed(() => (store.trendRadar?.source_mode === 'live') || !!(store.webSources && store.webSources.mode === 'live'));
+   *  giao diện vẫn báo "Chưa có tin thật nào" — hai tầng lệch nhau. Nay ưu tiên trạng thái THẬT của radar.
+   *  [ĐỔI CHÍNH SÁCH 2026-09-26] BỎ hẳn nhánh dự phòng đọc webSources.mode: nguồn kind=rss/page không còn
+   *  nuôi khối dữ liệu của bước này, nên lấy trạng thái của nó làm "có tin thật" là nói sai — người dùng
+   *  sẽ thấy danh sách tin của nguồn đã khai trong khi phần phân tích KHÔNG dùng những tin đó. */
+  const liveSources = computed(() => store.trendRadar?.source_mode === 'live');
   /** Số hướng đang được ĐO từ tin thật (khác hướng của bộ có sẵn) — hiện trên chip lọc. */
   const liveTrendCount = computed(() => trends.value.filter((trend) => trend.evidence_mode === 'live').length);
   /**
@@ -455,21 +458,29 @@ export function useAgentStudio() {
    * Gộp hai chuyện này là nói thiếu: "chưa ai tra hướng đó" khác hẳn "đã tra và không có tin nào nhắc tới".
    * Người dùng cần biết hệ thống đã thử, và cần biết con số đang hiện vẫn là số mẫu.
    */
-  const aiCheckedCount = computed(() => trends.value.filter((trend) => trend.evidence_mode !== 'live' && trend.checked_by_ai).length);
-  /** Tin hiển thị ưu tiên lấy từ radar (thứ phân tích THẬT SỰ đã dùng), rơi về báo cáo nguồn khi radar chưa có. */
-  const newsItems = computed(() => {
-    const items = (store.trendRadar?.external_evidence?.items?.length ? store.trendRadar.external_evidence.items : (store.webSources?.items || []));
-    return items.slice(0, 6);
-  });
+  // [ĐỔI CHÍNH SÁCH 2026-09-26] Đếm trên CẢ hai khoá: hướng AI đã tra mà không ra tin KHÔNG phải hướng có
+  // bằng chứng, nên nó nằm ở trends_demo — đếm mỗi `trends` thì con số này luôn bằng 0 và trạng thái thứ
+  // ba ("đã tra, chưa có tin") biến mất khỏi màn hình, đúng thứ mà người dùng cần biết để không tưởng hệ
+  // thống bỏ qua hướng đó.
+  const aiCheckedCount = computed(() => [...trends.value, ...trendsDemo.value]
+    .filter((trend) => trend.evidence_mode !== 'live' && trend.checked_by_ai).length);
+  /**
+   * Tin của LƯỢT NÀY — CHỈ lấy từ radar (thứ phân tích THẬT SỰ đã dùng).
+   *
+   * [ĐỔI CHÍNH SÁCH 2026-09-26] Bỏ nhánh rơi về `store.webSources.items` (tin của nguồn kind=rss/page đã
+   * khai). Vì sao: khối dữ liệu của bước 2 nay CHỈ gồm kết quả tìm kiếm, nên rơi về đó là hiện một danh
+   * sách KHÔNG tham gia vào con số nào của lượt này — đúng kiểu "sai mà trông rất cụ thể".
+   */
+  const newsItems = computed(() => (store.trendRadar?.external_evidence?.items || []).slice(0, 6));
+  /** Số nguồn TÌM KIẾM thật sự trả về tin trong lượt này (đọc từ khối dữ liệu của radar). */
   const activeSourceCount = computed(() => {
     const evidenceSources = store.trendRadar?.external_evidence?.sources;
-    if (Array.isArray(evidenceSources) && evidenceSources.length) {
-      return evidenceSources.filter((row) => (Number(row.count) || 0) > 0).length;
-    }
-    return ((store.webSources?.sources || []).filter((row) => row.ok)).length;
+    return Array.isArray(evidenceSources) ? evidenceSources.filter((row) => (Number(row.count) || 0) > 0).length : 0;
   });
   const fetchedAtLabel = computed(() => {
-    const at = store.webSources?.fetched_at;
+    // [ĐỔI CHÍNH SÁCH 2026-09-26] Ưu tiên thời điểm của LƯỢT TRA ở radar: danh sách tin cạnh dòng này là
+    // kết quả của lượt tra đó, nên lấy giờ của báo cáo nguồn (nguồn đã khai) là hai thứ lệch nhau.
+    const at = store.trendRadar?.external_evidence?.fetched_at || store.webSources?.fetched_at;
     if (!at) return '';
     try { return new Date(at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; }
   });
@@ -579,6 +590,12 @@ export function useAgentStudio() {
   /** Tên khu vực đang đọc — rail của trang in tên, không in mã ('hcm' là mã, không phải chữ cho người). */
   const regionName = computed(() => (regions.value.find((r) => r.id === selectedRegion.value) || {}).name || selectedRegion.value);
   const trends = computed(() => radar.value?.trends || []);
+  /**
+   * Hướng của BỘ CÓ SẴN — máy chủ LUÔN tách sang khoá riêng `trends_demo` (không xoá), nên giao diện vẫn
+   * đọc được chúng: dùng để đếm trạng thái "AI đã tra, chưa có tin" và để nói ra số đã tách.
+   * KHÔNG đưa khoá này vào lưới chọn hướng — lưới chỉ hiện hướng CÓ BẰNG CHỨNG THẬT.
+   */
+  const trendsDemo = computed(() => radar.value?.trends_demo || []);
   const sources = computed(() => radar.value?.sources || []);
   const sourceMode = computed(() => radar.value?.source_mode || 'demo');
   /**

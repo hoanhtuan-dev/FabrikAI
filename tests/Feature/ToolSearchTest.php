@@ -289,10 +289,16 @@ class ToolSearchTest extends TestCase
         $this->assertFalse($brief['model']['web_search']);
         $this->assertSame(0, $brief['model']['tool_search']['calls']);
         $this->assertStringNotContainsString('"tools"', $sent[0], 'Không khai vai tìm kiếm thì không được gửi công cụ.');
-        // Nguồn tin VẪN được đọc (đó là đường đọc tin cố định, không phải công cụ) — nhưng phải đọc bằng
-        // ĐÚNG từ khoá cấu hình của nguồn, không phải bằng từ khoá do model nghĩ ra.
+        // [ĐỔI CHÍNH SÁCH 2026-09-26] Đường đọc tin cố định bằng từ khoá cấu hình của nguồn đã bị BỎ khỏi
+        // khối dữ liệu của Agent Studio: nay máy chủ chạy LƯỢT TRA CHUNG bằng các truy vấn chủ đề chung.
+        // Assert được viết lại CHẶT HƠN (không bỏ assert nào): vẫn phải có lời gọi tới nguồn tìm kiếm, và
+        // câu hỏi gửi đi phải là câu hỏi CHUNG (có tên vùng) — KHÔNG phải từ khoá do model nghĩ ra.
         Http::assertSent(fn ($request) => str_contains($request->url(), 'news.example')
-            && str_contains($request->url(), 'q=thoi+trang'));
+            && str_contains(urldecode($request->url()), 'Việt Nam'));
+
+        // Và từ khoá của model thì KHÔNG được dùng ở lượt này (vai tìm kiếm bỏ trống ⇒ không có công cụ).
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'news.example')
+            && str_contains(urldecode($request->url()), 'áo dạ tweed'));
     }
 
     // ── (C) TRẦN LỜI GỌI ───────────────────────────────────────────────────

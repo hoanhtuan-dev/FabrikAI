@@ -438,7 +438,47 @@ của site không có RSS, máy chủ đọc các liên kết bài trên trang �
 | AI tra internet và ghi sổ | Một model được gán cho vai **"Agent Studio — Tìm kiếm nguồn ngoài"** (Cài đặt → Nhóm công việc). Bỏ trống ⇒ không có công cụ, lượt chạy vẫn xong bằng dữ liệu đã có |
 | Sổ giữ được nguồn | Đã chạy `php artisan migrate` (bảng `web_findings`, migration `2026_09_26_000010`) |
 | Nguồn đã lưu quay về khối DỮ LIỆU | Bạn đang đăng nhập — sổ gắn theo TÀI KHOẢN, không dùng chung giữa các tài khoản |
+| **Bước 2 có số liệu (tín hiệu thị trường)** | **Một NGUỒN TÌM KIẾM** đã bật — URL có `{query}` (hoặc tham số `q=`) và vùng khớp. Xem §11.9: nguồn `rss`/`page` **KHÔNG** còn nuôi bước 2 |
 | Đọc nội dung trang | Kết nối internet của máy chủ (đã đo: chạy được) |
+
+### 11.9 Bước 2/5 đo từ KẾT QUẢ TÌM KIẾM — không còn RSS/trang báo (2026-09-26)
+
+**Bạn thấy gì khác trên màn hình (bước «Tín hiệu»):**
+
+1. Khối số liệu nay tên là **"Tín hiệu đo từ kết quả tìm kiếm (N)"** — nó đếm trên những bài **máy chủ tự
+   tra trên web**, không đếm trên tin của nguồn bạn đã cấu hình.
+2. Dòng giải thích nói đúng việc máy chủ làm: *"Máy chủ tự tra trên web bằng các câu hỏi chung về ngành, rồi
+   đếm từ khoá đang được nhắc tới trong chính kết quả tra được…"*.
+3. Danh sách hướng **chỉ còn hướng CÓ BẰNG CHỨNG THẬT**. Hướng của **bộ có sẵn** bị **tách ra** (vẫn còn
+   nguyên trong dữ liệu, không bị xoá) và màn hình **nói ra số đã tách**.
+4. Nếu lượt này **không tra được hướng nào**, màn hình **nói thẳng**: *"Lượt này chưa tra được hướng nào có
+   bằng chứng thật trên web…"* kèm **lý do** và việc cần làm. Nó **KHÔNG lấp chỗ trống bằng danh mục mẫu**.
+
+**Vì sao đổi:** trước đây khối dữ liệu của bước 2 (và cả máy đo tín hiệu) đọc nguồn `kind=rss`/`kind=page` đã
+khai. Ba hệ quả đo được: số liệu chỉ phản ánh **chuyên mục** bạn khai · **chưa khai nguồn thì không có số nào**
+(bộ mẫu hiện ra và bị đọc như số thị trường) · dòng chữ "đọc tin từ các nguồn đã nối" **mô tả sai** việc máy chủ
+đang làm.
+
+**Cách hoạt động bây giờ — một lượt tra chung nuôi cả bước 2:**
+
+| Thành phần | Việc |
+|---|---|
+| Truy vấn chủ đề chung | 6 câu hỏi về NGÀNH, **có vùng + năm** (ví dụ *"chất liệu vải được ưa chuộng TP.HCM 2026"*). KHÔNG chứa sản phẩm/khách hàng/DNA của bất kỳ shop nào |
+| Ai chạy | Máy chủ chạy bằng nguồn tìm kiếm của bạn (đệm 15 phút theo *nguồn · từ khoá*), khử trùng theo địa chỉ, rồi **ghi vào SỔ nguồn** như mọi lượt tra khác |
+| Khối DỮ LIỆU của bước 2 | **Chỉ** gồm kết quả tra của lượt đó + nguồn **dùng lại từ SỔ** (`/api/design-agent/findings`). Tin của nguồn `rss`/`page` **không vào** khối này nữa |
+| Số đo tín hiệu | Đo **trên chính** kết quả tra đó (không đi mạng lần hai), nên số và danh sách nguồn luôn khớp nhau |
+| Lịch chạy nền | Lệnh `php artisan studio:market-signals` **tự chạy đúng 6 truy vấn chung đó** rồi đo. Không ra tin ⇒ báo **rỗng** và nói thật, **không ghi ảnh chụp rỗng** và **không** quay lại đọc RSS |
+
+**Một luật an toàn dữ liệu đi kèm (không được nới):** ảnh chụp tín hiệu là **dùng chung theo VÙNG** giữa các tài
+khoản, nên phần ĐO chỉ được dùng tin lấy bằng **truy vấn chung**. Sổ nguồn riêng của một tài khoản chỉ được trộn
+vào khối **hiển thị** của chính tài khoản đó, tuyệt đối không được đưa vào máy đo.
+
+**Cần làm gì để bước 2 có số liệu:** khai một **nguồn tìm kiếm** (§11.6 — Tavily chạy được ngay, không cần khoá,
+hoặc Google CSE nếu có khoá). Nguồn `rss`/`page` vẫn hữu ích cho lượt tra của trợ lý và cho màn Cài đặt, nhưng
+**không còn là nguồn số của bước 2**.
+
+> **Điều CHƯA kiểm chứng:** các con số trên đều đọc từ mã và từ bộ test (`tests/Feature/RadarSearchEvidenceTest.php`
+> · `MarketSignalTest` · `MarketAnalysisFromSourcesTest`), KHÔNG phải từ một lượt chạy thật trên production.
 
 > **TRẠNG THÁI — ĐO TRONG CÂY MÃ LÚC VIẾT (2026-09-26):** mục 11.1 mô tả khối đã có trên màn hình:
 > `resources/js/studio/components/agents/AgentRadarStep.vue` (khối "Nguồn AI đã tra được", `MAX_FINDINGS = 6`)

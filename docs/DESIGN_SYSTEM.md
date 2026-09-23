@@ -656,9 +656,45 @@ Sáu ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
 
 | Nhãn hiển thị | Nói với người dùng điều gì | KHÔNG được viết |
 |---|---|---|
-| "Đã ẩn N hướng thuộc bộ có sẵn của FabrikAI — lượt này đã có hướng kèm dữ liệu thật, nên chỉ hiện những hướng có bằng chứng." | Vì sao danh sách hướng NGẮN ĐI so với lần trước; thiếu câu này thì người dùng tưởng hệ thống mất dữ liệu | ẩn im lặng · "demo" · "mock" · "dữ liệu giả" |
+| "Đã **tách** N hướng thuộc bộ có sẵn của FabrikAI ra khỏi danh sách — lượt này chỉ hiện hướng có bằng chứng thật, **không lấp chỗ trống bằng dữ liệu mẫu**." | Vì sao danh sách hướng NGẮN ĐI so với lần trước; thiếu câu này thì người dùng tưởng hệ thống mất dữ liệu | ẩn im lặng · "demo" · "mock" · "dữ liệu giả" |
+| "N bộ có sẵn (đã tách)" (chip lọc) | Con số **đếm được** của phần đã tách — đọc từ khoá `demo_hidden` của máy chủ, không tự đếm ở trình duyệt | "N hướng bị ẩn" (gợi ý mất dữ liệu) |
 
-**Luật sinh ra nhãn này:** đo thật trên production — một lượt radar trả **3 hướng có bằng chứng thật + 8 hướng của bộ có sẵn**; người dùng đọc 11 thẻ mà không có cách nào biết 8 thẻ kia chỉ là danh mục MẪU. Nay máy chủ **chỉ trả hướng thật** khi lượt chạy đã có hướng thật, **đếm số đã ẩn** (khoá `demo_hidden`) và giao diện **nói ra**; hướng mẫu vẫn còn nguyên trong khoá `trends_demo` (không bị xoá).
+**Luật sinh ra nhãn này:** đo thật trên production — một lượt radar trả **3 hướng có bằng chứng thật + 8 hướng của bộ có sẵn**; người dùng đọc 11 thẻ mà không có cách nào biết 8 thẻ kia chỉ là danh mục MẪU. Nay máy chủ **chỉ trả hướng thật**, **đếm số đã tách** (khoá `demo_hidden`) và giao diện **nói ra**; hướng mẫu vẫn còn nguyên trong khoá `trends_demo` (không bị xoá).
+
+> **[ĐỔI CHÍNH SÁCH 2026-09-26 — lần 2]** Bản đầu chỉ tách hướng mẫu **khi lượt chạy đã có hướng thật** ⇒
+> ca tệ nhất vẫn lọt: lượt KHÔNG tra được gì (mạng hỏng · chưa khai nguồn tìm kiếm · hết hạn mức) hiện đủ
+> 8 hướng MẪU và người dùng đọc chúng như số liệu thị trường của lượt này. Nay hướng mẫu **LUÔN** bị tách
+> sang `trends_demo`, nên `trends` **có thể rỗng** — và khi rỗng thì giao diện nói thật (xem §6.9c).
+
+### 6.9c Bảng nhãn — BƯỚC 2 ĐO TỪ KẾT QUẢ TÌM KIẾM (2026-09-26)
+
+Bước **Tín hiệu** (bước 2/5 — `AgentRadarStep.vue`) đổi NGUỒN của mọi con số: từ tin của **nguồn đã khai**
+(`kind=rss` / `kind=page`) sang **kết quả máy chủ tự tra trên web**. Chữ trên màn hình phải theo kịp sự
+thật đó — đây là danh sách nhãn mới, và nó cũng là danh sách **câu cũ bị gỡ**.
+
+| Nhãn hiển thị | Nói với người dùng điều gì | KHÔNG được viết |
+|---|---|---|
+| "Tín hiệu đo từ **kết quả tìm kiếm** (N)" | Khối này đếm trên KẾT QUẢ TRA, không phải trên nguồn đã cấu hình | "Tín hiệu đo từ tin thật" (mơ hồ về nguồn) |
+| "số đo từ kết quả tìm kiếm · không phải AI đoán" | Ai tạo ra con số (thuật toán, không phải AI viết) | tên model · tên nhà cung cấp |
+| "Máy chủ **tự tra trên web** bằng các câu hỏi chung về ngành, rồi đếm từ khoá đang được nhắc tới trong chính kết quả tra được — số liệu THẬT kèm nguồn, không phải dự đoán của AI." | Việc máy chủ ĐANG LÀM, nói bằng ngôn ngữ thường | "Máy chủ đọc tin từ **các nguồn đã nối** rồi đếm từ khoá…" (câu SAI đã gỡ) |
+| "Lượt này **chưa tra được tin nào trên web**, nên chưa có số liệu thị trường nào để hiển thị." | Trạng thái rỗng nói thật ở dòng số liệu đầu màn hình | "Chưa có tin thật" (không nói vì sao) |
+| "**Đo từ kết quả tìm kiếm** = hướng xuất hiện trong những bài máy chủ tự tra trên web…" | Từ điển của khối "Giải thích" | "tin của các nguồn bạn cấu hình" (không còn đúng) |
+| "Chưa có nguồn tìm kiếm" (dòng trong bảng nguồn) | Trạng thái CẤU HÌNH + việc cần làm, thay vì bảng trống | "Không có dữ liệu" |
+| "Lượt này **chưa tra được hướng nào có bằng chứng thật trên web**. FabrikAI không lấp chỗ trống bằng danh mục có sẵn (N hướng mẫu đã được tách ra). Lý do: … Bấm «Tải lại» để tra lại, hoặc kiểm tra nguồn tìm kiếm ở khối «Nguồn dữ liệu cho phân tích»." | Trạng thái RỖNG của danh sách hướng: chuyện gì xảy ra · vì sao · làm gì tiếp | "Chưa đọc được xu hướng nào." (không nói việc cần làm) |
+| "Đang có N tin thật từ M nguồn · cập nhật HH:MM" | Tin của LƯỢT NÀY (kết quả tra + nguồn dùng lại từ sổ) | số của lần chạy khác |
+
+**Ba luật sinh ra các nhãn này (đều đã trả giá bằng một lỗi thật):**
+
+1. **Chữ phải khớp nguồn dữ liệu.** Câu cũ nói "đọc tin từ các nguồn đã nối" trong khi máy chủ đã chuyển
+   sang TRA THEO TỪ KHOÁ — người dùng đi kiểm tra cấu hình nguồn để tìm một thứ không còn được dùng.
+2. **Trạng thái rỗng phải nói thật, không được lấp.** Bỏ hẳn chỗ dựa "màn hình không được rỗng": rỗng là
+   trạng thái CÓ THẬT và câu nói rõ lý do (chưa khai nguồn tìm kiếm · đã tra mà không ra tin) mới giúp
+   người dùng sửa được.
+3. **Con số đếm ở máy chủ, giao diện chỉ đọc lại.** `demo_hidden`, số hướng, số nguồn, số tin đều do máy
+   chủ trả về; trình duyệt KHÔNG tự đếm để khoe một con số khác với con số đang dùng để xếp hạng.
+
+*Khoá bằng máy:* `tests/Feature/RadarSearchEvidenceTest.php` (năm luật của bước 2, gồm cả luật "câu sai cũ
+không quay lại") và `tests/Feature/MarketSignalTest.php` (nhãn khối đo · không chữ kỹ thuật).
 
 ### 6.9 Bảng nhãn — MODAL TRỢ LÝ (2026-09-26)
 
@@ -1498,6 +1534,10 @@ php artisan studio:market-signals        # lấy tin + ĐO tín hiệu + lưu l�
 > hết model là hết phân tích, và mọi con số trên màn hình vẫn là hằng số của bộ xu hướng có sẵn
 > (`momentum` 86/91/88 · `evidence_count` 18.420/24.180…). Trong khi đó model đang chạy **không có tìm
 > kiếm web thật** (§18.2). Nghĩa là: chủ xưởng vẫn đang quyết định bằng **số mẫu**, chỉ khoác thêm mấy cái URL.
+>
+> **[ĐỔI CHÍNH SÁCH 2026-09-26] NGUỒN ĐO ĐÃ ĐỔI** (§20.8): từ tin của nguồn đã khai (`kind=rss`/`page`) sang
+> **kết quả máy chủ tự tra trên web** bằng bộ truy vấn chủ đề chung. Đọc §20.8 trước khi sửa bất cứ dòng nào
+> ở mục này — ba mục 20.2–20.4 mô tả THUẬT TOÁN ĐO (không đổi), còn ĐƯỜNG DỮ LIỆU vào máy đo thì đã đổi.
 
 ### 20.1 Ba tầng, ba câu hỏi khác nhau
 
@@ -1532,10 +1572,13 @@ ngày thì `prune` xoá. Nhờ vậy bảng không phình mà vẫn có lịch s
 
 | Đường | Việc |
 |---|---|
-| `Schedule::command('studio:market-signals')` mỗi 30 phút | Lấy tin + đo + lưu (kể cả khi không ai mở trang) |
-| `php artisan studio:market-signals [--force] [--region=] [--prune]` | Chạy tay / kiểm tra |
-| `GET /api/design-agent/sources?force=1` (nút **Cập nhật tin**) | Lấy tin + đo lại ngay |
+| `Schedule::command('studio:market-signals')` mỗi 30 phút | **Tự chạy 6 truy vấn chủ đề chung** + đo + lưu (kể cả khi không ai mở trang) |
+| `php artisan studio:market-signals [--force] [--region=] [--prune]` | Chạy tay / kiểm tra (`--force` = ghi một lần đo mới) |
+| Lượt radar của Agent Studio | Đo trên CHÍNH kết quả tra của bước 2 (không đi mạng lần hai) |
 | Lần mở Agent Studio đầu tiên | Tự đo nếu chưa có bản nào (nơi triển khai chưa bật cron vẫn có dữ liệu) |
+
+> `GET /api/design-agent/sources?force=1` (nút **Cập nhật tin**) vẫn đọc nguồn đã khai — nhưng đó là màn
+> **Cài đặt nguồn**, KHÔNG còn nuôi khối dữ liệu của bước 2 (xem §20.8).
 
 ### 20.5 Nói thật ở bốn chỗ
 
@@ -1577,6 +1620,45 @@ chết không làm hỏng lượt · 5 trạng thái nguồn · bản lấy trư
 ngày kiểu Việt Nam · lọc từ khoá theo ranh giới từ · chống trùng theo tiêu đề · giao diện có khối tín hiệu và
 KHÔNG lộ chữ kỹ thuật · nhãn/aria cho khối mới.
 
+
+### 20.8 ĐỔI CHÍNH SÁCH 2026-09-26 — ĐO TỪ KẾT QUẢ TÌM KIẾM, KHÔNG TỪ RSS/TRANG BÁO
+
+Yêu cầu của chủ dự án: *"làm cho agent studio: Bước 2/5 · Tín hiệu sử dụng dữ liệu tìm kiếm thay vì rss|pages,
+tránh tự bịa hoặc dữ liệu [mẫu]."*
+
+**VÌ SAO ĐỔI — hiện trạng đã đo trước khi sửa:**
+
+| Hiện trạng | Hệ quả đo được |
+|---|---|
+| Khối dữ liệu của bước 2 lấy từ `WebSourceService::evidence()` (`kind=rss`/`kind=page`) | Số liệu chỉ phản ánh CHUYÊN MỤC mà chủ shop đã khai, không phải thứ đang được nói trên web |
+| `MarketSignalService::capture()` đo từ chính đường đó | Mọi con số của khối "Tín hiệu" là số đếm trên RSS/trang báo |
+| Không có hướng nào có bằng chứng thật | Danh mục MẪU vẫn hiện ở bước 2 và bị đọc như số liệu thị trường |
+| Câu trên giao diện | "Máy chủ đọc tin từ các nguồn đã nối…" — SAI việc máy chủ đang làm |
+
+**LUẬT MỚI (sáu điểm, mỗi điểm có test riêng):**
+
+1. **MỘT lượt tra chung nuôi cả bước 2** — `radar()` chạy `collectAiEvidence()` với **truy vấn chủ đề chung**
+   (`MarketSignalService::topicQueries()`: 6 câu, **có vùng + năm**, KHÔNG chứa dữ liệu riêng của shop). Dùng
+   LẠI đường có sẵn (chạy search · khử trùng theo URL · ghi SỔ nguồn) thay vì viết đường thứ hai.
+2. **Khối dữ liệu của bước 2 = CHỈ kết quả tìm kiếm**: (a) kết quả lượt tra chung + (b) nguồn DÙNG LẠI từ sổ
+   `WebFindingService`. `mergeFindings()` **bỏ hẳn** nhánh nhận `$feed`; tin của nguồn `page`/`rss` không
+   vào khối này nữa. Bảng `sources` của radar cũng nói về **nguồn tìm kiếm**, không phải nguồn đã khai.
+3. **Số đo đo trên KẾT QUẢ TÌM KIẾM**: `capture(string $region, bool $force = false, ?array $items = null)`.
+   Có `$items` (đường radar) ⇒ đo thẳng trên đó. Không có (đường cron) ⇒ **tự chạy đúng bộ truy vấn chung**,
+   tuyệt đối không quay lại `evidence()`.
+4. **AN TOÀN DỮ LIỆU (không được nới)**: `market_signals` là ảnh chụp **dùng chung theo VÙNG** ⇒ phần ĐO chỉ
+   được dùng tin lấy bằng **truy vấn chung**; sổ nguồn riêng của một tài khoản **KHÔNG** được trộn vào máy đo.
+   (Dự án đã dính đúng kiểu rò rỉ này ở bộ đệm radar — xem `mergeFindings`.)
+5. **Không dữ liệu mẫu ở bước 2**: `trends` CHỈ chứa hướng `evidence_mode === 'live'`; hướng của bộ có sẵn
+   **LUÔN** bị tách sang `trends_demo` và đếm vào `demo_hidden` (không xoá dữ liệu). Không có hướng thật ⇒
+   giao diện **nói thật** là lượt này chưa tra được (xem §6.9c), KHÔNG lấp bằng bộ có sẵn.
+6. **Không ra tin ⇒ báo cáo RỖNG + câu nói thật** ("Chưa tra được tin nào để đo tín hiệu thị trường."), kèm
+   lý do cụ thể: chưa khai nguồn tìm kiếm / đã tra mà không ra tin. KHÔNG ghi ảnh chụp rỗng vào lịch sử.
+
+**Khoá bằng máy:** `tests/Feature/RadarSearchEvidenceTest.php` (6 test — năm luật (a)–(e) của yêu cầu, trong
+đó có luật "nguồn `page`/`rss` có tin SỐNG cũng KHÔNG được vào khối và KHÔNG được đếm") ·
+`MarketSignalTest` (các bài ĐO nay chạy qua nguồn TÌM KIẾM) · `MarketAnalysisFromSourcesTest` ·
+`WebFindingLoopTest` · `SchedulerHonestyTest` · `ToolSearchTest` · `WebSourceTest`.
 
 ---
 

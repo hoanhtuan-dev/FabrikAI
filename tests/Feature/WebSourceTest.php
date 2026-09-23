@@ -164,10 +164,16 @@ class WebSourceTest extends TestCase
     }
     // ── (B) TIN THẬT ĐI VÀO PROMPT ─────────────────────────────────────────
 
-    /** Bằng chứng mạnh nhất: tiêu đề + URL của tin ngoài phải nằm TRONG payload gửi model. */
+    /**
+     * Bằng chứng mạnh nhất: tiêu đề + URL của tin ngoài phải nằm TRONG payload gửi model.
+     *
+     * [ĐỔI CHÍNH SÁCH 2026-09-26] Nguồn phải là nguồn TÌM KIẾM (URL có chỗ điền từ khoá): khối DỮ LIỆU của
+     * Agent Studio nay lấy từ KẾT QUẢ TÌM KIẾM, không đọc nguồn kind=rss/page đã khai nữa. Phần kiểm thì
+     * y nguyên — tiêu đề + URL thật vẫn phải tới được payload gửi model.
+     */
     public function test_external_news_reaches_the_model_prompt(): void
     {
-        $this->source();
+        $this->source(['url' => 'https://feed.example/rss?q={query}']);
 
         // Nhóm 'prompt' cần một model dùng được thì agent mới gọi AI.
         \App\Models\StudioProvider::create([
@@ -227,10 +233,15 @@ class WebSourceTest extends TestCase
         $this->assertSame(0, $radar['external_evidence']['count']);
     }
 
-    /** Có nguồn thật ⇒ radar nói `live` và trả về đúng tin đã dùng (để người dùng tự kiểm chứng). */
+    /**
+     * Có nguồn TÌM KIẾM thật ⇒ radar nói `live` và trả về đúng tin đã dùng (để người dùng tự kiểm chứng).
+     *
+     * [ĐỔI CHÍNH SÁCH 2026-09-26] Đổi nguồn khai RSS cố định sang nguồn TÌM KIẾM — đúng nguồn mà bước 2
+     * dùng từ nay. Assert giữ nguyên (mode=live · đúng 1 tin · đúng URL).
+     */
     public function test_radar_reports_live_mode_with_the_real_items(): void
     {
-        $this->source();
+        $this->source(['url' => 'https://feed.example/rss?q={query}']);
         Http::fake(['feed.example/*' => Http::response($this->rss('Tin thật', 'https://e/that'), 200)]);
 
         $radar = app(DesignAgentService::class)->radar($this->customer(), 'all', false);

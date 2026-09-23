@@ -141,10 +141,16 @@ class WebFindingLoopTest extends TestCase
                     ? Http::response($this->toolCall('web_search', ['query' => 'áo dạ tweed']), 200)
                     : Http::response($this->answer($this->briefJson()), 200);
             },
-            'news.example/*' => Http::response(
-                $this->rss('Áo dạ tweed lên ngôi mùa thu', 'https://bao.example/tweed', 'Tweed là chất liệu được nhắc nhiều nhất tháng này.'),
-                200
-            ),
+            // Nguồn TRẢ LỜI THEO TỪ KHOÁ: chỉ câu hỏi của model là ra tin, các câu hỏi CHUNG của lượt tra
+            // nền trả về rỗng. Vì sao phải phân biệt: [ĐỔI CHÍNH SÁCH 2026-09-26] đường brief nay LUÔN chạy
+            // một lượt tra chung trước lượt model, nên nếu nguồn trả cùng một bài cho MỌI từ khoá thì bài đó
+            // đã nằm trong sổ từ trước đó và phép đếm "ghi mới" của lượt model sẽ luôn ra 0 — test sẽ đỏ vì
+            // cách giả lập, không phải vì tính năng. Phép thử "tra thật thì ghi vào sổ" giữ nguyên.
+            'news.example/*' => function ($request) {
+                return str_contains(urldecode($request->url()), 'áo dạ tweed')
+                    ? Http::response($this->rss('Áo dạ tweed lên ngôi mùa thu', 'https://bao.example/tweed', 'Tweed là chất liệu được nhắc nhiều nhất tháng này.'), 200)
+                    : Http::response($this->emptyRss(), 200);
+            },
         ]);
 
         $customer = $this->customer();
@@ -242,14 +248,16 @@ class WebFindingLoopTest extends TestCase
     }
 
     /**
-     * THANG ƯU TIÊN CỦA KHỐI DỮ LIỆU: **KẾT QUẢ TÌM KIẾM trước → nguồn ĐÃ KHAI (trang/RSS) sau**.
+     * NGUỒN ĐÃ KHAI (trang/RSS) KHÔNG ĐƯỢC VÀO KHỐI DỮ LIỆU CỦA BƯỚC 2 — chỉ kết quả TÌM KIẾM.
      *
-     * [ĐỔI CHÍNH SÁCH 2026-09-26 — lần thứ BA] Bài này từng khoá điều NGƯỢC LẠI ("tin vừa lấy đứng đầu"),
-     * và trước đó nữa là "nguồn đã lưu đứng đầu". Yêu cầu mới nói rõ THANG: web search trước, trang/RSS là
-     * DỰ PHÒNG. Thứ tự đúng là thứ tự của THANG TÌM KIẾM, không phải của độ tươi hay độ tin — nguồn đã khai
-     * chỉ là lưới an toàn khi không có kết quả tìm kiếm nào.
+     * [ĐỔI CHÍNH SÁCH 2026-09-26 — lần thứ TƯ và cũng là lần cuối của câu hỏi "cái gì đứng trước"]
+     * Bài này từng khoá ba thang khác nhau: "nguồn đã lưu đứng đầu", rồi "tin vừa lấy đứng đầu", rồi
+     * "kết quả tìm kiếm trước — nguồn khai sau". Cả ba đều tranh luận về THỨ TỰ của một danh sách mà chủ dự
+     * án đã nói là không được tồn tại: bước 2 phải dùng DỮ LIỆU TÌM KIẾM, không phải RSS/trang báo.
+     * Nay khoá luật mạnh hơn hẳn: nguồn kind=rss/page có tin SỐNG cũng KHÔNG xuất hiện trong khối này,
+     * còn nguồn trong SỔ (đã lưu) vẫn phải đứng ĐẦU — assert cũ không bị bỏ, chỉ đổi sang luật mới.
      */
-    public function test_search_results_come_before_configured_page_and_rss_sources(): void
+    public function test_configured_page_or_rss_sources_never_enter_the_data_block(): void
     {
         // Feed sống: một nguồn RSS bình thường (không phải nguồn tìm kiếm).
         WebSource::create([
@@ -272,15 +280,17 @@ class WebFindingLoopTest extends TestCase
 
         $items = app(DesignAgentService::class)->radar($customer, 'all', false)['external_evidence']['items'];
 
-        $this->assertGreaterThanOrEqual(2, count($items), 'Phải có CẢ kết quả tìm kiếm lẫn nguồn đã khai.');
-        // (1) Kết quả AI TỰ TRA đứng TRƯỚC — dù nó đến từ sổ và đã cũ hơn tin vừa lấy.
+        // (1) Nguồn trong SỔ (người dùng ĐÃ LƯU) là kết quả TÌM KIẾM ⇒ vẫn đứng đầu khối dữ liệu.
         $this->assertSame('https://bao.example/da-luu', $items[0]['url'],
-            'Kết quả TÌM KIẾM phải đứng ĐẦU khối DỮ LIỆU (thang: tìm kiếm trước, nguồn khai sau).');
+            'Kết quả TÌM KIẾM đã lưu phải đứng ĐẦU khối DỮ LIỆU.');
         $this->assertSame('ai_search', $items[0]['found_by'] ?? null);
         $this->assertTrue($items[0]['saved'], 'Nguồn người dùng đã lưu vẫn phải giữ nhãn.');
-        // (2) Nguồn ĐÃ KHAI (trang chuyên mục / RSS) là DỰ PHÒNG ⇒ đứng sau.
-        $this->assertSame('https://bao.example/tin-moi', $items[1]['url'],
-            'Nguồn đã khai chỉ là dự phòng ⇒ đứng sau kết quả tìm kiếm.');
+        // (2) Tin của NGUỒN ĐÃ KHAI (trang chuyên mục / RSS) KHÔNG được có mặt — kể cả khi nguồn đó SỐNG và
+        // vừa trả về tin mới. Đây là điều chủ dự án yêu cầu: bước 2 dùng kết quả TÌM KIẾM, không dùng RSS.
+        $urls = array_column($items, 'url');
+        $this->assertNotContains('https://bao.example/tin-moi', $urls,
+            'Nguồn kind=rss/page không được vào khối dữ liệu của bước 2.');
+        $this->assertSame(['https://bao.example/da-luu'], $urls);
     }
 
     // ── (4)(5) ĐỌC TRANG: chỉ đọc địa chỉ có trong kết quả tìm kiếm ──────────

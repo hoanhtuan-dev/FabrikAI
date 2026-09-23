@@ -204,14 +204,36 @@ class DesignAgentService
         $internal = $this->internalBrandSignal($user);
         $candidates = $this->aiCandidates();
 
-        // NGUỒN NGOÀI: máy chủ tự đi lấy tin thật (RSS/JSON) cho vùng này. Không có nguồn nào / nguồn chết
-        // ⇒ `mode=empty` và mọi câu nói về dữ liệu thị trường vẫn phải là "dữ liệu mẫu".
-        $evidence = $this->externalEvidence($region, $user);
+        // ── MỘT LƯỢT TRA CHUNG NUÔI CẢ BƯỚC 2 (ĐỔI CHÍNH SÁCH 2026-09-26) ───────────────────────────────
+        //
+        // VÌ SAO ĐỔI: trước đây khối DỮ LIỆU của bước 2 lấy từ NGUỒN ĐÃ KHAI (kind=rss/page) qua
+        // WebSourceService::evidence(). Ba hệ quả đo được trên production, đúng ba điều chủ dự án phàn nàn:
+        //   · nguồn khai sẵn chỉ có tin của vài chuyên mục ⇒ "tín hiệu thị trường" là ảnh chụp của chuyên
+        //     mục, không phải thứ đang được nói trên web;
+        //   · chưa khai nguồn (hoặc nguồn chết) ⇒ KHÔNG có gì để đo, và danh mục MẪU của sản phẩm hiện ra ở
+        //     bước 2 như thể là dữ liệu thị trường;
+        //   · câu trên giao diện ("đọc tin từ các nguồn đã nối") mô tả sai việc máy chủ đang làm.
+        //
+        // NAY: MỘT lượt tra chung bằng các TRUY VẤN CHỦ ĐỀ CHUNG (MarketSignalService::topicQueries — có
+        // vùng + mốc thời gian, KHÔNG chứa dữ liệu riêng của shop) nuôi CẢ HAI: khối DỮ LIỆU hiển thị và
+        // máy đo tín hiệu. Dùng lại collectAiEvidence (chạy search + khử trùng theo URL + ghi SỔ NGUỒN) chứ
+        // KHÔNG viết đường thứ hai — hai đường là hai chỗ để lệch nhau.
+        $sharedQueries = MarketSignalService::topicQueries($region);
+        $sharedSearch = $this->collectAiEvidence($sharedQueries, $region, $user);
 
-        // TÍN HIỆU THỊ TRƯỜNG: đo các tin VỪA LẤY bằng thuật toán (không AI) rồi gắn vào danh mục xu hướng.
-        // Đây là phần trả lời đúng câu hỏi "model không có tìm kiếm web thì lấy đâu ra dữ liệu": từ khoá nào
-        // đang được nhắc tới, bao nhiêu tin, tăng hay giảm — đo được cả khi KHÔNG có model nào chạy.
-        $market = $this->marketReport($region);
+        // TÍN HIỆU THỊ TRƯỜNG: đo CHÍNH kết quả của lượt tra chung ở trên bằng thuật toán (không AI).
+        //
+        // AN TOÀN DỮ LIỆU — LUẬT BẮT BUỘC, KHÔNG ĐƯỢC NỚI: chỉ truyền $sharedSearch['items'] (kết quả của
+        // truy vấn CHUNG). TUYỆT ĐỐI không truyền khối dữ liệu đã trộn sổ nguồn của tài khoản
+        // ($evidence['items'] bên dưới) vào đây: bảng market_signals là ảnh chụp DÙNG CHUNG giữa các tài
+        // khoản theo vùng, nên nguồn riêng của một shop lọt vào là RÒ RỈ sang tài khoản khác — dự án đã
+        // dính đúng kiểu lỗi này một lần (bộ đệm radar dùng chung, xem mergeFindings).
+        $market = $this->marketReport($region, $sharedSearch['items']);
+
+        // KHỐI DỮ LIỆU của bước 2: CHỈ kết quả tìm kiếm (lượt tra chung ở trên + nguồn dùng lại từ SỔ).
+        // Tin của nguồn kind=page/rss KHÔNG vào khối này nữa — xem mergeFindings().
+        $evidence = $this->externalEvidence($region, $user, $sharedSearch);
+
         $trends = $this->withMarketSignals($this->trendCatalog($region), $market);
 
         // VAI TÌM KIẾM: nhóm riêng (nếu khai) quyết định model nào chạy lượt này VÀ cách tìm kiếm —
@@ -226,28 +248,19 @@ class DesignAgentService
         // nên một số hướng có thể VỪA được gắn bằng chứng thật (xem bước trong radarDirections).
         [$directions, $model, $trends] = $this->radarDirections($trends, $ruleDirections, $candidates, $region, $useAi, $evidence, $search, $market, $user);
 
-        // DỮ LIỆU MẪU KHÔNG ĐƯỢC ĐỨNG NGANG HÀNG VỚI DỮ LIỆU THẬT (yêu cầu 2026-09-26: "clean dữ liệu mẫu").
-        // Đo thật trên production: một lượt radar ra **3 hướng có bằng chứng THẬT + 8 hướng của bộ có sẵn** —
-        // người dùng đọc 11 thẻ và không có cách nào biết 8 thẻ kia chỉ là danh mục MẪU của sản phẩm.
-        // Luật: CÓ hướng thật ⇒ ẨN hướng mẫu và NÓI RA đã ẩn bao nhiêu; KHÔNG có hướng thật ⇒ giữ (màn hình
-        // không được rỗng) nhưng source_mode vẫn là demo để giao diện nói thật.
-        $demoHidden = 0;
-        $hasLiveTrend = false;
-        foreach ($trends as $trend) {
-            if (($trend['evidence_mode'] ?? '') === 'live') {
-                $hasLiveTrend = true;
-                break;
-            }
-        }
-        // KHÔNG VỨT ĐI, CHỈ TÁCH RA: danh mục mẫu vẫn còn nguyên trong khoá riêng `trends_demo` — để giao diện
-        // có thể mở một mục "bộ có sẵn" khi người dùng muốn xem, và để test/đo lường không mất dữ liệu.
-        $demoTrends = [];
-        if ($hasLiveTrend) {
-            $before = count($trends);
-            $demoTrends = array_values(array_filter($trends, fn (array $t) => ($t['evidence_mode'] ?? '') === 'demo'));
-            $trends = array_values(array_filter($trends, fn (array $t) => ($t['evidence_mode'] ?? '') !== 'demo'));
-            $demoHidden = $before - count($trends);
-        }
+        // ── KHÔNG DỮ LIỆU MẪU Ở BƯỚC 2 (ĐỔI CHÍNH SÁCH 2026-09-26) ──────────────────────────────────────
+        //
+        // VÌ SAO ĐỔI (đo được trước khi sửa): luật cũ chỉ ẩn hướng mẫu KHI lượt chạy đã có hướng thật. Hệ quả
+        // là đúng ca tệ nhất — lượt KHÔNG tra được gì (mạng hỏng, chưa khai nguồn tìm kiếm, hết hạn mức) lại
+        // hiện đủ 8 hướng của BỘ CÓ SẴN, và người dùng đọc chúng như số liệu thị trường của lượt này.
+        //
+        // LUẬT MỚI: trends CHỈ chứa hướng có bằng chứng THẬT (evidence_mode=live). Hướng thuộc bộ có sẵn
+        // LUÔN bị tách sang khoá riêng trends_demo và đếm vào demo_hidden — KHÔNG xoá dữ liệu (giao diện và
+        // test vẫn tra được), nhưng cũng KHÔNG lấp chỗ trống bằng số mẫu. Không có hướng thật thì giao diện
+        // NÓI THẬT là lượt này chưa tra được hướng nào.
+        $demoTrends = array_values(array_filter($trends, fn (array $t) => ($t['evidence_mode'] ?? 'demo') !== 'live'));
+        $trends = array_values(array_filter($trends, fn (array $t) => ($t['evidence_mode'] ?? 'demo') === 'live'));
+        $demoHidden = count($demoTrends);
 
         return [
             'agent' => 'TrendRadar',
@@ -271,6 +284,11 @@ class DesignAgentService
                 // nào do AI tự tra — không gộp chung với "tin máy chủ vừa lấy".
                 'findings_count' => (int) ($evidence['findings_count'] ?? 0),
                 'findings_saved' => (int) ($evidence['findings_saved'] ?? 0),
+                // LƯỢT TRA CHUNG (2026-09-26): tra bằng những câu hỏi nào, và nếu không ra tin thì vì sao.
+                // Thiếu hai khoá này thì giao diện chỉ có con số 0 mà không phân biệt được "chưa khai nguồn
+                // tìm kiếm" với "đã tra mà không ra tin" — hai việc cần hai cách xử lý khác nhau.
+                'queries' => array_values((array) ($evidence['queries'] ?? [])),
+                'search_error' => $evidence['search_error'] ?? null,
             ],
             'generated_at' => now()->toISOString(),
             'region' => $region,
@@ -287,8 +305,11 @@ class DesignAgentService
                 // Catalog mẫu hiện có 8 hướng; connector/CV/POS-ERP chưa chạy nên không phóng đại sản lượng.
                 'tracked_attributes' => 5,
                 'images_analyzed_monthly' => 0,
+                // Số hướng đang theo dõi = hướng CÓ BẰNG CHỨNG THẬT (hướng của bộ có sẵn nằm ở trends_demo,
+                // KHÔNG được cộng vào đây — đó là chỗ dễ thổi phồng con số nhất).
                 'active_trends' => count($trends),
                 'market_signals' => (int) ($market['signals_total'] ?? 0),
+                // Nguồn TÌM KIẾM trả lời được trong lượt này (sourcesReport nay là báo cáo của lượt tra).
                 'live_sources' => count(array_filter((array) ($evidence['sources'] ?? []), fn (array $row) => ($row['ok'] ?? false))),
                 'internal_products' => $internal['product_count'],
                 'internal_generations' => $internal['generation_count'],
@@ -300,17 +321,17 @@ class DesignAgentService
                 'silhouette_detection' => 'Trường dáng đã có; pipeline nhận diện ảnh chưa bật.',
                 'fabric_recognition' => 'Trường chất liệu đã có; pipeline nhận diện ảnh chưa bật.',
                 'price_band_analysis' => ($market['prices']['count'] ?? 0) > 0
-                    ? 'Giá trong tin thị trường được đọc tự động (không dùng AI) và hiển thị ở khối tín hiệu.'
-                    : 'Dải giá đề xuất theo brief; chưa đọc được giá nào trong tin thị trường.',
+                    ? 'Giá ghi trong kết quả tra được đọc tự động (không dùng AI) và hiển thị ở khối tín hiệu.'
+                    : 'Dải giá đề xuất theo brief; chưa đọc được giá nào trong kết quả tra được.',
                 'trend_lifecycle' => ($market['mode'] ?? 'empty') === 'live'
-                    ? 'Vòng đời của hướng CÓ TIN THẬT được suy từ mức tăng/giảm giữa các lần đo; hướng còn lại vẫn là nhãn của bộ có sẵn.'
-                    : 'Nhãn của bộ xu hướng có sẵn: emerging → peak → declining.',
-                // Câu này HIỂN THỊ cho người dùng ⇒ không nêu provider/model/nhóm công việc.
+                    ? 'Vòng đời của hướng CÓ TIN THẬT được suy từ mức tăng/giảm giữa các lần đo; hướng nào chưa có bằng chứng thì không hiện ở lượt này.'
+                    : 'Nhãn của bộ xu hướng có sẵn — lượt này chưa tra được hướng nào có bằng chứng.',
+                // Câu này HIỂN THỊ cho người dùng ⇒ không nêu tên nhà cung cấp / tên máy / nhóm công việc.
                 'ai_reasoning' => $model['mode'] === 'ai'
-                    ? 'Phần định hướng do AI viết trên đúng dữ liệu ở trên (tin thật + số liệu của bạn); các số liệu thì không do AI tạo.'
+                    ? 'Phần định hướng do AI viết trên đúng dữ liệu ở trên (kết quả tra trên web + số liệu của bạn); các số liệu thì không do AI tạo.'
                     : 'Phần định hướng được dựng tự động từ dữ liệu ở trên' . (($market['mode'] ?? 'empty') === 'live'
-                        ? ' (tin thật máy chủ vừa lấy, đo bằng thuật toán — không cần AI).'
-                        : ' (bộ có sẵn, vì chưa có tin thật nào; AI chưa tham gia bước này).'),
+                        ? ' (tin máy chủ tra được trên web, đo bằng thuật toán — không cần AI).'
+                        : ' (chưa tra được tin nào trên web ở lượt này; AI chưa tham gia bước này).'),
             ],
         ];
     }
@@ -642,6 +663,10 @@ class DesignAgentService
                 // nào do AI tự tra — không gộp chung với "tin máy chủ vừa lấy".
                 'findings_count' => (int) ($evidence['findings_count'] ?? 0),
                 'findings_saved' => (int) ($evidence['findings_saved'] ?? 0),
+                // LƯỢT TRA CHUNG của đường brief cũng là kết quả TÌM KIẾM (xem externalEvidence) — trả về
+                // câu hỏi đã tra để màn hình nói đúng nguồn của khối dữ liệu này.
+                'queries' => array_values((array) ($evidence['queries'] ?? [])),
+                'search_error' => $evidence['search_error'] ?? null,
             ],
             // Kết quả vai ĐỌC ẢNH — giao diện hiển thị để người dùng biết AI có nhìn ảnh mẫu hay không.
             'reference_style' => $referenceStyle,
@@ -935,8 +960,13 @@ class DesignAgentService
      *
      * Trước đây đường này trả về một danh sách TĨNH 5 dòng (4 dòng "Dữ liệu mẫu" + 1 dòng "Dữ liệu nội bộ")
      * bất kể thực tế: khi đã nối nguồn thật, người dùng vẫn đọc thấy "nguồn ngoài là dữ liệu mẫu" — vừa sai
-     * vừa làm họ mất tin vào phần phân tích. Nay: nguồn THẬT đang chạy lên trước (kèm số tin), và các KÊNH
-     * chưa kết nối được gộp thành MỘT dòng nói thẳng là chưa có.
+     * vừa làm họ mất tin vào phần phân tích.
+     *
+     * [ĐỔI CHÍNH SÁCH 2026-09-26] Bảng này nay nói về NGUỒN TÌM KIẾM (nguồn nào trả lời lượt tra của bước 2),
+     * KHÔNG phải về nguồn đã khai trong Cài đặt. VÌ SAO: khối dữ liệu của bước 2 đã đổi sang kết quả tìm
+     * kiếm (xem externalEvidence), nên giữ bảng cũ ở đây là để người dùng đọc một danh sách nguồn KHÔNG
+     * tham gia vào con số nào của lượt này — dạng sai lệch tệ nhất: sai mà vẫn trông rất cụ thể.
+     * Không có nguồn tìm kiếm nào được bật ⇒ thêm MỘT dòng nói thẳng việc cần làm, không để bảng trống.
      *
      * @param  array<string, mixed>  $evidence
      * @return list<array<string, mixed>>
@@ -945,23 +975,41 @@ class DesignAgentService
     {
         $rows = [];
         foreach ($evidence['sources'] ?? [] as $source) {
-            // Trạng thái lấy từ CHÍNH kết quả đo của trình kết nối (5 mức: đang dùng · bị lọc hết ·
-            // nguồn không có tin · đang dùng bản cũ · bỏ qua vì khác vùng). Chỉ đọc ok/không-ok thì
-            // nguồn của vùng khác bị hiện thành "Không lấy được" — người dùng đi sửa cấu hình không lỗi.
+            // Trạng thái lấy từ CHÍNH kết quả của đường tìm kiếm (đang dùng · bị lọc hết · nguồn không có
+            // tin · đang dùng bản cũ · bỏ qua vì khác vùng). Chỉ đọc ok/không-ok thì nguồn của vùng khác bị
+            // hiện thành "Không lấy được" — người dùng đi sửa cấu hình không lỗi.
             $state = (string) ($source['state'] ?? (($source['ok'] ?? false) ? 'live' : 'error'));
+            $kind = (string) ($source['kind'] ?? '');
             $rows[] = [
                 'id' => $source['slug'],
                 'name' => $source['name'],
                 'channels' => parse_url((string) $source['url'], PHP_URL_HOST) ?: $source['url'],
-                'method' => $source['kind'] === 'json'
-                    ? 'Nguồn dữ liệu JSON theo cấu hình'
-                    : 'Tin RSS/Atom',
+                // Cách nguồn này tham gia: nó được HỎI bằng từ khoá (xem WebSourceService::search), không
+                // phải đọc một chuyên mục cố định — nên câu mô tả phải nói về việc TÌM THEO TỪ KHOÁ.
+                'method' => in_array($kind, ['search', 'tavily', 'json'], true)
+                    ? 'Tìm theo từ khoá'
+                    : 'Tìm theo từ khoá trên trang nguồn',
                 // Chu kỳ THẬT — đọc từ NHỊP TIM của lịch chạy nền, không phải câu viết cứng: host này từng
                 // không có cron nào gọi schedule:run mà giao diện vẫn ghi "tự động mỗi 30 phút".
                 'frequency' => studio_scheduler_alive() ? 'Tự động mỗi 30 phút' : 'Khi mở màn hình',
                 'status' => $state,
                 'status_label' => (string) ($source['state_label'] ?? (($source['ok'] ?? false) ? 'Đang dùng' : 'Không lấy được')),
                 'count' => (int) ($source['count'] ?? 0),
+            ];
+        }
+
+        if ($rows === []) {
+            // CHƯA KHAI NGUỒN TÌM KIẾM = một trạng thái CẤU HÌNH, phải nói ra. Đây chính là ca mà bản cũ
+            // im lặng: bảng chỉ có dòng "Kênh chưa kết nối" nên người dùng tưởng máy chủ đang đọc tin.
+            $rows[] = [
+                'id' => 'no_search_source',
+                'name' => 'Chưa có nguồn tìm kiếm',
+                'channels' => '—',
+                'method' => 'Cần khai một nguồn tìm được theo từ khoá',
+                'frequency' => '—',
+                'status' => 'not_connected',
+                'status_label' => 'Chưa cấu hình',
+                'count' => 0,
             ];
         }
 
@@ -981,30 +1029,47 @@ class DesignAgentService
     }
 
     /**
-     * NGUỒN NGOÀI cho một lượt chạy — máy chủ tự đi lấy (RSS/JSON), lọc, đệm.
+     * KHỐI DỮ LIỆU của một lượt chạy — CHỈ KẾT QUẢ TÌM KIẾM (ĐỔI CHÍNH SÁCH 2026-09-26).
      *
-     * Không có trình kết nối (test đơn vị thuần PHPUnit) hoặc chưa khai nguồn nào ⇒ trả shape RỖNG nhưng
-     * ĐỦ KHOÁ, để nơi gọi không phải rẽ nhánh và prompt luôn nhận được `mode=empty` một cách tường minh.
+     * [ĐỔI CHÍNH SÁCH 2026-09-26] Bản cũ lấy tin từ WebSourceService::evidence() — tức là từ NGUỒN ĐÃ KHAI
+     * (kind=rss/page). Chủ dự án yêu cầu bước 2 dùng DỮ LIỆU TÌM KIẾM thay vì RSS/trang báo, nên nay khối
+     * này chỉ gồm HAI thứ, cả hai đều là kết quả tìm kiếm:
+     *   (a) kết quả của LƯỢT TRA CHUNG vừa chạy ($search — truy vấn chủ đề chung, xem MarketSignalService
+     *       ::topicQueries). Đường radar TRUYỀN SẴN lượt tra đó vào để bước 2 chỉ đi mạng MỘT lần; đường
+     *       brief không truyền thì hàm này tự chạy đúng bộ truy vấn ấy;
+     *   (b) nguồn DÙNG LẠI từ SỔ nguồn của tài khoản (WebFindingService — cũng là kết quả tìm kiếm của các
+     *       lượt trước, xem mergeFindings).
+     * Tin của nguồn kind=page/rss KHÔNG vào khối này nữa.
      *
-     * @return array{mode:string, fetched_at:string, fingerprint:string, items:list<array>, sources:list<array>}
+     * Không có trình kết nối (test đơn vị thuần PHPUnit) hoặc chưa khai nguồn tìm kiếm ⇒ trả shape RỖNG
+     * nhưng ĐỦ KHOÁ, để nơi gọi không phải rẽ nhánh và prompt luôn nhận được `mode=empty` tường minh.
+     *
+     * @param  array<string, mixed>  $search  kết quả collectAiEvidence của lượt tra chung (rỗng = tự chạy)
+     * @return array<string, mixed>
      */
-    private function externalEvidence(string $region, ?User $user = null): array
+    private function externalEvidence(string $region, ?User $user = null, array $search = []): array
     {
-        if ($this->sources === null) {
-            return $this->mergeFindings(['mode' => 'empty', 'fetched_at' => now()->toISOString(), 'fingerprint' => '', 'items' => [], 'sources' => []], $region, $user);
+        if ($search === []) {
+            // Đường KHÔNG truyền sẵn (brief): tự chạy ĐÚNG bộ truy vấn chủ đề chung, không dùng bộ truy vấn
+            // riêng nào khác — hai bộ truy vấn là hai khối dữ liệu khác nhau cho cùng một màn hình.
+            $search = $this->collectAiEvidence(MarketSignalService::topicQueries($region), $region, $user);
         }
 
-        try {
-            return $this->mergeFindings($this->sources->evidence($region), $region, $user);
-        } catch (\Throwable $e) {
-            // Nguồn ngoài là PHẦN THÊM: hỏng nó không được làm hỏng phân tích lõi.
-            try {
-                logger()->warning('WebSource: không lấy được nguồn ngoài', ['error' => $e->getMessage()]);
-            } catch (\Throwable) {
-            }
+        $items = array_values((array) ($search['items'] ?? []));
 
-            return $this->mergeFindings(['mode' => 'empty', 'fetched_at' => now()->toISOString(), 'fingerprint' => '', 'items' => [], 'sources' => []], $region, $user);
-        }
+        return $this->mergeFindings([
+            // mode=live CHỈ khi có ít nhất một tin thật — nơi gọi dùng nó để nói thật với người dùng.
+            'mode' => $items !== [] ? 'live' : 'empty',
+            'fetched_at' => now()->toISOString(),
+            // VÂN TAY của lượt tra: chỉ tính trên kết quả tìm kiếm (xem chú thích ở mergeFindings về lý do
+            // KHÔNG đưa nguồn trong SỔ vào đây).
+            'fingerprint' => md5(json_encode(array_map(fn (array $i) => (string) ($i['url'] ?? ''), $items))),
+            'items' => $items,
+            // Nguồn TÌM KIẾM nào đã trả lời (bảng nguồn của giao diện đọc khối này).
+            'sources' => array_values((array) ($search['sources_rows'] ?? [])),
+            'queries' => array_values((array) ($search['queries'] ?? [])),
+            'search_error' => $search['error'] ?? null,
+        ], $region, $user);
     }
 
     /**
@@ -1014,17 +1079,21 @@ class DesignAgentService
      * khối DỮ LIỆU mà mọi lượt radar/brief đọc. Nhờ vậy vòng khép kín: công cụ tra → sổ → lượt chạy sau có
      * sẵn bằng chứng (kể cả khi mạng hỏng) → model dẫn nguồn → giao diện hiện đúng nguồn đó.
      *
-     * THỨ TỰ có ý nghĩa, không phải tuỳ tiện — và đã ĐỔI một lần (2026-09-26), ghi rõ vì sao:
-     *   1. TIN MÁY CHỦ VỪA LẤY (feed, sống) — TÌM KIẾM THỰC đứng TRƯỚC: đây là thứ tươi nhất và đúng
-     *      nguyên tắc "ưu tiên dữ liệu thật vừa lấy hơn thứ đã nằm trong sổ";
-     *   2. nguồn NGƯỜI DÙNG ĐÃ LƯU — tín hiệu mạnh về ĐỘ TIN CẬY, nhưng vẫn là bản ghi CŨ;
-     *   3. nguồn AI tra được nhưng CHƯA lưu — bổ sung.
-     * Bản trước xếp nguồn đã lưu lên đầu (ý: "người dùng đã chọn thì quan trọng nhất"). Đổi lại vì yêu cầu
-     * 2026-09-26: khi model viết câu trả lời, nó đọc khối này từ TRÊN XUỐNG — mở đầu bằng bản cũ là mở đầu
-     * bằng thứ dễ lỗi thời nhất, trong khi thứ vừa lấy được lại nằm dưới.
+     * [ĐỔI CHÍNH SÁCH 2026-09-26 — LẦN THỨ TƯ VÀ CŨNG LÀ LẦN CUỐI CỦA CÂU HỎI "CÁI GÌ ĐỨNG TRƯỚC"]
+     * Bỏ HẲN nhánh nhận $feed từ WebSourceService::evidence() (tin của nguồn kind=rss/page đã khai).
+     * VÌ SAO BỎ: yêu cầu của chủ dự án là bước 2 dùng DỮ LIỆU TÌM KIẾM thay vì RSS/trang báo — mà trộn
+     * feed vào đây thì khối dữ liệu vẫn là "tin của nguồn đã khai" đội lốt kết quả tra, và ba lần tranh
+     * luận trước về THỨ TỰ (nguồn đã lưu trước · tin vừa lấy trước · tìm kiếm trước) đều là tranh luận về
+     * một danh sách lẽ ra không nên tồn tại. Nay khối này CHỈ có kết quả tìm kiếm: lượt tra chung (đã nằm
+     * trong $evidence['items'] khi vào đây) + nguồn trong SỔ.
+     *
+     * THỨ TỰ (còn lại hai nhóm, và thứ tự vẫn có nghĩa):
+     *   1. kết quả tìm kiếm của lượt tra VỪA CHẠY (đứng trước vì tươi nhất);
+     *   2. nguồn trong SỔ — trong đó nguồn NGƯỜI DÙNG ĐÃ LƯU đứng trước phần còn lại (tín hiệu mạnh về độ
+     *      tin cậy), nhưng tất cả vẫn là bản ghi CŨ.
      * Trần tổng vẫn là EVIDENCE_LIMIT để token không phình theo số lần tra trong sổ.
      *
-     * @param  array<string, mixed>  $evidence
+     * @param  array<string, mixed>  $evidence  khối dữ liệu đã có sẵn kết quả tìm kiếm của lượt này
      * @return array<string, mixed>
      */
     private function mergeFindings(array $evidence, string $region, ?User $user): array
@@ -1044,13 +1113,15 @@ class DesignAgentService
             return $evidence + ['findings_count' => 0, 'findings_saved' => 0];
         }
 
-        $feed = array_values((array) ($evidence['items'] ?? []));
+        // Kết quả tìm kiếm của LƯỢT TRA VỪA CHẠY — đây là thứ duy nhất được phép đứng trước nguồn trong sổ.
+        // KHÔNG còn biến $feed nào ở đây: xem khối "ĐỔI CHÍNH SÁCH" ở docblock — nguồn kind=page/rss không
+        // được vào khối dữ liệu của bước 2 nữa.
+        $fromSearch = array_values((array) ($evidence['items'] ?? []));
         // Nguồn NGƯỜI DÙNG ĐÃ LƯU và phần còn lại tách riêng: thứ tự ghép bên dưới là thứ tự ưu tiên.
         $saved = array_values(array_filter($found, fn (array $row) => ($row['saved'] ?? false) === true));
-        $rest = array_values(array_filter($found, fn (array $row) => ($row['saved'] ?? false) !== true));
 
         // Khử trùng bằng MỘT hàm duy nhất, theo URL rồi tới tiêu đề đã chuẩn hoá: cùng một bài có thể vừa
-        // nằm trong feed vừa nằm trong sổ (feed lấy lại chính bài mà AI đã tra hôm qua).
+        // nằm trong kết quả tra vừa nằm trong sổ (lượt tra này lấy lại chính bài mà AI đã tra hôm qua).
         $taken = [];
         $items = [];
         $push = function (array $row) use (&$taken, &$items): void {
@@ -1064,39 +1135,18 @@ class DesignAgentService
             $items[] = $row;
         };
 
-        // THANG ƯU TIÊN (yêu cầu 2026-09-26): **WEB SEARCH trước → trang/RSS là DỰ PHÒNG**.
-        //   1. nguồn do AI TỰ TRA (found_by=ai_search, trong đó nguồn người dùng ĐÃ LƯU lên đầu) — đây là
-        //      kết quả của công cụ tìm kiếm thật, đúng thứ người dùng muốn ưu tiên;
-        //   2. tin máy chủ lấy từ NGUỒN ĐÃ KHAI (trang chuyên mục / RSS) — chỉ là DỰ PHÒNG khi không có
-        //      kết quả tìm kiếm nào.
-        // Đây là lần thứ BA câu hỏi "cái gì đứng trước" được trả lời, nên ghi rõ LÝ DO: bản đầu xếp nguồn đã
-        // lưu lên đầu, bản hai xếp tin vừa lấy lên đầu; cả hai đúng một nửa. Thứ tự ĐÚNG là thứ tự của THANG
-        // TÌM KIẾM, không phải của độ tươi hay độ tin: tìm kiếm thật trước, nguồn khai sau.
-        $fromSearch = [];
-        $fromSources = [];
-        foreach ($found as $row) {
-            $isSearch = ($row['found_by'] ?? '') === 'ai_search' || ($row['finding_id'] ?? null) !== null;
-            if ($isSearch) {
-                $fromSearch[] = $row;
-            } else {
-                $fromSources[] = $row;
-            }
-        }
-        // Trong nhóm kết quả tìm kiếm: nguồn NGƯỜI DÙNG ĐÃ LƯU đứng trước phần còn lại.
-        $fromSearch = array_merge(
-            array_values(array_filter($fromSearch, fn (array $row) => ($row['saved'] ?? false) === true)),
-            array_values(array_filter($fromSearch, fn (array $row) => ($row['saved'] ?? false) !== true)),
-        );
-
+        // THỨ TỰ CÒN LẠI (2026-09-26): kết quả tra VỪA CHẠY trước → nguồn trong SỔ (đã lưu trước, chưa lưu
+        // sau). Cả hai nhóm đều là KẾT QUẢ TÌM KIẾM, nên thứ tự này không còn là câu hỏi "tìm kiếm hay
+        // nguồn khai" — câu đó đã được trả lời dứt khoát bằng việc bỏ hẳn nguồn khai khỏi khối này.
         foreach ($fromSearch as $row) {
             $push($row);
         }
-        foreach ($feed as $row) {
-            $push($row);
-        }   // nguồn ĐÃ KHAI (trang chuyên mục / RSS) = DỰ PHÒNG
-        foreach ($fromSources as $row) {
+        foreach ($saved as $row) {
             $push($row);
         }
+        foreach ($found as $row) {
+            $push($row);
+        }   // phần còn lại của sổ (chưa lưu) — bổ sung
 
         $items = array_slice($items, 0, WebSourceService::EVIDENCE_LIMIT);
 
@@ -1111,7 +1161,7 @@ class DesignAgentService
         // [LỖI THẬT — bắt được ngay khi viết test 2026-09-26] Bản đầu tính lại vân tay trên danh sách ĐÃ
         // TRỘN. Nhưng mỗi lượt chạy có công cụ lại GHI THÊM nguồn vào sổ, nên lượt sau vân tay khác lượt
         // trước ⇒ bộ đệm radar KHÔNG BAO GIỜ trúng nữa (mỗi lần mở màn hình là một lượt model ~28 giây).
-        // Vân tay chỉ đo thứ MÁY CHỦ vừa tự lấy (feed) — đúng nghĩa "có tin mới thì sinh lại".
+        // Vân tay chỉ đo KẾT QUẢ TÌM KIẾM của lượt tra chung — đúng nghĩa "có tin mới thì sinh lại".
         //
         // Nguồn trong sổ vẫn vào prompt, nên phải chặn rò rỉ giữa các tài khoản bằng cách khác: khoá đệm
         // radar thêm phần ĐỊNH DANH TÀI KHOẢN khi tài khoản đó có nguồn trong sổ (xem radarDirections).
@@ -1121,17 +1171,23 @@ class DesignAgentService
     }
 
     /**
-     * TÍN HIỆU THỊ TRƯỜNG cho lượt radar — đo từ tin thật, KHÔNG cần model có tìm kiếm web (2026-09-23).
+     * TÍN HIỆU THỊ TRƯỜNG cho lượt radar — đo từ KẾT QUẢ TÌM KIẾM, KHÔNG cần model suy luận (2026-09-23).
      *
      * Vì sao đặt ở đây: model đang chạy không tự ra internet được, nên nếu chỉ đưa TIN vào prompt thì hết
      * model là hết phân tích và mọi con số vẫn là số mẫu. Lớp MarketSignalService đo bằng thuật toán, còn
      * hàm này chỉ lo một việc: bảo đảm số liệu đủ mới rồi trả về ĐÚNG dạng mà giao diện và prompt cần.
      *
+     * $items (ĐỔI CHÍNH SÁCH 2026-09-26): đường radar TRUYỀN SẴN kết quả của LƯỢT TRA CHUNG để đo. LUẬT AN
+     * TOÀN DỮ LIỆU ĐI KÈM — chỉ được truyền kết quả của TRUY VẤN CHUNG; TUYỆT ĐỐI không truyền khối dữ liệu
+     * đã trộn SỔ NGUỒN của một tài khoản, vì ảnh chụp tín hiệu là DÙNG CHUNG theo vùng (xem radar()).
+     * Không truyền (đường brief) ⇒ MarketSignalService tự đi tra bằng đúng bộ truy vấn chung đó.
+     *
      * Không có trình kết nối (test thuần PHPUnit) ⇒ trả shape RỖNG đủ khoá, không rẽ nhánh ở nơi gọi.
      *
+     * @param  list<array<string, mixed>>|null  $items
      * @return array<string, mixed>
      */
-    private function marketReport(string $region): array
+    private function marketReport(string $region, ?array $items = null): array
     {
         if ($this->market === null) {
             return [
@@ -1142,7 +1198,7 @@ class DesignAgentService
         }
 
         try {
-            return $this->market->ensureFresh($region);
+            return $this->market->ensureFresh($region, MarketSignalService::SNAPSHOT_MAX_AGE_HOURS, $items);
         } catch (\Throwable $e) {
             try {
                 logger()->warning('Agent Studio: không đo được tín hiệu thị trường', ['error' => $e->getMessage()]);
@@ -1246,7 +1302,7 @@ class DesignAgentService
      */
     private function collectAiEvidence(array $queries, string $region, ?User $user = null): array
     {
-        $out = ['queries' => [], 'items' => [], 'sources' => [], 'count' => 0, 'stored' => 0, 'error' => null];
+        $out = ['queries' => [], 'items' => [], 'sources' => [], 'sources_rows' => [], 'count' => 0, 'stored' => 0, 'error' => null];
 
         if ($this->sources === null) {
             $out['error'] = 'không có trình kết nối nguồn ngoài';
@@ -1305,6 +1361,15 @@ class DesignAgentService
                 if ($name !== '' && ! in_array($name, $out['sources'], true)) {
                     $out['sources'][] = $name;
                 }
+
+                // BẢNG NGUỒN CỦA GIAO DIỆN (2026-09-26): giữ NGUYÊN hàng trạng thái mà đường tìm kiếm trả về
+                // (slug · tên · state · state_label · count · error) — báo cáo nguồn của bước 2 phải nói về
+                // NGUỒN TÌM KIẾM đã trả lời lượt này, không phải về nguồn đã khai trong Cài đặt. Khử trùng
+                // theo slug, giữ hàng CUỐI vì trạng thái mới nhất là trạng thái đúng.
+                $slug = (string) ($row['slug'] ?? '');
+                if ($slug !== '') {
+                    $out['sources_rows'][$slug] = $row;
+                }
             }
 
             if (($found['error'] ?? null) !== null) {
@@ -1313,6 +1378,7 @@ class DesignAgentService
         }
 
         $out['count'] = count($out['items']);
+        $out['sources_rows'] = array_values($out['sources_rows']);
 
         return $out;
     }
