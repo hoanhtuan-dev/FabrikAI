@@ -45,7 +45,15 @@ class AgentChatController extends Controller
 
         return response()->stream(function () use ($chat, $messages, $region, $request, $live) {
             // Câu trả lời có thể dài và phải đi qua công cụ — đừng để PHP cắt giữa chừng.
-            @set_time_limit(180);
+            //
+            // [LỖI THẬT — ĐO ĐƯỢC 2026-09-26] `set_time_limit` đặt giới hạn cho CẢ TIẾN TRÌNH, không riêng
+            // request này. Khi PHPUnit gọi đường này, giới hạn đó dính lại và cắt ngang BỘ TEST: đo được
+            // "Maximum execution time of 180 seconds exceeded" ở bài 732/1303 (bộ test nay chạy ~173 s, chỉ
+            // còn 7 s biên). Giới hạn này là để bảo vệ một PHẢN HỒI SSE thật đang chảy — trong test không có
+            // SSE thật, nên chỉ đặt khi chạy thật (cùng một cờ `$live` đang dùng cho output buffer).
+            if ($live) {
+                @set_time_limit(180);
+            }
             if ($live) {
                 while (ob_get_level() > 0) {
                     @ob_end_flush();

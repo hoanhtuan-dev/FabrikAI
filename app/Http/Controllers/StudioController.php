@@ -2235,7 +2235,13 @@ RULES:
 
         return response()->stream(function () use ($imagePath, $creativeLevel, $opts, $live) {
             // Vision có thể mất 30-90s với ảnh chi tiết — đừng để PHP cắt giữa chừng.
-            @set_time_limit(180);
+            //
+            // [LỖI THẬT — ĐO ĐƯỢC 2026-09-26] Cùng lý do đã ghi ở AgentChatController: `set_time_limit` áp
+            // cho CẢ TIẾN TRÌNH, nên khi PHPUnit đi qua đây thì giới hạn dính lại và cắt ngang bộ test ở
+            // bài 732/1303. Chỉ đặt khi chạy thật — trong test không có phản hồi SSE thật để bảo vệ.
+            if ($live) {
+                @set_time_limit(180);
+            }
             if ($live) {
                 while (ob_get_level() > 0) {
                     @ob_end_flush();

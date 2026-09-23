@@ -356,4 +356,38 @@ class AgentChatStreamTest extends TestCase
         $this->assertStringContainsString('quản trị viên', mb_strtolower((string) $error['message']));
         $this->assertNotContains('result', $this->types($events), 'Không có câu trả lời thì KHÔNG được phát sự kiện result.');
     }
+
+    // ── (f) GIỚI HẠN THỜI GIAN CỦA TIẾN TRÌNH ────────────────────────────────
+
+    /**
+     * ĐƯỜNG STREAM KHÔNG ĐƯỢC ĐẶT LẠI GIỚI HẠN THỜI GIAN KHI CHẠY TEST (2026-09-26).
+     *
+     * [LỖI THẬT — ĐO ĐƯỢC] `set_time_limit(180)` trong controller áp cho CẢ TIẾN TRÌNH PHP, không riêng
+     * request. Khi PHPUnit đi qua đường này, giới hạn dính lại và cắt ngang BỘ TEST: đo được
+     * "Maximum execution time of 180 seconds exceeded" ở bài 732/1303 (bộ test nay chạy ~173 s — chỉ còn
+     * 7 s biên, nên đây là lỗi sẽ nổ lại ở máy chậm hơn). Giới hạn đó tồn tại để bảo vệ một PHẢN HỒI SSE
+     * THẬT đang chảy; trong test không có SSE thật, nên nó chỉ được đặt khi chạy thật.
+     *
+     * Test này khoá đúng điều đó: đi qua đường stream mà giới hạn thời gian của tiến trình KHÔNG đổi.
+     */
+    public function test_the_stream_does_not_reset_the_process_time_limit_in_tests(): void
+    {
+        $this->model(DesignAgentService::REASON_GROUP, 'gw-chat', 'chat-1');
+
+        Http::fake([
+            'gw-chat.example/*' => $this->sseResponse($this->textChunks('Được, mình trả lời ngắn.')),
+        ]);
+
+        $before = (string) ini_get('max_execution_time');
+
+        $this->actingAs($this->customer())->postJson('/api/design-agent/chat/stream', [
+            'messages' => [['role' => 'user', 'content' => 'Chào bạn']],
+        ])->assertOk();
+
+        $this->assertSame(
+            $before,
+            (string) ini_get('max_execution_time'),
+            'Đặt lại giới hạn thời gian trong test là cắt ngang cả tiến trình PHPUnit, không chỉ request này.'
+        );
+    }
 }
