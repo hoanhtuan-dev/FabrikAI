@@ -5,6 +5,143 @@
 
 ---
 
+## Phiên 2026-09-26 (đợt 48) — LỚP KINH TẾ: giá bán theo model · sổ chi phí thật · biên ≥ 40 % · ĐÃ DEPLOY
+
+**Commit:** `aaf2c82` → `9e893cd`. **Trạng thái: đã push + deploy production `fabrikai.shop` + kiểm trên site thật.**
+
+### 0. Chủ dự án yêu cầu gì
+
+> *"làm theo đề xuất tốt nhất, đảm bảo gói thuê bao, số credit, giới hạn tạo ảnh, chất lượng có thể sửa được"* — rồi *"giải quyết ba việc còn lại → deploy"*.
+
+Nghĩa là: **mọi thứ thuộc lớp kinh tế phải là DỮ LIỆU sửa được trong Quản trị**, không phải hằng số trong mã; và ba món nợ đã ghi ở §9.6 của `docs/CREDIT_GOI_VA_LOI_NHUAN.md` phải trả nốt.
+
+---
+
+### 1. VÌ SAO PHẢI LÀM — ba đường đang LỖ ÂM THẦM
+
+Bản cũ: **mọi model đều bán 1 credit**, trong khi giá vốn lệch **hơn 300 lần** ($0,003/MP → $2,00/video). Đo được:
+
+| Đường | Biên trước |
+|---|---|
+| `flux-pro/fill` 2K | **−262 %** |
+| `veo3` 5 giây | **−189 %** |
+| `flux-pro/fill` 1K | **−45 %** |
+
+Và `generations` **chỉ có `credits_cost`** (khách trả) — không một cột nào ghi **ta trả bao nhiêu**, nên câu *"có lãi không"* không trả lời được bằng số.
+
+---
+
+### 2. ĐÃ LÀM
+
+| # | Việc | Chỗ |
+|---|---|---|
+| 1 | Ba bảng mới: `model_credit_cost` (bán) · `provider_price` (vốn) · `provider_usage` (sổ theo **từng lần gọi**) | migration `2026_09_26_000011`, `…000012` |
+| 2 | `plans.daily_image_limit` — **giới hạn tạo ảnh/ngày**, sửa được | cùng migration + form gói |
+| 3 | `ProviderCostService` — **một chỗ** cho: đổi đơn vị tính tiền, báo giá, ghi sổ, tính giá bán, báo cáo lãi/lỗ | `app/Services/` |
+| 4 | `studio_credit_cost_for()` — tra **model → giá của gói → mặc định**, không bao giờ ném | `app/Support/helpers.php` |
+| 5 | `queueGeneration()` **đảo thứ tự**: chốt provider/model TRƯỚC, rồi mới tính giá + kiểm credit; thêm chặn trần ngày (429 có cấu trúc) | `StudioController` |
+| 6 | Ghi chi phí ở **TỪNG LƯỢT THỬ** provider (không chỉ lượt thành công) | `ImageAIService::attemptProvider` + đường edit |
+| 7 | Giao diện **nói giá TRƯỚC khi bấm** | `/api/defaults` → `model_credit_costs`; `ConceptCard` (bỏ hằng số `const base = 1`), `InpaintCard` |
+| 8 | Quản trị: bảng giá sửa tại chỗ + cảnh báo đỏ dòng dưới 40 % + báo cáo lãi/lỗ | `/api/admin/model-credits`, `/api/admin/profit`, tab Gói cước |
+| 9 | `php artisan studio:pricing` — in bảng vốn→credit→biên; `--sync` tính lại; `--usage=N` **đối chiếu hoá đơn**; **exit 1** nếu có dòng dưới 40 % | `StudioPricingCommand` |
+
+---
+
+### 3. 🔴 BA LỖI THẬT bắt được — và cách bắt
+
+**(a) Gói `factory_season` không đạt 40 %.** Test bất biến phát hiện ngay lần chạy đầu:
+`3.290.000 ÷ 3.000 = 1.096,7 ₫/credit` ⇒ biên dòng đắt nhất chỉ **36,2 %**.
+→ **Sửa bằng TĂNG GIÁ lên 3.600.000 ₫, giữ nguyên 3.000 credit** (giảm credit là lấy đi thứ đã hứa; giá chỉ ảnh hưởng lượt mua sau).
+
+**(b) Bảng giá seed KHÔNG khớp model đang chạy.** SSH vào production mới thấy Model Registry khai:
+
+```
+edit   qwen-paygo  qwen-image-edit-2511      ← KHÔNG có trong bảng giá
+edit   qwen-paygo  qwen-image-edit-max
+edit   fal         fal-ai/flux-2-pro/edit
+image  fal         fal-ai/flux-2-flex
+image  fal         fal-ai/flux-2-pro
+swap   fal         fal-ai/flux-pro/v1/vto
+```
+
+Không khai giá cho **đúng** các model này thì sổ chi phí ghi `unknown_cost` cho gần hết lượt và báo cáo lợi nhuận **vô dụng**.
+
+**(c) Tên nhà cung cấp lệch ⇒ MỌI lượt tra giá đều TRƯỢT.** Registry khai `qwen-paygo`, bảng giá khoá `dashscope`.
+→ Thêm `PROVIDER_ALIASES`: `qwen|wan|qwen-paygo → dashscope`, `flux → fal`. Tên lạ **giữ nguyên** để nó lộ ra chứ không bị nuốt.
+
+---
+
+### 4. GIÁ THẬT CỦA CÁC MODEL PRODUCTION (đo từ trang model của fal)
+
+| Model | Cách fal tính | Ghi chú |
+|---|---|---|
+| `flux-2-flex` | **$0,05/MP cả mặt VÀO lẫn mặt RA** | làm tròn lên |
+| `flux-2-pro` | **$0,03 MP đầu + $0,015 mỗi MP thêm** | giá BẬC THANG |
+| `flux-2-pro/edit` | y hệt, nhưng tính **cả vào lẫn ra** | `billed_sides = 2` |
+| `flux-pro/v1/vto` | **$0,0375 MP vào đầu + $0,005 mỗi MP thêm** | 2 ảnh vào + 1 ra ⇒ `sides = 3` |
+| `qwen-image-edit-2511` (DashScope) | **$0,045/ẢNH** | theo ảnh, KHÔNG theo MP ⇒ 2K không đắt hơn 1K |
+
+⇒ Phải thêm hai cột `first_unit_price_usd` + `billed_sides`: mô hình cũ `đơn giá × số đơn vị` **không biểu diễn được** giá bậc thang và số mặt tính tiền.
+
+---
+
+### 5. KẾT QUẢ ĐO ĐƯỢC TRÊN PRODUCTION (sau deploy)
+
+```
+fal  fal-ai/flux-2-flex      1K 4:5  ->  2 credit      fal  fal-ai/flux-2-pro/edit  2K 1:1 -> 6 credit
+fal  fal-ai/flux-2-flex      1K 1:1  ->  4 credit      qwen-paygo qwen-image-edit-2511 2K -> 2 credit
+fal  fal-ai/flux-2-flex      2K 1:1  -> 10 credit      qwen-paygo qwen-image-edit-max  2K -> 3 credit
+fal  fal-ai/flux-pro/v1/vto  2K 1:1  ->  4 credit      → 170 dòng giá bán · 17 dòng giá vốn
+```
+
+| Gói | Giá | credit | ₫/credit | Biên xấu nhất | Trần ảnh/ngày |
+|---|---|---|---|---|---|
+| free (tặng) | 0 ₫ | 50/tháng | ≤ 35.750 ₫ phơi nhiễm | — | 20 |
+| starter | 199.000 ₫ | **155** | 1.284 | **45,5 %** ✅ | 60 |
+| pro | 499.000 ₫ | **405** | 1.232 | **43,2 %** ✅ | 150 |
+| studio | 1.490.000 ₫ | **1.240** | 1.202 | **41,8 %** ✅ | 400 |
+| factory_season | **3.600.000 ₫** | 3.000 | 1.200 | **41,7 %** ✅ | 400 |
+
+> ⚠️ **LỖI THỨ TƯ, bắt trên production:** phép kiểm bất biến báo *"gói free — 0 ₫/credit, cần ≥ 1.200"*.
+> **Đúng số nhưng SAI VIỆC**: gói TẶNG không có biên lợi nhuận để bảo vệ — chia cho doanh thu bằng 0 là vô nghĩa.
+> → Sửa: gói giá 0 được đo bằng **CHI PHÍ PHƠI NHIỄM** (credit × giá vốn tệ nhất), và bị chặn bởi **trần ảnh/ngày**.
+> Thêm bài test khoá: mọi gói tặng PHẢI có `daily_image_limit > 0` và phơi nhiễm < 200.000 ₫/tài khoản.
+
+---
+
+### 6. KIỂM CHỨNG
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Bộ test | **1323 test XANH** (trước đợt này: 1305) · 10.166 assertion |
+| Bài mới | 18 bài trong `tests/Feature/PricingMarginTest.php` |
+| Bài quan trọng nhất | chạy **ĐƯỜNG TIỀN THẬT** qua `/api/generate`: cùng model `flux/dev`, **1K 1:1 tốn 2 credit** còn **1K 4:5 tốn 1 credit** (đúng hệ quả fal làm tròn megapixel lên); sổ cái khớp đúng tổng đã trừ |
+| Build | `npm run build` ✓ 1,28 s |
+| Sao lưu DB trước deploy | `fabrikai-20260923-113128.sql.gz` · 1,1 MB · 48 bảng · kết thúc hợp lệ |
+| HEAD máy chủ | `539ae94` → **`9e893cd`** — khớp local |
+| Migration | `000011` + `000012` DONE |
+| Seed giá | `ProviderPriceSeeder` + `ModelCreditCostSeeder` DONE |
+| **Bất biến trên production** | **exit 0** — mọi dòng ≥ 40 %, mọi gói bán ≥ 1.200 ₫/credit |
+| HTTP | `/` **200** · `/up` **200** · `/bang-gia` **200** · `/agent-studio` **302 → đăng nhập** |
+| Bundle sống (CDN) | `pageBoot-BnLqYLfs.js` 302.821 B **có** `modelCreditCosts` · `costFor` · `editCost`; `ConceptCard-x7CKuZ_D.js` · `InpaintCard-CNsSsAQE.js` 200 |
+| `/api/defaults` | **401** khi chưa đăng nhập (đúng thiết kế) |
+
+> ⚠️ **Nhắc người dùng TẢI LẠI TRANG (Ctrl+Shift+R)** — hash JS đã đổi.
+
+---
+
+### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
+
+- **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.
+- **Chưa đối chiếu hoá đơn DashScope.** `qwen-image-edit-2511` đang khai **$0,045/ảnh** (suy từ bảng giá Model Studio). Nếu thực tế là bản `-plus` ($0,03) thì biên đang bị tính **thấp** — cần mở Billing/Usage của DashScope lọc theo model ID trong một ngày có lưu lượng rồi chia cho số ảnh.
+- **Provider `ckey` (custom) chưa khai giá** — model `phuocanh421994/Qwen_Image_3.0_Pro` đang có 36 lượt trong 30 ngày. Không khai được thì sổ ghi `unknown_cost`, và đó là **đúng** (thà thiếu còn hơn đoán).
+- **Chưa cập nhật `PRICING.md`** §1.1/§2/§3 — tài liệu cũ vẫn ghi giá Qwen sai +50…75 %.
+- **`trillfa.shop` chưa deploy** (HEAD `83bf3dd`) — chỉ `fabrikai.shop` được cập nhật trong đợt này.
+- **`ext-sodium` vẫn KHÔNG có trên production** — chưa làm phần webhook fal (D4/cron ngoài). Lớp kinh tế này độc lập với việc đó.
+
+---
+
+
 ## Phiên 2026-09-23 (đợt 47) — GẮN MODULE CHAT VÀO GÓI · BƯỚC 2/5 ĐO TỪ KẾT QUẢ TÌM KIẾM
 
 **Commit:** `b8c7344` · `57b8d1a` · `b8dd3cf` · `6d74635` · `0b19756`. **Trạng thái: đã push + deploy + kiểm trên production.**
