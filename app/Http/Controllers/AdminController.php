@@ -477,6 +477,34 @@ class AdminController extends Controller
     // Mọi thứ suy từ ModuleRegistry nên thêm module mới là màn này tự có thêm dòng.
 
     /** GET /api/admin/modules — danh mục module + ma trận gói × module + đề xuất. */
+    /**
+     * GET /api/admin/modules/history — LỊCH SỬ thay đổi quyền tính năng.
+     *
+     * VÌ SAO: siết tính năng ảnh hưởng khách đang trả tiền; không có dòng này thì không truy được
+     * "ai tắt, lúc nào, bao nhiêu khách bị ảnh hưởng" — đúng chỗ Playground AI trả giá.
+     */
+    public function moduleHistory(Request $request): JsonResponse
+    {
+        $rows = \App\Models\ModuleChangeLog::query()
+            ->with(['plan:id,name,slug', 'admin:id,name'])
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->map(fn ($log) => [
+                'id' => $log->id,
+                'at' => $log->created_at?->toISOString(),
+                'kind' => $log->kind,
+                'plan' => $log->plan ? ['id' => $log->plan->id, 'name' => $log->plan->name, 'slug' => $log->plan->slug] : null,
+                'admin' => $log->admin?->name ?? '—',
+                'added' => array_map(fn ($id) => ['id' => $id, 'name' => ModuleRegistry::name($id)], $log->added ?? []),
+                'removed' => array_map(fn ($id) => ['id' => $id, 'name' => ModuleRegistry::name($id)], $log->removed ?? []),
+                'affected_users' => (int) $log->affected_users,
+                'note' => $log->note,
+            ]);
+
+        return response()->json(['history' => $rows]);
+    }
+
     public function modules(): JsonResponse
     {
         $plans = Plan::query()->orderBy('sort')->get();
@@ -542,16 +570,42 @@ class AdminController extends Controller
 
         // Id lạ bị BỎ QUA nhưng phải BÁO LẠI (trang Quản trị mở lâu có thể còn id của module vừa gỡ
         // khỏi bản khai): bỏ qua để không chặn việc, báo để không im lặng nuốt lỗi gõ sai.
+        $before = ModuleRegistry::disabledGlobally();
         $ids = array_values(array_intersect($data['disabled'], ModuleRegistry::ids()));
         $ignored = array_values(array_diff($data['disabled'], ModuleRegistry::ids()));
 
+        $added = array_values(array_diff($ids, $before));     // module MỚI bị tắt
+        $removed = array_values(array_diff($before, $ids));   // module ĐƯỢC mở lại
+
         set_setting(ModuleRegistry::SETTING_DISABLED, json_encode($ids));
+
+        // ── LỊCH SỬ + SỐ KHÁCH BỊ ẢNH HƯỞNG (2026-09-26) ───────────────────────────────
+        // Tắt toàn cục module X = ảnh hưởng mọi khách có gói cấp module X.
+        $affected = 0;
+        if ($added) {
+            $planIds = Plan::query()->get()->filter(fn (Plan $p) => count(array_intersect($added, $p->modules())) > 0)->pluck('id');
+            $affected = (int) User::whereIn('plan_id', $planIds)->count();
+        }
+
+        if ($added || $removed) {
+            \App\Models\ModuleChangeLog::create([
+                'plan_id' => null,
+                'admin_id' => auth()->id(),
+                'kind' => \App\Models\ModuleChangeLog::KIND_GLOBAL_DISABLE,
+                'added' => $added,
+                'removed' => $removed,
+                'affected_users' => $affected,
+                'note' => 'Công tắc toàn cục: tắt thêm '.count($added).' · mở lại '.count($removed),
+            ]);
+        }
 
         return response()->json([
             'ok' => true,
             'disabled' => ModuleRegistry::disabledGlobally(),
             'ignored' => $ignored,
+            'affected_users' => $affected,
             'message' => count($ids).' module đang tắt toàn cục.'
+                .($added ? ' Tắt thêm '.count($added).' module — ảnh hưởng '.$affected.' khách.' : '')
                 .($ignored ? ' (bỏ qua '.count($ignored).' id không tồn tại: '.implode(', ', $ignored).')' : ''),
         ]);
     }
@@ -564,20 +618,43 @@ class AdminController extends Controller
             'modules.*' => ['string'],
         ]);
 
-        // Giữ thứ tự theo bản khai (dữ liệu đọc được, so sánh được) và bỏ qua id lạ — nhưng BÁO LẠI để
-        // không im lặng nuốt lỗi.
+        $before = $plan->modules();
         $ids = array_values(array_filter(ModuleRegistry::ids(), fn ($id) => in_array($id, $data['modules'], true)));
         $ignored = array_values(array_diff($data['modules'], ModuleRegistry::ids()));
 
+        $added = array_values(array_diff($ids, $before));
+        $removed = array_values(array_diff($before, $ids));
+
         $plan->forceFill(['modules' => $ids])->save();
+
+        // ── LỊCH SỬ + SỐ KHÁCH BỊ ẢNH HƯỞNG (2026-09-26) ───────────────────────────────
+        // GỠ module khỏi một gói là lấy đi thứ khách đang trả tiền — phải TRUY ĐƯỢC và HOÀN TÁC ĐƯỢC.
+        // affected_users = số khách đang ở gói này tại thời điểm lưu (ghi LẠI, không tính sau).
+        $affected = (int) User::where('plan_id', $plan->id)->count();
+
+        if ($added || $removed) {
+            \App\Models\ModuleChangeLog::create([
+                'plan_id' => $plan->id,
+                'admin_id' => auth()->id(),
+                'kind' => \App\Models\ModuleChangeLog::KIND_PLAN_MODULES,
+                'added' => $added,
+                'removed' => $removed,
+                'affected_users' => $removed ? $affected : 0,
+                'note' => 'Đổi module gói '.$plan->name.': +'.count($added).' −'.count($removed),
+            ]);
+        }
 
         return response()->json([
             'ok' => true,
             'plan' => ['id' => $plan->id, 'slug' => $plan->slug, 'name' => $plan->name],
             'modules' => $plan->fresh()->modules(),
             'modules_count' => $plan->fresh()->modulesCount(),
+            'added' => $added,
+            'removed' => $removed,
+            'affected_users' => $removed ? $affected : 0,
             'ignored' => $ignored,
             'message' => 'Gói '.$plan->name.' nay cấp '.count($ids).' module.'
+                .($removed ? ' ĐÃ GỠ '.count($removed).' module khỏi '.$affected.' khách.' : '')
                 .($ignored ? ' (bỏ qua '.count($ignored).' id không tồn tại: '.implode(', ', $ignored).')' : ''),
         ]);
     }

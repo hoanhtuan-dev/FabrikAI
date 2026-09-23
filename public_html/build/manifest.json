@@ -160,7 +160,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-DHCzgKyy.css",
+    "file": "assets/app-BD9F3q_U.css",
     "name": "app",
     "names": [
       "app.css"
@@ -363,7 +363,7 @@
     ]
   },
   "resources/js/studio/hub.js": {
-    "file": "assets/hub-B1NXJKw5.js",
+    "file": "assets/hub-CCNJmnGA.js",
     "name": "hub",
     "src": "resources/js/studio/hub.js",
     "isEntry": true,
@@ -373,7 +373,7 @@
       "_BaseModal-CiJql_03.js"
     ],
     "css": [
-      "assets/hub-Bf2ZwNbQ.css"
+      "assets/hub-DtEbTxiY.css"
     ]
   },
   "resources/js/studio/main.js": {

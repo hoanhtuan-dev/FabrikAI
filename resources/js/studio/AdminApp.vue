@@ -151,6 +151,8 @@ const pendingUpgrades = computed(() => Number(upgradesData.value.counts.pending 
 
 // [Modules] Công tắc tính năng: danh mục module (sinh từ ModuleRegistry) + gói nào cấp module nào.
 const modulesData = ref({ modules: [], plans: [], groups: {}, disabled: [], total_modules: 0 });
+const moduleHistory = ref([]);          // lịch sử thay đổi quyền tính năng
+const modHistoryLoading = ref(false);
 const moduleSearch = ref('');
 /** Bản nháp cục bộ: { [planSlug]: [moduleId] } — chỉ ghi khi bấm Lưu. */
 const planModules = ref({});
@@ -358,6 +360,14 @@ const upgradeTone = (s) => (s === 'pending' ? 'warn' : s === 'contacted' ? 'info
 // ─────────────────────────── Tính năng & gói (Modules) ───────────────────────────
 // Một nguồn: ModuleRegistry. Màn này chỉ đọc bản khai và ghi vào DỮ LIỆU (setting + plans.modules), nên
 // thêm module mới là màn tự có thêm dòng, không phải sửa giao diện.
+async function loadModuleHistory() {
+  modHistoryLoading.value = true;
+  try {
+    const d = await api('/modules/history');
+    moduleHistory.value = d.history || [];
+  } catch { /* lịch sử chưa có endpoint hoặc lỗi — không làm hỏng tab */ }
+  finally { modHistoryLoading.value = false; }
+}
 async function loadModules() {
   loading.modules = true;
   try {
@@ -377,8 +387,31 @@ function toggleGlobal(id) {
   moduleDirty.value = true;
 }
 async function saveGlobalModules() {
+  // Cảnh báo nếu ĐANG TẮT THÊM module (tắt toàn cục ảnh hưởng MỌI khách có gói cấp module đó).
+  const before = (modulesData.value.disabled || []).slice();
+  const added = globalDisabled.value.filter((id) => !before.includes(id));
+  if (added.length) {
+    let affected = 0;
+    (modulesData.value.plans || []).forEach((p) => {
+      if (added.some((id) => (p.modules || []).includes(id))) affected += Number(p.users_count || 0);
+    });
+    if (affected > 0) {
+      askConfirm(
+        'Tắt tính năng TOÀN HỆ THỐNG?',
+        'Đang tắt mới ' + added.length + ' module: ' + moduleNamesOf(added).join(' · ') + '. '
+          + affected + ' khách đang dùng các tính năng này sẽ THẤY KHOÁ ngay khi lưu. '
+          + 'Bấm Lưu là có hiệu lực — không hoàn tác trong giao diện (phải mở lại bằng tay).',
+        'Tắt và lưu (' + affected + ' khách bị ảnh hưởng)',
+        async () => {
+          const ok = await run(() => api('/modules', 'POST', { disabled: globalDisabled.value }), 'Đã lưu.');
+          if (ok) { loadModules(); loadModuleHistory(); }
+        },
+      );
+      return;
+    }
+  }
   const ok = await run(() => api('/modules', 'POST', { disabled: globalDisabled.value }), 'Đã lưu công tắc tính năng.');
-  if (ok) loadModules();
+  if (ok) { loadModules(); loadModuleHistory(); }
 }
 function toggleGrant(slug, id) {
   const list = planModules.value[slug] || [];
@@ -394,7 +427,7 @@ async function savePlanModules(plan) {
       () => api('/plans/' + plan.id + '/modules', 'PUT', { modules: next }),
       'Đã lưu module cho gói ' + plan.name,
     );
-    if (ok) loadModules();
+    if (ok) { loadModules(); loadModuleHistory(); }
   });
 }
 /**
@@ -427,7 +460,7 @@ async function applySuggested(plan) {
       () => api('/plans/' + plan.id + '/modules/suggested', 'POST', {}),
       'Đã áp đề xuất cho gói ' + plan.name,
     );
-    if (ok) loadModules();
+    if (ok) { loadModules(); loadModuleHistory(); }
   });
 }
 /** [Modules] Cấp LẠI toàn bộ tính năng cho gói — đường khôi phục 1 cú bấm nếu lỡ rút nhầm. */
@@ -465,7 +498,10 @@ function ensureLoaded(id) {
     if (!profitData.value) loadProfit();
   }
   if (id === 'upgrades' && !upgradesData.value.requests.length) loadUpgrades();
-  if (id === 'modules' && !modulesData.value.modules.length) loadModules();
+  if (id === 'modules') {
+    if (!modulesData.value.modules.length) loadModules();
+    if (!moduleHistory.value.length) loadModuleHistory();
+  }
   if (id === 'prompts' && !promptsData.value.length) loadPrompts();
 }
 
@@ -1107,8 +1143,47 @@ onMounted(async () => {
                 <button class="btn-outline btn-sm" @click="goTo('gui')"><StudioIcon name="palette" size="h-3.5 w-3.5" /> Thanh công cụ Studio</button>
               </div>
             </template>
-          </section>
 
+            <!-- ── LỊCH SỬ THAY ĐỔI QUYỀN (2026-09-26) ── -->
+            <div class="card p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
+                    <StudioIcon name="history" size="h-4 w-4" class="text-brand-300" /> Lịch sử thay đổi quyền
+                    <span v-if="moduleHistory.length" :class="[BADGE, BADGE_TONE.neutral]">{{ moduleHistory.length }} mục</span>
+                  </h2>
+                  <p class="mt-1 text-xs text-cream-300">
+                    Ghi lại MỖI lần bấm Lưu công tắc hoặc Lưu gói — ai làm, lúc nào, và bao nhiêu khách bị ảnh hưởng.
+                    Dùng để TRUY và HOÀN TÁC nếu lỡ rút nhầm.
+                  </p>
+                </div>
+                <button class="tool-btn" :disabled="modHistoryLoading" @click="loadModuleHistory()">
+                  <StudioIcon name="refresh" size="h-3.5 w-3.5" /> Nạp lại
+                </button>
+              </div>
+
+              <div v-if="modHistoryLoading && !moduleHistory.length" class="mt-3 h-16 animate-pulse rounded bg-ink-800"></div>
+              <div v-else-if="!moduleHistory.length" class="mt-3 text-body text-cream-300">
+                Chưa có thay đổi nào được ghi — lịch sử bắt đầu từ khi bản này được deploy.
+              </div>
+              <div v-else class="mt-3 divide-y divide-ink-800/60">
+                <div v-for="h in moduleHistory.slice(0, 25)" :key="h.id" class="flex flex-wrap items-start gap-2 py-2">
+                  <span class="text-label whitespace-nowrap text-cream-300">{{ h.at ? new Date(h.at).toLocaleString("vi-VN", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "—" }}</span>
+                  <span :class="[BADGE, h.kind === 'global_disable' ? BADGE_TONE.warn : BADGE_TONE.info]">{{ h.kind === 'global_disable' ? 'Toàn cục' : (h.plan ? h.plan.name : '—') }}</span>
+                  <span class="text-body-lg text-cream-200">
+                    <template v-if="h.removed && h.removed.length">
+                      <span class="text-warn">− rút {{ h.removed.length }} tính năng</span>
+                      <span v-if="h.affected_users" class="text-warn"> · ảnh hưởng {{ h.affected_users }} khách</span>
+                    </template>
+                    <template v-if="h.added && h.added.length">
+                      <span class="text-ok">{{ h.removed ? " · " : "" }}+ thêm {{ h.added.map(x => x.name || x.id).join(" · ") }}</span>
+                    </template>
+                  </span>
+                  <span class="ml-auto text-label text-cream-300">{{ h.admin || "—" }}</span>
+                </div>
+              </div>
+            </div>
+          </section>
           <!-- ───── NGƯỜI DÙNG ───── -->
           <section v-show="section === 'users'" class="space-y-5">
             <div v-if="!isSuper" class="card flex flex-col items-center gap-2 p-8 text-center">

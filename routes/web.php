@@ -570,6 +570,7 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api/admin')->name('api.
     // ── [Modules 2026-09-19] MODULE: công tắc toàn cục + công tắc theo GÓI ──
     // Danh mục + ma trận gói × module đều SINH TỪ ModuleRegistry nên thêm module mới là màn tự có thêm dòng.
     Route::get('/modules', [AdminController::class, 'modules'])->name('modules.index');
+    Route::get('/modules/history', [AdminController::class, 'moduleHistory'])->name('modules.history');
     Route::post('/modules', [AdminController::class, 'saveModules'])->name('modules.save');
     Route::put('/plans/{plan}/modules', [AdminController::class, 'savePlanModules'])->name('plans.modules.save');
     Route::post('/plans/{plan}/modules/suggested', [AdminController::class, 'applySuggestedPlanModules'])->name('plans.modules.suggested');
