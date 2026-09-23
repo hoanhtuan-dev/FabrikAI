@@ -20,6 +20,7 @@
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
+import { thumbUrl } from '../composables/useStudioThumb.js';
 import StudioIcon from './StudioIcon.vue';
 import SourceLibraryPicker from './SourceLibraryPicker.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
@@ -238,7 +239,7 @@ const sourceName = computed(() => store.upscaleName || 'Ảnh đang chọn');
       </button>
 
       <div v-if="store.upscaleSrc" class="mt-1.5 flex items-center gap-3 rounded-lg border border-ink-700 bg-ink-900/50 p-2">
-        <img :src="store.upscaleSrc" alt="Ảnh nguồn để phân tích" class="h-14 w-14 shrink-0 rounded-lg bg-ink-900 object-cover ring-1 ring-ink-600">
+        <img :src="thumbUrl(store.upscaleSrc)" alt="Ảnh nguồn để phân tích" class="h-14 w-14 shrink-0 rounded-lg bg-ink-900 object-cover ring-1 ring-ink-600">
         <div class="min-w-0 flex-1">
           <p class="truncate text-body font-semibold text-cream-100">{{ sourceName }}</p>
           <p class="mt-0.5 text-label leading-4 text-cream-400">Muốn đổi ảnh: chọn ảnh khác trên canvas hoặc trong Thư viện ảnh.</p>

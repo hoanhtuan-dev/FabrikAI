@@ -377,6 +377,151 @@ Ba chế độ đúng như thiết kế ở **mọi** khổ: **Tả** = 0 canvas
 | `MaskContractTest` (7) | Chiều mask bằng **pixel thật** (GD): góc TRẮNG, nét ĐEN; Cọ dựng được mask **không cần** `region`; nét cọ hỏng → `null`; Khoanh → chữ nhật ĐEN từ `region`; hai đầu payload khớp nhau |
 | `EditImageScreenTest` (+1) | `full` phải có tác dụng ở **cả hai** nhánh `BaseModal` |
 
+## Phiên 2026-09-26 (đợt 52) — MOBILE-FIRST: lưới 2 nút · trình xem thành trung tâm điều phối · dọn GUI canvas khỏi mặt lưới
+
+**Đã kiểm bằng Chrome thật ở 320 · 375 · 414 · 768 · 1280, rồi deploy lên `fabrikai.shop`.**
+
+Mọi con số dưới đây là SỐ ĐO trên trình duyệt thật, không phải suy luận từ source.
+
+### 1. LƯỚI KẾT QUẢ — CÒN ĐÚNG HAI NÚT NHANH
+
+| | Trước | Sau |
+|---|---|---|
+| Nút trên card | 4 (Chọn · Sửa · Biến thể · Tải) | **2 (Sửa · Tải)** |
+| Ô chạm mỗi nút (320px) | 54 x 28 | **53 x 44** |
+| Ô chạm (desktop) | 28 | 32 |
+
+Bốn nút chữ nhỏ trong một card rộng ~150px là bốn ô chạm nhau, không ô nào đủ to. Hai nút còn lại là
+hai việc người dùng làm NGAY tại lưới; **mọi việc khác đã chuyển vào trình xem ảnh** — chạm vào ảnh là tới.
+
+### 2. TRÌNH XEM ẢNH = TRUNG TÂM ĐIỀU PHỐI
+
+Panel giờ mở đầu bằng khối **«Làm tiếp với ảnh này»**: 8 nhóm công cụ (Tạo ảnh · Tạo biến thể ảnh ·
+Mặc thử đồ · Sửa ảnh · Studio · Ghép trang phục · Upscale · Kịch bản quay), mỗi ô 44px trên cảm ứng.
+
+- **MỘT NGUỒN:** danh sách nhận qua PROP từ `StudioApp`, suy ra từ chính `activityNav` — thứ đã lọc
+  theo cấu hình owner quản lý ở `/admin` và theo gói cước. Không giữ bản sao thứ hai.
+- **MỘT KÊNH:** đi qua `store.requestActivity(id)` — đúng kênh `ChatModal` đã dùng. Không dựng kênh mới.
+- **VÁ LỖ HỔNG:** kênh đó trước đây KHÔNG kiểm tra khoá gói, nên ai đi qua kênh (thẻ trong khung chat,
+  và nay là trình xem) đều mở được bảng của module chưa trả tiền. Nay `revealActivity()` chặn ở một chỗ.
+- **BỎ TRÙNG:** «Tạo video» và «Tạo biến thể từ ảnh này» đã gỡ khỏi danh sách nút rời — cả hai đều có
+  trong khối tính năng. Giữ lại là hai lối vào cho cùng một việc.
+
+### 3. DẢI ẢNH RA NGOÀI KHUNG ẢNH
+
+| | Trước | Sau |
+|---|---|---|
+| Vị trí | `absolute bottom-14` — **TRONG** khung ảnh | **CỘT 72px bên trái, ngoài khung ảnh** |
+| Điện thoại | hiện (đè lên ảnh) | **ẨN** |
+| Chồng thanh thu/phóng | có (cách nhau 44px, màn thấp là chạm) | không |
+
+> **Lỗi bắt được ngay sau khi chuyển:** mũi tên ‹ › neo theo LỚP PHỦ nên lập tức đè lên cột dải ảnh mới
+> (đo được: đè 21x25px lên một thumbnail). Đã chuyển hai mũi tên vào TRONG khung ảnh — từ nay chúng
+> không bao giờ chạm cột dải ảnh, dù cột đó rộng bao nhiêu.
+> Bỏ luôn bốn hàm kéo-ngang của dải cũ: cột dọc cuộn bằng con lăn mặc định, không cần mã nào.
+
+### 4. THÔNG TIN ẢNH MẶC ĐỊNH ẨN · GIẤU CHI TIẾT KỸ THUẬT
+
+- `fieldsOpen = false` — người mở trình xem là để LÀM gì đó với ảnh, không phải đọc lý lịch của nó.
+- `techOpen = false` — **model · provider · seed** nằm sau một tầng nữa. Người dùng cuối không cần biết
+  ảnh do model nào sinh ra; đó là chi tiết của nhà cung cấp.
+- Lưới thông tin mặc định chỉ còn thứ dùng được: Dự án · Tỷ lệ · Độ phân giải · Thời lượng · Ngày.
+
+### 5. MẶT LƯỚI KHÔNG CÒN GIAO DIỆN CANVAS
+
+Thanh trạng thái nằm NGOÀI hai mặt nên ở mặt lưới vẫn phơi: hoàn tác/làm lại thao tác **layer**, thu-phóng
+và **% zoom** của khung vẽ, bốn ô **NỀN CANVAS**, **bắt điểm**, **số lớp**. Nay mọi nhóm đó chỉ render khi
+đang ở mặt canvas — mặt lưới giữ đúng nút đổi mặt.
+
+ĐO ĐƯỢC ở cả 5 khổ: **số điều khiển chỉ-canvas còn hiện ở mặt lưới = 0**.
+
+**Ở điện thoại, ẩn luôn hai lối vào trùng lặp:**
+- nút «Kết quả» trên thanh tiêu đề — **gỡ hẳn** (nó và tab dưới dock cùng mở MỘT ngăn kéo);
+- tab «Kết quả» của dock — ẩn theo mặt (v-show + inert), vì ở mặt lưới chính mặt lưới đã là danh sách
+  kết quả, to hơn và có nút hành động.
+
+> Chú thích ở ngăn kéo đó ghi *"Nay render đúng lưới kết quả"* — **SAI**: nó chưa bao giờ render
+> `ResultGrid`, mà là `OutputModule`. Đã sửa chú thích cho khớp sự thật.
+
+### 6. CHẤT LƯỢNG ẢNH — CỠ THEO TỪNG CHỖ
+
+Mọi lưới gọi `thumbUrl(url)` **không kèm cỡ** ⇒ luôn nhận thumbnail **160px**, trong khi card ở lưới
+chính rộng 150-320 CSS px; màn 2x cần 300-640 điểm ảnh ⇒ nhòe đúng ở chỗ người dùng nhìn kỹ nhất.
+
+Nay lưới chính phát `srcset` với **bốn cỡ backend thật sự tạo** (160/320/480/640) + `sizes` khớp
+ĐÚNG breakpoint của lưới. ĐO ĐƯỢC trình duyệt tự chọn:
+
+| Khổ | 320 | 375 | 414 | 768 | 1280 |
+|---|---|---|---|---|---|
+| Cỡ thumbnail được chọn | **320** | **480** | **480** | **640** | **640** |
+
+Và chiều ngược lại — **năm card nạp ẢNH GỐC 2K-4K vào ô xem trước 56-64px** (`store.upscaleSrc`,
+`activeImg`, `img` trong UpscaleCard · SuggestCard · DirectorCard · InpaintCard · RefImageCard, cộng
+dải biến thể 48px trong StudioApp). Trên điện thoại mỗi lần mở card là một lần tải ảnh lớn cho một ô
+vuông nhỏ. Nay tất cả đi qua `thumbUrl()`.
+
+### 7. CARD TÍNH NĂNG TRÊN MOBILE — ĐO RỒI MỚI SỬA
+
+Mở ngăn kéo công cụ ở 320px và 375px, đo từng card:
+
+| Card | Điều khiển | Tràn ngang | Dưới sàn chạm |
+|---|---|---|---|
+| Tạo ảnh (concept) | 13 | không | 3 (ô đánh dấu 24px — nhãn 240x40) |
+| Tạo biến thể ảnh | 13 | không | **0** |
+| Mặc thử đồ | 10 | không | **0** |
+| Sửa ảnh | 12 | không | 2 (ô đánh dấu 24px — nhãn 240x40) |
+| Studio · Ghép trang phục | 34 | không | **0** |
+| Upscale | 4 | không | **0** |
+| Kịch bản quay | 19 | không | **0** |
+
+**Hai lỗ hổng của luật sàn chạm cũ** (nó chỉ nhắm `button/select/input-button`):
+1. **Thanh trượt cao ĐÚNG 16px** (rãnh `h-2` = 8px) và **ô đánh dấu 14x14px**. Nay 44px và 24x24, và
+   **nhãn bọc ô đánh dấu** cũng được nới lên 40px — vì vùng chạm thật là cả nhãn, không phải ô vuông
+   (nới ô lên 40px thì nó trông như cái nút và làm lệch hàng).
+2. **Liên kết tự vẽ kiểu nút** — nút «Sửa chip» là `<a>` với lớp viên thuốc tự viết nên không mang lớp
+   `btn`/`icon-btn` nào ⇒ cao đúng 24px. Thay vì nới luật cho MỌI thẻ `<a>` (sẽ kéo giãn cả liên kết
+   trong câu văn, làm vỡ dòng chữ), đây là **lớp đánh dấu tường minh** `.touch-target`.
+
+### 8. KIỂM "NÚT ĐÈ LÊN NHAU"
+
+Bộ dò đầu tiên báo dương tính giả: thẻ nằm trong vùng cuộn mà bị đẩy ra ngoài **vẫn còn toạ độ**, nên
+phải giao hình chữ nhật của phần tử với **mọi tổ tiên có `overflow != visible`** rồi mới xét.
+
+Kết quả sau khi sửa bộ dò — **0 cặp đè nhau**, ở CẢ NĂM khổ, cho cả lưới lẫn trình xem:
+
+| Khổ | Lưới (toàn trang) | Trình xem |
+|---|---|---|
+| 320 · 375 · 414 · 768 · 1280 | **0** | **0** |
+
+### 9. BÀI TEST KHOÁ LẠI — `MobileFirstUiTest` (9 bài)
+
+| Bài | Khoá điều gì |
+|---|---|
+| `luoi_chinh_tra_thumbnail...` | srcset + sizes; bốn cỡ PHẢI khớp whitelist backend |
+| `o_xem_truoc_nho...` | năm card không được nạp ảnh gốc vào ô 56-64px |
+| `thanh_truot_va_o_danh_dau...` | sàn chạm cho range/checkbox/nhãn; `.touch-target` |
+| `thanh_trang_thai_an_moi_nhom_chi_canvas...` | nhóm canvas chỉ hiện ở mặt canvas |
+| `o_mat_luoi_thi_khong_con_tab_ket_qua...` | tab trùng ẩn theo mặt; nút Kết quả cũ đã gỡ |
+| `dai_anh_ra_ngoai_khung_anh...` | cột 72px `lg:flex`; không còn `bottom-14` trong khung ảnh |
+| `thong_tin_anh_va_ky_thuat_mac_dinh_an` | hai tầng đều đóng; model/provider KHÔNG ở lưới mặc định (nhưng không bị xoá) |
+| `trinh_xem_dieu_phoi...` | đi qua `requestActivity`; danh sách suy ra từ `activityNav` |
+| `kenh_dieu_phoi_chan_nhom_bi_khoa` | kênh điều phối mở hộp thoại nâng cấp khi nhóm bị khoá |
+
+Cập nhật: `MainViewTest` (đếm nút trong ĐÚNG khối hai nút · bóc chú thích trước khi kiểm "không còn
+requestActivity"), `StudioDockResizeTest` (số phần tử `inert` 5 → 6, kèm lý do).
+
+> **Bài học lặp lại tới ba lần trong hai đợt:** test đọc source bằng `assertStringNotContainsString`
+> liên tục đỏ vì **chính chú thích ghi lại lịch sử** của tệp. Đã thống nhất một hàm `code()` bóc CẢ
+> chú thích HTML trong template lẫn `//` và `/* */`.
+
+### 10. KIỂM CHỨNG CUỐI
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Bộ test | **1381 XANH** (trước đợt: 1372) · 10.534 assertion |
+| Build | `npm run build` ✓ |
+| Chrome thật 5 khổ | nút lưới 2 · canvas-only **0** · thumbnail đúng cỡ · dải ảnh đúng chỗ · 8 tính năng · đè nhau **0** |
+
 ### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
 
 - **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.

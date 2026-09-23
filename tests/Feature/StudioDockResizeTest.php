@@ -140,8 +140,12 @@ class StudioDockResizeTest extends TestCase
         //   · 3 dock:   trái · Outputs · Layers
         //   · 2 mặt:    lưới kết quả · bảng ghép
         // Mặt đang ẩn phải inert, nếu không Tab sẽ nhảy vào lưới ảnh vô hình (hoặc vào canvas vô hình).
-        $this->assertSame(5, substr_count($app, ':inert='),
-            'Thứ gì ẩn bằng v-show (3 dock + 2 mặt chính) đều phải inert — nếu không, Tab vẫn nhảy vào nội dung vô hình.');
+        //
+        // [2026-09-26 · đợt 52] 5 → 6: tab "Kết quả" của dock điện thoại. Ở mặt lưới nó TRÙNG với
+        // chính mặt lưới (cùng một danh sách, mà lưới còn to hơn và có nút hành động), nên nó ẩn
+        // theo mặt — và ẩn bằng v-show + inert như mọi thứ khác ẩn theo mặt.
+        $this->assertSame(6, substr_count($app, ':inert='),
+            'Thứ gì ẩn bằng v-show (3 dock + 2 mặt chính + tab Kết quả) đều phải inert — nếu không, Tab vẫn nhảy vào nội dung vô hình.');
         // Và hai mặt chính phải khai ĐÚNG dấu hiệu nhận biết để tầng kiểm thử bằng trình duyệt tìm được.
         $this->assertSame(1, substr_count($app, 'data-main-view="grid"'), 'Thiếu mặt chính «lưới kết quả».');
         $this->assertSame(1, substr_count($app, 'data-main-view="canvas"'), 'Thiếu mặt chính «bảng ghép».');

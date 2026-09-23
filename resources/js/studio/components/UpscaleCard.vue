@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { useStudioStore } from '../store.js';
+import { thumbUrl } from '../composables/useStudioThumb.js';
 import CompareSlider from './CompareSlider.vue';
 import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
@@ -42,7 +43,8 @@ function setv(field, val) { store[field] = Number(val); store.saveUpscaleMemory(
 
     <template v-if="store.upscaleSrc">
       <div class="mt-3 flex items-center gap-3 rounded-lg border border-ink-700 bg-cream-50/5 p-2.5">
-        <img :src="store.upscaleSrc" class="h-16 w-16 rounded-md bg-ink-900 object-cover">
+        <!-- Ô xem trước 64px: dùng THUMBNAIL, không nạp ảnh gốc 2K-4K vào một ô 64px. -->
+        <img :src="thumbUrl(store.upscaleSrc)" class="h-16 w-16 rounded-md bg-ink-900 object-cover">
         <div class="min-w-0 text-xs text-cream-200">
           <p class="truncate font-semibold">{{ store.upscaleName }}</p>
           <p class="text-cream-400">{{ store.upscaleScale }}x</p>

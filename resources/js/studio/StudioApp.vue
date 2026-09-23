@@ -39,6 +39,8 @@ const DirectorCard = asyncCard(() => import('./components/DirectorCard.vue'));
 const SourcePickerPopup = asyncModal(() => import('./components/SourcePickerPopup.vue'));
 import { applyGuiConfig, fetchGuiConfig } from './guiConfig.js';
 import OutputModule from './components/OutputModule.vue';
+// Ô xem trước 48px ở dải biến thể: dùng THUMBNAIL, không nạp ảnh gốc cho một ô 48px.
+import { thumbUrl } from './composables/useStudioThumb.js';
 const LibraryApp = asyncModal(() => import('./LibraryApp.vue'));
 // MultiSelectBar đã gộp vào ContextToolbar (layer selection bar).
 const GalleryModal = asyncModal(() => import('./components/GalleryModal.vue'));
@@ -176,6 +178,21 @@ const activityBar = computed(() => {
 /** Nhóm panel (đổi sidebar) — dùng cho vòng lặp card + panel đang mở. */
 const activityNav = computed(() => activityBar.value.filter((a) => a.kind === 'panel'));
 
+/**
+ * [đợt 52] DANH SÁCH TÍNH NĂNG CHO TRÌNH XEM ẢNH — suy ra từ chính activityNav ở trên.
+ *
+ * Cố ý KHÔNG khai một mảng mới: danh sách này đã được lọc theo cấu hình owner quản lý ở /admin
+ * (thứ tự · nhãn · icon · ẩn/hiện) và theo gói cước (a.locked). Khai lại ở đây hay trong
+ * GalleryModal là bản sao thứ hai — owner đổi nhãn ở /admin thì trình xem vẫn hiện nhãn cũ.
+ *
+ * Loại 'collections' vì đó là bộ sưu tập đang làm (bối cảnh), không phải việc làm với MỘT tấm ảnh.
+ */
+const viewerActions = computed(() =>
+  activityNav.value
+    .filter((a) => a.id !== 'collections')
+    .map((a) => ({ id: a.id, label: a.label, icon: a.icon, locked: !!a.locked })),
+);
+
 /** Mục menu Cài đặt — luôn ghim ở ĐÁY; nhãn/icon/ẩn-hiện theo cấu hình. */
 const settingsEntry = computed(() => activityBar.value.find((a) => a.kind === 'menu' && a.id === 'settings') || null);
 
@@ -275,6 +292,12 @@ watch(() => store.workspaceOpenRequest, (n) => { if (n > 0) projectsOpen.value =
  */
 function revealActivity(id) {
   if (! id || ! activityNav.value.some((a) => a.id === id)) return;
+  // [đợt 52] Nhóm công cụ BỊ KHOÁ theo gói: kênh điều phối phải xử lý ở ĐÂY, không phải ở từng nơi
+  // gọi. Trước đây thanh công cụ tự kiểm tra khoá (a.locked ? openUpgradeFor : selectActivity) còn
+  // kênh requestActivity thì không — nên ai đi qua kênh (thẻ trong khung chat, và nay là trình xem
+  // ảnh) đều mở được bảng của một module họ chưa trả tiền. Một luật, một chỗ.
+  const target = activityNav.value.find((a) => a.id === id);
+  if (target && target.locked) { openUpgradeFor(id); return; }
   if (id === activeActivity.value) {
     // Đã đúng nhóm: chỉ mở bảng (desktop) / ngăn kéo (tablet–điện thoại), KHÔNG toggle đóng lại.
     store.leftPanelOpen = true;
@@ -308,6 +331,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeSettingsOnEsc))
 // Popup "Prompt Tạo Ảnh" (ConceptCard) mount GLOBAL ở cuối template (mọi viewport):
 // chỉ cần đồng bộ activity hiện tại + đóng drawer Outputs mobile cho gọn.
 watch(() => store.promptOpen, (v) => { if (v) { activeActivity.value = 'concept'; outputOpen.value = false; } });
+// [đợt 52] Về MẶT LƯỚI thì đóng ngăn kéo "Kết quả" của điện thoại: lối vào tab đó đã ẩn ở mặt lưới
+// (xem chú thích ở dock), nên để ngăn kéo mở lại là màn hình có một lớp phủ không còn nút nào đóng
+// ngoài nút X — đúng kiểu "trạng thái mồ côi" mà mặt lưới vừa dọn.
+watch(() => store.mainView, (v) => { if (v === 'grid') outputOpen.value = false; });
 // Lưu cài đặt status bar khi thay đổi (snap · nền canvas · inspector).
 watch([() => store.snapGrid, () => store.canvasBg, () => store.inspectorOpen, () => store.leftPanelOpen, () => store.outputDockOpen, () => store.leftDockWidth, () => store.outputDockWidth], () => store.saveBarSettings());
 // ── Thoát công cụ thông minh khi chuyển tác vụ / thoát ảnh tiêu điểm ──
@@ -1039,14 +1066,13 @@ function onTouchEnd(e) {
       </div>
 
       <div class="contents">
-        <!-- Hai lối vào hay dùng nhất trên ĐIỆN THOẠI (trước đây nằm ở thanh thứ hai, nay gộp vào đây):
-             Bộ sưu tập và Kết quả. Từ lg trở lên chúng đã có ở rail/thanh trạng thái nên ẩn đi. -->
+        <!-- Lối vào hay dùng nhất trên ĐIỆN THOẠI (trước đây nằm ở thanh thứ hai, nay gộp vào đây):
+             Bộ sưu tập. Từ lg trở lên đã có ở rail/thanh trạng thái nên ẩn đi.
+             [2026-09-26 · đợt 52] Nút "Kết quả" ở đây đã BỎ: nó và tab "Kết quả" dưới dock cùng mở
+             đúng một ngăn kéo ⇒ hai nút cho một việc, trên thanh tiêu đề vốn đã chật ở 320px. -->
         <button type="button" class="order-5 ml-auto icon-btn shrink-0 lg:hidden" :title="store.appliedProject ? 'Bộ sưu tập hiện tại: ' + store.appliedProject.name : 'Bộ sưu tập'" aria-label="Bộ sưu tập" @click="projectsOpen = true">
           <StudioIcon name="kanban" size="h-4 w-4" />
           <span v-if="store.appliedProject" class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-brand-400"></span>
-        </button>
-        <button type="button" class="order-6 icon-btn shrink-0 lg:hidden" title="Kết quả" aria-label="Kết quả" @click="outputOpen = true">
-          <StudioIcon name="grid" size="h-4 w-4" />
         </button>
 
         <!-- ══ CỤM 1 · ĐIỀU HƯỚNG KHÔNG GIAN LÀM VIỆC (desktop): MỘT khay gom mọi lối vào, nhóm theo
@@ -1417,7 +1443,12 @@ function onTouchEnd(e) {
         <StudioIcon name="kanban" size="h-5 w-5" />
         <span class="dock-label">Bộ sưu tập</span>
       </button>
-      <button type="button" data-dock-tab="outputs" :class="outputOpen ? 'dock-active' : ''" @click="outputOpen = true">
+      <!-- [2026-09-26 · đợt 52] Ở MẶT LƯỚI thì tab này là TRÙNG: mặt lưới đã hiện đúng danh sách
+           đó, to hơn và có nút hành động. Ngăn kéo "Kết quả" chỉ còn nghĩa khi đang ở mặt BẢNG GHÉP
+           (lúc đó nó là lối duy nhất để xem kết quả). Ẩn bằng v-show + inert theo đúng luật ẩn/hiện
+           của hai mặt (MainViewTest khoá: mặt thì dùng v-show, KHÔNG v-if). -->
+      <button type="button" data-dock-tab="outputs" v-show="store.mainView === 'canvas'" :inert="store.mainView === 'canvas' ? null : true"
+              :class="outputOpen ? 'dock-active' : ''" @click="outputOpen = true">
         <StudioIcon name="grid" size="h-5 w-5" />
         <span class="dock-label">Kết quả</span>
       </button>
@@ -1689,7 +1720,7 @@ function onTouchEnd(e) {
               <span class="text-label text-cream-400">{{ store.activeBatch.length }} biến thể</span>
               <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2 motion-ui motion-ui--size duration-base" :class="store.previewId === v.id ? 'border-brand-500 scale-105' : 'border-ink-600 hover:border-brand-400'">
                 <template v-if="v.status === 'completed' && v.media_url">
-                  <img :src="v.media_url" class="batch-thumb h-full w-full bg-ink-900 object-cover" loading="lazy">
+                  <img :src="thumbUrl(v.media_url)" class="batch-thumb h-full w-full bg-ink-900 object-cover" loading="lazy">
                 </template>
                 <template v-else>
                   <div class="skeleton-shimmer absolute inset-0"></div>
@@ -1810,7 +1841,10 @@ function onTouchEnd(e) {
       </div>
     </div>
     <!-- Mobile outputs overlay: [Đợt 0.5] trước đây drawer này RỖNG (div trong suông) dù OutputModule
-         đã import sẵn — người dùng điện thoại bấm "Kết quả" nhận một ngăn trống. Nay render đúng lưới kết quả. -->
+         đã import sẵn — người dùng điện thoại bấm "Kết quả" nhận một ngăn trống. Nay render OutputModule.
+         [đợt 52] Chú thích cũ ghi "render đúng lưới kết quả" là SAI — nó chưa bao giờ render ResultGrid.
+         Và lối vào ngăn kéo này nay chỉ còn ở MẶT BẢNG GHÉP: ở mặt lưới, chính mặt lưới đã là danh sách
+         kết quả (to hơn, có nút hành động) nên ngăn kéo chỉ là bản sao thu nhỏ của nó. -->
     <div v-if="outputOpen" role="dialog" aria-modal="true" aria-label="Kết quả tạo ảnh" class="fixed inset-0 z-50 lg:hidden">
       <div class="motion-fade-in absolute inset-0 bg-scrim/60"></div>
       <div class="motion-slide-in-right absolute right-0 top-0 flex h-full w-80 flex-col scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
@@ -1824,7 +1858,7 @@ function onTouchEnd(e) {
       </div>
     </div>
     <!-- GalleryModal: xem ảnh lớn (bấm vào output trong dock phải) -->
-    <GalleryModal v-if="store.viewer" />
+    <GalleryModal v-if="store.viewer" :actions="viewerActions" />
     <!-- SourcePickerPopup: popup chọn nguồn ảnh (nút "Nguồn ảnh" ở activity bar) -->
     <SourcePickerPopup v-if="store.sourcePickerOpen" v-model="store.sourcePickerOpen" />
     <!-- ProjectWorkspace: popup quản lý bộ sưu tập (nút "Bộ sưu tập" ở mobile bar / chip bộ sưu tập / popover apply) -->

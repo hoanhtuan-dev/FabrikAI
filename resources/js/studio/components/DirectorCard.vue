@@ -1,5 +1,6 @@
 <script setup>
 import { useStudioStore } from '../store.js';
+import { thumbUrl } from '../composables/useStudioThumb.js';
 import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
 </script>
@@ -56,7 +57,7 @@ const store = useStudioStore();
       <p class="label"><StudioIcon name="image" size="h-3.5 w-3.5" class="-mt-0.5 mr-1 inline text-brand-300" /> Nguồn ảnh</p>
     </div>
     <div v-if="store.upscaleSrc" class="mt-1 flex items-center gap-3 rounded-lg border border-ink-700 bg-cream-50/5 p-2.5">
-      <img :src="store.upscaleSrc" class="h-14 w-14 shrink-0 rounded-md bg-ink-900 object-cover" alt="nguồn video">
+      <img :src="thumbUrl(store.upscaleSrc)" class="h-14 w-14 shrink-0 rounded-md bg-ink-900 object-cover" alt="nguồn video">
       <div class="min-w-0 text-xs text-cream-200">
         <p class="truncate font-semibold">{{ store.upscaleName || 'Ảnh đang chọn' }}</p>
         <p class="text-cream-400">Dùng làm frame đầu của video</p>

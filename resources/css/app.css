@@ -1418,6 +1418,47 @@ html[data-theme='light'] {
         min-height: 2.5rem;
     }
 
+    /* Ô ĐIỀU KHIỂN KHÔNG PHẢI NÚT — lỗ hổng của luật trên.
+       ĐO ĐƯỢC trên Chrome thật ở 320px (đợt 52): thanh trượt <input type=range> cao ĐÚNG 16px (rãnh
+       vẽ bằng h-2 = 8px) và ô đánh dấu <input type=checkbox> là 14x14px. Luật sàn chạm phía trên chỉ
+       nhắm button/select/input-button nên hai loại này lọt lưới — mà thanh trượt là thứ người dùng
+       phải KÉO (trượt ngón ra ngoài rãnh 8px là mất tay), còn ô đánh dấu phải CHẠM trúng.
+       Mức: 44px cho thanh trượt (ngang hàng nút), 24x24 cho ô đánh dấu (sàn AA của WCAG 2.5.8).
+       Chỉ nới VÙNG CHẠM: độ dày thị giác của rãnh không đổi (do ::-webkit-slider-runnable-track vẽ). */
+    body input[type='range'] {
+        min-height: 2.75rem;
+    }
+
+    body input[type='checkbox'],
+    body input[type='radio'] {
+        width: 1.5rem;
+        height: 1.5rem;
+        min-width: 1.5rem;
+        min-height: 1.5rem;
+    }
+
+    /* NHÃN BỌC Ô ĐÁNH DẤU: vùng chạm thật là CẢ NHÃN, không phải ô vuông 24px. ĐO ĐƯỢC trên Chrome
+       thật: ô đánh dấu nằm trong <label> cùng dòng chữ mô tả — người dùng chạm vào chữ, không chạm
+       vào ô. Nới nhãn lên 40px cho khớp sàn chạm của nút, mà KHÔNG phình ô vuông lên 40px (ô 40px
+       trông như nút và làm lệch hàng). */
+    body label:has(input[type='checkbox']),
+    body label:has(input[type='radio']) {
+        min-height: 2.5rem;
+        display: flex;
+        align-items: center;
+    }
+
+    /* LIÊN KẾT TỰ VẼ KIỂU NÚT — lỗ hổng thứ hai của luật "a[class*=btn]".
+       ĐO ĐƯỢC: nút «Sửa chip» (components/StudioCard.vue) là <a> tự vẽ kiểu viên thuốc
+       (rounded-full border px-2 py-0.5) nên không mang lớp btn/icon-btn nào ⇒ cao đúng 24px, dưới
+       sàn chạm. Thay vì nới luật cho MỌI thẻ <a> (sẽ kéo giãn cả liên kết nằm trong câu văn, làm vỡ
+       dòng chữ), đây là lớp ĐÁNH DẤU TƯỜNG MINH: thêm .touch-target vào liên kết nào đóng vai nút. */
+    body .touch-target {
+        min-height: 2.5rem;
+        display: inline-flex;
+        align-items: center;
+    }
+
     body button[class*='h-5'][class*='w-5'],
     body button[class*='h-6'][class*='w-6'],
     body button[class*='h-7'][class*='w-7'],

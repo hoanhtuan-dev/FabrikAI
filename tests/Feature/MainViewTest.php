@@ -87,11 +87,53 @@ class MainViewTest extends TestCase
     {
         $grid = (string) file_get_contents(resource_path('js/studio/components/ResultGrid.vue'));
 
-        // KHÔNG thêm endpoint, KHÔNG đổi luồng — mọi nút đi qua ĐÚNG hàm OutputModule đang dùng.
+        // KHÔNG thêm endpoint, KHÔNG đổi luồng — mọi nút đi qua ĐÚNG hàm đã có.
         $this->assertStringContainsString('store.select(g)', $grid);
-        $this->assertStringContainsString('store.requestActivity(activity)', $grid);
         $this->assertStringContainsString("'/api/generations/' + g.id + '/download'", $grid);
         $this->assertStringContainsString('store.openViewer(g)', $grid);
         $this->assertStringContainsString('store.deleteGen(g)', $grid, 'Xoá phải đi cùng đường với GalleryModal.');
+    }
+
+    /**
+     * [2026-09-26 · đợt 52] LƯỚI CHỈ CÒN HAI NÚT NHANH — và mọi việc còn lại đã dồn về TRÌNH XEM ẢNH.
+     *
+     * Lý do (đo trên Chrome thật ở 320px): card rộng ~150px, bốn nút chữ nhỏ nằm cạnh nhau ⇒ ô chạm
+     * 54x28px, không ô nào đủ to để chạm chắc. Hai nút còn lại là hai việc người dùng làm NGAY tại
+     * lưới; phần còn lại chuyển vào trình xem ảnh (chạm ảnh là tới).
+     *
+     * Bất biến này giữ CẢ HAI đầu: lưới không được mọc lại nút thứ ba, VÀ trình xem phải thật sự
+     * nhận được việc đã chuyển đi — nếu không thì đây chỉ là "xoá tính năng", không phải "dời chỗ".
+     * Việc dời chỗ phải đi qua ĐÚNG kênh cũ (store.requestActivity), không dựng kênh thứ hai.
+     */
+    public function test_the_grid_has_exactly_two_quick_buttons_and_the_viewer_took_over(): void
+    {
+        $grid = (string) file_get_contents(resource_path('js/studio/components/ResultGrid.vue'));
+
+        // Đếm nút trong ĐÚNG khối hai nút nhanh (từ mốc đánh dấu tới thẻ đóng của khối).
+        // Không đếm cả file: mỗi card còn một <button> BỌC ẢNH (chạm ảnh = mở trình xem) và một
+        // nút Xoá cho thẻ "đang chạy/lỗi" — hai thứ đó vẫn phải còn.
+        $start = strpos($grid, 'HAI nút nhanh: Sửa');
+        $this->assertNotFalse($start, 'Thiếu mốc đánh dấu khối hai nút nhanh trong TEMPLATE.');
+        $bar = substr($grid, $start);
+        $bar = substr($bar, 0, strpos($bar, '</div>'));
+        $this->assertSame(2, substr_count($bar, '<button'), 'Khối nút nhanh của lưới phải có ĐÚNG hai nút.');
+
+        // Hai nút đó là Sửa và Tải — không phải hai nút khác.
+        $this->assertStringContainsString('data-edit-open', $bar, 'Nút nhanh thứ nhất phải là «Sửa».');
+        $this->assertStringContainsString('download(g)', $bar, 'Nút nhanh thứ hai phải là «Tải».');
+        // URL tải nằm ở script (hàm download) — khoá riêng, không lẫn với phần template ở trên.
+        $this->assertStringContainsString("'/api/generations/' + g.id + '/download'", $grid,
+            'Nút «Tải» phải đi đúng endpoint tải của máy chủ.');
+        // Bóc chú thích trước khi kiểm: phần đầu tệp GHI LẠI lịch sử (nó từng đi qua
+        // requestActivity) — kiểm mã sống, không kiểm tài liệu.
+        $gridCode = preg_replace('#/\*.*?\*/#s', '', $grid);
+        $gridCode = preg_replace('#(?<!:)//[^\n]*#', '', $gridCode);
+        $this->assertStringNotContainsString('requestActivity', $gridCode,
+            'Lưới không còn tự mở công cụ — việc đó đã thuộc về trình xem ảnh.');
+
+        // ...và trình xem phải THẬT SỰ nhận việc: đi qua đúng kênh requestActivity.
+        $viewer = (string) file_get_contents(resource_path('js/studio/components/GalleryModal.vue'));
+        $this->assertStringContainsString('store.requestActivity(', $viewer,
+            'Trình xem ảnh phải là nơi điều phối tới các tính năng — qua đúng kênh requestActivity.');
     }
 }

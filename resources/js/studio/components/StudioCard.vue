@@ -231,7 +231,7 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
         </p>
         <div class="flex items-center gap-1.5">
           <a :href="settingsUrl" target="_blank" rel="noopener"
-             class="motion-ui rounded-full border border-ink-600 px-2 py-0.5 text-tiny font-semibold text-cream-300 transition hover:border-brand-400 hover:text-brand-200"
+             class="touch-target motion-ui rounded-full border border-ink-600 px-2 py-0.5 text-tiny font-semibold text-cream-300 transition hover:border-brand-400 hover:text-brand-200"
              title="Chip lấy từ PRESET trong «Cài đặt của tôi» — mở để thêm/sửa">Sửa chip</a>
           <button v-if="selectedChips.length" type="button" class="tool-btn !px-2 !py-0.5 text-tiny" @click="store.clearSceneChips()">Bỏ chọn</button>
         </div>

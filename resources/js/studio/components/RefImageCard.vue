@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useStudioStore } from '../store.js';
+import { thumbUrl } from '../composables/useStudioThumb.js';
 import StudioIcon from './StudioIcon.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 
@@ -177,7 +178,7 @@ async function runRefgen() {
 
     <!-- Ảnh tham chiếu -->
     <div v-if="img" class="mt-3 flex items-center gap-3 rounded-lg border border-ink-700 bg-cream-50/5 p-2.5">
-      <img :src="img" class="h-14 w-14 rounded-md bg-ink-900 object-cover">
+      <img :src="thumbUrl(img)" class="h-14 w-14 rounded-md bg-ink-900 object-cover">
       <div class="min-w-0 text-xs text-cream-200">
         <p class="truncate font-semibold">{{ imgName }}</p>
         <p class="text-cream-400">{{ mode === 'tryon' ? 'Ảnh trang phục — sinh người mẫu mặc đúng đồ này' : 'Ảnh tham chiếu — giữ chủ thể/phong cách/bố cục' }}</p>

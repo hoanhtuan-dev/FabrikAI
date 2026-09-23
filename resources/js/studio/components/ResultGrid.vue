@@ -6,14 +6,24 @@
  * 156px bên phải. Đo được: canvas chiếm ~70% bề ngang trong khi việc người dùng thật sự làm là
  * XEM KẾT QUẢ và CHỌN BƯỚC TIẾP. Đổi vai: lưới kết quả thành mặt chính, canvas xuống hàng công cụ.
  *
- * TÁI DÙNG, KHÔNG VIẾT LẠI: mọi hành động ở đây đi qua ĐÚNG những hàm mà OutputModule.vue đang gọi
- * (store.select · store.requestActivity · /api/generations/{id}/download). Không thêm endpoint,
- * không đổi luồng generate — chỉ đổi chỗ đứng của cùng một bộ nút.
+ * TÁI DÙNG, KHÔNG VIẾT LẠI: mọi hành động ở đây đi qua ĐÚNG những hàm đã có
+ * (store.select · store.openViewer · store.deleteGen · /api/generations/{id}/download). Không thêm
+ * endpoint, không đổi luồng generate — chỉ đổi chỗ đứng của cùng một bộ nút.
  *
  * [§12 nguyên tắc 5 — và đây là chỗ KHÁC OutputModule có chủ ý] Thanh hành động ở lưới chính
  * LUÔN HIỆN, không ẩn theo hover. Lý do: ẩn theo hover là bẫy trên thiết bị cảm ứng (không có
  * hover), và đây là mặt chính nên người dùng mới phải thấy NGAY là có bước tiếp theo. Dock hẹp giữ
  * kiểu hover vì ở đó không gian là ràng buộc thật.
+ *
+ * [2026-09-26 · đợt 52 — MOBILE-FIRST] Card chỉ còn ĐÚNG HAI nút nhanh: **Sửa** · **Tải**.
+ * Trước đây có bốn (Chọn · Sửa · Biến thể · Tải) — bốn nút chữ nhỏ trong một card rộng ~150px trên
+ * điện thoại là bốn ô chạm nhau, không ô nào đủ to để chạm chắc. Hai nút còn lại là hai việc
+ * NGƯỜI DÙNG THẬT SỰ làm ngay tại lưới; mọi việc khác (biến thể · upscale · mặc thử · kịch bản quay
+ * · gắn bộ sưu tập · prompt…) đã chuyển vào TRÌNH XEM ẢNH — chạm vào ảnh là tới đó. Một chỗ để
+ * xem, một chỗ để làm tiếp.
+ *
+ * CHIỀU CAO NÚT: 44px trên cảm ứng (h-11), 32px khi có chuột (lg:h-8). 44px là sàn chạm của Apple
+ * HIG; luật nâng sàn chạm trong app.css chỉ áp cho phần tử dưới 40px nên ở đây phải khai thẳng.
  */
 import { computed } from 'vue';
 import { useStudioStore } from '../store.js';
@@ -36,10 +46,23 @@ function projectName(pid, fallback) {
   return p ? p.name : '#' + pid;
 }
 
-/** CHỌN ảnh này làm ảnh đang làm việc (đặt workingImage + đẩy layer trong giai đoạn chuyển). */
-function select(g) { store.select(g); }
-/** Mở công cụ với CHÍNH ảnh này làm ảnh nguồn. */
-function useIn(g, activity) { store.select(g); store.requestActivity(activity); }
+/**
+ * CỠ THUMBNAIL THEO TỪNG CHỖ — một bảng, không rải số khắp nơi.
+ *
+ * Lỗi cũ: mọi lưới gọi thumbUrl(url) KHÔNG kèm cỡ ⇒ luôn nhận thumbnail 160px, trong khi card ở
+ * lưới chính rộng 150-320 CSS px; trên màn 2x thì cần 300-640 điểm ảnh thật ⇒ ảnh nhòe đúng ở chỗ
+ * người dùng nhìn kỹ nhất (kết quả họ vừa tạo).
+ *
+ * Backend chỉ nhận 160|320|480|640 (whitelist cứng trong StudioController::studioImageThumb) nên
+ * srcset chỉ được trỏ vào bốn cỡ đó. Thuộc tính sizes PHẢI khớp breakpoint của lưới bên dưới:
+ *   grid-cols-2 (mặc định) · sm:grid-cols-3 (640) · lg:grid-cols-3 · xl:grid-cols-4 (1280) · 2xl:grid-cols-5 (1536)
+ * Lệch sizes thì trình duyệt tải sai cỡ — nhòe (nếu nhỏ hơn) hoặc phí băng thông (nếu lớn hơn).
+ */
+const THUMB_SIZES = [160, 320, 480, 640];
+const GRID_SIZES = '(min-width: 1536px) 20vw, (min-width: 1280px) 25vw, (min-width: 640px) 33vw, 50vw';
+function gridSrcset(url) {
+  return THUMB_SIZES.map((s) => thumbUrl(url, s) + ' ' + s + 'w').join(', ');
+}
 
 /**
  * MỞ MÀN «CHỈNH ẢNH» (bước 5.3) — MỘT ảnh, ba chế độ Tả/Khoanh/Cọ.
@@ -91,7 +114,7 @@ function onDragStart(e, g) {
       </button>
 
       <span class="ml-auto hidden text-label text-cream-400 lg:inline">
-        Bấm ảnh để xem lớn · nút dưới ảnh để làm tiếp
+        Bấm ảnh để xem lớn · mọi tính năng nằm trong đó
       </span>
     </div>
 
@@ -122,7 +145,7 @@ function onDragStart(e, g) {
               @click="store.openViewer(g)"
               @dragstart="onDragStart($event, g)"
             >
-              <img :src="thumbUrl(g.media_url)" class="pointer-events-none h-full w-full bg-ink-900 object-cover" loading="lazy" :alt="store.genName(g)" @error="onThumbError($event, g.media_url)">
+              <img :src="thumbUrl(g.media_url, 480)" :srcset="gridSrcset(g.media_url)" :sizes="GRID_SIZES" class="pointer-events-none h-full w-full bg-ink-900 object-cover" loading="lazy" decoding="async" :alt="store.genName(g)" @error="onThumbError($event, g.media_url)">
             </button>
           </template>
 
@@ -138,23 +161,17 @@ function onDragStart(e, g) {
           </template>
         </div>
 
-        <!-- ── Thanh hành động: LUÔN HIỆN (xem chú thích đầu file) ── -->
+        <!-- ── HAI nút nhanh: Sửa · Tải. LUÔN HIỆN (xem chú thích đầu file). ── -->
         <template v-if="g.status === 'completed' && g.media_url">
-          <div class="grid grid-cols-2 gap-1 border-t border-ink-700 p-1.5">
-            <button type="button" class="flex h-7 items-center justify-center gap-1 rounded bg-ink-700 text-tiny font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-cream-50" title="Chọn ảnh này làm ảnh đang làm việc" :aria-label="'Chọn ' + store.genName(g)" @click.stop="select(g)">
-              <StudioIcon name="target" size="h-3 w-3" /> Chọn
+          <div class="grid grid-cols-2 gap-1.5 border-t border-ink-700 p-1.5">
+            <button type="button" class="flex h-11 items-center justify-center gap-1.5 rounded-lg bg-brand-600 text-label font-semibold text-primary-content transition hover:bg-brand-500 lg:h-8 lg:text-tiny" title="Mở màn Chỉnh ảnh: tả · khoanh vùng · vẽ cọ" :aria-label="'Sửa ' + store.genName(g)" data-edit-open @click.stop="editImage(g)">
+              <StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa
             </button>
-            <button type="button" class="flex h-7 items-center justify-center gap-1 rounded bg-ink-700 text-tiny font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-cream-50" title="Mở màn Chỉnh ảnh: tả · khoanh vùng · vẽ cọ" :aria-label="'Sửa ' + store.genName(g)" data-edit-open @click.stop="editImage(g)">
-              <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
-            </button>
-            <button type="button" class="flex h-7 items-center justify-center gap-1 rounded bg-ink-700 text-tiny font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-cream-50" title="Tạo biến thể từ ảnh này" :aria-label="'Biến thể từ ' + store.genName(g)" @click.stop="useIn(g, 'variation')">
-              <StudioIcon name="variations" size="h-3 w-3" /> Biến thể
-            </button>
-            <button type="button" class="flex h-7 items-center justify-center gap-1 rounded bg-ink-700 text-tiny font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-cream-50" title="Tải ảnh gốc về máy" :aria-label="'Tải ' + store.genName(g)" @click.stop="download(g)">
-              <StudioIcon name="download" size="h-3 w-3" /> Tải
+            <button type="button" class="flex h-11 items-center justify-center gap-1.5 rounded-lg bg-ink-700 text-label font-semibold text-cream-200 transition hover:bg-ink-600 lg:h-8 lg:text-tiny" title="Tải ảnh gốc về máy" :aria-label="'Tải ' + store.genName(g)" @click.stop="download(g)">
+              <StudioIcon name="download" size="h-3.5 w-3.5" /> Tải
             </button>
           </div>
-          <p class="truncate px-2 pb-1.5 text-tiny text-cream-400" :title="store.genName(g)">{{ store.genName(g) }}</p>
+          <p class="truncate px-2 pb-1.5 pt-1 text-label text-cream-400 lg:text-tiny" :title="store.genName(g)">{{ store.genName(g) }}</p>
         </template>
         <template v-else>
           <div class="flex items-center gap-1 border-t border-ink-700 p-1.5">

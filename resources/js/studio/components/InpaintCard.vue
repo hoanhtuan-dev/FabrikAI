@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { useStudioStore } from '../store.js';
 import { useJobTicker } from '../composables/useJobTicker.js';
+import { thumbUrl } from '../composables/useStudioThumb.js';
 import CompareSlider from './CompareSlider.vue';
 import StudioIcon from './StudioIcon.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
@@ -79,7 +80,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
 
     <!-- Ảnh đang chọn -->
     <div v-if="activeImg" class="mt-3 flex items-center gap-3 rounded-lg border border-ink-700 bg-cream-50/5 p-2.5">
-      <img :src="activeImg" class="h-14 w-14 shrink-0 rounded-md bg-ink-900 object-cover">
+      <img :src="thumbUrl(activeImg)" class="h-14 w-14 shrink-0 rounded-md bg-ink-900 object-cover">
       <div class="min-w-0 text-xs text-cream-200">
         <p class="truncate font-semibold">{{ store.upscaleName || 'Ảnh đang chọn' }}</p>
         <p class="text-cream-400">Sẽ sửa trực tiếp trên ảnh này</p>

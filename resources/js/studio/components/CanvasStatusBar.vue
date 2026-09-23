@@ -54,6 +54,21 @@ const toolHint = computed(() => {
 // Nút icon của thanh này: 32px trên máy tính, và sàn chạm 40px của mobile (app.css) tự nâng khi màn hẹp.
 const BTN = 'grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700 disabled:opacity-30';
 
+/*
+ * [2026-09-26 · đợt 52] THANH NÀY LÀ CỦA CANVAS — Ở MẶT LƯỚI THÌ KHÔNG ĐƯỢC HIỆN.
+ *
+ * Lỗi cũ: thanh trạng thái nằm NGOÀI hai mặt (grid/canvas) nên ở mặt lưới nó vẫn phơi ra đủ thứ
+ * chỉ có nghĩa với canvas: hoàn tác/làm lại thao tác LAYER, thu-phóng và % zoom của khung vẽ, bốn ô
+ * NỀN CANVAS, bắt điểm, số LỚP. Trên điện thoại — nơi bề ngang là thứ đắt nhất — người dùng đang
+ * xem lưới kết quả mà thấy toàn nút của một khung vẽ họ không nhìn thấy.
+ *
+ * Nay: mặt lưới giữ LẠI ĐÚNG nút đổi mặt (thứ duy nhất thuộc về cả hai mặt). Mọi nhóm còn lại chỉ
+ * render khi đang ở mặt canvas. Không xoá nút nào — chỉ thôi phơi chúng ra sai chỗ.
+ * Ngoại lệ có chủ ý: giao diện Sáng/Tối và Lưu trang là việc của CẢ ỨNG DỤNG, không của canvas,
+ * nên vẫn hiện ở máy tính (nơi có chỗ); ở điện thoại chúng nằm trong menu Tài khoản.
+ */
+const isCanvas = computed(() => store.mainView === 'canvas');
+
 // Nền canvas — MỘT NGUỒN với chính vùng canvas.
 //
 // Trước đây chỗ này tự vẽ màu bằng inline style, lệch hẳn với màu thật của canvas: ô "tối" một sắc,
@@ -88,6 +103,8 @@ const BG_OPTIONS = [
       </button>
     </div>
 
+    <!-- ══ TỪ ĐÂY TRỞ XUỐNG: CHỈ MẶT CANVAS (xem chú thích isCanvas ở script) ══ -->
+    <template v-if="isCanvas">
     <div class="h-5 w-px bg-ink-700" aria-hidden="true"></div>
 
     <!-- 1. Hoàn tác / Làm lại -->
@@ -129,15 +146,17 @@ const BG_OPTIONS = [
       </select>
     </div>
 
+    </template><!-- /nhóm chỉ-canvas -->
+
     <!-- 4. Chỗ trống + gợi ý công cụ (Krita-style) -->
     <div class="flex-1"></div>
-    <div v-if="toolHint" class="flex min-w-0 items-center gap-1.5 overflow-hidden px-1 text-label text-cream-400" title="Hướng dẫn công cụ">
+    <div v-if="isCanvas && toolHint" class="flex min-w-0 items-center gap-1.5 overflow-hidden px-1 text-label text-cream-400" title="Hướng dẫn công cụ">
       <StudioIcon name="info" size="h-3.5 w-3.5" class="shrink-0" />
       <span class="truncate">{{ toolHint }}</span>
     </div>
 
     <!-- 5. Trạng thái lớp (md+) -->
-    <div class="hidden items-center gap-1.5 text-label text-cream-400 md:flex">
+    <div v-if="isCanvas" class="hidden items-center gap-1.5 text-label text-cream-400 md:flex">
       <StudioIcon name="layers" size="h-3.5 w-3.5" />
       <span>{{ store.canvasLayers.length }} lớp</span>
       <template v-if="store.activeLayer">
@@ -146,8 +165,11 @@ const BG_OPTIONS = [
       </template>
     </div>
 
-    <!-- 6. Menu "⋯" của ĐIỆN THOẠI — cùng các việc trên, không mở đường tắt nào mới -->
-    <div class="dropdown dropdown-end dropdown-top lg:hidden">
+    <!-- 6. Menu "⋯" của ĐIỆN THOẠI — cùng các việc trên, không mở đường tắt nào mới.
+         Toàn bộ nội dung menu là việc của canvas (nền · bắt điểm · panel Layers) ⇒ ở mặt lưới
+         không có gì để mở, nên ẩn luôn nút. Giao diện và Lưu trang trên điện thoại nằm ở menu
+         Tài khoản, không mất lối vào. -->
+    <div v-if="isCanvas" class="dropdown dropdown-end dropdown-top lg:hidden">
       <div tabindex="0" role="button" class="icon-btn !h-8 !w-8" title="Thêm tuỳ chọn hiển thị" aria-label="Thêm tuỳ chọn hiển thị">
         <StudioIcon name="sliders" size="h-4 w-4" />
       </div>
@@ -216,14 +238,18 @@ const BG_OPTIONS = [
         <span>{{ themeResolved === 'light' ? 'Sáng' : 'Tối' }}</span>
       </button>
       <button @click="store.saveNow()" class="icon-btn !h-8 !w-8" title="Lưu trang (Save)" aria-label="Lưu trang"><StudioIcon name="save" size="h-4 w-4" /></button>
-      <button
-        data-dock-toggle="inspector"
-        @click="store.toggleInspector()"
-        class="icon-btn !h-8 !w-8"
-        :class="store.inspectorOpen ? '!bg-brand-600/20 !text-brand-300' : ''"
-        title="Bật/tắt panel Layers"
-        aria-label="Bật/tắt panel Layers"
-      ><StudioIcon name="panelRight" size="h-4 w-4" /></button>
+      <!-- Panel Layers là của mặt canvas ⇒ ở mặt lưới không có gì để bật/tắt. -->
+      <template v-if="isCanvas">
+        <div class="h-5 w-px bg-ink-700" aria-hidden="true"></div>
+        <button
+          data-dock-toggle="inspector"
+          @click="store.toggleInspector()"
+          class="icon-btn !h-8 !w-8"
+          :class="store.inspectorOpen ? '!bg-brand-600/20 !text-brand-300' : ''"
+          title="Bật/tắt panel Layers"
+          aria-label="Bật/tắt panel Layers"
+        ><StudioIcon name="panelRight" size="h-4 w-4" /></button>
+      </template>
     </div>
   </div>
 </template>
