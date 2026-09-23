@@ -370,4 +370,43 @@ class ModuleRegistryTest extends TestCase
             );
         }
     }
+
+    /**
+     * ĐỀ XUẤT CỦA BẢN KHAI KHÔNG ĐƯỢC CẤP CON MÀ THIẾU CHA (2026-09-26).
+     *
+     * Vì sao: `module_allowed()` đi NGƯỢC LÊN theo `depends_on` — thiếu một module cha là module con KHÔNG
+     * dùng được, dù gói có ghi tên nó. Đo trên production: gói trả tiền có 'stylist' nhưng thiếu
+     * 'trend_radar'/'collection_bot' ⇒ khách bị chặn Agent Studio và chat, còn quản trị (được miễn công tắc
+     * gói) vẫn vào được nên không ai thấy. Bất biến này chặn đúng loại lệch đó NGAY Ở BẢN KHAI, trước khi nó
+     * kịp thành dữ liệu của gói.
+     *
+     * Chỉ rà các gói THẬT SỰ được bản khai nhắc tên; '*' không phải slug nên không rà ở đây.
+     */
+    public function test_de_xuat_cua_ban_khai_khong_bao_gio_cap_con_thieu_cha(): void
+    {
+        $slugs = [];
+        foreach (ModuleRegistry::all() as $m) {
+            foreach ((array) ($m['plans'] ?? []) as $slug) {
+                if ((string) $slug !== '*') {
+                    $slugs[] = (string) $slug;
+                }
+            }
+        }
+        $this->assertNotEmpty($slugs, 'Bản khai phải có ít nhất một đề xuất theo slug gói để bất biến này có nghĩa.');
+
+        foreach (array_values(array_unique($slugs)) as $slug) {
+            $suggested = ModuleRegistry::suggestedForPlan($slug);
+
+            foreach ($suggested as $id) {
+                foreach ((array) (ModuleRegistry::get($id)['depends_on'] ?? []) as $parent) {
+                    $this->assertContains(
+                        (string) $parent,
+                        $suggested,
+                        'Đề xuất cho gói '.$slug.' có module '.$id.' nhưng thiếu module cha '.$parent
+                            .' ⇒ gói đó cấp một tính năng KHÔNG DÙNG ĐƯỢC.'
+                    );
+                }
+            }
+        }
+    }
 }
