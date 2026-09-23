@@ -4,6 +4,7 @@ use App\Console\Commands\CleanStudioStorage;
 use App\Console\Commands\GrantPlanCredits;
 use App\Console\Commands\ProcessStudioGenerations;
 use App\Console\Commands\StudioPricingCommand;
+use App\Console\Commands\StudioWebhookDoctorCommand;
 use App\Console\Commands\ThemeSync;
 use App\Http\Middleware\EnsureUserCanUseStudio;
 use App\Http\Middleware\EnsureUserIsAdmin;
@@ -13,7 +14,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 
 $app = Application::configure(basePath: dirname(__DIR__))
-    ->withCommands([CleanStudioStorage::class, ProcessStudioGenerations::class, GrantPlanCredits::class, ThemeSync::class, StudioPricingCommand::class])
+    ->withCommands([CleanStudioStorage::class, ProcessStudioGenerations::class, GrantPlanCredits::class, ThemeSync::class, StudioPricingCommand::class, StudioWebhookDoctorCommand::class])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
