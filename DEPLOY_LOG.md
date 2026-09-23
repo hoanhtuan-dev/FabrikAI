@@ -130,6 +130,42 @@ fal  fal-ai/flux-pro/v1/vto  2K 1:1  ->  4 credit      → 170 dòng giá bán �
 
 ---
 
+### 8. BỔ SUNG CÙNG NGÀY — LỖI THỨ NĂM, VÀ NÓ CHỈ LỘ RA KHI MỞ TRANG THẬT
+
+**Commit `be4d542`.** Sau khi deploy, câu hỏi *"deploy chưa"* dẫn tới việc **mở https://fabrikai.shop/bang-gia ra đọc** thay vì tin vào dòng `migrate DONE`. Kết quả: trang giá **tự mâu thuẫn** —
+
+```
+thẻ gói:             155 credit / tháng
+danh sách đặc quyền: 120 credit mỗi tháng (+30 tặng lần đầu)   ← SỐ CŨ
+```
+
+**Nguyên nhân:** migration `000011` nâng `plans.credits_per_month` (120→155, 350→405, 1.200→1.240) nhưng **không đụng `plans.features`** — mảng chuỗi tiếp thị do chủ dự án viết. Hai nguồn, hai số, cùng một trang niêm yết giá.
+
+**Cách sửa (`2026_09_26_000013`):** THAY ĐÚNG chuỗi cũ → chuỗi mới, **không ghi đè cả mảng** (ghi đè là xoá mọi câu chủ dự án đã viết). Nhân đó sửa hai câu cũng sai sự thật:
+- Gói Miễn phí ghi *"50 credit dùng thử khi đăng ký"* — nhưng `PlanService::syncCycleCredits` cấp `credits_per_month` **LẠI MỖI CHU KỲ**, không phải một lần ⇒ nay ghi *"50 credit mỗi tháng — dùng thử không giới hạn thời gian"*.
+- Thêm dòng **"Tối đa N ảnh mỗi ngày"** — trần ngày là giới hạn THẬT (429), khách phải biết TRƯỚC khi mua chứ không phải phát hiện lúc bị chặn.
+
+**Hai bất biến mới khoá lớp lỗi này:**
+- mọi cụm `"<số> credit"` trong chữ của một gói **phải khớp** `credits_per_month` của chính gói đó;
+- gói nào có `daily_image_limit > 0` thì chữ **phải nói ra**.
+
+**Kiểm chứng trên trang THẬT** (không phải trên log):
+
+| Phải bằng 0 | | Phải > 0 | |
+|---|---|---|---|
+| `120 credit mỗi tháng` | **0** ✅ | `155 credit mỗi tháng` | **1** ✅ |
+| `350 credit mỗi tháng` | **0** ✅ | `405 credit mỗi tháng` | **1** ✅ |
+| `1.200 credit mỗi tháng` | **0** ✅ | `1.240 credit mỗi tháng` | **1** ✅ |
+| `3.290.000` | **0** ✅ | `3.600.000` | **2** ✅ |
+| `50 credit dùng thử` | **0** ✅ | `ảnh mỗi ngày` | **5** ✅ |
+
+**1325 test XANH** (thêm 2 bài). HEAD máy chủ: `be4d542`.
+
+> 🎯 **Bài học đắt nhất của cả đợt — ghi lại để phiên sau không trả giá lại:**
+> *"migrate DONE" KHÔNG phải bằng chứng.* Lần thứ nhất lỗi lộ ra khi **SSH đọc Model Registry** (bảng giá không khớp model đang chạy). Lần thứ hai lộ ra khi **mở trang khách nhìn**. Cả hai lần, mọi dấu hiệu kỹ thuật đều XANH. Thêm một bước bắt buộc vào quy trình deploy: **mở trang thật ra đọc, đối chiếu với con số vừa ghi vào CSDL.**
+
+---
+
 ### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
 
 - **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.
