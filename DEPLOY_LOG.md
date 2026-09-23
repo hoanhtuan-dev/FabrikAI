@@ -166,6 +166,54 @@ danh sách đặc quyền: 120 credit mỗi tháng (+30 tặng lần đầu)   �
 
 ---
 
+## Phiên 2026-09-26 (đợt 49) — BỐN VIỆC DỞ DANG ĐÃ TRẢ: video theo giây · cron ngoài · lịch sử module · webhook fal
+
+**Commit:** `2b76347` → `9dba613`. **Trạng thái: đã push + deploy `fabrikai.shop` + kiểm trên site thật.**
+
+### 1. VIDEO TÍNH ĐỘNG THEO GIÂY (trả nợ "model video chưa có giá")
+
+Đo trên production: Model Registry chạy `wan3.0-video` / `wan2.7-t2v` / `wan2.7-i2v` — **KHÔNG phải kling** đã khai trước. Giá thật (Model Studio, International):
+`wan3.0` 1080P **$0,20/s** · `wan2.7-t2v/i2v` 1080P **$0,15/s**.
+
+Và video cho người dùng chọn thời lượng **5/8/10/15/20 giây** ⇒ giá **PHẢI tính động theo giây**. Dòng cố định trong bảng (kling=13) để 20 giây tốn 4 lần 5 giây nhưng chỉ thu 1 lần — lỗ âm thầm đúng kiểu "1 ảnh = 1 credit".
+
+Đã làm: `studio_credit_cost_for()` nhận `$seconds`; nhánh video = `ceil(giây × đơn_giá / 720)`. Migration `000014` gỡ dòng video cố định. Test `VideoPricingTest` (4 bài) khoá "20 giây đắt hơn 5 giây".
+
+### 2. CRON NGOÀI (D4)
+
+Đo trên production: `crontab` KHÔNG tồn tại, cron hPanel chạy `schedule:run` mỗi 30 phút nhưng **LỖI 65 lần** (`proc_open`) ⇒ `studio:grant-plan-credits` không chạy đúng hạn.
+
+Đã làm: `POST /api/cron/tick?token=…` (không auth/CSRF/throttle) — `hash_equals` token + `Cache::lock` chống chồng + TỰ KHOÁ 403 khi chưa đặt token. Chạy `schedule:run` + `studio:process`, trả số đo thật, ghi nhịp tim. Test `ExternalCronTest` (4 bài). Doc: `DEPLOY.md §4b`.
+
+> ⚠️ **Sau deploy thêm route, PHẢI `php artisan route:clear`** — production bật route cache, quên thì route mới trả 404 (đã dính một lần, đã sửa).
+
+### 3. MÀN "TÍNH NĂNG & GÓI" — bổ sung lịch sử + cảnh báo
+
+Ma trận gói×module ĐÃ có sẵn. Thiếu đúng 2 thứ, đã thêm:
+- **`module_change_log`**: mỗi lần bấm Lưu (theo gói + toàn cục) ghi ai/lúc nào/rút gì/ảnh hưởng bao nhiêu khách **TẠI THỜI ĐIỂM LƯU**.
+- **Cảnh báo số khách bị ảnh hưởng** khi tắt toàn cục (trước đây chỉ có ở cấp gói).
+- `GET /api/admin/modules/history` + panel Lịch sử trong tab.
+
+### 4. WEBHOOK FAL + ext-sodium
+
+- `composer require paragonie/sodium_compat` — **production KHÔNG có ext-sodium**, nhưng sodium_compat **polyfill `sodium_crypto_sign_verify_detached`** ⇒ chữ ký Ed25519 kiểm được.
+- `POST /api/webhooks/fal` — BA TẦNG: token+request_id · Ed25519+JWKS · **re-fetch từ fal (không tin URL ảnh trong payload)**. Idempotent (CAS).
+- `studio:webhook-doctor` — trên production trả **5✓ · 0⚠ · 0✗**: sodium ✓ · APP_URL https ✓ · JWKS 2 khoá ✓ · **FAL_KEY sống** ✓ · webhook route ✓.
+
+> ⚠️ **Phía SUBMIT vẫn là poll (`tryFal`)** — chưa đổi sang gửi `webhook_url`. Đây là nửa còn lại của việc fal làm hàng đợi (đổi `ImageAIService`/`FalImageGateway`). Webhook NHẬN đã sẵn, chờ nửa GỬI.
+
+---
+
+### CÒN NỢ
+- **(5) Bỏ crop + paint/erase + dựng màn "Chỉnh ảnh" mặc định "Tả" (bỏ canvas)** — việc lớn nhất, đang làm.
+- Nửa GỬI của webhook fal (đổi `tryFal` sang `webhook_url` + lưu `meta.fal`).
+- Đối chiếu hoá đơn DashScope (`qwen-image-edit-2511` $0,045 vs `-plus` $0,03).
+- `PRICING.md` chưa cập nhật.
+- `trillfa.shop` đã bị loại bỏ từ lâu (không cần deploy).
+- Provider `ckey` thử nghiệm — không cần khai giá.
+
+---
+
 ### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
 
 - **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.
