@@ -522,6 +522,36 @@ requestActivity"), `StudioDockResizeTest` (số phần tử `inert` 5 → 6, kè
 | Build | `npm run build` ✓ |
 | Chrome thật 5 khổ | nút lưới 2 · canvas-only **0** · thumbnail đúng cỡ · dải ảnh đúng chỗ · 8 tính năng · đè nhau **0** |
 
+
+### 11. ĐÍNH CHÍNH CÁCH KIỂM "BUNDLE SỐNG" (quan trọng cho các phiên sau)
+
+Hai đợt trước tôi grep `pageBoot-*.js` và tưởng đó là chunk entry. **SAI.** Manifest khai nó là
+`_pageBoot-*.js` — một **chunk CHIA SẺ** (phụ thuộc dùng chung), không phải entry:
+
+| Muốn kiểm gì | Tệp ĐÚNG |
+|---|---|
+| Khung Studio, lưới kết quả, thanh trạng thái, `StudioApp` | `main-*.js` |
+| Trình xem ảnh | `GalleryModal-*.js` |
+| Modal dùng chung | `BaseModal-*.js` |
+| Sàn chạm, màu, bố cục | `app-*.css` |
+| Hằng số của kho dữ liệu (`mainView` · `setWorkingImage` …) | `_pageBoot-*.js` (khoá object không bị minify) |
+
+Vì sao nguy hiểm: `pageBoot-rDAiZCRu.js` giữ nguyên hash suốt cả đợt 52 nên nó **không được ghi lại**
+(git chỉ ghi tệp có nội dung đổi) ⇒ mtime cũ. Nhìn mtime mà kết luận "deploy cũ" là kết luận sai; nhìn
+`main-*.js` mới thấy `15:51` và md5 **trùng khớp từng byte** với bản dựng ở máy.
+
+Cách kiểm ĐÚNG và đủ: so **md5** của `main-*.js` + `app-*.css` giữa máy và máy chủ. Trùng md5 =
+đúng bản dựng đó đang chạy, không cần suy luận qua tên tệp.
+
+### 12. HAI THỨ CỐ Ý KHÔNG XOÁ (ghi để phiên sau không "dọn" nhầm)
+
+- `absolute bottom-14` trong `StudioApp.vue` là **dải biến thể** (batch-slider) nổi trên canvas khi
+  có ≥2 biến thể — KHÔNG phải dải ảnh của trình xem. Nó thuộc mặt canvas, giữ nguyên.
+- Nút «Tạo biến thể từ ảnh này» trong `OutputModule.vue` là của **dock Outputs** (desktop, mặt canvas),
+  không phải lưới kết quả. Yêu cầu "chỉ còn 2 nút nhanh" áp cho LƯỚI; dock hẹp giữ kiểu hover của nó.
+  Dock Outputs mặc định **vẫn hiện ở desktop** — cố ý: người dùng đã kéo được vách ngăn và bề rộng
+  được nhớ lại, gỡ nó là lấy đi một bảng họ đang dùng. Trên ĐIỆN THOẠI thì đã ẩn (xem §5).
+
 ### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
 
 - **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.
