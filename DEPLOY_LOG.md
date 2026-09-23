@@ -214,6 +214,79 @@ Ma trận gói×module ĐÃ có sẵn. Thiếu đúng 2 thứ, đã thêm:
 
 ---
 
+## Phiên 2026-09-26 (đợt 50) — BỎ CANVAS: bước 5.1 → 5.4 (lưới kết quả · màn Chỉnh ảnh · xoá crop & paint/erase)
+
+**Commit:** `2a7320a` → `58795d7`. **Trạng thái: đã push + deploy `fabrikai.shop` + kiểm trên bundle sống.**
+
+### 5.1 — TÁCH "ẢNH ĐANG LÀM VIỆC" KHỎI LAYER (commit `1e641e6`)
+
+Câu hỏi *"tôi đang sửa ẢNH NÀO"* trước đây chỉ trả lời được gián tiếp qua *"layer nào đang chọn"*. Mọi công cụ một-ảnh (Sửa · Upscale · Biến thể · Gợi ý · Kịch bản quay) đọc getter `upscaleSrc`, mà getter đó lấy từ layer ⇒ **bỏ layer là bỏ luôn ảnh nguồn của 8 card**.
+
+Đã làm: `state.workingImage = {id,url,name,kind,genId}` + action `setWorkingImage(img,kind)`, đặt ở **cả 3 đường vào** (`select()` · `addGen()` · `setSource()`). Getter đọc theo thứ tự **layer → workingImage → editSource/preview**.
+
+> **Chi tiết quyết định:** `setWorkingImage` được đặt **TRƯỚC** `pushCanvasLayer` trong `select()`. Đó là chủ ý — khi bước 5.4 xoá dòng layer, ảnh đang làm việc **vẫn được đặt**, nên 8 card không phải sửa một dòng. Có test khoá đúng thứ tự này.
+> **Không đổi hành vi:** nhánh layer vẫn thắng (layer có thể đã bị sửa pixel). Test: `WorkingImageTest` (6 bài).
+
+### 5.2 — LƯỚI KẾT QUẢ THÀNH MẶT CHÍNH (commit `2a7320a`)
+
+`ResultGrid.vue` (mới): lưới toàn bề ngang, **tái dùng ĐÚNG** các hàm `OutputModule` đang gọi (`select` · `requestActivity` · `download` · `openViewer` · `deleteGen`) — không thêm endpoint, không đổi luồng generate. **Thanh hành động LUÔN HIỆN** (không ẩn theo hover): đây là mặt chính, và hover là bẫy trên thiết bị cảm ứng.
+
+- `state.mainView` ('grid' mặc định | 'canvas'), lưu bền qua `saveBarSettings`.
+- Hai mặt ẩn/hiện bằng **v-show + inert** (KHÔNG v-if) — canvas giữ ref DOM (`canvasZoom` · `cvImg`) và lớp phủ mask đang vẽ dở.
+- `setMainView` là **action của store** (2 nơi gọi: thanh trạng thái + watch tự chuyển) — một luật, không hai bản sao.
+- Nút đổi mặt ở **THANH TRẠNG THÁI** (mọi bề rộng), không ở rail công cụ (rail chỉ hiện từ `lg`).
+
+> **Chi tiết đáng nhớ:** lần đầu tôi đặt nút đổi mặt VÀO RAIL thì `ToolbarAreaTest` đỏ. Thay vì nới test, tôi **đổi thiết kế cho đúng chỗ hơn** — đổi chế độ xem không phải công cụ canvas. Test: `MainViewTest` (6 bài).
+
+### 5.3 — MÀN "CHỈNH ẢNH": MỘT ẢNH, BA CHẾ ĐỘ (commit `ec7865e`)
+
+`EditImageModal.vue` (mới). Ba chế độ, **thứ tự là chủ ý (D5)**:
+- **Tả (mặc định)** — chỉ prompt, KHÔNG mask. Đường đi của **đa số** người dùng và là đường **duy nhất chạy tốt trên điện thoại**.
+- **Khoanh** — kéo một khung. **Cọ** — vẽ tự do + làm mềm mép.
+
+**Hệ toạ độ là MỘT hàm**: `toImageCoords()` đọc `getBoundingClientRect` của chính thẻ `<img>`. Một ảnh, không xoay, không layer ⇒ hình chữ nhật của ảnh **chính là** vùng ảnh; không cần `canvasMetrics()` (130 dòng + 21 chỗ đọc ref DOM).
+
+> ⚠️ **Chỗ dễ sai nhất, đã khoá bằng test:** backend dựng mask theo quy ước **TRẮNG = giữ nguyên, ĐEN = vùng sửa** (`StudioController::buildMaskImage`). Canvas vẽ giữ nét ĐEN trên nền TRONG SUỐT (để nhìn thấy ảnh bên dưới); lúc gửi mới đặt lên nền TRẮNG. Gửi sai chiều thì fal sửa **đúng vùng muốn giữ** — không lỗi, không cảnh báo, chỉ ra ảnh sai.
+> Hợp đồng mask KHÔNG đổi (rect → `mask_mode`+`region`; brush → `mask_data` PNG) ⇒ backend không phải sửa một dòng. Test: `EditImageScreenTest` (7 bài).
+
+### 5.4 — XOÁ CROP (D1) + PAINT/ERASE (D2) (commit `58795d7`)
+
+**778 dòng xoá, 208 thêm.**
+
+| Xoá | Chỗ |
+|---|---|
+| `brushes.js` — **cả file** (223 dòng) | `exitCanvasTools()` chuyển sang `canvasView.js` (là hàm dọn trạng thái DÙNG CHUNG, không thuộc cọ vẽ) |
+| Khối crop/reframe 141 dòng | `canvasView.js` — `cropStyle` · `initCropBox` · `toggleCrop` · `cropStart` · `confirmCrop` · `reframeCenter` · `ratioAspect` |
+| 27 khoá vẽ/xoá + 8 khoá crop | `state.js` |
+| Overlay cọ vẽ/cọ xoá · vòng cọ · khung crop + tay cầm · watch · phím tắt Esc/Enter/Ctrl+A · `CANVAS_ONLY_TOOLS` | `StudioApp.vue` (112 dòng) |
+| Nhóm "Vẽ / Xoá" + nút Crop | `RegionTools.vue` (63 dòng) |
+| Ba nhánh `eraseMode` · `drawMode` · `reframeOpen \|\| cropMode` | `ContextToolbar.vue` |
+| Lời nhắc + chặn phím tắt | `CanvasStatusBar.vue` · `CollectionsCard.vue` |
+
+**GIỮ NGUYÊN:** endpoint `/api/reframe` + `/api/look` KHÔNG bị xoá (chỉ hết call-site) — xoá API là việc khác và chưa được yêu cầu.
+**MASK KHÔNG thuộc nhóm này** — nó ở lại, và đã chuyển sang màn "Chỉnh ảnh" (5.3).
+
+### KIỂM CHỨNG
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Bộ test | **1357 XANH** (trước đợt này: 1338) · 10.288 assertion |
+| Bài mới | `WorkingImageTest` (6) · `MainViewTest` (6) · `EditImageScreenTest` (7) |
+| Build | `npm run build` ✓ |
+| HEAD máy chủ | `2a7320a` → **`58795d7`** — khớp local |
+| HTTP | `/` **200** · `/up` **200** · `/bang-gia` **200** |
+| **Bundle sống** | `drawMode` · `eraseMode` · `cropMode` · `reframeOpen` · `toggleDraw` · `toggleErase` · `confirmCrop` · `cropStyle` = **0** ✅ — đã xoá THẬT, không phải ẩn |
+| Bundle sống (còn lại) | `mainView` · `inpaintMaskMode` · `setWorkingImage` = **2** ✅ |
+| Kích thước chunk | 303,8 KB → **290,6 KB** (−13 KB) |
+| Log lỗi | 6 dòng ERROR — **tất cả là lỗi CÓ SẴN** (`proc_open` của cron hPanel, mỗi 30 phút), không phải do đợt này |
+
+### CÒN LẠI
+- **(5.5) Kiểm bằng Chrome thật 5 khổ** (320 · 375 · 414 · 768 · 1280) trên production — chưa chạy.
+- Nửa GỬI của webhook fal (đổi `tryFal` sang `webhook_url` + lưu `meta.fal`).
+- Đối chiếu hoá đơn DashScope · cập nhật `PRICING.md`.
+
+---
+
 ### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
 
 - **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.
