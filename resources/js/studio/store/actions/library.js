@@ -2,6 +2,23 @@
 // Action dùng this.* trỏ cùng store instance ⇒ gọi chéo giữa các miền hoạt động y hệt file gốc.
 import { apiError, CSRF } from '../helpers.js';
 export const libraryActions = {
+    /**
+     * MỞ THƯ VIỆN ẢNH trong chính SPA /studio — HÀM DUY NHẤT làm việc đó (2026-09-26).
+     *
+     * Vì sao đưa lên kho dữ liệu: việc "mở Thư viện" gồm HAI bước luôn phải đi cùng nhau — thoát công
+     * cụ canvas trước (nếu đang crop/vẽ/mask mà nhảy sang Thư viện thì công cụ đó treo lại, quay về
+     * canvas là thấy đang dở dang), rồi đổi cờ studioView. Trước đây hai bước đó được chép ở TỪNG nơi
+     * gọi (StudioApp.vue · components/LibraryCard.vue) — thêm một lối vào thứ ba (thẻ «Thư viện» trong
+     * khung chat, components/ChatModal.vue) là thêm bản sao thứ ba, và bản nào quên exitCanvasTools()
+     * thì lối vào đó hành xử khác hai lối kia.
+     *
+     * KHÔNG tự đóng chat: người gọi quyết định (ChatModal đóng chat ngay sau đó để lớp phủ không che
+     * Thư viện vừa mở).
+     */
+    openLibrary() {
+      this.exitCanvasTools();
+      this.studioView = 'library';
+    },
     // ── Thư viện (/api/library) — quản lý + xóa ảnh cũ / ảnh rác ──
     async _libraryFetch(url, body = null) {
       const opts = body == null

@@ -534,30 +534,29 @@ class CanvasControlsTest extends TestCase
     }
 
     /**
-     * Canvas trống CHỈ CÒN ô mô tả tạo ảnh (2026-09-26 · đợt 26).
+     * Canvas trống CHỈ CÒN MỘT LỜI MỜI NGẮN + hai lối vào (2026-09-26 · đợt 38).
      *
-     * Trước đây màn hình này là "command center": ô mô tả + ba thẻ Agent Studio + cột "Đi nhanh"
-     * (Prompt đầy đủ · Nguồn ảnh · Thư viện · Bộ sưu tập · Gói) + khối phím tắt — người mở Studio lần
-     * đầu phải đọc bốn khối trước khi gõ được chữ nào.
-     *
-     * [Yêu cầu 2026-09-20] ĐÃ XÓA hai khối khác khỏi màn hình này (vẫn phải giữ nguyên trạng thái xoá):
-     *   · "Bắt đầu từ mẫu việc" (job templates) — vẫn còn trong tab Hàng loạt của ConceptCard,
-     *   · "Ảnh gần đây" — ảnh cũ vẫn nằm ở Thư viện/Outputs.
-     *
-     * Bài này khoá BA việc: (1) màn hình trống vẫn nằm dưới layer và vẫn tạo ảnh được; (2) nó CHỈ còn
-     * phần tạo ảnh, không còn khối menu nào; (3) những gì bị gỡ KHÔNG biến mất khỏi sản phẩm — bốn nút
-     * của rail phải đã lên thanh tiêu đề (data-header-actions) và rail phải không được quay lại.
+     * [ĐỔI CHÍNH SÁCH 2026-09-26 — ĐỌC KHỐI NÀY TRƯỚC KHI "KHÔI PHỤC LẠI Ô MÔ TẢ CHO ĐỦ BỘ"]
+     * Bài này TRƯỚC ĐÂY tên là test_canvas_empty_state_is_only_the_prompt_composer và khoá điều NGƯỢC
+     * LẠI: nó bắt màn hình canvas trống PHẢI còn nguyên phần tạo ảnh — `canvas-quick-prompt` ·
+     * `store.imagePromptEn` · `store.imageRatio` · `variantCount` · `creditEstimate` ·
+     * `store.generateImage()` · nhãn «Prompt Tạo Ảnh». Chủ dự án yêu cầu BỎ HẲN ô mô tả khỏi đây;
+     * việc tạo ảnh chuyển vào KHUNG CHAT (components/ChatModal.vue). Lý do THẬT, không phải để gọn mắt:
+     *   · BA CHỖ VIẾT MỘT VIỆC — cùng trường imagePromptEn đã có ô nhập ở card «Tạo ảnh» (ConceptCard) và
+     *     ở đây; thêm ô trong chat nữa là ba ô cho một việc, ba chỗ phải sửa mỗi lần đổi quy ước;
+     *   · CHỖ SAI — ô mô tả chỉ tồn tại KHI CANVAS TRỐNG, nên vừa có ảnh trên canvas là mất chỗ viết mô tả.
+     * Bộ khẳng định KHÔNG bị nới lỏng: mọi bất biến CŨ còn đúng thì giữ nguyên (z-0 · hai khối menu không
+     * quay lại · bốn nút rail đã lên thanh tiêu đề), và phần vừa đổi được khoá theo CHIỀU MỚI (màn hình
+     * này KHÔNG còn đường tạo ảnh, nhưng PHẢI còn đường vào chat và bảng prompt đầy đủ — xem thêm
+     * tests/Feature/StudioHeaderAndPromptTest.php bài 4 và bài 8).
      */
-    public function test_canvas_empty_state_is_only_the_prompt_composer(): void
+    public function test_canvas_empty_state_is_only_an_invitation_and_a_way_into_chat(): void
     {
         $empty = $this->vue('CanvasEmptyState.vue');
 
-        // Vẫn nằm dưới layer (bất biến cũ) và vẫn tạo ảnh được.
+        // Bất biến CŨ giữ nguyên: nằm dưới layer, và hai khối menu đã xoá thì không được quay lại.
         $this->assertStringContainsString('absolute inset-0 z-0', $empty,
             'Canvas trống phải ở z-0 để không che hiệu ứng mờ của layer.');
-        $this->assertStringContainsString('store.generateImage()', $empty, 'Composer vẫn phải gọi được generateImage().');
-
-        // Hai khối đã xóa — không được quay lại Canvas.
         $this->assertStringNotContainsString('Bắt đầu từ mẫu việc', $empty,
             'Khối "Bắt đầu từ mẫu việc" phải bị xóa khỏi Canvas trống.');
         $this->assertStringNotContainsString('Ảnh gần đây', $empty,
@@ -567,18 +566,34 @@ class CanvasControlsTest extends TestCase
         $this->assertStringNotContainsString('recentGens', $empty,
             'Canvas trống không được giữ danh sách recentGens nữa.');
 
-        // (3) Chỉ còn phần TẠO ẢNH: ô mô tả + biến thể + tỉ lệ + chi phí + nút + gợi ý điền nhanh.
+        // (3) KHÔNG còn phần TẠO ẢNH — kể cả mã chết của nó. Mỗi chuỗi là một mảnh của ô mô tả cũ.
         foreach ([
-            'canvas-quick-prompt', 'store.imagePromptEn', 'store.imageRatio', 'variantCount',
-            'creditEstimate', 'Prompt Tạo Ảnh',
-        ] as $needle) {
-            $this->assertStringContainsString($needle, $empty, "Canvas trống thiếu phần tạo ảnh: {$needle}.");
+            'canvas-quick-prompt' => 'ô mô tả tạo ảnh (id cũ)',
+            'store.imagePromptEn' => 'trường mô tả của Studio',
+            'store.imageRatio' => 'bộ chọn tỉ lệ',
+            'variantCount' => 'bộ chọn số biến thể',
+            'creditEstimate' => 'số credit ước tính',
+            'store.generateImage' => 'đường tạo ảnh',
+            '<textarea' => 'ô nhập mô tả',
+        ] as $gone => $what) {
+            $this->assertStringNotContainsString($gone, $empty,
+                "Canvas trống còn sót phần tạo ảnh ({$gone} — {$what}). Việc tạo ảnh nay nằm trong khung "
+                .'chat (components/ChatModal.vue): hai chỗ viết một mô tả là hai chỗ để lệch nhau.'
+            );
         }
+
+        // (3b) KHÔNG mất tính năng: hai lối vào còn lại phải có thật.
+        $this->assertStringContainsString('store.chatOpen = true', $empty,
+            'Canvas trống mất lối vào khung chat — người đang đứng ở màn này không còn cách nào tạo ảnh.');
+        $this->assertStringContainsString('data-chat-open', $empty, 'Thiếu dấu nhận diện cho nút mở khung chat.');
+        $this->assertStringContainsString('store.promptOpen = true', $empty,
+            'Mất đường dự phòng «Bảng prompt đầy đủ» (prefix · negative · phom dáng · mẫu việc).');
 
         // Các khối đã GỠ — không được quay lại dưới bất kỳ hình thức nào.
         foreach (['AGENT_STEPS', 'quickActions', 'Đi nhanh', 'Mở Agent Studio', 'shortcuts', 'Phím tắt'] as $gone) {
             $this->assertStringNotContainsString($gone, $empty,
-                "Canvas trống còn khối menu ({$gone}) — màn hình này chỉ để tạo ảnh.");
+                "Canvas trống còn khối menu ({$gone}) — màn hình này chỉ để mời người dùng bắt đầu."
+            );
         }
 
         // (4) KHÔNG mất tính năng: bốn nút cũ của rail phải nay nằm trên thanh tiêu đề Studio.

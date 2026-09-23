@@ -546,8 +546,9 @@ và *hỏi đáp có nguồn*. Nay hai việc nằm ở hai chỗ:
 
 | Nơi | Mở bằng cách nào | Dùng để làm gì |
 |---|---|---|
-| **Modal «Trợ lý thiết kế»** | Nút **Trợ lý** (biểu tượng con bot) trong **cụm công cụ ở thanh trên** — mở được **từ bất kỳ lúc nào**, kể cả khi canvas đã có ảnh. Màn hẹp thì nằm trong **menu công cụ**; cũng có một lệnh trong **bảng lệnh** | Hỏi đáp có dẫn nguồn (đọc hồ sơ thương hiệu + tự tra internet), chữ hiện dần, nút **Dừng**, **Hội thoại mới** |
-| **Ô mô tả tạo ảnh** (canvas trống) | Không cần mở gì — hiện sẵn khi canvas trống | Viết mô tả để tạo ảnh; có nút phụ **«Hỏi trợ lý»** mở thẳng modal nếu bạn đang phân vân |
+| **Modal «Trợ lý thiết kế»** | **Nút NỔI ở góc dưới–phải vùng canvas** (biểu tượng con bot) — mở được **từ bất kỳ lúc nào**, kể cả khi canvas đã có ảnh; nút này hiện ở **mọi bề rộng màn hình**. Hai đường phụ: một lệnh trong **bảng lệnh** (Ctrl+K — đường dành cho bàn phím) và nút **«Mở trợ lý & tạo ảnh»** ở màn hình canvas trống | Hỏi đáp (đọc hồ sơ thương hiệu + tự tra internet), chữ hiện dần, nút **Dừng**, **Hội thoại mới** — **và từ 2026-09-26 là chỗ TẠO ẢNH** (xem §12.9) |
+| **Điều phối trong chat** | Thẻ chức năng ở trong khung chat (xem §12.9) | Đưa bạn tới đúng chỗ: Tạo ảnh · Gợi ý từ ảnh · Tín hiệu & Định hướng · Thư viện · Bộ sưu tập · Bảng prompt |
+| ~~Ô mô tả tạo ảnh (canvas trống)~~ — **ĐÃ GỠ 2026-09-26** | **Không còn.** Màn hình canvas trống nay chỉ có: một lời mời ngắn + nút **«Mở trợ lý & tạo ảnh»** + nút **«Bảng prompt đầy đủ»** | Viết mô tả để tạo ảnh **ngay trong khung chat** (§12.9), hoặc mở bảng Prompt Tạo Ảnh đầy đủ nếu bạn quen chỉnh kỹ (prefix · negative · phom dáng · mẫu việc) |
 
 Hai khung — modal ở Studio và bước **Hỏi đáp** trong Agent Studio — dùng **CHUNG một hội thoại** (cùng kho dữ
 liệu), nên không bao giờ có hai lịch sử lệch nhau. Gõ dở một câu rồi đóng modal thì chữ vẫn còn khi mở lại.
@@ -567,6 +568,69 @@ không nêu tên nhà cung cấp AI, tên model, mã HTTP hay chữ "json".
 | Gói không có **CollectionBot** | Bị chặn ở BACKEND: **403** kèm `code: module_locked` (ẩn nút trên giao diện không phải là phân quyền) |
 | Chưa đăng nhập | **401** |
 
+### 12.9 Tạo ảnh NGAY TRONG khung chat — và canvas trống đã nhả việc đó ra (2026-09-26)
+Từ **2026-09-26**, khung trò chuyện không chỉ để hỏi: nó là **chỗ tạo ảnh**. Đổi lại, **ô mô tả ở màn hình
+canvas trống đã bị GỠ HẲN** (textarea · nút «Tạo ảnh» · gợi ý điền nhanh · nút ẩn/gọi lại). Lý do thật:
+ô mô tả đó chỉ hiện **khi canvas trống**, nên vừa có ảnh trên canvas là bạn mất chỗ viết mô tả cho tấm
+tiếp theo; và cùng một trường dữ liệu ấy đã có ô nhập ở card «Tạo ảnh» — thêm ô trong chat nữa là **ba ô
+cho một việc**.
+
+| Trong khung chat | Nói gì |
+|---|---|
+| Thẻ **«Tạo ảnh»** | Mở **ô mô tả ngay trong chat** (không mở thêm một cửa sổ nào). Ô này nạp sẵn mô tả bạn đã có |
+| **«Lấy từ câu trả lời»** | Chèn câu trả lời mới nhất của trợ lý vào ô mô tả, ở **dạng chữ sạch** (bỏ dấu định dạng) và **nối thêm** — không đè lên chữ bạn đã gõ |
+| Nút **«Tạo ảnh»** | Gửi yêu cầu. Ô trống thì nút bị khoá và có dòng **↳** nói vì sao |
+| Thẻ kết quả | **"Đã gửi yêu cầu tạo ảnh."** + **nguyên văn mô tả đã gửi**, rồi trạng thái THẬT: *đang gửi* · *đã xếp hàng* · *đang tạo* · *đã tạo xong N/M ảnh* · *máy tạo ảnh báo lỗi*. Phần trăm là **con số của hệ thống**, không phải hoạt ảnh cho đẹp |
+| Nút **«Về canvas»** | Đóng khung chat để bạn nhìn ảnh đang hiện ra |
+
+**Đường tạo ảnh vẫn chỉ có MỘT**: khung chat ghi mô tả vào đúng trường mô tả của Studio rồi gọi **đúng
+hàm** mà card «Tạo ảnh» và bảng prompt vẫn gọi. Nhờ vậy tỉ lệ · độ phân giải · số biến thể · phom dáng ·
+prefix/negative · model đang chọn · bộ sưu tập đang áp dụng **không thể lệch** giữa các lối vào.
+
+### 12.9b Thẻ chức năng — chat điều phối bạn tới đúng việc (2026-09-26)
+Dưới câu trả lời (và ở trạng thái rỗng) có một dải **thẻ chức năng**. Mỗi thẻ là một **nút điều hướng
+THẬT**, bấm là tới nơi — **không gọi AI để quyết định**, nên chat vẫn nhanh:
+
+| Thẻ | Đưa bạn tới |
+|---|---|
+| **Tạo ảnh** | Ô mô tả ngay trong chat (§12.9) |
+| **Gợi ý từ ảnh** | Card **«Gợi ý từ ảnh»** — nơi đọc một ảnh mẫu rồi gợi ý prompt. Chat đóng lại và bạn được đưa tới đúng nhóm công cụ đó; **luồng phân tích chạy ở CARD, không chạy trong chat** |
+| **Tín hiệu & Định hướng** | Trang **Agent Studio** (điều hướng thật, đổi URL) |
+| **Thư viện** | **Thư viện ảnh** của Studio (ảnh đã tạo + file bạn tải lên) |
+| **Bộ sưu tập** | Bảng **Bộ sưu tập & dự án** |
+| **Bảng prompt** | Bảng **Prompt Tạo Ảnh đầy đủ** (prefix · negative · phom dáng · mẫu việc) |
+
+Câu ở đầu dải nói TRƯỚC: *"Chọn việc tiếp theo — thẻ nào mở chỗ khác thì khung chat sẽ đóng lại."* Thẻ
+nào mở ra chỗ khác thì chat **tự đóng**, để lớp phủ của chat không che đúng thứ bạn vừa mở.
+
+### 12.10 Đăng ký API key tìm kiếm web (ngay trong chat) — 2026-09-26
+Trong trạng thái rỗng của khung chat có mục **gấp lại, mặc định ĐÓNG**: **«Cách đăng ký API key tìm kiếm
+web»**. Nội dung **khớp với §11.6** ở trên; sửa một chỗ thì sửa cả hai.
+
+**· Tavily — KHUYÊN DÙNG, đang chạy.** Hiện đã bật chế độ **KHÔNG CẦN KHOÁ** nên tìm kiếm web **đã chạy**.
+Muốn hạn mức riêng: vào **app.tavily.com** → đăng nhập → copy khoá dạng `tvly-…` (**miễn phí 1.000
+credit/tháng, không cần thẻ**) → chạy trên máy chủ:
+```bash
+php artisan studio:web-search-setup --provider=tavily --key=tvly-…
+```
+
+**· Google Programmable Search — thay thế.** Tạo engine ở **programmablesearchengine.google.com** và
+**BẬT "Search the entire web"** → lấy mã `cx` → bật **Custom Search API** trong
+**console.cloud.google.com** → tạo API key → chạy trên máy chủ:
+```bash
+php artisan studio:web-search-setup --key=AIza… --cx=…
+```
+
+Hai câu lệnh có nút **Copy** cạnh mỗi dòng — câu lệnh dài, gõ tay sai một chữ là lệnh không chạy.
+
+**Hai điều phải biết trước khi bỏ công đi lấy khoá:**
+1. Khoá được lưu ở dạng **ĐÃ MÃ HOÁ** và **không hiện lại trên màn hình** — đừng đi tìm nó trong Cài đặt.
+2. Bạn **KHÔNG cần khoá** nếu chấp nhận dùng chung hạn mức có sẵn. Lấy khoá chỉ để có **hạn mức riêng**.
+
+⚠️ **Điều CHƯA kiểm chứng:** phiên viết mục này **không mở trình duyệt** để bấm thử mục đó; nội dung đọc
+từ mã (`resources/js/studio/components/ChatModal.vue`) và từ signature của lệnh
+(`app/Console/Commands/WebSearchSetupCommand.php`). Máy chủ **chưa chạy** hai câu lệnh trên để đo lại.
+
 > **Trạng thái (cập nhật 2026-09-23 sau khi deploy):** nội dung §12.1–§12.6 đọc từ **mã + test chạy tại máy**.
 > Tính năng **ĐÃ DEPLOY** production (commit `21e173c` · đợt 38) và **ĐÃ ĐO THẬT** trên máy chủ:
 > `php artisan studio:chat-check --live` → mảnh chữ đầu tiên **4.017 ms**, 103 mảnh, `streamed=CÓ`, 2 lượt công cụ,
@@ -574,5 +638,11 @@ không nêu tên nhà cung cấp AI, tên model, mã HTTP hay chữ "json".
 > chỉ có tin tức ⇒ trợ lý nói thẳng là chưa tra được). Ba con số trần ở §12.3 lấy NGUYÊN từ hằng số trong mã,
 > KHÔNG phải đo. **Điều vẫn CHƯA kiểm chứng:** chưa ai bấm tay trong trình duyệt (mở modal, xem chữ chảy, bấm
 > Dừng, bấm «Đưa vào mô tả ảnh»).
+>
+> **Trạng thái của §12.9 – §12.10 (thêm 2026-09-26):** đọc từ **mã + test chạy tại máy**
+> (`vendor/bin/phpunit --no-coverage` chạy TOÀN BỘ: **XANH**; `node scripts/check-chat-format.mjs`:
+> **XANH**), và bản build đã đóng gói các chuỗi mới. **Điều CHƯA kiểm chứng:** phiên làm việc này
+> **KHÔNG mở được trình duyệt** — chưa ai bấm thẻ «Tạo ảnh» trong chat, chưa bấm «Về canvas», chưa mở mục
+> khai khoá, và **chưa chạy** hai câu lệnh `studio:web-search-setup` trên máy chủ. Tính năng **CHƯA deploy**.
 
 ---

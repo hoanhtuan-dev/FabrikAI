@@ -321,7 +321,7 @@ npm run build                 # 4. CSS bán cho khách
 | `CompareSlider.vue` | tự làm trượt so sánh trước/sau |
 | `DockResizer.vue` (+ `useDockResize.js`) | tự làm vách ngăn kéo — dùng chung cho **cả ba** dock |
 | `CanvasEmptyState.vue` | màn hình canvas trống kiểu "một dòng chữ" |
-| `ChatModal.vue` | khung chat tự viết trong từng màn (trước 2026-09-26 là một TAB trong màn hình canvas trống) |
+| `ChatModal.vue` | khung chat tự viết trong từng màn (trước 2026-09-26 là một TAB trong màn hình canvas trống). **[2026-09-26]** nay kiêm luôn **ô mô tả tạo ảnh + thẻ chức năng điều hướng + mục khai khoá tìm kiếm web** — KHÔNG có component thứ hai cho ba việc đó, và ô mô tả ở đây gọi ĐÚNG MỘT đường `generateImage()` của kho dữ liệu (xem §6.9 ghi chú 5) |
 | `ChatFab.vue` | **nút nổi (FAB)** tự vẽ ở từng màn — nút Material tròn, neo vào VÙNG NỘI DUNG, ẩn khi hộp thoại của chính nó mở (luật đầy đủ ở §3.1) |
 | `NotificationCenter.vue` | khay thông báo tự chế (từng có 3 kiểu, 3 vị trí, 3 thời lượng) |
 | `SettingsSkeleton.vue` · `SettingsToasts.vue` | khung xương + khay thông báo tự chế ở khu Cài đặt |
@@ -619,6 +619,8 @@ không có bản thứ hai để lệch.
 | "Lượt này chưa trả lời được — bạn hỏi lại giúp." | Việc làm tiếp; phần chữ đã nhận vẫn được GIỮ | tên ngoại lệ · chi tiết lỗi của máy chủ |
 | "Hội thoại đã đủ 12 lượt. Bấm «Hội thoại mới» rồi hỏi tiếp…" | Đường đi tiếp khi chạm trần hội thoại | "422" · "validation failed" |
 | "Nhập câu hỏi ở ô trên rồi bấm «Hỏi»…" (sau dấu ↳) | Vì sao nút chính đang bị khoá (§4 luật 4) | — |
+| "Hỏi mình về bộ sưu tập vừa dựng nhé" + "Mình trả lời dần từng mảnh, và bạn copy được từng câu để dán sang tài liệu · email. Cần dữ kiện bên ngoài thì mình tra web giúp; chưa có thì mình nói thật là chưa có." (trạng thái rỗng của bước «Hỏi đáp», **[2026-09-26] viết lại**) | Lời chào của bước này nói khung làm được gì, cùng GIỌNG với lời chào ở §6.9 nhưng **KHÁC CÂU** — hai nơi hai bối cảnh (ở đây là bước 5 của một luồng vừa dựng xong bộ sưu tập), chép y nguyên là hai câu giống nhau ở hai chỗ để lệch nhau. Câu cũ ("Hỏi thẳng về bộ sưu tập bạn vừa dựng" + đoạn dài, viết hoa chữ COPY) **ĐÃ GỠ** | viết hoa cả câu · chữ kỹ thuật · bỏ mất vế "chưa có thì nói thật" |
+| Ô tạo ảnh · thẻ chức năng · mục khai khoá tìm kiếm web | **KHÔNG có ở bước này** — ba thứ đó thuộc RIÊNG `/studio`. Lý do: thẻ chức năng là điều hướng trong /studio (bấm ở đây là nhảy trang giữa lúc làm dở luồng 5 bước), còn việc ra ảnh ở đây là bước 4 của chính luồng. Nhãn của chúng ở §6.9 | chép ba khối đó sang đây "cho đủ bộ" |
 
 Sáu ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
 
@@ -685,21 +687,42 @@ vẫn chỉ có MỘT nguồn trong mã.
 | Nhãn hiển thị | Nói với người dùng điều gì | KHÔNG được viết |
 |---|---|---|
 | "Trợ lý thiết kế" (tiêu đề modal) | Tên việc, không phải tên công nghệ | tên model · tên nhà cung cấp · "AI Chat" |
-| "Hỏi thẳng về bộ sưu tập bạn đang làm" (trạng thái rỗng) | Khung này trả lời được việc gì | "Xin chào! Tôi là trợ lý ảo…" (lời chào không nói được gì) |
+| ~~"Hỏi thẳng về bộ sưu tập bạn đang làm" + đoạn "Trợ lý đọc hồ sơ thương hiệu và quy tắc làm việc bạn đã khai, tự tra internet khi cần dữ kiện, rồi trả lời. Chưa có dữ liệu thì nói thẳng là chưa có — không bịa."~~ — **ĐÃ GỠ 2026-09-26** | Hai câu này **KHÔNG còn hiện ra**: chủ dự án yêu cầu lời chào NGẮN và MỀM hơn (câu cũ dài, cứng, nhiều chữ kỹ thuật). Thay bằng hàng ngay dưới — **ba sự thật vẫn giữ ĐỦ**, chỉ đổi giọng | — |
+| "Cùng xem bộ sưu tập bạn đang làm nhé" (trạng thái rỗng, tiêu đề — 8 từ) | Khung này trả lời được việc gì, nói như người với người; KHÔNG ra lệnh, KHÔNG viết hoa cả câu | "Xin chào! Tôi là trợ lý ảo…" (lời chào không nói được gì) · câu dài quá 12 từ · chữ kỹ thuật ("dữ kiện", "truy vấn") |
+| "Mình đọc hồ sơ và quy tắc bạn đã khai, cần thì tra thêm trên web. Chưa có dữ liệu thì mình nói thật là chưa có." (đoạn dưới lời chào) | Nói TRƯỚC nguồn gốc câu trả lời để người dùng biết mức độ tin — giữ ĐỦ ba sự thật: (a) đọc hồ sơ/quy tắc của shop · (b) tự tra web khi cần · (c) không có dữ liệu thì nói thật | "câu trả lời chính xác 100%" · "AI thông minh nhất" · bỏ mất vế (c) — bỏ vế đó là hứa rằng trợ lý luôn có câu trả lời |
 | "Trợ lý đọc hồ sơ thương hiệu của shop và tự tra internet khi cần để trả lời." (dòng mô tả đầu modal) | Nói TRƯỚC nguồn gốc câu trả lời để người dùng biết mức độ tin | "câu trả lời chính xác 100%" · "AI thông minh nhất". **[2026-09-26]** câu cũ hứa "câu trả lời kèm nguồn bấm được để bạn tự kiểm" — khối nguồn đã gỡ hẳn nên lời hứa đó bị SỬA, không giữ lại |
 | Ba câu gợi ý (`CHAT_SUGGESTIONS` — MỘT hằng số ở `store/actions/agentChat.js`) | Mỗi câu một VIỆC khác nhau; bấm là gửi luôn vì gợi ý là câu hỏi HOÀN CHỈNH | câu mẫu chung chung ("Hỏi gì đó đi") · hai danh sách gợi ý ở hai nơi |
 | "Gõ câu hỏi rồi bấm nút gửi — ví dụ: «chất liệu nào đang lên?»" (sau dấu ↳) | Vì sao nút gửi đang bị khoá (§4 luật 4) | "disabled" · "invalid input" |
 | "Đang trả lời…" (khi lượt đó chưa có chữ nào) | Đang chờ việc gì | tên hàm công cụ · tên model |
-| "Đưa vào mô tả ảnh" | Cầu nối "tìm hiểu → làm": ghi câu trả lời vào `store.imagePromptEn` | "Áp dụng" · "Dùng" (không nói rõ đưa vào đâu) |
-| "Đã đưa câu trả lời vào ô mô tả ảnh — bấm «Tạo ảnh» khi bạn đã sửa lại cho vừa ý." | Việc đã xảy ra + bước tiếp theo | "Thành công!" (không có bước tiếp) |
+| "Đưa vào mô tả ảnh" | Cầu nối "tìm hiểu → làm". **[2026-09-26 · ĐỔI HÀNH VI]** nay nó **MỞ ô mô tả tạo ảnh NGAY TRONG chat** với câu trả lời đã chèn sẵn; trước đây nó ghi thẳng vào trường mô tả rồi ĐÓNG modal, và người dùng phải tự đi tìm ô mô tả ở canvas trống (ô đó đã gỡ 2026-09-26 — xem ghi chú 5 bên dưới). Một đường, không hai | "Áp dụng" · "Dùng" (không nói rõ đưa vào đâu) |
+| "Đã đưa câu trả lời vào ô mô tả ảnh — bạn sửa lại cho vừa ý rồi bấm «Tạo ảnh»." | Việc đã xảy ra + bước tiếp theo, NGAY TẠI CHỖ vừa mở | "Thành công!" (không có bước tiếp) |
 | "Bạn đã dừng lượt này — phần trả lời ở trên là phần đã nhận được." | Phần chữ đã nhận được GIỮ LẠI, không xoá đi | "Đã huỷ yêu cầu" · mã lỗi |
 | "Chưa trả lời được câu này. Bạn thử hỏi lại sau ít phút." (cho RIÊNG lượt đó) | Việc làm tiếp; lỗi của một lượt không phá cả hội thoại | tên ngoại lệ · chi tiết lỗi máy chủ |
-| "Hỏi trợ lý" (nút ở màn hình canvas trống) | Lối vào modal từ màn tạo ảnh | "Chat" · "Trò chuyện" (tên cũ của tab đã gỡ) |
+| ~~"Hỏi trợ lý"~~ → **"Mở trợ lý & tạo ảnh"** (nút ở màn hình canvas trống, 2026-09-26) | Lối vào modal từ màn hình trống. **Nhãn cũ "Hỏi trợ lý" ĐÃ GỠ cùng nhãn "Bảng đầy đủ"** vì từ đợt 38 khung chat là chỗ DUY NHẤT để viết mô tả ảnh — nút không còn chỉ để "hỏi", nó là đường TẠO ẢNH, và nhãn phải nói đúng việc | "Chat" · "Trò chuyện" (tên cũ của tab đã gỡ) |
+| "Bảng prompt đầy đủ" (nút phụ cạnh đó) | Đường DỰ PHÒNG cho người quen chỉnh kỹ: mở popup Prompt Tạo Ảnh (prefix · negative · phom dáng · mẫu việc) | nhãn cũ "Bảng đầy đủ" (không nói bảng CỦA CÁI GÌ) |
 | "Copy câu hỏi này" · "Copy câu trả lời này" (nút Copy của TỪNG tin nhắn — nhắc lại từ §6.8 [2026-09-26]) | Nhãn nói rõ **COPY CÁI GÌ**; tin của trợ lý chép bản CHỮ SẠCH (bỏ dấu định dạng, link thành "chữ (địa chỉ)") | "Copy" trống · "Sao chép nội dung" |
 | "Đã copy … vào bộ nhớ tạm." · "Trình duyệt chặn việc copy — bạn bôi đen chữ rồi copy tay giúp." (nhắc lại từ §6.8) | Việc ĐÃ xảy ra, và đường đi tiếp khi clipboard bị chặn (không HTTPS hoặc không phải thao tác trực tiếp) | "Thành công!" · chi tiết lỗi của trình duyệt |
 | "Xuống dòng (thêm dòng mới)" (nút trong ô hỏi của modal — nhắc lại từ §6.8) | Trên ĐIỆN THOẠI Enter là GỬI; nút chèn dòng mới tại ĐÚNG VỊ TRÍ CON TRỎ | "Enter" · "Shift+Enter" (hai phím không có trên điện thoại) |
+| **THẺ CHỨC NĂNG** (2026-09-26) — "Chọn việc tiếp theo — thẻ nào mở chỗ khác thì khung chat sẽ đóng lại." | Dải thẻ là ĐIỀU PHỐI: bấm là ĐI ĐÂU ĐÓ THẬT, và câu này nói TRƯỚC rằng chat sẽ đóng — người dùng không bị bất ngờ khi khung chat biến mất | "Gợi ý" · "Bạn có thể muốn…" (chữ trang trí, không nói nút LÀM gì) |
+| Thẻ "Tạo ảnh" | Mở ô mô tả NGAY TRONG chat (không mở modal thứ hai) | "Tạo ảnh mới" · "Sinh ảnh" |
+| Thẻ "Gợi ý từ ảnh" | Đưa người dùng tới ĐÚNG card «Gợi ý từ ảnh» (nhóm công cụ `concept`) rồi đóng chat; hành động chạy luồng là ở CARD đó, không phải ở chat | "Phân tích ảnh" (nghe như chat tự phân tích) · tên hàm/kỹ thuật |
+| Thẻ "Tín hiệu & Định hướng" | Điều hướng THẬT sang trang Agent Studio | "Radar" · "Trend" |
+| Thẻ "Thư viện" · "Bộ sưu tập" · "Bảng prompt" | Ba cửa vào ĐANG CÓ của Studio (Thư viện ảnh · bảng Bộ sưu tập & dự án · bảng Prompt Tạo Ảnh đầy đủ) | tên bảng dữ liệu · tên route |
+| **Ô TẠO ẢNH TRONG CHAT** (2026-09-26) — "Mô tả ảnh cần tạo" | Nói rõ ô này để làm gì; mô tả là chữ TIẾNG ANH đi thẳng vào máy tạo ảnh | "Prompt" trống không giải thích · "EN" (viết tắt kỹ thuật) |
+| "Lấy từ câu trả lời" | Chèn câu trả lời MỚI NHẤT vào ô mô tả, dạng CHỮ SẠCH (bỏ dấu định dạng) và NỐI THÊM chứ không đè | "Áp dụng" · "Auto-fill" |
+| "Chưa có mô tả — gõ vài chữ tả tấm ảnh bạn muốn rồi bấm Tạo ảnh." (sau dấu ↳) | Vì sao nút «Tạo ảnh» đang bị khoá (§4 luật 4) | "disabled" · "invalid" |
+| "Đã gửi yêu cầu tạo ảnh." + "Mô tả đã gửi: …" | Xác nhận việc ĐÃ XẢY RA và nhắc lại **ĐÚNG** mô tả đã đi (không phải bản nháp đang gõ dở) | "Thành công!" · hiện mô tả đang gõ dở thay vì mô tả đã gửi |
+| "Đang gửi yêu cầu tạo ảnh…" · "Đã xếp hàng — đang chờ máy tạo ảnh…" · "Đang tạo ảnh…" · "Đã tạo xong N/M ảnh — ảnh đã nằm trên canvas." · "Máy tạo ảnh báo lỗi cho lô này — bạn thử lại giúp." · "Chưa gửi được yêu cầu tạo ảnh — bạn thử lại giúp." | SÁU trạng thái THẬT đọc từ kho dữ liệu (`store.generating` · `store.generateStage` · `store.generateProgress` · `store.generatedCount` · `store.lastBatch`). Phần trăm là con số CỦA KHO DỮ LIỆU | phần trăm tự bịa · hoạt ảnh phần trăm · im lặng khi chưa gửi được · nói "Hoàn tất!" khi ảnh còn đang chờ |
+| "Về canvas" (nút trong thẻ kết quả) | Đường ĐÓNG chat để nhìn ảnh đang tạo — nếu không người dùng phải tự đoán | "Đóng" · "OK" (không nói đóng để làm gì) |
+| **MỤC KHAI API KEY TÌM KIẾM WEB** (2026-09-26) — "Cách đăng ký API key tìm kiếm web" (gấp lại, MẶC ĐỊNH ĐÓNG) | Đây là việc MỘT LẦN của chủ shop, không phải việc hằng ngày — mở sẵn ra là chiếm chỗ của câu hỏi | mở sẵn · nhét vào menu Cài đặt (chủ shop không biết tìm ở đâu) |
+| "Tavily — khuyên dùng, đang chạy" | Nói TRƯỚC rằng tìm kiếm web **đã chạy** ở chế độ KHÔNG CẦN KHOÁ, nên người dùng không đi tìm khoá một cách vô ích | "chưa cấu hình" · "cần API key để dùng" (sai sự thật) |
+| "Muốn hạn mức riêng thì vào app.tavily.com → đăng nhập → copy khoá dạng tvly-… (miễn phí 1.000 credit/tháng, không cần thẻ) → chạy trên máy chủ:" | Ba thứ người dùng cần: lấy ở ĐÂU · được gì · chạy Ở ĐÂU (máy chủ, không phải trình duyệt) | "truy cập trang quản trị" (mơ hồ) · giấu điều kiện miễn phí |
+| "Google Programmable Search — thay thế" + "BẬT \"Search the entire web\"" | Đường thay thế, và **điều kiện dễ quên nhất** khiến engine chỉ tìm trong vài site (triệu chứng duy nhất nhìn thấy là "0 kết quả") | "Google CSE" (viết tắt nội bộ) · bỏ mất câu BẬT "Search the entire web" |
+| `php artisan studio:web-search-setup --provider=tavily --key=tvly-…` · `php artisan studio:web-search-setup --key=AIza… --cx=…` | HAI câu lệnh phải chạy TRÊN MÁY CHỦ, nguyên văn từ signature của `app/Console/Commands/WebSearchSetupCommand.php`. Đây là **NGOẠI LỆ CÓ Ý THỨC** của §6.1 (xem ghi chú 6) | chép thiếu tham số (`--cx` · `--provider`) · đổi thứ tự · khoá THẬT trong mã nguồn |
+| "Khoá được lưu ở dạng ĐÃ MÃ HOÁ và không hiện lại trên màn hình. Bạn KHÔNG cần khoá nếu chấp nhận dùng chung hạn mức có sẵn." | HAI sự thật phải nói trước khi người dùng bỏ công đi lấy khoá: khoá không hiện lại (nên đừng tìm), và việc này là TÙY CHỌN | "khoá sẽ được hiển thị trong Cài đặt" · "bắt buộc phải có khoá" |
+| "Copy" trong mục khai khoá (cạnh mỗi câu lệnh) | Câu lệnh dài, gõ tay là sai một chữ là lệnh không chạy — nút copy dùng ĐƯỜNG COPY DÙNG CHUNG `chatCopy.js` | "Sao chép" trống · tự viết một bản clipboard riêng |
 
-Bốn ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
+**Sáu** ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
 
 1. **MỘT hội thoại, MỘT kho dữ liệu.** Modal KHÔNG giữ bản sao tin nhắn: nó đọc/ghi
    `store.agentChatMessages` cùng các action `agentChatAsk` · `agentChatStop` · `agentChatReset` của
@@ -715,6 +738,27 @@ Bốn ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
 4. **Bộ gõ tiếng Việt**: Enter chỉ gửi khi `event.isComposing` là false — chặn Enter trong lúc đang
    chốt dấu là gõ dấu nào cũng thành gửi. Ô nhập là `textarea` một dòng (không phải `input`) vì quy ước
    "Shift+Enter xuống dòng" chỉ có nghĩa với `textarea`.
+5. **[2026-09-26] MỘT ĐƯỜNG TẠO ẢNH — và màn hình canvas trống đã NHẢ việc đó ra.** Ô mô tả tạo ảnh ở
+   `CanvasEmptyState.vue` (textarea · nút «Tạo ảnh» · gợi ý điền nhanh · nút ẩn/gọi lại + khoá
+   `fabrikai:studio:prompt-collapsed`) **đã bị GỠ HẲN**, cùng lúc với việc khung chat nhận ô mô tả của
+   nó. Lý do: cùng trường dữ liệu mô tả ảnh đã có ô nhập ở card «Tạo ảnh» (`ConceptCard.vue`) — thêm ô
+   trong chat nữa là **ba ô cho một việc**, và ô ở canvas trống chỉ tồn tại KHI CANVAS TRỐNG (vừa có ảnh
+   là mất chỗ viết mô tả cho ảnh sau). Màn hình trống nay chỉ còn **một lời mời ngắn + hai nút**: mở
+   khung chat (`data-chat-open`) và mở bảng Prompt Tạo Ảnh đầy đủ (`store.promptOpen`). Mọi đường tạo
+   ảnh — chat · card «Tạo ảnh» · nút trong popup prompt — **vẫn gọi ĐÚNG MỘT hàm** `generateImage()` của
+   kho dữ liệu; trong `ChatModal.vue` chuỗi đó xuất hiện **đúng một lần** và có test khoá
+   (`StudioHeaderAndPromptTest` bài 8, khối (b)). Payload tạo ảnh (tỉ lệ · độ phân giải · biến thể ·
+   phom dáng · prefix/negative · model · bộ sưu tập · seed) **chỉ được dựng ở một chỗ** — khung chat
+   KHÔNG được tự gọi `/api/generate`.
+6. **[2026-09-26] Mục khai khoá tìm kiếm web là NGOẠI LỆ CÓ Ý THỨC của §6.1.** §6.1 cấm giao diện nói
+   chi tiết kỹ thuật (lệnh CLI, tên bảng, mã lỗi). Mục này **in ra hai câu lệnh `php artisan`** và ba
+   địa chỉ web. Vì sao vẫn đúng: mục đó tồn tại **CHỈ ĐỂ** chủ shop tự khai khoá trên máy chủ của
+   chính họ, và **không có cách nào nói việc đó mà giấu câu lệnh đi**. Ba rào giữ nó không phình ra:
+   (a) mặc định **ĐÓNG** (@@BT@@apiKeyOpen = ref(false)@@BT@@); (b) nội dung **KHỚP** với
+   `HUONG_DAN_TINH_NANG_MOI.md` §11.6 và signature của `WebSearchSetupCommand` — sửa một chỗ thì sửa
+   cả ba; (c) **KHÔNG có khoá thật nào trong mã** — chỉ dạng mẫu `tvly-…` · `AIza…`, và có test khoá
+   điều đó (`StudioHeaderAndPromptTest` bài 8, khối (e)). Khoá đã lưu nằm **ĐÃ MÃ HOÁ** và **không
+   hiện lại** trên màn hình; người dùng **KHÔNG cần khoá** nếu chấp nhận hạn mức chung.
 
 ---
 

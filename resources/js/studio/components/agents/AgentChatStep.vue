@@ -23,6 +23,18 @@
  * CHỦ ĐỘNG (bấm mới hiện), KHÔNG tự hiện như trước.
  * Cùng đợt, khung này nhận: nút COPY cho TỪNG tin nhắn (cả hai vai) và nút XUỐNG DÒNG trong ô hỏi.
  *
+ * [2026-09-26 · VÌ SAO KHUNG NÀY **KHÔNG** NHẬN Ô TẠO ẢNH VÀ THẺ CHỨC NĂNG — ĐỌC TRƯỚC KHI "CHO ĐỦ BỘ"]
+ * Cùng đợt, modal trợ lý ở /studio (components/ChatModal.vue) nhận thêm hai thứ: ô mô tả tạo ảnh NGAY
+ * TRONG chat, và một dải THẺ CHỨC NĂNG điều hướng (Gợi ý từ ảnh · Thư viện · Bộ sưu tập · Bảng prompt…).
+ * Hai thứ đó CỐ Ý KHÔNG có ở bước này, và lý do không phải "để sau":
+ *   · Thẻ chức năng là ĐIỀU HƯỚNG trong /studio (đổi nhóm công cụ · mở bảng Bộ sưu tập · mở Thư viện
+ *     nhúng). Trang này là MỘT TRANG KHÁC (/agent-studio) — bấm một thẻ ở đây sẽ nhảy trang giữa lúc
+ *     đang làm dở luồng 5 bước, và người dùng mất đúng chỗ đang đứng.
+ *   · Ô tạo ảnh trong chat gắn với màn hình canvas của /studio (nút «Về canvas» phải có canvas để về).
+ *     Ở đây, việc ra ảnh là bước 4 của chính luồng này — đã có đường riêng, không cần đường thứ hai.
+ * Hai khung vẫn dùng CHUNG mọi thứ thuộc về HỘI THOẠI (kho dữ liệu · cách hiển thị chữ · nút copy ·
+ * nút xuống dòng) — chỉ những gì thuộc RIÊNG /studio mới không lặp lại ở đây.
+ *
  * KHÔNG hiển thị tên nhà cung cấp / tên model ở bất kỳ đâu (§6.1 luật 2): sự kiện `provider` của luồng
  * bị kho dữ liệu BỎ HẲN, không đi vào state hiển thị (xem store/actions/agentChat.js).
  *
@@ -138,9 +150,10 @@ function copyTitle(row) {
  * Thêm một dấu xuống dòng tại ĐÚNG VỊ TRÍ CON TRỎ (yêu cầu chủ dự án 2026-09-26).
  *
  * Vì sao cần: trên ĐIỆN THOẠI, Enter là GỬI (không có phím Shift), nên người đang gõ giữa câu không có
- * cách nào xuống dòng. Cách làm chép ĐÚNG nút data-prompt-newline của ô mô tả tạo ảnh
- * (components/CanvasEmptyState.vue): cùng icon cornerDownLeft, cùng lối xử lý con trỏ — hai ô nhập
- * trong cùng một sản phẩm không được hành xử khác nhau.
+ * cách nào xuống dòng. Quy ước chép ĐÚNG nút xuống dòng của modal trợ lý
+ * (components/ChatModal.vue — data-chat-newline): cùng icon cornerDownLeft, cùng lối xử lý con trỏ —
+ * hai ô nhập trong cùng một sản phẩm không được hành xử khác nhau. (Bản gốc của quy ước này từng là ô
+ * mô tả tạo ảnh ở màn hình canvas trống; ô đó đã GỠ ngày 2026-09-26.)
  * Con trỏ đặt LẠI ngay SAU ký tự vừa chèn (start + 1), không nhảy về cuối: người đang sửa giữa câu mà
  * bị đẩy về cuối là mất chỗ đang gõ.
  */
@@ -186,10 +199,15 @@ function insertNewline() {
       <!-- ── 5.2 TRẠNG THÁI RỖNG: ba câu gợi ý BẤM ĐƯỢC, mỗi câu một việc khác nhau ── -->
       <div v-if="!chatMessages.length" class="rounded-xl border border-dashed border-ink-700 bg-ink-900/60 p-5 text-center sm:p-7">
         <StudioIcon name="bot" size="h-8 w-8" class="mx-auto text-brand-300" />
-        <p class="mt-3 text-sm font-semibold text-cream-100">Hỏi thẳng về bộ sưu tập bạn vừa dựng</p>
+        <!-- [2026-09-26] LỜI CHÀO VIẾT LẠI cho ngắn và mềm: câu cũ dài, cứng và viết hoa cả chữ COPY.
+             Ba sự thật vẫn còn ĐỦ, nhưng nói như người với người: chữ hiện dần · copy được từng câu ·
+             cần dữ kiện bên ngoài thì tra web, chưa có thì nói thật. Cố ý KHÔNG chép y nguyên lời chào
+             của modal trợ lý (components/ChatModal.vue): hai nơi hai bối cảnh (ở đây là bước 5 của một
+             luồng vừa dựng xong bộ sưu tập), chép y nguyên là hai câu giống nhau ở hai chỗ để lệch nhau. -->
+        <p class="mt-3 text-sm font-semibold text-cream-100">Hỏi mình về bộ sưu tập vừa dựng nhé</p>
         <p class="mx-auto mt-1 max-w-xl text-xs leading-5 text-cream-400">
-          Câu trả lời hiện dần theo từng mảnh, và COPY được từng câu để dán sang tài liệu · email · ô mô tả ảnh.
-          Hỏi được cả thứ nằm ngoài dữ liệu shop: chất liệu, hướng màu đang lên, nhịp ra hàng của xưởng.
+          Mình trả lời dần từng mảnh, và bạn copy được từng câu để dán sang tài liệu · email.
+          Cần dữ kiện bên ngoài thì mình tra web giúp; chưa có thì mình nói thật là chưa có.
         </p>
         <div class="mx-auto mt-4 flex max-w-2xl flex-wrap items-center justify-center gap-1.5">
           <button
@@ -290,7 +308,7 @@ function insertNewline() {
           <div class="ml-auto flex items-center gap-1.5">
             <!-- XUỐNG DÒNG (yêu cầu chủ dự án 2026-09-26): trên ĐIỆN THOẠI Enter là GỬI nên không có
                  cách nào xuống dòng giữa câu. Cùng icon cornerDownLeft và cùng lối xử lý con trỏ với
-                 nút data-prompt-newline của ô mô tả tạo ảnh (components/CanvasEmptyState.vue).
+                 nút data-chat-newline của modal trợ lý (components/ChatModal.vue).
                  type="button" để nút KHÔNG bị hiểu là nút gửi của khung. -->
             <button
               type="button"

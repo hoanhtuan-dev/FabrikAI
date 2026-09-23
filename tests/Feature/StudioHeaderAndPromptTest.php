@@ -10,10 +10,17 @@ use Tests\TestCase;
  * Ba yêu cầu của chủ dự án, khoá lại thành bất biến:
  *   1. header theo chuẩn daisyUI (navbar + hai nhóm start/end),
  *   2. mọi việc thuộc TÀI KHOẢN nằm trong MỘT menu (nút Cài đặt riêng đã bỏ, Đăng xuất gộp vào),
- *   3. ô mô tả ở màn hình trống cuộn được · ẩn được · gọi lại được.
+ *   3. màn hình canvas trống chỉ còn MỘT LỜI MỜI NGẮN + lối vào chat và bảng prompt đầy đủ.
  *
  * [ĐỔI CHÍNH SÁCH 2026-09-26] Điểm 3 TRƯỚC ĐÂY còn kèm "và có TAB TRÒ CHUYỆN lấy dữ liệu thật". Tab đó
  * đã GỠ: chat nay là MODAL DÙNG CHUNG mở được từ bất kỳ đâu trong /studio (xem bài 5 bên dưới).
+ *
+ * [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 4] Điểm 3 lại đổi một lần nữa, và lần này NGƯỢC chiều với hai đợt
+ * trước: màn hình canvas trống BỎ HẲN ô mô tả tạo ảnh (textarea · nút «Tạo ảnh» · gợi ý điền nhanh ·
+ * nút ẩn/gọi lại · khoá localStorage). Việc tạo ảnh CHUYỂN VÀO KHUNG CHAT (bài 8 bên dưới).
+ * Bài 4 KHÔNG bị nới lỏng — nó khoá ĐÚNG sự thật mới, và khoá CHẶT HƠN: trước đây nó chỉ đòi màn hình
+ * trống CÓ ô mô tả, nay nó đòi màn hình trống SẠCH HẲN mọi dấu vết của ô đó (kể cả mã chết: hằng số,
+ * khoá localStorage, hàm chèn dòng) mà VẪN giữ đúng hai lối vào còn lại cùng bất biến z-0.
  *
  * [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 2] Lối vào modal trợ lý lại đổi một lần nữa, và bài 5 bên dưới được
  * viết lại theo ĐÚNG sự thật mới: nút icon trong cụm công cụ ở thanh tiêu đề (data-header-action="chat")
@@ -124,30 +131,70 @@ class StudioHeaderAndPromptTest extends TestCase
         $this->assertTrue(\App\Support\IconRegistry::has('logout'), 'IconRegistry phải thấy logout (PHP và Vue dùng chung file).');
     }
 
-    /** 4. Ô mô tả: cuộn được · ẩn được · gọi lại được. */
-    public function test_the_prompt_can_scroll_collapse_and_be_called_back(): void
+    /**
+     * 4. [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 4] MÀN HÌNH CANVAS TRỐNG KHÔNG CÒN Ô MÔ TẢ TẠO ẢNH.
+     *
+     * [ĐỌC KHỐI NÀY TRƯỚC KHI "KHÔI PHỤC LẠI Ô MÔ TẢ CHO ĐỦ BỘ"]
+     * Bài này TRƯỚC ĐÂY khoá điều NGƯỢC LẠI: nó bắt màn hình trống phải có ô mô tả CUỘN ĐƯỢC · ẨN ĐƯỢC ·
+     * GỌI LẠI ĐƯỢC — `max-h-[38vh]` · `data-prompt-newline` · `insertNewline` ·
+     * `data-prompt-collapse` · `data-prompt-recall` · khoá `fabrikai:studio:prompt-collapsed` ·
+     * nút «Mở ô tạo ảnh» · `canvas-quick-prompt` · `store.generateImage()`.
+     * Chủ dự án yêu cầu màn hình trống chỉ còn MỘT LỜI MỜI NGẮN + lối vào chat. Hai lý do THẬT, không
+     * phải thẩm mỹ:
+     *   · BA CHỖ VIẾT MỘT VIỆC — cùng trường dữ liệu imagePromptEn đã có ô nhập ở card «Tạo ảnh»
+     *     (ConceptCard) và ở đây; thêm ô trong chat nữa là BA ô cho một việc, và ba chỗ phải sửa mỗi lần
+     *     đổi quy ước (biến thể · tỉ lệ · phím tắt · cách chèn dòng);
+     *   · CHỖ SAI — ô mô tả chỉ tồn tại KHI CANVAS TRỐNG (StudioApp render nó theo v-if), nên vừa có ảnh
+     *     trên canvas là mất chỗ viết mô tả cho ảnh tiếp theo.
+     * Bộ khẳng định dưới đây KHÔNG yếu hơn bộ cũ: nó đòi màn hình trống sạch HẲN dấu vết của ô mô tả
+     * (kể cả mã chết — hằng số, khoá localStorage, hàm chèn dòng) mà VẪN giữ đúng hai lối vào còn lại
+     * (chat · bảng prompt đầy đủ) và VẪN giữ bất biến z-0 (nằm dưới layer).
+     */
+    public function test_the_empty_canvas_no_longer_holds_a_prompt_composer(): void
     {
         $empty = $this->empty();
 
-        $this->assertStringContainsString('max-h-[38vh]', $empty, 'Ô mô tả phải có trần chiều cao.');
-        $this->assertStringContainsString('overflow-y-auto', $empty, 'Ô mô tả phải tự cuộn khi mô tả dài.');
+        // Bất biến CŨ, giữ nguyên: màn hình trống nằm DƯỚI layer (nếu không nó che hiệu ứng mờ của layer
+        // đang tắt) và vẫn tự cuộn được trên màn hình thấp.
         $this->assertStringContainsString('absolute inset-0 z-0', $empty, 'Màn hình trống vẫn phải nằm dưới layer.');
+        $this->assertStringContainsString('overflow-y-auto', $empty, 'Màn hình trống vẫn phải cuộn được trên màn hình thấp.');
 
         // [đợt 28] Không còn dòng tiêu đề mào đầu — màn hình trống chỉ còn đúng việc để làm.
         $this->assertStringNotContainsString('Tạo ảnh đầu tiên', $empty, 'Dòng tiêu đề phải bị xoá.');
         $this->assertStringNotContainsString('Mô tả trang phục, phong cách, bối cảnh và ánh sáng', $empty, 'Dòng phụ đề phải bị xoá.');
 
-        // Nút xuống dòng cho ô nhập (máy không có Shift+Enter tiện).
-        $this->assertStringContainsString('data-prompt-newline', $empty, 'Thiếu nút xuống dòng.');
-        $this->assertStringContainsString('insertNewline', $empty, 'Thiếu hàm chèn dấu xuống dòng.');
+        // KHÔNG còn ô mô tả tạo ảnh — kể cả mã chết của nó. Mỗi chuỗi dưới đây là một mảnh của ô đó.
+        foreach ([
+            'canvas-quick-prompt' => 'ô mô tả tạo ảnh (id cũ)',
+            '<textarea' => 'ô nhập mô tả',
+            'data-prompt-newline' => 'nút xuống dòng của ô mô tả',
+            'insertNewline' => 'hàm chèn dấu xuống dòng',
+            'data-prompt-collapse' => 'nút ẩn ô mô tả',
+            'data-prompt-recall' => 'nút gọi lại ô mô tả',
+            'fabrikai:studio:prompt-collapsed' => 'khoá localStorage chỉ phục vụ ô mô tả',
+            'max-h-[38vh]' => 'trần chiều cao của ô mô tả',
+            'store.generateImage' => 'đường tạo ảnh ở màn hình trống',
+            'EXAMPLES' => 'gợi ý điền nhanh của ô mô tả',
+            'creditEstimate' => 'số credit của ô mô tả',
+        ] as $gone => $what) {
+            $this->assertStringNotContainsString($gone, $empty,
+                'Màn hình canvas trống còn sót '.$what.' ('.$gone.') — việc tạo ảnh đã CHUYỂN VÀO KHUNG CHAT '
+                .'(components/ChatModal.vue, bài 8 bên dưới), và hai chỗ viết một mô tả là hai chỗ để lệch nhau.'
+            );
+        }
 
-        $this->assertStringContainsString('fabrikai:studio:prompt-collapsed', $empty, 'Trạng thái ẩn phải được nhớ (khoá fabrikai:).');
-        $this->assertStringContainsString('data-prompt-collapse', $empty, 'Thiếu nút ẩn ô mô tả.');
-        $this->assertStringContainsString('data-prompt-recall', $empty, 'Thiếu nút gọi lại ô mô tả.');
-        $this->assertStringContainsString('Mở ô tạo ảnh', $empty, 'Nút gọi lại phải nói rõ nó mở lại ô mô tả.');
-
-        $this->assertStringContainsString('store.generateImage()', $empty);
-        $this->assertStringContainsString('canvas-quick-prompt', $empty);
+        // KHÔNG mất tính năng: hai lối vào còn lại phải CÓ THẬT.
+        $this->assertStringContainsString('data-chat-open', $empty,
+            'Màn hình trống phải giữ lối vào khung chat — nếu không, người đang đứng ở canvas trống không có '
+            .'cách nào tạo ảnh (ô mô tả ở đây đã gỡ).'
+        );
+        $this->assertStringContainsString('store.chatOpen = true', $empty,
+            'Nút mở chat phải mở ĐÚNG cờ của modal dùng chung.'
+        );
+        $this->assertStringContainsString('store.promptOpen = true', $empty,
+            'Thiếu đường DỰ PHÒNG cho người quen chỉnh kỹ: bảng Prompt Tạo Ảnh đầy đủ (prefix · negative · '
+            .'phom dáng · mẫu việc) vẫn phải mở được từ màn hình trống.'
+        );
     }
 
     /**
@@ -200,9 +247,17 @@ class StudioHeaderAndPromptTest extends TestCase
             'Canvas trống phải có nút mở MODAL trợ lý — nếu không thì người đang đứng ở màn này không có lối tới trợ lý.'
         );
         $this->assertStringContainsString('data-chat-open', $empty, 'Thiếu dấu nhận diện cho nút mở modal.');
-        // Phần TẠO ẢNH phải còn nguyên — đây mới là việc của màn hình này.
-        $this->assertStringContainsString('canvas-quick-prompt', $empty, 'Canvas trống phải giữ ô mô tả tạo ảnh.');
-        $this->assertStringContainsString('store.generateImage()', $empty, 'Canvas trống phải vẫn tạo ảnh được.');
+        // [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 4] HAI khẳng định ở đây TRƯỚC ĐÂY bắt canvas trống PHẢI có ô mô tả
+        // (`canvas-quick-prompt`) và PHẢI gọi `store.generateImage()`. Chúng nay SAI theo thiết kế:
+        // việc tạo ảnh chuyển vào khung chat (xem bài 4 và bài 8). Không bỏ khoá — ĐỔI CHIỀU khoá, và khoá
+        // cả hai file cùng lúc: canvas trống KHÔNG được có đường tạo ảnh, còn khung chat thì BẮT BUỘC có
+        // ĐÚNG MỘT đường (bài 8 khối (b)). Cộng lại thì vẫn đúng một đường tạo ảnh trong cả /studio.
+        $this->assertStringNotContainsString('canvas-quick-prompt', $empty,
+            'Canvas trống vẫn còn ô mô tả tạo ảnh — việc đó đã chuyển vào khung chat (components/ChatModal.vue).'
+        );
+        $this->assertStringNotContainsString('store.generateImage', $empty,
+            'Canvas trống vẫn còn đường tạo ảnh — đường DUY NHẤT nay nằm trong khung chat (bài 8 khối (b)).'
+        );
 
         // ── (b) MODAL TRỢ LÝ: có thật, dùng BaseModal dùng chung, và là chat THẬT theo luồng ──
         $this->assertFileExists(resource_path('js/studio/components/ChatModal.vue'),
@@ -506,8 +561,14 @@ class StudioHeaderAndPromptTest extends TestCase
                 $name.' phải dùng CÙNG icon với nút data-prompt-newline của ô mô tả tạo ảnh.'
             );
         }
-        $this->assertStringContainsString('data-prompt-newline', $empty,
-            'Nút xuống dòng của ô mô tả tạo ảnh biến mất — đó là bản gốc mà nút của khung chat chép theo.'
+        // [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 4] Khẳng định cũ ở đây bắt canvas trống phải còn
+        // `data-prompt-newline` — "bản gốc" mà nút của khung chat chép theo. Bản gốc đó đã GỠ cùng ô
+        // mô tả tạo ảnh, nên khẳng định ấy nay SAI. Bất biến KHÔNG bị nới lỏng: quy ước "cùng icon · cùng
+        // lối xử lý con trỏ" vẫn được khoá ở vòng lặp NGAY TRÊN (cả hai khung chat phải dùng
+        // `cornerDownLeft`), và dưới đây khoá thêm chiều ngược lại — canvas trống KHÔNG được mọc lại nút đó.
+        $this->assertStringNotContainsString('data-prompt-newline', $empty,
+            'Canvas trống lại có nút xuống dòng của ô mô tả — ô đó đã gỡ 2026-09-26, nút xuống dòng nay chỉ '
+            .'thuộc về hai khung chat (data-chat-newline).'
         );
 
         // (f.5) Biểu tượng copy lấy từ nguồn icon duy nhất (icons.json) — không svg chép tay, không emoji.
@@ -516,6 +577,146 @@ class StudioHeaderAndPromptTest extends TestCase
         foreach ($frames as $name => $frame) {
             $this->assertStringContainsString('name="copy"', $frame, $name.' phải dùng biểu tượng copy dùng chung.');
         }
+    }
+
+    /**
+     * 8. [2026-09-26] CHAT NHẬN THÊM BA VIỆC: TẠO ẢNH · ĐIỀU PHỐI · KHAI KHOÁ TÌM KIẾM WEB.
+     *
+     * Yêu cầu của chủ dự án, khoá thành bất biến — MỖI khối dưới đây khoá một điều KHÔNG ĐƯỢC phép lệch:
+     *   (a) canvas trống KHÔNG còn ô mô tả/nút tạo ảnh, VẪN có nút mở chat, và KHÔNG chứa chuỗi
+     *       `'/agent-studio'` (bài 4 khoá phần "không còn ô mô tả"; khối này khoá nốt hai vế còn lại);
+     *   (b) khung chat CÓ ô tạo ảnh, gọi ĐÚNG MỘT đường generateImage() và ĐÚNG trường imagePromptEn;
+     *   (c) khung chat CÓ thẻ trỏ tới hoạt động 'concept' — và KHÔNG chép luồng phân tích ảnh;
+     *   (d) mỗi thẻ chức năng trỏ tới một CỜ/HÀM CÓ THẬT (không nút chết);
+     *   (e) mục khai khoá có ĐÚNG cả hai câu lệnh studio:web-search-setup, và KHÔNG có khoá giả nào.
+     *
+     * Vì sao phải khoá bằng máy: cả ba việc này đều là loại "dễ mục" — một nút điều hướng trỏ vào cờ đã
+     * đổi tên thì KHÔNG đỏ ở đâu cả, nó chỉ im lặng không làm gì khi người dùng bấm; và một câu lệnh CLI
+     * chép sai một chữ thì lệnh chạy ra lỗi trên máy chủ của khách.
+     */
+    public function test_the_chat_composes_images_navigates_and_documents_search_keys(): void
+    {
+        $empty = $this->empty();
+        $modal = (string) file_get_contents(resource_path('js/studio/components/ChatModal.vue'));
+        $app = $this->app();
+        // Bỏ CHÚ THÍCH trước khi soi: quy ước của repo là chú thích KỂ LẠI việc đã gỡ và nhắc tên hàm cũ,
+        // nên soi cả chú thích là tự tạo cảnh báo giả (cùng lý do đã ghi ở withoutComments()).
+        $code = $this->withoutComments($modal);
+
+        // ── (a) CANVAS TRỐNG: không còn đường tạo ảnh, vẫn có lối vào chat, KHÔNG mở Agent Studio ──
+        $this->assertStringNotContainsString('store.generateImage', $empty,
+            'Canvas trống còn đường tạo ảnh — đường DUY NHẤT nay nằm trong khung chat.'
+        );
+        $this->assertStringNotContainsString('<textarea', $empty, 'Canvas trống còn ô nhập mô tả.');
+        $this->assertStringContainsString('data-chat-open', $empty, 'Canvas trống mất nút mở chat.');
+        $this->assertStringNotContainsString("'/agent-studio'", $empty,
+            'Canvas trống lại mở Agent Studio — lối vào đó nằm ở thanh công cụ của Studio '
+            .'(tests/Feature/AgentStudioPageTest.php khoá cùng điều này).'
+        );
+
+        // ── (b) Ô TẠO ẢNH TRONG CHAT: ĐÚNG MỘT đường, ĐÚNG trường dữ liệu ──
+        $this->assertStringContainsString('data-chat-image', $code, 'Khung chat thiếu ô tạo ảnh.');
+        $this->assertStringContainsString('data-chat-image-send', $code, 'Ô tạo ảnh thiếu nút gửi.');
+        $this->assertSame(1, substr_count($code, 'store.generateImage()'),
+            'Khung chat phải gọi ĐÚNG MỘT đường tạo ảnh (store.generateImage()). Hai lời gọi — hoặc một '
+            .'đường tự dựng payload riêng — là hai nơi để lệch nhau về tỉ lệ/độ phân giải/phom dáng/prefix.'
+        );
+        $this->assertStringNotContainsString("'/api/generate'", $code,
+            'Khung chat tự gọi /api/generate — payload tạo ảnh chỉ được dựng ở MỘT chỗ (kho dữ liệu generation).'
+        );
+        $this->assertStringContainsString('store.imagePromptEn', $code,
+            'Ô tạo ảnh phải ghi vào ĐÚNG trường mô tả của Studio (store.imagePromptEn) — đó là trường mà '
+            .'bảng Prompt Tạo Ảnh đầy đủ và card «Tạo ảnh» cùng đọc.'
+        );
+        // TIẾN TRÌNH PHẢI LÀ SỐ CỦA KHO DỮ LIỆU, không phải hoạt ảnh tự chế ở giao diện.
+        foreach (['store.generating', 'store.generateStage', 'store.generateProgress', 'store.lastBatch'] as $truth) {
+            $this->assertStringContainsString($truth, $code,
+                'Thẻ kết quả tạo ảnh phải đọc trạng thái THẬT ('.$truth.') — giao diện không được tự bịa tiến trình.'
+            );
+        }
+        $this->assertStringContainsString('data-chat-back-canvas', $code,
+            'Thẻ kết quả thiếu nút «Về canvas» — người dùng phải có đường đóng chat để nhìn thấy ảnh.'
+        );
+        $this->assertStringContainsString('LoadingSpinner', $modal,
+            'Chỉ báo đang chờ của phần tạo ảnh phải dùng <LoadingSpinner> dùng chung (§3), không tự vẽ.'
+        );
+
+        // ── (c) «GỢI Ý TỪ ẢNH»: TRỎ tới card đang có, KHÔNG chép luồng phân tích ──
+        $this->assertStringContainsString("store.requestActivity('concept')", $code,
+            "Thẻ «Gợi ý từ ảnh» phải đi qua ĐÚNG kênh điều hướng có sẵn (store.requestActivity('concept')) — "
+            .'activeActivity là biến CỤC BỘ của StudioApp.vue nên không component nào được tự đổi nó.'
+        );
+        $this->assertStringContainsString('store.activityRequest', $app,
+            'StudioApp phải TIÊU THỤ kênh yêu cầu đó (một nguồn sự thật, không hai bản sao logic).'
+        );
+        // Soi bản ĐÃ BỎ CHÚ THÍCH ($code): chú thích của tệp có nhắc tên đường dẫn này để GIẢI THÍCH vì sao
+        // không chép nó sang — soi cả chú thích là tự tạo cảnh báo giả (xem withoutComments()).
+        $this->assertStringNotContainsString('/api/suggest/stream', $code,
+            'Khung chat chép lại luồng phân tích ảnh — luồng đó thuộc card «Gợi ý từ ảnh» '
+            .'(components/SuggestCard.vue), chép sang đây là bản sao thứ hai.'
+        );
+        $this->assertStringNotContainsString('suggestStyleStream', $code,
+            'Khung chat gọi thẳng luồng gợi ý phong cách — phải TRỎ tới card, không chạy lại luồng.'
+        );
+
+        // ── (d) THẺ CHỨC NĂNG: mỗi thẻ trỏ tới một cờ/hàm CÓ THẬT ──
+        $this->assertStringContainsString('data-chat-actions', $code, 'Thiếu dải thẻ chức năng.');
+        $this->assertStringContainsString('data-chat-card', $code, 'Thẻ chức năng thiếu dấu nhận diện cho test.');
+
+        // Từng hàm của thẻ phải được KHAI trong chính file (nút gọi vào hư không là nút chết).
+        foreach (['openImageComposer', 'goConcept', 'goAgentStudio', 'goLibrary', 'goProjects', 'goPromptPanel'] as $fn) {
+            $this->assertStringContainsString('function '.$fn.'(', $modal, 'Thẻ chức năng gọi hàm không tồn tại: '.$fn);
+        }
+        // Và từng ĐÍCH điều hướng phải có thật trong mã — kiểm ở ĐÚNG nơi nó sống.
+        $library = (string) file_get_contents(resource_path('js/studio/store/actions/library.js'));
+        $projects = (string) file_get_contents(resource_path('js/studio/store/actions/projects.js'));
+        $state = (string) file_get_contents(resource_path('js/studio/store/state.js'));
+        $this->assertStringContainsString('openLibrary() {', $library,
+            'Thẻ «Thư viện» gọi store.openLibrary() nhưng kho dữ liệu không có hàm đó.'
+        );
+        $this->assertStringContainsString('requestWorkspace() {', $projects,
+            'Thẻ «Bộ sưu tập» gọi store.requestWorkspace() nhưng kho dữ liệu không có hàm đó.'
+        );
+        $this->assertStringContainsString('promptOpen: false,', $state,
+            'Thẻ «Bảng prompt» ghi vào store.promptOpen nhưng cờ đó không có trong state.'
+        );
+        $this->assertStringContainsString("const AGENT_STUDIO_URL = '/agent-studio'", $modal,
+            'Thẻ «Tín hiệu & Định hướng» phải trỏ tới ĐÚNG đường dẫn trang Agent Studio, khai ở MỘT chỗ.'
+        );
+        // MỘT bản logic mở Thư viện: StudioApp gọi lại hàm của kho dữ liệu, KHÔNG chép hai bước vào đây.
+        $this->assertStringContainsString('function goLibrary() { store.openLibrary(); }', $app,
+            'StudioApp chép lại logic mở Thư viện — phải gọi store.openLibrary() để chỉ còn MỘT bản.'
+        );
+        // Điều hướng phải TẤT ĐỊNH: yêu cầu mở nhóm công cụ KHÔNG được "bấm lần hai thì đóng bảng".
+        $this->assertStringContainsString('function revealActivity(id)', $app,
+            'Thiếu đường mở nhóm công cụ tất định — requestActivity không được toggle đóng bảng đang mở.'
+        );
+
+        // ── (e) MỤC KHAI API KEY TÌM KIẾM: đúng HAI câu lệnh, KHÔNG có khoá giả ──
+        $this->assertStringContainsString('data-chat-apikey', $code, 'Thiếu mục «Cách đăng ký API key tìm kiếm web».');
+        $this->assertStringContainsString('apiKeyOpen = ref(false)', $modal,
+            'Mục khai khoá phải MẶC ĐỊNH ĐÓNG — đây là việc một lần của chủ shop, không phải việc hằng ngày.'
+        );
+        $this->assertStringContainsString('v-if="apiKeyOpen"', $code, 'Nội dung mục khai khoá phải gấp lại được.');
+        $this->assertStringContainsString('php artisan studio:web-search-setup --provider=tavily --key=tvly-', $code,
+            'Thiếu câu lệnh Tavily — đường ĐANG CHẠY (chế độ không cần khoá).'
+        );
+        $this->assertStringContainsString('php artisan studio:web-search-setup --key=AIza', $code,
+            'Thiếu câu lệnh Google Programmable Search (đường thay thế).'
+        );
+        $this->assertStringContainsString('--cx=', $code, 'Câu lệnh Google thiếu tham số --cx (Search engine ID).');
+        $this->assertStringContainsString('app.tavily.com', $code, 'Thiếu chỗ lấy khoá Tavily.');
+        $this->assertStringContainsString('programmablesearchengine.google.com', $code, 'Thiếu chỗ tạo engine Google.');
+        $this->assertStringContainsString('console.cloud.google.com', $code, 'Thiếu chỗ bật Custom Search API.');
+        // HAI sự thật phải nói rõ, không hứa gì thêm.
+        $this->assertStringContainsString('ĐÃ MÃ HOÁ', $code, 'Phải nói rõ khoá được lưu ở dạng đã mã hoá.');
+        $this->assertStringContainsString('KHÔNG cần khoá', $code, 'Phải nói rõ người dùng không cần khoá nếu dùng hạn mức chung.');
+        $this->assertStringContainsString('data-chat-apikey-copy', $code, 'Câu lệnh phải copy được (chatCopy.js dùng chung).');
+        // KHÔNG có khoá THẬT/GIẢ nào trong mã: chỉ được là dạng mẫu tvly-… · AIza… (kết thúc ngay bằng dấu …).
+        $this->assertSame(0, preg_match('/(?:AIza|tvly-)[0-9A-Za-z_\-]{8,}/', $modal),
+            'Trong mã khung chat có một chuỗi TRÔNG NHƯ KHOÁ THẬT — chỉ được để dạng mẫu tvly-… · AIza…, '
+            .'khoá thật không bao giờ nằm trong mã nguồn.'
+        );
     }
 
     /**

@@ -256,10 +256,31 @@ function openUpgradeFor(id) {
 watch(() => store.workspaceOpenRequest, (n) => { if (n > 0) projectsOpen.value = true; });
 // [Trục 3 — 2026-09-20] Dock Outputs xin chuyển nhóm công cụ (vd "Sửa ảnh" từ ảnh kết quả):
 // ảnh đã được đưa lên canvas trước đó bằng store.select(g) nên card sẽ thấy đúng ảnh nguồn.
+/**
+ * MỞ ĐÚNG NHÓM CÔNG CỤ khi có ai đó yêu cầu (kho dữ liệu đếm số lần, xem requestActivity() trong
+ * store/actions/projects.js). Thẻ «Gợi ý từ ảnh» trong khung chat (components/ChatModal.vue) đi qua
+ * ĐÚNG kênh này — KHÔNG dựng kênh thứ hai, và KHÔNG chép logic chọn panel sang component khác, vì
+ * activeActivity là biến CỤC BỘ ở đây.
+ *
+ * [ĐỔI CHÍNH SÁCH 2026-09-26 — ĐIỀU HƯỚNG PHẢI TẤT ĐỊNH, KHÔNG ĐƯỢC "BẤM LẦN HAI THÌ ĐÓNG"]
+ * Trước đây chỗ này gọi thẳng selectActivity(id), mà hàm đó là kiểu TOGGLE của VSCode: bấm vào mục ĐANG
+ * MỞ thì nó ĐÓNG bảng lại. Với cú bấm trên thanh công cụ thì đó là hành vi đúng; nhưng với một YÊU CẦU
+ * ĐIỀU HƯỚNG ("đưa tôi tới Gợi ý từ ảnh") thì đóng bảng là làm NGƯỢC ý người dùng — họ vừa bấm một thẻ
+ * để được đưa tới nơi, và nơi đó lại biến mất. Nay: nếu đã đúng nhóm thì chỉ ĐẢM BẢO bảng đang mở.
+ */
+function revealActivity(id) {
+  if (! id || ! activityNav.value.some((a) => a.id === id)) return;
+  if (id === activeActivity.value) {
+    // Đã đúng nhóm: chỉ mở bảng (desktop) / ngăn kéo (tablet–điện thoại), KHÔNG toggle đóng lại.
+    store.leftPanelOpen = true;
+    if (window.innerWidth < 1024) menuOpen.value = true;
+    return;
+  }
+  selectActivity(id);
+}
 watch(() => store.activityRequest && store.activityRequest.n, (n) => {
-  const id = store.activityRequest && store.activityRequest.id;
-  if (!n || !id) return;
-  if (activityNav.value.some((a) => a.id === id)) selectActivity(id);
+  if (! n) return;
+  revealActivity(store.activityRequest && store.activityRequest.id);
 });
 
 const activeActivity = ref('concept');
@@ -649,7 +670,15 @@ function selectActivity(id) {
   else store.leftPanelOpen = true;
 }
 // Right activity bar: Nguồn ảnh (popup) · Thư viện (điều hướng) · Outputs (toggle dock).
-function goLibrary() { store.exitCanvasTools(); store.studioView = 'library'; }
+/**
+ * MỞ THƯ VIỆN — nay chỉ còn MỘT dòng vì bản thân việc đó đã nằm ở kho dữ liệu
+ * (store.openLibrary(), store/actions/library.js). Lý do: thẻ «Thư viện» trong khung chat
+ * (components/ChatModal.vue) cũng phải mở được Thư viện, mà việc đó gồm HAI bước luôn đi cùng nhau
+ * (thoát công cụ canvas rồi đổi cờ studioView). Chép hai bước đó sang chỗ thứ ba là ba bản sao, và bản
+ * nào quên một bước thì lối vào đó hành xử khác hai lối kia. Giữ TÊN hàm này vì menu mobile và bảng
+ * lệnh đang gọi nó (tests/Feature/StaticIntegrityTest.php khoá sự có mặt của goLibrary trong menu).
+ */
+function goLibrary() { store.openLibrary(); }
 
 // ── Command Palette (VSCode-style: Ctrl+Shift+P / F1 / Ctrl+K) ──
 const paletteOpen = ref(false);

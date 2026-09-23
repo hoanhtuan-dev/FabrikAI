@@ -80,13 +80,30 @@ class AgentStudioPageTest extends TestCase
         $this->assertStringContainsString("id === 'stylist'", $studio,
             'Thiếu nhánh điều hướng cho mục stylist trên activity bar.');
 
-        // [2026-09-26 · đợt 26] Màn hình canvas trống KHÔNG còn là lối vào Agent Studio — nó chỉ còn
-        // ô mô tả tạo ảnh. Lối vào duy nhất là rail công cụ của Studio, đã khoá ngay trên (nhánh
-        // id === 'stylist' phải điều hướng sang /agent-studio). Ghi lại ở đây để không ai thêm lối vào
-        // thứ hai đi đường vòng (popup / state store) mà bỏ qua hợp đồng URL có bước.
+        // [2026-09-26 · đợt 26] Màn hình canvas trống KHÔNG còn là lối vào Agent Studio. Lối vào duy
+        // nhất là rail công cụ của Studio, đã khoá ngay trên (nhánh id === 'stylist' phải điều hướng
+        // sang /agent-studio). Ghi lại ở đây để không ai thêm lối vào thứ hai đi đường vòng (popup /
+        // state store) mà bỏ qua hợp đồng URL có bước.
+        //
+        // [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 4] Đợt 38 gỡ nốt Ô MÔ TẢ TẠO ẢNH khỏi màn hình này (màn hình
+        // trống nay chỉ còn một lời mời ngắn + hai nút: mở khung chat · mở bảng prompt đầy đủ), nên câu
+        // "nó chỉ còn ô mô tả tạo ảnh" ở trên không còn đúng — bất biến thì KHÔNG đổi: màn hình này vẫn
+        // KHÔNG được mở Agent Studio. Thẻ «Tín hiệu & Định hướng» mới nằm trong KHUNG CHAT
+        // (components/ChatModal.vue), và nó KHÔNG đi đường vòng: đó là ĐIỀU HƯỚNG THẬT
+        // (`window.location.href = '/agent-studio'`), tức vẫn đi qua đúng hợp đồng URL có bước của trang.
         $empty = $this->src('resources/js/studio/components/CanvasEmptyState.vue');
         $this->assertStringNotContainsString("'/agent-studio'", $empty,
-            'Canvas trống không còn mở Agent Studio — lối vào nằm ở rail công cụ của Studio.');
+            'Canvas trống không còn mở Agent Studio — lối vào trên màn hình trống đã gỡ từ đợt 26.');
+
+        // Chốt lại ĐÚNG cách lối vào mới đi: điều hướng THẬT, không phải một cờ state mở popup — cờ state
+        // là thứ hợp đồng URL của trang (/agent-studio?buoc=…) không kiểm soát được.
+        $chatModal = $this->src('resources/js/studio/components/ChatModal.vue');
+        $this->assertStringContainsString("const AGENT_STUDIO_URL = '/agent-studio'", $chatModal,
+            'Thẻ «Tín hiệu & Định hướng» trong khung chat phải trỏ tới ĐÚNG đường dẫn trang, khai ở MỘT chỗ.');
+        $this->assertStringContainsString('window.location.href = AGENT_STUDIO_URL', $chatModal,
+            'Thẻ đó phải ĐIỀU HƯỚNG THẬT (đổi URL) — mở bằng cờ state là đi đường vòng qua hợp đồng URL có bước.');
+        $this->assertStringNotContainsString('window.open(', $chatModal,
+            'Không mở trang Agent Studio bằng cửa sổ mới — trang đó có bước ghi lên URL, mở tab mới là mất mạch làm việc.');
     }
 
     public function test_the_open_step_is_addressable_from_the_url(): void
