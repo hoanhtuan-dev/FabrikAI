@@ -161,7 +161,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app--7EDPSWa.css",
+    "file": "assets/app-CO9Aehbs.css",
     "name": "app",
     "names": [
       "app.css"
@@ -394,7 +394,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-EteG21M_.js",
+    "file": "assets/main-VUgJnEQH.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -424,7 +424,7 @@
       "resources/js/studio/components/ProjectWorkspace.vue"
     ],
     "css": [
-      "assets/main-BtsKJiLx.css"
+      "assets/main-B_UTbmEd.css"
     ]
   }
 }

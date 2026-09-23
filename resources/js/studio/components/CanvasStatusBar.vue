@@ -67,6 +67,17 @@ const BTN = 'grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-
  * Ngoại lệ có chủ ý: giao diện Sáng/Tối và Lưu trang là việc của CẢ ỨNG DỤNG, không của canvas,
  * nên vẫn hiện ở máy tính (nơi có chỗ); ở điện thoại chúng nằm trong menu Tài khoản.
  */
+/*
+ * [2026-09-26 · đợt 53] TOÀN BỘ THANH NÀY LÀ CỦA MẶT CANVAS — vào mặt lưới thì nó BIẾN MẤT.
+ *
+ * Vòng đời của luật này: đợt 52 tôi ẩn TỪNG NHÓM một khi ở mặt lưới (hoàn tác · thu/phóng · nền ·
+ * bắt điểm · số lớp), chỉ giữ lại nút đổi mặt. Nhưng giữ nút đổi mặt ở đây nghĩa là mặt lưới vẫn
+ * phải nuôi cả một thanh 40px — mà thanh đó, ngoài hai nút, KHÔNG còn gì thuộc về mặt lưới.
+ *
+ * Nút đổi mặt đã chuyển lên thanh tiêu đề (nơi đứng của mọi thứ thuộc CẢ HAI mặt). Nay không cần
+ * chia nhóm nữa: cả thanh ẩn/hiện theo mặt, và mọi thứ bên trong cứ thế mà hiện khi mặt canvas mở.
+ * Bớt được một tầng điều kiện — ít chỗ hơn để một nhóm lọt lưới như lần trước.
+ */
 const isCanvas = computed(() => store.mainView === 'canvas');
 
 // Nền canvas — MỘT NGUỒN với chính vùng canvas.
@@ -85,26 +96,12 @@ const BG_OPTIONS = [
 </script>
 
 <template>
-  <div class="relative z-30 flex min-h-10 shrink-0 items-center gap-1 border-t border-ink-700 bg-ink-900/95 px-2">
-    <!-- 0. [Bước 5.2 — 2026-09-26] ĐỔI MẶT CHÍNH: Lưới kết quả ⇄ Bảng ghép.
-         Đặt ở THANH TRẠNG THÁI chứ không ở rail công cụ: đây là đổi CHẾ ĐỘ XEM của cả khung,
-         không phải một công cụ vẽ — và thanh trạng thái hiện ở MỌI bề rộng (rail chỉ có từ lg).
-         Hai mặt SONG SONG trong giai đoạn chuyển; bước 5.4 xoá mặt 'canvas' thì bỏ luôn nhóm này. -->
-    <div class="flex shrink-0 items-center gap-0.5 rounded-lg bg-ink-800 p-0.5" role="group" aria-label="Chọn mặt chính của khung làm việc">
-      <button type="button" class="icon-btn !h-8 !w-8" :class="store.mainView === 'grid' ? 'bg-brand-600 text-primary-content' : ''"
-              title="Lưới kết quả — xem và chọn bước tiếp (mặc định)" aria-label="Xem lưới kết quả" data-main-view-switch="grid"
-              @click="store.setMainView('grid')">
-        <StudioIcon name="grid" size="h-4 w-4" />
-      </button>
-      <button type="button" class="icon-btn !h-8 !w-8" :class="store.mainView === 'canvas' ? 'bg-brand-600 text-primary-content' : ''"
-              title="Bảng ghép — khoanh vùng sửa, cắt khung, ghép layer" aria-label="Xem bảng ghép" data-main-view-switch="canvas"
-              @click="store.setMainView('canvas')">
-        <StudioIcon name="layers" size="h-4 w-4" />
-      </button>
-    </div>
-
-    <!-- ══ TỪ ĐÂY TRỞ XUỐNG: CHỈ MẶT CANVAS (xem chú thích isCanvas ở script) ══ -->
-    <template v-if="isCanvas">
+  <div
+    v-show="store.mainView === 'canvas'"
+    :inert="store.mainView === 'canvas' ? null : true"
+    data-canvas-status
+    class="relative z-30 flex min-h-10 shrink-0 items-center gap-1 border-t border-ink-700 bg-ink-900/95 px-2"
+  >
     <div class="h-5 w-px bg-ink-700" aria-hidden="true"></div>
 
     <!-- 1. Hoàn tác / Làm lại -->
@@ -146,17 +143,15 @@ const BG_OPTIONS = [
       </select>
     </div>
 
-    </template><!-- /nhóm chỉ-canvas -->
-
     <!-- 4. Chỗ trống + gợi ý công cụ (Krita-style) -->
     <div class="flex-1"></div>
-    <div v-if="isCanvas && toolHint" class="flex min-w-0 items-center gap-1.5 overflow-hidden px-1 text-label text-cream-400" title="Hướng dẫn công cụ">
+    <div v-if="toolHint" class="flex min-w-0 items-center gap-1.5 overflow-hidden px-1 text-label text-cream-400" title="Hướng dẫn công cụ">
       <StudioIcon name="info" size="h-3.5 w-3.5" class="shrink-0" />
       <span class="truncate">{{ toolHint }}</span>
     </div>
 
     <!-- 5. Trạng thái lớp (md+) -->
-    <div v-if="isCanvas" class="hidden items-center gap-1.5 text-label text-cream-400 md:flex">
+    <div class="hidden items-center gap-1.5 text-label text-cream-400 md:flex">
       <StudioIcon name="layers" size="h-3.5 w-3.5" />
       <span>{{ store.canvasLayers.length }} lớp</span>
       <template v-if="store.activeLayer">
@@ -169,7 +164,7 @@ const BG_OPTIONS = [
          Toàn bộ nội dung menu là việc của canvas (nền · bắt điểm · panel Layers) ⇒ ở mặt lưới
          không có gì để mở, nên ẩn luôn nút. Giao diện và Lưu trang trên điện thoại nằm ở menu
          Tài khoản, không mất lối vào. -->
-    <div v-if="isCanvas" class="dropdown dropdown-end dropdown-top lg:hidden">
+    <div class="dropdown dropdown-end dropdown-top lg:hidden">
       <div tabindex="0" role="button" class="icon-btn !h-8 !w-8" title="Thêm tuỳ chọn hiển thị" aria-label="Thêm tuỳ chọn hiển thị">
         <StudioIcon name="sliders" size="h-4 w-4" />
       </div>
@@ -238,18 +233,15 @@ const BG_OPTIONS = [
         <span>{{ themeResolved === 'light' ? 'Sáng' : 'Tối' }}</span>
       </button>
       <button @click="store.saveNow()" class="icon-btn !h-8 !w-8" title="Lưu trang (Save)" aria-label="Lưu trang"><StudioIcon name="save" size="h-4 w-4" /></button>
-      <!-- Panel Layers là của mặt canvas ⇒ ở mặt lưới không có gì để bật/tắt. -->
-      <template v-if="isCanvas">
-        <div class="h-5 w-px bg-ink-700" aria-hidden="true"></div>
-        <button
-          data-dock-toggle="inspector"
-          @click="store.toggleInspector()"
-          class="icon-btn !h-8 !w-8"
-          :class="store.inspectorOpen ? '!bg-brand-600/20 !text-brand-300' : ''"
-          title="Bật/tắt panel Layers"
-          aria-label="Bật/tắt panel Layers"
-        ><StudioIcon name="panelRight" size="h-4 w-4" /></button>
-      </template>
+      <div class="h-5 w-px bg-ink-700" aria-hidden="true"></div>
+      <button
+        data-dock-toggle="inspector"
+        @click="store.toggleInspector()"
+        class="icon-btn !h-8 !w-8"
+        :class="store.inspectorOpen ? '!bg-brand-600/20 !text-brand-300' : ''"
+        title="Bật/tắt panel Layers"
+        aria-label="Bật/tắt panel Layers"
+      ><StudioIcon name="panelRight" size="h-4 w-4" /></button>
     </div>
   </div>
 </template>

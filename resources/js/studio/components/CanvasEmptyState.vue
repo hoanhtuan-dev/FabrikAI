@@ -36,8 +36,20 @@ const store = useStudioStore();
   <!-- z-0 (không phải z-20): lớp này nằm DƯỚI các layer. Ẩn layer cuối cùng thì màn hình trống
        hiện ra ngay và không che hiệu ứng mờ của layer đang tắt. -->
   <div class="motion-fade-in absolute inset-0 z-0 overflow-y-auto bg-gradient-to-b from-ink-950/97 via-ink-950/94 to-ink-950/97 p-4 backdrop-blur-sm sm:p-6" role="region" aria-label="Canvas trống">
-    <div class="mx-auto flex w-full max-w-xl flex-col items-center gap-3 py-12 text-center sm:py-20">
-      <span class="grid h-12 w-12 place-items-center rounded-full bg-brand-600/15 text-brand-300">
+    <!-- [đợt 53] pb-44 (176px) DƯỚI lg, KHÔNG phải py-12 đều hai đầu.
+         ĐO ĐƯỢC trên Chrome thật ở 320px: nút nổi Trợ lý (ChatFab: bottom-32 + nút 48px ⇒ 128–176px
+         tính từ đáy vùng canvas, neo góc phải) ĐÈ LÊN hàng nút cuối của khối này — 2 cặp chồng nhau,
+         lệch tới 9x6 và 7x34 px. Ở 320px hai nút này xuống dòng nên hàng cuối rơi đúng vào vùng đó.
+         Từ lg: nút nổi về bottom-4 (16+48=64px) nên chừa 80px là đủ. -->
+    <!-- min-h-full + justify-center: canh giữa nội dung trong phần KHÔNG gian CÒN LẠI, không phải
+         trong cả khung. pb-44 (176px) dưới lg chính là vùng nút nổi Trợ lý chiếm (xem chú thích
+         ChatFab: bottom-32 + nút 48px) ⇒ nội dung được canh giữa phía TRÊN nó, không chồng lên. -->
+    <div class="mx-auto flex min-h-full w-full max-w-xl flex-col items-center justify-center gap-3 pb-52 text-center lg:pb-20">
+      <!-- [đợt 53] Hình minh hoạ ẩn dưới sm. ĐO ĐƯỢC ở 320x640: vùng canvas còn ~500px, nút nổi Trợ lý
+           chiếm 176px ở đáy, nội dung khối này ~300px ⇒ thiếu đúng ~24px, và hàng nút cuối chồng lên
+           nút nổi 7x6px. Bỏ hình (48px + 12px khe) là đủ dư. Hình này chỉ trang trí — tiêu đề, lời mời
+           và hai nút mới là thứ truyền đạt; bỏ nó không mất thông tin nào. -->
+      <span class="hidden h-12 w-12 place-items-center rounded-full bg-brand-600/15 text-brand-300 sm:grid">
         <StudioIcon name="sparkles" size="h-6 w-6" />
       </span>
 

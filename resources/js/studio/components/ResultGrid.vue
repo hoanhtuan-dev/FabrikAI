@@ -25,7 +25,7 @@
  * CHIỀU CAO NÚT: 44px trên cảm ứng (h-11), 32px khi có chuột (lg:h-8). 44px là sàn chạm của Apple
  * HIG; luật nâng sàn chạm trong app.css chỉ áp cho phần tử dưới 40px nên ở đây phải khai thẳng.
  */
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import StudioIcon from './StudioIcon.vue';
@@ -33,8 +33,39 @@ import { PROJECT_COLOR } from '../dataColors.js';
 
 const store = useStudioStore();
 
-const items = computed(() => store.visibleGenerations || []);
-const pending = computed(() => items.value.filter((g) => ['pending', 'processing'].includes(g.status)).length);
+/**
+ * LỌC THEO TRẠNG THÁI — [đợt 53] tính năng còn thiếu của mặt lưới.
+ *
+ * VÌ SAO CẦN: một lượt tạo 8-12 ảnh nằm lẫn trong lưới; ảnh ĐANG CHẠY là thứ duy nhất người dùng
+ * cần theo dõi, mà trước đây không có cách nào tách nó ra — phải tự dò từng ô xem ô nào còn quay.
+ * Chip «N đang tạo» trên đầu lưới nói CÓ bao nhiêu nhưng không chỉ RA ô nào.
+ *
+ * LỌC Ở LOCAL, KHÔNG ĐỤNG KHO DỮ LIỆU: đây là chuyện XEM, không phải chuyện dữ liệu. Lọc trong
+ * store sẽ đổi visibleGenerations — thứ mà 6 nơi khác đang đọc (OutputModule, biến thể, chọn ảnh…)
+ * và biến một bộ lọc màn hình thành trạng thái toàn cục. Giữ nó ở đúng chỗ nó có nghĩa.
+ */
+const filter = ref('all');
+const all = computed(() => store.visibleGenerations || []);
+const FILTERS = [
+  { id: 'all', label: 'Tất cả', test: () => true },
+  { id: 'running', label: 'Đang chạy', test: (g) => ['pending', 'processing'].includes(g.status) },
+  { id: 'done', label: 'Hoàn tất', test: (g) => g.status === 'completed' },
+  { id: 'failed', label: 'Lỗi', test: (g) => ['failed', 'cancelled'].includes(g.status) },
+];
+// Số trên mỗi chip tính từ danh sách ĐẦY ĐỦ: bộ lọc không được làm con số tự nói dối về chính nó.
+const filterCounts = computed(() => {
+  const out = {};
+  for (const f of FILTERS) out[f.id] = all.value.filter(f.test).length;
+  return out;
+});
+const items = computed(() => {
+  const f = FILTERS.find((x) => x.id === filter.value) || FILTERS[0];
+  return all.value.filter(f.test);
+});
+// Chip «đang tạo» đọc danh sách ĐẦY ĐỦ — đang có việc chạy là sự thật của cả lưới, không của bộ lọc.
+const pending = computed(() => filterCounts.value.running);
+// Lọc ra rỗng KHÁC HẲN chưa có ảnh nào: một bên là "đổi bộ lọc đi", một bên là "tạo ảnh đầu tiên".
+const filteredEmpty = computed(() => !items.value.length && all.value.length > 0);
 
 function projectColor(pid) {
   const p = store.projects.find((x) => Number(x.id) === Number(pid));
@@ -118,6 +149,25 @@ function onDragStart(e, g) {
       </span>
     </div>
 
+    <!-- ── Lọc theo trạng thái: chỉ hiện khi đã có ảnh (lưới rỗng thì lọc là vô nghĩa) ── -->
+    <div v-if="all.length" class="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-ink-700 px-2 py-1.5 scrollbar-hide" role="group" aria-label="Lọc kết quả theo trạng thái">
+      <button
+        v-for="f in FILTERS" :key="f.id"
+        type="button"
+        class="flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-label font-semibold transition lg:h-7"
+        :class="filter === f.id ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-300 hover:bg-ink-700'"
+        :data-output-filter="f.id"
+        :aria-pressed="filter === f.id"
+        @click="filter = f.id"
+      >
+        {{ f.label }}
+        <span class="rounded-full px-1.5 text-micro tabular-nums" :class="filter === f.id ? 'bg-ink-950/30' : 'bg-ink-900 text-cream-400'">{{ filterCounts[f.id] }}</span>
+      </button>
+      <button v-if="filter !== 'all'" type="button" class="ml-1 flex h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-label font-semibold text-cream-400 transition hover:text-cream-100 lg:h-7" title="Bỏ bộ lọc" @click="filter = 'all'">
+        <StudioIcon name="x" size="h-3 w-3" /> Bỏ lọc
+      </button>
+    </div>
+
     <!-- Banner nói thật khi lô này có ảnh DEMO (không phải do AI tạo) -->
     <p v-if="items.some((g) => g.is_demo)" class="mx-3 mt-2 rounded-md border border-warn/40 bg-warn/10 px-2 py-1.5 text-label leading-snug text-warn">
       <span class="font-semibold">Ảnh DEMO:</span> tính năng tạo ảnh chưa được bật nên kết quả là ảnh mẫu (hoặc chính ảnh gốc), <span class="font-semibold">không phải do AI tạo</span>. Vui lòng báo cho quản trị viên để bật tính năng.
@@ -182,6 +232,18 @@ function onDragStart(e, g) {
           </div>
         </template>
       </article>
+    </div>
+
+    <!-- ── Lọc ra rỗng: KHÁC HẲN chưa có ảnh nào — đừng mời "tạo ảnh đầu tiên" khi họ đã có ảnh ── -->
+    <div v-else-if="filteredEmpty" class="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+      <span class="grid h-12 w-12 place-items-center rounded-full bg-ink-800 text-cream-400">
+        <StudioIcon name="filter" size="h-6 w-6" />
+      </span>
+      <p class="text-base font-semibold text-cream-100">Không có ảnh nào ở mục «{{ (FILTERS.find(f => f.id === filter) || {}).label }}»</p>
+      <p class="max-w-md text-body text-cream-300">{{ all.length }} ảnh vẫn còn nguyên — chỉ là không ảnh nào đang ở trạng thái này.</p>
+      <button type="button" class="tool-btn" data-output-filter-clear @click="filter = 'all'">
+        <StudioIcon name="x" size="h-3.5 w-3.5" /> Xem tất cả {{ all.length }} ảnh
+      </button>
     </div>
 
     <!-- ── Trống: nói việc đầu tiên nên làm, KHÔNG liệt kê tính năng ── -->

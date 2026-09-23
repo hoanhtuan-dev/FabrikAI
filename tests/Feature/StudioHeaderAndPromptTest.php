@@ -63,11 +63,16 @@ class StudioHeaderAndPromptTest extends TestCase
         // ở bên trái; nút điện thoại + khay công cụ đẩy sang phải.
         foreach ([
             'class="icon-btn shrink-0 lg:hidden order-1"' => 'nút menu',
-            'class="order-2 flex shrink-0 items-center gap-2"' => 'thương hiệu FabrikAI',
+            // [đợt 53] Thương hiệu ẩn dưới sm ("hidden ... sm:flex"): ở 320px nó chỉ còn là hình trang
+            // trí chiếm 40px và đẩy nút «Bộ sưu tập» ra ngoài mép phải thanh tiêu đề.
+            'class="order-2 hidden shrink-0 items-center gap-2 sm:flex"' => 'thương hiệu FabrikAI',
             // [đợt 35] Hai nút này nay nằm trong KHAY TRÁI (data-header-account) — thứ tự trong khay lo
             // bằng order-1/order-3 vì mã nguồn xếp credit trước tài khoản.
             'class="order-1 relative"' => 'nút + menu tài khoản',
             'class="order-3 relative"' => 'nút Gói & credit',
+            // [đợt 53] Nút ĐỔI MẶT chen vào giữa thương hiệu và nút Bộ sưu tập: nó thuộc CẢ HAI mặt nên
+            // đứng ở thanh tiêu đề, không nằm trong chrome của mặt nào.
+            'class="order-4 icon-btn !h-8 !w-8 shrink-0"' => 'nút đổi mặt Lưới ⇄ Bảng ghép',
             'class="order-5 ml-auto' => 'nút Bộ sưu tập (điện thoại)',
             'class="order-7 ml-auto hidden' => 'khay điều hướng không gian làm việc',
         ] as $needle => $what) {

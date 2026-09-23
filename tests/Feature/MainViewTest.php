@@ -51,21 +51,47 @@ class MainViewTest extends TestCase
     public function test_switching_the_main_view_is_a_store_action_not_a_local_copy(): void
     {
         $actions = (string) file_get_contents(resource_path('js/studio/store/actions/canvasView.js'));
-        $status = (string) file_get_contents(resource_path('js/studio/components/CanvasStatusBar.vue'));
+        $app = $this->app();
 
-        // MỘT luật, ở store — hai nơi gọi.
+        // MỘT luật, ở store — MỘT nơi gọi (nút đổi mặt ở thanh tiêu đề sau đợt 53).
         $this->assertStringContainsString('setMainView(v)', $actions, 'setMainView phải là action của store.');
         $this->assertStringContainsString('saveBarSettings', $actions, 'Chọn mặt nào thì lần sau mở lại phải đúng mặt đó.');
-        $this->assertStringContainsString('store.setMainView(', $status, 'Thanh trạng thái phải gọi action của store, không tự đặt state.');
+        $this->assertStringContainsString('store.setMainView(', $app, 'Nút đổi mặt phải gọi action của store, không tự đặt state.');
     }
 
-    public function test_the_switch_lives_in_the_status_bar_so_every_width_can_reach_it(): void
+    /**
+     * ĐỔI MẶT PHẢI TỚI ĐƯỢC TỪ MỌI BỀ RỘNG — bất biến giữ nguyên, CHỖ ĐỨNG đã đổi.
+     *
+     * [đợt 53] Trước đây nút này ở thanh trạng thái. Nhưng thanh trạng thái là chrome CỦA CANVAS
+     * (hoàn tác layer · thu/phóng · nền · bắt điểm · số lớp), nên giữ nút đổi mặt ở đó buộc mặt lưới
+     * phải nuôi cả một thanh 40px chỉ để chứa hai nút — mà ở 320px thì 40px là thứ đắt nhất trên màn.
+     * Nay nút nằm ở THANH TIÊU ĐỀ: chỗ đứng của mọi thứ thuộc CẢ HAI mặt, và hiện ở mọi bề rộng
+     * (không gắn lg như rail công cụ) ⇒ điện thoại vẫn có lối đổi mặt.
+     *
+     * Đây là bất biến về KHẢ NĂNG TỚI ĐƯỢC, không phải về vị trí — nên bài test kiểm đúng điều đó.
+     */
+    public function test_the_switch_is_reachable_at_every_width(): void
     {
-        $status = (string) file_get_contents(resource_path('js/studio/components/CanvasStatusBar.vue'));
+        $app = $this->app();
 
-        // Rail công cụ là 'hidden lg:flex' (chỉ từ 1024px) ⇒ đặt nút ở đó là điện thoại không có lối đổi mặt.
-        $this->assertStringContainsString('data-main-view-switch="grid"', $status);
-        $this->assertStringContainsString('data-main-view-switch="canvas"', $status);
+        // MỘT nút công tắc: giá trị mang ĐÍCH ĐẾN, nên cả 'grid' lẫn 'canvas' đều có mặt trong source
+        // và trong DOM (mỗi lần một giá trị). Đây là điều tầng kiểm thử bằng trình duyệt bám vào.
+        $this->assertStringContainsString('data-main-view-switch', $app);
+        $this->assertStringContainsString("? 'canvas' : 'grid'", $app, 'Nút đổi mặt phải mang giá trị ĐÍCH ĐẾN.');
+
+        // PHẢI tới được từ mọi bề rộng: nút không được nằm trong cụm chỉ-desktop ("hidden ... lg:flex").
+        $i = strpos($app, 'data-main-view-switch');
+        $tag = substr($app, max(0, $i - 600), 1000);
+        $this->assertStringNotContainsString('hidden shrink-0 items-center gap-1 rounded-xl', $tag,
+            'Nút đổi mặt KHÔNG được nằm trong cụm chỉ-desktop — điện thoại sẽ mất lối đổi mặt.');
+        $this->assertStringContainsString('order-4', $tag, 'Nút đổi mặt phải là một phần tử độc lập của thanh tiêu đề.');
+
+        // Và thanh trạng thái phải là chrome của RIÊNG mặt canvas.
+        $status = (string) file_get_contents(resource_path('js/studio/components/CanvasStatusBar.vue'));
+        $this->assertStringContainsString('v-show="store.mainView === \'canvas\'"', $status,
+            'Thanh trạng thái là chrome của canvas ⇒ phải ẩn hoàn toàn ở mặt lưới.');
+        $this->assertStringNotContainsString('data-main-view-switch', $status,
+            'Nút đổi mặt đã chuyển lên thanh tiêu đề — không giữ bản sao thứ hai ở thanh trạng thái.');
     }
 
     public function test_canvas_only_tools_auto_open_the_canvas_face(): void

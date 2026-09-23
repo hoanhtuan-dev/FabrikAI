@@ -552,6 +552,103 @@ Cách kiểm ĐÚNG và đủ: so **md5** của `main-*.js` + `app-*.css` giữa
   Dock Outputs mặc định **vẫn hiện ở desktop** — cố ý: người dùng đã kéo được vách ngăn và bề rộng
   được nhớ lại, gỡ nó là lấy đi một bảng họ đang dùng. Trên ĐIỆN THOẠI thì đã ẩn (xem §5).
 
+## Phiên 2026-09-23 (đợt 53) — HAI MẶT SẠCH HOÀN TOÀN: dọn nốt chrome canvas khỏi mặt lưới + lưới giàu tính năng hơn
+
+**Đo bằng Chrome thật ở 320 · 375 · 768 · 1280, cả hai mặt, sau mỗi thay đổi.**
+
+### 1. PHẦN SÓT NGƯỜI DÙNG CHỈ RA — và nó ở đâu
+
+Câu `Chọn công cụ từ thanh công cụ cạnh canvas (Esc = hủy · Enter = xong)` nằm ở
+`ContextToolbar.vue` — nhánh "không có công cụ nào đang bật". Nó được render trong **rail công cụ
+ngữ cảnh h-12** (desktop) nằm TRÊN hai mặt, nên ở mặt lưới vẫn hiện.
+
+Đây là mảnh chrome canvas cuối cùng còn sót ở mặt lưới. Đợt 52 tôi đã ẩn thanh TRẠNG THÁI theo từng
+nhóm nhưng bỏ sót rail này — vì nó không nằm trong thanh trạng thái.
+
+### 2. BA MẢNH CHROME CANVAS — ẨN THEO **MẶT**, Ở CẤP GỐC
+
+| Mảnh | Dấu hiệu | Vì sao thuộc canvas |
+|---|---|---|
+| Rail công cụ ngữ cảnh (h-12, desktop) | `data-canvas-toolbar` | Chính chỗ phơi câu gợi ý trên |
+| Thanh trạng thái | `data-canvas-status` | Hoàn tác layer · thu/phóng · nền canvas · bắt điểm · số lớp |
+| Nút Outputs trên thanh tiêu đề | (đã có `data-header-action="outputs"`) | Dock của nó là bản sao thu nhỏ của chính lưới |
+
+**Bỏ luôn tầng điều kiện bên trong.** Đợt 52 tôi ẩn TỪNG NHÓM của thanh trạng thái và giữ lại nút
+đổi mặt — nghĩa là mặt lưới vẫn nuôi cả thanh 40px chỉ để chứa hai nút. Nay thanh trạng thái ẩn
+nguyên khối theo mặt, và mọi thứ bên trong cứ thế mà hiện khi mặt canvas mở. **Bớt một tầng điều kiện
+= bớt một chỗ cho nhóm lọt lưới** — đúng kiểu lỗi vừa xảy ra.
+
+### 3. NÚT ĐỔI MẶT LÊN THANH TIÊU ĐỀ, VÀ GỘP THÀNH MỘT
+
+Nút đổi mặt là thứ DUY NHẤT thuộc về **cả hai** mặt, nên nó không được nằm trong chrome của mặt nào.
+Chuyển lên thanh tiêu đề — chỗ đứng của mọi thứ thuộc cả hai mặt.
+
+**Rồi đo được một lỗi do chính mình vừa gây ra:** khối HAI nút rộng 86px, đẩy nút «Bộ sưu tập» ra
+NGOÀI mép phải thanh tiêu đề ở 320px (**282→322 trong khi header chỉ rộng 320**). Hai bước sửa, mỗi
+bước đều đo lại:
+
+1. Gộp hai nút thành **MỘT công tắc** (40px): nhãn nói ĐÍCH ĐẾN ("Sang bảng ghép" / "Về lưới kết quả"),
+   icon là icon của mặt sẽ tới, `data-main-view-switch` mang giá trị ĐÍCH. Còn tràn 2px.
+2. Ẩn khối thương hiệu dưới `sm`: nó trỏ về chính trang đang mở và chữ "FabrikAI" vốn đã ẩn dưới sm
+   ⇒ chỉ còn là hình trang trí chiếm 32px + 8px khe. **Nay vừa khít ở cả 4 khổ** (`TRAN_HEADER=0`).
+
+> Một công tắc chạy y hệt nhau ở MỌI bề rộng — không có bản mobile/desktop lệch nhau.
+
+### 4. LƯỚI GIÀU TÍNH NĂNG HƠN: LỌC THEO TRẠNG THÁI
+
+Tính năng còn thiếu thật sự: một lượt tạo 8-12 ảnh nằm lẫn trong lưới, **ảnh ĐANG CHẠY không có cách
+nào tách ra** — chip «N đang tạo» nói CÓ bao nhiêu nhưng không chỉ RA ô nào.
+
+Bốn mục: **Tất cả · Đang chạy · Hoàn tất · Lỗi**, mỗi mục kèm số. Ba quyết định:
+
+- **Lọc ở LOCAL, không đụng kho dữ liệu.** `visibleGenerations` có 6 nơi khác đang đọc (OutputModule,
+  biến thể, chọn ảnh…). Lọc trong store là biến một bộ lọc màn hình thành trạng thái toàn cục.
+- **Số trên chip tính từ danh sách ĐẦY ĐỦ**, không từ danh sách đã lọc — nếu không, con số tự nói dối
+  về chính nó. Chip «đang tạo» cũng đọc danh sách đầy đủ: đang có việc chạy là sự thật của cả lưới.
+- **HAI trạng thái rỗng KHÁC NHAU.** Lọc ra rỗng thì màn hình nói *"Không có ảnh nào ở mục «Lỗi» ·
+  N ảnh vẫn còn nguyên"* kèm nút **«Xem tất cả N ảnh»** — KHÔNG được rơi vào màn «Chưa có ảnh nào»
+  và mời người đã có 120 ảnh đi tạo ảnh đầu tiên.
+
+### 5. HAI LỖI ĐÈ NHAU TÌM THÊM ĐƯỢC NHỜ ĐO LẠI
+
+Bộ dò đè nhau (có tính phần bị cắt bởi vùng cuộn) chạy trên **cả hai mặt** sau mỗi thay đổi:
+
+- **Mặt lưới: 0** ở mọi khổ, mọi bước.
+- **Mặt canvas ở 320px: 2 cặp** — hàng nút cuối của khối «Canvas trống» chồng lên **nút nổi Trợ lý**
+  (`ChatFab`: `bottom-32` + nút 48px ⇒ chiếm 128-176px ở đáy). Nguyên nhân số học: vùng canvas còn
+  ~500px, nút nổi chiếm 176px, nội dung khối ~300px ⇒ **thiếu đúng ~24px**.
+
+Sửa: canh giữa nội dung trong phần KHÔNG gian CÒN LẠI (`min-h-full` + `justify-center` + `pb-52`)
+và **ẩn hình minh hoạ trang trí dưới `sm`** (48px + 12px khe) — hình đó chỉ trang trí, tiêu đề và hai
+nút mới là thứ truyền đạt. **Kết quả: 0 cặp đè nhau ở cả hai mặt, cả 4 khổ.**
+
+### 6. KIỂM CHỨNG HAI MẶT (sau khi chuẩn hoá về mặt lưới trước mỗi phép đo)
+
+| | Mặt LƯỚI | Mặt CANVAS |
+|---|---|---|
+| Câu gợi ý canvas | **không** (mọi khổ) | có ở desktop (rail là `lg:flex`) |
+| Thanh trạng thái | **ẩn** | hiện |
+| Rail công cụ | **ẩn** | hiện ở desktop |
+| Nút Outputs | **ẩn** | hiện ở desktop |
+| Hoàn tác · % zoom · số lớp | **ẩn** | hiện |
+| Nút đổi mặt | 1, ở thanh tiêu đề | 1, ở thanh tiêu đề |
+| Tràn ngang | không | không |
+| **Nút đè nhau** | **0** | **0** |
+| Bộ lọc | 4 mục, 40px mobile / 28px desktop | — |
+
+### 7. BÀI TEST
+
+`MobileFirstUiTest` lên **11 bài**: thêm bộ lọc (4 mục · số tính từ danh sách đầy đủ · lọc không ghi
+ngược vào store · hai trạng thái rỗng khác nhau · có nút thoát) và khối canvas trống (chừa chỗ nút nổi).
+
+Sửa cho khớp cấu trúc mới — mỗi lần đều ghi rõ LÝ DO, không chỉ đổi số:
+- `MainViewTest`: `test_the_switch_lives_in_the_status_bar...` → `test_the_switch_is_reachable_at_every_width`.
+  Bất biến là **KHẢ NĂNG TỚI ĐƯỢC**, không phải vị trí — nên bài test kiểm đúng điều đó (nút không nằm
+  trong cụm chỉ-desktop).
+- `ToolbarAreaTest`: nới phần trong dấu nháy của `v-if` (nay có thêm điều kiện MẶT). Bất biến của
+  bài là LỚP của khung, không phải điều kiện hiện/ẩn — điều kiện đổi không được làm bài test đỏ.
+- `StudioDockResizeTest`: số phần tử `inert` 6 → 8, kèm lý do từng cái.
+
 ### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
 
 - **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.

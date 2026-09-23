@@ -44,7 +44,10 @@ class ToolbarAreaTest extends TestCase
         // Chỉ lấy nhánh desktop (rail trên) hoặc mobile (khối nổi) quanh <ContextToolbar />.
         $pattern = $branch === 'desktop'
             ? '/<div class="([^"]*)"[^>]*>\s*<div class="([^"]*)"[^>]*>\s*<ContextToolbar \/>/s'
-            : '/<div v-if="toolActive"[^>]*class="([^"]*)"[^>]*>\s*<div class="([^"]*)"[^>]*><ContextToolbar \/>/s';
+            // [đợt 53] v-if có thêm điều kiện MẶT (khung nổi này là của mặt canvas) ⇒ nới phần trong
+            // dấu nháy thay vì bám đúng chuỗi cũ. Bất biến của bài này là LỚP của khung, không phải
+            // điều kiện hiện/ẩn — nên điều kiện đổi thì không được làm bài test đỏ.
+            : '/<div v-if="toolActive[^"]*"[^>]*class="([^"]*)"[^>]*>\s*<div class="([^"]*)"[^>]*><ContextToolbar \/>/s';
 
         $this->assertSame(1, preg_match($pattern, $source, $m),
             "Không đọc được khung toolbar ($branch) trong StudioApp.vue — cấu trúc đã đổi.");

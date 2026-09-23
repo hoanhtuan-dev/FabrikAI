@@ -1055,10 +1055,39 @@ function onTouchEnd(e) {
           <StudioIcon name="sliders" size="h-4 w-4" />
         </button>
 
-        <a href="/" class="order-2 flex shrink-0 items-center gap-2" title="FabrikAI Studio">
+        <!-- [đợt 53] DƯỚI sm THÌ ẨN CẢ KHỐI THƯƠNG HIỆU. ĐO ĐƯỢC ở 320px sau khi thêm nút đổi mặt:
+             nút «Bộ sưu tập» bị đẩy ra ngoài mép phải thanh tiêu đề (282→322 trong khi header rộng
+             320). Khối này trỏ về chính trang đang mở và chữ "FabrikAI" vốn đã ẩn dưới sm — nên ở
+             đây nó chỉ còn là hình trang trí chiếm 32px + 8px khe. Nhường chỗ cho việc bấm được. -->
+        <a href="/" class="order-2 hidden shrink-0 items-center gap-2 sm:flex" title="FabrikAI Studio">
           <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-4 w-4" /></span>
           <span class="hidden font-display text-sm font-semibold text-cream-50 sm:inline">FabrikAI</span>
         </a>
+
+        <!-- ══ ĐỔI MẶT CHÍNH: Lưới kết quả ⇄ Bảng ghép ══
+             [đợt 53] CHUYỂN TỪ THANH TRẠNG THÁI LÊN ĐÂY, VÀ GỘP HAI NÚT THÀNH MỘT.
+             Vì sao lên đây: nút đổi mặt là thứ DUY NHẤT thuộc về CẢ HAI mặt, nên nó không được nằm
+             trong chrome của một mặt nào. Khi còn ở thanh trạng thái, mặt lưới buộc phải nuôi cả một
+             thanh 40px chỉ để chứa hai nút — thanh đó là chrome của canvas, và ở 320px thì 40px là
+             thứ đắt nhất trên màn.
+             Vì sao GỘP: ĐO ĐƯỢC ở 320px — khối hai nút rộng 86px và đẩy nút «Bộ sưu tập» ra NGOÀI
+             thanh tiêu đề (328→368 trong khi header chỉ rộng 320). Một nút 40px là mức nhỏ nhất đúng
+             cho một công tắc hai trạng thái, và nó chạy y hệt nhau ở MỌI bề rộng — một điều khiển,
+             một luật, không có bản mobile/desktop lệch nhau.
+             Nhãn nói ĐÍCH ĐẾN ("Sang bảng ghép" / "Về lưới kết quả") chứ không nói trạng thái hiện
+             tại: người dùng bấm là để ĐI ĐÂU, và icon là icon của mặt sẽ tới.
+             data-main-view-switch mang giá trị của ĐÍCH — tầng kiểm thử bằng trình duyệt vẫn tìm được
+             cả hai giá trị 'grid' và 'canvas' trong DOM. -->
+        <button
+          type="button"
+          class="order-4 icon-btn !h-8 !w-8 shrink-0"
+          :data-main-view-switch="store.mainView === 'grid' ? 'canvas' : 'grid'"
+          :title="store.mainView === 'grid' ? 'Sang bảng ghép — xếp layer, khoanh vùng sửa' : 'Về lưới kết quả — xem và chọn bước tiếp'"
+          :aria-label="store.mainView === 'grid' ? 'Sang bảng ghép' : 'Về lưới kết quả'"
+          @click="store.setMainView(store.mainView === 'grid' ? 'canvas' : 'grid')"
+        >
+          <StudioIcon :name="store.mainView === 'grid' ? 'layers' : 'grid'" size="h-4 w-4" />
+        </button>
 
         <span v-if="!store.user" class="order-3 flex min-w-0 items-center gap-1.5 rounded-lg bg-warn/15 px-2 py-1 text-label font-semibold text-warn">
           <StudioIcon name="lock" size="h-3.5 w-3.5" /> Chưa đăng nhập
@@ -1126,7 +1155,11 @@ function onTouchEnd(e) {
           <button type="button" class="icon-btn !h-8 !w-8" data-header-action="palette" title="Bảng lệnh (Ctrl+K) — tìm lệnh, bộ sưu tập, mẫu việc, ảnh" aria-keyshortcuts="Control+K" aria-label="Bảng lệnh" @click="openPalette()">
             <StudioIcon name="search" size="h-4 w-4" />
           </button>
-          <button type="button" class="icon-btn !h-8 !w-8" data-header-action="outputs" data-dock-toggle="outputs" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách ảnh đã tạo" aria-label="Outputs" @click="store.toggleOutputDock()">
+          <!-- [đợt 53] Nút Outputs ẩn ở MẶT LƯỚI: chính mặt lưới ĐÃ LÀ danh sách ảnh đã tạo (to hơn,
+               có nút hành động). Mở dock 156px bên cạnh chỉ để xem lại đúng danh sách đó là bản sao
+               thu nhỏ — và nó chiếm bề ngang của chính lưới. Ở mặt bảng ghép thì dock này là lối duy
+               nhất để xem kết quả nên vẫn còn nguyên. -->
+          <button type="button" v-show="store.mainView === 'canvas'" :inert="store.mainView === 'canvas' ? null : true" class="icon-btn !h-8 !w-8" data-header-action="outputs" data-dock-toggle="outputs" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách ảnh đã tạo" aria-label="Outputs" @click="store.toggleOutputDock()">
             <StudioIcon name="grid" size="h-4 w-4" />
             <span v-if="store.generations.length" class="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-micro font-bold leading-none text-primary-content">{{ store.generations.length }}</span>
           </button>
@@ -1564,7 +1597,10 @@ function onTouchEnd(e) {
                chỗ, nhưng khi tràn thì mép TRÁI vẫn kéo tới được (justify-center trên khung cuộn sẽ
                đẩy phần đầu ra ngoài vùng cuộn, không bao giờ xem tới được).
                scrollbar-hide: thanh cuộn của rail không được chiếm mất chiều cao đã cố định. -->
-          <div class="scrollbar-hide relative z-40 hidden h-12 shrink-0 items-stretch overflow-x-auto overflow-y-hidden border-b border-ink-700/40 lg:flex">
+          <div class="scrollbar-hide relative z-40 hidden h-12 shrink-0 items-stretch overflow-x-auto overflow-y-hidden border-b border-ink-700/40 lg:flex"
+               v-show="store.mainView === 'canvas'"
+               :inert="store.mainView === 'canvas' ? null : true"
+               data-canvas-toolbar>
             <div class="mx-auto flex w-max items-center gap-2 px-3">
               <ContextToolbar />
             </div>
@@ -1756,7 +1792,7 @@ function onTouchEnd(e) {
           </aside>
           </div><!-- /flex row: canvas + inspector -->
           <!-- ══ Toolbar ngữ cảnh floating trên mobile (12px trên status bar) ══ -->
-          <div v-if="toolActive" data-covers-canvas="bottom" class="scrollbar-hide absolute bottom-12 left-1/2 z-40 flex h-11 max-w-[calc(100%-1rem)] -translate-x-1/2 items-center overflow-x-auto overflow-y-hidden lg:hidden">
+          <div v-if="toolActive && store.mainView === 'canvas'" data-covers-canvas="bottom" class="scrollbar-hide absolute bottom-12 left-1/2 z-40 flex h-11 max-w-[calc(100%-1rem)] -translate-x-1/2 items-center overflow-x-auto overflow-y-hidden lg:hidden">
             <div class="mx-auto w-max"><ContextToolbar /></div>
           </div>
           <!-- ══ Status bar dock dưới khung canvas ══ -->
