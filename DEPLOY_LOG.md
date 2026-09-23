@@ -5,6 +5,39 @@
 
 ---
 
+## Phiên 2026-09-23 (đợt 45) — CHAT TRỢ LÝ: GỠ KHỐI NGUỒN · NÚT COPY · CHỮ ĐƯỢC TRANG TRÍ · NÚT XUỐNG DÒNG
+
+**Commit:** `3db9272`. **Trạng thái: đã push + deploy + kiểm trên bundle sống.**
+
+Bốn yêu cầu của chủ dự án (2026-09-26), làm ở **CẢ HAI** khung chat (modal «Trợ lý thiết kế» ở /studio và bước «Hỏi đáp» của Agent Studio):
+
+| # | Yêu cầu | Đã làm |
+|---|---|---|
+| 1 | **Ẩn vĩnh viễn** khối "Nguồn để bạn tự kiểm" (kể cả dòng "thu gọn nguồn này") | **Xoá hẳn khỏi DOM** ở cả hai khung — không phải ẩn bằng CSS, không còn nút nào mở lại. Dữ liệu `citations` **vẫn giữ trong kho dữ liệu**; chú thích trong mã ghi rõ vì sao xoá hẳn và rằng muốn trả lại thì phải là **hành động người dùng chủ động** |
+| 2 | Câu hỏi và câu trả lời **copy được** | **Nút Copy cho TỪNG tin** (icon `copy`), title rõ («Copy câu hỏi này» / «Copy câu trả lời này»), `toast` xác nhận, và `toast` lỗi khi trình duyệt chặn. Đường copy nằm ở **một module dùng chung** (`chatCopy.js`: `navigator.clipboard` + dự phòng `document.execCommand`) — hai bản copy trong hai khung là hai chỗ để lệch nhau |
+| 3 | Chữ trợ lý **được trang trí** thay vì hiện markdown thô | Module thuần `chatFormat.js` (`formatAssistantText` · `assistantPlainText`) + component dùng chung `ChatMessageText.vue` render bằng **thẻ THẬT** (`strong` · `em` · `code` · `ul/ol` · `a target=_blank rel=noopener`). **KHÔNG `v-html`**, không `innerHTML`; chỉ nhận `http/https`. Copy dùng bản **văn bản sạch** |
+| 4 | **Nút xuống dòng** trong ô nhập | Chèn `\n` tại **đúng vị trí con trỏ** rồi đặt lại con trỏ; cùng icon `cornerDownLeft` với nút `data-prompt-newline` của ô mô tả tạo ảnh (một sản phẩm, một cách hành xử) |
+
+### Việc phát sinh bắt buộc (ghi rõ vì sao)
+Gỡ khối nguồn làm **bốn câu + title nút nổi** hứa *"câu trả lời kèm nguồn bấm được để bạn tự kiểm"* trở thành **nói sai** ⇒ đã sửa cả năm chỗ (repo có luật giao diện không được nói sai). Khẳng định tương ứng trong test được viết lại **chặt-tương-đương** (title phải nói VIỆC "hỏi đáp" + NGUỒN GỐC "tự tra", và **không** còn hứa "nguồn bấm được").
+
+### Kiểm chứng
+- `vendor/bin/phpunit --no-coverage` ⇒ **OK (1286 tests, 9860 assertions)**; bộ UI theo yêu cầu **93 tests**.
+- `node scripts/check-chat-format.mjs` ⇒ **31 mục OK** (đậm · nghiêng · mã · link · link `javascript:` bị chặn · URL trần + dấu câu · danh sách · tiêu đề · ký tự lạ · mã độc · khớp bản định dạng ↔ bản copy) — ghép vào PHPUnit đúng lối `check-session-store.mjs`.
+- `npm run build` xanh; kiểm **trên bundle ĐÃ deploy qua CDN**:
+  `main-CYL5WlK7.js` (185.566 B) và `agent-studio-BoKCTj1g.js` (212.716 B) — **KHÔNG còn** chuỗi "Nguồn để bạn tự kiểm", **có** `data-chat-copy` · `data-chat-newline` · "Copy câu trả lời này".
+- Render thật `ChatMessageText.vue` bằng `@vue/server-renderer` (script tạm): đúng thẻ, và payload `<script>alert(1)</script>` ra thành **chữ đã escape**, không thành thẻ.
+
+### Nợ còn lại
+| # | Việc |
+|---|---|
+| 1 | **Chưa bấm tay trong trình duyệt**: luồng xin quyền clipboard (có/không có toast), đường dự phòng `execCommand` trên trang http, bàn phím điện thoại cho nút Xuống dòng, bố cục nút Copy cạnh bong bóng — mọi khẳng định vẫn là số đo từ mã + render phía máy chủ |
+| 2 | Chưa kiểm luồng chữ đang CHẢY khi markdown chưa đóng giữa lượt (chỉ kiểm ở mức hàm) |
+| 3 | Khối nguồn đã gỡ ⇒ **người dùng không còn chỗ bấm kiểm chứng trong chat**; dữ liệu vẫn ở `citations` nếu sau này muốn mở lại bằng hành động chủ động |
+
+
+---
+
 ## Phiên 2026-09-23 (đợt 44) — TEST SẢN PHẨM · DỌN DỮ LIỆU MẪU · THANG ƯU TIÊN: TÌM KIẾM TRƯỚC, TRANG/RSS DỰ PHÒNG
 
 **Commit:** `865344d`. **Trạng thái: đã push + deploy + ĐO trên production.**
