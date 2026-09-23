@@ -409,6 +409,27 @@ export const layerTransformActions = {
     // ── Cài đặt status bar (snap · nền canvas · inspector · bề rộng dock) ──
     saveBarSettings() { try { localStorage.setItem('fabrikai.bar', JSON.stringify({ mainView: this.mainView, snapGrid: this.snapGrid, canvasBg: this.canvasBg, inspectorOpen: this.inspectorOpen, leftPanelOpen: this.leftPanelOpen, outputDockOpen: this.outputDockOpen, leftDockWidth: this.leftDockWidth, outputDockWidth: this.outputDockWidth, inspectorWidth: this.inspectorWidth })); } catch (e) { /* bỏ qua */ } },
     restoreBarSettings() { try { const d = JSON.parse(localStorage.getItem('fabrikai.bar') || 'null'); if (!d) return; if (d.mainView === 'grid' || d.mainView === 'canvas') this.mainView = d.mainView; if (d.snapGrid != null) this.snapGrid = Number(d.snapGrid) || 0; if (d.canvasBg) this.canvasBg = d.canvasBg; if (d.inspectorOpen != null) this.inspectorOpen = !!d.inspectorOpen; if (d.leftPanelOpen != null) this.leftPanelOpen = !!d.leftPanelOpen; if (d.outputDockOpen != null) this.outputDockOpen = !!d.outputDockOpen; if (d.leftDockWidth != null) this.leftDockWidth = Number(d.leftDockWidth) || this.leftDockWidth; if (d.outputDockWidth != null) this.outputDockWidth = Number(d.outputDockWidth) || this.outputDockWidth; if (d.inspectorWidth != null) this.inspectorWidth = Number(d.inspectorWidth) || this.inspectorWidth; } catch (e) { /* bỏ qua */ } },
+    // ── Tuỳ chọn XEM LƯỚI KẾT QUẢ (đợt 55) ──
+    // Khoá RIÊNG, không nhét vào 'fabrikai.bar': bar settings là chrome của khung làm việc (dock,
+    // bề rộng, nền canvas), còn đây là cách người dùng muốn NHÌN danh sách ảnh. Hai mối quan tâm
+    // khác nhau, hai vòng đời khác nhau — nhét chung là mỗi lần đổi cỡ lưới lại ghi cả bề rộng dock.
+    saveOutputPrefs() {
+      try {
+        localStorage.setItem('fabrikai.outputs', JSON.stringify({
+          sortBy: this.outputSortBy, density: this.outputDensity, filterProject: this.outputFilterProject,
+        }));
+      } catch (e) { /* chế độ riêng tư: bỏ qua */ }
+    },
+    restoreOutputPrefs() {
+      try {
+        const d = JSON.parse(localStorage.getItem('fabrikai.outputs') || 'null');
+        if (!d) return;
+        if (['new', 'old', 'name', 'running'].includes(d.sortBy)) this.outputSortBy = d.sortBy;
+        if (['s', 'm', 'l'].includes(d.density)) this.outputDensity = d.density;
+        if (d.filterProject != null) this.outputFilterProject = !!d.filterProject;
+      } catch (e) { /* dữ liệu hỏng: giữ mặc định */ }
+    },
+
     // ── Ghi nhớ cài đặt prompt của người dùng (localStorage) — ƯU TIÊN hơn dữ liệu DB ──
     // Lưu negative prompt + prefix/suffix + 3 checkbox bật/tắt. Khi load lại trang,
     // giá trị local ghi đè lên defaults từ database (nếu đã từng chỉnh sửa ở đây).

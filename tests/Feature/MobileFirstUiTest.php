@@ -250,12 +250,15 @@ class MobileFirstUiTest extends TestCase
             $this->assertStringContainsString($f, $grid, 'Bộ lọc thiếu mục '.$f.'.');
         }
 
-        // Đếm trên chip tính từ danh sách ĐẦY ĐỦ, không tính từ danh sách đã lọc.
+        // [đợt 55] Số trên chip tính từ danh sách ĐÃ ÁP phạm vi bộ sưu tập + tìm kiếm, nhưng TRƯỚC
+        // bộ lọc TRẠNG THÁI. Đó mới là bất biến thật: bật chip «Lỗi» không được làm con số của chính
+        // chip «Lỗi» đổi theo (con số tự nói dối về chính nó), còn thu hẹp theo bộ sưu tập/tìm kiếm
+        // thì con số PHẢI thu hẹp theo — người dùng đang tìm trong bộ X thì số phải nói về bộ X.
         $this->assertStringContainsString('const all = computed(() => store.visibleGenerations || [])', $grid);
-        $this->assertStringContainsString('out[f.id] = all.value.filter(f.test).length', $grid,
-            'Số trên chip phải tính từ danh sách ĐẦY ĐỦ — nếu không con số tự nói dối về chính nó.');
+        $this->assertStringContainsString('out[f.id] = searched.value.filter(f.test).length', $grid,
+            'Số trên chip phải tính từ danh sách trước bộ lọc trạng thái — nếu không con số tự nói dối.');
         $this->assertStringContainsString('const pending = computed(() => filterCounts.value.running)', $grid,
-            'Chip «đang tạo» là sự thật của CẢ LƯỚI, không của bộ lọc đang bật.');
+            'Chip «đang tạo» là sự thật của lưới ĐANG XEM, không của bộ lọc trạng thái đang bật.');
 
         // Lọc ở LOCAL, không đụng kho dữ liệu (visibleGenerations có 6 nơi khác đang đọc).
         $this->assertStringNotContainsString('store.visibleGenerations =', $grid,
@@ -287,6 +290,57 @@ class MobileFirstUiTest extends TestCase
             'Phải canh giữa trong phần KHÔNG gian còn lại, không phải trong cả khung.');
         $this->assertStringContainsString('hidden h-12 w-12 place-items-center rounded-full bg-brand-600/15 text-brand-300 sm:grid', $empty,
             'Hình minh hoạ phải ẩn dưới sm — ở 320px nó là 60px làm hàng nút chồng lên nút nổi.');
+    }
+
+    /**
+     * QUẢN LÝ LƯỚI KẾT QUẢ (đợt 55) — xem theo bộ sưu tập (mặc định) · tìm · sắp xếp · cỡ lưới.
+     *
+     * Bất biến quan trọng nhất ở đây là SỰ ĐI CẶP giữa số cột và thuộc tính sizes của ảnh: đổi cỡ
+     * lưới mà quên đổi sizes thì trình duyệt vẫn tải thumbnail theo bề rộng CŨ — lưới nhỏ đi thì tải
+     * ảnh thừa, lưới to ra thì nhòe. Đó là loại lỗi không ai thấy cho tới khi nhìn kỹ một tấm ảnh.
+     */
+    public function test_quan_ly_luoi_co_pham_vi_tim_sap_xep_va_co_luoi(): void
+    {
+        $grid = $this->code($this->src('components/ResultGrid.vue'));
+        $state = $this->code($this->src('store/state.js'));
+
+        // 1. MẶC ĐỊNH xem theo bộ sưu tập đang áp dụng.
+        $this->assertStringContainsString('outputFilterProject: true', $state,
+            'Mặc định phải là XEM THEO BỘ SƯU TẬP — người đang làm một bộ thì cần thấy ảnh của bộ đó.');
+        $this->assertStringContainsString('const scope = computed(', $grid);
+        $this->assertStringContainsString('data-output-scope', $grid, 'Thiếu bộ chọn phạm vi.');
+
+        // 2. Tìm kiếm: theo TÊN hoặc MÔ TẢ, và BỎ DẤU tiếng Việt (gõ "ao thun" phải ra "Áo thun").
+        $this->assertStringContainsString('data-output-search', $grid);
+        $this->assertStringContainsString("normalize('NFD')", $grid, 'Tìm kiếm phải bỏ dấu — tiếng Việt gõ không dấu là chuyện thường.');
+        $this->assertStringContainsString('norm(g.prompt).includes(needle)', $grid, 'Phải tìm được theo mô tả, không chỉ theo tên.');
+
+        // 3. Sắp xếp + cỡ lưới, lưu bền.
+        $this->assertStringContainsString('data-output-sort', $grid);
+        foreach (['new', 'old', 'name', 'running'] as $s) {
+            $this->assertStringContainsString("case '".$s."'", $grid, 'Thiếu kiểu sắp xếp '.$s.'.');
+        }
+        $this->assertStringContainsString('data-output-density', $grid);
+        $this->assertStringContainsString('saveOutputPrefs', $grid);
+        $this->assertStringContainsString("localStorage.setItem('fabrikai.outputs'", $this->src('store/actions/layerTransform.js'),
+            'Tuỳ chọn xem phải được lưu bền — nhưng ở KHOÁ RIÊNG, không nhét vào bar settings của khung làm việc.');
+
+        // 4. SỐ CỘT ĐI CẶP VỚI sizes — cấu trúc bảng DENSITY phải giữ cả hai trong CÙNG một mục.
+        $this->assertStringContainsString('const DENSITY = {', $grid);
+        foreach (['s', 'm', 'l'] as $k) {
+            $this->assertMatchesRegularExpression(
+                '/'.$k.': \{ cols: .+?, sizes: /',
+                $grid,
+                'Mức cỡ lưới "'.$k.'" phải khai cols VÀ sizes liền nhau — tách rời là tải thumbnail sai cỡ.'
+            );
+        }
+        $this->assertStringContainsString(':class="gridCols"', $grid, 'Số cột phải lấy từ bảng DENSITY, không viết cứng trong template.');
+        $this->assertStringContainsString(':sizes="GRID_SIZES"', $grid);
+
+        // 5. Lối thoát khi bộ lọc ra rỗng: cả bỏ trạng thái LẪN bỏ giới hạn bộ sưu tập.
+        $this->assertStringContainsString('data-output-filter-clear', $grid);
+        $this->assertStringContainsString('data-output-scope-clear', $grid,
+            'Kẹt trong lưới rỗng vì còn giới hạn bộ sưu tập mà không có nút bỏ giới hạn là ngõ cụt thật.');
     }
 
     // ── 4. TRÌNH XEM ẢNH LÀ TRUNG TÂM ĐIỀU PHỐI ────────────────────────────────

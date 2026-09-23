@@ -1437,6 +1437,21 @@ html[data-theme='light'] {
         min-height: 1.5rem;
     }
 
+    /* Ô NHẬP CHỮ — lỗ hổng thứ ba của luật sàn chạm (sau NÚT và THANH TRƯỢT/Ô ĐÁNH DẤU).
+       ĐO ĐƯỢC ở 390px: ô tìm kiếm trong lưới kết quả cao ĐÚNG 22px (nó nằm trong nhãn 44px nên vẫn
+       chạm được, nhưng con trỏ đặt vào giữa ô 22px thì khó, và bất kỳ ô nhập nào KHÔNG có nhãn bọc
+       sẽ là mục tiêu 22px). Nút đã có sàn 40px từ trước; ô nhập thì chưa có gì.
+       Áp cho các kiểu ô nhập CHỮ thông dụng — không đụng checkbox/radio/range (đã có luật riêng ở trên). */
+    body input[type='text'],
+    body input[type='search'],
+    body input[type='email'],
+    body input[type='password'],
+    body input[type='number'],
+    body input[type='url'],
+    body input[type='tel'] {
+        min-height: 2.75rem;
+    }
+
     /* NHÃN BỌC Ô ĐÁNH DẤU: vùng chạm thật là CẢ NHÃN, không phải ô vuông 24px. ĐO ĐƯỢC trên Chrome
        thật: ô đánh dấu nằm trong <label> cùng dòng chữ mô tả — người dùng chạm vào chữ, không chạm
        vào ô. Nới nhãn lên 40px cho khớp sàn chạm của nút, mà KHÔNG phình ô vuông lên 40px (ô 40px

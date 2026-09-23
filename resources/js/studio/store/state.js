@@ -473,7 +473,17 @@ export function studioState() {
     activeProjectGenerations: [], // generations của dự án đang xem
     activeProjectReviewOnly: false, // true khi mở dự án của NGƯỜI KHÁC (scope=pending, Super Admin duyệt) → KHÔNG áp dụng cho phiên tạo ảnh
     appliedProject: null,         // "Bộ sưu tập hiện tại" — được ÁP DỤNG cho phiên tạo ảnh/video; tồn tại độc lập với việc đang mở workspace
-    outputFilterProject: false,   // Outputs (Studio): chỉ hiện output thuộc dự án đang áp dụng
+    // Outputs (Studio): chỉ hiện output thuộc dự án đang áp dụng.
+  // [đợt 55] MẶC ĐỊNH BẬT — "xem ảnh theo bộ sưu tập" là cách làm việc thật: người dùng đang làm
+  // một bộ sưu tập thì thứ họ cần thấy là ảnh CỦA BỘ ĐÓ, không phải trộn lẫn với mọi bộ khác.
+  // Không áp dụng bộ sưu tập nào thì cờ này vô hiệu (getter trả về toàn bộ) — không cần tắt tay.
+  outputFilterProject: true,
+
+  // ── Tuỳ chọn XEM LƯỚI KẾT QUẢ (đợt 55) ──
+  // Đây là SỞ THÍCH XEM, không phải dữ liệu: lọc/sắp xếp/cỡ lưới không được ghi ngược vào
+  // generations. Lưu riêng một khoá localStorage (cùng lối với savePromptMemory/saveUpscaleMemory).
+  outputSortBy: 'new',   // 'new' | 'old' | 'name' | 'running'
+  outputDensity: 'm',    // 's' | 'm' | 'l' — số cột lưới
     viewerList: null,             // danh sách tùy chỉnh cho GalleryModal (vd: outputs của 1 dự án) — ưu tiên cao nhất trong viewerItems
     projectView: 'board',         // 'board' (kanban) | 'list'
     projectsArchived: false,      // lọc dự án đã lưu trữ

@@ -751,6 +751,100 @@ bằng `git checkout` và làm lại **chỉ bằng công cụ sửa theo mốc*
 tệp từ dữ liệu đã đọc có thể bị cắt; sửa theo mốc, và khi cần chèn/xoá khối lớn thì dùng mốc văn bản
 chứ không dùng số dòng.
 
+## Phiên 2026-09-23 (đợt 55) — QUẢN LÝ LƯỚI KẾT QUẢ + trả lời về nút «Bộ sưu tập …»
+
+### 0. NÚT "Bộ sưu tập <tên bộ>" LÀ GÌ
+
+Nó là **chip lọc theo bộ sưu tập đang áp dụng** trong thanh đầu của lưới kết quả
+(`ResultGrid.vue`): bật/tắt `store.outputFilterProject` — bật thì lưới chỉ hiện ảnh thuộc bộ sưu
+tập đang áp dụng, tắt thì hiện tất cả.
+
+**Vì sao nó khó hiểu — ba lỗi thiết kế, không phải lỗi người dùng:**
+1. Nhãn chỉ có MỘT CÁI TÊN ("Bọ Sưu Thu Đông Toàn quốc"), không nói nó LÀM GÌ. Nghĩa của nút nằm
+   trong thuộc tính `title` — mà `title` **không bao giờ hiện trên điện thoại** vì không có hover.
+2. Nó là một cái BẬT/TẮT nhưng trông như một nhãn: bấm lần nữa thì lưới đổi nội dung mà không có gì
+   nói rằng vừa có chuyện gì xảy ra.
+3. Nó chỉ hiện khi ĐÃ áp dụng một bộ sưu tập, nên cùng một chỗ lúc có lúc không.
+
+**Đã thay** bằng bộ chọn PHẠM VI nói rõ: `Tất cả ảnh` ⇄ tên bộ sưu tập, kèm số ảnh mỗi bộ, và
+**mặc định là bộ đang áp dụng** (xem §1).
+
+### 1. XEM ẢNH THEO BỘ SƯU TẬP — MẶC ĐỊNH
+
+`outputFilterProject: false` → **`true`**. Người đang làm một bộ sưu tập thì thứ họ cần thấy là ảnh
+CỦA BỘ ĐÓ, không phải trộn lẫn với mọi bộ khác. Không áp dụng bộ nào thì cờ này vô hiệu (getter trả
+toàn bộ) — không phải tắt tay.
+
+Bộ chọn phạm vi còn là **lối áp bộ sưu tập nhanh**: chọn một bộ trong danh sách = áp dụng nó + bật
+lọc. Một khái niệm (bộ sưu tập đang áp dụng), không thêm khái niệm "phạm vi" thứ hai.
+
+### 2. QUẢN LÝ LƯỚI — BỐN VIỆC, XẾP THEO TẦN SUẤT DÙNG TRÊN ĐIỆN THOẠI
+
+| | Cách làm | Vì sao |
+|---|---|---|
+| **Tìm** | ô nhập chiếm trọn dòng | gõ là việc cần ngón tay + bàn phím nhất |
+| **Phạm vi** | `<select>` bộ sưu tập | |
+| **Sắp xếp** | `<select>`: Mới nhất · Cũ nhất · Tên A→Z · Đang chạy trước | |
+| **Cỡ lưới** | `<select>`: Nhỏ · Vừa · Lớn | |
+| **Trạng thái** | 4 chip (đã có từ đợt 53) | |
+
+Dùng `<select>` GỐC chứ không menu tự vẽ: trên điện thoại nó mở bảng chọn **của hệ điều hành** (to,
+dễ chạm), và trình đọc màn hình + bàn phím đã hiểu sẵn nó.
+
+Tìm kiếm theo **TÊN hoặc MÔ TẢ** và **BỎ DẤU tiếng Việt** — gõ `ao thun` phải ra `Áo thun`;
+gõ không dấu là chuyện thường, bắt gõ đúng dấu là bắt người dùng làm việc của máy.
+
+**Số cột ĐI CẶP với thuộc tính `sizes` của ảnh** trong CÙNG một bảng `DENSITY`. Đây là chỗ dễ sai
+nhất khi thêm "chỉnh cỡ lưới": đổi số cột mà quên đổi `sizes` thì trình duyệt vẫn tải thumbnail theo
+bề rộng CŨ — lưới nhỏ đi thì tải ảnh thừa, lưới to ra thì nhòe. ĐO ĐƯỢC: đổi cỡ sang Lớn, trình duyệt
+đổi từ `?size=480` sang `?size=640`.
+
+Số cột đo được trên Chrome thật:
+
+| | Nhỏ | Vừa | Lớn |
+|---|---|---|---|
+| 390 · 320 | **3** | **2** | **1** |
+| 1280 | **8** | **5** | **4** |
+
+Ngoài ra: bộ đếm nói rõ khi con số KHÔNG phải tổng (`8 / 24 ảnh`), và màn "lọc ra rỗng" có **hai**
+lối thoát — bỏ lọc trạng thái VÀ bỏ giới hạn bộ sưu tập (kẹt trong lưới rỗng vì còn giới hạn bộ sưu
+tập mà không có nút bỏ là ngõ cụt thật).
+
+Lưu bền ở KHOÁ RIÊNG `fabrikai.outputs`, không nhét vào `fabrikai.bar`: bar settings là chrome của
+khung làm việc (dock, bề rộng, nền canvas), còn đây là cách người dùng muốn NHÌN danh sách ảnh — hai
+mối quan tâm, hai vòng đời. Nhét chung là mỗi lần đổi cỡ lưới lại ghi cả bề rộng dock.
+
+### 3. LỖ HỔNG THỨ BA CỦA LUẬT SÀN CHẠM
+
+ĐO ĐƯỢC: các `<select>` mới cao **19px** ở desktop, ô tìm kiếm cao **22px**. Luật sàn chạm trong
+`app.css` chỉ nhắm `button · [role=button] · select · input[type=button|submit]` — nên select trong
+nhãn `lg:h-8` bị bỏ đói, và **ô nhập chữ chưa bao giờ có luật nào**.
+
+Sửa hai tầng: select `h-full` (nay 42px mobile / 30px desktop), và thêm **luật sàn chạm cho ô nhập
+chữ** (`text · search · email · password · number · url · tel` → 44px trên màn hẹp; đo lại được
+`search:44`). Không đụng checkbox/radio/range — chúng đã có luật riêng từ đợt 53.
+
+### 4. HỌC TỪ openart.ai VÀ create.wan.video — PHẦN KHÔNG LÀM ĐƯỢC, NÓI THẲNG
+
+Tôi đã mở CẢ HAI bằng Chrome headless ở khung 390x844 và đo cấu trúc DOM. **Nhưng cả hai studio đều
+cần ĐĂNG NHẬP** — tôi không có tài khoản, nên không lấy được lưới outputs thật của họ. Trang công khai
+chỉ là landing/marketing, và các đường như `/explore` · `/discover` trả 404 với khách.
+
+Thứ ĐO ĐƯỢC từ trang công khai của Wan: **lưới 4 cột, khe 4px, thanh trên cố định cao 64px** ở 390px;
+nút nhỏ nhất 32px. Đó là tất cả những gì trang công khai nói được về lưới của họ.
+
+Vì vậy phần quản lý lưới ở trên làm theo **mẫu đã được kiểm chứng rộng rãi** cho lưới ảnh (thanh công
+cụ gọn: tìm · phạm vi · sắp xếp · cỡ · lọc trạng thái; chọn gốc của hệ điều hành cho các lựa chọn), chứ
+KHÔNG phải bản sao từ hai trang kia. Nếu cần bám sát họ thì phải có tài khoản để đo — nói trước để
+không ai tưởng phần này đã được đối chiếu với họ.
+
+### 5. BÀI TEST
+
+`MobileFirstUiTest` thêm bài `quan_ly_luoi_co_pham_vi_tim_sap_xep_va_co_luoi` (mặc định theo bộ sưu
+tập · tìm bỏ dấu · 4 kiểu sắp xếp · lưu khoá riêng · **số cột đi cặp với sizes** · hai lối thoát khỏi
+lưới rỗng). Bài cũ về chip trạng thái được cập nhật cho luật mới: số trên chip tính từ danh sách đã áp
+phạm vi + tìm kiếm nhưng TRƯỚC bộ lọc trạng thái.
+
 ### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
 
 - **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.

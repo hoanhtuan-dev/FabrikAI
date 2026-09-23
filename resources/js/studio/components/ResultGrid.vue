@@ -25,7 +25,7 @@
  * CHIỀU CAO NÚT: 44px trên cảm ứng (h-11), 32px khi có chuột (lg:h-8). 44px là sàn chạm của Apple
  * HIG; luật nâng sàn chạm trong app.css chỉ áp cho phần tử dưới 40px nên ở đây phải khai thẳng.
  */
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import StudioIcon from './StudioIcon.vue';
@@ -45,7 +45,31 @@ const store = useStudioStore();
  * và biến một bộ lọc màn hình thành trạng thái toàn cục. Giữ nó ở đúng chỗ nó có nghĩa.
  */
 const filter = ref('all');
+// Tìm theo TÊN hoặc PROMPT — hai thứ người dùng nhớ về một tấm ảnh. Không phân biệt hoa/thường và
+// bỏ dấu tiếng Việt: gõ "ao thun" phải ra "Áo thun".
+const q = ref('');
+const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
 const all = computed(() => store.visibleGenerations || []);
+
+/**
+ * SẮP XẾP — tính từ danh sách ĐẦY ĐỦ, trước khi lọc. Sắp xếp sau khi lọc cũng ra cùng thứ tự, nhưng
+ * đặt ở đây thì mọi thứ đọc danh sách đầy đủ đều nhất quán, và thứ tự không đổi khi đổi bộ lọc.
+ */
+const sorted = computed(() => {
+  const list = [...all.value];
+  const t = (g) => new Date(g.created_at_raw || g.created_at || 0).getTime() || 0;
+  const n = (g) => norm(store.genName(g));
+  const running = (g) => (['pending', 'processing'].includes(g.status) ? 0 : 1);
+  switch (store.outputSortBy) {
+    case 'old': return list.sort((a, b) => t(a) - t(b));
+    case 'name': return list.sort((a, b) => n(a).localeCompare(n(b), 'vi'));
+    case 'running': return list.sort((a, b) => running(a) - running(b) || t(b) - t(a));
+    // 'new' khai TƯỜNG MINH chứ không để rơi vào default: đây là mặc định của người dùng, và một
+    // giá trị lạ trong localStorage phải rơi vào default chứ không lặng lẽ thành "mới nhất".
+    case 'new': return list.sort((a, b) => t(b) - t(a));
+    default: return list.sort((a, b) => t(b) - t(a));
+  }
+});
 const FILTERS = [
   { id: 'all', label: 'Tất cả', test: () => true },
   { id: 'running', label: 'Đang chạy', test: (g) => ['pending', 'processing'].includes(g.status) },
@@ -53,19 +77,45 @@ const FILTERS = [
   { id: 'failed', label: 'Lỗi', test: (g) => ['failed', 'cancelled'].includes(g.status) },
 ];
 // Số trên mỗi chip tính từ danh sách ĐẦY ĐỦ: bộ lọc không được làm con số tự nói dối về chính nó.
+const searched = computed(() => {
+  const needle = norm(q.value).trim();
+  if (!needle) return sorted.value;
+  return sorted.value.filter((g) => norm(store.genName(g)).includes(needle) || norm(g.prompt).includes(needle));
+});
 const filterCounts = computed(() => {
   const out = {};
-  for (const f of FILTERS) out[f.id] = all.value.filter(f.test).length;
+  for (const f of FILTERS) out[f.id] = searched.value.filter(f.test).length;
   return out;
 });
 const items = computed(() => {
   const f = FILTERS.find((x) => x.id === filter.value) || FILTERS[0];
-  return all.value.filter(f.test);
+  return searched.value.filter(f.test);
 });
-// Chip «đang tạo» đọc danh sách ĐẦY ĐỦ — đang có việc chạy là sự thật của cả lưới, không của bộ lọc.
+// Chip «đang tạo» là sự thật của lưới ĐANG XEM (đã tính bộ sưu tập + tìm kiếm), không của bộ lọc
+// trạng thái — người dùng đang tìm trong bộ X thì con số phải nói về bộ X.
 const pending = computed(() => filterCounts.value.running);
 // Lọc ra rỗng KHÁC HẲN chưa có ảnh nào: một bên là "đổi bộ lọc đi", một bên là "tạo ảnh đầu tiên".
 const filteredEmpty = computed(() => !items.value.length && all.value.length > 0);
+
+// ── PHẠM VI: TẤT CẢ ẢNH ⇄ MỘT BỘ SƯU TẬP ──
+// Thay cho chip cũ chỉ hiện mỗi TÊN bộ sưu tập — nó không nói mình làm gì, và trên điện thoại thì
+// thuộc tính title không bao giờ hiện vì không có hover.
+const collections = computed(() => (store.projects || []).filter((p) => !p.archived));
+const scope = computed(() => (store.outputFilterProject && store.appliedProjectId() ? 'p:' + store.appliedProjectId() : 'all'));
+function setScope(v) {
+  if (v === 'all') { store.outputFilterProject = false; store.saveOutputPrefs(); return; }
+  const p = collections.value.find((x) => 'p:' + x.id === v);
+  if (p) { store.applyProject(p); store.outputFilterProject = true; store.saveOutputPrefs(); }
+}
+onMounted(() => {
+  store.restoreOutputPrefs();
+  // Bộ chọn PHẠM VI cần danh sách bộ sưu tập. Không nạp thì nó chỉ có một mục «Tất cả ảnh» — tức là
+  // tính năng "xem theo bộ sưu tập" trông như không tồn tại. loadProjects() là hàm ĐỌC có sẵn và tự
+  // bỏ qua khi đã nạp (cùng lối bảng lệnh đang dùng), nên mở lưới không sinh request thừa.
+  if (!store.projectLoaded) store.loadProjects();
+});
+function setSort(v) { store.outputSortBy = v; store.saveOutputPrefs(); }
+function setDensity(v) { store.outputDensity = v; store.saveOutputPrefs(); }
 
 function projectColor(pid) {
   const p = store.projects.find((x) => Number(x.id) === Number(pid));
@@ -90,10 +140,25 @@ function projectName(pid, fallback) {
  * Lệch sizes thì trình duyệt tải sai cỡ — nhòe (nếu nhỏ hơn) hoặc phí băng thông (nếu lớn hơn).
  */
 const THUMB_SIZES = [160, 320, 480, 640];
-const GRID_SIZES = '(min-width: 1536px) 20vw, (min-width: 1280px) 25vw, (min-width: 640px) 33vw, 50vw';
 function gridSrcset(url) {
   return THUMB_SIZES.map((s) => thumbUrl(url, s) + ' ' + s + 'w').join(', ');
 }
+
+/**
+ * CỠ LƯỚI — ba mức, và SỐ CỘT phải đi CẶP với thuộc tính sizes của ảnh.
+ *
+ * Đây là chỗ dễ sai nhất khi thêm tính năng "chỉnh cỡ lưới": đổi số cột mà quên đổi sizes thì trình
+ * duyệt vẫn tải thumbnail theo bề rộng CŨ — lưới nhỏ đi thì tải ảnh thừa (phí băng thông), lưới to
+ * ra thì tải ảnh thiếu (nhòe). Vì vậy hai thứ nằm CHUNG một bảng, không tách rời.
+ */
+const DENSITY = {
+  s: { cols: 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8', sizes: '(min-width: 1536px) 12vw, (min-width: 1280px) 16vw, (min-width: 640px) 25vw, 33vw', label: 'Nhỏ' },
+  m: { cols: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5', sizes: '(min-width: 1536px) 20vw, (min-width: 1280px) 25vw, (min-width: 640px) 33vw, 50vw', label: 'Vừa' },
+  l: { cols: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4', sizes: '(min-width: 1536px) 25vw, (min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw', label: 'Lớn' },
+};
+const density = computed(() => store.outputDensity || 'm');
+const gridCols = computed(() => (DENSITY[density.value] || DENSITY.m).cols);
+const GRID_SIZES = computed(() => (DENSITY[density.value] || DENSITY.m).sizes);
 
 /**
  * MỞ MÀN «CHỈNH ẢNH» (bước 5.3) — MỘT ảnh, ba chế độ Tả/Khoanh/Cọ.
@@ -122,31 +187,75 @@ function onDragStart(e, g) {
 
 <template>
   <div class="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-ink-700 bg-ink-900">
-    <!-- ── Thanh đầu: đếm · lọc dự án · việc đang chạy ── -->
+    <!-- ══ THANH ĐẦU: ĐẾM · VIỆC ĐANG CHẠY ══ -->
     <div class="flex flex-wrap items-center gap-2 border-b border-ink-700 px-3 py-2">
       <h2 class="flex items-center gap-2 font-display text-sm font-semibold text-cream-50">
         <StudioIcon name="grid" size="h-4 w-4" class="text-brand-300" /> Kết quả
       </h2>
-      <span class="rounded-full bg-ink-700 px-2 py-0.5 text-label text-cream-300">{{ items.length }}</span>
+      <span class="rounded-full bg-ink-700 px-2 py-0.5 text-label text-cream-300" data-output-count>{{ items.length }}</span>
+      <!-- Nói rõ khi con số KHÔNG phải tổng: người dùng phải biết mình đang xem một phần. -->
+      <span v-if="items.length !== (store.generations || []).length" class="text-label text-cream-400">
+        / {{ (store.generations || []).length }} ảnh
+      </span>
 
       <span v-if="pending" class="flex items-center gap-1 rounded-full bg-warn/15 px-2 py-0.5 text-label font-semibold text-warn">
         <span class="h-2 w-2 animate-pulse rounded-full bg-warn"></span>{{ pending }} đang tạo
       </span>
 
-      <button
-        v-if="store.appliedProject"
-        type="button"
-        class="tool-btn !py-1 text-label"
-        :class="store.outputFilterProject ? 'is-active' : ''"
-        :title="store.outputFilterProject ? 'Đang lọc theo bộ sưu tập: ' + store.appliedProject.name : 'Chỉ hiện ảnh của bộ sưu tập đang áp dụng'"
-        @click="store.outputFilterProject = !store.outputFilterProject"
-      >
-        <StudioIcon name="filter" size="h-3 w-3" /> {{ store.appliedProject.name }}
-      </button>
-
       <span class="ml-auto hidden text-label text-cream-400 lg:inline">
         Bấm ảnh để xem lớn · mọi tính năng nằm trong đó
       </span>
+    </div>
+
+    <!-- ══ THANH QUẢN LÝ LƯỚI (đợt 55) ══
+         Bốn việc, xếp theo TẦN SUẤT DÙNG trên điện thoại:
+           1. Tìm  — ô nhập, chiếm trọn dòng (gõ là thứ cần ngón tay và bàn phím nhất);
+           2. Xem theo bộ sưu tập — PHẠM VI, mặc định là bộ đang áp dụng;
+           3. Sắp xếp · 4. Cỡ lưới — hai <select> gốc: trên điện thoại chúng mở bảng chọn CỦA HỆ ĐIỀU
+              HÀNH (to, dễ chạm) thay vì một menu tự vẽ nhỏ xíu.
+         Dùng <select> gốc còn vì lý do a11y: trình đọc màn hình và bàn phím đã hiểu sẵn nó. -->
+    <div v-if="all.length" class="flex shrink-0 flex-col gap-1.5 border-b border-ink-700 px-2 py-1.5">
+      <label class="flex h-11 items-center gap-2 rounded-lg border border-ink-600 bg-ink-800 px-2.5 lg:h-8">
+        <StudioIcon name="search" size="h-3.5 w-3.5" class="shrink-0 text-cream-400" />
+        <input v-model="q" type="search" data-output-search placeholder="Tìm theo tên hoặc mô tả…"
+               class="min-w-0 flex-1 border-0 bg-transparent p-0 text-body text-cream-100 placeholder:text-cream-500 focus:outline-none"
+               aria-label="Tìm ảnh theo tên hoặc mô tả">
+        <button v-if="q" type="button" class="shrink-0 text-cream-400 hover:text-cream-100" title="Xoá tìm kiếm" aria-label="Xoá tìm kiếm" @click="q = ''">
+          <StudioIcon name="x" size="h-3.5 w-3.5" />
+        </button>
+      </label>
+
+      <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+        <label class="flex h-11 shrink-0 items-center gap-1 rounded-lg border border-ink-600 bg-ink-800 px-2 lg:h-8">
+          <StudioIcon name="folderOpen" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
+          <select :value="scope" data-output-scope class="h-full max-w-40 border-0 bg-transparent p-0 text-label font-semibold text-cream-100 focus:outline-none"
+                  aria-label="Xem ảnh theo bộ sưu tập" @change="setScope($event.target.value)">
+            <option value="all">Tất cả ảnh</option>
+            <option v-for="p in collections" :key="'sc-' + p.id" :value="'p:' + p.id">{{ p.name }}</option>
+          </select>
+        </label>
+
+        <label class="flex h-11 shrink-0 items-center gap-1 rounded-lg border border-ink-600 bg-ink-800 px-2 lg:h-8">
+          <StudioIcon name="list" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
+          <select :value="store.outputSortBy" data-output-sort class="h-full border-0 bg-transparent p-0 text-label font-semibold text-cream-100 focus:outline-none"
+                  aria-label="Sắp xếp ảnh" @change="setSort($event.target.value)">
+            <option value="new">Mới nhất</option>
+            <option value="old">Cũ nhất</option>
+            <option value="name">Tên A→Z</option>
+            <option value="running">Đang chạy trước</option>
+          </select>
+        </label>
+
+        <label class="flex h-11 shrink-0 items-center gap-1 rounded-lg border border-ink-600 bg-ink-800 px-2 lg:h-8">
+          <StudioIcon name="grid" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
+          <select :value="density" data-output-density class="h-full border-0 bg-transparent p-0 text-label font-semibold text-cream-100 focus:outline-none"
+                  aria-label="Cỡ lưới" @change="setDensity($event.target.value)">
+            <option value="s">Nhỏ</option>
+            <option value="m">Vừa</option>
+            <option value="l">Lớn</option>
+          </select>
+        </label>
+      </div>
     </div>
 
     <!-- ── Lọc theo trạng thái: chỉ hiện khi đã có ảnh (lưới rỗng thì lọc là vô nghĩa) ── -->
@@ -174,7 +283,9 @@ function onDragStart(e, g) {
     </p>
 
     <!-- ── Lưới kết quả ── -->
-    <div v-if="items.length" class="scrollbar-hide grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto p-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+    <!-- Số cột đến từ store.outputDensity (bảng DENSITY ở script) — ĐI CẶP với thuộc tính sizes của
+         ảnh, không tách rời, nếu không trình duyệt tải thumbnail sai cỡ. -->
+    <div v-if="items.length" class="scrollbar-hide grid flex-1 auto-rows-min gap-3 overflow-y-auto p-3" :class="gridCols">
       <article
         v-for="g in items"
         :key="g.id"
@@ -240,10 +351,15 @@ function onDragStart(e, g) {
         <StudioIcon name="filter" size="h-6 w-6" />
       </span>
       <p class="text-base font-semibold text-cream-100">Không có ảnh nào ở mục «{{ (FILTERS.find(f => f.id === filter) || {}).label }}»</p>
-      <p class="max-w-md text-body text-cream-300">{{ all.length }} ảnh vẫn còn nguyên — chỉ là không ảnh nào đang ở trạng thái này.</p>
-      <button type="button" class="tool-btn" data-output-filter-clear @click="filter = 'all'">
-        <StudioIcon name="x" size="h-3.5 w-3.5" /> Xem tất cả {{ all.length }} ảnh
-      </button>
+      <p class="max-w-md text-body text-cream-300">{{ all.length }} ảnh vẫn còn nguyên — chỉ là không ảnh nào khớp bộ lọc đang bật.</p>
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <button type="button" class="tool-btn" data-output-filter-clear @click="filter = 'all'; q = ''">
+          <StudioIcon name="x" size="h-3.5 w-3.5" /> Xem tất cả {{ all.length }} ảnh
+        </button>
+        <button v-if="scope !== 'all'" type="button" class="tool-btn" data-output-scope-clear @click="setScope('all')">
+          <StudioIcon name="folderOpen" size="h-3.5 w-3.5" /> Bỏ giới hạn bộ sưu tập
+        </button>
+      </div>
     </div>
 
     <!-- ── Trống: nói việc đầu tiên nên làm, KHÔNG liệt kê tính năng ── -->
@@ -263,8 +379,10 @@ function onDragStart(e, g) {
           <StudioIcon name="sliders" size="h-3.5 w-3.5" /> Bảng prompt đầy đủ
         </button>
       </div>
+      <!-- Chưa có ảnh NÀO mà vẫn đang giới hạn theo bộ sưu tập là ngõ cụt thật: nói rõ và mở lối ra. -->
       <p v-if="store.appliedProject && store.outputFilterProject" class="text-label text-cream-400">
-        Đang lọc theo bộ sưu tập «{{ store.appliedProject.name }}» — <button type="button" class="underline" @click="store.outputFilterProject = false">bỏ lọc</button>
+        Đang chỉ xem ảnh của bộ sưu tập «{{ store.appliedProject.name }}» —
+        <button type="button" class="underline" data-output-scope-clear @click="setScope('all')">xem tất cả ảnh</button>
       </p>
     </div>
   </div>
