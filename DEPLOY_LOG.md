@@ -27,7 +27,28 @@ Hai ô mô tả tạo ảnh (một ở canvas, một ở chat) là **hai lịch 
 - **Chat chạy thật trên production** (`php artisan studio:chat-check --live --show`): mảnh chữ đầu tiên **9.046 ms**, tổng **28.624 ms**, **194 mảnh**, CHẢY THEO LUỒNG **CÓ**, **5 lượt công cụ · 17 kết quả · 13 trích dẫn**, câu trả lời 1.413 ký tự và **mở bằng nguồn thật** (Harper's Bazaar · Who What Wear · Net-A-Porter · Eva.vn).
 
 ### Còn nợ (ghi để phiên sau không tưởng đã xong)
-- **Chưa bấm thử bằng trình duyệt thật** (vị trí FAB ở 320/375px, hover/active, hai chủ đề sáng/tối, hộp thoại xin quyền clipboard, luồng dự phòng `execCommand`, nút xuống dòng khi bàn phím điện thoại mở, bố cục chat trong modal 720px) — đã nợ từ đợt 45, **vẫn nợ**.
+### Kiểm chứng BẰNG TRÌNH DUYỆT THẬT (đợt 46 bổ sung — món nợ từ đợt 45 đã trả)
+Dựng **Chrome 153 headless + giao thức DevTools** (máy này có sẵn `google-chrome`) điều khiển thẳng trang thật, **không** phải đọc mã rồi suy đoán. Ba khổ: **375×812 · 320×700 (đo ra 322) · 414×896 · 1280×900**.
+
+| Đo gì | Kết quả THẬT |
+|---|---|
+| Nút nổi trợ lý ở màn hình hẹp | 375px: `x=302 y=526 48×48`; 320px: `x=247 y=414`; 414px: `x=341 y=610` — **không bị che** (`elementFromPoint` tại tâm trả về **chính nút**), thanh điều hướng dưới (`top=761`) **không đè** nút (đáy nút 574), **không tràn ngang** (`scrollWidth == innerWidth`) |
+| Canvas trống | `textarea = 0` ở **cả ba** khổ ⇒ ô mô tả tạo ảnh **đã biến mất thật**, không phải ẩn bằng CSS |
+| Thẻ chức năng | Đúng **6** thẻ, id `image · concept · trend · library · projects · prompt` |
+| Thẻ có **điều phối thật** không | Bấm «Bảng prompt» ⇒ chat **đóng**, bảng prompt mở (`textarea 1 → 5`); bấm «Thư viện» ⇒ chat đóng, tiêu đề «Thư viện 0» xuất hiện ⇒ **đi thẳng tới đúng tính năng**, đúng như yêu cầu #4 |
+| Ô tạo ảnh trong chat | Thẻ «Tạo ảnh» mở ô ngay trong khung chat (`data-chat-image`, 2 `textarea`), nút gửi **khoá khi mô tả trống** (`disabled=true`) |
+| **Nút xuống dòng** | Gõ thật bằng bàn phím rồi bấm thật bằng chuột: `"dong mot"` → `"dong mot\n"`, con trỏ nhảy tới vị trí **9**, gõ tiếp ra `"dong mot\ndong hai"` ⇒ **chèn đúng chỗ con trỏ** |
+| **Copy** | Bấm nút Copy rồi **đọc lại clipboard**: nhận đúng `"Chào bạn, bạn giúp được gì?"`, kèm thông báo «Đã copy câu hỏi của bạn vào bộ nhớ tạm.»; `title` = «Copy câu hỏi này» |
+| Lỗi JavaScript | `Runtime.exceptionThrown` + `Log.entryAdded` ⇒ **rỗng** (không exception, không lỗi console nào ngoài 401 do chưa đăng nhập ở lần chạy đầu) |
+| Tràn ngang khi đã có câu trả lời ở 375px | `scrollWidth = 375 = innerWidth` ⇒ **không tràn** |
+
+**Ảnh chụp để trong `/tmp/ui/`** (22 ảnh: `w375-1-canvas` … `w1280-5-library`, `r3-375-canvas`, `r3-image-composer`, `r5-mobile-answer`…) — máy này đang chạy **model không đọc được ảnh**, nên phần "nhìn bằng mắt" (màu, khoảng thở, hover/active, hai chủ đề sáng/tối) **vẫn là việc của chủ dự án**; mọi thứ **đo được bằng số** thì đã đo.
+
+**Cách dựng lại phiên kiểm này** (đừng đoán lại từ đầu): `php artisan serve --port=8123` → tạo tài khoản thử trong **CSDL local** `php artisan tinker --execute='\App\Models\User::updateOrCreate(["email"=>"ui-check@fabrikai.local"],["name"=>"UI Check","password"=>bcrypt("UiCheck!2026"),"email_verified_at"=>now()])'` → chạy `google-chrome --headless=new --remote-debugging-port=9222` → điều khiển bằng CDP. Nhớ **gỡ tài khoản thử** sau khi xong.
+
+### Còn nợ (ghi để phiên sau không tưởng đã xong)
+- **Chưa render câu trả lời THẬT của model trong trình duyệt**: máy dev **không có khoá nhà cung cấp AI** (`.env` local không có khoá nào), mà tài khoản thường thì bị **cổng gói** chặn đúng như thiết kế — đo được nguyên văn: `403 {"code":"module_locked","module":"collection_bot","reason":"plan"}`. Đã thử nâng tài khoản thử lên `super_admin` (rồi **trả về `customer`**): hết 403 nhưng lượt trả lời vẫn hỏng vì thiếu khoá. Phần **chữ của trợ lý** vì vậy chỉ được chứng minh bằng `scripts/check-chat-format.mjs` (**31 mục**) + render `@vue/server-renderer`, **không** phải bằng một lượt thật trong trình duyệt. Muốn trả nốt: chạy đúng phiên kiểm trên **production** bằng một tài khoản có gói.
+- **Nhìn bằng mắt** (màu · khoảng thở · hover/active · hai chủ đề sáng/tối · hộp thoại xin quyền clipboard · luồng dự phòng `execCommand` khi trang không phải HTTPS): xem 22 ảnh trong `/tmp/ui/`.
 - Trần **rate-limit của Tavily keyless chưa đo**; muốn trần cao hơn thì chủ dự án đưa khoá `tvly-…` (hoặc Google CSE) là chạy đúng câu lệnh ở mục 2.
 - Hai nguồn `kind=page` trên production (`vnexpress-thoi-trang`, `eva`) **cần đo lại** bằng `php artisan studio:web-page-probe` sau khi chủ dự án đổi địa chỉ.
 
