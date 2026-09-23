@@ -5,6 +5,34 @@
 
 ---
 
+## Phiên 2026-09-23 (đợt 46) — TRỢ LÝ LÀ TRUNG TÂM: TẠO ẢNH TRONG CHAT · TRẢ CANVAS TRỐNG SẠCH · LỜI CHAO MỀM · CÁCH ĐĂNG KÝ API KEY
+
+**Commit:** `c9a37b3`. **Trạng thái: đã push + deploy + kiểm trên bundle sống (CDN) + chat chạy thật.**
+
+Bốn yêu cầu của chủ dự án (2026-09-26):
+
+| # | Yêu cầu | Đã làm |
+|---|---|---|
+| 1 | Viết lại **ngắn gọn, văn phong nhẹ nhàng mềm mỏng** lời chào *"Hỏi thẳng về bộ sưu tập bạn đang làm"* | Lời chào mới ở **cả hai** khung: modal /studio — *"Cùng xem bộ sưu tập bạn đang làm nhé"* / *"Mình đọc hồ sơ và quy tắc bạn đã khai, cần thì tra thêm trên web. Chưa có dữ liệu thì mình nói thật là chưa có."*; bước «Hỏi đáp» của Agent Studio — *"Hỏi mình về bộ sưu tập vừa dựng nhé"* + câu thứ hai nói rõ copy được từng câu và việc tra web. Bỏ hết giọng mệnh lệnh ("Hỏi thẳng", "bắt buộc") |
+| 2 | **Thêm cách đăng ký API key** tìm kiếm web | Khối gập được *"Cách đăng ký API key tìm kiếm web"* **ngay trong chat**: Tavily (miễn phí 1.000 lượt/tháng, **không khoá vẫn chạy**) và Google CSE, kèm **đúng câu lệnh** `php artisan studio:web-search-setup --provider=tavily --key=tvly-…` / `… --provider=google --key=AIza… --cx=…`, có nút Copy dùng chung `chatCopy.js`. Cố ý đặt trong chat vì đó là chỗ người dùng **nhận ra** "trả lời chưa có nguồn" rồi mới cần khoá |
+| 3 | **Hợp nhất tạo ảnh vào chat** và **trả lại canvas trống sạch sẽ** | `CanvasEmptyState.vue`: **xoá hẳn** ô mô tả tạo ảnh (`textarea` · nút «Tạo ảnh» · 3 gợi ý điền nhanh) — 193 → **64 dòng**, chỉ còn lời mời ngắn + nút mở trợ lý + nút mở bảng Prompt đầy đủ. `ChatModal.vue` nhận **tạo ảnh · đọc ảnh · gợi ý prompt từ ảnh** đúng đường `store.generateImage()` mà card «Tạo ảnh» đang gọi (một đường sinh ảnh, không đẻ đường thứ hai) |
+| 4 | Trợ lý thành **người điều phối nhanh nhưng đắc lực** tới các tính năng | **6 card chức năng** trong chat (`data-chat-card`): Tạo ảnh · Gợi ý từ ảnh · Thư viện · Bảng prompt · Radar xu hướng · Bộ sưu tập — bấm là **đi thẳng** tới đúng chỗ (`store.openLibrary()`, `store.activityRequest` cho `revealActivity()`), **không gọi model** để định tuyến (nhanh, tất định, không tốn lượt) |
+
+### Vì sao gỡ ô tạo ảnh khỏi canvas mà không phải ẩn
+Hai ô mô tả tạo ảnh (một ở canvas, một ở chat) là **hai lịch sử** người dùng không biết cái nào thật, và màn hình trống thì việc đầu tiên nên là **nói cho trợ lý biết mình muốn gì**, không phải điền một form. Chú thích trong mã ghi rõ vì sao gỡ và rằng muốn trả lại thì phải là quyết định mới, không phải bật lại CSS.
+
+### Kiểm chứng (số thật)
+- `vendor/bin/phpunit --no-coverage` ⇒ **OK (1287 tests, 9917 assertions)**; `node scripts/check-chat-format.mjs` ⇒ **31 mục OK**; `npm run build` xanh.
+- **Trên bundle ĐÃ deploy qua CDN**: `main-DRDlU_rR.js` (189.991 B) **có** "Cùng xem bộ sưu tập bạn đang làm nhé" · `data-chat-card` · `data-chat-newline` · `data-chat-copy` · "Cách đăng ký API key tìm kiếm web" · `tvly-` · `AIza` · "Canvas đang trống" · `data-chat-open` · `data-prompt-panel`; **KHÔNG còn** `canvas-quick-prompt` · "Nguồn để bạn tự kiểm" · "thu gọn nguồn này". `agent-studio-Dk45VL-3.js` (212.661 B) có lời chào riêng của bước «Hỏi đáp» và `data-chat-copy`, **cố ý không** có khối API key và không có card chức năng (khác trang, khác việc).
+- **Chat chạy thật trên production** (`php artisan studio:chat-check --live --show`): mảnh chữ đầu tiên **9.046 ms**, tổng **28.624 ms**, **194 mảnh**, CHẢY THEO LUỒNG **CÓ**, **5 lượt công cụ · 17 kết quả · 13 trích dẫn**, câu trả lời 1.413 ký tự và **mở bằng nguồn thật** (Harper's Bazaar · Who What Wear · Net-A-Porter · Eva.vn).
+
+### Còn nợ (ghi để phiên sau không tưởng đã xong)
+- **Chưa bấm thử bằng trình duyệt thật** (vị trí FAB ở 320/375px, hover/active, hai chủ đề sáng/tối, hộp thoại xin quyền clipboard, luồng dự phòng `execCommand`, nút xuống dòng khi bàn phím điện thoại mở, bố cục chat trong modal 720px) — đã nợ từ đợt 45, **vẫn nợ**.
+- Trần **rate-limit của Tavily keyless chưa đo**; muốn trần cao hơn thì chủ dự án đưa khoá `tvly-…` (hoặc Google CSE) là chạy đúng câu lệnh ở mục 2.
+- Hai nguồn `kind=page` trên production (`vnexpress-thoi-trang`, `eva`) **cần đo lại** bằng `php artisan studio:web-page-probe` sau khi chủ dự án đổi địa chỉ.
+
+---
+
 ## Phiên 2026-09-23 (đợt 45) — CHAT TRỢ LÝ: GỠ KHỐI NGUỒN · NÚT COPY · CHỮ ĐƯỢC TRANG TRÍ · NÚT XUỐNG DÒNG
 
 **Commit:** `3db9272`. **Trạng thái: đã push + deploy + kiểm trên bundle sống.**
