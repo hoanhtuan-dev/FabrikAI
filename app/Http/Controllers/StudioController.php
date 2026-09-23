@@ -2865,7 +2865,11 @@ RULES:
 
             // Cỡ thumbnail: whitelist cứng để chống lạm dụng tạo ảnh lớn/tiêu tốn bộ nhớ.
             $size = (int) $request->query('size', 160);
-            $allowed = [160, 320, 480, 640];
+            // [đợt 57] Thêm 960 · 1280. Lý do ĐO ĐƯỢC: máy ảnh điện thoại là 3x điểm ảnh, nên một ô
+            // ảnh rộng 390 CSS px cần ~1170 điểm ảnh thật. Trần cũ 640 bị KÉO GIÃN ở lưới lớn ⇒ nhòe
+            // — đúng lỗi người dùng báo ("tăng kích thước lưới khiến ảnh đã nhòe nay còn nhòe hơn").
+            // Ảnh gốc vẫn là nguồn duy nhất; đây chỉ là cỡ bản thu nhỏ, tạo 1 lần rồi cache.
+            $allowed = [160, 320, 480, 640, 960, 1280];
             if (! in_array($size, $allowed, true)) {
                 $size = 160;
             }

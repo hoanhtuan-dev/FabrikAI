@@ -484,6 +484,11 @@ export function studioState() {
   // generations. Lưu riêng một khoá localStorage (cùng lối với savePromptMemory/saveUpscaleMemory).
   outputSortBy: 'new',   // 'new' | 'old' | 'name' | 'running'
   outputDensity: 'm',    // 's' | 'm' | 'l' — số cột lưới
+  outputQuery: '',       // từ khoá tìm ảnh (bỏ dấu khi so)
+  outputStatus: 'all',   // 'all' | 'running' | 'done' | 'failed'
+  // [đợt 57] Bảng lọc nằm trong POPUP do thanh tiêu đề mở, không phải một dải chiếm chỗ trong lưới.
+  // '' = đóng · 'filter' = mở bảng lọc · 'search' = mở bảng lọc và đặt con trỏ vào ô tìm.
+  outputSheet: '',
     viewerList: null,             // danh sách tùy chỉnh cho GalleryModal (vd: outputs của 1 dự án) — ưu tiên cao nhất trong viewerItems
     projectView: 'board',         // 'board' (kanban) | 'list'
     projectsArchived: false,      // lọc dự án đã lưu trữ

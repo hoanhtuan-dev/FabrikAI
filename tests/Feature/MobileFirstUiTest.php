@@ -50,8 +50,13 @@ class MobileFirstUiTest extends TestCase
         $this->assertStringContainsString(':sizes="GRID_SIZES"', $grid);
 
         // Bốn cỡ PHẢI khớp whitelist cứng của backend (StudioController::studioImageThumb).
-        $this->assertStringContainsString('const THUMB_SIZES = [160, 320, 480, 640];', $grid,
-            'srcset chỉ được trỏ vào bốn cỡ backend thật sự tạo (160|320|480|640).');
+        // [đợt 57] 640 là TRẦN CŨ và nó là nguyên nhân nhòe: máy 3x cần ~1170 điểm ảnh cho một ô
+        // 390px, nên 640 bị KÉO GIÃN. Đã thêm 960/1280 ở CẢ HAI phía (whitelist backend + srcset).
+        $this->assertStringContainsString('const THUMB_SIZES = [160, 320, 480, 640, 960, 1280];', $grid,
+            'srcset phải khớp whitelist backend, gồm cả 960/1280.');
+        $php = (string) file_get_contents(base_path('app/Http/Controllers/StudioController.php'));
+        $this->assertStringContainsString('$allowed = [160, 320, 480, 640, 960, 1280];', $php,
+            'Backend phải THẬT SỰ tạo được 960/1280 — thêm vào srcset mà backend không có là ảnh lỗi.');
 
         // sizes phải khai ĐÚNG breakpoint của lưới, nếu không trình duyệt tải sai cỡ.
         foreach (['1536px', '1280px', '640px'] as $bp) {

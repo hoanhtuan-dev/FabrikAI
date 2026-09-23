@@ -44,10 +44,12 @@ const store = useStudioStore();
  * store sẽ đổi visibleGenerations — thứ mà 6 nơi khác đang đọc (OutputModule, biến thể, chọn ảnh…)
  * và biến một bộ lọc màn hình thành trạng thái toàn cục. Giữ nó ở đúng chỗ nó có nghĩa.
  */
-const filter = ref('all');
+// [đợt 57] Bộ lọc nằm trong STORE vì bảng lọc do THANH TIÊU ĐỀ mở (nút kính lúp / nút lọc), còn
+// lưới chỉ đọc lại. Để hai bản sao local là hai chỗ để lệch nhau.
+const filter = computed({ get: () => store.outputStatus, set: (v) => { store.outputStatus = v; } });
 // Tìm theo TÊN hoặc PROMPT — hai thứ người dùng nhớ về một tấm ảnh. Không phân biệt hoa/thường và
 // bỏ dấu tiếng Việt: gõ "ao thun" phải ra "Áo thun".
-const q = ref('');
+const q = computed({ get: () => store.outputQuery, set: (v) => { store.outputQuery = v; } });
 const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
 const all = computed(() => store.visibleGenerations || []);
 
@@ -132,6 +134,10 @@ onMounted(() => {
   // bỏ qua khi đã nạp (cùng lối bảng lệnh đang dùng), nên mở lưới không sinh request thừa.
   if (!store.projectLoaded) store.loadProjects();
 });
+// Đặt con trỏ vào ô tìm khi bảng lọc được mở từ NÚT KÍNH LÚP (store.outputSheet === 'search').
+function focusSearch(el) {
+  if (el && store.outputSheet === 'search') { requestAnimationFrame(() => el.focus()); }
+}
 function setSort(v) { store.outputSortBy = v; store.saveOutputPrefs(); }
 function setDensity(v) { store.outputDensity = v; store.saveOutputPrefs(); }
 
@@ -157,7 +163,9 @@ function projectName(pid, fallback) {
  *   grid-cols-2 (mặc định) · sm:grid-cols-3 (640) · lg:grid-cols-3 · xl:grid-cols-4 (1280) · 2xl:grid-cols-5 (1536)
  * Lệch sizes thì trình duyệt tải sai cỡ — nhòe (nếu nhỏ hơn) hoặc phí băng thông (nếu lớn hơn).
  */
-const THUMB_SIZES = [160, 320, 480, 640];
+// Phải khớp whitelist của StudioController::studioImageThumb. 960/1280 có từ đợt 57 để ô ảnh lớn
+// trên máy 3x không bị kéo giãn.
+const THUMB_SIZES = [160, 320, 480, 640, 960, 1280];
 function gridSrcset(url) {
   return THUMB_SIZES.map((s) => thumbUrl(url, s) + ' ' + s + 'w').join(', ');
 }
@@ -208,74 +216,61 @@ function onDragStart(e, g) {
 
 <template>
   <div class="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-ink-700 bg-ink-900">
-    <!-- ══ THANH LƯỚI — ĐÚNG MỘT HÀNG, CUỘN NGANG (đợt 56) ══
-         Lịch sử của chỗ này: 4 hàng → 3 hàng → 2 hàng → **1 hàng**. ĐO ĐƯỢC trên Chrome thật ở 390px:
-         4 hàng chiếm 171px trên vùng lưới 699px = **24% màn hình** chỉ để hiện bộ lọc. Số HÀNG mới là
-         thứ ăn chỗ; bề ngang thì ngón tay đã quen vuốt.
-         Nay tất cả trong một dải: tiêu đề (chỉ từ lg, vì ở điện thoại mặt lưới vốn đã là "kết quả") ·
-         tìm · đếm · việc đang chạy · chip trạng thái · ba lựa chọn · nút bỏ lọc.
-         Dropdown dùng lớp .select CỦA daisyUI và nút dùng .btn của daisyUI: màu nền/viền/chữ lấy từ
-         theme, không tự pha màu tay — bản trước tự pha nên trông lệch hẳn khỏi phần còn lại. -->
-    <div class="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-ink-700 px-2 py-1.5 scrollbar-hide" role="group" aria-label="Lọc và sắp xếp kết quả">
-      <h2 class="hidden shrink-0 items-center gap-2 font-display text-sm font-semibold text-cream-50 lg:flex">
-        <StudioIcon name="grid" size="h-4 w-4" class="text-brand-300" /> Kết quả
-      </h2>
+    <!-- ══ BẢNG LỌC (popup) — do THANH TIÊU ĐỀ mở (đợt 57) ══
+         Vì sao rời khỏi lưới: một dải lọc nằm trong lưới là một dải ăn chỗ CỦA ẢNH suốt phiên làm
+         việc, dù người dùng chỉ mở nó vài lần. Popup chiếm chỗ lúc MỞ, và trả lại toàn bộ diện tích
+         cho ảnh lúc ĐÓNG — đó mới là trạng thái thường trực.
+         Không có bản sao thứ hai: mọi điều khiển ở đây ghi thẳng vào store, lưới đọc lại. -->
+    <div v-if="store.outputSheet" class="fixed inset-0 z-[70] lg:absolute lg:inset-x-0 lg:top-0 lg:z-30" role="dialog" aria-modal="true" aria-label="Bộ lọc kết quả">
+      <div class="absolute inset-0 bg-scrim/60" @click="store.outputSheet = ''"></div>
+      <div class="absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-2xl border-t border-ink-700 bg-ink-900 p-3 pb-6 lg:inset-x-2 lg:bottom-auto lg:top-2 lg:rounded-xl lg:border lg:pb-3" data-output-sheet>
+        <div class="mb-2 flex items-center justify-between">
+          <span class="panel-title"><StudioIcon name="filter" size="h-4 w-4" class="text-brand-300" /> Bộ lọc</span>
+          <button type="button" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng" aria-label="Đóng" @click="store.outputSheet = ''"><StudioIcon name="x" size="h-4 w-4" /></button>
+        </div>
 
-      <label class="flex min-w-28 flex-1 items-center lg:max-w-64">
-        <input v-model="q" type="search" data-output-search placeholder="Tìm ảnh…"
-               class="input input-sm w-full" aria-label="Tìm ảnh theo tên hoặc mô tả">
-      </label>
+        <label class="mb-2 flex items-center gap-2">
+          <input v-model="q" :ref="focusSearch" type="search" data-output-search placeholder="Tìm theo tên hoặc mô tả…"
+                 class="input input-sm w-full" aria-label="Tìm ảnh theo tên hoặc mô tả">
+        </label>
 
-      <span class="badge badge-sm shrink-0" data-output-count>{{ items.length }}</span>
-      <!-- Nói rõ khi con số KHÔNG phải tổng: người dùng phải biết mình đang xem một phần. -->
-      <span v-if="items.length !== (store.generations || []).length" class="shrink-0 text-label text-cream-400">
-        / {{ (store.generations || []).length }}
-      </span>
+        <p class="mb-1 text-tiny font-semibold uppercase tracking-wide text-cream-400">Trạng thái</p>
+        <div class="mb-3 flex flex-wrap gap-1.5">
+          <button v-for="f in FILTERS" :key="f.id" type="button"
+                  class="btn btn-sm gap-1.5" :class="filter === f.id ? 'btn-primary' : 'btn-ghost'"
+                  :data-output-filter="f.id" :aria-pressed="filter === f.id" @click="filter = f.id">
+            {{ f.label }}<span class="badge badge-xs">{{ filterCounts[f.id] }}</span>
+          </button>
+        </div>
 
-      <span v-if="pending" class="badge badge-warn badge-sm shrink-0 gap-1">
-        <span class="h-2 w-2 animate-pulse rounded-full bg-current"></span>{{ pending }} đang tạo
-      </span>
+        <p class="mb-1 text-tiny font-semibold uppercase tracking-wide text-cream-400">Bộ sưu tập</p>
+        <select :value="scope" data-output-scope class="select select-sm mb-3 w-full" aria-label="Xem ảnh theo bộ sưu tập" @change="setScope($event.target.value)">
+          <option value="all">Tất cả ảnh</option>
+          <option v-for="p in collections" :key="'sc-' + p.id" :value="'p:' + p.id">{{ p.name }}</option>
+        </select>
 
-      <span v-if="all.length" class="mx-0.5 h-6 w-px shrink-0 bg-ink-700" aria-hidden="true"></span>
-      <button
-        v-for="f in FILTERS" :key="f.id"
-        type="button"
-        class="btn btn-sm shrink-0 gap-1.5"
-        :class="filter === f.id ? 'btn-primary' : 'btn-ghost'"
-        :data-output-filter="f.id"
-        :aria-pressed="filter === f.id"
-        @click="filter = f.id"
-      >
-        {{ f.label }}
-        <span class="badge badge-xs" :class="filter === f.id ? 'badge-neutral' : 'badge-ghost'">{{ filterCounts[f.id] }}</span>
-      </button>
+        <p class="mb-1 text-tiny font-semibold uppercase tracking-wide text-cream-400">Sắp xếp</p>
+        <select :value="store.outputSortBy" data-output-sort class="select select-sm mb-3 w-full" aria-label="Sắp xếp ảnh" @change="setSort($event.target.value)">
+          <option value="new">Mới nhất trước</option>
+          <option value="old">Cũ nhất trước</option>
+          <option value="name">Tên A → Z</option>
+          <option value="running">Đang chạy lên đầu</option>
+        </select>
 
-      <span class="mx-0.5 h-6 w-px shrink-0 bg-ink-700" aria-hidden="true"></span>
+        <p class="mb-1 text-tiny font-semibold uppercase tracking-wide text-cream-400">Cỡ ảnh trong lưới</p>
+        <select :value="density" data-output-density class="select select-sm mb-3 w-full" aria-label="Cỡ lưới" @change="setDensity($event.target.value)">
+          <option value="s">Nhỏ — nhiều ảnh một màn</option>
+          <option value="m">Vừa</option>
+          <option value="l">Lớn — xem kỹ từng ảnh</option>
+        </select>
 
-      <select :value="scope" data-output-scope class="select select-sm w-auto max-w-44 shrink-0"
-              aria-label="Xem ảnh theo bộ sưu tập" @change="setScope($event.target.value)">
-        <option value="all">Tất cả ảnh</option>
-        <option v-for="p in collections" :key="'sc-' + p.id" :value="'p:' + p.id">{{ p.name }}</option>
-      </select>
-
-      <select :value="store.outputSortBy" data-output-sort class="select select-sm w-auto shrink-0"
-              aria-label="Sắp xếp ảnh" @change="setSort($event.target.value)">
-        <option value="new">Mới nhất</option>
-        <option value="old">Cũ nhất</option>
-        <option value="name">Tên A→Z</option>
-        <option value="running">Đang chạy trước</option>
-      </select>
-
-      <select :value="density" data-output-density class="select select-sm w-auto shrink-0"
-              aria-label="Cỡ lưới" @change="setDensity($event.target.value)">
-        <option value="s">Lưới nhỏ</option>
-        <option value="m">Lưới vừa</option>
-        <option value="l">Lưới lớn</option>
-      </select>
-
-      <button v-if="filter !== 'all' || q" type="button" class="btn btn-ghost btn-sm shrink-0 gap-1" data-output-filter-clear @click="filter = 'all'; q = ''">
-        <StudioIcon name="x" size="h-3.5 w-3.5" /> Bỏ lọc
-      </button>
+        <div class="flex gap-1.5">
+          <button type="button" class="btn btn-sm flex-1 gap-1" data-output-filter-clear @click="filter = 'all'; q = ''">
+            <StudioIcon name="x" size="h-3.5 w-3.5" /> Xoá bộ lọc
+          </button>
+          <button type="button" class="btn btn-primary btn-sm flex-1" @click="store.outputSheet = ''">Xong</button>
+        </div>
+      </div>
     </div>
 
     <!-- Banner nói thật khi lô này có ảnh DEMO (không phải do AI tạo) -->
@@ -290,7 +285,7 @@ function onDragStart(e, g) {
       <article
         v-for="g in items"
         :key="g.id"
-        class="group relative overflow-hidden rounded-xl border-2 bg-ink-800 transition-colors"
+        class="group relative min-w-0 overflow-hidden rounded-xl border-2 bg-ink-800 transition-colors"
         :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700 hover:border-ink-600'"
       >
         <div class="relative aspect-square">
@@ -323,17 +318,21 @@ function onDragStart(e, g) {
           </template>
         </div>
 
-        <!-- ── HAI nút nhanh: Sửa · Tải. LUÔN HIỆN (xem chú thích đầu file). ── -->
+        <!-- ── HAI nút nhanh: Sửa · Tải. LUÔN HIỆN (xem chú thích đầu file).
+             [đợt 57] HAI NÚT CÙNG MỘT KIỂU. Trước đây «Sửa» tô brand còn «Tải» nền xám — người dùng
+             đọc đó là "Sửa là việc chính, Tải là việc phụ", trong khi cả hai đều là việc ngang nhau
+             trên một tấm ảnh đã xong. Không có việc nào chính hơn việc nào.
+             CAPTION ĐÃ BỎ: tên ảnh chiếm một dòng trong mỗi thẻ, nhân lên thành cả một hàng chữ
+             chạy ngang lưới — chỗ đó thuộc về ẢNH. Tên vẫn còn trong title + trình xem. ── -->
         <template v-if="g.status === 'completed' && g.media_url">
           <div class="grid grid-cols-2 gap-1.5 border-t border-ink-700 p-1.5">
-            <button type="button" class="flex h-11 items-center justify-center gap-1.5 rounded-lg bg-brand-600 text-label font-semibold text-primary-content transition hover:bg-brand-500 lg:h-8 lg:text-tiny" title="Mở màn Chỉnh ảnh: tả · khoanh vùng · vẽ cọ" :aria-label="'Sửa ' + store.genName(g)" data-edit-open @click.stop="editImage(g)">
+            <button type="button" class="flex h-11 items-center justify-center gap-1.5 rounded-lg bg-ink-700 text-label font-semibold text-cream-200 transition hover:bg-ink-600 lg:h-8 lg:text-tiny" title="Mở màn Chỉnh ảnh: tả · khoanh vùng · vẽ cọ" :aria-label="'Sửa ' + store.genName(g)" data-edit-open @click.stop="editImage(g)">
               <StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa
             </button>
             <button type="button" class="flex h-11 items-center justify-center gap-1.5 rounded-lg bg-ink-700 text-label font-semibold text-cream-200 transition hover:bg-ink-600 lg:h-8 lg:text-tiny" title="Tải ảnh gốc về máy" :aria-label="'Tải ' + store.genName(g)" @click.stop="download(g)">
               <StudioIcon name="download" size="h-3.5 w-3.5" /> Tải
             </button>
           </div>
-          <p class="truncate px-2 pb-1.5 pt-1 text-label text-cream-400 lg:text-tiny" :title="store.genName(g)">{{ store.genName(g) }}</p>
         </template>
         <template v-else>
           <div class="flex items-center gap-1 border-t border-ink-700 p-1.5">

@@ -905,6 +905,61 @@ từ `lg` — ở điện thoại mặt lưới vốn đã LÀ kết quả, khô
 Không nhét mọi nút ra toàn màn hình cho dễ bấm: các lựa chọn dùng `select-sm` (32px trên máy tính,
 40px trên cảm ứng theo sàn chạm sẵn có), chip dùng `btn-sm`, và TẤT CẢ nằm trong một dải cuộn ngang.
 
+## Phiên 2026-09-23 (đợt 57) — SÁU LỖI NGƯỜI DÙNG BÁO LẦN HAI, sửa và đo lại
+
+### 1. LƯỚI ẢNH TRÀN MÀN HÌNH — GỐC LÀ `min-w-0` THIẾU
+
+Khung mặt lưới là một **flex item**; mặc định của flex item là `min-width: auto`, nghĩa là nó **không
+co xuống dưới bề rộng nội dung**. Lưới ảnh bên trong cứ thế đẩy khung rộng ra quá màn hình điện thoại.
+Thêm `min-w-0` cho cả hai mặt. ĐO ĐƯỢC ở 320px: `scrollWidth 294 = clientWidth 294`, thẻ cuối kết
+thúc ở 294px trong khung 320px.
+
+### 2. HEADER QUÁ CAO
+
+| | Trước | Sau |
+|---|---|---|
+| Chiều cao header (390px) | ~110px | **63px** |
+
+### 3. NÚT THƯƠNG HIỆU TẢI LẠI TRANG — đổi thành KHỐI TĨNH
+
+Nó là `<a href="/">` nằm ngay chỗ ngón tay hay chạm nhất ở góc trên trái; bấm vào là **tải lại cả
+trang**, mất sạch trạng thái đang làm (ảnh đang chọn, bộ lọc, bản nháp prompt). Đã đổi thành `<span>`:
+đây chỉ là nhận diện, và đã ở trang chủ rồi thì không có gì để "về".
+
+### 4. NÚT «SỬA» KHÁC MÀU NÚT «TẢI» — đã cùng một kiểu
+
+«Sửa» tô brand còn «Tải» nền xám ⇒ người dùng đọc thành "Sửa là việc chính, Tải là việc phụ". Cả hai
+đều là việc NGANG NHAU trên một tấm ảnh đã xong. ĐO ĐƯỢC: cả hai nay cùng `rgb(41,47,55)`.
+
+### 5. CAPTION CHIẾM CHỖ — đã bỏ
+
+Tên ảnh chiếm một dòng trong MỖI thẻ; nhân lên thành cả một hàng chữ chạy ngang lưới. Tên vẫn còn
+trong `title` (rê chuột) và trong trình xem.
+
+### 6. THANH LỌC → POPUP MỞ TỪ HEADER
+
+Bảng lọc rời khỏi lưới. Diện tích dọc của lưới nay **toàn bộ thuộc về ẢNH** — trước đây là một dải ăn
+chỗ suốt phiên dù người dùng chỉ mở vài lần.
+
+Hai nút trên thanh tiêu đề:
+- **kính lúp** → mở bảng lọc với con trỏ đặt sẵn ở ô tìm (đúng yêu cầu "chỉ để icon rồi mở popup nhập liệu");
+- **nút lọc** → mở bảng lọc, kèm **chấm báo** khi có bộ lọc đang bật (để người dùng không tưởng ảnh
+  của mình biến mất).
+
+Trong bảng lọc có ĐỦ: tìm · 4 trạng thái · bộ sưu tập · **sắp xếp** · **cỡ lưới** · xoá lọc · Xong.
+**Sắp xếp và cỡ lưới đã trở lại** — bản trước tôi nhét chúng vào một dải cuộn ngang nên trên điện thoại
+chúng nằm NGOÀI màn hình, coi như mất.
+
+### 7. NHÒE — TÔI ĐÃ HIỂU SAI VÀ SỬA ĐÚNG CHỖ
+
+Người dùng nói đúng: yêu cầu là **tăng độ nét của ảnh**, nhưng lần trước tôi chỉ nâng `sizes` mà trần
+thumbnail của máy chủ vẫn là **640**. Một ô ảnh 390 CSS px trên máy **3x** cần ~1170 điểm ảnh thật ⇒
+ảnh 640 bị **KÉO GIÃN** ⇒ nhòe. Lưới càng to càng nhòe.
+
+Đã thêm **960 và 1280** vào cả hai phía: whitelist `studioImageThumb` **và** `THUMB_SIZES` của srcset
+(thêm một phía mà quên phía kia là ảnh lỗi). ĐO ĐƯỢC ở `deviceScaleFactor: 3`: ô 159px ⇒ trình duyệt
+chọn `?size=640` (159x3 = 477, cỡ kế tiếp là 640 — đúng, không còn kéo giãn).
+
 ### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
 
 - **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.

@@ -357,6 +357,13 @@ watch(() => store.promptOpen, (v) => { if (v) { activeActivity.value = 'concept'
  * trong trạng thái (chỉ bị lg:hidden che) thì lần thu hẹp sau chúng hiện lại đè lên màn hình mà
  * người dùng chưa bấm gì.
  */
+function openOutputSheet(mode) { store.outputSheet = store.outputSheet ? '' : mode; }
+// "Đang có bộ lọc" = có thứ gì đó đang thu hẹp kết quả ⇒ chấm báo trên nút, để người dùng không
+// tưởng ảnh của mình biến mất.
+const hasOutputFilter = computed(() =>
+  store.outputStatus !== 'all' || !!store.outputQuery || (store.outputFilterProject && !!store.appliedProjectId()),
+);
+
 function syncViewport() {
   if (window.innerWidth < 1024) {
     if (store.mainView === 'canvas') store.setMainView('grid');
@@ -1108,10 +1115,30 @@ function onTouchEnd(e) {
              đẩy ra ngoài mép phải). [đợt 54] Hai nút điện thoại đã gỡ khỏi thanh tiêu đề (chúng về
              dock dưới đáy) nên chỗ đã có lại — trả thương hiệu về, vì một ứng dụng không có nhận diện
              nào ở đầu trang là chuyện lạ, và đây là lối về trang chủ. -->
-        <a href="/" class="order-2 flex shrink-0 items-center gap-2" title="FabrikAI Studio">
+        <!-- [đợt 57] THƯƠNG HIỆU LÀ NÚT, KHÔNG PHẢI LIÊN KẾT. Trước đây là <a href="/"> — bấm vào là
+             TẢI LẠI CẢ TRANG, mất sạch trạng thái đang làm (ảnh đang chọn, bộ lọc, bản nháp prompt).
+             Đó là một cái bẫy nằm ngay chỗ ngón tay hay chạm nhất ở góc trên bên trái. Ở đây nó chỉ
+             là nhận diện; đã ở trang chủ rồi thì không có gì để "về" nữa. -->
+        <span class="order-2 flex shrink-0 items-center gap-2" title="FabrikAI Studio">
           <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-4 w-4" /></span>
           <span class="hidden font-display text-sm font-semibold text-cream-50 sm:inline">FabrikAI</span>
-        </a>
+        </span>
+
+        <!-- ══ HAI NÚT LỌC CỦA MẶT LƯỚI (đợt 57) ══
+             Bảng lọc KHÔNG còn là một dải trong lưới: nó là popup mở từ đây. Nhờ vậy toàn bộ diện
+             tích dọc của lưới thuộc về ẢNH, và hai lối vào nằm ở thanh tiêu đề — chỗ người dùng đã
+             quen tìm công cụ. Kính lúp mở thẳng bảng lọc với con trỏ đặt sẵn ở ô tìm. -->
+        <button type="button" class="order-4 icon-btn !h-8 !w-8 shrink-0" data-header-action="search-output"
+                title="Tìm ảnh" aria-label="Tìm ảnh" @click="openOutputSheet('search')">
+          <StudioIcon name="search" size="h-4 w-4" />
+        </button>
+        <button type="button" class="order-4 icon-btn !h-8 !w-8 relative shrink-0" data-header-action="filter-output"
+                :class="hasOutputFilter ? 'is-active' : ''"
+                :title="hasOutputFilter ? 'Bộ lọc đang bật' : 'Lọc và sắp xếp kết quả'" aria-label="Lọc và sắp xếp kết quả"
+                @click="openOutputSheet('filter')">
+          <StudioIcon name="filter" size="h-4 w-4" />
+          <span v-if="hasOutputFilter" class="absolute right-0 top-0 h-2 w-2 rounded-full bg-brand-400"></span>
+        </button>
 
         <!-- ══ ĐỔI MẶT CHÍNH: Lưới kết quả ⇄ Bảng ghép ══
              [đợt 53] CHUYỂN TỪ THANH TRẠNG THÁI LÊN ĐÂY, VÀ GỘP HAI NÚT THÀNH MỘT.
@@ -1662,11 +1689,14 @@ function onTouchEnd(e) {
                Dùng v-show (KHÔNG v-if) vì canvas bên dưới giữ ref DOM (canvasZoom · cvImg) và lớp phủ
                mask — gỡ khỏi DOM là mất trạng thái đang vẽ dở. Cùng lý do §15.2 đã chốt cho các dock:
                "Ẩn = thu về 0 kèm inert, KHÔNG dùng v-if". -->
-          <div v-show="store.mainView === 'grid'" :inert="store.mainView !== 'grid' ? true : null" class="min-h-0 flex-1" data-main-view="grid">
+          <!-- min-w-0 là BẮT BUỘC: mặc định của flex item là min-width:auto, nghĩa là nó KHÔNG co
+               xuống dưới bề rộng nội dung — và lưới ảnh bên trong cứ thế đẩy khung ra ngoài màn hình
+               điện thoại (lỗi người dùng báo: "lưới ảnh bị tràn màn hình"). -->
+          <div v-show="store.mainView === 'grid'" :inert="store.mainView !== 'grid' ? true : null" class="min-h-0 min-w-0 flex-1" data-main-view="grid">
             <ResultGrid />
           </div>
           <!-- ══ Vùng canvas (trái, flex-1) — nay là BẢNG GHÉP, mở khi cần ══ -->
-          <div v-show="store.mainView === 'canvas'" :inert="store.mainView !== 'canvas' ? true : null" class="relative flex-1 overflow-hidden" :class="bgClass" data-main-view="canvas" @dragover.prevent="dropOver = true" @dragleave="dropOver = false" @drop.prevent="onCanvasDrop($event)">
+          <div v-show="store.mainView === 'canvas'" :inert="store.mainView !== 'canvas' ? true : null" class="relative min-w-0 flex-1 overflow-hidden" :class="bgClass" data-main-view="canvas" @dragover.prevent="dropOver = true" @dragleave="dropOver = false" @drop.prevent="onCanvasDrop($event)">
             <!-- Khung báo kéo-thả khi đang kéo ảnh vào canvas -->
             <div v-if="dropOver" class="pointer-events-none absolute inset-2 z-50 rounded-lg border-2 border-dashed border-brand-400 bg-brand-400/5"></div>
             <!-- Khung chọn nhóm (mỗi nhóm được chọn trọn = 1 đối tượng) -->
