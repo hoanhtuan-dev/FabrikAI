@@ -40,6 +40,15 @@ function projectName(pid, fallback) {
 function select(g) { store.select(g); }
 /** Mở công cụ với CHÍNH ảnh này làm ảnh nguồn. */
 function useIn(g, activity) { store.select(g); store.requestActivity(activity); }
+
+/**
+ * MỞ MÀN «CHỈNH ẢNH» (bước 5.3) — MỘT ảnh, ba chế độ Tả/Khoanh/Cọ.
+ *
+ * VÌ SAO KHÔNG dùng useIn(g,'inpaint') như trước: đường cũ đưa ảnh lên canvas rồi bắt người dùng
+ * khoanh vùng TRÊN CANVAS nhiều layer. Màn mới làm đúng một việc, trên đúng một ảnh — và chạy được
+ * trên điện thoại.
+ */
+function editImage(g) { store.select(g); store.editImageOpen = true; }
 function download(g) {
   if (!g || !g.id) return;
   window.location.href = '/api/generations/' + g.id + '/download';
@@ -135,7 +144,7 @@ function onDragStart(e, g) {
             <button type="button" class="flex h-7 items-center justify-center gap-1 rounded bg-ink-700 text-tiny font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-cream-50" title="Chọn ảnh này làm ảnh đang làm việc" :aria-label="'Chọn ' + store.genName(g)" @click.stop="select(g)">
               <StudioIcon name="target" size="h-3 w-3" /> Chọn
             </button>
-            <button type="button" class="flex h-7 items-center justify-center gap-1 rounded bg-ink-700 text-tiny font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-cream-50" title="Mở công cụ Sửa ảnh với ảnh này" :aria-label="'Sửa ' + store.genName(g)" @click.stop="useIn(g, 'inpaint')">
+            <button type="button" class="flex h-7 items-center justify-center gap-1 rounded bg-ink-700 text-tiny font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-cream-50" title="Mở màn Chỉnh ảnh: tả · khoanh vùng · vẽ cọ" :aria-label="'Sửa ' + store.genName(g)" data-edit-open @click.stop="editImage(g)">
               <StudioIcon name="pencil" size="h-3 w-3" /> Sửa
             </button>
             <button type="button" class="flex h-7 items-center justify-center gap-1 rounded bg-ink-700 text-tiny font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-cream-50" title="Tạo biến thể từ ảnh này" :aria-label="'Biến thể từ ' + store.genName(g)" @click.stop="useIn(g, 'variation')">

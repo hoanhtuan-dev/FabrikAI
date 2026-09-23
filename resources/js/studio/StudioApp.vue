@@ -42,6 +42,9 @@ import OutputModule from './components/OutputModule.vue';
 const LibraryApp = asyncModal(() => import('./LibraryApp.vue'));
 // MultiSelectBar đã gộp vào ContextToolbar (layer selection bar).
 const GalleryModal = asyncModal(() => import('./components/GalleryModal.vue'));
+// [Bước 5.3 — 2026-09-26] MÀN "CHỈNH ẢNH": MỘT ảnh, ba chế độ Tả/Khoanh/Cọ (mặc định Tả).
+// Nạp lười như mọi popup khác: người dùng chưa chắc mở nó trong phiên làm việc.
+const EditImageModal = asyncModal(() => import('./components/EditImageModal.vue'));
 const ProjectWorkspace = asyncModal(() => import('./components/ProjectWorkspace.vue'));
 import StudioIcon from './components/StudioIcon.vue';
 import LayersPanel from './components/LayersPanel.vue';
@@ -1935,6 +1938,8 @@ function onTouchEnd(e) {
          ở trên: NÚT NỔI trong vùng canvas (components/ChatFab.vue — lối vào chính, hiện ở mọi bề
          rộng), lệnh trong bảng lệnh, và nút phụ «Hỏi trợ lý» ở màn hình canvas trống. -->
 
+    <!-- [Bước 5.3] Màn Chỉnh ảnh — mount thường trực, tự ẩn/hiện theo store.editImageOpen -->
+    <EditImageModal />
     <ChatModal />
     <ConceptCard v-if="conceptPromptOpened" popup />
     <!-- [2026-09-25] Agent Studio KHÔNG còn mount ở đây: nó là trang riêng /agent-studio

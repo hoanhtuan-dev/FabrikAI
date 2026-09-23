@@ -120,6 +120,8 @@ export function studioState() {
     // 'canvas' = BẢNG GHÉP (giữ trong giai đoạn chuyển) — nơi mask/crop/tay cầm layer đang sống.
     // Trong bước 5.2–5.3 hai mặt SONG SONG: canvas chưa bị xoá, chỉ đổi vai thành hàng công cụ.
     mainView: 'grid',
+    // Màn "Chỉnh ảnh" (bước 5.3) — MỘT ảnh, ba chế độ Tả/Khoanh/Cọ. Mặc định 'Tả' (không mask).
+    editImageOpen: false,
     texture: 5,
     // upscale params (fabric-weave slider removed — it affected dark skin & detail edges)
     upscaleScale: 2,

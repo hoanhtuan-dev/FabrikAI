@@ -1,1 +1,0 @@
-import{K as e,M as t}from"./pageBoot-CcasX1Fc.js";import{t as n}from"./RefImageCard-C_dl-G2d.js";var r={__name:`TryOnCard`,setup(r){return(r,i)=>(e(),t(n,{variant:`tryon`}))}};export{r as default};
