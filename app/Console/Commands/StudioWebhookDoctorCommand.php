@@ -73,11 +73,14 @@ class StudioWebhookDoctorCommand extends Command
             $err++;
         }
 
-        // 4. FAL_KEY
+        // 4. FAL_KEY — key THẬT ở studio_api_keys (Model Registry), không phải env.
         $this->line('');
-        $key = (string) studio_config('fal_key', env('FAL_KEY', ''));
+        $key = (string) studio_api_key('fal');
         if ($key === '') {
-            $this->warn('  ⚠ FAL_KEY chưa được đặt — không kiểm tra được.');
+            $key = (string) studio_config('fal_key', env('FAL_KEY', ''));
+        }
+        if ($key === '') {
+            $this->warn('  ⚠ Chưa khai key fal — không kiểm tra được. (Cài đặt → Nhóm công việc / Model Registry → key fal.)');
             $warn++;
         } else {
             try {
