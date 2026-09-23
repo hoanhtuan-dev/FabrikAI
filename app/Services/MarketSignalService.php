@@ -489,14 +489,20 @@ class MarketSignalService
      */
     private function sourceLabel(array $item): string
     {
+        // TÊN MIỀN trước tiên: một lượt tra trả về NHIỀU toà soạn, nên nhãn nói được nhiều nhất là tên miền
+        // của chính bài (WebSourceService::itemSite đặt sẵn cho mọi mục tin của cả hai đường).
+        $site = trim((string) ($item['site'] ?? ''));
+        if ($site !== '') {
+            return $site;
+        }
+
         $name = trim((string) ($item['source_name'] ?? $item['source'] ?? ''));
         if ($name !== '') {
             return $name;
         }
 
-        $host = (string) parse_url((string) ($item['url'] ?? ''), PHP_URL_HOST);
-
-        return (string) preg_replace('/^www\./i', '', $host);
+        // Mục tin cũ (đã nằm trong sổ từ trước khi có trường `site`) vẫn phải đếm được nguồn.
+        return \App\Services\WebSourceService::itemSite($item);
     }
 
     /**

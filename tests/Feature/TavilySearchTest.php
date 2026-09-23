@@ -89,6 +89,11 @@ class TavilySearchTest extends TestCase
         $this->assertStringContainsString('Giặt nước lạnh', (string) $found['items'][0]['summary']);
         $this->assertNotNull($found['items'][0]['published_at'], 'Tavily trả ngày đăng — đây là điểm hơn hẳn RSS.');
 
+        // (1b) MỘT TIN LUÔN CÓ NGUỒN (2026-09-26): mục tin của đường tìm kiếm KHÔNG có `source_name` như
+        // đường RSS, nên nếu thiếu `site` thì máy đo đếm ra "0 nguồn" và prompt không có gì để dẫn nguồn
+        // ngoài tiêu đề — đo thật trên production: "Đo từ 7 tin của 0 nguồn" + warning "Undefined array key".
+        $this->assertSame('gusa.vn', $found['items'][0]['site'], 'Nhãn nguồn của một mục tin là TÊN MIỀN của nó.');
+
         // KHÔNG có khoá ⇒ đi chế độ keyless; và KHÔNG gửi Authorization rỗng.
         $this->assertCount(1, $sent);
         $this->assertSame('keyless', $sent[0]['headers']['X-Tavily-Access-Mode'][0] ?? null);

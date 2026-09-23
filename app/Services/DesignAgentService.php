@@ -518,11 +518,16 @@ class DesignAgentService
             'external_evidence' => [
                 'mode' => $evidence['mode'],
                 'fetched_at' => $evidence['fetched_at'],
+                // ĐỌC KIỂU CHỊU ĐƯỢC THIẾU KHOÁ (2026-09-26): mục tin nay đến từ HAI đường — nguồn đã khai
+                // (đủ khoá) và KẾT QUẢ TÌM KIẾM (không có `source_name`). Bản trước đọc thẳng
+                // `$item['source_name']` nên production ghi warning "Undefined array key" cho MỖI mục tin của
+                // mỗi lượt chạy — và tệ hơn: chỗ dẫn nguồn cho model thành rỗng mà không ai thấy.
+                // Thứ tự nhãn: `site` (tên miền — nói đúng toà soạn của bài) → `source_name` → tên miền tự suy.
                 'items' => array_map(fn (array $item) => [
-                    'title' => $item['title'],
-                    'url' => $item['url'],
-                    'published_at' => $item['published_at'],
-                    'source' => $item['source_name'],
+                    'title' => (string) ($item['title'] ?? ''),
+                    'url' => (string) ($item['url'] ?? ''),
+                    'published_at' => $item['published_at'] ?? null,
+                    'source' => (string) ($item['site'] ?? $item['source_name'] ?? '') ?: WebSourceService::itemSite($item),
                     'summary' => $item['summary'],
                 ], $evidence['items']),
             ],
@@ -2489,11 +2494,16 @@ class DesignAgentService
             'external_evidence' => [
                 'mode' => $evidence['mode'] ?? 'empty',
                 'fetched_at' => $evidence['fetched_at'] ?? null,
+                // ĐỌC KIỂU CHỊU ĐƯỢC THIẾU KHOÁ (2026-09-26): mục tin nay đến từ HAI đường — nguồn đã khai
+                // (đủ khoá) và KẾT QUẢ TÌM KIẾM (không có `source_name`). Bản trước đọc thẳng
+                // `$item['source_name']` nên production ghi warning "Undefined array key" cho MỖI mục tin của
+                // mỗi lượt chạy — và tệ hơn: chỗ dẫn nguồn cho model thành rỗng mà không ai thấy.
+                // Thứ tự nhãn: `site` (tên miền — nói đúng toà soạn của bài) → `source_name` → tên miền tự suy.
                 'items' => array_map(fn (array $item) => [
-                    'title' => $item['title'],
-                    'url' => $item['url'],
-                    'published_at' => $item['published_at'],
-                    'source' => $item['source_name'],
+                    'title' => (string) ($item['title'] ?? ''),
+                    'url' => (string) ($item['url'] ?? ''),
+                    'published_at' => $item['published_at'] ?? null,
+                    'source' => (string) ($item['site'] ?? $item['source_name'] ?? '') ?: WebSourceService::itemSite($item),
                     // ĐOẠN TRÍCH đi kèm tiêu đề: có nó thì model trả lời được câu hỏi cụ thể mà không phải
                     // gọi thêm một lượt tìm nữa (mỗi lượt là một lần khách chờ). Nguồn từ SỔ cũng có trường này.
                     'snippet' => (string) ($item['summary'] ?? $item['snippet'] ?? ''),

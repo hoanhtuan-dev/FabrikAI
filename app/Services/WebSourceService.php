@@ -680,6 +680,10 @@ class WebSourceService
                 'published_at' => $published,
                 // Đoạn trích đã làm sạch của Tavily — đi thẳng vào prompt (nó viết cho LLM đọc).
                 'summary' => $this->clean((string) ($row['content'] ?? ''), 400),
+                // TÊN MIỀN của tin (2026-09-26) — xem itemSite(): mục tin của đường tìm kiếm không có
+                // `source_name` như đường RSS, nên thiếu trường này thì máy đo đếm ra "0 nguồn" và prompt
+                // không có gì để dẫn nguồn ngoài tiêu đề.
+                'site' => self::itemSite(['url' => $url]),
             ];
 
             // CÙNG luật lọc độ mới như mọi nguồn khác: có ngày mà quá cũ thì bỏ; KHÔNG có ngày thì giữ.
@@ -705,6 +709,27 @@ class WebSourceService
         $result['ms'] = (int) round((microtime(true) - $started) * 1000);
 
         return $result;
+    }
+
+    /**
+     * TÊN MIỀN của một mục tin — "MỘT TIN LUÔN CÓ NGUỒN" (2026-09-26).
+     *
+     * Vì sao cần một hàm dùng chung: mục tin đến từ HAI đường khác nhau. Đường RSS/trang có `source_name`
+     * (tên nguồn chủ shop đã khai); đường TÌM KIẾM trả về nhiều toà soạn trong cùng một lượt nên tên nguồn
+     * đã khai KHÔNG nói được gì về từng bài — cái nói được là TÊN MIỀN của chính bài đó.
+     *
+     * [LỖI THẬT — ĐO TRÊN PRODUCTION 2026-09-26] Sau khi bước 2 chuyển sang đo từ kết quả tìm kiếm:
+     *   · lệnh `studio:market-signals` in "Đo từ 7 tin của 0 nguồn" (máy đo đọc `source_name` — không có);
+     *   · và PHP ghi warning "Undefined array key \"source_name\"" ở DesignAgentService mỗi mục tin.
+     * Cả hai đều vì mục tin của đường tìm kiếm thiếu trường đó. Nay mọi mục tin đều có `site`.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    public static function itemSite(array $item): string
+    {
+        $host = (string) parse_url((string) ($item['url'] ?? ''), PHP_URL_HOST);
+
+        return (string) preg_replace('/^www\./i', '', $host);
     }
 
     /** Bản sao nguồn với từ khoá đã điền vào URL (không sửa bản ghi thật trong DB). */
@@ -1717,6 +1742,9 @@ class WebSourceService
             $out[] = $item + [
                 'source' => $source->slug,
                 'source_name' => $source->name,
+                // TÊN MIỀN đi kèm mọi mục tin (2026-09-26): xem itemSite(). Nhãn "nguồn" mà người đọc cần
+                // khi một lượt tra trả về nhiều toà soạn khác nhau.
+                'site' => self::itemSite($item),
             ];
         }
 
