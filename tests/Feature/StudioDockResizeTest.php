@@ -133,8 +133,18 @@ class StudioDockResizeTest extends TestCase
         $this->assertSame(3, substr_count($app, ':data-collapsed='), 'Cả ba dock phải báo trạng thái ẩn qua data-collapsed.');
         // Và trạng thái đang kéo (để tắt transition cho con trỏ đi trước).
         $this->assertSame(3, substr_count($app, ':data-resizing='), 'Cả ba dock phải báo trạng thái đang kéo qua data-resizing.');
-        // Ẩn khỏi bàn phím: dock thu về 0 vẫn còn cây DOM nên phải chặn Tab vào trong.
-        $this->assertSame(3, substr_count($app, ':inert='), 'Dock đã ẩn phải inert — nếu không, Tab vẫn nhảy vào nội dung vô hình.');
+        // Ẩn khỏi bàn phím: thứ gì thu về 0 mà VẪN CÒN trong cây DOM thì phải chặn Tab vào trong.
+        //
+        // [2026-09-26 · bước 5.2] Con số này từ 3 lên 5 vì khung làm việc nay có HAI MẶT CHÍNH
+        // (lưới kết quả ⇄ bảng ghép) ẩn/hiện bằng v-show — cùng đúng một nguyên tắc với ba dock:
+        //   · 3 dock:   trái · Outputs · Layers
+        //   · 2 mặt:    lưới kết quả · bảng ghép
+        // Mặt đang ẩn phải inert, nếu không Tab sẽ nhảy vào lưới ảnh vô hình (hoặc vào canvas vô hình).
+        $this->assertSame(5, substr_count($app, ':inert='),
+            'Thứ gì ẩn bằng v-show (3 dock + 2 mặt chính) đều phải inert — nếu không, Tab vẫn nhảy vào nội dung vô hình.');
+        // Và hai mặt chính phải khai ĐÚNG dấu hiệu nhận biết để tầng kiểm thử bằng trình duyệt tìm được.
+        $this->assertSame(1, substr_count($app, 'data-main-view="grid"'), 'Thiếu mặt chính «lưới kết quả».');
+        $this->assertSame(1, substr_count($app, 'data-main-view="canvas"'), 'Thiếu mặt chính «bảng ghép».');
     }
 
 

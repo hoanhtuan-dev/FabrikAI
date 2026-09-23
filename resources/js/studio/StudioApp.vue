@@ -49,6 +49,8 @@ import LayersPanel from './components/LayersPanel.vue';
 import DockResizer from './components/DockResizer.vue';
 import { useDockResize, DOCK_PRESETS } from './composables/useDockResize.js';
 import CanvasStatusBar from './components/CanvasStatusBar.vue';
+// [Bước 5.2 — 2026-09-26] LƯỚI KẾT QUẢ là mặt chính; canvas xuống hàng công cụ (mở khi cần).
+import ResultGrid from './components/ResultGrid.vue';
 import AuthNotice from './components/AuthNotice.vue';
 import CanvasEmptyState from './components/CanvasEmptyState.vue';
 // [2026-09-26] MODAL TRỢ LÝ — mount MỘT LẦN ở đây (không phải trong từng card): chat phải mở được từ
@@ -328,6 +330,21 @@ function openApplyPopover() {
 // — đúng hiện tượng "không có tay cầm chỉnh kích cỡ" khi dùng màn hình nhỏ.
 const viewportTick = ref(0);
 function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++; viewportTick.value++; }); }
+
+
+/**
+ * CÔNG CỤ CHỈ SỐNG TRÊN BẢNG GHÉP ⇒ tự mở bảng ghép (bước 5.2).
+ *
+ * VÌ SAO CẦN: mask/crop/tay cầm layer chỉ có nghĩa khi canvas hiện ra. Nếu người dùng bấm «Sửa ảnh»
+ * từ lưới kết quả mà canvas đang ẩn, họ sẽ thấy công cụ đã bật nhưng KHÔNG có chỗ để khoanh vùng —
+ * đúng kiểu "nút bấm được nhưng không làm gì". Tự chuyển mặt là cách giữ luồng cũ chạy nguyên vẹn
+ * trong khi lưới đã thành mặt chính.
+ */
+const CANVAS_ONLY_TOOLS = ['inpaintMaskMode', 'cropMode', 'eraseMode', 'drawMode', 'selectTool', 'panMode', 'reframeOpen', 'filmOpen'];
+watch(() => CANVAS_ONLY_TOOLS.map((k) => store[k]), (vals) => {
+  const active = vals.some((v) => (typeof v === 'string' ? v !== 'none' && v !== '' : !!v));
+  if (active && store.mainView !== 'canvas') store.setMainView('canvas');
+}, { deep: false });
 // ═════════════════════════════════════════════════════════════════════════════
 // DOCK CO/GIÃN ĐƯỢC (bảng trái · dock Outputs) — cùng một cơ sở: useDockResize + DockResizer.
 // Bề rộng là state của STORE (lưu bền cùng cài đặt status bar) nên composable chỉ đọc/ghi qua
@@ -1573,10 +1590,17 @@ function onTouchEnd(e) {
               <ContextToolbar />
             </div>
           </div>
-          <!-- ══ Thân frame: vùng canvas + inspector Layers dock phải (desktop) ══ -->
+          <!-- ══ Thân frame: MẶT CHÍNH (lưới kết quả HOẶC bảng ghép) + inspector Layers ══ -->
           <div class="flex min-h-0 flex-1">
-          <!-- ══ Vùng canvas (trái, flex-1) ══ -->
-          <div class="relative flex-1 overflow-hidden" :class="bgClass" @dragover.prevent="dropOver = true" @dragleave="dropOver = false" @drop.prevent="onCanvasDrop($event)">
+          <!-- ══ BƯỚC 5.2 — LƯỚI KẾT QUẢ là mặt chính ══
+               Dùng v-show (KHÔNG v-if) vì canvas bên dưới giữ ref DOM (canvasZoom · cvImg) và lớp phủ
+               mask — gỡ khỏi DOM là mất trạng thái đang vẽ dở. Cùng lý do §15.2 đã chốt cho các dock:
+               "Ẩn = thu về 0 kèm inert, KHÔNG dùng v-if". -->
+          <div v-show="store.mainView === 'grid'" :inert="store.mainView !== 'grid' ? true : null" class="min-h-0 flex-1" data-main-view="grid">
+            <ResultGrid />
+          </div>
+          <!-- ══ Vùng canvas (trái, flex-1) — nay là BẢNG GHÉP, mở khi cần ══ -->
+          <div v-show="store.mainView === 'canvas'" :inert="store.mainView !== 'canvas' ? true : null" class="relative flex-1 overflow-hidden" :class="bgClass" data-main-view="canvas" @dragover.prevent="dropOver = true" @dragleave="dropOver = false" @drop.prevent="onCanvasDrop($event)">
             <!-- Khung báo kéo-thả khi đang kéo ảnh vào canvas -->
             <div v-if="dropOver" class="pointer-events-none absolute inset-2 z-50 rounded-lg border-2 border-dashed border-brand-400 bg-brand-400/5"></div>
             <!-- Khung chọn nhóm (mỗi nhóm được chọn trọn = 1 đối tượng) -->

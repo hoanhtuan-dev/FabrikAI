@@ -114,6 +114,12 @@ export function studioState() {
     // TƯỜNG MINH là điều kiện để bỏ canvas mà không phải viết lại 8 card.
     //   { id, url, name, kind: 'generation'|'source'|'upload', genId }
     workingImage: null,
+    // ── MẶT CHÍNH CỦA KHUNG LÀM VIỆC (bước 5.2, 2026-09-26) ──────────────────────────────
+    // 'grid'   = LƯỚI KẾT QUẢ (mặc định mới) — việc thật của người dùng là XEM KẾT QUẢ và chọn
+    //            bước tiếp, không phải kéo layer.
+    // 'canvas' = BẢNG GHÉP (giữ trong giai đoạn chuyển) — nơi mask/crop/tay cầm layer đang sống.
+    // Trong bước 5.2–5.3 hai mặt SONG SONG: canvas chưa bị xoá, chỉ đổi vai thành hàng công cụ.
+    mainView: 'grid',
     texture: 5,
     // upscale params (fabric-weave slider removed — it affected dark skin & detail edges)
     upscaleScale: 2,

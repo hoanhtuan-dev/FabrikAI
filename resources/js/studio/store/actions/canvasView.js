@@ -28,6 +28,21 @@ export const canvasViewActions = {
       }
       this.zoomAt(cx, cy, delta > 0 ? 1 / 1.15 : 1.15);
     },
+    /**
+     * ĐỔI MẶT CHÍNH của khung làm việc (bước 5.2 — 2026-09-26): 'grid' ⇄ 'canvas'.
+     *
+     * VÌ SAO LÀ ACTION CỦA STORE, không phải hàm cục bộ trong component: HAI nơi cần gọi nó —
+     * thanh trạng thái (người dùng bấm) và watch tự-chuyển khi bật công cụ chỉ sống trên canvas.
+     * Hai bản sao của cùng một luật là cách chắc chắn để chúng lệch nhau.
+     *
+     * Lưu bền qua saveBarSettings như mọi cài đặt thanh trạng thái khác (bề rộng dock · nền canvas ·
+     * bắt điểm) — người dùng chọn mặt nào thì lần sau mở lại vẫn đúng mặt đó.
+     */
+    setMainView(v) {
+      this.mainView = v === 'canvas' ? 'canvas' : 'grid';
+      try { this.saveBarSettings(); } catch (e) { /* chế độ riêng tư: bỏ qua */ }
+    },
+
     // ── Canvas refs (set by StudioApp template refs; markRaw so Vue never proxies DOM nodes) ──
     setCanvasRefs(img, zoom) { this.cvImg = img ? markRaw(img) : null; this.canvasZoom = zoom ? markRaw(zoom) : null; },
     setBrushCanvas(el) { this.brushOverlay = el ? markRaw(el) : null; },
