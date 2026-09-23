@@ -472,6 +472,34 @@ class MarketSignalService
     // ─────────────────────────────────────────────────────────────────────────────
 
     /**
+     * NHÃN NGUỒN của một tin — và ĐỊA CHỈ là nguồn khi tin không mang tên nguồn (2026-09-26).
+     *
+     * [LỖI THẬT — ĐO TRÊN PRODUCTION] Sau khi bước 2 chuyển sang đo từ KẾT QUẢ TÌM KIẾM, lệnh
+     * `studio:market-signals` in ra "Đo từ 7 tin của **0 nguồn**" và mọi tín hiệu đều "N tin · 0 nguồn".
+     * Nguyên nhân: mục tin của đường tìm kiếm (Tavily) chỉ có title · url · published_at · summary, KHÔNG có
+     * `source_name`; máy đếm đọc `source_name`/`source` nên đếm ra 0. Hệ quả không chỉ là con số vô lý trên
+     * màn hình: `source_count` còn là một vế của ĐỘ TIN CẬY (một từ khoá chỉ xuất hiện ở một bài là chuyện
+     * khác hẳn với nó xuất hiện ở năm bài của năm toà soạn).
+     *
+     * Luật ở đây: MỘT TIN LUÔN CÓ NGUỒN — chính địa chỉ của nó. Tin không khai tên toà soạn thì lấy TÊN MIỀN
+     * làm nhãn (bỏ "www."), KHÔNG bịa tên báo. Đây là cùng một luật đang áp cho đường Google CSE (nhãn =
+     * tên nguồn đã khai), chỉ khác nguồn của cái nhãn.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function sourceLabel(array $item): string
+    {
+        $name = trim((string) ($item['source_name'] ?? $item['source'] ?? ''));
+        if ($name !== '') {
+            return $name;
+        }
+
+        $host = (string) parse_url((string) ($item['url'] ?? ''), PHP_URL_HOST);
+
+        return (string) preg_replace('/^www\./i', '', $host);
+    }
+
+    /**
      * Đo từ một danh sách tin: tín hiệu theo từ khoá + dải giá ghi nhận.
      *
      * @param  list<array<string, mixed>>  $items
@@ -493,7 +521,7 @@ class MarketSignalService
             }
 
             $text = $title.' '.$summary;
-            $sourceName = trim((string) ($item['source_name'] ?? $item['source'] ?? ''));
+            $sourceName = $this->sourceLabel($item);
             if ($sourceName !== '') {
                 $sources[$sourceName] = true;
             }

@@ -144,6 +144,35 @@ class MarketSignalTest extends TestCase
         $this->assertContains('sơ mi', $terms);
     }
 
+    // ── (1b) NGUỒN CỦA MỘT TIN ────────────────────────────────────────────────
+
+    /**
+     * MỘT TIN LUÔN CÓ NGUỒN — kể cả khi mục tin không mang tên toà soạn (2026-09-26).
+     *
+     * [LỖI THẬT — ĐO TRÊN PRODUCTION] Sau khi bước 2 chuyển sang đo từ KẾT QUẢ TÌM KIẾM, lệnh
+     * `studio:market-signals` in ra "Đo từ 7 tin của **0 nguồn**" và mọi tín hiệu đều "N tin · 0 nguồn".
+     * Mục tin của đường tìm kiếm chỉ có title · url · published_at · summary (không có `source_name`), nên
+     * máy đếm ra 0. Con số ấy không chỉ vô lý khi đọc: `source_count` còn là một vế của ĐỘ TIN CẬY — một từ
+     * khoá xuất hiện ở MỘT bài khác hẳn với nó xuất hiện ở NĂM bài của NĂM toà soạn.
+     *
+     * Luật: thiếu tên toà soạn thì lấy TÊN MIỀN của chính tin làm nhãn (bỏ "www.") — KHÔNG bịa tên báo.
+     */
+    public function test_a_news_item_without_a_publisher_name_still_counts_as_a_source(): void
+    {
+        $measured = $this->market()->extract([
+            ['title' => 'Xu hướng áo khoác tweed mùa thu', 'summary' => 'Chất liệu tweed lên ngôi', 'url' => 'https://www.harpersbazaar.com/fashion/tweed-trend'],
+            ['title' => 'Tweed quay lại trong mùa thu', 'summary' => 'Dáng blazer bằng tweed', 'url' => 'https://vnexpress.example/thoi-trang/tweed'],
+        ]);
+
+        $this->assertSame(2, $measured['source_count'], 'Tin không có tên toà soạn vẫn phải được đếm là có nguồn (tên miền của chính nó).');
+
+        $row = collect($measured['signals'])->firstWhere('term', 'tweed');
+        $this->assertNotNull($row, 'Phải đo được từ khoá ngành trong hai tin này.');
+        $this->assertSame(2, $row['source_count'], '"tweed" nằm ở hai tên miền khác nhau ⇒ độ tin cậy phải khác 0.');
+        $this->assertContains('harpersbazaar.com', $row['sources'], 'Nhãn nguồn là TÊN MIỀN, không phải tên bịa ra.');
+        $this->assertNotContains('www.harpersbazaar.com', $row['sources'], 'Bỏ "www." cho dễ đọc.');
+    }
+
     // ── (2) GIÁ ───────────────────────────────────────────────────────────────
 
     /** Giá đọc được trong tin: ba cách viết thường gặp của báo Việt Nam. */
