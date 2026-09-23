@@ -1837,8 +1837,9 @@ if (! function_exists('studio_credit_cost_for')) {
         ?string $resolution = null,
         ?string $ratio = null,
         $user = null,
+        ?int $seconds = null,
     ): int {
-        // ── 1. Giá bán theo MODEL ────────────────────────────────────────────────────────
+        // ── 1. Giá bán theo MODEL (bảng đã seed) ─────────────────────────────────────────
         try {
             $credits = app(\App\Services\ProviderCostService::class)
                 ->creditsFor($provider, $model, $resolution, $ratio);
@@ -1846,10 +1847,28 @@ if (! function_exists('studio_credit_cost_for')) {
                 return $credits;
             }
         } catch (\Throwable $e) {
-            // Bảng chưa migrate / lỗi truy vấn: rơi xuống giá của gói. Không được làm hỏng pipeline.
+            // Bảng chưa migrate / lỗi truy vấn: rơi xuống nhánh dưới. Không được làm hỏng pipeline.
         }
 
-        // ── 2 + 3. Giá của GÓI, rồi mặc định toàn cục (nguyên văn studio_credit_cost) ─────
+        // ── 2. VIDEO: giá ĐỘNG theo giây (2026-09-26) ────────────────────────────────────
+        // VÌ SAO KHÔNG DÙNG BẢNG: video cho người dùng chọn thời lượng 5/8/10/15/20 giây, và giá
+        // vốn tính THEO GIÂY. Một dòng cố định trong bảng thì 20 giây tốn 4 lần 5 giây nhưng chỉ
+        // thu 1 lần — lỗ âm thầm đúng kiểu "1 ảnh = 1 credit" ta vừa bỏ.
+        //
+        // Công thức: credit = ceil(giây × giá_vốn_giây_VNĐ / 720), cùng mẫu số với ảnh.
+        if ($kind === 'video' && $provider && $model) {
+            try {
+                $cost = app(\App\Services\ProviderCostService::class);
+                $q = $cost->quote($provider, $model, ['seconds' => max(1, $seconds ?: 10)]);
+                if ($q['known'] && $q['cost_vnd'] !== null) {
+                    return max(1, (int) ceil($q['cost_vnd'] / $cost::CREDIT_DIVISOR_VND));
+                }
+            } catch (\Throwable $e) {
+                // Giá vốn video chưa khai: rơi về giá của gói (cũ), và sổ sẽ ghi unknown_cost.
+            }
+        }
+
+        // ── 3. Giá của GÓI, rồi mặc định toàn cục (nguyên văn studio_credit_cost) ─────
         return studio_credit_cost($kind, $user);
     }
 }

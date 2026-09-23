@@ -2031,6 +2031,8 @@ RULES:
             $data['resolution'] ?? null,
             $data['ratio'] ?? null,
             $billing,
+            // Video tính THEO GIÂY (5/8/10/15/20) — thời lượng do người dùng chọn.
+            $type === 'video' ? (int) ($data['duration'] ?? 10) : null,
         );
 
         // ── (3) GIỚI HẠN TẠO ẢNH THEO NGÀY (2026-09-26) ─────────────────────────────────────

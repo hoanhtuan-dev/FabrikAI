@@ -249,7 +249,8 @@ class StudioPricingCommand extends Command
                     }
                 }
             } elseif ($price->unit === ProviderPrice::UNIT_SECOND) {
-                $n += $this->upsert($cost, $price, '', '', ['seconds' => 5]);
+                // Video KHÔNG có giá cố định trong bảng — tính động theo giây trong
+                // studio_credit_cost_for(). Ở đây chỉ giữ dữ liệu VỐN, không sinh dòng bán.
             } else {
                 $n += $this->upsert($cost, $price, '', '', []);
             }

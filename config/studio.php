@@ -203,6 +203,10 @@ return [
     */
     'gemini_key' => env('GEMINI_API_KEY', ''),
     'fal_key' => env('FAL_KEY', ''),
+    // [2026-09-26] CRON NGOÀI — token xác thực endpoint /api/cron/tick (cron-job.org / GitHub
+    // Actions gọi mỗi 1–5 phút thay cho cron hPanel đang lỗi). Rỗng = endpoint TỰ KHOÁ (403).
+    // Có thể ghi đè bằng DB setting 'studio_cron_token' để đổi mà không cần sửa .env.
+    'cron_token' => env('STUDIO_CRON_TOKEN', ''),
     'replicate_token' => env('REPLICATE_API_TOKEN', ''),
     'wan_key' => env('WAN_API_KEY', ''),
     'veo_key' => env('GOOGLE_VEO_KEY', ''),

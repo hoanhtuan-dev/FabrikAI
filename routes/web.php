@@ -76,6 +76,12 @@ Route::post('/chia-se/{token}/phan-hoi', [ProjectShareController::class, 'submit
 Route::post('/dang-ky', [AuthController::class, 'register'])->middleware('throttle:register')->name('register.store');
 Route::post('/dang-xuat', [AuthController::class, 'logout'])->name('logout');
 
+// ── CRON NGOÀI (2026-09-26) — một URL chạy schedule:run, không cần cron hPanel ──
+// Gọi bởi cron-job.org / GitHub Actions mỗi 1–5 phút. KHÔNG auth (cron không có phiên), KHÔNG
+// CSRF (đã loại trừ ở bootstrap/app.php), KHÔNG throttle — xác thực bằng token hash_equals trong
+// controller. Nếu chưa đặt STUDIO_CRON_TOKEN thì endpoint TỰ KHOÁ (403), không chạy hớ.
+Route::post('/api/cron/tick', [App\Http\Controllers\CronController::class, 'tick'])->name('cron.tick');
+
 // ── SPA pages (Blade shells) ──
 Route::get('/', [StudioController::class, 'appIndex'])->name('home');
 // [Quyết định 2026-09-17] /settings là CÀI ĐẶT TOÀN CỤC (API key · model registry) ⇒ cấp OWNER.

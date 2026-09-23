@@ -30,6 +30,10 @@ $app = Application::configure(basePath: dirname(__DIR__))
         // Apply no-store to ALL web responses so the browser never caches any auth/redirect
         // (definitively fixes ERR_TOO_MANY_REDIRECTS from stale cached redirects).
         $middleware->web(append: [\App\Http\Middleware\NoStoreCache::class]);
+        // [2026-09-26] Webhook fal + cron ngoài là POST đến từ bên thứ ba (fal.ai / cron-job.org),
+        // không có CSRF token. Xác thực bằng token riêng trong controller, không phải bằng CSRF.
+        // KHÔNG đưa route khác vào danh sách này — đây là cửa hậu, mở hẹp nhất có thể.
+        $middleware->validateCsrfTokens(except: ['api/cron/tick', 'api/webhooks/*']);
         // [Modules 2026-09-19] CÔNG TẮC MODULE: chặn ở backend theo bản khai ModuleRegistry (gói nào cấp
         // module nào · module bị tắt toàn cục). Đặt SAU auth trong chuỗi nên chỉ chạy khi đã biết người dùng.
         $middleware->web(append: [\App\Http\Middleware\EnforceModules::class]);

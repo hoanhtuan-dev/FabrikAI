@@ -408,7 +408,13 @@ class ProviderCostService
         $unknown = 0;
 
         foreach ($rows as $r) {
-            $credits = $this->creditsFor($r->provider, $r->model) ?? 1;
+            // VIDEO tính động theo giây, không có dòng cố định trong bảng — dùng 10 giây làm đại diện
+            // cho một lượt bình quân. Đây là ƯỚC LƯỢNG cho báo cáo; số ĐÚNG theo từng lượt nằm ở
+            // generations.credits_cost của từng generation.
+            $credits = $this->creditsFor($r->provider, $r->model)
+                ?? (($this->priceFor($r->provider, $r->model)?->unit === ProviderPrice::UNIT_SECOND)
+                    ? $this->suggestCredits($r->provider, $r->model, ['seconds' => 10])
+                    : 1);
             $revenue = (float) $r->calls * $credits * $rate;
             $cost = (float) $r->cost_vnd;
             $totalRevenue += $revenue;

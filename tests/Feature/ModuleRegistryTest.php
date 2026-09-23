@@ -64,6 +64,12 @@ class ModuleRegistryTest extends TestCase
         // 'design-search' (2026-09-26): TÌM THIẾT KẾ CŨ trên chính kho tài liệu của người dùng. Cùng lý
         // do: đây là đường ĐỌC LẠI việc họ đã làm, không phải tính năng bán theo gói.
         'design-search',
+        // 'cron' (2026-09-26): CRON NGOÀI — máy chủ tự gọi schedule:run. Không phải tính năng khách dùng,
+        // không nằm dưới công tắc gói. Xác thực bằng token riêng, không phải bằng module.
+        'cron',
+        // 'webhooks' (2026-09-26): webhook từ nhà cung cấp (fal.ai) — POST từ bên thứ ba, không phải
+        // tính năng khách dùng, không nằm dưới công tắc gói.
+        'webhooks',
     ];
 
     protected function setUp(): void

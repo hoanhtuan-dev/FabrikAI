@@ -141,7 +141,10 @@ class StudioFlowTest extends TestCase
         $this->assertFileExists(public_path(ltrim((string) $settled->media_url, '/')));
         $this->assertNotNull($settled->elapsed_ms);
         $this->assertSame('video', ($settled->meta['type'] ?? null));
-        $this->assertSame(989, $user->fresh()->credits_balance);
+        // [2026-09-26] Video giờ tính credit ĐỘNG theo giây (không còn cố định 10). Khẳng định
+        // số dư = 1000 − 1 ảnh − credit video ĐÃ GHI trên generation (không viết cứng 989).
+        $videoCost = (int) $settled->credits_cost;
+        $this->assertSame(999 - $videoCost, $user->fresh()->credits_balance);
     }
 
     public function test_studio_refgen_tryon_creates_generation_with_garment_prompt(): void

@@ -66,6 +66,20 @@ class ProviderPriceSeeder extends Seeder
             ['fal', 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video', ProviderPrice::UNIT_SECOND, 0.07, null, 1,
                 'Video 5 giây = $0,35. veo3 ($0,40/giây, 5 giây = $2,00) ĐÃ BỎ KHỎI UI vì lỗ nặng — xem §3.5.'],
 
+            // ── DashScope — video wan (MODEL PRODUCTION ĐANG CHẠY THẬT) ───────────────────
+            // Đo từ bảng giá Model Studio (International, giá LIST):
+            //   wan3.0-video: 480P $0,05/s · 720P $0,10/s · 1080P $0,20/s
+            //   wan2.7-t2v/i2v: 720P $0,10/s · 1080P $0,15/s
+            // KHÔNG CÓ cột độ phân giải trong provider_price ⇒ khai giá 1080P (TRƯỜNG HỢP TỆ NHẤT)
+            // để không bao giờ đánh giá THẤP giá vốn. Video 720P (mặc định) sẽ bị thu cao hơn giá
+            // vốn thật — đó là LỰA CHỌN AN TOÀN, chủ dự án tinh chỉnh lại bằng dữ liệu sau khi
+            // có hoá đơn thật (php artisan studio:pricing --usage=N).
+            ['dashscope', 'wan3.0-video', ProviderPrice::UNIT_SECOND, 0.20, null, 1, '1080P $0,20/s (list, International).'],
+            ['dashscope', 'wan2.7-t2v', ProviderPrice::UNIT_SECOND, 0.15, null, 1, '1080P $0,15/s (list, International).'],
+            ['dashscope', 'wan2.7-i2v', ProviderPrice::UNIT_SECOND, 0.15, null, 1, '1080P $0,15/s (list, International).'],
+            ['dashscope', 'wan2.6-t2v', ProviderPrice::UNIT_SECOND, 0.15, null, 1, 'Legacy fallback, 1080P $0,15/s.'],
+            ['dashscope', 'wan2.5-t2v', ProviderPrice::UNIT_SECOND, 0.15, null, 1, 'Legacy fallback, 1080P $0,15/s.'],
+
             // ── Qwen / DashScope — ĐƯỜNG DỰ PHÒNG (D3) ───────────────────────────────────
             ['dashscope', 'qwen-image-edit', ProviderPrice::UNIT_IMAGE, 0.045, null, 1,
                 'Tính theo ẢNH, KHÔNG theo megapixel — nên ảnh 2K rẻ hơn fal rõ rệt.'],

@@ -45,13 +45,12 @@ class ModelCreditCostSeeder extends Seeder
                 continue;
             }
 
-            // Model theo GIÂY (video): một dòng cho 5 giây — độ dài bán chính.
+            // Model theo GIÂY (video): KHÔNG seed vào bảng cố định.
+            // VÌ SAO: video cho người dùng chọn thời lượng 5/8/10/15/20 giây, và giá vốn tính
+            // THEO GIÂY. Một dòng cố định thì 20 giây tốn 4 lần 5 giây nhưng chỉ thu 1 lần — lỗ
+            // âm thầm đúng kiểu "1 ảnh = 1 credit" ta vừa bỏ. Giá video được TÍNH ĐỘNG trong
+            // studio_credit_cost_for() (nhánh video), nên bảng chỉ cần dữ liệu VỐN ở đây.
             if ($price->unit === ProviderPrice::UNIT_SECOND) {
-                $credits = $cost->suggestCredits($price->provider, $price->model, ['seconds' => 5]);
-                ModelCreditCost::firstOrCreate(
-                    ['provider' => $price->provider, 'model' => $price->model, 'resolution' => '', 'ratio' => ''],
-                    ['credits' => $credits, 'note' => 'Video 5 giây, $'.$price->unit_price_usd.'/giây'],
-                );
                 continue;
             }
 
