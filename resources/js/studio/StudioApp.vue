@@ -187,6 +187,9 @@ const activityNav = computed(() => activityBar.value.filter((a) => a.kind === 'p
  *
  * Loại 'collections' vì đó là bộ sưu tập đang làm (bối cảnh), không phải việc làm với MỘT tấm ảnh.
  */
+/** Mục 'action' của thanh công cụ (vd Prompt Tạo Ảnh) — dùng cho danh sách công cụ trên điện thoại. */
+const toolbarActions = computed(() => activityBar.value.filter((a) => a.kind === 'action'));
+
 const viewerActions = computed(() =>
   activityNav.value
     .filter((a) => a.id !== 'collections')
@@ -207,7 +210,7 @@ const settingsEntry = computed(() => activityBar.value.find((a) => a.kind === 'm
 const AGENT_STUDIO_URL = '/agent-studio';
 
 function runToolbarAction(id) {
-  if (id === 'prompt') { store.promptOpen = true; outputOpen.value = false; settingsOpen.value = false; return; }
+  if (id === 'prompt') { store.promptOpen = true; settingsOpen.value = false; return; }
   if (id === 'stylist') { window.location.href = AGENT_STUDIO_URL; }
 }
 
@@ -233,9 +236,9 @@ function isToolbarActionActive(id) {
  */
 function openChat() {
   store.promptOpen = false;
-  outputOpen.value = false;
   settingsOpen.value = false;
-  menuOpen.value = false;
+  toolsListOpen.value = false;
+  mobileToolOpen.value = false;
   store.chatOpen = true;
 }
 
@@ -298,10 +301,13 @@ function revealActivity(id) {
   // ảnh) đều mở được bảng của một module họ chưa trả tiền. Một luật, một chỗ.
   const target = activityNav.value.find((a) => a.id === id);
   if (target && target.locked) { openUpgradeFor(id); return; }
+  // [đợt 54] ĐIỆN THOẠI: mở THẲNG công cụ đó, toàn màn hình — kể cả khi nó đang là công cụ hiện tại.
+  // Trước đây nhánh "đã đúng nhóm" chỉ bật ngăn kéo; nay ngăn kéo không còn là nơi làm việc, nên
+  // "đưa tôi tới X" phải luôn kết thúc ở màn hình làm việc của X.
+  if (window.innerWidth < 1024) { selectActivity(id); return; }
   if (id === activeActivity.value) {
-    // Đã đúng nhóm: chỉ mở bảng (desktop) / ngăn kéo (tablet–điện thoại), KHÔNG toggle đóng lại.
+    // Đã đúng nhóm: chỉ mở bảng, KHÔNG toggle đóng lại.
     store.leftPanelOpen = true;
-    if (window.innerWidth < 1024) menuOpen.value = true;
     return;
   }
   selectActivity(id);
@@ -312,8 +318,13 @@ watch(() => store.activityRequest && store.activityRequest.n, (n) => {
 });
 
 const activeActivity = ref('concept');
-const menuOpen = ref(false);
-const outputOpen = ref(false);
+// [đợt 54] HAI tầng của luồng công cụ trên điện thoại, thay cho một ngăn kéo trộn lẫn:
+//   toolsListOpen — popup DANH SÁCH công cụ (mở từ tab «Công cụ» ở dock dưới);
+//   mobileToolOpen — MỘT công cụ, toàn màn hình (mở khi chọn công cụ trong danh sách).
+// Tách đôi vì hai việc này có hai ngữ cảnh khác nhau: chọn (quét nhanh, cần thấy hết) và làm việc
+// (cần trọn màn hình, không thấy công cụ khác).
+const toolsListOpen = ref(false);
+const mobileToolOpen = ref(false);
 const projectsOpen = ref(false);
 const promptPopupOpen = ref(false);  // popup độc lập cho Prompt Tạo Ảnh (ConceptCard)
 // [P0] Chờ boot async xong mới render UI thật — tránh flash cấu hình sai (panel lộn, activity lỗi).
@@ -330,11 +341,35 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeSettingsOnEsc))
 // [Đợt 0.6] Đã gỡ khối cài đặt PWA (hai nút "Cài đặt FabrikAI" + 4 hàm/ref liên quan) — Chốt Q4 bỏ PWA hoàn toàn.
 // Popup "Prompt Tạo Ảnh" (ConceptCard) mount GLOBAL ở cuối template (mọi viewport):
 // chỉ cần đồng bộ activity hiện tại + đóng drawer Outputs mobile cho gọn.
-watch(() => store.promptOpen, (v) => { if (v) { activeActivity.value = 'concept'; outputOpen.value = false; } });
-// [đợt 52] Về MẶT LƯỚI thì đóng ngăn kéo "Kết quả" của điện thoại: lối vào tab đó đã ẩn ở mặt lưới
-// (xem chú thích ở dock), nên để ngăn kéo mở lại là màn hình có một lớp phủ không còn nút nào đóng
-// ngoài nút X — đúng kiểu "trạng thái mồ côi" mà mặt lưới vừa dọn.
-watch(() => store.mainView, (v) => { if (v === 'grid') outputOpen.value = false; });
+watch(() => store.promptOpen, (v) => { if (v) { activeActivity.value = 'concept'; toolsListOpen.value = false; mobileToolOpen.value = false; } });
+/**
+ * [đợt 54] ĐIỆN THOẠI CHỈ CÓ MỘT MẶT: LƯỚI KẾT QUẢ.
+ *
+ * Bảng ghép là không gian làm việc nhiều layer — nó cần bề ngang và con trỏ chính xác. Trên điện
+ * thoại nó vừa bị bóp không dùng được, vừa buộc mọi màn hình mang thêm chrome của một mặt mà người
+ * dùng không mở. Nay dưới lg KHÔNG vào được mặt canvas:
+ *   · nút đổi mặt ẩn dưới lg (xem template);
+ *   · mặt đang lưu trong localStorage là 'canvas' thì bị kéo về 'grid' ngay khi mở ở màn hẹp;
+ *   · công cụ canvas tự bật cũng KHÔNG kéo sang mặt canvas trên màn hẹp (xem CANVAS_ONLY_TOOLS).
+ * Một luật, ba chỗ áp — và đây là chỗ duy nhất biết về bề ngang.
+ *
+ * Cùng chỗ này cũng đóng hai bề mặt CHỈ-CÓ-Ở-ĐIỆN-THOẠI khi cửa sổ rộng ra: để chúng "đang mở"
+ * trong trạng thái (chỉ bị lg:hidden che) thì lần thu hẹp sau chúng hiện lại đè lên màn hình mà
+ * người dùng chưa bấm gì.
+ */
+function syncViewport() {
+  if (window.innerWidth < 1024) {
+    if (store.mainView === 'canvas') store.setMainView('grid');
+    return;
+  }
+  // Mở rộng cửa sổ: hai bề mặt của điện thoại phải đóng lại. Nếu không, chúng vẫn "đang mở" trong
+  // trạng thái (chỉ bị lg:hidden che) — và bất kỳ lần thu hẹp nào sau đó sẽ làm chúng HIỆN LẠI đè
+  // lên màn hình mà người dùng chưa hề bấm gì.
+  toolsListOpen.value = false;
+  mobileToolOpen.value = false;
+}
+onMounted(() => { syncViewport(); window.addEventListener('resize', syncViewport); });
+onBeforeUnmount(() => window.removeEventListener('resize', syncViewport));
 // Lưu cài đặt status bar khi thay đổi (snap · nền canvas · inspector).
 watch([() => store.snapGrid, () => store.canvasBg, () => store.inspectorOpen, () => store.leftPanelOpen, () => store.outputDockOpen, () => store.leftDockWidth, () => store.outputDockWidth], () => store.saveBarSettings());
 // ── Thoát công cụ thông minh khi chuyển tác vụ / thoát ảnh tiêu điểm ──
@@ -373,6 +408,9 @@ function onCanvasResize() { nextTick(() => { viewportTick.value++; }); }
   // [D1+D2] Đã bỏ cropMode · eraseMode · drawMode · reframeOpen — bốn công cụ đó không còn tồn tại.
 const CANVAS_ONLY_TOOLS = ['inpaintMaskMode', 'selectTool', 'panMode', 'filmOpen'];
 watch(() => CANVAS_ONLY_TOOLS.map((k) => store[k]), (vals) => {
+  // [đợt 54] MÀN HẸP KHÔNG CÓ MẶT CANVAS (xem forceGridOnNarrow) ⇒ đừng kéo sang đó nữa: ở đó công cụ
+  // canvas không có chỗ dùng, và luật này sẽ đánh nhau với luật kéo-về-lưới mỗi lần một cờ canvas đổi.
+  if (window.innerWidth < 1024) return;
   const active = vals.some((v) => (typeof v === 'string' ? v !== 'none' && v !== '' : !!v));
   if (active && store.mainView !== 'canvas') store.setMainView('canvas');
 }, { deep: false });
@@ -693,16 +731,28 @@ watch([activeActivity, () => store.appliedProject?.name], () => {
 }, { immediate: true });
 // Chọn activity: trên tablet/mobile (sidebar ẩn) mở drawer để hiện card; desktop chỉ đổi card sidebar.
 // Toggle kiểu VSCode: bấm icon ĐANG CHỌN → đóng/mở card; bấm icon KHÁC → đổi card + mở.
+/**
+ * CHỌN CÔNG CỤ — hai nền tảng, hai luồng, có chủ ý.
+ *
+ * MÁY TÍNH: đổi card trong bảng trái, kiểu VSCode — bấm icon ĐANG CHỌN thì đóng/mở bảng, bấm icon
+ * KHÁC thì đổi card và mở bảng. Ở đó bảng trái là NƠI LÀM VIỆC, luôn nằm cạnh canvas/lưới.
+ *
+ * [đợt 54] ĐIỆN THOẠI: KHÔNG toggle, KHÔNG ngăn kéo chung. Chọn công cụ = mở RIÊNG công cụ đó TOÀN
+ * MÀN HÌNH, và danh sách công cụ đóng lại. Trước đây ngăn kéo trộn hai việc vào một khung 320px:
+ * vừa là dải chọn công cụ, vừa là chỗ làm việc — nên công cụ đang chọn bị đẩy xuống dưới dải chọn,
+ * và người dùng phải cuộn qua những công cụ họ không dùng để tới việc mình cần.
+ * Luồng mới: DANH SÁCH -> MỘT CÔNG CỤ. Một màn hình, một việc.
+ */
 function selectActivity(id) {
-  const tablet = window.innerWidth < 1024;
-  if (id === activeActivity.value) {
-    if (tablet) menuOpen.value = !menuOpen.value;
-    else store.leftPanelOpen = !store.leftPanelOpen;
+  if (window.innerWidth < 1024) {
+    activeActivity.value = id;
+    toolsListOpen.value = false;
+    mobileToolOpen.value = true;
     return;
   }
+  if (id === activeActivity.value) { store.leftPanelOpen = !store.leftPanelOpen; return; }
   activeActivity.value = id;
-  if (tablet) menuOpen.value = true;
-  else store.leftPanelOpen = true;
+  store.leftPanelOpen = true;
 }
 // Right activity bar: Nguồn ảnh (popup) · Thư viện (điều hướng) · Outputs (toggle dock).
 /**
@@ -1050,16 +1100,15 @@ function onTouchEnd(e) {
          đăng xuất — một chỗ cho mọi việc thuộc về tài khoản. -->
     <header class="navbar elev-bar relative z-30 !min-h-0 shrink-0 gap-2 border-b border-ink-700 bg-ink-900/95 px-2 py-1.5 backdrop-blur sm:px-4 sm:py-2">
       <div class="contents">
-        <!-- Nút menu công cụ: chỉ có ở điện thoại/máy tính bảng hẹp (thanh rail bên trái hiện từ lg). -->
-        <button type="button" class="icon-btn shrink-0 lg:hidden order-1" title="Mở menu công cụ" aria-label="Mở menu công cụ" @click="menuOpen = true">
-          <StudioIcon name="sliders" size="h-4 w-4" />
-        </button>
+        <!-- [đợt 54] ĐÃ GỠ nút «Mở menu công cụ» ở thanh tiêu đề: nó và tab «Công cụ» dưới dock cùng
+             mở một ngăn kéo — hai nút cho một việc, mà ở 320px thanh tiêu đề là chỗ đắt nhất. Dock
+             dưới đáy là nơi điều hướng của điện thoại; thanh tiêu đề chỉ còn danh tính + tài khoản. -->
 
-        <!-- [đợt 53] DƯỚI sm THÌ ẨN CẢ KHỐI THƯƠNG HIỆU. ĐO ĐƯỢC ở 320px sau khi thêm nút đổi mặt:
-             nút «Bộ sưu tập» bị đẩy ra ngoài mép phải thanh tiêu đề (282→322 trong khi header rộng
-             320). Khối này trỏ về chính trang đang mở và chữ "FabrikAI" vốn đã ẩn dưới sm — nên ở
-             đây nó chỉ còn là hình trang trí chiếm 32px + 8px khe. Nhường chỗ cho việc bấm được. -->
-        <a href="/" class="order-2 hidden shrink-0 items-center gap-2 sm:flex" title="FabrikAI Studio">
+        <!-- [đợt 53] Khối này từng phải ẩn dưới sm vì thanh tiêu đề tràn ở 320px (nút «Bộ sưu tập» bị
+             đẩy ra ngoài mép phải). [đợt 54] Hai nút điện thoại đã gỡ khỏi thanh tiêu đề (chúng về
+             dock dưới đáy) nên chỗ đã có lại — trả thương hiệu về, vì một ứng dụng không có nhận diện
+             nào ở đầu trang là chuyện lạ, và đây là lối về trang chủ. -->
+        <a href="/" class="order-2 flex shrink-0 items-center gap-2" title="FabrikAI Studio">
           <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-4 w-4" /></span>
           <span class="hidden font-display text-sm font-semibold text-cream-50 sm:inline">FabrikAI</span>
         </a>
@@ -1080,7 +1129,7 @@ function onTouchEnd(e) {
              cả hai giá trị 'grid' và 'canvas' trong DOM. -->
         <button
           type="button"
-          class="order-4 icon-btn !h-8 !w-8 shrink-0"
+          class="order-4 hidden icon-btn !h-8 !w-8 shrink-0 lg:grid"
           :data-main-view-switch="store.mainView === 'grid' ? 'canvas' : 'grid'"
           :title="store.mainView === 'grid' ? 'Sang bảng ghép — xếp layer, khoanh vùng sửa' : 'Về lưới kết quả — xem và chọn bước tiếp'"
           :aria-label="store.mainView === 'grid' ? 'Sang bảng ghép' : 'Về lưới kết quả'"
@@ -1095,14 +1144,10 @@ function onTouchEnd(e) {
       </div>
 
       <div class="contents">
-        <!-- Lối vào hay dùng nhất trên ĐIỆN THOẠI (trước đây nằm ở thanh thứ hai, nay gộp vào đây):
-             Bộ sưu tập. Từ lg trở lên đã có ở rail/thanh trạng thái nên ẩn đi.
-             [2026-09-26 · đợt 52] Nút "Kết quả" ở đây đã BỎ: nó và tab "Kết quả" dưới dock cùng mở
-             đúng một ngăn kéo ⇒ hai nút cho một việc, trên thanh tiêu đề vốn đã chật ở 320px. -->
-        <button type="button" class="order-5 ml-auto icon-btn shrink-0 lg:hidden" :title="store.appliedProject ? 'Bộ sưu tập hiện tại: ' + store.appliedProject.name : 'Bộ sưu tập'" aria-label="Bộ sưu tập" @click="projectsOpen = true">
-          <StudioIcon name="kanban" size="h-4 w-4" />
-          <span v-if="store.appliedProject" class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-brand-400"></span>
-        </button>
+        <!-- [đợt 54] ĐÃ GỠ nút «Bộ sưu tập» ở thanh tiêu đề: nó mở ProjectWorkspace (bảng công việc),
+             trong khi tab «Bộ sưu tập» dưới dock nay mở ĐÚNG bộ sưu tập. Hai nút cùng tên mà hai đích
+             khác nhau là chỗ chắc chắn gây nhầm — giữ một, và giữ đúng cái có nhãn đúng. -->
+        <span class="order-5 ml-auto"></span>
 
         <!-- ══ CỤM 1 · ĐIỀU HƯỚNG KHÔNG GIAN LÀM VIỆC (desktop): MỘT khay gom mọi lối vào, nhóm theo
              chức năng — Bộ sưu tập (chọn bối cảnh) → Nguồn ảnh · Thư viện · Bảng lệnh · Outputs.
@@ -1467,25 +1512,31 @@ function onTouchEnd(e) {
          điện thoại: bốn đích chính luôn nằm trong tầm ngón tay cái, mỗi đích MỘT chạm.
          Bốn mục này KHÔNG mở đường tắt nào mới: chúng gọi đúng những hàm mà thanh trên cùng đang gọi, nên
          luật khoá theo gói vẫn do máy chủ quyết định. -->
+    <!-- [đợt 54] DOCK ĐIỆN THOẠI — viết lại. Bốn đích, mỗi đích MỘT việc:
+           · Tạo ảnh    -> bảng prompt (như cũ)
+           · Trợ lý     -> MỞ THẲNG trợ lý thiết kế. Trước đây trợ lý chỉ có nút nổi ở góc nên người
+                           dùng mới không biết nó ở đó; nay nó đứng cạnh «Tạo ảnh» vì đó là hai cách
+                           ngang hàng để bắt đầu một tấm ảnh.
+           · Bộ sưu tập -> MỞ ĐÚNG BỘ SƯU TẬP (công cụ 'collections'), KHÔNG mở bảng công việc. Trước
+                           đây tab này mở ProjectWorkspace — một bảng tiến độ/job — trong khi nhãn ghi
+                           «Bộ sưu tập». Nhãn và đích phải là một.
+           · Công cụ    -> popup DANH SÁCH công cụ; chọn một công cụ thì mở riêng công cụ đó toàn màn hình.
+         Tab «Kết quả» đã BỎ: nó chỉ có nghĩa ở mặt bảng ghép, mà điện thoại nay không có mặt đó
+         (xem forceGridOnNarrow) ⇒ nó là tab chết. Kết quả trên điện thoại CHÍNH LÀ mặt lưới. -->
     <nav v-if="store.studioView !== 'library'" class="dock dock-sm z-40 lg:hidden" aria-label="Điều hướng chính">
       <button type="button" data-dock-tab="prompt" :class="store.promptOpen ? 'dock-active' : ''" @click="store.promptOpen = true">
         <StudioIcon name="sparkles" size="h-5 w-5" />
         <span class="dock-label">Tạo ảnh</span>
       </button>
-      <button type="button" data-dock-tab="projects" :class="projectsOpen ? 'dock-active' : ''" @click="projectsOpen = true">
-        <StudioIcon name="kanban" size="h-5 w-5" />
+      <button type="button" data-dock-tab="assistant" :class="store.chatOpen ? 'dock-active' : ''" @click="openChat()">
+        <StudioIcon name="bot" size="h-5 w-5" />
+        <span class="dock-label">Trợ lý</span>
+      </button>
+      <button type="button" data-dock-tab="collections" :class="mobileToolOpen && activeActivity === 'collections' ? 'dock-active' : ''" @click="selectActivity('collections')">
+        <StudioIcon name="folderOpen" size="h-5 w-5" />
         <span class="dock-label">Bộ sưu tập</span>
       </button>
-      <!-- [2026-09-26 · đợt 52] Ở MẶT LƯỚI thì tab này là TRÙNG: mặt lưới đã hiện đúng danh sách
-           đó, to hơn và có nút hành động. Ngăn kéo "Kết quả" chỉ còn nghĩa khi đang ở mặt BẢNG GHÉP
-           (lúc đó nó là lối duy nhất để xem kết quả). Ẩn bằng v-show + inert theo đúng luật ẩn/hiện
-           của hai mặt (MainViewTest khoá: mặt thì dùng v-show, KHÔNG v-if). -->
-      <button type="button" data-dock-tab="outputs" v-show="store.mainView === 'canvas'" :inert="store.mainView === 'canvas' ? null : true"
-              :class="outputOpen ? 'dock-active' : ''" @click="outputOpen = true">
-        <StudioIcon name="grid" size="h-5 w-5" />
-        <span class="dock-label">Kết quả</span>
-      </button>
-      <button type="button" data-dock-tab="menu" :class="menuOpen ? 'dock-active' : ''" @click="menuOpen = true">
+      <button type="button" data-dock-tab="tools" :class="toolsListOpen || mobileToolOpen ? 'dock-active' : ''" @click="toolsListOpen = true">
         <StudioIcon name="sliders" size="h-5 w-5" />
         <span class="dock-label">Công cụ</span>
       </button>
@@ -1829,68 +1880,75 @@ function onTouchEnd(e) {
            xem khối data-header-actions ở <header>. Không còn cột dọc 56px nào chiếm bề ngang canvas. -->
     </div>
 
-    <!-- Mobile menu overlay -->
-    <div v-if="menuOpen" role="dialog" aria-modal="true" aria-label="Menu Studio" class="fixed inset-0 z-50 lg:hidden" @click="menuOpen=false">
-      <div class="motion-fade-in absolute inset-0 bg-scrim/60"></div>
-      <div class="motion-slide-in-left absolute left-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
-        <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-300" /> Studio</span><button @click="menuOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng menu" aria-label="Đóng menu"><StudioIcon name="x" size="h-4 w-4" /></button></div>
-        <div class="mb-3 flex gap-1.5 overflow-x-auto">
-          <!-- [Sửa 2026-09-17] Panel + nút popup đều sinh từ CÙNG cấu hình owner quản lý, nên
-               mobile không còn bản sao viết cứng lệch khỏi desktop. -->
-          <template v-for="a in activityBar" :key="'m-' + a.id">
-            <button v-if="a.kind === 'panel'" @click="a.locked ? openUpgradeFor(a.id) : selectActivity(a.id)"
-                    class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors"
-                    :class="a.locked ? 'bg-ink-800 text-cream-400' : (activeActivity === a.id ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-300')"
-                    :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label">
-                <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-4 w-4" /> {{ a.label }}
-            </button>
-            <button v-else-if="a.kind === 'action'" @click="a.locked ? openUpgradeFor(a.id) : runToolbarAction(a.id); menuOpen = a.locked ? menuOpen : false"
-                    class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors"
-                    :class="a.locked ? 'bg-ink-800 text-cream-400' : (isToolbarActionActive(a.id) ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-300')"
-                    :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label">
-                <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-4 w-4" /> {{ a.label }}
-            </button>
-          </template>
-          <!-- [Đợt 0.5] Nguồn ảnh + Thư viện: trước đây chỉ có nút ở rail hidden lg:flex (≥1024px),
-               nên người dùng điện thoại KHÔNG có cách mở. Nay cho vào drawer mobile. -->
-          <button @click="menuOpen = false; store.sourcePickerOpen = true" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors" :class="store.sourcePickerOpen ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-300'" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm">
-            <StudioIcon name="imagePlus" size="h-4 w-4" /> Nguồn ảnh
-          </button>
-          <button @click="menuOpen = false; goLibrary()" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-label font-semibold transition-colors bg-ink-800 text-cream-300" title="Thư viện — xem ảnh đã tạo & file tải lên">
-            <StudioIcon name="library" size="h-4 w-4" /> Thư viện
-          </button>
-          <!-- [ĐỔI CHÍNH SÁCH 2026-09-26 · LẦN 2] MỤC «TRỢ LÝ» TRONG MENU MOBILE ĐÃ GỠ.
-               Lý do: nút nổi (components/ChatFab.vue) hiện ở MỌI bề rộng, kể cả màn hẹp — nên mục này
-               không còn là "lối duy nhất của điện thoại" nữa, mà chỉ là bản sao thứ hai của cùng một
-               việc (đúng thứ §3 cấm). Người dùng điện thoại vẫn tới được trợ lý bằng nút nổi, và bằng
-               lệnh trong BẢNG LỆNH (Ctrl+K) — bảng lệnh là đường dành cho bàn phím nên nó KHÔNG bị gỡ. -->
+    <!-- ══════════════════════════════════════════════════════════════════════════════
+         ĐIỆN THOẠI — LUỒNG CÔNG CỤ HAI TẦNG (đợt 54)
+         Tầng 1 · DANH SÁCH: quét nhanh, thấy HẾT công cụ, chọn một cái.
+         Tầng 2 · MỘT CÔNG CỤ: toàn màn hình, không còn công cụ nào khác trên màn hình.
+         Vì sao tách: ngăn kéo cũ trộn hai việc vào một khung 320px — vừa là dải chọn công cụ, vừa là
+         chỗ làm việc. Hệ quả: công cụ đang chọn bị đẩy xuống DƯỚI dải chọn, và muốn làm việc thì phải
+         cuộn qua đúng những công cụ mình không dùng.
+         ══════════════════════════════════════════════════════════════════════════════ -->
+    <div v-if="toolsListOpen" role="dialog" aria-modal="true" aria-label="Chọn công cụ" class="fixed inset-0 z-[60] lg:hidden">
+      <div class="motion-fade-in absolute inset-0 bg-scrim/60" @click="toolsListOpen = false"></div>
+      <div class="motion-rise-in absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-2xl border-t border-ink-700 bg-ink-900 px-3 pb-6 pt-2.5" data-tool-list>
+        <div class="mb-2 flex items-center justify-between">
+          <span class="panel-title"><StudioIcon name="sliders" size="h-4 w-4" class="text-brand-300" /> Chọn công cụ</span>
+          <button type="button" @click="toolsListOpen = false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
+        </div>
 
-          <!-- [Yêu cầu 2026-09-17] Trên desktop là nút Cài đặt ở góc trái dưới; mobile phải có lối vào tương đương. -->
-          <a v-if="settingsEntry" href="/presets" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-label font-semibold text-cream-300 transition-colors" :title="settingsEntry.label + ' — preset prompt của bạn'">
-            <StudioIcon :name="settingsEntry.icon" size="h-4 w-4" /> {{ settingsEntry.label }}
+        <!-- Công cụ — sinh từ CÙNG cấu hình owner quản lý ở /admin, không giữ bản sao. -->
+        <div class="grid grid-cols-2 gap-1.5">
+          <button v-for="a in activityNav" :key="'tl-' + a.id"
+                  type="button"
+                  class="flex min-h-14 items-center gap-2 rounded-xl border border-ink-600 bg-ink-800 px-3 text-left text-body font-semibold transition-colors active:bg-ink-700"
+                  :class="a.locked ? 'text-cream-400 opacity-60' : 'text-cream-100'"
+                  :data-tool-item="a.id"
+                  :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label"
+                  @click="a.locked ? openUpgradeFor(a.id) : selectActivity(a.id)">
+            <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-5 w-5" class="shrink-0 text-brand-300" />
+            <span class="min-w-0 flex-1 truncate">{{ a.label }}</span>
+          </button>
+          <!-- Mục 'action' (vd Prompt Tạo Ảnh) đi qua ĐÚNG runToolbarAction như thanh công cụ desktop. -->
+          <button v-for="a in toolbarActions" :key="'ta-' + a.id"
+                  type="button"
+                  class="flex min-h-14 items-center gap-2 rounded-xl border border-ink-600 bg-ink-800 px-3 text-left text-body font-semibold transition-colors active:bg-ink-700"
+                  :class="a.locked ? 'text-cream-400 opacity-60' : (isToolbarActionActive(a.id) ? 'text-brand-200' : 'text-cream-100')"
+                  @click="toolsListOpen = false; (a.locked ? openUpgradeFor(a.id) : runToolbarAction(a.id))">
+            <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-5 w-5" class="shrink-0 text-brand-300" />
+            <span class="min-w-0 flex-1 truncate">{{ a.label }}</span>
+          </button>
+        </div>
+
+        <!-- Lối vào KHÔNG phải công cụ — trước đây nằm lẫn trong dải chọn công cụ, nay tách hẳn xuống
+             dưới một đường kẻ: chúng đổi KHÔNG GIAN LÀM VIỆC, không phải công cụ đang làm. -->
+        <div class="mt-3 space-y-1.5 border-t border-ink-700 pt-3">
+          <button type="button" @click="toolsListOpen = false; store.sourcePickerOpen = true" class="flex min-h-12 w-full items-center gap-2 rounded-xl border border-ink-600 bg-ink-800 px-3 text-left text-body font-semibold text-cream-100">
+            <StudioIcon name="imagePlus" size="h-5 w-5" class="text-brand-300" /> Nguồn ảnh
+          </button>
+          <button type="button" @click="toolsListOpen = false; goLibrary()" class="flex min-h-12 w-full items-center gap-2 rounded-xl border border-ink-600 bg-ink-800 px-3 text-left text-body font-semibold text-cream-100">
+            <StudioIcon name="library" size="h-5 w-5" class="text-brand-300" /> Thư viện &amp; ảnh của tôi
+          </button>
+          <a v-if="settingsEntry" href="/cai-dat/presets" class="flex min-h-12 w-full items-center gap-2 rounded-xl border border-ink-600 bg-ink-800 px-3 text-body font-semibold text-cream-100">
+            <StudioIcon name="template" size="h-5 w-5" class="text-brand-300" /> {{ settingsEntry.label }}
           </a>
-          <a href="/model-settings" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg bg-ink-800 px-2.5 py-1.5 text-label font-semibold text-cream-300 transition-colors" title="Cài đặt — khuôn mặt & dáng pose của bạn">
-            <StudioIcon name="user" size="h-4 w-4" /> Mặt &amp; dáng
+          <a href="/cai-dat/model" class="flex min-h-12 w-full items-center gap-2 rounded-xl border border-ink-600 bg-ink-800 px-3 text-body font-semibold text-cream-100">
+            <StudioIcon name="user" size="h-5 w-5" class="text-brand-300" /> Mặt &amp; dáng
           </a>
         </div>
-        <div class="space-y-3"><component :is="c" v-for="(c,i) in panel" :key="i" /></div>
       </div>
     </div>
-    <!-- Mobile outputs overlay: [Đợt 0.5] trước đây drawer này RỖNG (div trong suông) dù OutputModule
-         đã import sẵn — người dùng điện thoại bấm "Kết quả" nhận một ngăn trống. Nay render OutputModule.
-         [đợt 52] Chú thích cũ ghi "render đúng lưới kết quả" là SAI — nó chưa bao giờ render ResultGrid.
-         Và lối vào ngăn kéo này nay chỉ còn ở MẶT BẢNG GHÉP: ở mặt lưới, chính mặt lưới đã là danh sách
-         kết quả (to hơn, có nút hành động) nên ngăn kéo chỉ là bản sao thu nhỏ của nó. -->
-    <div v-if="outputOpen" role="dialog" aria-modal="true" aria-label="Kết quả tạo ảnh" class="fixed inset-0 z-50 lg:hidden">
-      <div class="motion-fade-in absolute inset-0 bg-scrim/60"></div>
-      <div class="motion-slide-in-right absolute right-0 top-0 flex h-full w-80 flex-col scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
-        <div class="panel-head -mx-3 mb-2 flex shrink-0 items-center justify-between border-b border-ink-700 px-3">
-          <span class="panel-title"><StudioIcon name="grid" size="h-3.5 w-3.5" class="text-brand-300" /> Kết quả</span>
-          <button @click="outputOpen = false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
+
+    <!-- TẦNG 2 · MỘT CÔNG CỤ, TOÀN MÀN HÌNH. Không dải chọn, không công cụ nào khác. -->
+    <div v-if="mobileToolOpen" role="dialog" aria-modal="true" :aria-label="activeActivityDef.label" class="fixed inset-0 z-[55] flex flex-col bg-ink-950 lg:hidden" data-tool-panel>
+      <div class="panel-head shrink-0 border-b border-ink-700 bg-ink-900">
+        <span class="panel-title"><StudioIcon :name="activeActivityDef.icon" size="h-4 w-4" class="text-brand-300" /> {{ activeActivityDef.label }}</span>
+        <div class="flex shrink-0 items-center gap-1.5">
+          <button type="button" @click="mobileToolOpen = false; toolsListOpen = true" class="icon-btn !h-9 !w-9" title="Đổi công cụ khác" aria-label="Đổi công cụ khác" data-tool-switch><StudioIcon name="sliders" size="h-4 w-4" /></button>
+          <button type="button" @click="mobileToolOpen = false" class="icon-btn !h-9 !w-9 bg-ink-800" title="Đóng" aria-label="Đóng" data-tool-close><StudioIcon name="x" size="h-4 w-4" /></button>
         </div>
-        <div class="min-h-0 flex-1">
-          <OutputModule />
-        </div>
+      </div>
+      <div class="min-h-0 flex-1 overflow-y-auto p-2.5">
+        <div class="space-y-2.5"><component :is="c" v-for="(c,i) in panel" :key="i" /></div>
       </div>
     </div>
     <!-- GalleryModal: xem ảnh lớn (bấm vào output trong dock phải) -->

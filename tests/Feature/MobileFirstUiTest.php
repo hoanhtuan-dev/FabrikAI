@@ -159,29 +159,78 @@ class MobileFirstUiTest extends TestCase
             'Đổi mặt là MỘT công tắc, không phải hai nút — hai nút làm tràn thanh tiêu đề ở 320px.');
     }
 
-    public function test_o_mat_luoi_thi_khong_con_tab_ket_qua_trung_lap(): void
+    /**
+     * [đợt 54] ĐIỆN THOẠI CHỈ CÓ MỘT MẶT ⇒ không còn lối vào kết quả nào khác ngoài chính mặt lưới.
+     *
+     * Đợt 52 tab «Kết quả» của dock được ẩn theo mặt. Nhưng khi màn hẹp bị khoá về mặt lưới thì tab
+     * đó KHÔNG BAO GIỜ hiện — nó là tab chết, và ngăn kéo của nó là một bề mặt không lối vào. Nay bỏ
+     * hẳn cả hai, và bất biến chuyển thành: màn hẹp có ĐÚNG MỘT mặt, nên chỉ có ĐÚNG MỘT nơi xem kết quả.
+     */
+    public function test_man_hep_chi_co_mot_mat_nen_chi_co_mot_noi_xem_ket_qua(): void
     {
-        $app = $this->src('StudioApp.vue');
+        $app = $this->code($this->src('StudioApp.vue'));
 
-        // Tab "Kết quả" của dock điện thoại ẩn theo mặt (v-show + inert, KHÔNG v-if — luật MainViewTest).
-        // So khớp CHUỖI TƯỜNG MINH thay vì regex nhiều tầng: đọc ra là biết ngay nó đòi gì.
-        $this->assertStringContainsString(
-            'data-dock-tab="outputs" v-show="store.mainView === \'canvas\'"',
-            $app,
-            'Tab Kết quả trùng với chính mặt lưới ⇒ phải ẩn khi đang ở mặt lưới (bằng v-show, không v-if).'
-        );
-        $this->assertStringContainsString(
-            ':inert="store.mainView === \'canvas\' ? null : true"',
-            $app,
-            'Ẩn bằng v-show thì phải inert — nếu không Tab vẫn nhảy vào tab vô hình.'
-        );
-        // Và nút "Kết quả" thứ hai trên thanh tiêu đề (cùng mở một ngăn kéo) đã bị gỡ.
-        // Nhắm ĐÚNG nút đã gỡ (title + aria-label của nó), không nhắm chuỗi con — ngăn kéo vẫn còn
-        // aria-label="Kết quả tạo ảnh" và đó là chuyện khác.
+        // 1. Khoá màn hẹp về mặt lưới — đây là điều kiện khiến mọi thứ dưới đây an toàn.
+        $this->assertStringContainsString('function syncViewport()', $app);
+        $this->assertStringContainsString("if (store.mainView === 'canvas') store.setMainView('grid')", $app);
+
+        // 2. Không còn tab «Kết quả» và không còn ngăn kéo rời của nó.
+        $this->assertStringNotContainsString('data-dock-tab="outputs"', $app,
+            'Tab «Kết quả» là tab chết khi màn hẹp chỉ có mặt lưới — phải bỏ.');
+        $this->assertStringNotContainsString('v-if="outputOpen"', $app,
+            'Ngăn kéo «Kết quả» rời đã bỏ: mặt lưới chính là danh sách kết quả.');
         $this->assertStringNotContainsString('title="Kết quả" aria-label="Kết quả"', $app,
-            'Hai nút mở cùng một ngăn kéo là trùng lặp — nút trên thanh tiêu đề đã gỡ.');
-        $this->assertStringNotContainsString('class="order-6 icon-btn shrink-0 lg:hidden"', $app,
-            'Nút Kết quả cũ trên thanh tiêu đề điện thoại phải không còn.');
+            'Nút Kết quả trên thanh tiêu đề cũng đã gỡ.');
+
+        // 3. Nút đổi mặt chỉ hiện từ lg (điện thoại không có mặt bảng ghép).
+        $this->assertStringContainsString('class="order-4 hidden icon-btn !h-8 !w-8 shrink-0 lg:grid"', $app,
+            'Nút đổi mặt phải ẩn dưới lg — điện thoại chỉ có mặt lưới.');
+
+        // 4. Dock điện thoại: bốn đích, và KHÔNG có đích nào thuộc canvas.
+        foreach (['prompt', 'assistant', 'collections', 'tools'] as $tab) {
+            $this->assertStringContainsString('data-dock-tab="'.$tab.'"', $app, 'Dock thiếu mục '.$tab.'.');
+        }
+        $this->assertSame(4, substr_count($app, 'data-dock-tab='), 'Dock điện thoại phải có ĐÚNG bốn đích.');
+    }
+
+    /**
+     * LUỒNG CÔNG CỤ HAI TẦNG TRÊN ĐIỆN THOẠI — danh sách, rồi MỘT công cụ toàn màn hình.
+     *
+     * Ngăn kéo cũ trộn hai việc vào một khung 320px: vừa là dải chọn công cụ, vừa là chỗ làm việc —
+     * nên công cụ đang chọn bị đẩy XUỐNG DƯỚI dải chọn, và muốn làm việc phải cuộn qua đúng những
+     * công cụ mình không dùng.
+     */
+    public function test_dien_thoai_chon_cong_cu_roi_mo_mot_cong_cu_toan_man_hinh(): void
+    {
+        $app = $this->code($this->src('StudioApp.vue'));
+
+        // Tầng 1: danh sách sinh từ CÙNG cấu hình owner quản lý, không giữ bản sao.
+        $this->assertStringContainsString('data-tool-list', $app);
+        $this->assertStringContainsString('v-for="a in activityNav"', $app);
+        $this->assertStringContainsString(':data-tool-item="a.id"', $app);
+
+        // Tầng 2: ĐÚNG card của công cụ đang chọn, không có dải chọn nào khác trên màn hình.
+        $this->assertStringContainsString('data-tool-panel', $app);
+        $this->assertMatchesRegularExpression(
+            '/data-tool-panel[\s\S]{0,900}?<component :is="c" v-for="\(c,i\) in panel"/',
+            $app,
+            'Tầng 2 phải render đúng card của công cụ đang chọn.'
+        );
+        $panelStart = strpos($app, 'data-tool-panel');
+        $panelEnd = strpos($app, '<!-- GalleryModal', (int) $panelStart);
+        $panel = substr($app, (int) $panelStart, (int) $panelEnd - (int) $panelStart);
+        $this->assertStringNotContainsString('data-tool-item', $panel,
+            'Trong màn hình MỘT công cụ không được còn dải chọn công cụ nào — đó là cả điểm của việc tách đôi.');
+
+        // Chọn công cụ = mở thẳng công cụ đó toàn màn hình, KHÔNG toggle ngăn kéo.
+        $this->assertStringContainsString('toolsListOpen.value = false;', $app);
+        $this->assertStringContainsString('mobileToolOpen.value = true;', $app);
+        $this->assertStringNotContainsString('menuOpen', $app,
+            'Ngăn kéo chung cũ đã bị thay bằng hai tầng — không được còn tên cũ.');
+
+        // Lối thoát: đổi công cụ khác và đóng, cả hai đều có.
+        $this->assertStringContainsString('data-tool-switch', $app);
+        $this->assertStringContainsString('data-tool-close', $app);
     }
 
     /**

@@ -649,6 +649,108 @@ Sửa cho khớp cấu trúc mới — mỗi lần đều ghi rõ LÝ DO, không
   bài là LỚP của khung, không phải điều kiện hiện/ẩn — điều kiện đổi không được làm bài test đỏ.
 - `StudioDockResizeTest`: số phần tử `inert` 6 → 8, kèm lý do từng cái.
 
+## Phiên 2026-09-23 (đợt 54) — ĐIỆN THOẠI: MỘT MẶT · HEADER GỌN · LUỒNG CÔNG CỤ HAI TẦNG
+
+**Đo bằng Chrome thật ở 320 · 375 · 1280 sau mỗi bước.**
+
+### 1. ĐIỆN THOẠI CHỈ CÒN MỘT MẶT: LƯỚI KẾT QUẢ
+
+Bảng ghép cần bề ngang và con trỏ chính xác — trên điện thoại nó vừa bị bóp không dùng được, vừa
+buộc mọi màn hình mang thêm chrome của một mặt người dùng không mở. Nay dưới `lg` **không vào được
+mặt canvas**, áp ở BA chỗ và chỉ một nơi biết về bề ngang (`syncViewport()`):
+
+1. nút đổi mặt ẩn dưới `lg` (`hidden ... lg:grid`);
+2. mặt đang lưu trong localStorage là `'canvas'` thì bị kéo về `'grid'` ngay khi mở ở màn hẹp;
+3. công cụ canvas tự bật cũng KHÔNG kéo sang mặt canvas trên màn hẹp — nếu không, luật này đánh nhau
+   với luật kéo-về-lưới mỗi lần một cờ canvas đổi.
+
+Cùng chỗ đó cũng **đóng hai bề mặt chỉ-có-ở-điện-thoại khi cửa sổ rộng ra**: để chúng "đang mở" trong
+trạng thái (chỉ bị `lg:hidden` che) thì lần thu hẹp sau chúng hiện lại đè lên màn hình mà người dùng
+chưa bấm gì.
+
+### 2. HEADER GỌN — HAI NÚT ĐIỆN THOẠI VỀ DOCK
+
+**Gỡ khỏi thanh tiêu đề:** nút «Mở menu công cụ» và nút «Bộ sưu tập».
+Cả hai đều trùng với dock dưới đáy — hai nút cho một việc, trên thanh vốn đã chật ở 320px.
+
+ĐO ĐƯỢC ở 320px sau khi gỡ: thanh tiêu đề chỉ còn **thương hiệu + chip credit**, không tràn
+(`TRAN_HEADER=0`). Đợt 53 tôi từng phải ẩn thương hiệu dưới `sm` để nhường chỗ cho nút đổi mặt —
+nay chỗ có lại nên **trả thương hiệu về ở mọi bề rộng** (một ứng dụng không có nhận diện nào ở đầu
+trang là chuyện lạ, và đó là lối về trang chủ).
+
+> Nút «Bộ sưu tập» cũ mở `ProjectWorkspace` — một **bảng tiến độ/job** — trong khi nhãn ghi
+> «Bộ sưu tập». Nhãn và đích phải là một. Tab mới mở ĐÚNG bộ sưu tập.
+
+### 3. DOCK ĐIỆN THOẠI — BỐN ĐÍCH, MỖI ĐÍCH MỘT VIỆC
+
+| Tab | Việc |
+|---|---|
+| **Tạo ảnh** | bảng prompt (như cũ) |
+| **Trợ lý** | mở THẲNG trợ lý thiết kế — **nút mới, đứng cạnh «Tạo ảnh»** |
+| **Bộ sưu tập** | mở ĐÚNG bộ sưu tập (công cụ `collections`), không mở bảng công việc |
+| **Công cụ** | popup danh sách công cụ |
+
+**Tab «Kết quả» đã bỏ hẳn** (cùng ngăn kéo rời của nó): nó chỉ có nghĩa ở mặt bảng ghép, mà điện thoại
+nay không có mặt đó ⇒ nó là **tab chết**, và ngăn kéo là một bề mặt không lối vào. Kết quả trên điện
+thoại CHÍNH LÀ mặt lưới.
+
+> **Đổi chính sách, ghi rõ ở đây:** trước đây có bất biến "trợ lý CHỈ có một lối vào là nút nổi" (lý do:
+> nút nổi hiện ở mọi bề rộng nên mục trong menu chỉ là bản sao). Chủ dự án đổi quyết định: **nút nổi là
+> lối TẮT theo ngữ cảnh** (đang làm dở thì gọi ngay), **dock là lối ĐIỀU HƯỚNG** (người dùng mới không
+> biết nút nổi ở góc là gì, mà dock luôn nằm trong tầm ngón tay). Bất biến đổi từ "chỉ một lối vào"
+> sang **"nhiều lối vào, MỘT hàm"** — cả hai đều gọi đúng `openChat()`.
+
+### 4. LUỒNG CÔNG CỤ HAI TẦNG — LÝ DO VÀ KẾT QUẢ
+
+Ngăn kéo cũ trộn hai việc vào một khung 320px: vừa là dải chọn công cụ, vừa là chỗ làm việc. Hệ quả:
+công cụ đang chọn bị **đẩy xuống DƯỚI dải chọn**, và muốn làm việc phải **cuộn qua đúng những công cụ
+mình không dùng**.
+
+Nay tách đôi — vì hai việc này có hai ngữ cảnh khác nhau:
+
+| Tầng | Dấu hiệu | Ngữ cảnh |
+|---|---|---|
+| 1 · DANH SÁCH | `data-tool-list` | quét nhanh, cần **thấy hết** (9 mục) |
+| 2 · MỘT CÔNG CỤ | `data-tool-panel` | làm việc, cần **trọn màn hình** |
+
+ĐO ĐƯỢC ở 320px: bấm «Công cụ» → danh sách 9 mục; chọn «Upscale» → panel **cao 640px = trọn màn hình**,
+**đúng 1 card**, **không còn mục công cụ nào** trong đó. Bấm «Đổi công cụ khác» → về danh sách.
+Ở 375px: panel cao 812px (trọn màn hình).
+
+> Tầng 1 sinh từ **cùng** `activityNav` (cấu hình owner quản lý ở `/admin`), không giữ bản sao.
+> Nhóm «không phải công cụ» (Nguồn ảnh · Thư viện · Preset · Mặt & dáng) tách xuống dưới một đường kẻ:
+> chúng đổi **không gian làm việc**, không phải công cụ đang làm.
+
+### 5. KIỂM NÚT ĐÈ NHAU — BỘ DÒ PHẢI BIẾT VỀ TẦNG
+
+Bộ dò đầu tiên báo 16–34 cặp "đè nhau" — **toàn bộ là dương tính giả**: nó so mọi phần tử với nhau,
+kể cả phần tử của **modal đè lên trang**, mà đó là cách mọi hộp thoại hoạt động.
+
+Sửa: mỗi phần tử được gán **tầng gần nhất** (`[role=dialog]` · `[data-tool-panel]` · `header` ·
+`nav.dock` · mặt chính) và **chỉ so trong cùng một tầng**. Kết quả thật:
+
+| | Tạo ảnh | Trợ lý | Bộ sưu tập | Công cụ |
+|---|---|---|---|---|
+| 320 · 375 | **0** | **0** | **0** | **0** |
+
+### 6. BÀI TEST
+
+- Viết lại `StaticIntegrityTest::test_mobile_drawer_...` → `test_the_mobile_tool_list_...`.
+  Bất biến "điện thoại phải tới được công cụ · nguồn ảnh · thư viện" **giữ nguyên**, chỉ đổi chỗ đứng —
+  và thêm bất biến mới: bỏ ngăn kéo «Kết quả» chỉ an toàn KHI màn hẹp bị khoá về mặt lưới (thiếu luật
+  đó là mất lối xem kết quả, nên bài test kiểm cả hai vế).
+- `MobileFirstUiTest`: thay bài "tab Kết quả ẩn theo mặt" bằng **"màn hẹp chỉ có một mặt nên chỉ có
+  một nơi xem kết quả"** (mạnh hơn), cộng bài mới cho luồng hai tầng — trong đó có vế *"trong màn hình
+  MỘT công cụ không được còn dải chọn công cụ nào"*, vì đó là cả điểm của việc tách đôi.
+- `StudioHeaderAndPromptTest`: cập nhật thứ tự header + đổi chính sách lối vào trợ lý (ghi rõ lý do).
+- `StudioDockResizeTest`: `:inert=` 8 → 7 (tab Kết quả đã bỏ).
+
+**Sự cố trong lúc làm, ghi lại để phiên sau tránh:** tôi đọc cả tệp `StudioApp.vue` (1.942 dòng)
+bằng một lần gọi và kết quả bị CẮT, rồi dùng chính kết quả đó để ghi đè — làm hỏng tệp. Đã khôi phục
+bằng `git checkout` và làm lại **chỉ bằng công cụ sửa theo mốc**. Bài học: không bao giờ ghi đè cả
+tệp từ dữ liệu đã đọc có thể bị cắt; sửa theo mốc, và khi cần chèn/xoá khối lớn thì dùng mốc văn bản
+chứ không dùng số dòng.
+
 ### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
 
 - **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.

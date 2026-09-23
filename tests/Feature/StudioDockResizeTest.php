@@ -151,8 +151,11 @@ class StudioDockResizeTest extends TestCase
         //   · nút Outputs trên thanh tiêu đề — dock của nó là bản sao thu nhỏ của chính lưới.
         // (Thanh trạng thái cũng bị chặn theo mặt, nhưng :inert của nó nằm trong CanvasStatusBar.vue
         //  nên không tính vào con số của tệp này.)
-        $this->assertSame(8, substr_count($app, ':inert='),
-            'Thứ gì ẩn bằng v-show (3 dock + 2 mặt chính + tab Kết quả + rail công cụ + nút Outputs) đều phải inert — nếu không, Tab vẫn nhảy vào nội dung vô hình.');
+        //
+        // [2026-09-26 · đợt 54] 8 → 7: tab «Kết quả» của dock điện thoại đã BỎ HẲN (cùng ngăn kéo của
+        // nó) — màn hẹp bị khoá về mặt lưới nên tab đó không bao giờ hiện, tức là tab chết.
+        $this->assertSame(7, substr_count($app, ':inert='),
+            'Thứ gì ẩn bằng v-show (3 dock + 2 mặt chính + rail công cụ + nút Outputs) đều phải inert — nếu không, Tab vẫn nhảy vào nội dung vô hình.');
         // Và hai mặt chính phải khai ĐÚNG dấu hiệu nhận biết để tầng kiểm thử bằng trình duyệt tìm được.
         $this->assertSame(1, substr_count($app, 'data-main-view="grid"'), 'Thiếu mặt chính «lưới kết quả».');
         $this->assertSame(1, substr_count($app, 'data-main-view="canvas"'), 'Thiếu mặt chính «bảng ghép».');

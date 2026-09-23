@@ -390,22 +390,38 @@ class StaticIntegrityTest extends TestCase
         return $out;
     }
 
-    public function test_mobile_drawer_renders_outputs_sources_and_library(): void
+    public function test_the_mobile_tool_list_renders_tools_sources_and_library(): void
     {
-        // [Đợt 0.5 — Mobile dùng được]
-        //   Ba lỗi gốc: (a) drawer "Kết quả" trên điện thoại RỖNG — OutputModule đã import nhưng không
-        //   render; (b) "Nguồn ảnh"/"Thư viện" chỉ nằm ở rail hidden lg:flex (≥1024px) nên điện thoại
-        //   không có cách mở; (c) SourcePanel/LibraryCard import chết (đã bị thay bằng SourcePickerPopup/
-        //   LibraryApp) làm người đọc tưởng mobile đang dùng chúng.
+        // [Đợt 0.5 — Mobile dùng được] Ba lỗi gốc: (a) drawer "Kết quả" trên điện thoại RỖNG —
+        // OutputModule đã import nhưng không render; (b) "Nguồn ảnh"/"Thư viện" chỉ nằm ở rail
+        // hidden lg:flex (≥1024px) nên điện thoại không có cách mở; (c) SourcePanel/LibraryCard
+        // import chết làm người đọc tưởng mobile đang dùng chúng.
+        //
+        // [đợt 54 — luồng công cụ hai tầng] Ngăn kéo cũ đã bị THAY, không phải bị bỏ: nó trộn hai việc
+        // vào một khung 320px (vừa chọn công cụ, vừa làm việc). Nay tầng 1 là DANH SÁCH công cụ
+        // (data-tool-list) và tầng 2 là MỘT công cụ toàn màn hình (data-tool-panel).
+        // Bất biến của bài này — "điện thoại phải tới được công cụ, nguồn ảnh và thư viện" — GIỮ NGUYÊN,
+        // chỉ đổi chỗ đứng. Và có thêm một bất biến mới: (a') kết quả trên điện thoại KHÔNG còn là một
+        // ngăn kéo rời vì mặt lưới CHÍNH LÀ kết quả (điện thoại không còn mặt bảng ghép).
         $app = (string) file_get_contents(resource_path('js/studio/StudioApp.vue'));
 
-        // (a) OutputModule PHẢI được render bên trong drawer "Kết quả" mobile, không chỉ import.
-        $this->assertMatchesRegularExpression('/v-if="outputOpen"[^>]*>.*?<OutputModule \/>/s', $app,
-            'Drawer "Kết quả" mobile phải RENDER <OutputModule /> (trước đây rỗng trong suông).');
+        // (a') Ngăn kéo "Kết quả" rời đã bỏ — và điều đó chỉ ĐÚNG khi mặt lưới là mặt duy nhất ở màn hẹp.
+        $this->assertStringNotContainsString('v-if="outputOpen"', $app,
+            'Ngăn kéo "Kết quả" rời phải bỏ: ở màn hẹp, mặt lưới CHÍNH LÀ danh sách kết quả.');
+        $this->assertStringContainsString('function syncViewport()', $app,
+            'Bỏ ngăn kéo "Kết quả" chỉ an toàn khi màn hẹp bị khoá về mặt lưới — thiếu luật đó là mất lối xem kết quả.');
 
-        // (b) Nguồn ảnh + Thư viện phải mở được từ menu mobile (drawer), không chỉ từ rail desktop.
-        $this->assertMatchesRegularExpression('/menuOpen[^>]*>.*?sourcePickerOpen.*?goLibrary/s', $app,
-            'Menu mobile phải có "Nguồn ảnh" (sourcePickerOpen) và "Thư viện" (goLibrary).');
+        // (b) Nguồn ảnh + Thư viện phải mở được từ DANH SÁCH CÔNG CỤ trên điện thoại.
+        $this->assertMatchesRegularExpression('/data-tool-list[^>]*>.*?sourcePickerOpen.*?goLibrary/s', $app,
+            'Danh sách công cụ trên điện thoại phải có "Nguồn ảnh" (sourcePickerOpen) và "Thư viện" (goLibrary).');
+        // Và danh sách đó phải THẬT SỰ render công cụ, không phải div suông (đúng lỗi gốc đợt 0.5).
+        $this->assertMatchesRegularExpression('/data-tool-list[^>]*>.*?data-tool-item/s', $app,
+            'Danh sách công cụ phải render các công cụ (data-tool-item), không được rỗng.');
+        $this->assertMatchesRegularExpression(
+            '/data-tool-panel[^>]*>.*?<component :is="c" v-for="\(c,i\) in panel"/s',
+            $app,
+            'Tầng 2 phải render ĐÚNG card của công cụ đang chọn.'
+        );
 
         // (c) Không còn import chết SourcePanel / LibraryCard.
         $this->assertStringNotContainsString('import SourcePanel', $app, 'Import chết SourcePanel phải bị gỡ.');

@@ -59,20 +59,23 @@ class StudioHeaderAndPromptTest extends TestCase
             'Thanh tiêu đề Studio phải dùng .navbar của daisyUI (kèm .elev-bar để giữ độ nổi đã chốt).'
         );
         // [đợt 34] Thứ tự do `order` quyết định (hai nhóm navbar-start/navbar-end nay là khung trong
-        // suốt `contents`), nên bài này khoá THỨ TỰ THỊ GIÁC: menu · thương hiệu · TÀI KHOẢN · CREDIT
-        // ở bên trái; nút điện thoại + khay công cụ đẩy sang phải.
+        // suốt `contents`), nên bài này khoá THỨ TỰ THỊ GIÁC: thương hiệu · TÀI KHOẢN · CREDIT ở bên
+        // trái; khay công cụ đẩy sang phải.
+        // [đợt 54] Thanh tiêu đề điện thoại đã GỌN: nút «Mở menu công cụ» và nút «Bộ sưu tập» ở đây
+        // đã gỡ — cả hai việc đó nay nằm ở dock dưới đáy, nơi điều hướng của điện thoại. Thanh tiêu
+        // đề chỉ còn danh tính + tài khoản, và nút đổi mặt chỉ hiện từ lg (điện thoại không có mặt
+        // bảng ghép).
         foreach ([
-            'class="icon-btn shrink-0 lg:hidden order-1"' => 'nút menu',
-            // [đợt 53] Thương hiệu ẩn dưới sm ("hidden ... sm:flex"): ở 320px nó chỉ còn là hình trang
-            // trí chiếm 40px và đẩy nút «Bộ sưu tập» ra ngoài mép phải thanh tiêu đề.
-            'class="order-2 hidden shrink-0 items-center gap-2 sm:flex"' => 'thương hiệu FabrikAI',
+            // [đợt 53] Từng phải ẩn dưới sm vì thanh tiêu đề tràn ở 320px. [đợt 54] Hai nút điện thoại
+            // đã gỡ khỏi thanh tiêu đề (về dock) nên chỗ có lại — thương hiệu trở về ở MỌI bề rộng.
+            'class="order-2 flex shrink-0 items-center gap-2"' => 'thương hiệu FabrikAI',
             // [đợt 35] Hai nút này nay nằm trong KHAY TRÁI (data-header-account) — thứ tự trong khay lo
             // bằng order-1/order-3 vì mã nguồn xếp credit trước tài khoản.
             'class="order-1 relative"' => 'nút + menu tài khoản',
             'class="order-3 relative"' => 'nút Gói & credit',
             // [đợt 53] Nút ĐỔI MẶT chen vào giữa thương hiệu và nút Bộ sưu tập: nó thuộc CẢ HAI mặt nên
             // đứng ở thanh tiêu đề, không nằm trong chrome của mặt nào.
-            'class="order-4 icon-btn !h-8 !w-8 shrink-0"' => 'nút đổi mặt Lưới ⇄ Bảng ghép',
+            'class="order-4 hidden icon-btn !h-8 !w-8 shrink-0 lg:grid"' => 'nút đổi mặt Lưới ⇄ Bảng ghép (chỉ từ lg)',
             'class="order-5 ml-auto' => 'nút Bộ sưu tập (điện thoại)',
             'class="order-7 ml-auto hidden' => 'khay điều hướng không gian làm việc',
         ] as $needle => $what) {
@@ -418,19 +421,31 @@ class StudioHeaderAndPromptTest extends TestCase
             'openChat() phải là chỗ DUY NHẤT bật cờ mở modal (cùng chỗ đóng các lớp phủ đang mở).'
         );
 
-        // (d.5) HAI LỐI VÀO CŨ PHẢI BIẾN MẤT (đây là "CHUYỂN", không phải "thêm bản thứ hai")…
+        // (d.5) LỐI VÀO Ở THANH TIÊU ĐỀ PHẢI BIẾN MẤT — nút đó vẫn đứng giữa cụm công cụ làm việc.
         $this->assertStringNotContainsString('data-header-action="chat"', $app,
-            'Nút «Trợ lý» cũ VẪN CÒN trong cụm công cụ ở thanh tiêu đề — nút nổi là để CHUYỂN, không phải thêm bản thứ hai.'
+            'Nút «Trợ lý» cũ VẪN CÒN trong cụm công cụ ở thanh tiêu đề.'
         );
-        $drawerStart = strpos($app, 'aria-label="Menu Studio"');
-        $this->assertNotFalse($drawerStart, 'Không đọc được menu mobile để kiểm lối vào trùng.');
-        $drawerEnd = strpos($app, 'Mobile outputs overlay', (int) $drawerStart);
-        $this->assertNotFalse($drawerEnd, 'Không đọc được cuối menu mobile để kiểm lối vào trùng.');
-        $drawer = substr($app, (int) $drawerStart, (int) $drawerEnd - (int) $drawerStart);
-        $this->assertStringNotContainsString('openChat()', $drawer,
-            'Menu mobile vẫn còn lối vào thứ hai mở trợ lý — nút nổi đã hiện trên MỌI bề rộng nên mục đó '
-            .'chỉ là bản sao (người dùng phải nhớ hai chỗ cho cùng một việc).'
+
+        // [đợt 54] ĐỔI CHÍNH SÁCH: trợ lý NAY CÓ MỘT MỤC Ở DOCK ĐIỆN THOẠI, cạnh «Tạo ảnh».
+        //
+        // Trước đây bài này CẤM mọi lối vào trợ lý ngoài nút nổi, với lý do "nút nổi hiện ở mọi bề
+        // rộng nên mục kia chỉ là bản sao". Chủ dự án đã đổi quyết định: nút nổi là lối TẮT theo
+        // ngữ cảnh (đang làm dở thì gọi ngay), còn dock là lối ĐIỀU HƯỚNG — người dùng mới không
+        // biết nút nổi ở góc là gì, mà dock thì luôn nằm trong tầm ngón tay.
+        //
+        // Điều KHÔNG được đổi là "một luật, một chỗ": cả hai lối phải gọi ĐÚNG openChat().
+        // Bất biến vì thế chuyển từ "chỉ một lối vào" sang "nhiều lối vào, MỘT hàm".
+        $this->assertMatchesRegularExpression(
+            '/data-dock-tab="assistant"[^>]*@click="openChat\(\)"/',
+            $app,
+            'Mục «Trợ lý» ở dock điện thoại phải gọi đúng openChat() — không dựng logic mở thứ hai.'
         );
+        $dockStart = strpos($app, 'aria-label="Điều hướng chính"');
+        $this->assertNotFalse($dockStart, 'Không đọc được dock điện thoại.');
+        $dock = substr($app, (int) $dockStart, 1800);
+        $this->assertStringContainsString('Trợ lý', $dock, 'Dock phải có mục «Trợ lý» cạnh «Tạo ảnh».');
+        $this->assertSame(1, substr_count($dock, 'openChat()'),
+            'Chỉ MỘT mục trong dock được mở trợ lý — hai mục là hai chỗ để lệch nhau.');
 
         // …(d.6) NHƯNG LỆNH TRONG BẢNG LỆNH THÌ GIỮ: bảng lệnh là đường dành cho BÀN PHÍM (§3.1).
         $this->assertStringContainsString('run: () => openChat()', $app,
