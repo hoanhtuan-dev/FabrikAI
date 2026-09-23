@@ -326,8 +326,25 @@ Muốn đo lại bất cứ lúc nào: `php artisan studio:web-search-probe` (ho
 
 ### 11.6 Muốn AI tra được WEB CHUNG (không chỉ tin tức) — khai nguồn tìm kiếm
 
-**CÁCH NHANH NHẤT — MỘT LỆNH (từ 2026-09-26).** Lấy **cx** + **API key** của Google (2 phút, xem bảng dưới),
-rồi chạy NGAY TRÊN MÁY CHỦ để khoá không phải đi qua chat/email:
+#### Cách 1 (KHUYÊN DÙNG): Tavily — chạy được NGAY, **KHÔNG cần khoá**
+```bash
+php artisan studio:web-search-setup --provider=tavily
+# tuỳ chọn: --topic=news|finance · --time-range=week|month|year · --depth=advanced · --key=tvly-… (khi có khoá)
+```
+**Không phải đăng ký gì.** Tavily có chế độ **keyless** (`X-Tavily-Access-Mode: keyless`): miễn phí, có giới hạn
+nhịp, **cùng schema** kết quả như khi có khoá. Đo thật trên production (2026-09-23): câu *"cách giặt vải linen"* —
+trước là **0 kết quả** — nay trả **5 nguồn thật** (heramo.com · nhavailinen.com · cleanipedia.com…), và trợ lý trả
+lời kèm **2 trích dẫn** thay vì nói "chưa tra được".
+
+Ba điểm hơn nguồn RSS: **có ngày đăng** (bộ lọc độ mới và số đo xu hướng chạy được thật) · **đoạn trích viết cho
+LLM đọc** · **tìm cả web chung**, không chỉ tin tức.
+
+⚠️ Keyless **có giới hạn nhịp** — bị chặn thì lệnh/hệ thống nói rõ *"giới hạn nhịp"* (HTTP 429), **không im lặng
+trả 0**. Muốn hạn mức riêng (**miễn phí 1.000 credit/tháng, không cần thẻ**): lấy khoá ở `app.tavily.com` rồi chạy
+lại lệnh kèm `--key=tvly-…` — **không phải sửa mã**, chỉ đổi từ keyless sang Bearer.
+
+#### Cách 2: Google CSE — API có khoá
+Lấy **cx** + **API key** của Google (2 phút, xem bảng dưới), rồi chạy NGAY TRÊN MÁY CHỦ để khoá không đi qua chat/email:
 
 ```bash
 php artisan studio:web-search-setup --key=AIza… --cx=0123abc…

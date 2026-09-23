@@ -74,10 +74,34 @@ class WebSearchProbeCommand extends Command
         }
 
         $this->newLine();
-        $this->line($live === count($questions)
-            ? 'Kết luận: MỌI câu hỏi đều có kết quả thật.'
-            : 'Kết luận: '.(count($questions) - $live).'/'.count($questions).' câu hỏi KHÔNG tra được gì — nguồn hiện khai thiên về TIN TỨC. '
-                .'Muốn tra được web chung thì khai thêm nguồn tìm kiếm (vd Google Programmable Search): xem HUONG_DAN_TINH_NANG_MOI.md §11.6.');
+
+        if ($live === count($questions)) {
+            $this->line('Kết luận: MỌI câu hỏi đều có kết quả thật.');
+
+            return self::SUCCESS;
+        }
+
+        // KẾT LUẬN PHẢI CHỈ ĐÚNG VIỆC CẦN LÀM — ba nguyên nhân rất khác nhau, và cả ba đều hiện ra là "0 kết quả":
+        $hasWebSearch = false;
+        foreach ($sources->searchableSources($region) as $source) {
+            if (in_array((string) ($source->kind ?? ''), ['tavily', 'search'], true)) {
+                $hasWebSearch = true;
+            }
+        }
+
+        $this->line('Kết luận: '.(count($questions) - $live).'/'.count($questions).' câu hỏi KHÔNG tra được gì.');
+        if (! $hasWebSearch) {
+            $this->line('  · Nguồn đang khai KHÔNG có nguồn tìm kiếm web chung ⇒ câu hỏi ngoài tin tức sẽ luôn 0 kết quả.');
+            $this->line('    Khai bằng MỘT lệnh: php artisan studio:web-search-setup --provider=tavily   (tavily.com — chạy được KHÔNG cần khoá)');
+            $this->line('    hoặc một API có khoá (Google CSE) — xem HUONG_DAN_TINH_NANG_MOI.md §11.6');
+
+            return self::SUCCESS;
+        }
+
+        // Đã CÓ nguồn web chung mà vẫn 0 ⇒ phần lớn là do BỘ LỌC ĐỘ MỚI, không phải "internet không có gì".
+        $this->line('  · Đã có nguồn tìm kiếm web chung. Câu hỏi ra 0 thường vì kết quả đều CŨ hơn '
+            .WebSourceService::MAX_AGE_DAYS.' ngày (xem cột "bỏ vì cũ").');
+        $this->line('    Đây là luật CỐ Ý của dự án: thà không có tin còn hơn đưa tin cũ rồi gọi đó là xu hướng hiện tại.');
 
         return self::SUCCESS;
     }

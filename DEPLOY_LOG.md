@@ -5,6 +5,68 @@
 
 ---
 
+## Phiên 2026-09-23 (đợt 43) — TAVILY: TÌM KIẾM WEB CHUNG CHẠY ĐƯỢC **KHÔNG CẦN KHOÁ**
+
+**Commit:** `6d16cf2` (+ commit sau cho kết luận của lệnh đo). **Trạng thái: đã push + deploy + ĐO trên production.**
+
+### 1. Vì sao Tavily (đo trước khi làm)
+
+| Đo được trước đó | Hệ quả |
+|---|---|
+| Nguồn RSS chỉ có **tin tức** | "cách giặt vải linen" · "giá vải linen" → **0 kết quả** (đọc được 16-23 tin nhưng đều quá cũ) |
+| Google CSE | Cần khoá **và** không trả ngày đăng ⇒ mục vào prompt là "không ngày", không đo được xu hướng |
+| Tavily | **Keyless** (không tài khoản, không khoá, cùng schema) · **có ngày đăng** · đoạn trích viết cho LLM · tìm cả web chung |
+
+### 2. Đã làm
+
+| Việc | Chi tiết |
+|---|---|
+| Loại nguồn thứ năm: `tavily` | `POST https://api.tavily.com/search`; khoá ở HEADER (`Authorization: Bearer tvly-…`) hoặc **keyless**; `isSearchable()` trả true cho loại này (từ khoá đi trong BODY nên `querySlot()` không thấy — thiếu dòng đó thì nguồn Tavily **không bao giờ được gọi**) |
+| Đọc kết quả | `interpretTavily()`: `title` · `url` · `content` (→ đoạn trích) · `published_date` (→ ngày đăng), CÙNG hình dạng kết quả với mọi nguồn khác ⇒ bộ lọc độ mới, khử trùng, số đo, prompt **không phải biết** nguồn này khác gì |
+| Tuỳ chọn trong URL nguồn | `?topic=general|news|finance` · `time_range=day|week|month|year` · `depth=basic|fast|ultra-fast|advanced` · `raw=1` — thấy và sửa được ở màn Cài đặt |
+| Nói đúng bệnh | HTTP **429** ⇒ *"nhà cung cấp tạm giới hạn nhịp… hoặc khai khoá để có hạn mức riêng"*; và `search()` nay giữ **câu lỗi CỤ THỂ của nguồn** thay vì thay bằng câu chung chung vô dụng |
+| Lệnh khai nguồn | `studio:web-search-setup --provider=tavily [--key=tvly-…] [--topic=] [--time-range=] [--depth=]` — khai nguồn rồi **THỬ THẬT**; không có `--key` thì đi keyless và **không tạo hàng khoá rỗng** |
+| Lệnh đo độ phủ | `studio:web-search-probe` kết luận nay **chỉ đúng việc cần làm**: chưa có nguồn web chung ⇒ chỉ cách khai; đã có mà vẫn 0 ⇒ nói rõ là do **bộ lọc 60 ngày** (luật cố ý), không phải "internet không có gì" |
+| Test | `TavilySearchTest` (5 bài) + `WebSearchSetupTest` (4 bài) |
+
+### 3. ĐO THẬT trên production (sau deploy)
+
+```
+$ php artisan studio:web-search-setup --provider=tavily --test="cách giặt vải linen"
+Đã TẠO nguồn "tavily-search" (kind=tavily) · URL: https://api.tavily.com/search
+  kết quả: 5 mục · đọc được 5 · bỏ vì cũ 0
+   · Hướng dẫn cách giặt đồ linen đơn giản và nhanh chóng tại nhà — heramo.com/blog/cach-giat-do-linen
+   · Cách giặt và bảo quản quần áo vải linen bền màu — nhavailinen.com/tin-nha-vai/…
+   · Cách giặt vải linen đúng cách, không mất form — cleanipedia.com/vn/giat-la/…
+  ĐẠT: web chung đã tra được thật (5 mục cho câu hỏi thử).
+
+$ php artisan studio:web-search-probe
+  cách giặt vải linen   CÓ KẾT QUẢ · 1 nguồn    (TRƯỚC: 0 KẾT QUẢ)
+  giá vải linen         CÓ KẾT QUẢ · 3 nguồn    (TRƯỚC: 0 KẾT QUẢ)
+  xu hướng áo dạ tweed 2026  0 KẾT QUẢ · đọc được 6 · bỏ vì cũ 6
+      ← ĐÃ có nguồn web chung; kết quả CŨ hơn 60 ngày nên bị luật độ mới loại (luật CỐ Ý, không phải lỗi)
+
+$ php artisan studio:chat-check --live --show --ask="Cách giặt vải linen cho khỏi nhão?"
+  công cụ: 2 lượt · 2 kết quả · 2 trích dẫn · 1.493 ký tự · chảy từng mảnh
+  Mở đầu: "Tra được 2 nguồn tiếng Anh; nguồn tiếng Việt cho từ khoá này CHƯA CÓ TIN NÀO MỚI trong 60 ngày
+  gần đây nên mình dùng nguồn nước ngoài (cũ hơn, không ghi ngày)." + dẫn link woolite.us
+```
+
+⇒ Ba tầng cùng đúng: **tìm thật** (5 nguồn web chung) · **dẫn nguồn bấm được** · **nói thật về độ mới** thay vì
+gọi tin cũ là xu hướng hiện tại.
+
+### 4. Nợ còn lại
+
+| # | Việc |
+|---|---|
+| 1 | **Keyless có giới hạn nhịp** — chưa đo trần thật; muốn chắc thì khai khoá (miễn phí 1.000 credit/tháng) bằng `--key=tvly-…`, **không phải sửa mã** |
+| 2 | Tin **"không ngày"** vẫn có: Tavily trả `published_date` khi dò được; trang hướng dẫn (heramo/cleanipedia) thường không ⇒ mục đó vào prompt không ngày, không đo được xu hướng |
+| 3 | Hai nguồn `kind=page` còn lại trên production (`vnexpress-thoi-trang` · `eva`) chưa đo lại sau khi chủ dự án đổi URL — nên chạy `studio:web-page-probe` cho từng cái |
+| 4 | Chưa bấm tay trong trình duyệt (FAB + modal + luồng chat) — xem đợt 42 |
+
+
+---
+
 ## Phiên 2026-09-23 (đợt 42) — NÚT NỔI TRỢ LÝ + VÁ MARKUP DEEPSEEK + GÁN deepseek-flash VÀO VAI TÌM KIẾM
 
 **Commit:** `b8d41c7` (FAB) · `4c0ced4` (vá markup). **Trạng thái: đã push + deploy + ĐO trên production.**
