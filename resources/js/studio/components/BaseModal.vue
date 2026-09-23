@@ -6,7 +6,10 @@ const props = defineProps({
   modelValue: { type: Boolean, default: false },
   title: { type: String, default: '' },
   wide: { type: Boolean, default: false },
-  full: { type: Boolean, default: false },  // workspace lớn (Agent Studio): gần toàn màn hình, nội dung tự chia cột
+  full: { type: Boolean, default: false },  // workspace lớn: gần toàn màn hình, nội dung tự chia cột
+  //  LUU Y: 'full' phai duoc ton trong o CA HAI mode. Truoc 2026-09-26 nhanh mode 2 (khong truyen
+  //  'height') bo qua 'full' va roi vao max-w-lg = 512px — do duoc: man "Chinh anh" o desktop chi
+  //  rong 470px, tru cot dieu khien 380px con 90px cho vung anh ⇒ anh hien 66x66px.
   height: { type: String, default: '' },  // chiều cao cố định (vd '80vh') -> header/tab cố định, body cuộn
 });
 const emit = defineEmits(['update:modelValue']);
@@ -56,7 +59,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey, true); trap
     <div
       v-else
       class="w-full overflow-y-auto overscroll-contain rounded-lg border border-brand-500/40 bg-ink-900 shadow-2xl"
-      :class="wide ? 'max-w-3xl' : 'max-w-lg'"
+      :class="full ? 'w-[min(1440px,calc(100vw-1rem))] max-w-none' : (wide ? 'max-w-3xl' : 'max-w-lg')"
       style="max-height: 85vh"
       @click.stop
     >

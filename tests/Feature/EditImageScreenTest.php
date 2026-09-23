@@ -111,4 +111,36 @@ class EditImageScreenTest extends TestCase
             'Nút «Sửa» phải đặt ảnh đang làm việc RỒI mới mở màn — nếu không, màn mở ra với ảnh cũ.');
         $this->assertStringContainsString('data-edit-open', $grid, 'Nút mở màn Chỉnh ảnh thiếu dấu hiệu nhận biết.');
     }
+
+    /**
+     * (g) MÀN NÀY PHẢI RỘNG THẬT TRÊN DESKTOP.
+     *
+     * Lỗi đo được 2026-09-26 (Chrome thật, 1280x800): BaseModal chỉ tôn trọng prop 'full' ở
+     * NHÁNH CÓ 'height'; màn này không truyền 'height' nên rơi vào nhánh còn lại và ăn 'max-w-lg'
+     * = 512px. Kết quả: hộp thoại rộng 470px, trừ cột điều khiển 380px còn 90px cho vùng ảnh
+     * ⇒ ảnh hiển thị 66x66px, canvas cọ 66x66px — không vẽ được gì.
+     *
+     * Đây là loại lỗi mà test đọc source KHÔNG bắt được (mọi class đều "đúng"), nên bất biến phải
+     * được ghi thẳng vào chỗ dễ sửa nhất: 'full' phải có tác dụng ở CẢ HAI nhánh.
+     */
+    public function test_modal_full_phai_co_tac_dung_o_ca_hai_nhanh(): void
+    {
+        $modal = (string) file_get_contents(resource_path('js/studio/components/BaseModal.vue'));
+
+        $fullBranch = "full ? 'w-[min(1440px,calc(100vw-1rem))] max-w-none' : ";
+        $this->assertSame(
+            2,
+            substr_count($modal, $fullBranch),
+            "BaseModal có 2 nhánh (có 'height' / không 'height'). Prop 'full' phải được tôn trọng ở CẢ HAI — "
+            .'bỏ sót một nhánh là màn rộng rơi về max-w-lg (512px) và vùng ảnh co còn vài chục px.'
+        );
+
+        $screen = $this->screen();
+        $this->assertStringContainsString('full', $screen, "Màn Chỉnh ảnh phải mở ở chế độ 'full'.");
+        $this->assertStringContainsString(
+            "lg:w-[380px]",
+            $screen,
+            'Cột điều khiển cố định 380px là LÝ DO phải mở rộng modal: nếu modal hẹp, cột này ăn hết chỗ của ảnh.'
+        );
+    }
 }

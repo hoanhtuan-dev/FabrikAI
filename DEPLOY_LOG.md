@@ -287,6 +287,96 @@ Câu hỏi *"tôi đang sửa ẢNH NÀO"* trước đây chỉ trả lời đư
 
 ---
 
+## Phiên 2026-09-26 (đợt 51) — KIỂM BẰNG CHROME THẬT (bước 5.5) + hai lỗi tìm ra và vá
+
+**Đã kiểm trên `google-chrome --headless=new` qua CDP, 5 khổ màn hình, đăng nhập thật, dữ liệu thật.**
+
+### Vì sao phải kiểm bằng trình duyệt thật
+
+Toàn bộ test PHP đều xanh, nhưng chúng **đọc source dạng chuỗi**. Kiểu test đó không bao giờ bắt được:
+một `max-width` thừa, một canvas 66px, một payload gửi kèm trường sai. Bước 5.5 tồn tại đúng vì lý do đó —
+và nó tìm ra **hai lỗi thật** ngay lần chạy đầu.
+
+Cách làm: `google-chrome --headless=new --remote-debugging-port`, lái bằng **CDP qua `WebSocket` có sẵn
+của Node 26** (không cần Puppeteer). Đăng nhập bằng form thật → dựng 6 generation thật (ảnh PNG sinh bằng GD)
+→ đo DOM.
+
+### LỖI 1 — Màn "Chỉnh ảnh" bị bóp còn 66px ở desktop
+
+| | Trước | Sau |
+|---|---|---|
+| Hộp thoại | 470px | **1248px** |
+| Vùng ảnh | 90px | **826px** |
+| Ảnh hiển thị | **66×66** | **640×640** |
+| Canvas cọ | **66×66** | **640×640** |
+
+**Nguyên nhân:** `BaseModal` chỉ tôn trọng prop `full` ở **nhánh có `height`**. Màn "Chỉnh ảnh" truyền
+`full` nhưng không truyền `height` ⇒ rơi vào nhánh còn lại ⇒ ăn `max-w-lg` = 512px. Trừ cột điều khiển
+`lg:w-[380px]` còn 90px, trừ tiếp padding còn 66px.
+
+> **Vì sao test không bắt được:** mọi class trong source đều *đúng*. Lỗi chỉ tồn tại khi hai prop gặp nhau ở
+> một nhánh `v-if` khác. Đã khoá bằng `EditImageScreenTest::test_modal_full_phai_co_tac_dung_o_ca_hai_nhanh`
+> — đếm **cả hai** nhánh phải có chuỗi xử lý `full`.
+> **Đã vá ĐÚNG MỘT NHÁNH** (mode 2), không đụng 20 modal khác: `full` chỉ có `EditImageModal` truyền.
+
+### LỖI 2 — Mask cọ sống nhờ may mắn, và một mìn im lặng
+
+Điều kiện dựng mask cũ:
+
+```php
+if ($maskMode !== '' && ! empty($data['region']) && $sourceUrl)   // ĐÒI 'region' cho CẢ HAI chế độ
+```
+
+Chế độ **Cọ** không hề dùng `region` (`buildMaskImage` rẽ nhánh theo `maskMode`), nhưng vẫn **bắt buộc**
+phải có. Nó chạy được chỉ vì `state.js` có khung mặc định cứng `{x:0.425, y:0.425, w:0.15, h:0.15}` — đo
+được trong payload thật: chế độ Cọ gửi kèm đúng khung 15% chưa ai đụng tới.
+
+> **Mìn:** bỏ khung mặc định đó đi (hoặc để nó thành `null`) là mask bị **nuốt âm thầm** — ảnh bị sửa TOÀN
+> BỘ, không lỗi, không cảnh báo, chỉ ra ảnh sai. Cùng loại với "gửi sai chiều mask", và cũng im lặng như nó.
+
+**Đã vá cả hai đầu:**
+- **Client** (`generation.js`): mỗi chế độ gửi **đúng một** dạng — Cọ → `mask_data`, Khoanh → `region`.
+- **Backend** (`StudioController`): điều kiện theo chế độ — `rect` cần `region`, `brush` cần `mask_data`.
+- **Thêm:** nét cọ hỏng/không giải mã được ⇒ trả `null` (KHÔNG mask), thay vì trả mask TRẮNG trơn — mask trắng
+  + câu lệnh "chỉ sửa vùng ĐEN" = "đừng sửa gì", mâu thuẫn thẳng với prompt người dùng.
+
+### KIỂM CHỨNG BẰNG REQUEST THẬT
+
+Bắt gói POST `/api/inpaint` ra khỏi trình duyệt rồi **giải mã PNG** trong chính trang:
+
+| Khổ | Chế độ | Trường gửi lên | PNG mask | Góc (giữ) | Giữa nét (sửa) |
+|---|---|---|---|---|---|
+| 375 | Cọ | `mask_mode` + `mask_data` — **KHÔNG `region`** | 554×554 | (255,255,255) | (0,0,0) |
+| 1280 | Cọ | `mask_mode` + `mask_data` — **KHÔNG `region`** | 1280×1280 | (255,255,255) | (0,0,0) |
+| 375 | Khoanh | `mask_mode` + `region` — **KHÔNG `mask_data`** | — | — | region {0.300, 0.300, 0.401, 0.401} = đúng khung đã kéo 0.3→0.7 |
+
+⇒ **Chiều mask đúng**: TRẮNG ở góc (giữ nguyên), ĐEN đúng chỗ vừa kéo (vùng sửa). Toạ độ chuẩn hoá 0..1 khớp
+với thao tác kéo thật (1px trên ảnh 277px = 0,0036).
+
+### BỐ CỤC ĐO ĐƯỢC — 5 KHỔ
+
+| | 320 | 375 | 414 | 768 | 1280 |
+|---|---|---|---|---|---|
+| Cột lưới | 2 | 2 | 2 | 3 | 4 |
+| Tràn ngang | không | không | không | không | không |
+| Thanh hành động | **6/6 hiện sẵn** | 6/6 | 6/6 | 6/6 | 6/6 |
+| Ảnh tải được | 6/6 | 6/6 | 6/6 | 6/6 | 6/6 |
+| Nút hành động | 40px | 40px | 40px | 40px | 28px |
+| Nút chế độ | 40px | 40px | 40px | 40px | 40px |
+| Canvas cọ | 224px | 277px | 316px | 635px | **640px** |
+| Mặc định | Tả | Tả | Tả | Tả | Tả |
+
+Ba chế độ đúng như thiết kế ở **mọi** khổ: **Tả** = 0 canvas + 0 khung (thật sự không mask); **Khoanh** = 1 khung
++ 0 canvas; **Cọ** = 1 canvas + 0 khung. Mặt lưới là mặc định, canvas `v-show=false` + `inert`.
+
+### BÀI TEST MỚI KHOÁ LẠI
+
+| Bài | Nội dung |
+|---|---|
+| `RemovedCanvasFeaturesTest` (6) | Crop (D1) + vẽ/xoá (D2) đã xoá **thật** — quét *mã sống*, tự bóc chú thích để không cấm chính tài liệu của mình; `brushes.js` phải không còn; endpoint `/api/reframe` + `/api/look` phải còn |
+| `MaskContractTest` (7) | Chiều mask bằng **pixel thật** (GD): góc TRẮNG, nét ĐEN; Cọ dựng được mask **không cần** `region`; nét cọ hỏng → `null`; Khoanh → chữ nhật ĐEN từ `region`; hai đầu payload khớp nhau |
+| `EditImageScreenTest` (+1) | `full` phải có tác dụng ở **cả hai** nhánh `BaseModal` |
+
 ### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
 
 - **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.

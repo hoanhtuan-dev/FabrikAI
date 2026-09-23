@@ -415,11 +415,15 @@ export const generationActions = {
         const selModel = this.inpaintModel ? this.inpaintModels.find(o => o.provider + ':' + o.model === this.inpaintModel) : null;
         if (selModel) { body.provider = selModel.provider; body.model = selModel.model; }
         // Gửi mask đã LƯU (bấm "Xong") — dù overlay công cụ đã tắt vẫn xử lý đúng vùng.
+        // Mỗi chế độ gửi ĐÚNG dữ liệu của nó — KHÔNG gửi kèm 'region' ở chế độ Cọ: box trong
+        // state chỉ là khung mặc định 15%, gửi kèm làm payload sai nghĩa (backend bỏ qua nên
+        // không lộ ra, nhưng đọc lại payload sẽ tưởng nhầm là "khoanh vùng").
         if (this.inpaintMaskDone && this._inpaintMaskKind) {
           body.mask_mode = this._inpaintMaskKind;
-          body.region = this.inpaintMaskBox;
-          if (this._inpaintMaskKind === 'brush' && this.inpaintBrushData) {
-            body.mask_data = this.inpaintBrushData;
+          if (this._inpaintMaskKind === 'brush') {
+            body.mask_data = this.inpaintBrushData || '';
+          } else {
+            body.region = this.inpaintMaskBox;
           }
         }
         // Endpoint source-agnostic: nhận ẢNH BẤT KỲ (không phụ thuộc generation cha của Outputs).

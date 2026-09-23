@@ -388,8 +388,14 @@ class StudioController extends Controller
         // Nếu có mask → tạo mask image và gửi kèm (dùng ĐÚNG ảnh đang hiển thị)
         $maskUrl = null;
         $maskMode = (string) ($data['mask_mode'] ?? '');
-        if ($maskMode !== '' && ! empty($data['region']) && $sourceUrl) {
-            $maskUrl = $this->buildMaskImage($sourceUrl, $data['region'], $maskMode, $data['mask_data'] ?? null, (int) ($data['feather'] ?? 0));
+        // Mỗi chế độ chỉ cần ĐÚNG dữ liệu của nó: 'rect' cần 'region', 'brush' cần 'mask_data'.
+        // Trước đây điều kiện bắt buộc phải có 'region' cho CẢ HAI chế độ, nên mask cọ chỉ sống
+        // được nhờ khung mặc định 15% trong state.js — bỏ khung đó đi thì mask bị NUỐT ÂM THẦM
+        // (ảnh bị sửa toàn bộ, không lỗi, không cảnh báo). Xem RemovedCanvasFeaturesTest.
+        $maskReady = ($maskMode === 'rect' && ! empty($data['region']))
+            || ($maskMode === 'brush' && ! empty($data['mask_data']));
+        if ($maskReady && $sourceUrl) {
+            $maskUrl = $this->buildMaskImage($sourceUrl, (array) ($data['region'] ?? []), $maskMode, $data['mask_data'] ?? null, (int) ($data['feather'] ?? 0));
         }
 
         $promptInstruction = 'Using the provided image as the exact base, edit it surgically. Change ONLY: '.$request->input('prompt')
@@ -446,6 +452,7 @@ class StudioController extends Controller
                 if ($comma !== false) $b64 = substr($b64, $comma + 1);
             }
             $brushRaw = base64_decode($b64, true);
+            $brushOk = false;
             if ($brushRaw !== false && $brushRaw !== '') {
                 $brushImg = studio_image_decode($brushRaw);
                 if ($brushImg) {
@@ -459,8 +466,16 @@ class StudioController extends Controller
                         }
                         imagecopy($mask, $brushImg, 0, 0, 0, 0, $w, $h);
                         imagedestroy($brushImg);
+                        $brushOk = true;
                     }
                 }
+            }
+            // Nét cọ hỏng / không giải mã được ⇒ trả null (KHÔNG mask) thay vì nền TRẮNG trắng trơn:
+            // mask trắng + câu lệnh "chỉ sửa vùng ĐEN" = "đừng sửa gì", mâu thuẫn với prompt người dùng.
+            if (! $brushOk) {
+                imagedestroy($mask);
+
+                return null;
             }
         } else {
             // Rect mode: vẽ hình chữ nhật ĐEN
