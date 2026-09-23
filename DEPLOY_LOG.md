@@ -5,6 +5,60 @@
 
 ---
 
+## Phiên 2026-09-23 (đợt 44) — TEST SẢN PHẨM · DỌN DỮ LIỆU MẪU · THANG ƯU TIÊN: TÌM KIẾM TRƯỚC, TRANG/RSS DỰ PHÒNG
+
+**Commit:** `865344d`. **Trạng thái: đã push + deploy + ĐO trên production.**
+
+### 1. TEST THỬ SẢN PHẨM (chạy thật trên production)
+
+| Phép đo | Kết quả |
+|---|---|
+| Radar thật (admin, AI bật) | `engine=ai-v1` · `source_mode=live` · **3 hướng có bằng chứng THẬT + 8 hướng của BỘ CÓ SẴN** · `tool_search: mode=tool · 8 lượt · 9 kết quả` (model TỰ TRA 8 lượt qua Tavily) |
+| Dữ liệu mẫu trong DB | `generations is_demo = 0` (KHÔNG có hàng demo) · 53 generations · 15 projects · 8 suggest_results ⇒ "dữ liệu mẫu" nằm ở DANH MỤC HƯỚNG trong mã, không phải trong DB |
+| Chat thật | 2 lượt công cụ · 2 kết quả · **2 trích dẫn** · nói thật về độ mới của nguồn (đợt 43) |
+
+### 2. DỌN DỮ LIỆU MẪU — ẩn khỏi sản phẩm, KHÔNG xoá
+
+Đo được: người dùng đọc **11 thẻ hướng** mà không có cách nào biết **8 thẻ là danh mục MẪU** của sản phẩm.
+
+| Việc | Chi tiết |
+|---|---|
+| Luật mới | CÓ hướng thật ⇒ **chỉ trả hướng thật**, đếm số đã ẩn vào `demo_hidden`; KHÔNG có hướng thật ⇒ giữ nguyên (màn hình không được rỗng) và `source_mode=demo` vẫn nói thật |
+| Không mất dữ liệu | Hướng mẫu **tách sang khoá `trends_demo`** (không xoá) — sau này có thể mở mục "bộ có sẵn", và test/đo lường vẫn đọc được |
+| Giao diện | Dòng *"Đã ẩn N hướng thuộc bộ có sẵn của FabrikAI — lượt này đã có hướng kèm dữ liệu thật…"* ở bước Tín hiệu; ghi vào `docs/DESIGN_SYSTEM.md` **§6.9b** kèm luật sinh ra nhãn |
+| Test phải sửa | 2 bài trong `ToolSearchTest` tra hướng mẫu ⇒ nay tra trong **cả hai khoá**, kèm ghi chú vì sao (dữ liệu không mất, chỉ tách) |
+
+### 3. THANG ƯU TIÊN: **WEB SEARCH trước → NGUỒN TRANG/RSS là DỰ PHÒNG**
+
+`mergeFindings()` nay xếp theo THANG TÌM KIẾM (không phải theo độ tươi hay độ tin):
+
+1. **kết quả AI TỰ TRA** (`found_by=ai_search`; trong đó nguồn người dùng **ĐÃ LƯU** lên đầu);
+2. **tin từ NGUỒN ĐÃ KHAI** (trang chuyên mục / RSS) — lưới an toàn khi không có kết quả tìm kiếm nào.
+
+Đây là lần thứ BA câu hỏi "cái gì đứng trước" được trả lời (bản 1: nguồn đã lưu trước; bản 2: tin vừa lấy trước; cả hai đúng một nửa). Lý do cuối cùng đã ghi ngay trong mã: thứ tự đúng là **thứ tự của thang tìm kiếm**.
+
+**ĐO LẠI trên production sau deploy:**
+
+    engine=ai-v1 · source_mode=live
+    HUONG THAT hien thi: 3 · HUONG MAU da an: 8 (con trong trends_demo: 8)   ← dọn dữ liệu mẫu
+    tool_search: mode=tool calls=8 results=9
+    DU LIEU: 14 muc · ket qua TIM KIEM dung dau:
+       1. [TIM KIEM] TOP #7 xu hướng quần jean nữ 2026 đẹp HOT TREND nhất …   ← tìm kiếm đứng đầu
+       2. [TIM KIEM] Mẫu Hot Trend 2026, Chất Jean Dày, Đẹp Chuẩn Dáng
+       3. [TIM KIEM] Trend+ Xu hướng
+
+### 4. Nợ còn lại
+
+| # | Việc |
+|---|---|
+| 1 | **Chưa bấm tay trong trình duyệt** (FAB · modal chat · dòng "đã ẩn N hướng mẫu") — mọi khẳng định về giao diện vẫn là số đo từ mã |
+| 2 | Hai nguồn `kind=page` trên production (`vnexpress-thoi-trang` · `eva`) **chưa đo lại** sau khi đổi URL — nên chạy `studio:web-page-probe` cho từng cái |
+| 3 | Trần nhịp của Tavily keyless chưa đo (muốn chắc thì khai khoá — một lệnh, không phải sửa mã) |
+| 4 | Danh mục hướng MẪU vẫn nằm trong mã (`trendCatalog`) — nay chỉ dùng khi KHÔNG có dữ liệu thật; muốn bỏ hẳn thì mỗi vùng phải có nguồn thật |
+
+
+---
+
 ## Phiên 2026-09-23 (đợt 43) — TAVILY: TÌM KIẾM WEB CHUNG CHẠY ĐƯỢC **KHÔNG CẦN KHOÁ**
 
 **Commit:** `6d16cf2` (+ commit sau cho kết luận của lệnh đo). **Trạng thái: đã push + deploy + ĐO trên production.**
