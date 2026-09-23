@@ -114,7 +114,11 @@ class ToolbarAreaTest extends TestCase
 
         // (3) MỌI gốc của template (mỗi biến thể là một gốc) đều phải theo khuôn chung.
         preg_match_all('/^  <(div|span)\b[^>]*>/m', $ctx, $roots);
-        $this->assertGreaterThanOrEqual(8, count($roots[0]),
+        // [2026-09-26 · D1+D2] Từ 10 xuống 7 gốc: đã XOÁ ba biến thể theo quyết định của chủ dự án —
+        // «Crop/Reframe» (D1 — không cần crop) và «Xoá vùng» + «Vẽ tự do» (D2 — bỏ hẳn paint/erase).
+        // Con số này là LƯỚI BẮT LỖI ĐỌC FILE: nếu tụt xuống nữa thì hoặc là xoá nhầm, hoặc là cách
+        // đọc file đã hỏng. Giữ đúng 7 để lần xoá sau phải CỐ Ý cập nhật con số.
+        $this->assertGreaterThanOrEqual(7, count($roots[0]),
             'Số gốc template ít hơn số biến thể đã biết — hãy kiểm tra lại cách đọc file.');
 
         foreach ($roots[0] as $tag) {

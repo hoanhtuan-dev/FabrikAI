@@ -14,7 +14,6 @@ import { projectsActions } from './store/actions/projects.js';
 import { agentStudioActions } from './store/actions/agentStudio.js';
 import { agentChatActions } from './store/actions/agentChat.js';
 import { layerCoreActions } from './store/actions/layerCore.js';
-import { brushesActions } from './store/actions/brushes.js';
 import { layerTransformActions } from './store/actions/layerTransform.js';
 import { sourcesActions } from './store/actions/sources.js';
 import { maskSelectActions } from './store/actions/maskSelect.js';
@@ -35,7 +34,6 @@ export const useStudioStore = defineStore('studio', {
     ...agentStudioActions,
     ...agentChatActions,
     ...layerCoreActions,
-    ...brushesActions,
     ...layerTransformActions,
     ...sourcesActions,
     ...maskSelectActions,

@@ -90,41 +90,10 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ Xóa vùng (erase) ══ -->
-  <div v-else-if="store.eraseMode" :class="[bar, ring]">
-    <div class="flex items-center justify-center gap-0.5 rounded-lg bg-ink-800/70 px-1.5 py-0.5"><StudioIcon name="brush" size="h-3 w-3" class="text-brand-300"/><input type="range" min="3" max="150" step="1" :value="store.eraseBrushSize" @input="store.eraseBrushSize = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-8 text-right text-tiny tabular-nums text-cream-100">{{ store.eraseBrushSize }}px</span></div>
-    <div class="flex items-center justify-center gap-0.5 rounded-lg bg-ink-800/70 px-1.5 py-0.5"><StudioIcon name="feather" size="h-3 w-3" class="text-brand-300"/><input type="range" min="0" max="60" step="1" :value="store.eraseFeather" @input="store.eraseFeather = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-6 text-right text-tiny tabular-nums text-cream-100">{{ store.eraseFeather }}</span></div>
-    <span :class="sep"></span>
-    <button @click="store.applyEraseNow()" :class="[lbl, btn]" title="Áp dụng nét đã xóa và vẽ tiếp"><StudioIcon name="trash" :size="I"/>Xóa</button>
-    <button @click="store.finishErase()" :class="[lbl, primary]"><StudioIcon name="check" :size="I"/>Xong</button>
-    <button @click="store.cancelErase()" :class="iconBtn" title="Hủy" aria-label="Hủy"><StudioIcon name="x" :size="I"/></button>
-  </div>
 
   <!-- ══ Vẽ tự do (paint brush) — tiến tới Krita/PS ══ -->
-  <div v-else-if="store.drawMode" :class="[bar, ring]">
-    <label class="flex items-center gap-1.5 rounded-lg bg-ink-800 px-1.5 py-1"><StudioIcon name="brush" size="h-3 w-3" class="shrink-0 text-brand-300"/><input type="range" min="3" max="150" step="1" :value="store.drawBrushSize" @input="store.drawBrushSize = Number($event.target.value)" class="h-1 w-14 cursor-pointer accent-cream-300"><span class="w-7 shrink-0 text-right text-micro tabular-nums text-cream-100">{{ store.drawBrushSize }}px</span></label>
-    <label class="flex items-center gap-1.5 rounded-lg bg-ink-800 px-1.5 py-1"><StudioIcon name="droplet" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-tiny text-cream-400">Đậm</span><input type="range" min="0.05" max="1" step="0.05" :value="store.drawOpacity" @input="store.drawOpacity = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-7 shrink-0 text-right text-micro tabular-nums text-cream-100">{{ Math.round(store.drawOpacity * 100) }}%</span></label>
-    <label class="flex items-center gap-1.5 rounded-lg bg-ink-800 px-1.5 py-1"><StudioIcon name="feather" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-tiny text-cream-400">Mềm</span><input type="range" min="0" max="60" step="1" :value="store.drawSoftness" @input="store.drawSoftness = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-5 shrink-0 text-right text-micro tabular-nums text-cream-100">{{ store.drawSoftness }}</span></label>
-    <label class="flex items-center gap-1.5 rounded-lg bg-ink-800 px-1.5 py-1"><StudioIcon name="hardness" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-tiny text-cream-400">Cứng</span><input type="range" min="0" max="100" step="1" :value="store.drawHardness" @input="store.drawHardness = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-7 shrink-0 text-right text-micro tabular-nums text-cream-100">{{ store.drawHardness }}%</span></label>
-    <label class="flex items-center gap-1.5 rounded-lg bg-ink-800 px-1.5 py-1"><StudioIcon name="droplet" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-tiny text-cream-400">Mực</span><input type="range" min="0.05" max="1" step="0.05" :value="store.drawFlow" @input="store.drawFlow = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-7 shrink-0 text-right text-micro tabular-nums text-cream-100">{{ Math.round(store.drawFlow * 100) }}%</span></label>
-    <label class="flex items-center gap-1.5 rounded-lg bg-ink-800 px-1.5 py-1"><StudioIcon name="betweenDots" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-tiny text-cream-400">Khoảng</span><input type="range" min="0.05" max="1" step="0.05" :value="store.drawSpacing" @input="store.drawSpacing = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-7 shrink-0 text-right text-micro tabular-nums text-cream-100">{{ Math.round(store.drawSpacing * 100) }}%</span></label>
-    <label class="flex items-center gap-1.5 rounded-lg bg-ink-800 px-1.5 py-1"><StudioIcon name="waves" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-tiny text-cream-400">Mượt</span><input type="range" min="0" max="100" step="1" :value="store.drawSmoothing" @input="store.drawSmoothing = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-5 shrink-0 text-right text-micro tabular-nums text-cream-100">{{ store.drawSmoothing }}</span></label>
-    <label class="flex items-center gap-1.5 rounded-lg bg-ink-800 px-1.5 py-1"><StudioIcon name="blend" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-tiny text-cream-400">Chế độ</span><select :value="store.drawBlend" @change="store.drawBlend = $event.target.value" class="h-7 rounded-lg border border-ink-700 bg-ink-800 px-1 text-label text-cream-100 focus:outline-none"><option value="normal">Thường</option><option value="multiply">Nhân</option><option value="screen">Màn hình</option><option value="overlay">Phủ</option><option value="darken">Tối</option><option value="lighten">Sáng</option></select></label>
-    <label class="relative inline-flex h-7 w-7 shrink-0 cursor-pointer overflow-hidden rounded-full ring-1 ring-ink-600" title="Chọn màu vẽ"><span class="absolute inset-0" :style="{ background: store.inpaintFillColor }"></span><input type="color" :value="store.inpaintFillColor" @input="store.inpaintFillColor = $event.target.value" class="absolute inset-0 cursor-pointer opacity-0"></label>
-    <button @click="store.applyDrawNow()" :class="[lbl, btn]" title="Áp dụng nét vẽ và vẽ tiếp"><StudioIcon name="brush" :size="I"/>Vẽ</button>
-    <button @click="store.finishDraw()" :class="[lbl, primary]"><StudioIcon name="check" :size="I"/>Xong</button>
-    <button @click="store.cancelDraw()" :class="iconBtn" title="Hủy" aria-label="Hủy"><StudioIcon name="x" :size="I"/></button>
-  </div>
 
   <!-- ══ Crop ══ -->
-  <div v-else-if="store.reframeOpen || store.cropMode" :class="[bar, ring]">
-    <span class="flex items-center gap-1 text-cream-200"><StudioIcon name="crop" :size="I"/>Crop</span>
-    <button v-for="r in reframeRatios" :key="r" type="button" @click="store.reframeRatio = r" class="rounded-full border px-2 py-0.5 text-body font-medium transition-colors" :class="store.reframeRatio === r ? chipOn : chipOff">{{ r }}</button>
-    <span class="h-4 w-px bg-ink-600"></span>
-    <button @click="store.reframeCenter()" :disabled="store.reframing || !store.upscaleSrc" :class="[lbl, btn]" class="disabled:opacity-40">{{ store.reframing ? 'Đang cắt…' : 'Cắt giữa' }}</button>
-    <button @click="store.toggleCrop()" :disabled="store.reframing || !store.upscaleSrc" :class="[lbl, store.cropMode ? on : btn]" class="disabled:opacity-40"><StudioIcon name="boxSelect" :size="I"/>{{ store.cropMode ? 'Hủy chọn vùng' : 'Chọn vùng' }}</button>
-    <button v-if="store.cropMode" @click="store.confirmCrop()" :disabled="store.reframing || !store.upscaleSrc" :class="[lbl, primary]" class="disabled:opacity-40"><StudioIcon name="check" :size="I"/>Áp dụng</button>
-    <button @click="store.reframeOpen = false; if (store.cropMode) store.toggleCrop()" :class="iconBtnDanger" title="Đóng" aria-label="Đóng"><StudioIcon name="x" :size="I"/></button>
-  </div>
 
   <!-- ══ Film Look ══ -->
   <div v-else-if="store.filmOpen || store.looking" :class="[bar, ring]">

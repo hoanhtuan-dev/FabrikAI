@@ -469,8 +469,10 @@ class CanvasControlsTest extends TestCase
         // Chế độ "chỉnh 1 layer" (công cụ vẽ/xóa/vùng chọn) không được làm mất tay cầm.
         $this->assertStringNotContainsString('isolateActive.value) return null', $app,
             'Tay cầm KHÔNG được ẩn chỉ vì đang ở chế độ chỉnh 1 layer.');
-        $this->assertMatchesRegularExpression('/store\.cropMode \|\| store\.reframeOpen\) return \[\]/', $app,
-            'Chỉ ẩn tay cầm khi đang Crop/Reframe (khung crop có tay cầm riêng).');
+        // [2026-09-26 · D1] Crop/Reframe đã bị xoá, nên tay cầm KHÔNG còn lý do nào để ẩn theo công cụ.
+        // Bất biến mới mạnh hơn bất biến cũ: tay cầm chỉ được ẩn khi không có phần tử để bám vào.
+        $this->assertStringContainsString('if (!el) return [];', $app,
+            'Tay cầm chỉ được ẩn khi không có phần tử — không công cụ nào được phép ẩn tay cầm.');
 
         // Khung xem 1 layer GIỮ nguyên nguồn ảnh cũ (không đổi luồng crop/inpaint) nhưng phải TÔN TRỌNG
         // ẩn/hiện — trước đây layer bị ẩn vẫn hiện ảnh dự phòng nên bấm con mắt không thấy gì đổi.
@@ -480,8 +482,13 @@ class CanvasControlsTest extends TestCase
         $this->assertStringContainsString('đang bị <b>ẨN</b>', $app, 'Layer bị ẩn thì phải nói rõ, không im lặng hiện ảnh khác.');
 
         // Thông tin chế độ nằm ở THANH TRẠNG THÁI (không dán nhãn lên canvas cho đỡ rối không gian làm việc).
-        $this->assertStringContainsString('Đang VẼ TỰ DO', $bar, 'Thanh trạng thái phải nói rõ đang ở chế độ vẽ 1 layer.');
-        $this->assertStringContainsString('Đang XÓA VÙNG', $bar, 'Thanh trạng thái phải nói rõ đang ở chế độ xóa vùng.');
+        // [2026-09-26 · D2] Hai dòng «Đang VẼ TỰ DO» / «Đang XÓA VÙNG» đã bị gỡ cùng lúc với chính hai
+        // công cụ đó. Bất biến giữ lại là phần CÒN ĐÚNG: mặt nạ (vùng sửa) vẫn phải được thanh trạng
+        // thái nói rõ — đó là công cụ một-layer duy nhất còn lại.
+        $this->assertStringContainsString('inpaintMaskMode', $bar,
+            'Thanh trạng thái phải còn nói rõ chế độ vùng chọn/mặt nạ — công cụ một-layer còn lại.');
+        $this->assertStringNotContainsString('Đang VẼ TỰ DO', $bar, 'Công cụ vẽ đã bị xoá — không được còn lời nhắc.');
+        $this->assertStringNotContainsString('Đang XÓA VÙNG', $bar, 'Công cụ xoá đã bị xoá — không được còn lời nhắc.');
         $this->assertStringNotContainsString('Đang chỉnh 1 layer', $app,
             'Không dán nhãn chế độ lên canvas nữa — thông tin này ở thanh trạng thái.');
     }

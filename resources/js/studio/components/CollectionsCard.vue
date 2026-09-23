@@ -295,8 +295,10 @@ function toolBusy() {
   // liên kết nguồn) sẽ kích hoạt phím tắt duyệt mẫu Ở PHÍA SAU lớp phủ — đúng lớp lỗi mà danh sách này
   // sinh ra để chặn (promptOpen đã nằm trong danh sách vì cùng lý do).
   return !!(store.viewer || store.promptOpen || store.chatOpen || store.planOpen || store.sourcePickerOpen
-    || store.confirmDeleteOpen || store.confirmClearCanvasOpen || store.reframeOpen || store.filmOpen
-    || store.cropMode || store.inpaintMaskMode !== 'none' || store.drawMode || store.eraseMode
+    // [2026-09-26 · D1+D2] Đã bỏ reframeOpen · cropMode · drawMode · eraseMode: bốn công cụ đó
+    // không còn tồn tại nên không còn lớp phủ nào để chặn phím tắt vì chúng.
+    || store.confirmDeleteOpen || store.confirmClearCanvasOpen || store.filmOpen
+    || store.inpaintMaskMode !== 'none'
     || store.selectTool || store.panMode);
 }
 function onReviewKey(e) {

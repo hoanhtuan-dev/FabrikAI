@@ -3,6 +3,23 @@
 import { markRaw } from 'vue';
 import { apiError, CSRF } from '../helpers.js';
 export const canvasViewActions = {
+    /**
+     * "THOÁT CÔNG CỤ" THÔNG MINH — gọi khi chuyển sang tác vụ khác (đổi bước · mở trình xem ảnh ·
+     * mở popup Prompt · mở popup nguồn ảnh · bỏ chọn layer).
+     *
+     * [2026-09-26 · bước 5.4] CHUYỂN TỪ brushes.js SANG ĐÂY vì brushes.js (vẽ tự do + xoá pixel) đã
+     * bị xoá theo quyết định D2. Hàm này KHÔNG thuộc về cọ vẽ — nó là hàm dọn trạng thái dùng chung
+     * của cả khung làm việc, nên ở lại canvasView cùng zoom/pan/mask là đúng chỗ.
+     *
+     * Đã bỏ khỏi đây: drawMode · eraseMode (D2 — bỏ vẽ/xoá pixel) và cropMode · reframeOpen (D1 —
+     * bỏ crop). Giữ nguyên mask + film + chọn + pan vì bốn thứ đó vẫn đang được dùng thật.
+     */
+    exitCanvasTools() {
+      if (this.inpaintMaskMode !== 'none') this.clearInpaintMask();
+      this.filmOpen = false;
+      this.selectTool = false;
+      this.panMode = false;
+    },
     // Zoom theo điểm chuột (cx, cy = px so với TÂM khung) — điểm ảnh dưới con trỏ
     // không trôi khi phóng/thu (pan' = c*(1-k) + pan*k).
     zoomAt(cx, cy, factor) {
@@ -48,7 +65,6 @@ export const canvasViewActions = {
     setBrushCanvas(el) { this.brushOverlay = el ? markRaw(el) : null; },
     // ── Reframe / Crop ──
     _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); },
-    ratioAspect() { const p = (this.reframeRatio || '3:4').split(':').map(Number); return p[1] ? p[0] / p[1] : 0.75; },
     // CSS transform dùng chung cho layer (stack + isolate + overlay neo khung) — 1 công thức duy
     // nhất để overlay/preview bám CHÍNH XÁC theo <img> (kể cả xoay/lật/scale của layer).
     layerTransformStyle(l) {
@@ -99,147 +115,16 @@ export const canvasViewActions = {
         ia: (iw > 1 && ih > 1) ? iw / ih : fl.w / fl.h, iw, ih,
       };
     },
-    cropStyle() {
-      const m = this.canvasMetrics(); if (!m) return { display: 'none' };
-      const b = this.cropBox || { x: 0.15, y: 0.15, w: 0.7, h: 0.7 };
-      return { left: ((m.vx + b.x * m.vw) / m.crW * 100) + '%', top: ((m.vy + b.y * m.vh) / m.crH * 100) + '%', width: (b.w * m.vw / m.crW * 100) + '%', height: (b.h * m.vh / m.crH * 100) + '%' };
-    },
-    cropSizeLabel() {
-      const img = this.cvImg, b = this.cropBox;
-      if (!img || !b) return this.reframeRatio;
-      const w = Math.max(1, Math.round(b.w * (img.naturalWidth || 1)));
-      const h = Math.max(1, Math.round(b.h * (img.naturalHeight || 1)));
-      return this.reframeRatio + ' · ' + w + '×' + h;
-    },
-    // (Re)create the crop box: 70% tall, keeping the current ratio, centered on the image.
-    initCropBox() {
-      const m = this.canvasMetrics();
-      const ia = m ? m.ia : (this.cropBox && this.cropBox.h ? this.cropBox.w / this.cropBox.h : 0.75);
-      const r = this.ratioAspect();
-      const ratioFrac = r / ia;
-      let h = 0.7; if (h * ratioFrac > 1) h = 1 / ratioFrac;
-      let w = h * ratioFrac;
-      if (w > 1) { w = 1; h = w / ratioFrac; }
-      this.cropBox = { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
-    },
-    // Re-fit an existing crop box to a new ratio, keeping its center and height where possible.
-    refitCropBox() {
-      const m = this.canvasMetrics(); if (!m) return;
-      const old = this.cropBox || { x: 0.15, y: 0.15, w: 0.7, h: 0.7 };
-      const cx = old.x + old.w / 2, cy = old.y + old.h / 2;
-      const ratioFrac = this.ratioAspect() / m.ia;
-      let h = Math.max(0.2, Math.min(0.9, old.h));
-      let w = h * ratioFrac;
-      if (w > 1) { w = 1; h = w / ratioFrac; }
-      if (h > 1) { h = 1; w = h * ratioFrac; }
-      this.cropBox = { x: this._clamp(cx - w / 2, 0, 1 - w), y: this._clamp(cy - h / 2, 0, 1 - h), w, h };
-    },
-    toggleCrop() {
-      this.cropMode = !this.cropMode;
-      if (this.cropMode) {
-        // Nếu mask đang active → lấy luôn vùng mask làm crop box
-        if (this.inpaintMaskMode !== 'none' && (this.inpaintMaskBox.w || 0) >= 0.02) {
-          this.cropBox = { ...this.inpaintMaskBox };
-        } else {
-          this.initCropBox();
-        }
-      } else {
-        this._cropStop(null);
-      }
-    },
-    onCanvasImgLoad() {
-      this.imgTick++; // overlay đang bật cần đo lại sau khi ảnh decode xong (kích thước thật)
-      if (this.cropMode) this.initCropBox();
-      // Ảnh load xong có thể làm overlay erase/draw được gắn LÚC ẢNH CHƯA DECODE bị sai kích thước
-      // (gắn với ratio mặc định vuông). Re-attach để khớp tỉ lệ thật của ảnh; nét vẽ trước đó sẽ
-      // bị xoá nhưng trước khi ảnh hiển thị thì chưa thể vẽ gì có ý nghĩa — nên an toàn.
-      if (this.eraseMode && this._eraseCanvas) this.attachEraseCanvas(this._eraseCanvas);
-      if (this.drawMode && this._drawCanvas) this.attachDrawCanvas(this._drawCanvas);
-    },
-    cropStart(e, key) {
-      if (!this.cropMode) return;
-      // NOTE: no preventDefault() here — canceling pointerdown would also suppress the
-      // compatibility dblclick used for "double-click to cancel". touch-action:none (CSS)
-      // already blocks scroll/zoom and select-none blocks text selection.
-      e.stopPropagation();
-      // A previous drag may still be armed (e.g. a fast second press before the first release) — close it first so its window listeners are removed.
-      if (this._cropDrag) this._cropStop(this._cropDrag.handlers);
-      const handlers = { move: (ev) => this._cropQueue(ev), up: () => this._cropStop(handlers) };
-      this._cropDrag = { key, sx: e.clientX, sy: e.clientY, box: { ...(this.cropBox || { x: 0.15, y: 0.15, w: 0.7, h: 0.7 }) }, handlers };
-      window.addEventListener('pointermove', handlers.move);
-      window.addEventListener('pointerup', handlers.up);
-      window.addEventListener('pointercancel', handlers.up);
-    },
-    // Batch pointermoves through rAF so dragging never triggers a layout read per event.
-    _cropQueue(e) {
-      if (!this._cropDrag) return;
-      this._cropPending = e;
-      if (this._cropRaf) return;
-      const flush = () => { this._cropRaf = null; const ev = this._cropPending; this._cropPending = null; if (ev && this._cropDrag) this.cropMove(ev); };
-      if (typeof requestAnimationFrame === 'function') this._cropRaf = requestAnimationFrame(flush);
-      else flush();
-    },
-    _cropStop(handlers) {
-      this._cropDrag = null;
-      this._cropPending = null;
-      if (this._cropRaf != null) { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this._cropRaf); this._cropRaf = null; }
-      if (handlers) {
-        window.removeEventListener('pointermove', handlers.move);
-        window.removeEventListener('pointerup', handlers.up);
-        window.removeEventListener('pointercancel', handlers.up);
-      }
-    },
-    cropMove(e) {
-      const d = this._cropDrag; if (!d || !this.cropMode) return;
-      const m = this.canvasMetrics(); if (!m) return;
-      const bx = (e.clientX - d.sx) / m.vw, by = (e.clientY - d.sy) / m.vh;
-      const b = { ...d.box };
-      const MIN = 0.05;
-      if (d.key === 'move') {
-        b.x = this._clamp(b.x + bx, 0, 1 - b.w);
-        b.y = this._clamp(b.y + by, 0, 1 - b.h);
-      } else {
-        // Corner resize, ratio-locked, opposite corner anchored.
-        const ratioFrac = this.ratioAspect() / m.ia;
-        const maxRight = 1 - b.x, maxBottom = 1 - b.y;
-        const right = b.x + b.w, bottom = b.y + b.h;
-        let nw = b.w, nh = b.h, x = b.x, y = b.y;
-        if (d.key === 'se' || d.key === 'resize') { nh = this._clamp(b.h + Math.max(bx, by), MIN, Math.max(MIN, Math.min(maxBottom, maxRight / ratioFrac))); nw = nh * ratioFrac; }
-        else if (d.key === 'sw') { nh = this._clamp(b.h + Math.max(-bx, by), MIN, Math.max(MIN, Math.min(maxBottom, right / ratioFrac))); nw = nh * ratioFrac; x = right - nw; }
-        else if (d.key === 'ne') { nw = this._clamp(b.w + Math.max(bx, -by), MIN, Math.max(MIN, Math.min(maxRight, bottom * ratioFrac))); nh = nw / ratioFrac; y = bottom - nh; }
-        else if (d.key === 'nw') { nw = this._clamp(b.w + Math.max(-bx, -by), MIN, Math.max(MIN, Math.min(right, bottom * ratioFrac))); nh = nw / ratioFrac; x = right - nw; y = bottom - nh; }
-        b.w = this._clamp(nw, MIN, 1); b.h = this._clamp(nh, MIN, 1); b.x = x; b.y = y;
-      }
-      this.cropBox = b;
-    },
-    async confirmCrop() {
-      if (!this.cropMode || this.reframing) return;
-      const img = this.cvImg;
-      if (!img) { this.toast('Chưa có ảnh trên canvas.', 'error'); return; }
-      const iw = img.naturalWidth, ih = img.naturalHeight;
-      if (!iw || !ih) { this.toast('Ảnh chưa tải xong.', 'error'); return; }
-      const b = this.cropBox || { x: 0.15, y: 0.15, w: 0.7, h: 0.7 };
-      const x = Math.max(0, Math.round(b.x * iw)), y = Math.max(0, Math.round(b.y * ih));
-      const w = Math.max(1, Math.min(iw - x, Math.round(b.w * iw))), h = Math.max(1, Math.min(ih - y, Math.round(b.h * ih)));
-      this.reframing = true;
-      try {
-        const d = await this.api('/api/reframe', { image: this.upscaleSrc, ratio: this.reframeRatio, x, y, w, h, ...this.projectField() });
-        this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'reframe', provider: 'reframe', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa cắt' });
-        this.cropMode = false; this._cropStop(null);
-        this.toast('Đã cắt vùng đã chọn.');
-      } catch (err) { this.toast(err.message || 'Lỗi cắt.', 'error'); }
-      finally { this.reframing = false; }
-    },
-    async reframeCenter() {
-      if (!this.upscaleSrc || this.reframing) return;
-      this.reframing = true;
-      try {
-        const d = await this.api('/api/reframe', { image: this.upscaleSrc, ratio: this.reframeRatio, ...this.projectField() });
-        this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'reframe', provider: 'reframe', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa cắt' });
-        this.toast('Đã cắt giữa ' + this.reframeRatio + '.');
-      } catch (e) { this.failToast(e, 'Lỗi cắt.'); }
-      finally { this.reframing = false; }
-    },
+    // ==============================================================================
+    // [2026-09-26 - D1 - BO CROP] DA XOA KHOI CROP/REFRAME (141 dong, truoc o day):
+    //   cropStyle - initCropBox - _cropSyncBox - toggleCrop - cropStart - _cropQueue - _cropStop
+    //   - cropMove - confirmCrop - reframeCenter   (cung ratioAspect() o tren).
+    //
+    // Quyet dinh cua chu du an: khong can du crop.
+    //
+    // GIU NGUYEN: endpoint /api/reframe KHONG bi xoa - chi het call-site tu giao dien.
+    // Xoa API la viec khac va chua duoc yeu cau; giu lai thi re hon xoa roi phai dung lai.
+    // ==============================================================================
     async applyFilmLook() {
       if (!this.upscaleSrc || this.looking) return;
       this.looking = true;
@@ -323,7 +208,7 @@ export const canvasViewActions = {
     beginPinch(t1, t2) { this._pinch = { dist: Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY) || 1, zoom: this.zoom }; this._drag = null; },
     pinchMove(t1, t2) { if (!this._pinch) return; const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY) || 1; this.zoom = Math.max(0.1, Math.min(8, this._pinch.zoom * (dist / this._pinch.dist))); },
     endPinch() { this._pinch = null; },
-    panStart(e) { if (this._cropDrag) return; this._drag = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y }; },
+    panStart(e) { this._drag = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y }; },
     panMove(e) {
       if (!this._drag) return;
       // Pan TỰ DO, không giới hạn, không đọc layout mỗi event → kéo mượt không khựng.

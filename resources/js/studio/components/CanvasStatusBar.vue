@@ -19,9 +19,8 @@ function toggleTheme() { setTheme(themeResolved.value === 'light' ? 'dark' : 'li
 const toolHint = computed(() => {
   // Chế độ "chỉnh 1 layer" (bật bởi công cụ vẽ/xóa/vùng chọn) — nói ở ĐÂY thay vì dán nhãn lên canvas:
   // người dùng vẫn hiểu vì sao chỉ thấy một layer, mà không gian làm việc không bị thêm chữ.
-  if (store.drawMode) return 'Đang VẼ TỰ DO trên layer đang chọn — canvas chỉ hiện layer đó · thoát công cụ (Esc) để thấy toàn bộ';
-  if (store.eraseMode) return 'Đang XÓA VÙNG trên layer đang chọn — canvas chỉ hiện layer đó · thoát công cụ (Esc) để thấy toàn bộ';
-  if (store.cropMode) return 'Đang CẮT KHUNG — canvas chỉ hiện layer đang chọn';
+  // [2026-09-26 · D1+D2] Đã bỏ gợi ý cho VẼ TỰ DO · XOÁ VÙNG · CẮT KHUNG: ba công cụ đó đã bị xoá
+  // theo quyết định của chủ dự án (không cần crop · bỏ hẳn paint/erase).
   // Không có layer nào đang chọn (bấm ra vùng trống là bỏ chọn): nói rõ cách lấy lại tay cầm chỉnh kích cỡ.
   if (!store.activeLayer && store.visibleLayers.length) return 'Chưa chọn layer — bấm vào một layer để chỉnh kích cỡ · xoay';
   const m = store.inpaintMaskMode;

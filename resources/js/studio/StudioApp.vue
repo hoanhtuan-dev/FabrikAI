@@ -332,7 +332,7 @@ function openApplyPopover() {
 // tay cầm còn ở "left: 734px" trong khi vùng canvas chỉ rộng 364px ⇒ nằm NGOÀI màn hình, không bấm được
 // — đúng hiện tượng "không có tay cầm chỉnh kích cỡ" khi dùng màn hình nhỏ.
 const viewportTick = ref(0);
-function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++; viewportTick.value++; }); }
+function onCanvasResize() { nextTick(() => { viewportTick.value++; }); }
 
 
 /**
@@ -343,7 +343,8 @@ function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++
  * đúng kiểu "nút bấm được nhưng không làm gì". Tự chuyển mặt là cách giữ luồng cũ chạy nguyên vẹn
  * trong khi lưới đã thành mặt chính.
  */
-const CANVAS_ONLY_TOOLS = ['inpaintMaskMode', 'cropMode', 'eraseMode', 'drawMode', 'selectTool', 'panMode', 'reframeOpen', 'filmOpen'];
+  // [D1+D2] Đã bỏ cropMode · eraseMode · drawMode · reframeOpen — bốn công cụ đó không còn tồn tại.
+const CANVAS_ONLY_TOOLS = ['inpaintMaskMode', 'selectTool', 'panMode', 'filmOpen'];
 watch(() => CANVAS_ONLY_TOOLS.map((k) => store[k]), (vals) => {
   const active = vals.some((v) => (typeof v === 'string' ? v !== 'none' && v !== '' : !!v));
   if (active && store.mainView !== 'canvas') store.setMainView('canvas');
@@ -456,39 +457,26 @@ onMounted(() => {
   if (canvasZoom.value) canvasRo.observe(canvasZoom.value);
 });
 onBeforeUnmount(() => { if (canvasRo) { canvasRo.disconnect(); canvasRo = null; } });
-const eraseOverlay = ref(null);
-const drawOverlay = ref(null);
+// [2026-09-26 · D1+D2] Đã xoá: drawOverlay/eraseOverlay refs + watch gắn canvas cọ vẽ/cọ xoá, và
+// watch crop (reframeRatio → refitCropBox; upscaleSrc → initCropBox). Ba công cụ đó không còn.
 watch([cvImg, canvasZoom], ([img, zoom]) => { store.setCanvasRefs(img, zoom); });
-watch(eraseOverlay, (el) => store.attachEraseCanvas(el));
-watch(drawOverlay, (el) => store.attachDrawCanvas(el));
-// While crop mode is on: re-fit the box when the ratio changes, re-init when the image changes.
-watch(() => store.reframeRatio, () => { if (store.cropMode) store.refitCropBox(); });
-// Khi đổi layer, KHÔNG reset zoom/pan — giữ nguyên khung nhìn của người dùng.
-watch(() => store.upscaleSrc, () => {
-  if (store.cropMode) store.initCropBox();
-});
 function onCanvasKey(e) {
-  const editing = store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode || store.selectTool || store.panMode;
+  // [D1+D2] Ưu tiên thoát chỉ còn: vùng chọn/mask → selectTool → panMode.
+  const editing = store.inpaintMaskMode !== 'none' || store.selectTool || store.panMode;
   if (!editing) return;
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
   if (e.key === 'Escape') {
-    // Thoát an toàn theo ưu tiên: vùng chọn/mask → vẽ → xóa → crop → selectTool → panMode.
+    // Thoát an toàn theo ưu tiên: vùng chọn/mask → selectTool → panMode.
     if (store.inpaintMaskMode !== 'none') store.clearInpaintMask();
-    else if (store.drawMode) store.cancelDraw();
-    else if (store.eraseMode) store.cancelErase();
-    else if (store.cropMode) store.toggleCrop();
     else if (store.selectTool) store.selectTool = false;
     else if (store.panMode) store.panMode = false;
   } else if (e.key === 'Enter' && !(t && t.tagName === 'BUTTON')) {
     // Hoàn tất công cụ đang dùng (Enter = "Xong").
-    if (store.cropMode) store.confirmCrop();
-    else if (store.inpaintMaskMode !== 'none') store.confirmInpaintMask();
-    else if (store.eraseMode) store.finishErase();
-    else if (store.drawMode) store.finishDraw();
+    if (store.inpaintMaskMode !== 'none') store.confirmInpaintMask();
   } else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
-    // Ctrl+A: chọn tất cả layer (chỉ khi selectTool đang bật hoặc không có tool nào khác)
-    if (!store.cropMode && store.inpaintMaskMode === 'none' && !store.drawMode && !store.eraseMode) {
+    // Ctrl+A: chọn tất cả layer (chỉ khi không có công cụ nào khác đang bật)
+    if (store.inpaintMaskMode === 'none') {
       e.preventDefault();
       store.selectAll();
     }
@@ -504,7 +492,7 @@ function onCanvasKey(e) {
 }
 // Phím tắt cho layer (chế độ stack): mũi tên di chuyển, Ctrl/Cmd+D nhân đôi.
 function onLayerKeys(e) {
-  if (store.cropMode || store.inpaintMaskMode !== 'none') return;
+  if (store.inpaintMaskMode !== 'none') return;
   if (store.viewer || store.confirmDeleteOpen) return; // đang có modal → không xử lý phím layer
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
@@ -594,7 +582,7 @@ const layerHandles = computed(() => {
   void viewportTick.value;                            // đổi kích thước vùng canvas ⇒ tính lại vị trí tay cầm
   const el = store.canvasZoom;
   // Chỉ ẩn khi đang Crop/Reframe (khung crop có tay cầm riêng của nó).
-  if (!el || store.cropMode || store.reframeOpen) return [];
+  if (!el) return [];
   const r = el.getBoundingClientRect();
   if (!r.width || !r.height) return [];
 
@@ -653,9 +641,9 @@ const layerHandles = computed(() => {
 // bar tự vẽ màu riêng nên lệch với màu thật. Một nguồn ⇒ không thể lệch nữa.
 // Tên công cụ đang khiến canvas ở chế độ "chỉnh 1 layer" — hiện trong nhãn chế độ (xem template).
 const isolateToolLabel = computed(() => {
-  if (store.cropMode || store.reframeOpen) return 'Crop/Reframe';
-  if (store.drawMode) return 'Vẽ tự do';
-  if (store.eraseMode) return 'Xóa vùng';
+
+
+
   const m = store.inpaintMaskMode;
   if (m === 'rect') return 'vùng chữ nhật';
   if (m === 'freehand') return 'lasso';
@@ -814,10 +802,10 @@ function onGlobalKey(e) {
   if (mod && !e.shiftKey && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); paletteOpen.value = !paletteOpen.value; paletteQuery.value = ''; return; }
 }
 // ContextToolbar chỉ hiện (floating) trên mobile khi có công cụ đang hoạt động — tối giản mobile.
-const toolActive = computed(() => store.inpaintMaskMode !== 'none' || store.inpaintMaskDone || store.eraseMode || store.drawMode || store.reframeOpen || store.cropMode || store.filmOpen || store.looking || store.selectTool || store.panMode || !!store.activeLayer);
+const toolActive = computed(() => store.inpaintMaskMode !== 'none' || store.inpaintMaskDone || store.filmOpen || store.looking || store.selectTool || store.panMode || !!store.activeLayer);
 
 // ── Layer editor (composite + transform) ──
-const isolateActive = computed(() => (store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode) && !store.panMode);
+const isolateActive = computed(() => (store.inpaintMaskMode !== 'none') && !store.panMode);
 function layerStyle(l, i) {
   return {
     transform: store.layerTransformStyle(l),
@@ -838,41 +826,6 @@ const isolateLayerStyle = computed(() => {
     transformOrigin: 'center',
     opacity: l.opacity != null ? l.opacity : 1,
     mixBlendMode: (l.blend && l.blend !== 'normal') ? l.blend : 'normal',
-  };
-});
-// Overlay canvas xóa bám đúng vùng ảnh hiển thị (chịu zoom/pan) — khớp canvasMetrics.
-const eraseTick = ref(0);
-watch([() => store.zoom, () => store.pan.x, () => store.pan.y, () => store.upscaleSrc, () => store.imgTick], () => { nextTick(() => { eraseTick.value++; }); });
-// Kích hoạt công cụ / ảnh isolate thay đổi → overlay chưa đo được vị trí ngay trong render đầu
-// (img vừa được tạo). Bump tick SAU khi patch để khung vẽ/overlay hiện đúng vị trí từ giây đầu.
-watch([() => store.cropMode, () => store.inpaintMaskMode, () => store.eraseMode, () => store.drawMode, () => store.cvImg, () => store.imgTick], () => {
-  nextTick(() => { eraseTick.value++; drawTick.value++; });
-});
-const eraseOverlayStyle = computed(() => {
-  void eraseTick.value;
-  const m = store.canvasMetrics();
-  if (!m || !store.eraseMode) return { display: 'none' };
-  return {
-    left: (m.vx / m.crW * 100) + '%',
-    top: (m.vy / m.crH * 100) + '%',
-    width: (m.vw / m.crW * 100) + '%',
-    height: (m.vh / m.crH * 100) + '%',
-    touchAction: 'none',
-  };
-});
-// Overlay canvas vẽ (paint) bám đúng vùng ảnh — giống erase.
-const drawTick = ref(0);
-watch([() => store.zoom, () => store.pan.x, () => store.pan.y, () => store.upscaleSrc], () => { nextTick(() => { drawTick.value++; }); });
-const drawOverlayStyle = computed(() => {
-  void drawTick.value;
-  const m = store.canvasMetrics();
-  if (!m || !store.drawMode) return { display: 'none' };
-  return {
-    left: (m.vx / m.crW * 100) + '%',
-    top: (m.vy / m.crH * 100) + '%',
-    width: (m.vw / m.crW * 100) + '%',
-    height: (m.vh / m.crH * 100) + '%',
-    touchAction: 'none',
   };
 });
 // Bấm tay cầm của layer đang KHÓA = mở khóa luôn. Vì sao không chỉ hiện thông báo: người dùng đã
@@ -1018,14 +971,6 @@ function onCanvasBgUp(e) {
   if (bgDownPos && !isolateActive.value && !store.panMode && Math.hypot(e.clientX - bgDownPos.x, e.clientY - bgDownPos.y) < 5) store.deselectAll();
   bgDownPos = null;
 }
-// Vòng cọ (preview) khi vẽ — bám con trỏ, cỡ = drawBrushSize × zoom.
-const brushCursorStyle = computed(() => {
-  if (!store.drawMode || !store._drawCursor) return { display: 'none' };
-  const el = store.canvasZoom; if (!el) return { display: 'none' };
-  const r = el.getBoundingClientRect();
-  const d = Math.max(2, (store.drawBrushSize || 24) * 2 * (store.zoom || 1));
-  return { left: (store._drawCursor.x - r.left - d / 2) + 'px', top: (store._drawCursor.y - r.top - d / 2) + 'px', width: d + 'px', height: d + 'px' };
-});
 const marqueeStyle = computed(() => {
   const m = marquee.value, el = store.canvasZoom; if (!m || !el) return { display: 'none' };
   const r = el.getBoundingClientRect();
@@ -1692,32 +1637,11 @@ function onTouchEnd(e) {
               </template>
             </div>
 
-            <!-- Overlay canvas xóa: bám đúng vùng ảnh hiển thị (chịu zoom/pan) -->
-            <canvas v-if="store.eraseMode" ref="eraseOverlay" class="absolute z-30 cursor-crosshair rounded bg-danger/10" :style="eraseOverlayStyle" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
-            <!-- Overlay canvas vẽ (paint): tô màu lên layer -->
-            <div v-if="store.drawMode" class="pointer-events-none absolute z-40 rounded-full border border-white/80" :style="brushCursorStyle"></div>
-            <canvas v-if="store.drawMode" ref="drawOverlay" class="absolute z-30 cursor-crosshair rounded" :style="drawOverlayStyle" @pointerdown.stop="store.beginDrawBrush($event)" @pointermove="store.drawBrushMove($event)" @pointerup="store.endDrawBrush()" @pointerleave="store.endDrawBrush()"></canvas>
             <!-- Vùng chọn quét (marquee) -->
             <div v-if="marquee" class="pointer-events-none absolute z-50 rounded border-2 border-brand-400 bg-brand-400/10" :style="marqueeStyle"></div>
             <!-- Đường guide khi bắt điểm (snap) -->
             <div v-if="store.snapX != null" class="pointer-events-none absolute inset-y-0 z-40 w-px bg-brand-400/80" :style="{ left: 'calc(50% + ' + (store.snapX * store.zoom + store.pan.x) + 'px)' }"></div>
             <div v-if="store.snapY != null" class="pointer-events-none absolute inset-x-0 z-40 h-px bg-brand-400/80" :style="{ top: 'calc(50% + ' + (store.snapY * store.zoom + store.pan.y) + 'px)' }"></div>
-            <div v-if="store.cropMode && store.upscaleSrc" class="pointer-events-none absolute inset-0" style="z-index:30">
-              <div class="absolute cursor-move select-none" style="pointer-events:auto; touch-action:none" :style="store.cropStyle()" @pointerdown.stop="store.cropStart($event,'move')" @dblclick="store.toggleCrop" title="Kéo để di chuyển · nhấn đúp để hủy">
-                <div class="pointer-events-none absolute inset-0 border-2 border-dashed border-select ovl-dim"></div>
-                <div class="pointer-events-none absolute inset-0 opacity-30">
-                  <div class="absolute left-1/3 top-0 h-full w-px bg-brand-300/60"></div>
-                  <div class="absolute left-2/3 top-0 h-full w-px bg-brand-300/60"></div>
-                  <div class="absolute left-0 top-1/3 h-px w-full bg-brand-300/60"></div>
-                  <div class="absolute left-0 top-2/3 h-px w-full bg-brand-300/60"></div>
-                </div>
-                <div class="pointer-events-none absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-label font-semibold text-brand-200">{{ store.cropSizeLabel() }}</div>
-                <div class="absolute -left-2 -top-2 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.cropStart($event,'nw')" @dblclick.stop></div>
-                <div class="absolute -right-2 -top-2 h-4 w-4 cursor-nesw-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.cropStart($event,'ne')" @dblclick.stop></div>
-                <div class="absolute -bottom-2 -left-2 h-4 w-4 cursor-nesw-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.cropStart($event,'sw')" @dblclick.stop></div>
-                <div class="absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.cropStart($event,'se')" @dblclick.stop></div>
-              </div>
-            </div>
 
           </div>
 

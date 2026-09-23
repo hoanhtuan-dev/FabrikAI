@@ -132,18 +132,12 @@ export function studioState() {
     lookPreset: 'studio',
     lookLevel: 5,
     looking: false,
-    // reframe
-    reframeRatio: '3:4',
-    reframing: false,
-    cropMode: false,
-    reframeOpen: false,  // hiển thị toolbar crop (dock phía trên)
+    // [2026-09-26 · D1 — BỎ CROP] Đã xoá: reframeRatio · reframing · cropMode · reframeOpen · cropBox ·
+    // _cropDrag · _cropRaf · _cropPending. Quyết định của chủ dự án: "không cần dữ crop". Endpoint
+    // /api/reframe GIỮ NGUYÊN trong mã (không xoá API), chỉ hết call-site từ giao diện.
     filmOpen: false,      // hiển thị toolbar film look (dock phía trên)
-    cropBox: { x: 0.15, y: 0.15, w: 0.7, h: 0.7 },
     cvImg: null,
     canvasZoom: null,
-    _cropDrag: null,
-    _cropRaf: null,
-    _cropPending: null,
     // canvas foundation (zoom/pan/background)
     zoom: 1,
     pan: { x: 0, y: 0 },
@@ -158,35 +152,12 @@ export function studioState() {
     confirmDeleteOpen: false, // popup xác nhận xóa nhiều layer
     confirmClearCanvasOpen: false, // popup xác nhận dọn toàn bộ canvas
     _pinch: null,
-    // Xóa vùng (erase) với feather
-    eraseMode: false,
-    eraseFeather: 15,       // độ mềm mép nét xóa (0-60)
-    eraseBrushSize: 24,     // độ dày cọ xóa (px 3-150)
-    _eraseCanvas: null,
-    _eraseCtx: null,
-    _eraseDrawing: false,
-    _eraseLast: null,
-    _eraseHasStrokes: false, // đã có nét thật? (tránh push history/bake khi không xoá gì)
-    _eraseBusy: false,   // chống bake trùng khi đang áp dụng nét xóa
-    // Vẽ tự do (paint brush) — tô màu lên layer
-    drawMode: false,
-    drawBrushSize: 24,   // độ dày cọ (px 3-150)
-    drawOpacity: 1,      // độ đậm nét (0-1)
-    drawSoftness: 15,    // độ mềm mép (0-60)
-    drawHardness: 80,   // độ cứng cọ 0-100 (%)
-    drawFlow: 1,        // lượng mực 0.01-1 (thấp = nét nhạt, tô dày dần)
-    drawSpacing: 0.08,  // khoảng cách giữa các chấm cọ (tỉ lệ đường kính 0.03-1) — gần => mịn, không hạt
-    drawSmoothing: 0,   // làm mượt nét 0-100 (0 = tắt)
-    drawBlend: 'normal', // chế độ hòa trộn nét vẽ
-    _drawCanvas: null,
-    _drawCtx: null,
-    _drawCursor: null,  // {x,y} client coords cho vòng cọ
-    _drawSmooth: null,  // điểm đã làm mượt
-    _drawDrawing: false,
-    _drawLast: null,
-    _drawHasStrokes: false, // đã có nét thật? (tránh push history/bake khi không vẽ gì)
-    _drawPressure: 1,   // áp lực bút stylus (0-1) cho cọ vẽ
-    _drawBusy: false,    // chống bake trùng khi đang áp dụng nét vẽ
+    // [2026-09-26 · D2 — BỎ HẲN VẼ & XOÁ PIXEL] Đã xoá 27 khoá: eraseMode · eraseFeather ·
+    // eraseBrushSize · _erase* (6) · drawMode · drawBrushSize · drawOpacity · drawSoftness ·
+    // drawHardness · drawFlow · drawSpacing · drawSmoothing · drawBlend · _draw* (8).
+    // Quyết định của chủ dự án: "Bỏ hẳn paint/erase (vẽ & xoá pixel)". File brushes.js đã xoá;
+    // hàm dọn trạng thái exitCanvasTools() đã chuyển sang canvasView.js.
+    // MASK (vùng sửa của Sửa ảnh) KHÔNG thuộc nhóm này — nó ở lại, xem inpaintMaskMode bên dưới.
     _flattenBusy: false, // đang chuẩn hoá transform layer (xoay/lật) — chống gọi song song
     // concept
     imagePromptEn: '',
