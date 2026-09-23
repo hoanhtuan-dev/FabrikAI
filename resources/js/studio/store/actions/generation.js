@@ -43,7 +43,54 @@ export const generationActions = {
         }
       } catch (e) { console.error('studio load failed', e); }
     },
-    select(g) { if (!g) return; this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; if (g.media_url) { this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id); this.setActiveLayer(String(g.id)); } },
+    select(g) {
+      if (!g) return;
+      this.previewId = g.id;
+      this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' };
+      if (g.media_url) {
+        // BƯỚC 5.1 (2026-09-26): đặt ẢNH ĐANG LÀM VIỆC tường minh TRƯỚC khi đẩy layer.
+        // Hôm nay hai thứ trùng nhau nên hành vi KHÔNG đổi; khi bỏ canvas (5.4) thì đây là thứ
+        // duy nhất còn lại, và 8 card đọc nó qua getter upscaleSrc mà không phải sửa gì.
+        this.setWorkingImage({ id: g.id, media_url: g.media_url, type: g.type || 'image' }, 'generation');
+        this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id);
+        this.setActiveLayer(String(g.id));
+      }
+    },
+
+    /**
+     * ĐẶT ẢNH ĐANG LÀM VIỆC — "tôi đang sửa ẢNH NÀO", độc lập với layer/canvas.
+     *
+     * VÌ SAO CẦN (bước 5.1 của kế hoạch bỏ canvas): hôm nay câu hỏi đó chỉ trả lời được gián tiếp
+     * qua "layer nào đang chọn". Mọi công cụ một-ảnh đọc getter upscaleSrc, mà getter đó lấy từ
+     * layer ⇒ bỏ layer là bỏ luôn ảnh nguồn của 8 card. Tách ra thành dữ liệu tường minh thì việc
+     * bỏ canvas chỉ còn là XOÁ một nhánh trong getter, không phải viết lại card nào.
+     *
+     * Nhận: URL (chuỗi) hoặc một generation ({ id, media_url }).
+     * kind: 'generation' (ảnh kết quả) | 'source' (ảnh nguồn/upload) | 'upload'.
+     *
+     * @returns {{id:*,url:string,name:string,kind:string,genId:*}|null}
+     */
+    setWorkingImage(img, kind = 'generation') {
+      if (!img) { this.workingImage = null; return null; }
+
+      const url = typeof img === 'string' ? img : (img.media_url || img.url || '');
+      if (!url) return null;
+
+      const id = (typeof img === 'object' && img.id != null) ? img.id : null;
+      const name = (typeof img === 'object' && img.name)
+        ? String(img.name)
+        : (id != null ? 'Ảnh #' + id : 'Ảnh đang chọn');
+
+      this.workingImage = {
+        id,
+        url: String(url),
+        name,
+        kind,
+        genId: kind === 'generation' ? id : null,
+      };
+
+      return this.workingImage;
+    },
     // Đảm bảo một ảnh kết quả được "in" vào layer canvas (id duy nhất, không trùng).
     syncLayerForGen(id, mediaUrl, name, setActive) {
       if (!id || !mediaUrl) return;

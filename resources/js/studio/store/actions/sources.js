@@ -38,6 +38,8 @@ export const sourcesActions = {
     },
     setSource(url, name) {
       this.editSource = { url, name: name || 'Ảnh nguồn' };
+      // 5.1: ảnh nguồn cũng là "ảnh đang làm việc" — cùng một khái niệm, khác nguồn gốc.
+      this.setWorkingImage({ name: name || 'Ảnh nguồn', media_url: url }, 'source');
       // Bỏ layer 'source' CŨ trước khi thêm ảnh mới — nếu không pushCanvasLayer bị chặn
       // do trùng id 'source' → ảnh mới không vào được canvas khi canvas vẫn còn ảnh cũ.
       this.canvasLayers = this.canvasLayers.filter((l) => l.id !== 'source');

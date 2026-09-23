@@ -36,8 +36,28 @@ export const studioGetters = {
     planCostVideo() { return (this.planStatus && this.planStatus.costs && this.planStatus.costs.video) || 10; },
     /** Sắp cạn credit: còn ít hơn 3 thao tác ảnh ⇒ tô đậm nút để khách biết trước. */
     creditsLow() { return this.creditsLeft < this.planCostImage * 3; },
-    upscaleSrc() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId && x.visible !== false); if (l && l.image) return l.image; } return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
-    upscaleName() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId); if (l) return l.name; } return (this.editSource && this.editSource.name) || (this.preview ? 'Ảnh kết quả #' + this.preview.id : 'Ảnh đang chọn'); },
+    /**
+     * ẢNH NGUỒN của mọi công cụ một-ảnh (Sửa ảnh · Upscale · Biến thể · Gợi ý · Kịch bản quay).
+     *
+     * THỨ TỰ ĐỌC — và vì sao thứ tự này:
+     *   1. LAYER ĐANG CHỌN — nguồn PIXEL thật trong giai đoạn chuyển: layer có thể đã bị sửa
+     *      (transform · crop · vẽ) nên ảnh của nó KHÁC ảnh gốc. Đổi thứ tự ở đây là đổi hành vi.
+     *   2. workingImage    — "ảnh đang làm việc" tường minh (MỚI, 2026-09-26).
+     *   3. editSource / preview — đường cũ, giữ nguyên.
+     *
+     * KHI BỎ CANVAS (bước 5.4) chỉ cần XOÁ nhánh (1) — hai nhánh còn lại đã sẵn sàng, và 8 card
+     * không phải sửa một dòng nào. Đó chính là mục đích của bước tách này.
+     */
+    upscaleSrc() {
+      if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId && x.visible !== false); if (l && l.image) return l.image; }
+      if (this.workingImage && this.workingImage.url) return this.workingImage.url;
+      return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || '';
+    },
+    upscaleName() {
+      if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId); if (l) return l.name; }
+      if (this.workingImage && this.workingImage.name) return this.workingImage.name;
+      return (this.editSource && this.editSource.name) || (this.preview ? 'Ảnh kết quả #' + this.preview.id : 'Ảnh đang chọn');
+    },
 
     activeBatch() { return this.generations.filter(g => this.lastBatch.includes(g.id)); },
     // Nguồn ảnh cho GalleryModal: viewerList (context riêng, vd outputs của dự án) →

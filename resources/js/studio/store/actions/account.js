@@ -87,7 +87,12 @@ export const accountActions = {
       else this.generations.unshift(g);
       this.previewId = g.id;
       if (g.status === 'completed') { this.preview = { id: g.id, media_url: g.media_url, type: 'image', status: 'completed' }; }
-      if (g.media_url) { this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id); this.setActiveLayer(String(g.id)); }
+      if (g.media_url) {
+        // Ảnh VỪA TẠO XONG là ảnh người dùng đang quan tâm ⇒ đặt làm ảnh đang làm việc (5.1).
+        this.setWorkingImage({ id: g.id, media_url: g.media_url }, 'generation');
+        this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id);
+        this.setActiveLayer(String(g.id));
+      }
     },
     setPreview(g) { if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } },
     /**

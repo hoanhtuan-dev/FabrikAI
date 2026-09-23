@@ -107,6 +107,13 @@ export function studioState() {
     teamForm: { name: '', email: '', phone: '' },
     // film / reframe share the source image (editSource || preview)
     editSource: null,
+    // ── ẢNH ĐANG LÀM VIỆC (2026-09-26 · bước 5.1 của kế hoạch bỏ canvas) ────────────────
+    // KHÁI NIỆM TÁCH KHỎI LAYER: "tôi đang sửa ẢNH NÀO" là MỘT ảnh, không phải một chồng layer.
+    // Hôm nay câu hỏi đó được trả lời gián tiếp bằng "layer nào đang được chọn" — và mọi công cụ
+    // (Sửa ảnh · Biến thể · Upscale · Gợi ý) đều đọc qua getter upscaleSrc. Tách ra thành dữ liệu
+    // TƯỜNG MINH là điều kiện để bỏ canvas mà không phải viết lại 8 card.
+    //   { id, url, name, kind: 'generation'|'source'|'upload', genId }
+    workingImage: null,
     texture: 5,
     // upscale params (fabric-weave slider removed — it affected dark skin & detail edges)
     upscaleScale: 2,
