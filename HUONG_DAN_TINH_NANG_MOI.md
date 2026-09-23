@@ -492,6 +492,35 @@ hoặc Google CSE nếu có khoá). Nguồn `rss`/`page` vẫn hữu ích cho l�
 > **Điều CHƯA kiểm chứng:** phiên viết tài liệu này KHÔNG mở trình duyệt đo bằng mắt (mọi câu ở mục 11.1 đọc từ
 > mã + từ bản build), và CHƯA đo trên production — migration `2026_09_26_000010` còn phải chạy ở máy chủ.
 
+### 11.10 GẮN MODULE VÀO GÓI — vì sao khách trả tiền từng bị chặn (2026-09-26)
+
+**Chuyện ĐÃ XẢY RA (đo trên production 2026-09-26, không phải giả định):** ba gói trả tiền
+(pro · studio · factory_season) đã có module «Agent thiết kế» nhưng **THIẾU** hai module mà nó phụ thuộc là
+«TrendRadar» và «CollectionBot». `module_allowed()` đi NGƯỢC LÊN theo phụ thuộc, nên **khách trả tiền bị
+chặn Agent Studio VÀ chat**, còn tài khoản quản trị (được miễn công tắc gói) vẫn vào được ⇒ lỗi **IM LẶNG**,
+không màn hình nào báo.
+
+**Một lệnh để gắn, một lệnh để rà:**
+
+| Việc | Lệnh |
+|---|---|
+| Rà lệch giữa các gói | `php artisan studio:modules-grant --check` |
+| Gắn module theo ĐỀ XUẤT của bản khai | `php artisan studio:modules-grant collection_bot` |
+| Gắn cho MỌI gói đang mở bán | `php artisan studio:modules-grant collection_bot --all-plans` |
+| Gắn cho đúng vài gói | `php artisan studio:modules-grant collection_bot --plans=pro,studio` |
+| Xem trước, KHÔNG ghi | `php artisan studio:modules-grant collection_bot --dry-run` |
+
+**Ba luật của lệnh** (mỗi luật sinh ra từ một cách sai đã gặp):
+1. Mặc định **CẤP KÈM module phụ thuộc** — cấp con mà thiếu cha là cấp một quyền KHÔNG DÙNG ĐƯỢC;
+2. **KHÔNG BAO GIỜ ghi** vào gói chưa cấu hình (`modules = NULL` nghĩa là "đủ module") — ghi vào là âm thầm
+   CẮT tính năng mà khách đang dùng;
+3. `--check` trả **mã lỗi** khi có gói vi phạm phụ thuộc; còn "thiếu so với đề xuất" chỉ là **gợi ý** (chủ dự
+   án có quyền cố ý không bán một tính năng).
+
+**Đã chạy trên production 2026-09-26:** pro · studio · factory_season nhận thêm `trend_radar` +
+`collection_bot` (23 → 25 module) ⇒ khách trả tiền mở được Agent Studio và chat. Gói `free` **cố ý KHÔNG
+có** chat (theo đề xuất của bản khai: chat tốn lượt gọi máy chủ mỗi câu hỏi). Muốn đổi: thêm `--all-plans`.
+
 ## 12. HỎI ĐÁP THEO LUỒNG — bước thứ 5 của Agent Studio (2026-09-26)
 
 ### 12.1 Đọc trước: cái gì ĐÃ CÓ, cái gì CHƯA (đo trong cây mã lúc viết)

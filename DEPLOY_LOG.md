@@ -5,6 +5,124 @@
 
 ---
 
+## Phiên 2026-09-23 (đợt 47) — GẮN MODULE CHAT VÀO GÓI · BƯỚC 2/5 ĐO TỪ KẾT QUẢ TÌM KIẾM
+
+**Commit:** `b8c7344` · `57b8d1a` · `b8dd3cf` · `6d74635` · `0b19756`. **Trạng thái: đã push + deploy + kiểm trên production.**
+
+Hai yêu cầu của chủ dự án (2026-09-26):
+
+| # | Yêu cầu (nguyên văn) | Đã làm |
+|---|---|---|
+| 1 | "gắn module chat vào gói" | Lệnh **`studio:modules-grant`** + đã chạy trên production: pro · studio · factory_season nhận `trend_radar` + `collection_bot` |
+| 2 | "làm cho agent studio: Bước 2/5 · Tín hiệu sử dụng dữ liệu tìm kiếm thay vì rss\|pages, tránh tự bịa hoặc dữ liệu [mẫu]" | Bước 2 nay **đo từ kết quả TÌM KIẾM** (6 câu hỏi chung về ngành, có vùng + năm); nguồn `rss`/`page` **không còn** vào khối dữ liệu lẫn máy đo; bộ hướng MẪU **luôn** bị tách sang `trends_demo` |
+
+### 1. GẮN MODULE VÀO GÓI — VÀ MỘT LỖI THẬT ĐO ĐƯỢC: KHÁCH TRẢ TIỀN BỊ CHẶN AGENT STUDIO + CHAT
+
+Rà bằng chính lệnh mới trên production **TRƯỚC** khi sửa:
+
+```
+· pro: 23 module · THIẾU PHỤ THUỘC 2 · thiếu so với đề xuất: outfit, trend_radar, collection_bot
+    LỖI stylist → trend_radar — cấp con mà thiếu cha thì con KHÔNG dùng được.
+    LỖI stylist → collection_bot — cấp con mà thiếu cha thì con KHÔNG dùng được.
+· studio: 23 module · THIẾU PHỤ THUỘC 2 …   · factory_season: 23 module · THIẾU PHỤ THUỘC 2 …
+```
+
+Ba gói trả tiền **đã có** «Agent thiết kế» nhưng **thiếu hai module cha** mà nó `depends_on`. Vì
+`module_allowed()` đi NGƯỢC LÊN theo phụ thuộc, khách trả tiền bị chặn **cả Agent Studio lẫn chat**, còn
+tài khoản quản trị (được miễn công tắc gói) vẫn vào được ⇒ **lỗi im lặng**, không màn hình nào báo.
+
+**Vì sao cần LỆNH chứ không phải migration:** đây là DỮ LIỆU KINH DOANH (gói nào bán gì), và việc này sẽ
+lặp lại mỗi lần thêm module mới — migration chạy một lần rồi thôi.
+
+| Việc | Lệnh |
+|---|---|
+| Rà lệch giữa các gói | `php artisan studio:modules-grant --check` |
+| Gắn theo ĐỀ XUẤT của bản khai | `php artisan studio:modules-grant collection_bot` |
+| Gắn cho MỌI gói đang mở bán | `php artisan studio:modules-grant collection_bot --all-plans` |
+| Xem trước, không ghi | `php artisan studio:modules-grant collection_bot --dry-run` |
+
+Ba luật: (1) mặc định **cấp kèm module phụ thuộc**; (2) **không bao giờ ghi** vào gói `modules = NULL`
+("đủ module" — ghi vào là âm thầm CẮT tính năng đang có); (3) `--check` trả **mã lỗi** khi có gói vi phạm
+phụ thuộc, còn "thiếu so với đề xuất" chỉ là **gợi ý**.
+
+**Đã chạy:** `php artisan studio:modules-grant collection_bot,trend_radar` ⇒ `pro · studio ·
+factory_season: +2 module (trend_radar, collection_bot) ⇒ 25 module`; `--check` sau đó:
+**"Không gói nào vi phạm phụ thuộc"**. Kiểm lại bằng tài khoản thật trong CSDL:
+`vanhoabamien@gmail.com` (gói free) vẫn bị chặn **đúng như thiết kế**, còn pro/studio/factory_season đã có
+`collection_bot` + `trend_radar` + `stylist` dùng được.
+
+**CÒN LẠI CHO CHỦ DỰ ÁN QUYẾT:** gói `free` **cố ý không có** chat (theo đề xuất của bản khai — mỗi câu hỏi
+tốn một lượt gọi máy chủ). Trong CSDL **đang có một khách thật ở gói free**. Muốn mở cho mọi gói:
+`php artisan studio:modules-grant collection_bot --all-plans`.
+
+### 2. BƯỚC 2/5 — ĐO TỪ KẾT QUẢ TÌM KIẾM, KHÔNG CÒN RSS/TRANG BÁO
+
+**Hành vi CŨ (đo được):** khối dữ liệu radar lấy từ `WebSourceService::evidence()` (nguồn `kind=rss/page`
+đã khai), và `MarketSignalService::capture()` **đo từ chính đường đó** ⇒ mọi con số của bước 2 là số đếm
+từ RSS/trang báo; không có hướng nào có bằng chứng thì **danh mục MẪU vẫn hiện ra** như số liệu thị trường.
+
+**Hành vi MỚI:**
+- `radar()` chạy **MỘT lượt tra chung** bằng `MarketSignalService::topicQueries()` — 6 câu hỏi NGÀNH, có
+  vùng + năm, **không chứa dữ liệu của shop** — qua `collectAiEvidence()` (đường có sẵn, có ghi SỔ NGUỒN).
+  Lượt tra đó nuôi **cả** khối dữ liệu **lẫn** máy đo ⇒ số liệu hiển thị và danh sách nguồn luôn khớp nhau.
+- `external_evidence.items` **chỉ** gồm kết quả tìm kiếm + nguồn dùng lại từ sổ; `mergeFindings()` bỏ hẳn
+  nhánh nhận tin từ nguồn đã khai.
+- `MarketSignalService::capture($region, $force, $items)`: đo trên tin được truyền, hoặc **tự chạy tìm kiếm**
+  khi không truyền (đường cron); không ra tin ⇒ báo cáo **RỖNG** + câu nói thật, **không ghi ảnh chụp rỗng**,
+  **không bịa số**.
+- `trends` **luôn** chỉ có hướng `evidence_mode=live`; bộ có sẵn **luôn** tách sang `trends_demo` +
+  `demo_hidden` (không xoá dữ liệu).
+- Giao diện: khối đo nay tên **"Tín hiệu đo từ kết quả tìm kiếm (N)"**; bỏ câu sai *"đọc tin từ các nguồn đã
+  nối"*; thêm trạng thái **nói thật** khi lượt này không tra được hướng nào; bảng nguồn ghi rõ nó là **CẤU
+  HÌNH**, không phải nguồn của số liệu ở trên.
+- **LUẬT AN TOÀN DỮ LIỆU:** `market_signals` là ảnh chụp THEO VÙNG, **dùng chung giữa các tài khoản** ⇒ chỉ
+  truyền tin của **truy vấn chung** vào máy đo, tuyệt đối không trộn sổ nguồn riêng của một tài khoản.
+
+**ĐO TRÊN PRODUCTION (sau deploy):**
+- `php artisan studio:market-signals --force` ⇒ in ra 6 câu hỏi chung + nguồn **Tavily — tìm kiếm web**, rồi
+  `Đo từ 7 tin tra được trên web (6 nguồn): 23 từ khoá ngành và 6 chủ đề trong tin`.
+- Gọi thẳng `radar()` cho tài khoản chủ (vùng `hcm`): `engine=ai-v1 · source_mode=live · demo_hidden=5 ·
+  trends(thật)=9 · trends_demo=5 · evidence=14 tin · 6 câu hỏi tra · market: 14 tin/14 nguồn`.
+
+### 3. HAI LỖI THẬT BẮT ĐƯỢC NGAY KHI KIỂM TRÊN PRODUCTION (và đã sửa)
+
+| Lỗi (nguyên văn trên máy chủ) | Nguyên nhân | Sửa |
+|---|---|---|
+| `Đo từ 7 tin của 0 nguồn` — mọi tín hiệu đều "N tin · 0 nguồn" | Mục tin của đường **tìm kiếm** (Tavily) không có `source_name` như đường RSS; máy đo đếm ra 0. Con số này còn là một vế của **ĐỘ TIN CẬY** | `WebSourceService::itemSite()` dùng chung + **mọi** mục tin nay mang `site` = tên miền (bỏ `www.`, KHÔNG bịa tên báo); máy đo ưu tiên `site` → `source_name` → tên miền tự suy |
+| `PHP Warning: Undefined array key "source_name"` ở `DesignAgentService` cho **MỖI** mục tin, **MỖI** lượt chạy | Hai chỗ dựng khối `items` cho prompt đọc thẳng `$item['source_name']` — khoá chỉ có ở đường RSS | Hai chỗ đọc **chịu được thiếu khoá**, ưu tiên `site`; hết warning và chỗ dẫn nguồn cho model không còn rỗng |
+
+Kiểm lại sau khi sửa: `market: 14 tin | 14 nguồn`, mục tin đầu có `site=andora.com.vn`, **không còn warning**.
+
+### 4. LỖI THỨ BA — BỘ TEST BỊ CHÍNH MÃ SẢN PHẨM CẮT NGANG
+
+`set_time_limit(180)` trong hai controller stream áp cho **CẢ TIẾN TRÌNH** PHP, không riêng request. Khi
+PHPUnit đi qua đường đó, giới hạn dính lại và bộ test chết ở **bài 732/1303**: `Maximum execution time of 180
+seconds exceeded` (bộ test nay chạy ~150–173 s nên chỉ còn vài giây biên — **sẽ nổ lại ở máy chậm hơn**). Nay
+chỉ đặt khi **chạy thật** (cùng cờ `$live` đang dùng cho output buffer), kèm một test khoá đúng điều đó.
+
+### Kiểm chứng
+- `vendor/bin/phpunit --no-coverage` ⇒ **OK (1305 tests, 10053 assertions)** (trước đợt này: 1287/9917).
+  Test MỚI: `ModuleGrantCommandTest` (9) · `RadarSearchEvidenceTest` (6) · bất biến "đề xuất không cấp con
+  thiếu cha" ở `ModuleRegistryTest` · "tin không có tên toà soạn vẫn là CÓ NGUỒN" · "đường stream không đặt
+  lại giới hạn thời gian khi chạy test".
+- `npm run build` xanh (`agent-studio-Cq54RApj.js` 213,42 kB); kiểm trên **bundle đã deploy**: có *"Tín hiệu
+  đo từ kết quả tìm kiếm"* · *"Máy chủ tự tra trên web bằng các câu hỏi chung về ngành"* · *"Lượt này chưa tra
+  được hướng nào có bằng chứng thật trên web"*; **KHÔNG còn** *"đọc tin từ các nguồn đã nối"*.
+
+### Còn nợ
+- **Cron trên máy chủ KHÔNG chạy**: nhịp tim lịch chạy nền đọc được lúc kiểm là **`2026-09-23T10:10:03Z`**
+  (TTL 30 phút) ⇒ số liệu bước 2 chỉ mới khi có người mở màn hình hoặc chạy lệnh tay. Bật cron thì **mỗi 30
+  phút tốn 6 truy vấn tìm kiếm** (≈ 288/ngày) — với Tavily keyless chưa đo được trần, với Google CSE thì vượt
+  hạn mức miễn phí 100 truy vấn/ngày. Nên đo trần rồi hẵng bật, hoặc khai khoá trả phí.
+- **Gói `free` không có chat** — xem mục 1 (có khách thật đang ở gói này).
+- Gợi ý còn lại của `--check`: ba gói trả tiền và hai gói thấp **thiếu `outfit`** so với đề xuất (không phải
+  lỗi phụ thuộc — chủ dự án quyết có bán hay không).
+- Bộ truy vấn chủ đề là **danh sách cứng trong mã** (6 câu) — muốn đổi chủ đề phải sửa mã.
+- Nhìn bằng mắt trên trình duyệt thật cho **bước 2 mới** (bố cục khối "Tín hiệu đo từ kết quả tìm kiếm" ở
+  375px và trạng thái RỖNG) — chưa làm.
+
+---
+
 ## Phiên 2026-09-23 (đợt 46) — TRỢ LÝ LÀ TRUNG TÂM: TẠO ẢNH TRONG CHAT · TRẢ CANVAS TRỐNG SẠCH · LỜI CHAO MỀM · CÁCH ĐĂNG KÝ API KEY
 
 **Commit:** `c9a37b3`. **Trạng thái: đã push + deploy + kiểm trên bundle sống (CDN) + chat chạy thật.**
