@@ -26,12 +26,18 @@ class WebSource extends Model
      *              Bộ đọc chỉ nhận liên kết TRÔNG NHƯ BÀI VIẾT (cùng tên miền, đường dẫn dài, tiêu đề đủ
      *              dài); đa số trang danh sách KHÔNG có ngày đăng nên item để published_at = null.
      *
-     * Vì sao cần kiểu thứ ba: đo thật — Google News RSS (kiểu rss) CHỈ có tin tức, nên câu hỏi tra cứu
-     * thường ("cách giặt vải linen") và câu hỏi thương mại ("xưởng may gia công ở Tân Bình") đều trả về
-     * **0 kết quả**. Muốn tra được WEB CHUNG thì phải gọi một API tìm kiếm thật (vd Google Custom Search
-     * JSON API), và API đó cần khoá.
+     *   · tavily — API TÌM KIẾM WEB CHO AGENT của Tavily (2026-09-26): `POST https://api.tavily.com/search`,
+     *              từ khoá đi trong BODY, tuỳ chọn cấu hình nằm ở query string của URL
+     *              (`?topic=news&time_range=week&depth=basic`). Chạy được **KHÔNG CẦN KHOÁ** (chế độ
+     *              keyless của Tavily, có giới hạn nhịp); có khoá thì dùng hạn mức riêng (miễn phí
+     *              1.000 credit/tháng) — đổi qua lại KHÔNG phải sửa mã. Trả về cả **ngày đăng**, nên bộ lọc
+     *              độ mới của dự án chạy được thật (RSS không có ngày, Google CSE cũng không trả).
+     *
+     * Vì sao cần kiểu TÌM KIẾM: đo thật trên production — Google News RSS (kiểu rss) CHỈ có tin tức, nên câu
+     * hỏi tra cứu thường ("cách giặt vải linen") và câu hỏi thương mại ("giá vải linen") đều trả về **0 kết
+     * quả** (đọc được 16-23 tin nhưng đều quá cũ). Muốn tra được WEB CHUNG thì phải gọi một API tìm kiếm thật.
      */
-    public const KINDS = ['rss', 'json', 'search', 'page'];
+    public const KINDS = ['rss', 'json', 'search', 'page', 'tavily'];
 
     /**
      * Cột `items_path` mang HAI nghĩa tuỳ loại nguồn — nói rõ ở đây vì cùng một ô nhập trên màn Cài đặt:

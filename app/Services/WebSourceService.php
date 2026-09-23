@@ -207,6 +207,12 @@ class WebSourceService
      */
     public static function isSearchable(WebSource $source): bool
     {
+        // NGUỒN TAVILY luôn là nguồn tìm kiếm: từ khoá đi trong BODY của POST, không nằm trên URL — nên
+        // \`querySlot()\` trả null và nếu không có dòng này thì nguồn Tavily KHÔNG BAO GIỜ được gọi.
+        if (($source->kind ?? '') === 'tavily') {
+            return true;
+        }
+
         return self::querySlot((string) $source->url) !== null;
     }
 
@@ -325,7 +331,11 @@ class WebSourceService
         // mode=live CHỈ khi có tin thật: model phải đọc được "tìm rồi mà không có gì" khác "không tìm được".
         $out['mode'] = $out['count'] > 0 ? 'live' : 'empty';
         if ($out['count'] === 0 && $okCount === 0) {
-            $out['error'] = 'không nguồn tìm kiếm nào trả lời được';
+            // NÓI ĐÚNG BỆNH khi đã biết: "không nguồn tìm kiếm nào trả lời được" là câu ĐÚNG nhưng vô dụng khi
+            // lý do cụ thể đã có sẵn ở khối trạng thái từng nguồn (bị chặn nhịp · sai khoá · URL trả HTML).
+            // Model và người dùng đọc câu này để biết phải làm gì tiếp — câu chung chung thì không.
+            $specific = trim((string) ($out['sources'][0]['error'] ?? ''));
+            $out['error'] = $specific !== '' ? $specific : 'không nguồn tìm kiếm nào trả lời được';
         }
 
         return $out;
@@ -469,6 +479,13 @@ class WebSourceService
      */
     private function searchOnce(WebSource $source, string $query, int $limit): array
     {
+        // TAVILY đi đường riêng: POST + JSON body + khoá ở HEADER — không phải đường GET với khoá gắn vào
+        // URL. Tách hẳn để đường cũ không phải mang thêm nhánh điều kiện, và để nguồn Tavily dùng được
+        // chế độ KHÔNG CẦN KHOÁ (\`X-Tavily-Access-Mode: keyless\`).
+        if (($source->kind ?? '') === 'tavily') {
+            return $this->tavilySearch($source, $query, $limit);
+        }
+
         // Nguồn tìm kiếm thiếu khoá ⇒ trả lý do đọc được thay vì gọi ra API rồi nhận 403.
         if ($source->kind === 'search' && $this->searchKeyFor($source) === null) {
             return [
@@ -502,6 +519,190 @@ class WebSourceService
         } catch (\Throwable) {
             // Bộ đệm là tối ưu tốc độ.
         }
+
+        return $result;
+    }
+
+    /**
+     * TAVILY — API TÌM KIẾM WEB CHO AGENT (2026-09-26). Nguồn loại \`tavily\`.
+     *
+     * Vì sao thêm nhà cung cấp này thay vì chỉ dùng RSS: đo trên production — nguồn RSS chỉ có TIN TỨC, nên
+     * câu hỏi web chung ("cách giặt vải linen", "giá vải linen") trả về **0 kết quả**. Tavily là API tìm
+     * kiếm làm SẴN cho agent: trả về tiêu đề + đoạn trích đã làm sạch + **ngày đăng** (RSS/Google CSE không
+     * có), nên bộ lọc độ mới của dự án chạy được thật thay vì tin nào cũng "không ngày".
+     *
+     * HAI chế độ, cùng một schema kết quả (đo từ tài liệu chính thức của Tavily):
+     *   · KHÔNG CẦN KHOÁ — \`X-Tavily-Access-Mode: keyless\`: dùng được NGAY, miễn phí, có giới hạn nhịp;
+     *   · CÓ KHOÁ — \`Authorization: Bearer tvly-…\`: khoá đọc từ bảng khoá (provider = slug của nguồn),
+     *     gói miễn phí 1.000 credit/tháng. Đổi từ keyless sang có khoá KHÔNG phải sửa mã.
+     *
+     * CẤU HÌNH NẰM NGAY TRONG URL (đúng lối của các loại nguồn khác — thấy được và sửa được ở màn Cài đặt):
+     *   https://api.tavily.com/search?topic=news&time_range=week&depth=basic
+     *   · \`topic\`      general (mặc định) · news · finance
+     *   · \`time_range\`  day · week · month · year  — Tavily lọc theo NGÀY ĐĂNG ở phía họ
+     *   · \`depth\`       basic (mặc định, 1 credit) · fast · ultra-fast · advanced (2 credit)
+     *   · \`raw=1\`       lấy thêm nội dung trang đã làm sạch (nặng hơn; mặc định KHÔNG lấy)
+     *
+     * KHÔNG BAO GIỜ NÉM: mọi thất bại thành kết quả ĐỌC ĐƯỢC (kèm lý do) để model nói thật thay vì tưởng
+     * mình vừa đọc được tin.
+     *
+     * @return array<string, mixed>
+     */
+    private function tavilySearch(WebSource $source, string $query, int $limit): array
+    {
+        $limit = max(1, min(20, $limit));
+        $key = self::SEARCH_CACHE_PREFIX.'tavily:'.md5($source->slug.'|'.$query.'|'.$limit.'|'.$source->url);
+
+        try {
+            $hit = Cache::get($key);
+            if (is_array($hit)) {
+                return $hit;
+            }
+        } catch (\Throwable) {
+            // Đệm hỏng không được làm hỏng việc tìm.
+        }
+
+        $started = microtime(true);
+        $options = $this->tavilyOptions($source);
+
+        $body = [
+            'query' => $query,
+            'max_results' => $limit,
+            'search_depth' => $options['depth'],
+            'topic' => $options['topic'],
+            // NGÀY ĐĂNG là thứ RSS không có và Google CSE không trả — xin ngay từ đầu để bộ lọc độ mới chạy.
+            'include_published_date' => true,
+        ];
+        if ($options['time_range'] !== null) {
+            $body['time_range'] = $options['time_range'];
+        }
+        if ($options['raw']) {
+            $body['include_raw_content'] = 'markdown';
+        }
+
+        try {
+            $this->assertPublicUrl('https://api.tavily.com/search');
+
+            $request = Http::connectTimeout(self::CONNECT_TIMEOUT)
+                ->timeout(self::TIMEOUT)
+                ->withHeaders(array_filter([
+                    'Content-Type' => 'application/json',
+                    'User-Agent' => 'FabrikAI/1.0 (+https://fabrikai.shop)',
+                    // Khoá đi ở HEADER (không nhét vào URL): URL hiện nguyên văn trên màn Cài đặt và đi vào log.
+                    'Authorization' => $this->searchKeyFor($source) !== null ? 'Bearer '.$this->searchKeyFor($source) : null,
+                    // Không có khoá ⇒ chế độ keyless của chính Tavily (cùng schema, có giới hạn nhịp).
+                    'X-Tavily-Access-Mode' => $this->searchKeyFor($source) === null ? 'keyless' : null,
+                ]));
+
+            $response = $request->post('https://api.tavily.com/search', $body);
+        } catch (\Throwable $e) {
+            return $this->failure($source, $e, $started);
+        }
+
+        $result = $this->interpretTavily($response, $started, $limit);
+
+        try {
+            Cache::put($key, $result, now()->addMinutes(self::SEARCH_CACHE_MINUTES));
+        } catch (\Throwable) {
+            // Bộ đệm là tối ưu tốc độ.
+        }
+
+        return $result;
+    }
+
+    /**
+     * Tuỳ chọn của nguồn Tavily, đọc từ query string của URL (mặc định an toàn: general · basic · không lọc).
+     *
+     * @return array{topic:string, depth:string, time_range:?string, raw:bool}
+     */
+    private function tavilyOptions(WebSource $source): array
+    {
+        parse_str((string) (parse_url((string) $source->url, PHP_URL_QUERY) ?: ''), $params);
+
+        $topic = mb_strtolower((string) ($params['topic'] ?? 'general'));
+        $depth = mb_strtolower((string) ($params['depth'] ?? 'basic'));
+        $range = mb_strtolower((string) ($params['time_range'] ?? ''));
+
+        return [
+            'topic' => in_array($topic, ['general', 'news', 'finance'], true) ? $topic : 'general',
+            'depth' => in_array($depth, ['basic', 'fast', 'ultra-fast', 'advanced'], true) ? $depth : 'basic',
+            'time_range' => in_array($range, ['day', 'week', 'month', 'year', 'd', 'w', 'm', 'y'], true) ? $range : null,
+            'raw' => ($params['raw'] ?? '') === '1',
+        ];
+    }
+
+    /**
+     * Đọc phản hồi Tavily thành kết quả chuẩn — CÙNG hình dạng với \`interpretSearch()\` nên mọi tầng trên
+     * (bộ lọc độ mới, khử trùng, số đo, prompt) không phải biết nguồn này khác gì.
+     *
+     * @return array<string, mixed>
+     */
+    private function interpretTavily(Response $response, float $started, int $limit): array
+    {
+        $result = [
+            'ok' => false, 'http' => $response->status(), 'ms' => 0, 'items' => [],
+            'error' => null, 'parsed' => 0, 'dropped' => 0, 'stale' => false,
+        ];
+
+        if (! $response->successful()) {
+            // 429 = hết nhịp (keyless có trần) — nói ĐÚNG việc cần làm thay vì "0 kết quả".
+            $result['error'] = $response->status() === 429
+                ? 'nhà cung cấp tạm giới hạn nhịp (HTTP 429) — thử lại sau, hoặc khai khoá Tavily để có hạn mức riêng'
+                : $this->httpErrorReason((string) $response->body(), $response->status());
+            $result['ms'] = (int) round((microtime(true) - $started) * 1000);
+
+            return $result;
+        }
+
+        $json = $response->json();
+        $rows = is_array($json) ? (array) ($json['results'] ?? []) : [];
+        $result['ok'] = true;
+
+        $cutoff = now()->subDays(self::MAX_AGE_DAYS)->getTimestamp();
+        $seen = [];
+        $kept = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $url = trim((string) ($row['url'] ?? ''));
+            if (preg_match('#^https?://#i', $url) !== 1 || isset($seen[$url])) {
+                continue;
+            }
+            $seen[$url] = true;
+            $result['parsed']++;
+
+            $published = $this->isoDate((string) ($row['published_date'] ?? ''));
+            $item = [
+                'title' => $this->clean((string) ($row['title'] ?? ''), 200),
+                'url' => Str::limit($url, 500, ''),
+                'published_at' => $published,
+                // Đoạn trích đã làm sạch của Tavily — đi thẳng vào prompt (nó viết cho LLM đọc).
+                'summary' => $this->clean((string) ($row['content'] ?? ''), 400),
+            ];
+
+            // CÙNG luật lọc độ mới như mọi nguồn khác: có ngày mà quá cũ thì bỏ; KHÔNG có ngày thì giữ.
+            if ($published !== null) {
+                $ts = strtotime($published);
+                if ($ts !== false && $ts < $cutoff) {
+                    $result['dropped']++;
+                    continue;
+                }
+            }
+
+            $kept[] = $item;
+        }
+
+        usort($kept, fn (array $a, array $b) => strcmp((string) ($b['published_at'] ?? ''), (string) ($a['published_at'] ?? '')));
+        $result['items'] = array_slice($kept, 0, max(1, min(20, $limit)));
+
+        if ($rows === []) {
+            // Đọc được HTTP mà không có mục nào: nói ra, đừng để người dùng tưởng internet không có gì.
+            $result['error'] = 'nhà cung cấp trả về 0 kết quả cho từ khoá này';
+        }
+
+        $result['ms'] = (int) round((microtime(true) - $started) * 1000);
 
         return $result;
     }
@@ -780,7 +981,9 @@ class WebSourceService
     /** Khoá API của một nguồn TÌM KIẾM: slot theo SLUG của nguồn trước, rồi tới slot chung `google_cse`. */
     private function searchKeyFor(WebSource $source): ?string
     {
-        if (($source->kind ?? '') !== 'search') {
+        // Tavily cũng dùng bảng khoá (provider = slug của nguồn) — nhưng khoá KHÔNG bắt buộc: không có khoá
+        // thì gọi chế độ keyless. Vì vậy chỗ kiểm "thiếu khoá thì dừng" chỉ áp cho loại \`search\`.
+        if (! in_array((string) ($source->kind ?? ''), ['search', 'tavily'], true)) {
             return null;
         }
 
