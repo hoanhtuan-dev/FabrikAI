@@ -460,4 +460,54 @@ class PricingMarginTest extends TestCase
             );
         }
     }
+
+    // ── (l) TRANG GIÁ KHÔNG ĐƯỢC TỰ MÂU THUẪN ────────────────────────────────────────────
+
+    public function test_the_pricing_page_copy_does_not_contradict_the_real_credit_numbers(): void
+    {
+        // LỖI THẬT đo trên https://fabrikai.shop/bang-gia (2026-09-26): migration nâng
+        // `credits_per_month` 120→155 nhưng KHÔNG đụng `features` (mảng chuỗi tiếp thị do chủ dự án
+        // viết) ⇒ thẻ gói ghi "155 credit" còn danh sách đặc quyền ghi "120 credit mỗi tháng".
+        // Khách đọc thấy HAI câu trả lời khác nhau cho cùng một câu hỏi, trên trang niêm yết giá.
+        //
+        // Bất biến: MỌI con số credit xuất hiện trong chữ của một gói phải khớp credits_per_month
+        // của chính gói đó.
+        $problems = [];
+
+        foreach (Plan::all() as $plan) {
+            $credits = (int) $plan->credits_per_month;
+            if ($credits <= 0) {
+                continue;
+            }
+
+            $haystack = implode(' | ', array_map('strval', (array) $plan->features));
+
+            // Bắt mọi cụm "<số> credit" trong chữ (chấp nhận dấu phân cách nghìn kiểu Việt Nam).
+            if (preg_match_all('/([0-9][0-9.,]*)\s*credit/i', $haystack, $m)) {
+                foreach ($m[1] as $raw) {
+                    $n = (int) preg_replace('/[^0-9]/', '', $raw);
+                    if ($n > 0 && $n !== $credits) {
+                        $problems[] = $plan->slug.': chữ ghi "'.$raw.' credit" nhưng credits_per_month = '.$credits;
+                    }
+                }
+            }
+        }
+
+        $this->assertSame([], $problems, "Trang giá tự mâu thuẫn:\n · ".implode("\n · ", $problems));
+    }
+
+    public function test_every_plan_with_a_daily_cap_says_so_in_its_copy(): void
+    {
+        // Giới hạn tạo ảnh/ngày là giới hạn THẬT (429) — khách phải biết TRƯỚC khi mua,
+        // không phải phát hiện lúc bị chặn.
+        foreach (Plan::where('daily_image_limit', '>', 0)->get() as $plan) {
+            $haystack = implode(' | ', array_map('strval', (array) $plan->features));
+
+            $this->assertMatchesRegularExpression(
+                '/ảnh\/ngày|ảnh mỗi ngày/u',
+                $haystack,
+                'Gói '.$plan->slug.' có trần '.$plan->daily_image_limit.' ảnh/ngày nhưng chữ không nói ra.',
+            );
+        }
+    }
 }
