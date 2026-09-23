@@ -26,7 +26,6 @@ Hai ô mô tả tạo ảnh (một ở canvas, một ở chat) là **hai lịch 
 - **Trên bundle ĐÃ deploy qua CDN**: `main-DRDlU_rR.js` (189.991 B) **có** "Cùng xem bộ sưu tập bạn đang làm nhé" · `data-chat-card` · `data-chat-newline` · `data-chat-copy` · "Cách đăng ký API key tìm kiếm web" · `tvly-` · `AIza` · "Canvas đang trống" · `data-chat-open` · `data-prompt-panel`; **KHÔNG còn** `canvas-quick-prompt` · "Nguồn để bạn tự kiểm" · "thu gọn nguồn này". `agent-studio-Dk45VL-3.js` (212.661 B) có lời chào riêng của bước «Hỏi đáp» và `data-chat-copy`, **cố ý không** có khối API key và không có card chức năng (khác trang, khác việc).
 - **Chat chạy thật trên production** (`php artisan studio:chat-check --live --show`): mảnh chữ đầu tiên **9.046 ms**, tổng **28.624 ms**, **194 mảnh**, CHẢY THEO LUỒNG **CÓ**, **5 lượt công cụ · 17 kết quả · 13 trích dẫn**, câu trả lời 1.413 ký tự và **mở bằng nguồn thật** (Harper's Bazaar · Who What Wear · Net-A-Porter · Eva.vn).
 
-### Còn nợ (ghi để phiên sau không tưởng đã xong)
 ### Kiểm chứng BẰNG TRÌNH DUYỆT THẬT (đợt 46 bổ sung — món nợ từ đợt 45 đã trả)
 Dựng **Chrome 153 headless + giao thức DevTools** (máy này có sẵn `google-chrome`) điều khiển thẳng trang thật, **không** phải đọc mã rồi suy đoán. Ba khổ: **375×812 · 320×700 (đo ra 322) · 414×896 · 1280×900**.
 
