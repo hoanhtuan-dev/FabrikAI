@@ -226,8 +226,35 @@ class DesignAgentService
         // nên một số hướng có thể VỪA được gắn bằng chứng thật (xem bước trong radarDirections).
         [$directions, $model, $trends] = $this->radarDirections($trends, $ruleDirections, $candidates, $region, $useAi, $evidence, $search, $market, $user);
 
+        // DỮ LIỆU MẪU KHÔNG ĐƯỢC ĐỨNG NGANG HÀNG VỚI DỮ LIỆU THẬT (yêu cầu 2026-09-26: "clean dữ liệu mẫu").
+        // Đo thật trên production: một lượt radar ra **3 hướng có bằng chứng THẬT + 8 hướng của bộ có sẵn** —
+        // người dùng đọc 11 thẻ và không có cách nào biết 8 thẻ kia chỉ là danh mục MẪU của sản phẩm.
+        // Luật: CÓ hướng thật ⇒ ẨN hướng mẫu và NÓI RA đã ẩn bao nhiêu; KHÔNG có hướng thật ⇒ giữ (màn hình
+        // không được rỗng) nhưng source_mode vẫn là demo để giao diện nói thật.
+        $demoHidden = 0;
+        $hasLiveTrend = false;
+        foreach ($trends as $trend) {
+            if (($trend['evidence_mode'] ?? '') === 'live') {
+                $hasLiveTrend = true;
+                break;
+            }
+        }
+        // KHÔNG VỨT ĐI, CHỈ TÁCH RA: danh mục mẫu vẫn còn nguyên trong khoá riêng `trends_demo` — để giao diện
+        // có thể mở một mục "bộ có sẵn" khi người dùng muốn xem, và để test/đo lường không mất dữ liệu.
+        $demoTrends = [];
+        if ($hasLiveTrend) {
+            $before = count($trends);
+            $demoTrends = array_values(array_filter($trends, fn (array $t) => ($t['evidence_mode'] ?? '') === 'demo'));
+            $trends = array_values(array_filter($trends, fn (array $t) => ($t['evidence_mode'] ?? '') !== 'demo'));
+            $demoHidden = $before - count($trends);
+        }
+
         return [
             'agent' => 'TrendRadar',
+            // Số hướng MẪU đã ẩn vì lượt này đã có hướng thật — giao diện đọc để NÓI RA, không ẩn im lặng.
+            'demo_hidden' => $demoHidden,
+            // Hướng mẫu bị ẩn (rỗng khi chưa có hướng thật). Tách ra chứ KHÔNG xoá: dữ liệu vẫn tra được.
+            'trends_demo' => $demoTrends,
             'engine' => $model['mode'] === 'ai' ? 'ai-v1' : 'rule-based-v1',
             'model' => $model,
             'directions' => $directions,
@@ -1037,14 +1064,37 @@ class DesignAgentService
             $items[] = $row;
         };
 
-        // TÌM KIẾM THỰC TRƯỚC: feed (vừa lấy) → nguồn đã lưu → còn lại. Xem chú thích ở docblock.
+        // THANG ƯU TIÊN (yêu cầu 2026-09-26): **WEB SEARCH trước → trang/RSS là DỰ PHÒNG**.
+        //   1. nguồn do AI TỰ TRA (found_by=ai_search, trong đó nguồn người dùng ĐÃ LƯU lên đầu) — đây là
+        //      kết quả của công cụ tìm kiếm thật, đúng thứ người dùng muốn ưu tiên;
+        //   2. tin máy chủ lấy từ NGUỒN ĐÃ KHAI (trang chuyên mục / RSS) — chỉ là DỰ PHÒNG khi không có
+        //      kết quả tìm kiếm nào.
+        // Đây là lần thứ BA câu hỏi "cái gì đứng trước" được trả lời, nên ghi rõ LÝ DO: bản đầu xếp nguồn đã
+        // lưu lên đầu, bản hai xếp tin vừa lấy lên đầu; cả hai đúng một nửa. Thứ tự ĐÚNG là thứ tự của THANG
+        // TÌM KIẾM, không phải của độ tươi hay độ tin: tìm kiếm thật trước, nguồn khai sau.
+        $fromSearch = [];
+        $fromSources = [];
+        foreach ($found as $row) {
+            $isSearch = ($row['found_by'] ?? '') === 'ai_search' || ($row['finding_id'] ?? null) !== null;
+            if ($isSearch) {
+                $fromSearch[] = $row;
+            } else {
+                $fromSources[] = $row;
+            }
+        }
+        // Trong nhóm kết quả tìm kiếm: nguồn NGƯỜI DÙNG ĐÃ LƯU đứng trước phần còn lại.
+        $fromSearch = array_merge(
+            array_values(array_filter($fromSearch, fn (array $row) => ($row['saved'] ?? false) === true)),
+            array_values(array_filter($fromSearch, fn (array $row) => ($row['saved'] ?? false) !== true)),
+        );
+
+        foreach ($fromSearch as $row) {
+            $push($row);
+        }
         foreach ($feed as $row) {
             $push($row);
-        }
-        foreach ($saved as $row) {
-            $push($row);
-        }
-        foreach ($rest as $row) {
+        }   // nguồn ĐÃ KHAI (trang chuyên mục / RSS) = DỰ PHÒNG
+        foreach ($fromSources as $row) {
             $push($row);
         }
 

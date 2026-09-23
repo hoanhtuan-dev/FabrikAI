@@ -242,14 +242,14 @@ class WebFindingLoopTest extends TestCase
     }
 
     /**
-     * ƯU TIÊN TÌM KIẾM THỰC TRƯỚC (yêu cầu 2026-09-26): trong khối DỮ LIỆU, TIN VỪA LẤY phải đứng TRƯỚC
-     * nguồn trong sổ.
+     * THANG ƯU TIÊN CỦA KHỐI DỮ LIỆU: **KẾT QUẢ TÌM KIẾM trước → nguồn ĐÃ KHAI (trang/RSS) sau**.
      *
-     * Vì sao khoá bằng test: model đọc khối này từ TRÊN XUỐNG, và bản trước xếp nguồn ĐÃ LƯU lên đầu (ý cũ:
-     * "người dùng đã chọn thì quan trọng nhất"). Mở đầu bằng bản ghi CŨ là mở đầu bằng thứ dễ lỗi thời nhất
-     * trong khi thứ vừa lấy được nằm dưới — đúng thứ tự mà yêu cầu này muốn đảo lại.
+     * [ĐỔI CHÍNH SÁCH 2026-09-26 — lần thứ BA] Bài này từng khoá điều NGƯỢC LẠI ("tin vừa lấy đứng đầu"),
+     * và trước đó nữa là "nguồn đã lưu đứng đầu". Yêu cầu mới nói rõ THANG: web search trước, trang/RSS là
+     * DỰ PHÒNG. Thứ tự đúng là thứ tự của THANG TÌM KIẾM, không phải của độ tươi hay độ tin — nguồn đã khai
+     * chỉ là lưới an toàn khi không có kết quả tìm kiếm nào.
      */
-    public function test_fresh_sources_come_before_stored_ones_in_the_data_block(): void
+    public function test_search_results_come_before_configured_page_and_rss_sources(): void
     {
         // Feed sống: một nguồn RSS bình thường (không phải nguồn tìm kiếm).
         WebSource::create([
@@ -272,10 +272,15 @@ class WebFindingLoopTest extends TestCase
 
         $items = app(DesignAgentService::class)->radar($customer, 'all', false)['external_evidence']['items'];
 
-        $this->assertGreaterThanOrEqual(2, count($items), 'Phải có CẢ tin vừa lấy lẫn nguồn trong sổ.');
-        $this->assertSame('https://bao.example/tin-moi', $items[0]['url'], 'Tin VỪA LẤY phải đứng ĐẦU khối DỮ LIỆU.');
-        $this->assertSame('https://bao.example/da-luu', $items[1]['url'], 'Nguồn trong sổ đứng SAU tin vừa lấy.');
-        $this->assertTrue($items[1]['saved'], 'Nguồn đó là nguồn người dùng đã lưu — vẫn phải giữ nhãn.');
+        $this->assertGreaterThanOrEqual(2, count($items), 'Phải có CẢ kết quả tìm kiếm lẫn nguồn đã khai.');
+        // (1) Kết quả AI TỰ TRA đứng TRƯỚC — dù nó đến từ sổ và đã cũ hơn tin vừa lấy.
+        $this->assertSame('https://bao.example/da-luu', $items[0]['url'],
+            'Kết quả TÌM KIẾM phải đứng ĐẦU khối DỮ LIỆU (thang: tìm kiếm trước, nguồn khai sau).');
+        $this->assertSame('ai_search', $items[0]['found_by'] ?? null);
+        $this->assertTrue($items[0]['saved'], 'Nguồn người dùng đã lưu vẫn phải giữ nhãn.');
+        // (2) Nguồn ĐÃ KHAI (trang chuyên mục / RSS) là DỰ PHÒNG ⇒ đứng sau.
+        $this->assertSame('https://bao.example/tin-moi', $items[1]['url'],
+            'Nguồn đã khai chỉ là dự phòng ⇒ đứng sau kết quả tìm kiếm.');
     }
 
     // ── (4)(5) ĐỌC TRANG: chỉ đọc địa chỉ có trong kết quả tìm kiếm ──────────

@@ -1131,7 +1131,11 @@ class ToolSearchTest extends TestCase
 
         // (2) Hướng model KHÔNG tra tới thì KHÔNG được gắn nhãn "đã tra" — nhãn phải đúng sự thật, vì nó
         // là thứ nói với người dùng "hệ thống ĐÃ thử hướng này rồi".
-        $quiet = collect($radar['trends'])->firstWhere('id', 'quiet-shine');
+        //
+        // [2026-09-26] Từ khi có luật "ẩn hướng MẪU khi đã có hướng THẬT", hướng mẫu nằm ở khoá RIÊNG
+        // `trends_demo` (không bị xoá). Bài này cố tình kiểm CẢ hướng mẫu nên phải tìm trong cả hai khoá.
+        $allTrends = array_merge((array) $radar['trends'], (array) ($radar['trends_demo'] ?? []));
+        $quiet = collect($allTrends)->firstWhere('id', 'quiet-shine');
         $this->assertNotNull($quiet);
         $this->assertArrayNotHasKey('checked_by_ai', (array) $quiet, 'Chưa tra thì không được nói là đã tra.');
     }
@@ -1178,7 +1182,10 @@ class ToolSearchTest extends TestCase
         ]);
 
         $radar = app(DesignAgentService::class)->radar($this->customer(), 'all', true);
-        $trend = fn (string $id) => (array) collect($radar['trends'])->firstWhere('id', $id);
+        // [2026-09-26] Hướng MẪU nay nằm ở khoá riêng `trends_demo` khi lượt chạy đã có hướng THẬT (luật "ẩn
+        // hướng mẫu"). Bài này kiểm cả hướng mẫu ⇒ tra trong CẢ HAI khoá; dữ liệu không bị mất, chỉ tách ra.
+        $allTrends = array_merge((array) $radar['trends'], (array) ($radar['trends_demo'] ?? []));
+        $trend = fn (string $id) => (array) collect($allTrends)->firstWhere('id', $id);
 
         // (a) XÁC NHẬN CÓ NGUỒN THẬT ⇒ thành "có tin thật", kèm link để bấm vào kiểm.
         $earth = $trend('earth-neutral');

@@ -628,6 +628,14 @@ Năm ghi chú kỹ thuật (KHÔNG hiện ra giao diện):
 5. **Không tự vẽ bộ chấm tiến trình**: dùng `LoadingSpinner.vue` dùng chung (§3). Khung chat chỉ đưa
    CHỮ (nhãn giai đoạn + dòng đang tra) vào đó.
 
+### 6.9b Bảng nhãn — HƯỚNG MẪU BỊ ẨN (2026-09-26)
+
+| Nhãn hiển thị | Nói với người dùng điều gì | KHÔNG được viết |
+|---|---|---|
+| "Đã ẩn N hướng thuộc bộ có sẵn của FabrikAI — lượt này đã có hướng kèm dữ liệu thật, nên chỉ hiện những hướng có bằng chứng." | Vì sao danh sách hướng NGẮN ĐI so với lần trước; thiếu câu này thì người dùng tưởng hệ thống mất dữ liệu | ẩn im lặng · "demo" · "mock" · "dữ liệu giả" |
+
+**Luật sinh ra nhãn này:** đo thật trên production — một lượt radar trả **3 hướng có bằng chứng thật + 8 hướng của bộ có sẵn**; người dùng đọc 11 thẻ mà không có cách nào biết 8 thẻ kia chỉ là danh mục MẪU. Nay máy chủ **chỉ trả hướng thật** khi lượt chạy đã có hướng thật, **đếm số đã ẩn** (khoá `demo_hidden`) và giao diện **nói ra**; hướng mẫu vẫn còn nguyên trong khoá `trends_demo` (không bị xoá).
+
 ### 6.9 Bảng nhãn — MODAL TRỢ LÝ (2026-09-26)
 
 **Chat nay là MỘT MODAL dùng chung cho cả `/studio`** (`resources/js/studio/components/ChatModal.vue`).

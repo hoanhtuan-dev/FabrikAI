@@ -42,6 +42,10 @@ const aiSearchMode = inject('aiSearchMode');
 const aiSearchOn = inject('aiSearchOn');
 const step = inject('step');
 const radar = inject('radar');
+// HƯỚNG MẪU ĐÃ BỊ ẨN (2026-09-26): máy chủ chỉ trả về hướng có bằng chứng THẬT khi lượt này đã có dữ liệu
+// thật, và bỏ các hướng của BỘ CÓ SẴN sang khoá riêng. Giao diện phải NÓI RA số đã ẩn — nếu không, người
+// dùng thấy danh sách ngắn đi mà không hiểu vì sao.
+const demoHidden = computed(() => Number(radar.value?.demo_hidden || 0));
 const regions = inject('regions');
 const selectedRegion = inject('selectedRegion');
 const trends = inject('trends');
@@ -145,6 +149,9 @@ watch(selectedRegion, (region, previous) => {
                 {{ marketLive
                   ? 'Số đầu tiên là số ĐO từ tin thật; các hướng còn lại ghi rõ hướng nào có tin thật, hướng nào thuộc bộ có sẵn.'
                   : 'Chưa có tin thật: các hướng hiển thị thuộc BỘ XU HƯỚNG CÓ SẴN của FabrikAI, không phải số liệu thị trường.' }}
+              </p>
+              <p v-if="demoHidden" class="mt-1 text-tiny leading-4 text-cream-400 sm:text-label sm:leading-5">
+                Đã ẩn {{ demoHidden }} hướng thuộc bộ có sẵn của FabrikAI — lượt này đã có hướng kèm dữ liệu thật, nên chỉ hiện những hướng có bằng chứng.
               </p>
               <!-- CÁCH DỮ LIỆU ĐƯỢC LƯU · QUẢN LÝ · TÁI SỬ DỤNG — trả lời "lưu ở đâu, ai lưu, dùng lại ra sao". -->
               <details class="mt-1">
