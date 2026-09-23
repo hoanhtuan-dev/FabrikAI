@@ -14,7 +14,7 @@ class Generation extends Model
 
     protected $fillable = [
         'user_id', 'project_id', 'prompts_history_id', 'type', 'status',
-        'prompt', 'model', 'provider', 'resolution', 'ratio', 'duration', 'media_url', 'base_image', 'mask_image', 'job_id', 'error', 'credits_cost', 'elapsed_ms', 'meta',
+        'prompt', 'model', 'provider', 'resolution', 'ratio', 'duration', 'media_url', 'base_image', 'mask_image', 'job_id', 'error', 'credits_cost', 'cost_vnd', 'elapsed_ms', 'meta',
         // [Đợt 0.3] cờ DEMO — xem migration 2026_09_17_000000_add_demo_flags_to_generations
         'is_demo', 'demo_reason',
         // [Đợt 1.1] vòng đời shot — xem migration 2026_09_17_000002_add_shot_lifecycle_to_generations
@@ -25,6 +25,7 @@ class Generation extends Model
     {
         return [
             'meta' => 'array',
+            'cost_vnd' => 'float',
             'is_demo' => 'boolean',
             'is_selected' => 'boolean',
             'sort' => 'integer',

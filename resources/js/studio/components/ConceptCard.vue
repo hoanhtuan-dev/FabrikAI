@@ -19,6 +19,20 @@ const activeTab = ref('prompt'); // 'prompt' | 'body' | 'hair' | 'pose' | 'advan
 // phải sửa prompt rồi bấm tạo từng lần. Nay dán danh sách (mỗi dòng một mục) → MỘT lần bấm.
 const batchText = ref('');
 const batchVariants = ref(1);
+
+/**
+ * ĐƠN GIÁ MỘT ẢNH của lượt sắp chạy (2026-09-26).
+ *
+ * Trước đây chỗ báo giá viết cứng `const base = 1` — khách luôn thấy "~1 credit" kể cả khi model
+ * đang chọn tốn 4 credit. Nay TRA bảng giá máy chủ gửi xuống, theo ĐÚNG model + cỡ + tỉ lệ đang
+ * chọn, nên đổi model hay đổi tỉ lệ là con số nhảy ngay.
+ *
+ * Khai ở đây (trước mọi chỗ dùng) để người đọc không phải đi tìm.
+ */
+const unitCost = computed(() => {
+  const sel = store.selectedTaskModel('image');
+  return store.costFor(sel && sel.provider, sel && sel.model, store.imageRes, store.imageRatio);
+});
 // Mẫu việc theo ngành: nạp 1 lần khi mở tab Hàng loạt (server là nguồn duy nhất của dữ liệu mẫu).
 const templatesLoading = ref(false);
 async function ensureTemplates() {
@@ -49,7 +63,8 @@ const batchItems = computed(() => batchText.value.split('\n').map((s) => s.trim(
 const batchOverLimit = computed(() => batchItems.value.length > BATCH_MAX_ITEMS);
 const batchItemsUsed = computed(() => batchItems.value.slice(0, BATCH_MAX_ITEMS));
 const batchImages = computed(() => batchItemsUsed.value.length * Math.max(1, Math.min(4, Number(batchVariants.value) || 1)));
-const batchCredits = computed(() => batchImages.value * (store.planCostImage || 1));
+// Dùng CÙNG đơn giá với tạo lẻ (unitCost) — hai đường không được báo hai giá khác nhau.
+const batchCredits = computed(() => batchImages.value * unitCost.value);
 const batchShort = computed(() => batchCredits.value > store.creditsLeft);
 function runBatch() {
   if (!batchItemsUsed.value.length || store.generating) return;
@@ -245,7 +260,7 @@ const textureLabel = computed(() => {
   if (t <= 4) return 'Dệt nhẹ'; if (t <= 6) return 'Rõ vừa';
   if (t <= 8) return 'Chi tiết cao'; return 'Siêu chi tiết';
 });
-const creditEstimate = computed(() => { const base = 1; return base * store.variantCount; });
+const creditEstimate = computed(() => unitCost.value * (Number(store.variantCount) || 1));
 
 // ── Debounce for sliders ──
 const debounceTimers = {};
@@ -959,7 +974,7 @@ const bodyHipsLabel = computed(() => {
                       placeholder="Áo sơ mi linen trắng form rộng&#10;Quần tây ống suông đen&#10;Váy midi hoa nhí"></textarea>
             <p class="mt-1 flex flex-wrap items-center gap-x-2 text-body" :class="batchShort ? 'text-warn' : 'text-cream-300'">
               <span>{{ batchItemsUsed.length }} mục × {{ batchVariants }} biến thể = <b class="text-cream-100">{{ batchImages }} ảnh</b></span>
-              <span>· ~{{ batchCredits }} credit (gói của bạn: {{ store.planCostImage }} credit/ảnh)</span>
+              <span>· ~{{ batchCredits }} credit ({{ unitCost }} credit/ảnh theo model và tỉ lệ đang chọn)</span>
               <span>· còn {{ store.creditsLeft }} credit</span>
             </p>
             <p v-if="batchOverLimit" class="mt-1 text-body text-warn">Chỉ {{ BATCH_MAX_ITEMS }} mục đầu được gửi (còn {{ batchItems.length - BATCH_MAX_ITEMS }} mục nữa) — chia thành nhiều lượt để an toàn.</p>

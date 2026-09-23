@@ -55,6 +55,10 @@ class RenderImageJob implements ShouldQueue
 
             $refImages = (array) ($generation->meta['ref_images'] ?? []);
             $faceRef = $generation->meta['face_ref'] ?? null;
+
+            // SỔ CHI PHÍ: gắn lượt gọi này với generation TRƯỚC khi chạy, để ImageAIService ghi được
+            // TỪNG lần thử provider (chuỗi dự phòng có thể tiêu tiền ở 2–3 nhà cung cấp cho MỘT ảnh).
+            $images->setCostContext($generation->id);
             $url = $images->generate(
                 $prompt,
                 $generation->base_image,
@@ -107,6 +111,21 @@ class RenderImageJob implements ShouldQueue
             // requested one when the generation fell back to another provider after a key/quota failure.
             $usedProvider = $images->lastProvider() ?: $generation->provider;
             $usedModel = $images->lastModel() ?: $generation->model;
+
+            // ── SỔ CHI PHÍ: CỘNG DỒN TA ĐÃ TRẢ BAO NHIÊU (2026-09-26) ──────────────────────
+            // Từng LƯỢT THỬ provider đã được ImageAIService ghi vào `provider_usage` (kể cả lượt
+            // hỏng — fal không tính lỗi 5xx nhưng lỗi 422 thì CÓ THỂ vẫn tính). Ở đây chỉ CỘNG DỒN
+            // vào `generations.cost_vnd` để lưới ảnh và báo cáo khỏi phải JOIN.
+            //
+            // KHÔNG ghi thêm một dòng `provider_usage` ở đây: làm vậy là ĐẾM HAI LẦN lượt thành công.
+            try {
+                app(\App\Services\ProviderCostService::class)->syncGenerationCost($generation);
+            } catch (\Throwable $e) {
+                // Ghi sổ hỏng KHÔNG được làm hỏng kết quả render đã xong.
+                logger()->warning('Không cộng dồn được chi phí provider', [
+                    'generation_id' => $generation->id, 'error' => $e->getMessage(),
+                ]);
+            }
 
             // [M-d — 2026-09-17] CAS: nếu người dùng đã Huỷ trong lúc job chạy (hoặc đường khác đã
             // kết thúc row) thì KHÔNG ghi đè 'completed'. Trước đây update() vô điều kiện làm "hồi

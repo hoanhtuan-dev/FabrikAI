@@ -17,6 +17,24 @@ function submitInpaint() {
 
 const activeImg = computed(() => store.upscaleSrc || '');
 
+/**
+ * GIÁ CỦA LƯỢT SỬA NÀY (2026-09-26) — tra theo ĐÚNG model + cỡ + tỉ lệ đang chọn.
+ *
+ * Sửa ảnh là đường ĐẮT NHẤT của sản phẩm: fal tính theo megapixel LÀM TRÒN LÊN, nên ảnh 1K 1:1
+ * (2 MP) tốn gấp đôi 1K 4:5 (1 MP), và ảnh 2K tốn gấp 3–5 lần 1K. Trước đây nút ghi cứng
+ * `store.imageCreditCost` (= 1) nên khách bấm "Sửa ảnh" tưởng 1 credit mà bị trừ 6–10.
+ */
+const editCost = computed(() => {
+  const sel = store.inpaintModel
+    ? store.inpaintModels.find((o) => o.provider + ':' + o.model === store.inpaintModel)
+    : null;
+  const fallback = store.taskGroupModels('edit')[0] || store.inpaintModels[0] || null;
+  const provider = (sel && sel.provider) || (fallback && fallback.provider) || 'dashscope';
+  const model = (sel && sel.model) || (fallback && fallback.model) || '';
+  // Ảnh đang sửa giữ nguyên cỡ/tỉ lệ của nó; độ phân giải gói là trần, nên dùng cỡ đang chọn.
+  return store.costFor(provider, model, store.imageRes, store.imageRatio);
+});
+
 // ── Chip "Đổi màu" → popup chọn màu target ──
 const colorPickerOpen = ref(false);
 const editColor = ref('#e11d48');
@@ -150,7 +168,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     <button @click="submitInpaint" :disabled="!canSubmit" class="btn-brand mt-3 w-full whitespace-nowrap">
       <span v-if="store.inpainting && store.inpaintStage === 'send'">Đang gửi yêu cầu…</span>
       <span v-else-if="store.inpainting">AI đang chỉnh sửa…</span>
-      <span v-else>Sửa ảnh <span class="opacity-70">· {{ store.imageCreditCost }} credit</span></span>
+      <span v-else>Sửa ảnh <span class="opacity-70">· {{ editCost }} credit</span></span>
     </button>
     <p v-if="blockReason" class="mt-1.5 text-label leading-4 text-warn">↳ {{ blockReason }}</p>
 

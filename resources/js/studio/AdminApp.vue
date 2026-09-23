@@ -110,10 +110,30 @@ const session = useSessionStore();
 const me = computed(() => session.me);
 const section = ref('dashboard');
 const toast = ref(null);
-const loading = reactive({ dashboard: true, plans: false, users: false, ledger: false, gui: false, upgrades: false, modules: false });
+const loading = reactive({ dashboard: true, plans: false, users: false, ledger: false, gui: false, upgrades: false, modules: false, modelCredits: false, profit: false });
 
 const dashboard = ref(null);
 const plansData = ref([]);
+
+// [2026-09-26] LỚP KINH TẾ — xem docs/CREDIT_GOI_VA_LOI_NHUAN.md §4.6.
+// Ngưỡng đơn giá tối thiểu của một gói. Đến từ dòng ĐẮT NHẤT trên mỗi credit (video kling
+// 9.100 ₫ ÷ 13 credit = 700 ₫/credit): 700 ÷ (1 − 0,40) = 1.166,67 ⇒ làm tròn lên 1.200 ₫.
+// PHẢI khớp ProviderCostService::MIN_VND_PER_CREDIT (test đối chiếu hai bên).
+const MIN_VND_PER_CREDIT = 1200;
+
+/** Đơn giá credit của một gói (₫/credit). null = gói không bán credit (Miễn phí). */
+function planRate(p) {
+  const credits = Number(p && p.credits_per_month) || 0;
+  if (credits <= 0) return null;
+  return (Number(p.price_vnd) || 0) / credits;
+}
+
+// ── Bảng giá bán theo model + báo cáo lãi/lỗ (nạp khi mở tab Gói cước) ──
+const modelCredits = ref(null);   // { rows, plan_rates, min_rate_vnd, min_required_vnd, credit_divisor_vnd, fx_rate }
+const profitData = ref(null);
+const profitDays = ref(30);
+const mcSaving = ref(0);          // id dòng đang lưu — khoá ĐÚNG nút đó, không khoá cả bảng
+const mcFilter = ref('');         // '' = tất cả; 'warn' = chỉ dòng dưới 40 %
 const usersData = ref({ users: [], total: 0, page: 1, last_page: 1 });
 const ledgerData = ref({ transactions: [], total: 0, page: 1, last_page: 1 });
 const guiItems = ref([]);
@@ -219,6 +239,50 @@ async function loadPlans() {
   catch (e) { flash(userFacingError(e, 'Thao tác thất bại.'), false); }
   finally { loading.plans = false; }
 }
+
+/**
+ * Nạp BẢNG GIÁ BÁN THEO MODEL (kèm giá vốn + biên do MÁY CHỦ tính).
+ *
+ * Vì sao tính biên ở MÁY CHỦ chứ không ở giao diện: công thức (megapixel làm tròn lên, mẫu số
+ * 720 ₫, tỉ giá) là MỘT nguồn sự thật. Chép công thức sang JS là tạo bản sao thứ hai — và bản
+ * sao thứ hai luôn lệch sau vài lần sửa.
+ */
+async function loadModelCredits() {
+  loading.modelCredits = true;
+  try { modelCredits.value = await api('/model-credits'); }
+  catch (e) { flash(userFacingError(e, 'Không nạp được bảng giá theo model.'), false); }
+  finally { loading.modelCredits = false; }
+}
+async function loadProfit() {
+  loading.profit = true;
+  try { profitData.value = await api('/profit?days=' + profitDays.value); }
+  catch (e) { flash(userFacingError(e, 'Không nạp được báo cáo lợi nhuận.'), false); }
+  finally { loading.profit = false; }
+}
+
+/** Sửa SỐ CREDIT của một dòng giá — giá vốn KHÔNG sửa được ở đây (đó là sự thật của nhà cung cấp). */
+async function saveModelCredit(row, credits) {
+  const value = Number(credits);
+  if (!Number.isFinite(value) || value < 1 || value === row.credits) return;
+  mcSaving.value = row.id;
+  try {
+    await api('/model-credits/' + row.id, { method: 'PUT', body: { credits: value } });
+    row.credits = value;
+    flash('Đã đặt ' + value + ' credit cho ' + row.model + '.');
+    await loadModelCredits();   // tính lại biên — đổi giá là đổi lãi, phải thấy ngay
+  } catch (e) { flash(userFacingError(e, 'Không lưu được giá.'), false); }
+  finally { mcSaving.value = 0; }
+}
+
+/** Các dòng ĐANG DƯỚI 40 % (hoặc chưa khai giá vốn) — thứ duy nhất cần nhìn trong bảng 96 dòng. */
+const mcProblems = computed(() => ((modelCredits.value && modelCredits.value.rows) || []).filter((r) => !r.ok));
+const mcVisible = computed(() => {
+  const rows = (modelCredits.value && modelCredits.value.rows) || [];
+  if (mcFilter.value === 'warn') return rows.filter((r) => !r.ok);
+  if (mcFilter.value) return rows.filter((r) => r.provider === mcFilter.value);
+  return rows;
+});
+const mcProviders = computed(() => [...new Set(((modelCredits.value && modelCredits.value.rows) || []).map((r) => r.provider))]);
 async function loadUsers() {
   if (!isSuper.value) return;
   loading.users = true;
@@ -393,7 +457,13 @@ function ensureLoaded(id) {
   if (id === 'users' && isSuper.value && !usersData.value.users.length) loadUsers();
   if (id === 'ledger' && !ledgerData.value.transactions.length) loadLedger();
   if (id === 'gui' && !guiItems.value.length) loadGui();
-  if (id === 'plans' && !plansData.value.length) loadPlans();
+  if (id === 'plans') {
+    if (!plansData.value.length) loadPlans();
+    // [2026-09-26] Nạp kèm lớp kinh tế: bảng giá bán theo model + báo cáo lãi/lỗ.
+    // Nạp LƯỜI (chỉ khi mở tab) — hai bảng này không ai cần lúc vào trang Quản trị.
+    if (!modelCredits.value) loadModelCredits();
+    if (!profitData.value) loadProfit();
+  }
   if (id === 'upgrades' && !upgradesData.value.requests.length) loadUpgrades();
   if (id === 'modules' && !modulesData.value.modules.length) loadModules();
   if (id === 'prompts' && !promptsData.value.length) loadPrompts();
@@ -558,7 +628,7 @@ function blankPlan() {
   // seats: [Q4] số NGƯỜI dùng chung một gói (1 = một người).
   // modules: [Modules] công tắc cấp phát tính năng của gói (danh sách id module).
   // features: ghi chú HIỂN THỊ nhập tay — chỉ để khách đọc, KHÔNG cấp quyền gì.
-  return { name: '', slug: '', tagline: '', price_vnd: 0, credits_per_month: 0, bonus_credits: 0, image_credit_cost: 1, video_credit_cost: 10, resolution_cap: '2K', seats: 1, modules: [], features: [], is_active: true, is_default: false, sort: 0 };
+  return { name: '', slug: '', tagline: '', price_vnd: 0, credits_per_month: 0, bonus_credits: 0, image_credit_cost: 1, video_credit_cost: 10, daily_image_limit: 0, resolution_cap: '2K', seats: 1, modules: [], features: [], is_active: true, is_default: false, sort: 0 };
 }
 function openCreateUser() { Object.assign(userModal, { open: true, mode: 'create', row: null, form: blankUser(), errors: {}, saving: false }); }
 function openEditUser(u) {
@@ -889,7 +959,7 @@ onMounted(async () => {
             <StudioIcon name="gear" size="h-3.5 w-3.5" />
             <span class="hidden sm:inline">Cài đặt</span>
           </a>
-          <button class="tool-btn" :disabled="loading.dashboard" title="Nạp lại dữ liệu" @click="loadDashboard(); if (section==='users') loadUsers(); if (section==='ledger') loadLedger(); if (section==='gui') loadGui(); if (section==='plans') loadPlans(); if (section==='upgrades') loadUpgrades(); if (section==='modules') loadModules()">
+          <button class="tool-btn" :disabled="loading.dashboard" title="Nạp lại dữ liệu" @click="loadDashboard(); if (section==='users') loadUsers(); if (section==='ledger') loadLedger(); if (section==='gui') loadGui(); if (section==='plans') { loadPlans(); loadModelCredits(); loadProfit(); } if (section==='upgrades') loadUpgrades(); if (section==='modules') loadModules()">
             <StudioIcon name="refresh" size="h-3.5 w-3.5" :class="{ 'animate-spin': loading.dashboard }" />
             <span class="hidden sm:inline">Tải lại</span>
           </button>
@@ -1235,6 +1305,17 @@ onMounted(async () => {
                   <span :class="[BADGE, BADGE_TONE.neutral]"><StudioIcon name="image" size="h-3 w-3" /> {{ p.image_credit_cost }} credit/ảnh</span>
                   <span :class="[BADGE, BADGE_TONE.neutral]"><StudioIcon name="film" size="h-3 w-3" /> {{ p.video_credit_cost }} credit/video</span>
                   <span :class="[BADGE, BADGE_TONE.neutral]">{{ p.resolution_cap }}</span>
+                  <!-- [2026-09-26] ĐƠN GIÁ CREDIT: bất biến ₫/credit ≥ 1.200 là điều kiện để
+                       MỌI dòng đạt biên 40 %. Hiện ngay tại đây để sửa gói là thấy hậu quả. -->
+                  <span :class="[BADGE, (planRate(p) !== null && planRate(p) < MIN_VND_PER_CREDIT) ? BADGE_TONE.danger : BADGE_TONE.neutral]"
+                        :title="'Đơn giá mỗi credit. Phải ≥ ' + fmtNum(MIN_VND_PER_CREDIT) + ' ₫ thì dòng đắt nhất (video) mới đạt biên 40 %.'">
+                    <StudioIcon name="coins" size="h-3 w-3" />
+                    {{ planRate(p) !== null ? fmtNum(Math.round(planRate(p))) + ' ₫/credit' : 'không bán credit' }}
+                  </span>
+                  <span :class="[BADGE, p.daily_image_limit ? BADGE_TONE.neutral : BADGE_TONE.warn]"
+                        :title="'Trần tạo ảnh mỗi ngày. Credit chặn tổng chi tiêu; trần ngày chặn việc đốt sạch credit trong một phiên.'">
+                    {{ p.daily_image_limit ? fmtNum(p.daily_image_limit) + ' ảnh/ngày' : 'không trần ngày' }}
+                  </span>
                   <span :class="[BADGE, p.seats > 1 ? BADGE_TONE.ok : BADGE_TONE.neutral]" title="Số ghế: số người dùng chung gói này">
                     <StudioIcon name="users" size="h-3 w-3" /> {{ p.seats_label || (p.seats + ' người') }}
                   </span>
@@ -1247,6 +1328,183 @@ onMounted(async () => {
                   <button class="tool-btn !text-danger hover:!bg-danger/15" @click="askDeletePlan(p)"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xoá</button>
                 </div>
               </article>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════════════════════════
+                 LỚP KINH TẾ (2026-09-26) — docs/CREDIT_GOI_VA_LOI_NHUAN.md §4–§5
+                 VÌ SAO Ở ĐÚNG TAB NÀY: giá bán, credit và lãi/lỗ là MỘT việc. Tách sang tab khác
+                 thì người sửa giá không nhìn thấy hậu quả của việc mình vừa sửa.
+                 ═══════════════════════════════════════════════════════════════════════════ -->
+
+            <!-- ── CẢNH BÁO: chỗ đang KHÔNG đạt 40 % ── -->
+            <div v-if="mcProblems.length" class="card border-danger/40 bg-danger/5 p-4">
+              <h2 class="flex flex-wrap items-center gap-2 font-display text-base font-semibold text-danger">
+                <StudioIcon name="alertTriangle" size="h-4 w-4" /> {{ mcProblems.length }} dòng đang DƯỚI biên 40 %
+              </h2>
+              <p class="mt-1 max-w-3xl text-body leading-relaxed text-cream-200">
+                Mỗi dòng là một model bán dưới giá vốn cộng biên tối thiểu — tức mỗi lượt khách dùng là một lượt lỗ.
+                Sửa bằng cách TĂNG số credit ở bảng dưới, hoặc cập nhật giá vốn nếu nhà cung cấp đã đổi giá.
+              </p>
+              <ul class="mt-2 space-y-1">
+                <li v-for="r in mcProblems.slice(0, 8)" :key="r.id" class="text-body-lg text-cream-200">
+                  · <b>{{ r.model }}</b> ({{ r.scope }}) — {{ r.credits }} credit · giá vốn
+                  {{ r.cost_vnd !== null ? fmtNum(r.cost_vnd) + ' ₫' : 'CHƯA KHAI' }} ·
+                  biên <b class="text-danger">{{ r.margin_pct !== null ? r.margin_pct + ' %' : '—' }}</b>
+                </li>
+              </ul>
+            </div>
+
+            <!-- ── BẢNG GIÁ BÁN THEO MODEL ── -->
+            <div class="card p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
+                    <StudioIcon name="coins" size="h-4 w-4" class="text-brand-300" /> Giá credit theo model
+                    <span v-if="modelCredits" :class="[BADGE, BADGE_TONE.neutral]">{{ fmtNum(modelCredits.rows.length) }} dòng</span>
+                  </h2>
+                  <p class="mt-1 max-w-3xl text-xs leading-relaxed text-cream-300">
+                    Số credit thu của khách cho MỘT lượt, theo từng model và từng cỡ ảnh.
+                    Biên tính ở <b>đơn giá tệ nhất trong các gói</b>
+                    <template v-if="modelCredits">({{ fmtNum(Math.round(modelCredits.min_rate_vnd)) }} ₫/credit)</template>
+                    — nên <b>mọi dòng ≥ 40 %</b> nghĩa là khách dùng gì cũng không lỗ.
+                    Giá vốn tính theo megapixel <b>làm tròn lên</b> đúng như fal tính tiền, nên ảnh 1:1 ở 1K
+                    tốn gấp đôi ảnh 4:5.
+                  </p>
+                </div>
+                <button class="tool-btn" :disabled="loading.modelCredits" @click="loadModelCredits()">
+                  <StudioIcon name="refresh" size="h-3.5 w-3.5" /> Nạp lại
+                </button>
+              </div>
+
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <button class="tool-btn" :class="mcFilter === '' ? 'is-active' : ''" @click="mcFilter = ''">Tất cả</button>
+                <button v-for="pv in mcProviders" :key="pv" class="tool-btn" :class="mcFilter === pv ? 'is-active' : ''" @click="mcFilter = pv">{{ pv }}</button>
+                <button v-if="mcProblems.length" class="tool-btn !text-danger" :class="mcFilter === 'warn' ? 'is-active' : ''" @click="mcFilter = 'warn'">
+                  Chỉ dòng dưới 40 % ({{ mcProblems.length }})
+                </button>
+              </div>
+
+              <div v-if="loading.modelCredits && !modelCredits" class="mt-3 h-32 animate-pulse rounded bg-ink-800"></div>
+              <div v-else-if="modelCredits" class="mt-3 overflow-x-auto">
+                <table class="w-full text-left text-body">
+                  <thead class="text-label uppercase tracking-wide text-cream-300">
+                    <tr class="border-b border-ink-700">
+                      <th class="py-2 pr-3">Model</th>
+                      <th class="py-2 pr-3">Cỡ · tỉ lệ</th>
+                      <th class="py-2 pr-3">Credit</th>
+                      <th class="py-2 pr-3">Giá vốn</th>
+                      <th class="py-2 pr-3">Biên</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in mcVisible" :key="r.id" class="border-b border-ink-800/60">
+                      <td class="py-1.5 pr-3">
+                        <span class="font-mono text-tiny text-cream-300">{{ r.provider }}</span>
+                        <span class="ml-1 text-cream-100">{{ r.model }}</span>
+                      </td>
+                      <td class="py-1.5 pr-3 text-cream-300">{{ r.scope }}</td>
+                      <td class="py-1.5 pr-3">
+                        <input type="number" min="1" max="1000" :value="r.credits" :disabled="mcSaving === r.id"
+                               class="input !w-20 !py-1 text-body"
+                               :aria-label="'Số credit cho ' + r.model + ' ' + r.scope"
+                               @change="saveModelCredit(r, $event.target.value)">
+                      </td>
+                      <td class="py-1.5 pr-3 text-cream-300">{{ r.cost_vnd !== null ? fmtNum(r.cost_vnd) + ' ₫' : 'chưa khai' }}</td>
+                      <td class="py-1.5 pr-3">
+                        <span :class="[BADGE, r.ok ? BADGE_TONE.ok : BADGE_TONE.danger]">
+                          {{ r.margin_pct !== null ? r.margin_pct + ' %' : 'chưa rõ' }}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr v-if="!mcVisible.length"><td colspan="5" class="py-4 text-center text-cream-300">Không có dòng nào khớp bộ lọc.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- ── BÁO CÁO LÃI/LỖ ── -->
+            <div class="card p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="flex items-center gap-2 font-display text-base font-semibold text-cream-50">
+                    <StudioIcon name="zap" size="h-4 w-4" class="text-brand-300" /> Lợi nhuận
+                    <span v-if="profitData" :class="[BADGE, BADGE_TONE.neutral]">{{ profitData.days }} ngày</span>
+                  </h2>
+                  <p class="mt-1 max-w-3xl text-xs leading-relaxed text-cream-300">
+                    Doanh thu ước tính (số credit đã trừ × đơn giá credit trung bình của các gói đang bán)
+                    trừ giá vốn THẬT ghi ở sổ <span class="font-mono">provider_usage</span>.
+                    Số này chỉ đúng khi giá vốn được khai đủ — dòng nào chưa khai sẽ bị đếm riêng, không đoán bừa.
+                  </p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <select v-model.number="profitDays" class="input !w-auto !py-1.5" aria-label="Khoảng thời gian" @change="loadProfit()">
+                    <option :value="7">7 ngày</option>
+                    <option :value="30">30 ngày</option>
+                    <option :value="90">90 ngày</option>
+                  </select>
+                  <button class="tool-btn" :disabled="loading.profit" @click="loadProfit()"><StudioIcon name="refresh" size="h-3.5 w-3.5" /> Nạp lại</button>
+                </div>
+              </div>
+
+              <div v-if="loading.profit && !profitData" class="mt-3 h-24 animate-pulse rounded bg-ink-800"></div>
+              <template v-else-if="profitData">
+                <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  <div class="rounded-lg border border-ink-700 bg-ink-800/50 p-3">
+                    <p class="text-label uppercase tracking-wide text-cream-300">Doanh thu</p>
+                    <p class="font-display text-lg font-semibold text-cream-50">{{ fmtNum(Math.round(profitData.revenue_vnd)) }} ₫</p>
+                  </div>
+                  <div class="rounded-lg border border-ink-700 bg-ink-800/50 p-3">
+                    <p class="text-label uppercase tracking-wide text-cream-300">Giá vốn</p>
+                    <p class="font-display text-lg font-semibold text-cream-50">{{ fmtNum(Math.round(profitData.cost_vnd)) }} ₫</p>
+                  </div>
+                  <div class="rounded-lg border border-ink-700 bg-ink-800/50 p-3">
+                    <p class="text-label uppercase tracking-wide text-cream-300">Lãi gộp</p>
+                    <p class="font-display text-lg font-semibold" :class="profitData.profit_vnd >= 0 ? 'text-ok' : 'text-danger'">
+                      {{ fmtNum(Math.round(profitData.profit_vnd)) }} ₫
+                    </p>
+                  </div>
+                  <div class="rounded-lg border border-ink-700 bg-ink-800/50 p-3">
+                    <p class="text-label uppercase tracking-wide text-cream-300">Biên</p>
+                    <p class="font-display text-lg font-semibold" :class="profitData.margin_pct >= 40 ? 'text-ok' : 'text-warn'">
+                      {{ profitData.margin_pct }} %
+                    </p>
+                  </div>
+                </div>
+
+                <p v-if="profitData.unknown_count" class="mt-2 rounded border border-warn/30 bg-warn/10 px-2 py-1.5 text-label text-warn">
+                  {{ fmtNum(profitData.unknown_count) }} lượt CHƯA RÕ giá vốn — chưa khai giá cho model đó. Đã để trống thay vì đoán.
+                </p>
+
+                <div v-if="profitData.rows.length" class="mt-3 overflow-x-auto">
+                  <table class="w-full text-left text-body">
+                    <thead class="text-label uppercase tracking-wide text-cream-300">
+                      <tr class="border-b border-ink-700">
+                        <th class="py-2 pr-3">Model</th>
+                        <th class="py-2 pr-3">Lượt</th>
+                        <th class="py-2 pr-3">Credit/lượt</th>
+                        <th class="py-2 pr-3">Giá vốn</th>
+                        <th class="py-2 pr-3">Doanh thu</th>
+                        <th class="py-2 pr-3">Biên</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="r in profitData.rows" :key="r.provider + r.model" class="border-b border-ink-800/60">
+                        <td class="py-1.5 pr-3"><span class="font-mono text-tiny text-cream-300">{{ r.provider }}</span> <span class="text-cream-100">{{ r.model }}</span></td>
+                        <td class="py-1.5 pr-3 text-cream-200">{{ fmtNum(r.calls) }}</td>
+                        <td class="py-1.5 pr-3 text-cream-200">{{ r.credits_each }}</td>
+                        <td class="py-1.5 pr-3 text-cream-200">{{ fmtNum(Math.round(r.cost_vnd)) }} ₫</td>
+                        <td class="py-1.5 pr-3 text-cream-200">{{ fmtNum(Math.round(r.revenue_vnd)) }} ₫</td>
+                        <td class="py-1.5 pr-3">
+                          <span :class="[BADGE, r.losing ? BADGE_TONE.danger : (r.margin_pct >= 40 ? BADGE_TONE.ok : BADGE_TONE.warn)]">
+                            {{ r.margin_pct !== null ? r.margin_pct + ' %' : '—' }}
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p v-else class="mt-3 text-body text-cream-300">Chưa có lượt gọi nhà cung cấp nào trong khoảng này.</p>
+              </template>
             </div>
           </section>
 
@@ -1954,6 +2212,12 @@ onMounted(async () => {
           <div>
             <label class="label" for="pl-bonus">Credit tặng lần đầu</label>
             <input id="pl-bonus" v-model.number="planModal.form.bonus_credits" type="number" min="0" class="input !py-2">
+          </div>
+          <!-- [2026-09-26] GIỚI HẠN TẠO ẢNH/NGÀY — sửa được bằng dữ liệu, không cần deploy. -->
+          <div>
+            <label class="label" for="pl-daily">Giới hạn ảnh mỗi ngày (0 = không giới hạn)</label>
+            <input id="pl-daily" v-model.number="planModal.form.daily_image_limit" type="number" min="0" max="100000" class="input !py-2">
+            <p class="mt-1 text-body text-cream-300">Credit chặn TỔNG chi tiêu; trần theo ngày chặn việc đốt sạch credit trong một phiên.</p>
           </div>
           <div>
             <label class="label" for="pl-res">Độ phân giải tối đa</label>

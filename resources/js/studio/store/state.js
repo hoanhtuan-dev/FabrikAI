@@ -227,6 +227,11 @@ export function studioState() {
     inpaintPreserveBg: true,  // giữ nguyên nền
     inpaintPreserveFace: true,// giữ nguyên khuôn mặt
     inpaintModels: [],        // các model chỉnh sửa được phép chọn (load từ /api/defaults)
+    // ── GIÁ THEO MODEL (2026-09-26) ──────────────────────────────────────────────────────
+    // Bảng TRA giá bán: [{ p: provider, m: model, r: '1K'|'2K'|'', t: '4:5'|'', c: credit }].
+    // Giao diện CHỈ TRA, KHÔNG TÍNH: công thức (megapixel làm tròn lên, mẫu số 720 ₫) nằm ở
+    // ProviderCostService — chép sang JS là tạo bản sao thứ hai và bản sao luôn lệch.
+    modelCreditCosts: [],
     inpaintModel: '',         // model đang chọn cho card Sửa ảnh — '' = mặc định (Qwen Edit cấu hình)
     taskGroups: {},            // model theo nhóm công việc (image/edit/video/vision/prompt/translate) — load từ /api/defaults
     imageModelSel: '',         // model đang chọn cho Tạo Ảnh 2D + Ảnh mới từ ảnh mẫu ('' = default nhóm image)

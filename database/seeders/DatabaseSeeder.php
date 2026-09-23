@@ -22,6 +22,14 @@ class DatabaseSeeder extends Seeder
         // ── Gói cước (plans) — dữ liệu CẤU HÌNH, không phải demo ──
         $this->call(PlanSeeder::class);
 
+        // ── LỚP KINH TẾ (2026-09-26) ────────────────────────────────────────────────────
+        // Giá vốn nhà cung cấp TRƯỚC, rồi giá bán theo model SINH TỪ giá vốn (không chép tay).
+        // Thứ tự này là bắt buộc: ModelCreditCostSeeder đọc provider_price để tính.
+        // Bỏ hai dòng này thì mọi thứ vẫn chạy — giá rơi về plans.image_credit_cost như cũ —
+        // nhưng biên lợi nhuận sẽ không còn được bảo đảm.
+        $this->call(ProviderPriceSeeder::class);
+        $this->call(ModelCreditCostSeeder::class);
+
         // ── Nội dung CẤU HÌNH của app (không phải dữ liệu demo) ──
         // Preset thợ may / khuôn mặt / tư thế + thư viện Trợ lý thiết kế. Đây là thứ app cần để chạy,
         // không phải hàng mẫu, nên seed cả ở production.

@@ -17,7 +17,7 @@ class Plan extends Model
     protected $fillable = [
         'name', 'slug', 'tagline', 'price_vnd', 'unit_months', 'cycle_months', 'units',
         'credits_per_month', 'bonus_credits',
-        'image_credit_cost', 'video_credit_cost', 'resolution_cap', 'seats', 'features', 'modules',
+        'image_credit_cost', 'video_credit_cost', 'daily_image_limit', 'resolution_cap', 'seats', 'features', 'modules',
         'is_active', 'is_default', 'sort',
     ];
 
@@ -34,6 +34,7 @@ class Plan extends Model
         'bonus_credits' => 'integer',
         'image_credit_cost' => 'integer',
         'video_credit_cost' => 'integer',
+        'daily_image_limit' => 'integer',
         'seats' => 'integer',
         'sort' => 'integer',
     ];

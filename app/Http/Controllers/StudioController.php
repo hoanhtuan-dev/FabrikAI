@@ -1980,34 +1980,14 @@ RULES:
         // không được kiểm ở đâu ⇒ gói Miễn phí (1K) và gói Studio (2K) cho ra ảnh giống hệt nhau.
         $data = $this->clampResolutionToPlan($data);
 
-        // [Q1 — 2026-09-19] CHẶN khi hết credit (chủ dự án đã bật; tắt được bằng setting
-        // studio_enforce_credits=0). Trả 402 có CẤU TRÚC thay vì chỉ một câu chữ: giao diện cần biết
-        // thiếu bao nhiêu, còn bao nhiêu, và nâng cấp ở đâu — nếu không thì khách chỉ thấy "lỗi" mà
-        // không biết làm gì tiếp, đúng thứ làm khách bỏ đi.
-        // Chủ hệ thống (Super Admin) KHÔNG bị chặn: đây là công cụ nội bộ của chính chủ dự án, khoá tài
-        // khoản owner khi credit = 0 là tự khoá mình khỏi sản phẩm (đo trên production 2026-09-19: tài
-        // khoản owner đang có 0 credit). Việc chặn nhằm bảo vệ DOANH THU từ khách, và khách vẫn bị chặn
-        // đúng như đã quyết — muốn thử trải nghiệm bị chặn thì dùng một tài khoản khách.
-        // [Q4 — 2026-09-19] Thành viên nhóm tiêu credit của CHỦ NHÓM ⇒ mọi phép kiểm/trừ ở đây dùng
-        // người trả tiền (billingUser), còn ảnh vẫn ghi `user_id` = người bấm để biết ai làm gì.
+        // [Q4 — 2026-09-19] Người TRẢ TIỀN là chủ nhóm (nếu có) — mọi phép kiểm/trừ dùng người này.
         $billing = $user->billingUser();
         $limits = studio_plan_limits($billing);
-        if ($cost > 0 && ! $user->isSuperAdmin() && $limits['enforce_credits'] && (int) $billing->credits_balance < $cost) {
-            $plan = $limits['plan'];
-            abort(response()->json([
-                'code' => 'out_of_credits',
-                'message' => ($billing->is($user) ? 'Bạn' : 'Nhóm của bạn').' đã dùng hết credit của gói (thao tác này cần '.$cost.' credit, hiện còn '
-                    .max(0, (int) $billing->credits_balance).'). Mở «Gói & credit» để nâng cấp gói.',
-                'needed' => $cost,
-                'balance' => max(0, (int) $billing->credits_balance),
-                'plan' => $plan ? ['id' => $plan->id, 'name' => $plan->name, 'slug' => $plan->slug] : null,
-                'upgrade_url' => '/bang-gia',
-            ], 402));
-        }
 
-        // (M-h — 2026-09-17) Việc TRỪ CREDIT đã chuyển xuống khối `DB::transaction` ngay dưới,
-        // nằm CÙNG transaction với `generations.create()`: create lỗi ⇒ rollback ⇒ không mất credit.
-
+        // ── (1) CHỐT PROVIDER + MODEL TRƯỚC ─────────────────────────────────────────────────
+        // [2026-09-26] Khối này được CHUYỂN LÊN TRƯỚC phép kiểm credit, vì giá một lượt giờ phụ
+        // thuộc vào MODEL chứ không còn là một con số cố định: tạo ảnh nhanh 1 credit, sửa ảnh có
+        // mask 2K 10 credit. Kiểm credit bằng con số cũ rồi mới biết model thật là kiểm sai.
         if (! empty($data['edit'])) {
             // Per-request override from the Sửa ảnh card (e.g. qwen-image-3.0-pro). Only
             // edit-capable models are honored — anything else keeps the configured Qwen
@@ -2033,6 +2013,75 @@ RULES:
                 ? [(string) $data['provider'], (string) $data['model']]
                 : $this->defaultProviderModel($type);
         }
+
+        // ── (2) GIÁ CỦA LƯỢT NÀY — theo model + cỡ + tỉ lệ (2026-09-26) ─────────────────────
+        // VÌ SAO: bán mọi model với cùng một giá là lỗ âm thầm — giá vốn lệch hơn 300 lần giữa
+        // model rẻ nhất và đắt nhất. Xem docs/CREDIT_GOI_VA_LOI_NHUAN.md §3.5 và §4.5.
+        //
+        // Thứ tự tra trong studio_credit_cost_for(): model_credit_cost(model, cỡ, tỉ lệ) → giá của
+        // GÓI → mặc định toàn cục. Nhờ vậy hệ thống KHÔNG vỡ khi bảng giá chưa được seed: gói vẫn
+        // là nguồn dự phòng, đúng hành vi cũ.
+        //
+        // $cost truyền vào từ nơi gọi bị BỎ QUA khi bảng giá theo model đã có dòng — tham số đó nay
+        // chỉ còn là giá trị dự phòng.
+        $cost = studio_credit_cost_for(
+            $type === 'video' ? 'video' : 'image',
+            $provider,
+            $model,
+            $data['resolution'] ?? null,
+            $data['ratio'] ?? null,
+            $billing,
+        );
+
+        // ── (3) GIỚI HẠN TẠO ẢNH THEO NGÀY (2026-09-26) ─────────────────────────────────────
+        // Credit chặn TỔNG chi tiêu nhưng KHÔNG chặn một tài khoản đốt sạch credit trong 10 phút
+        // rồi bỏ — và với gói Miễn phí (100 credit tặng) thì trần chi phí thật của một tài khoản
+        // là 65.000 ₫. Trần theo NGÀY là công cụ chống lạm dụng rẻ nhất, và nó SỬA ĐƯỢC ở Quản trị
+        // (plans.daily_image_limit; 0 = không giới hạn).
+        $dailyLimit = (int) ($limits['plan']->daily_image_limit ?? 0);
+        if ($dailyLimit > 0 && $type === 'image' && ! $user->isSuperAdmin()) {
+            $todayCount = \App\Models\Generation::query()
+                ->where('user_id', $user->id)
+                ->where('type', 'image')
+                ->whereDate('created_at', now()->toDateString())
+                ->count();
+            if ($todayCount >= $dailyLimit) {
+                abort(response()->json([
+                    'code' => 'daily_limit_reached',
+                    'message' => 'Gói '.($limits['plan']->name ?? 'hiện tại').' cho tối đa '.$dailyLimit
+                        .' ảnh mỗi ngày. Bạn đã dùng '.$todayCount.' ảnh hôm nay — mai tạo tiếp, hoặc nâng gói để có trần cao hơn.',
+                    'limit' => $dailyLimit,
+                    'used' => $todayCount,
+                    'upgrade_url' => '/bang-gia',
+                ], 429));
+            }
+        }
+
+        // [Q1 — 2026-09-19] CHẶN khi hết credit (chủ dự án đã bật; tắt được bằng setting
+        // studio_enforce_credits=0). Trả 402 có CẤU TRÚC thay vì chỉ một câu chữ: giao diện cần biết
+        // thiếu bao nhiêu, còn bao nhiêu, và nâng cấp ở đâu — nếu không thì khách chỉ thấy "lỗi" mà
+        // không biết làm gì tiếp, đúng thứ làm khách bỏ đi.
+        // Chủ hệ thống (Super Admin) KHÔNG bị chặn: đây là công cụ nội bộ của chính chủ dự án, khoá tài
+        // khoản owner khi credit = 0 là tự khoá mình khỏi sản phẩm (đo trên production 2026-09-19: tài
+        // khoản owner đang có 0 credit). Việc chặn nhằm bảo vệ DOANH THU từ khách, và khách vẫn bị chặn
+        // đúng như đã quyết — muốn thử trải nghiệm bị chặn thì dùng một tài khoản khách.
+        // [Q4 — 2026-09-19] Thành viên nhóm tiêu credit của CHỦ NHÓM ⇒ mọi phép kiểm/trừ ở đây dùng
+        // người trả tiền (billingUser), còn ảnh vẫn ghi `user_id` = người bấm để biết ai làm gì.
+        if ($cost > 0 && ! $user->isSuperAdmin() && $limits['enforce_credits'] && (int) $billing->credits_balance < $cost) {
+            $plan = $limits['plan'];
+            abort(response()->json([
+                'code' => 'out_of_credits',
+                'message' => ($billing->is($user) ? 'Bạn' : 'Nhóm của bạn').' đã dùng hết credit của gói (thao tác này cần '.$cost.' credit, hiện còn '
+                    .max(0, (int) $billing->credits_balance).'). Mở «Gói & credit» để nâng cấp gói.',
+                'needed' => $cost,
+                'balance' => max(0, (int) $billing->credits_balance),
+                'plan' => $plan ? ['id' => $plan->id, 'name' => $plan->name, 'slug' => $plan->slug] : null,
+                'upgrade_url' => '/bang-gia',
+            ], 402));
+        }
+
+        // (M-h — 2026-09-17) Việc TRỪ CREDIT đã chuyển xuống khối `DB::transaction` ngay dưới,
+        // nằm CÙNG transaction với `generations.create()`: create lỗi ⇒ rollback ⇒ không mất credit.
 
         // [M-h — 2026-09-17] Trừ credit + tạo row trong CÙNG một transaction. Trước đây decrement()
         // chạy TRƯỚC create(); nếu create ném lỗi (DB/constraint/model event) thì người dùng mất
@@ -5107,6 +5156,33 @@ RULES:
     /**
      * Return studio config defaults so the frontend can initialise its sliders/fields.
      */
+    /**
+     * Bảng giá bán theo model, dạng RÚT GỌN để gửi xuống giao diện.
+     *
+     * Khoá ngắn (p/m/r/t/c) vì bảng có ~170 dòng và nó đi kèm MỌI lần tải Studio.
+     * Giao diện chỉ TRA, không tính — xem chú thích ở nơi dùng ('model_credit_costs').
+     *
+     * @return list<array{p:string,m:string,r:string,t:string,c:int}>
+     */
+    protected function modelCreditCostTable(): array
+    {
+        try {
+            return \App\Models\ModelCreditCost::query()
+                ->orderBy('resolution')->orderBy('ratio')
+                ->get(['provider', 'model', 'resolution', 'ratio', 'credits'])
+                ->map(fn ($r) => [
+                    'p' => strtolower((string) $r->provider),
+                    'm' => (string) $r->model,
+                    'r' => (string) $r->resolution,
+                    't' => (string) $r->ratio,
+                    'c' => (int) $r->credits,
+                ])->all();
+        } catch (\Throwable $e) {
+            // Bảng chưa migrate: giao diện rơi về giá của gói. KHÔNG được làm hỏng Studio.
+            return [];
+        }
+    }
+
     public function defaults(): \Illuminate\Http\JsonResponse
     {
         // Options for the "Sửa ảnh" card model selector: lấy từ NHÓM CÔNG VIỆC 'edit'
@@ -5167,6 +5243,17 @@ RULES:
             'suggest_enabled' => studio_suggest_enabled(),
             'suggest_default_lang' => (string) studio_suggest_config('default_lang', 'en'),
             'image_credits' => (int) studio_config('image_credits', 1),
+            // ── GIÁ THEO MODEL (2026-09-26) — để giao diện nói giá TRƯỚC khi khách bấm ──────
+            // VÌ SAO GỬI CẢ BẢNG: "1 ảnh = 1 credit" không còn đúng — sửa ảnh có mask ở 2K tốn
+            // 6 credit trong khi tạo ảnh nhanh tốn 1. Khách bấm "Sửa ảnh" tưởng 1 credit mà bị
+            // trừ 6 là loại lỗi làm mất khách nhanh nhất, và nó chống lại đúng nguyên tắc 3
+            // ("chi phí hiện TRƯỚC khi bấm").
+            //
+            // Gửi BẢNG ĐÃ TÍNH SẴN (khoá rút gọn p/m/r/t/c ≈ 10 KB sau gzip) chứ KHÔNG gửi công
+            // thức: công thức (megapixel làm tròn lên, mẫu số 720 ₫) là MỘT nguồn sự thật ở
+            // ProviderCostService. Chép sang JS là tạo bản sao thứ hai — và bản sao luôn lệch.
+            // Giao diện chỉ TRA BẢNG, không tính gì.
+            'model_credit_costs' => $this->modelCreditCostTable(),
             // Task groups — model theo nhóm công việc cho selector trên từng card.
             'task_groups' => $taskGroups,
             // Card Sửa ảnh: các model chỉnh sửa được phép chọn (mặc định đứng đầu).

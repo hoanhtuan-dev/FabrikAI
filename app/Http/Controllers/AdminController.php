@@ -6,6 +6,8 @@ use App\Models\CreditTransaction;
 use App\Models\Generation;
 use App\Models\Plan;
 use App\Models\UpgradeRequest;
+use App\Models\ModelCreditCost;
+use App\Services\ProviderCostService;
 use App\Support\ModuleRegistry;
 use App\Models\User;
 use App\Services\CreditService;
@@ -595,6 +597,101 @@ class AdminController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/admin/model-credits — BẢNG GIÁ BÁN THEO MODEL kèm giá vốn và biên.
+     *
+     * VÌ SAO Ở QUẢN TRỊ chứ không chỉ ở lệnh artisan: đây là con số chủ dự án phải SỬA ĐƯỢC khi
+     * giá nhà cung cấp đổi — mà chủ dự án không phải lúc nào cũng ngồi SSH.
+     *
+     * Trả kèm \`min_rate\` (đơn giá gói thấp nhất) để giao diện tính biên bằng ĐÚNG con số mà
+     * lệnh \`studio:pricing\` dùng — hai nơi không thể lệch nhau.
+     */
+    public function modelCredits(ProviderCostService $cost): JsonResponse
+    {
+        $rates = Plan::where('price_vnd', '>', 0)->where('credits_per_month', '>', 0)->get()
+            ->mapWithKeys(fn (Plan $p) => [$p->slug => round($p->price_vnd / (int) $p->credits_per_month, 1)])
+            ->all();
+        $minRate = $rates ? min($rates) : (float) ProviderCostService::MIN_VND_PER_CREDIT;
+
+        $rows = ModelCreditCost::orderBy('provider')->orderBy('model')->orderBy('resolution')->orderBy('ratio')->get()
+            ->map(function (ModelCreditCost $m) use ($cost, $minRate) {
+                // Dòng "mọi cỡ" (resolution/ratio rỗng) dùng hình dạng ĐẮT NHẤT để không đánh giá thấp giá vốn.
+                [$w, $h] = $m->resolution !== '' && $m->ratio !== ''
+                    ? $cost->imageDimensions($m->resolution, $m->ratio)
+                    : $cost->imageDimensions('1K', '1:1');
+
+                $q = $cost->quote($m->provider, $m->model, ['width' => $w, 'height' => $h, 'seconds' => 5]);
+                $revenue = $m->credits * $minRate;
+                $margin = ($q['known'] && $revenue > 0)
+                    ? round((($revenue - (float) $q['cost_vnd']) / $revenue) * 100, 1)
+                    : null;
+
+                return [
+                    'id' => $m->id,
+                    'provider' => $m->provider,
+                    'model' => $m->model,
+                    'scope' => trim($m->resolution.' '.$m->ratio) !== '' ? trim($m->resolution.' '.$m->ratio) : 'mọi cỡ',
+                    'resolution' => $m->resolution,
+                    'ratio' => $m->ratio,
+                    'credits' => (int) $m->credits,
+                    'cost_vnd' => $q['known'] ? round((float) $q['cost_vnd'], 0) : null,
+                    'margin_pct' => $margin,
+                    'ok' => $margin !== null && $margin >= 40,
+                    'unit' => $q['unit'],
+                    'units' => $q['units'],
+                ];
+            });
+
+        return response()->json([
+            'rows' => $rows,
+            'plan_rates' => $rates,
+            'min_rate_vnd' => $minRate,
+            'min_required_vnd' => ProviderCostService::MIN_VND_PER_CREDIT,
+            'credit_divisor_vnd' => ProviderCostService::CREDIT_DIVISOR_VND,
+            'fx_rate' => $cost->fxRate(),
+        ]);
+    }
+
+    /**
+     * PUT /api/admin/model-credits/{modelCredit} — sửa SỐ CREDIT của một dòng giá.
+     *
+     * Cố ý chỉ cho sửa \`credits\` — giá vốn là SỰ THẬT của nhà cung cấp, sửa nó là tự lừa mình.
+     * Muốn đổi giá vốn thì dùng bảng \`provider_price\` (nguồn duy nhất).
+     */
+    public function saveModelCredit(Request $request, ModelCreditCost $modelCredit): JsonResponse
+    {
+        $data = $request->validate([
+            'credits' => ['required', 'integer', 'min:1', 'max:1000'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $modelCredit->forceFill([
+            'credits' => (int) $data['credits'],
+            'note' => $data['note'] ?? $modelCredit->note,
+        ])->save();
+
+        return response()->json([
+            'ok' => true,
+            'row' => ['id' => $modelCredit->id, 'credits' => (int) $modelCredit->credits],
+            'message' => 'Đã đặt '.$data['credits'].' credit cho '.$modelCredit->model.'.',
+        ]);
+    }
+
+    /**
+     * GET /api/admin/profit — BÁO CÁO LÃI/LỖ theo model trong một khoảng ngày.
+     *
+     * Đây là chỗ trả lời câu "tháng này có lãi không" bằng SỐ. Trước đây \`generations\` chỉ có
+     * \`credits_cost\` (khách trả) và KHÔNG có cột nào ghi ta trả bao nhiêu.
+     */
+    public function profit(Request $request, ProviderCostService $cost): JsonResponse
+    {
+        $days = (int) $request->query('days', 30);
+        $days = max(1, min(365, $days));
+
+        $report = $cost->marginReport(now()->subDays($days)->startOfDay(), now()->endOfDay());
+
+        return response()->json($report + ['days' => $days]);
+    }
     public function plans(): JsonResponse
     {
         $plans = Plan::query()->withCount('users')->orderBy('sort')->get();
@@ -714,6 +811,9 @@ class AdminController extends Controller
             'bonus_credits' => ['nullable', 'integer', 'min:0', 'max:1000000'],
             'image_credit_cost' => ['nullable', 'integer', 'min:1', 'max:100'],
             'video_credit_cost' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            // [2026-09-26] GIỚI HẠN TẠO ẢNH/NGÀY. 0 = không giới hạn. Credit chặn TỔNG chi tiêu
+            // nhưng không chặn một tài khoản đốt sạch credit trong 10 phút rồi bỏ.
+            'daily_image_limit' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'resolution_cap' => ['nullable', 'string', 'in:1K,2K'],
             // [Q4] Số ghế: gói cho bao nhiêu NGƯỜI dùng chung (1–100).
             'seats' => ['nullable', 'integer', 'min:1', 'max:100'],
@@ -759,6 +859,7 @@ class AdminController extends Controller
             'bonus_credits' => (int) $p->bonus_credits,
             'image_credit_cost' => (int) $p->image_credit_cost,
             'video_credit_cost' => (int) $p->video_credit_cost,
+            'daily_image_limit' => (int) $p->daily_image_limit,
             'resolution_cap' => $p->resolution_cap,
             // [Q4] Ghế để trang Quản trị hiện và sửa được.
             'seats' => $p->seats(),

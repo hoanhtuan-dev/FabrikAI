@@ -1808,6 +1808,52 @@ if (! function_exists('studio_credit_cost')) {
     }
 }
 
+if (! function_exists('studio_credit_cost_for')) {
+    /**
+     * Chi phí credit của MỘT LƯỢT CỤ THỂ — theo MODEL + ĐỘ PHÂN GIẢI + TỈ LỆ, rơi về giá của gói.
+     *
+     * VÌ SAO CẦN (docs/CREDIT_GOI_VA_LOI_NHUAN.md §4): giá vốn giữa model rẻ nhất và đắt nhất lệch
+     * hơn 300 lần ($0,003/MP → $2,00/video). Bán tất cả với giá 1 credit nghĩa là model đắt LỖ ÂM
+     * THẦM — đo được: flux-pro/fill 2K −262 %, veo3 −189 %, flux-pro/fill 1K −45 %.
+     *
+     * Thứ tự tra:
+     *   1. model_credit_cost(provider, model, cỡ, tỉ lệ)   ← giá bán theo model (Quản trị đặt được)
+     *   2. plans.image_credit_cost / video_credit_cost     ← giá của gói (tương thích ngược)
+     *   3. studio_config('image_credits' / 'video_credits') ← mặc định toàn cục
+     *
+     * KHÔNG BAO GIỜ NÉM: mọi lỗi (bảng chưa migrate, DB hỏng) đều rơi về nhánh (2)/(3) — cùng
+     * nguyên tắc với studio_credit_cost(), vì hàm này nằm trên đường tạo ảnh của khách.
+     *
+     * @param  string  $kind  'image' | 'video'
+     * @param  string|null  $provider  provider đã CHỌN cho lượt này (rỗng = chưa biết)
+     * @param  string|null  $model  model đã CHỌN cho lượt này
+     * @param  string|null  $resolution  '1K' | '2K'
+     * @param  string|null  $ratio  '1:1' | '4:5' | …
+     */
+    function studio_credit_cost_for(
+        string $kind = 'image',
+        ?string $provider = null,
+        ?string $model = null,
+        ?string $resolution = null,
+        ?string $ratio = null,
+        $user = null,
+    ): int {
+        // ── 1. Giá bán theo MODEL ────────────────────────────────────────────────────────
+        try {
+            $credits = app(\App\Services\ProviderCostService::class)
+                ->creditsFor($provider, $model, $resolution, $ratio);
+            if ($credits !== null && $credits > 0) {
+                return $credits;
+            }
+        } catch (\Throwable $e) {
+            // Bảng chưa migrate / lỗi truy vấn: rơi xuống giá của gói. Không được làm hỏng pipeline.
+        }
+
+        // ── 2 + 3. Giá của GÓI, rồi mặc định toàn cục (nguyên văn studio_credit_cost) ─────
+        return studio_credit_cost($kind, $user);
+    }
+}
+
 
 /**
  * Studio model registry — dynamic per group (image | video | inference).

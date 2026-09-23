@@ -5,6 +5,34 @@ export const studioGetters = {
     planName() { return (this.planStatus && this.planStatus.plan) ? this.planStatus.plan.name : ''; },
     /** Chi phí credit theo GÓI (server trả) — fallback về giá trị mặc định đã nạp. */
     planCostImage() { return (this.planStatus && this.planStatus.costs && this.planStatus.costs.image) || this.imageCreditCost || 1; },
+
+    /**
+     * GIÁ CỦA MỘT LƯỢT CỤ THỂ theo model + cỡ + tỉ lệ — TRA bảng máy chủ gửi xuống.
+     *
+     * VÌ SAO CẦN: "1 ảnh = 1 credit" không còn đúng. Tạo ảnh nhanh 1K tốn 1 credit, nhưng sửa ảnh
+     * có mask ở 2K tốn tới 6–10 credit (fal tính megapixel LÀM TRÒN LÊN, và ảnh 1:1 tốn gấp đôi
+     * ảnh 4:5). Khách bấm mà không thấy giá là bị trừ bất ngờ — đúng thứ nguyên tắc 3 cấm.
+     *
+     * Thứ tự tra PHẢI khớp ProviderCostService::creditsFor():
+     *   (cỡ, tỉ lệ) → (cỡ, mọi tỉ lệ) → (mọi cỡ, mọi tỉ lệ) → giá của gói.
+     *
+     * @returns {number} số credit của lượt này (luôn ≥ 1)
+     */
+    costFor() {
+      return (provider, model, resolution, ratio) => {
+        const rows = this.modelCreditCosts || [];
+        const p = String(provider || '').toLowerCase().trim();
+        const m = String(model || '').trim();
+        if (!p || !m || !rows.length) return this.planCostImage;
+
+        const r = String(resolution || '').toUpperCase().trim();
+        const t = String(ratio || '').trim();
+        const find = (rr, tt) => rows.find((x) => x.p === p && x.m === m && x.r === rr && x.t === tt);
+        const hit = find(r, t) || find(r, '') || find('', '');
+
+        return hit && hit.c > 0 ? Number(hit.c) : this.planCostImage;
+      };
+    },
     planCostVideo() { return (this.planStatus && this.planStatus.costs && this.planStatus.costs.video) || 10; },
     /** Sắp cạn credit: còn ít hơn 3 thao tác ảnh ⇒ tô đậm nút để khách biết trước. */
     creditsLow() { return this.creditsLeft < this.planCostImage * 3; },

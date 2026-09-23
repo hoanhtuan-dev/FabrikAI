@@ -75,6 +75,22 @@ class RenderVideoJob implements ShouldQueue
                 $generation->provider,
             );
 
+            // ── SỔ CHI PHÍ (2026-09-26) — video tính tiền theo GIÂY, không theo ảnh ──────────
+            // veo3 $0,40/giây ⇒ video 5 giây = $2,00, mà gói chỉ thu 10 credit (~12.000 ₫). Đó là
+            // lý do veo3 bị BỎ KHỎI GIAO DIỆN — nhưng endpoint vẫn còn, nên sổ chi phí phải ghi cả
+            // trường hợp đó, không thì một lượt gọi veo3 lỗ $1,31 sẽ vô hình trong báo cáo.
+            try {
+                $cost = app(\App\Services\ProviderCostService::class);
+                $cost->record($generation, $generation->provider, $generation->model, [
+                    'seconds' => max(1, (int) $generation->duration ?: 5),
+                ]);
+                $cost->syncGenerationCost($generation);
+            } catch (\Throwable $e) {
+                logger()->warning('Không ghi được chi phí provider (video)', [
+                    'generation_id' => $generation->id, 'error' => $e->getMessage(),
+                ]);
+            }
+
             $genMeta = (array) ($generation->meta ?? []);
             // [M-d — 2026-09-17] CAS: không hồi sinh row đã cancelled (xem RenderImageJob cùng lý do).
             $claimed = studio_claim_generation($generation, ['processing'], [

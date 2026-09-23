@@ -362,6 +362,8 @@ export const accountActions = {
       if (defaults.image_credits != null) this.imageCreditCost = Number(defaults.image_credits);
       // Card Sửa ảnh: danh sách model chỉnh sửa (mặc định đứng đầu).
       if (Array.isArray(defaults.inpaint_models)) this.inpaintModels = defaults.inpaint_models;
+      // Giá theo model — để giao diện nói giá TRƯỚC khi khách bấm (nguyên tắc 3).
+      if (Array.isArray(defaults.model_credit_costs)) this.modelCreditCosts = defaults.model_credit_costs;
       // Task groups: model theo nhóm công việc — selector trên từng card (Cài đặt →  Nhóm công việc).
       if (defaults.task_groups && typeof defaults.task_groups === 'object') this.taskGroups = defaults.task_groups;
       // Card "Kịch bản quay": preset video_scene từ Prompt Templates (Cài đặt).

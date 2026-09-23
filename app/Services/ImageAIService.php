@@ -52,6 +52,55 @@ class ImageAIService
         return $this->lastModel;
     }
 
+    // ── SỔ CHI PHÍ (2026-09-26) ─────────────────────────────────────────────────────────
+    // VÌ SAO GHI Ở ĐÂY chứ không ở RenderImageJob: một lượt tạo ảnh có thể đi qua NHIỀU nhà cung
+    // cấp (chuỗi ưu tiên qwen → custom → flux → gemini), và mỗi lần thử đều CÓ THỂ bị tính tiền —
+    // fal không tính lỗi 5xx nhưng lỗi 422 thì CÓ THỂ vẫn tính nếu runner đã tiêu GPU. Ghi ở job
+    // thì chỉ thấy lượt THÀNH CÔNG, và báo cáo lợi nhuận sẽ ĐÁNH GIÁ THẤP chi phí thật.
+    //
+    // Đặt ở attemptProvider() là ĐÚNG MỘT chỗ phễu: mọi đường gọi provider đều đi qua đó.
+    protected ?int $costGenerationId = null;
+
+    /** Gắn lượt gọi này với một generation (để sổ chi phí quy về đúng ảnh). Null = lượt lẻ. */
+    public function setCostContext(?int $generationId): void
+    {
+        $this->costGenerationId = $generationId;
+        $this->costAttempt = 0;
+    }
+
+    protected int $costAttempt = 0;
+
+    /**
+     * Ghi MỘT lần gọi provider vào sổ chi phí. Không bao giờ ném ra ngoài.
+     *
+     * @param  'ok'|'failed'|'timeout'  $outcome
+     */
+    protected function recordCostAttempt(string $provider, string $model, string $outcome, ?string $resolution = null, ?string $ratio = null, ?float $seconds = null): void
+    {
+        try {
+            $cost = app(\App\Services\ProviderCostService::class);
+            [$w, $h] = $cost->imageDimensions($resolution, $ratio);
+
+            $generation = $this->costGenerationId
+                ? \App\Models\Generation::find($this->costGenerationId)
+                : null;
+
+            $cost->record(
+                $generation,
+                $provider,
+                $model,
+                ['width' => $w, 'height' => $h, 'seconds' => $seconds ?? 5.0],
+                $outcome,
+                ++$this->costAttempt,
+            );
+        } catch (\Throwable $e) {
+            // Ghi sổ hỏng KHÔNG được làm hỏng lượt tạo ảnh.
+            logger()->warning('Không ghi được chi phí provider', [
+                'provider' => $provider, 'model' => $model, 'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     protected function falKey(): ?string
     {
         return studio_api_key('fal');
@@ -256,7 +305,29 @@ class ImageAIService
     /**
      * Call ONE (provider, model) candidate with its resolved key. Returns the image URL or null.
      */
+    /**
+     * PHỄU DUY NHẤT của mọi lượt gọi provider — nên cũng là chỗ DUY NHẤT ghi sổ chi phí.
+     *
+     * Tách làm hai: hàm này GHI SỔ rồi gọi hàm thật bên dưới. Nhờ vậy không phải rải lệnh ghi sổ
+     * vào 6 nhánh return của hàm thật (và không thể quên một nhánh khi thêm provider mới).
+     */
     protected function attemptProvider(string $provider, string $model, string $prompt, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $negativePrompt = null, ?int $seed = null): ?string
+    {
+        $url = $this->attemptProviderOnce($provider, $model, $prompt, $key, $resolution, $ratio, $faceRef, $negativePrompt, $seed);
+
+        $this->recordCostAttempt(
+            $provider,
+            $model,
+            $url ? \App\Models\ProviderUsage::OUTCOME_OK : \App\Models\ProviderUsage::OUTCOME_FAILED,
+            $resolution,
+            $ratio,
+        );
+
+        return $url;
+    }
+
+    /** Gọi THẬT một (provider, model) với một key. Trả URL ảnh hoặc null. */
+    protected function attemptProviderOnce(string $provider, string $model, string $prompt, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $negativePrompt = null, ?int $seed = null): ?string
     {
         if ($provider === 'gemini') {
             return $this->tryGeminiImage($prompt, $key, $resolution, $ratio, $model);
@@ -1092,6 +1163,15 @@ class ImageAIService
             $content[] = ['text' => $prompt];
 
             $editUrl = $this->postMultimodalEdit($model, $base, $key, $content);
+
+            // SỔ CHI PHÍ: đường SỬA ẢNH không đi qua attemptProvider() nên phải ghi ở đây — không
+            // thì mọi lượt inpaint (đường ĐẮT NHẤT, 1.300–6.500 ₫/lượt) đều VÔ HÌNH trong báo cáo.
+            $this->recordCostAttempt(
+                'dashscope',
+                $model,
+                $editUrl ? \App\Models\ProviderUsage::OUTCOME_OK : \App\Models\ProviderUsage::OUTCOME_FAILED,
+            );
+
             if ($editUrl) {
                 $this->lastModel = $model;
                 logger()->info('Edit succeeded', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);

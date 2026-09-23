@@ -41,8 +41,16 @@ class StudioInpaintTest extends TestCase
             'id' => $res->json('generation_id'),
             'type' => 'image',
             'provider' => 'qwen',
-            'credits_cost' => 1,
         ]);
+
+        // [2026-09-26] GIÁ THEO MODEL, không còn "1 ảnh = 1 credit". Sửa ảnh là đường ĐẮT NHẤT:
+        // model edit tốn nhiều credit hơn tạo ảnh (giá vốn 1.035–1.170 ₫ so với 78 ₫).
+        // Khẳng định con số bằng CHÍNH bảng giá, không viết cứng — bảng giá đổi thì test vẫn đúng
+        // chừng nào giá vẫn được suy từ giá vốn.
+        $gen = Generation::findOrFail($res->json('generation_id'));
+        $expected = studio_credit_cost_for('image', $gen->provider, $gen->model, $gen->resolution, $gen->ratio, $gen->user);
+        $this->assertSame($expected, (int) $gen->credits_cost, 'Số credit phải khớp bảng giá theo model.');
+        $this->assertGreaterThanOrEqual(1, (int) $gen->credits_cost);
     }
 
     public function test_inpaint_requires_prompt(): void

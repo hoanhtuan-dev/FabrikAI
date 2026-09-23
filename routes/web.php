@@ -546,6 +546,15 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('api/admin')->name('api.
     Route::delete('/plans/{plan}', [AdminController::class, 'destroyPlan'])->name('plans.destroy');
     Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');
 
+    // ── [2026-09-26] LỚP KINH TẾ: giá BÁN theo model + báo cáo lãi/lỗ ──
+    // VÌ SAO CÓ: giá vốn giữa model rẻ nhất và đắt nhất lệch hơn 300 lần, nhưng trước đây mọi
+    // model đều bán 1 credit ⇒ ba đường LỖ ÂM THẦM (đo được: flux-pro/fill 2K −262 %, veo3 −189 %).
+    // Hai đường dưới đây là chỗ chủ dự án SỬA giá bán và XEM lãi/lỗ bằng số, không phải bằng cảm tính.
+    // Xem docs/CREDIT_GOI_VA_LOI_NHUAN.md §4–§5.
+    Route::get('/model-credits', [AdminController::class, 'modelCredits'])->name('model-credits.index');
+    Route::put('/model-credits/{modelCredit}', [AdminController::class, 'saveModelCredit'])->name('model-credits.save');
+    Route::get('/profit', [AdminController::class, 'profit'])->name('profit.index');
+
     // ── [Q2 — 2026-09-19] YÊU CẦU NÂNG CẤP + THÔNG TIN THANH TOÁN ──
     // Chủ dự án theo dõi yêu cầu của khách ở đây: xác nhận đã liên hệ, đánh dấu đã kích hoạt, huỷ.
     Route::get('/upgrade-requests', [AdminController::class, 'upgradeRequests'])->name('upgrade.index');
