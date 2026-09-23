@@ -25,7 +25,7 @@
  * CHIỀU CAO NÚT: 44px trên cảm ứng (h-11), 32px khi có chuột (lg:h-8). 44px là sàn chạm của Apple
  * HIG; luật nâng sàn chạm trong app.css chỉ áp cho phần tử dưới 40px nên ở đây phải khai thẳng.
  */
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import StudioIcon from './StudioIcon.vue';
@@ -107,6 +107,24 @@ function setScope(v) {
   const p = collections.value.find((x) => 'p:' + x.id === v);
   if (p) { store.applyProject(p); store.outputFilterProject = true; store.saveOutputPrefs(); }
 }
+/**
+ * BỘ SƯU TẬP ĐANG ÁP DỤNG MÀ RỖNG ⇒ TỰ VỀ «TẤT CẢ ẢNH» VÀ NÓI RA.
+ *
+ * Lỗi người dùng gặp: đang áp một bộ sưu tập chưa có ảnh nào ⇒ lưới rỗng, và màn hình rơi vào khối
+ * "Chưa có ảnh nào" (vốn là câu chuyện của canvas trống) ⇒ người dùng không hiểu vì sao ảnh của họ
+ * biến mất. Ảnh KHÔNG mất — chỉ là đang bị giới hạn vào một bộ rỗng.
+ * Nay: tự mở phạm vi ra VÀ nói rõ vừa xảy ra chuyện gì. Im lặng tự đổi phạm vi cũng là một kiểu nói
+ * dối khác — người dùng phải biết vì sao màn hình vừa đổi.
+ */
+watch([() => store.outputFilterProject, () => store.appliedProjectId(), () => all.value.length, () => (store.generations || []).length], () => {
+  const hasAny = (store.generations || []).length > 0;
+  if (store.outputFilterProject && store.appliedProjectId() && all.value.length === 0 && hasAny) {
+    const name = store.appliedProject?.name || 'đang áp dụng';
+    setScope('all');
+    store.toast('Bộ sưu tập «' + name + '» chưa có ảnh nào — đang xem tất cả ' + (store.generations || []).length + ' ảnh.');
+  }
+}, { immediate: true });
+
 onMounted(() => {
   store.restoreOutputPrefs();
   // Bộ chọn PHẠM VI cần danh sách bộ sưu tập. Không nạp thì nó chỉ có một mục «Tất cả ảnh» — tức là
@@ -151,10 +169,13 @@ function gridSrcset(url) {
  * duyệt vẫn tải thumbnail theo bề rộng CŨ — lưới nhỏ đi thì tải ảnh thừa (phí băng thông), lưới to
  * ra thì tải ảnh thiếu (nhòe). Vì vậy hai thứ nằm CHUNG một bảng, không tách rời.
  */
+// [đợt 56] Bề rộng khai ở đây là bề rộng CỦA Ô ẢNH, và nó phải là mức TRẦN (không phải mức trung
+// bình): máy ảnh thật của điện thoại là 3x điểm ảnh, nên ô 195px cần ~585 điểm ảnh thật. Khai thấp
+// hơn thực tế là trình duyệt chọn cỡ nhỏ hơn và ảnh NHÒE — đúng lỗi người dùng báo.
 const DENSITY = {
-  s: { cols: 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8', sizes: '(min-width: 1536px) 12vw, (min-width: 1280px) 16vw, (min-width: 640px) 25vw, 33vw', label: 'Nhỏ' },
-  m: { cols: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5', sizes: '(min-width: 1536px) 20vw, (min-width: 1280px) 25vw, (min-width: 640px) 33vw, 50vw', label: 'Vừa' },
-  l: { cols: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4', sizes: '(min-width: 1536px) 25vw, (min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw', label: 'Lớn' },
+  s: { cols: 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8', sizes: '(min-width: 1536px) 14vw, (min-width: 1280px) 18vw, (min-width: 640px) 28vw, 36vw', label: 'Nhỏ' },
+  m: { cols: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5', sizes: '(min-width: 1536px) 22vw, (min-width: 1280px) 28vw, (min-width: 640px) 36vw, 54vw', label: 'Vừa' },
+  l: { cols: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4', sizes: '(min-width: 1536px) 28vw, (min-width: 1280px) 36vw, (min-width: 640px) 54vw, 100vw', label: 'Lớn' },
 };
 const density = computed(() => store.outputDensity || 'm');
 const gridCols = computed(() => (DENSITY[density.value] || DENSITY.m).cols);
@@ -187,93 +208,73 @@ function onDragStart(e, g) {
 
 <template>
   <div class="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-ink-700 bg-ink-900">
-    <!-- ══ THANH ĐẦU: ĐẾM · VIỆC ĐANG CHẠY ══ -->
-    <div class="flex flex-wrap items-center gap-2 border-b border-ink-700 px-3 py-2">
-      <h2 class="flex items-center gap-2 font-display text-sm font-semibold text-cream-50">
+    <!-- ══ THANH LƯỚI — ĐÚNG MỘT HÀNG, CUỘN NGANG (đợt 56) ══
+         Lịch sử của chỗ này: 4 hàng → 3 hàng → 2 hàng → **1 hàng**. ĐO ĐƯỢC trên Chrome thật ở 390px:
+         4 hàng chiếm 171px trên vùng lưới 699px = **24% màn hình** chỉ để hiện bộ lọc. Số HÀNG mới là
+         thứ ăn chỗ; bề ngang thì ngón tay đã quen vuốt.
+         Nay tất cả trong một dải: tiêu đề (chỉ từ lg, vì ở điện thoại mặt lưới vốn đã là "kết quả") ·
+         tìm · đếm · việc đang chạy · chip trạng thái · ba lựa chọn · nút bỏ lọc.
+         Dropdown dùng lớp .select CỦA daisyUI và nút dùng .btn của daisyUI: màu nền/viền/chữ lấy từ
+         theme, không tự pha màu tay — bản trước tự pha nên trông lệch hẳn khỏi phần còn lại. -->
+    <div class="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-ink-700 px-2 py-1.5 scrollbar-hide" role="group" aria-label="Lọc và sắp xếp kết quả">
+      <h2 class="hidden shrink-0 items-center gap-2 font-display text-sm font-semibold text-cream-50 lg:flex">
         <StudioIcon name="grid" size="h-4 w-4" class="text-brand-300" /> Kết quả
       </h2>
-      <span class="rounded-full bg-ink-700 px-2 py-0.5 text-label text-cream-300" data-output-count>{{ items.length }}</span>
-      <!-- Nói rõ khi con số KHÔNG phải tổng: người dùng phải biết mình đang xem một phần. -->
-      <span v-if="items.length !== (store.generations || []).length" class="text-label text-cream-400">
-        / {{ (store.generations || []).length }} ảnh
-      </span>
 
-      <span v-if="pending" class="flex items-center gap-1 rounded-full bg-warn/15 px-2 py-0.5 text-label font-semibold text-warn">
-        <span class="h-2 w-2 animate-pulse rounded-full bg-warn"></span>{{ pending }} đang tạo
-      </span>
-
-      <span class="ml-auto hidden text-label text-cream-400 lg:inline">
-        Bấm ảnh để xem lớn · mọi tính năng nằm trong đó
-      </span>
-    </div>
-
-    <!-- ══ THANH QUẢN LÝ LƯỚI (đợt 55) ══
-         Bốn việc, xếp theo TẦN SUẤT DÙNG trên điện thoại:
-           1. Tìm  — ô nhập, chiếm trọn dòng (gõ là thứ cần ngón tay và bàn phím nhất);
-           2. Xem theo bộ sưu tập — PHẠM VI, mặc định là bộ đang áp dụng;
-           3. Sắp xếp · 4. Cỡ lưới — hai <select> gốc: trên điện thoại chúng mở bảng chọn CỦA HỆ ĐIỀU
-              HÀNH (to, dễ chạm) thay vì một menu tự vẽ nhỏ xíu.
-         Dùng <select> gốc còn vì lý do a11y: trình đọc màn hình và bàn phím đã hiểu sẵn nó. -->
-    <div v-if="all.length" class="flex shrink-0 flex-col gap-1.5 border-b border-ink-700 px-2 py-1.5">
-      <label class="flex h-11 items-center gap-2 rounded-lg border border-ink-600 bg-ink-800 px-2.5 lg:h-8">
-        <StudioIcon name="search" size="h-3.5 w-3.5" class="shrink-0 text-cream-400" />
-        <input v-model="q" type="search" data-output-search placeholder="Tìm theo tên hoặc mô tả…"
-               class="min-w-0 flex-1 border-0 bg-transparent p-0 text-body text-cream-100 placeholder:text-cream-500 focus:outline-none"
-               aria-label="Tìm ảnh theo tên hoặc mô tả">
-        <button v-if="q" type="button" class="shrink-0 text-cream-400 hover:text-cream-100" title="Xoá tìm kiếm" aria-label="Xoá tìm kiếm" @click="q = ''">
-          <StudioIcon name="x" size="h-3.5 w-3.5" />
-        </button>
+      <label class="flex min-w-28 flex-1 items-center lg:max-w-64">
+        <input v-model="q" type="search" data-output-search placeholder="Tìm ảnh…"
+               class="input input-sm w-full" aria-label="Tìm ảnh theo tên hoặc mô tả">
       </label>
 
-      <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-        <label class="flex h-11 shrink-0 items-center gap-1 rounded-lg border border-ink-600 bg-ink-800 px-2 lg:h-8">
-          <StudioIcon name="folderOpen" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
-          <select :value="scope" data-output-scope class="h-full max-w-40 border-0 bg-transparent p-0 text-label font-semibold text-cream-100 focus:outline-none"
-                  aria-label="Xem ảnh theo bộ sưu tập" @change="setScope($event.target.value)">
-            <option value="all">Tất cả ảnh</option>
-            <option v-for="p in collections" :key="'sc-' + p.id" :value="'p:' + p.id">{{ p.name }}</option>
-          </select>
-        </label>
+      <span class="badge badge-sm shrink-0" data-output-count>{{ items.length }}</span>
+      <!-- Nói rõ khi con số KHÔNG phải tổng: người dùng phải biết mình đang xem một phần. -->
+      <span v-if="items.length !== (store.generations || []).length" class="shrink-0 text-label text-cream-400">
+        / {{ (store.generations || []).length }}
+      </span>
 
-        <label class="flex h-11 shrink-0 items-center gap-1 rounded-lg border border-ink-600 bg-ink-800 px-2 lg:h-8">
-          <StudioIcon name="list" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
-          <select :value="store.outputSortBy" data-output-sort class="h-full border-0 bg-transparent p-0 text-label font-semibold text-cream-100 focus:outline-none"
-                  aria-label="Sắp xếp ảnh" @change="setSort($event.target.value)">
-            <option value="new">Mới nhất</option>
-            <option value="old">Cũ nhất</option>
-            <option value="name">Tên A→Z</option>
-            <option value="running">Đang chạy trước</option>
-          </select>
-        </label>
+      <span v-if="pending" class="badge badge-warn badge-sm shrink-0 gap-1">
+        <span class="h-2 w-2 animate-pulse rounded-full bg-current"></span>{{ pending }} đang tạo
+      </span>
 
-        <label class="flex h-11 shrink-0 items-center gap-1 rounded-lg border border-ink-600 bg-ink-800 px-2 lg:h-8">
-          <StudioIcon name="grid" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
-          <select :value="density" data-output-density class="h-full border-0 bg-transparent p-0 text-label font-semibold text-cream-100 focus:outline-none"
-                  aria-label="Cỡ lưới" @change="setDensity($event.target.value)">
-            <option value="s">Nhỏ</option>
-            <option value="m">Vừa</option>
-            <option value="l">Lớn</option>
-          </select>
-        </label>
-      </div>
-    </div>
-
-    <!-- ── Lọc theo trạng thái: chỉ hiện khi đã có ảnh (lưới rỗng thì lọc là vô nghĩa) ── -->
-    <div v-if="all.length" class="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-ink-700 px-2 py-1.5 scrollbar-hide" role="group" aria-label="Lọc kết quả theo trạng thái">
+      <span v-if="all.length" class="mx-0.5 h-6 w-px shrink-0 bg-ink-700" aria-hidden="true"></span>
       <button
         v-for="f in FILTERS" :key="f.id"
         type="button"
-        class="flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-label font-semibold transition lg:h-7"
-        :class="filter === f.id ? 'bg-brand-600 text-primary-content' : 'bg-ink-800 text-cream-300 hover:bg-ink-700'"
+        class="btn btn-sm shrink-0 gap-1.5"
+        :class="filter === f.id ? 'btn-primary' : 'btn-ghost'"
         :data-output-filter="f.id"
         :aria-pressed="filter === f.id"
         @click="filter = f.id"
       >
         {{ f.label }}
-        <span class="rounded-full px-1.5 text-micro tabular-nums" :class="filter === f.id ? 'bg-ink-950/30' : 'bg-ink-900 text-cream-400'">{{ filterCounts[f.id] }}</span>
+        <span class="badge badge-xs" :class="filter === f.id ? 'badge-neutral' : 'badge-ghost'">{{ filterCounts[f.id] }}</span>
       </button>
-      <button v-if="filter !== 'all'" type="button" class="ml-1 flex h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-label font-semibold text-cream-400 transition hover:text-cream-100 lg:h-7" title="Bỏ bộ lọc" @click="filter = 'all'">
-        <StudioIcon name="x" size="h-3 w-3" /> Bỏ lọc
+
+      <span class="mx-0.5 h-6 w-px shrink-0 bg-ink-700" aria-hidden="true"></span>
+
+      <select :value="scope" data-output-scope class="select select-sm w-auto max-w-44 shrink-0"
+              aria-label="Xem ảnh theo bộ sưu tập" @change="setScope($event.target.value)">
+        <option value="all">Tất cả ảnh</option>
+        <option v-for="p in collections" :key="'sc-' + p.id" :value="'p:' + p.id">{{ p.name }}</option>
+      </select>
+
+      <select :value="store.outputSortBy" data-output-sort class="select select-sm w-auto shrink-0"
+              aria-label="Sắp xếp ảnh" @change="setSort($event.target.value)">
+        <option value="new">Mới nhất</option>
+        <option value="old">Cũ nhất</option>
+        <option value="name">Tên A→Z</option>
+        <option value="running">Đang chạy trước</option>
+      </select>
+
+      <select :value="density" data-output-density class="select select-sm w-auto shrink-0"
+              aria-label="Cỡ lưới" @change="setDensity($event.target.value)">
+        <option value="s">Lưới nhỏ</option>
+        <option value="m">Lưới vừa</option>
+        <option value="l">Lưới lớn</option>
+      </select>
+
+      <button v-if="filter !== 'all' || q" type="button" class="btn btn-ghost btn-sm shrink-0 gap-1" data-output-filter-clear @click="filter = 'all'; q = ''">
+        <StudioIcon name="x" size="h-3.5 w-3.5" /> Bỏ lọc
       </button>
     </div>
 

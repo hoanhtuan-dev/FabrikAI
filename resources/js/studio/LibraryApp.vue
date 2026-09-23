@@ -517,7 +517,12 @@ onMounted(async () => {
              class="group relative overflow-hidden rounded-lg border-2 transition"
              :class="isSelected(g.id) ? 'border-brand-400' : 'border-ink-700'">
           <div class="relative cursor-pointer" @click="openViewer(g)">
-            <img v-if="g.media_url" :src="thumbUrl(g.media_url, 480)" class="aspect-[3/4] w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)">
+            <!-- [đợt 56] 480 → 640 + srcset: ô này rộng 200-320 CSS px, màn 2x-3x cần 400-960 điểm ảnh thật.
+                   Chỉ 480 là NHÒE đúng ở chỗ người dùng nhìn kỹ nhất (thư viện ảnh của họ). -->
+              <img v-if="g.media_url" :src="thumbUrl(g.media_url, 640)"
+                   :srcset="[320, 480, 640].map(s => thumbUrl(g.media_url, s) + ' ' + s + 'w').join(', ')"
+                   sizes="(min-width: 1280px) 20vw, (min-width: 768px) 33vw, 50vw"
+                   class="aspect-[3/4] w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)">
             <div v-else class="grid aspect-[3/4] w-full place-items-center bg-ink-800 text-xs text-cream-400">
               {{ g.status === 'failed' ? 'Lỗi' : (g.status === 'cancelled' ? 'Đã hủy' : (g.type === 'video' ? '▶ Video' : 'Không có ảnh')) }}
             </div>
@@ -658,7 +663,10 @@ onMounted(async () => {
                class="group relative overflow-hidden rounded-lg border-2 transition"
                :class="isUploadSelected(f.rel) ? 'border-brand-400' : (f.used ? 'border-ink-700' : 'border-danger/40')">
             <div class="relative cursor-pointer">
-              <img :src="thumbUrl(f.url, 480)" class="aspect-square w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, f.url)">
+              <img :src="thumbUrl(f.url, 640)"
+                   :srcset="[320, 480, 640].map(s => thumbUrl(f.url, s) + ' ' + s + 'w').join(', ')"
+                   sizes="(min-width: 1280px) 20vw, (min-width: 768px) 33vw, 50vw"
+                   class="aspect-square w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, f.url)">
               <span v-if="f.used" class="absolute left-2 top-2 rounded-full border border-ok/40 bg-ok/15 px-2 py-0.5 text-tiny font-semibold text-ok">đang dùng</span>
               <span v-else class="absolute left-2 top-2 rounded-full border border-danger/40 bg-danger/15 px-2 py-0.5 text-tiny font-semibold text-danger">chưa dùng</span>
               <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-scrim/85 via-scrim/40 to-transparent px-2 pb-1.5 pt-6">

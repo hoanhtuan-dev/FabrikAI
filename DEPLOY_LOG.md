@@ -845,6 +845,66 @@ tập · tìm bỏ dấu · 4 kiểu sắp xếp · lưu khoá riêng · **số 
 lưới rỗng). Bài cũ về chip trạng thái được cập nhật cho luật mới: số trên chip tính từ danh sách đã áp
 phạm vi + tìm kiếm nhưng TRƯỚC bộ lọc trạng thái.
 
+## Phiên 2026-09-23 (đợt 56) — SÁU LỖI NGƯỜI DÙNG BÁO, đo lại bằng Chrome thật
+
+### 1. DOCK LAYERS ĐI THEO TỪ CANVAS SANG LƯỚI — đã chặn
+
+`#dock-inspector` là **ANH EM** của hai mặt (không nằm trong mặt canvas), nên nó chỉ bị điều khiển
+bởi `store.inspectorOpen` — đang ở canvas với bảng Lớp mở rồi chuyển sang Lưới là **bảng Lớp Ở LẠI**.
+Mặt canvas ẩn đi mà chrome của nó thì không.
+
+Đã buộc cả vách ngăn lẫn dock vào MẶT: `v-show="store.mainView === 'canvas'"` + `inert` theo cùng
+điều kiện. ĐO ĐƯỢC sau khi sửa: ở canvas bật bảng Lớp → chuyển sang lưới ⇒ `dockLayers=false` ở cả
+390px và 1280px.
+
+### 2. BỘ SƯU TẬP RỖNG ⇒ RƠI VÀO MÀN "CHƯA CÓ ẢNH NÀO" — đã tự thoát và NÓI RA
+
+Ảnh không hề mất; chúng bị giới hạn vào một bộ sưu tập chưa có ảnh. Người dùng nhìn màn "Chưa có ảnh
+nào" (câu chuyện của canvas trống) và không hiểu vì sao ảnh biến mất.
+
+Nay: bộ đang áp rỗng mà vẫn còn ảnh ở nơi khác ⇒ **tự mở phạm vi về «Tất cả ảnh»** và báo
+*"Bộ sưu tập «X» chưa có ảnh nào — đang xem tất cả N ảnh."* Im lặng tự đổi phạm vi cũng là một kiểu
+nói dối khác — người dùng phải biết vì sao màn hình vừa đổi.
+
+### 3. MÀU DROPDOWN SAI ⇒ CHUYỂN SANG LỚP CỦA daisyUI
+
+Bản trước tôi tự pha màu (`bg-transparent` + `border-ink-600` + `text-cream-100`) nên trông lệch
+hẳn khỏi phần còn lại. Nay dùng `.select select-sm` của daisyUI; nút lọc dùng `.btn btn-sm
+btn-primary/btn-ghost`; số đếm dùng `.badge`. ĐO ĐƯỢC: nền select = `rgb(29,35,42)` — đúng màu
+nền theme, không còn màu tự pha.
+
+### 4. THANH LỌC CHIẾM 1/3 MÀN HÌNH ⇒ CÒN ĐÚNG MỘT HÀNG
+
+Lịch sử: **4 hàng → 3 hàng → 2 hàng → 1 hàng**. ĐO ĐƯỢC ở 390px:
+
+| | Trước | Sau |
+|---|---|---|
+| Chiều cao thanh lọc | **171px** | **61px** |
+| % vùng lưới (699px) | **24%** | **8,7%** |
+
+Số HÀNG mới là thứ ăn chỗ; bề ngang thì ngón tay đã quen vuốt. Nay một dải cuộn ngang gồm: tìm · đếm ·
+việc đang chạy · 4 chip trạng thái · phạm vi · sắp xếp · cỡ lưới · bỏ lọc. Tiêu đề «Kết quả» chỉ hiện
+từ `lg` — ở điện thoại mặt lưới vốn đã LÀ kết quả, không cần nhãn.
+
+> **Một lỗi tôi tự gây và tự bắt:** lần gộp đầu vẫn còn 114px vì **hàng chip trạng thái cũ (đợt 53)
+> vẫn nằm đó** — tôi chèn chip mới vào thanh mới mà quên xoá hàng cũ. Đo trực tiếp các con của khối
+> lưới mới thấy `kids: [61, 53, 583]` — ba con thay vì hai. Đã xoá.
+
+### 5. THUMBNAIL NHÒE ⇒ NÂNG CỠ + `sizes` LÀ MỨC TRẦN
+
+- **Thư viện**: `480` → **`640`** kèm `srcset` 320/480/640 + `sizes` khớp breakpoint.
+- **Dock Outputs**: `160` → **`320`**.
+- **Lưới chính**: nâng bề rộng khai trong `sizes` (vừa: 50vw → 54vw; nhỏ: 33vw → 36vw). Khai `sizes`
+  phải là mức **TRẦN**, không phải trung bình: máy ảnh điện thoại thật là **3x** điểm ảnh, nên ô 195px
+  cần ~585 điểm ảnh thật — khai thấp hơn thực tế là trình duyệt chọn cỡ nhỏ hơn và ảnh NHÒE.
+
+ĐO ĐƯỢC: 390px → `?size=480` · 1280px → `?size=640`.
+
+### 6. GỌN NHƯNG ĐỦ LINH HOẠT
+
+Không nhét mọi nút ra toàn màn hình cho dễ bấm: các lựa chọn dùng `select-sm` (32px trên máy tính,
+40px trên cảm ứng theo sàn chạm sẵn có), chip dùng `btn-sm`, và TẤT CẢ nằm trong một dải cuộn ngang.
+
 ### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
 
 - **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.

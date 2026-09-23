@@ -527,9 +527,14 @@ class CanvasControlsTest extends TestCase
         $this->assertStringContainsString('panelId: \'dock-inspector\'', $app, 'Dock Layers phải khai panelId cho aria-controls.');
         $this->assertStringContainsString('id="dock-inspector"', $app, 'Thiếu id của dock Layers.');
         $this->assertStringContainsString('class="dock-panel', $app, 'Dock Layers phải dùng class .dock-panel (có hiệu ứng).');
+        $this->assertStringContainsString('v-show="store.mainView === \'canvas\'"', $app,
+            'Dock Layers phải ẩn theo MẶT — nếu không, chuyển từ canvas sang lưới là bảng Lớp đi theo.');
         $this->assertStringContainsString(':data-collapsed="store.inspectorOpen ? \'false\' : \'true\'"', $app,
             'Dock Layers phải đánh dấu trạng thái thu gọn — đó là thứ chạy hiệu ứng bật/tắt.');
-        $this->assertStringContainsString('<DockResizer v-if="store.inspectorOpen" :dock="inspectorDock" controls="dock-inspector"', $app,
+        // [đợt 56] Vách ngăn chỉ có nghĩa khi MẶT CANVAS đang hiện — dock Layers là của canvas, và nó
+        // là ANH EM của hai mặt nên không được thừa hưởng việc ẩn của mặt (lỗi: ở canvas rồi chuyển
+        // sang lưới thì bảng Lớp Ở LẠI).
+        $this->assertStringContainsString('<DockResizer v-if="store.inspectorOpen && store.mainView === \'canvas\'" :dock="inspectorDock" controls="dock-inspector"', $app,
             'Thiếu VÁCH NGĂN KÉO cho dock Layers — đây chính là "tay cầm điều chỉnh kích cỡ".');
         // Không được gỡ dock khỏi DOM khi tắt: gỡ là mất cả hiệu ứng lẫn trạng thái bên trong.
         $this->assertStringNotContainsString('v-if="store.inspectorOpen" data-covers-canvas', $app,

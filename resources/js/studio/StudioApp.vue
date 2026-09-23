@@ -1826,18 +1826,23 @@ function onTouchEnd(e) {
           <!-- data-covers-canvas: trên mobile bảng Lớp là ngăn kéo ĐÈ LÊN canvas ⇒ tay cầm layer phải
                tránh vùng bị nó che (xem handleClampBox trong script). -->
           <!-- Vách ngăn kéo của BẢNG LAYERS (desktop): kéo · ←/→ · Enter ẩn/hiện · nhấp đúp mặc định. -->
-          <DockResizer v-if="store.inspectorOpen" :dock="inspectorDock" controls="dock-inspector" class="hidden lg:block" />
+          <!-- [đợt 56] DOCK LAYERS LÀ CỦA CANVAS — ẩn theo MẶT, không chỉ theo inspectorOpen.
+               Lỗi đo được: đang ở canvas (bảng Lớp mở) rồi chuyển sang Lưới ⇒ bảng Lớp Ở LẠI, vì nó
+               chỉ bị điều khiển bởi store.inspectorOpen. Nó là ANH EM của hai mặt (không nằm trong
+               mặt canvas) nên không được thừa hưởng việc ẩn của mặt. -->
+          <DockResizer v-if="store.inspectorOpen && store.mainView === 'canvas'" :dock="inspectorDock" controls="dock-inspector" class="hidden lg:block" />
           <!-- Dock Layers: KHÔNG dùng v-if nữa — giữ trong DOM để ẩn/hiện là THU BỀ RỘNG có hiệu ứng
                (trước đây gỡ khỏi DOM nên bật/tắt là "giật" tức thì, và không có gì để kéo). -->
           <aside
             id="dock-inspector"
             data-covers-canvas="right"
             class="dock-panel scrollbar-hide absolute inset-y-0 right-0 z-50 flex flex-col bg-ink-900/95 lg:static lg:z-auto"
+            v-show="store.mainView === 'canvas'"
             :style="inspectorDock.panelStyle"
             :data-collapsed="store.inspectorOpen ? 'false' : 'true'"
             :data-resizing="inspectorDock.resizing ? 'true' : 'false'"
-            :aria-hidden="store.inspectorOpen ? null : 'true'"
-            :inert="store.inspectorOpen ? null : true"
+            :aria-hidden="(store.inspectorOpen && store.mainView === 'canvas') ? null : 'true'"
+            :inert="(store.inspectorOpen && store.mainView === 'canvas') ? null : true"
           >
             <LayersPanel />
           </aside>
