@@ -10,7 +10,7 @@
  * Mọi thời lượng dùng token --motion-dur-* (MotionFoundationTest), mọi gradient dùng lớp
  * dùng chung trong app.css (DesignSystemTest §2) — component KHÔNG tự khai.
  */
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import StudioIcon from './StudioIcon.vue';
 import { usePopmenu } from '../composables/usePopmenu.js';
 import { haptic } from '../composables/useHaptics.js';
@@ -21,11 +21,18 @@ const props = defineProps({
   placeholder: { type: String, default: 'Mô tả thiết kế bạn mơ…' },
   running: { type: Boolean, default: false },
   space: { type: String, default: '' },           // id không gian hiện tại (đánh dấu trong menu)
+  // v-model tuỳ chọn: StudioPhone buộc thẳng vào store.imagePromptEn để ?prompt= từ Trang chủ
+  // hiện SẴN trong ô. Không truyền thì dùng state nội bộ như cũ (Trang chủ, ShellChrome).
+  modelValue: { type: String, default: null },
 });
-const emit = defineEmits(['go']);
+const emit = defineEmits(['go', 'update:modelValue']);
 
 const { openPopmenu } = usePopmenu();
-const text = ref('');
+const localText = ref('');
+const text = computed({
+  get: () => (props.modelValue !== null ? props.modelValue : localText.value),
+  set: (v) => { if (props.modelValue !== null) emit('update:modelValue', v); else localText.value = v; },
+});
 
 function openSpaces(e) {
   haptic(10);

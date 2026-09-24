@@ -25,7 +25,7 @@ const store = useStudioStore();
 const nav = useNavStack();
 
 const level = computed(() => nav.state.stack[nav.state.stack.length - 1] || null);
-const TITLES = { options: 'Tác vụ ảnh', variant: 'Tạo biến thể', upscale: 'Nâng cấp ảnh', delete: 'Xoá ảnh này?' };
+const TITLES = { options: 'Tác vụ ảnh', variant: 'Tạo biến thể', upscale: 'Nâng cấp ảnh', reframe: 'Đổi khung hình', delete: 'Xoá ảnh này?' };
 const title = computed(() => TITLES[level.value] || '');
 const hasImage = computed(() => !!store.upscaleSrc);
 
@@ -76,6 +76,27 @@ async function runUpscale() {
   finally { store.upscaling = false; }
 }
 
+/* ── Đổi khung hình (POST /api/reframe — crop tâm theo tỉ lệ, đồng bộ, miễn phí) ── */
+const ratio = ref('3:4');
+const RATIOS = ['3:4', '4:5', '1:1', '9:16', '16:9'];
+const reframing = ref(false);
+async function runReframe() {
+  if (!hasImage.value || reframing.value) return;
+  haptic(12);
+  reframing.value = true;
+  try {
+    const d = await store.api('/api/reframe', { image: store.upscaleSrc, ratio: ratio.value, project_id: store.appliedProjectId() });
+    store.addGen({
+      id: d.generation_id, type: 'image', status: 'completed',
+      model: 'reframe', provider: 'reframe', media_url: d.media_url,
+      credits_cost: 0, created_at: 'Vừa đổi khung',
+    });
+    close();
+    store.toast('Đã đổi khung ' + ratio.value + ' — xem ở Kết quả gần đây.');
+  } catch (e) { store.failToast(e, 'Lỗi đổi khung hình.'); }
+  finally { reframing.value = false; }
+}
+
 /* ── Việc trực tiếp (không cần cấp con) ── */
 function download() {
   const g = store.preview;
@@ -118,6 +139,11 @@ async function runDelete() {
       <button type="button" class="opt" :disabled="!hasImage || store.upscaling" @click="go('upscale')">
         <span class="opt-ic"><StudioIcon name="maximize" size="h-[18px] w-[18px]" /></span>
         <span class="opt-main"><b>Nâng cấp ảnh</b><i>Phóng to 2×/4× giữ chi tiết</i></span>
+        <StudioIcon name="chevronRight" size="h-4 w-4" class="text-cream-400" />
+      </button>
+      <button type="button" class="opt" :disabled="!hasImage" @click="go('reframe')">
+        <span class="opt-ic"><StudioIcon name="crop" size="h-[18px] w-[18px]" /></span>
+        <span class="opt-main"><b>Đổi khung hình</b><i>Cắt theo tỉ lệ 3:4 · 1:1 · 9:16…</i></span>
         <StudioIcon name="chevronRight" size="h-4 w-4" class="text-cream-400" />
       </button>
       <button type="button" class="opt" :disabled="!hasImage" @click="download">
@@ -177,6 +203,22 @@ async function runDelete() {
       <p class="text-micro text-cream-400">Ảnh mới là một KẾT QUẢ riêng — ảnh gốc giữ nguyên.</p>
       <button type="button" class="btn-magic flex h-12 items-center justify-center gap-2 rounded-2xl text-label font-bold transition active:scale-[0.98]" :disabled="store.upscaling" @click="runUpscale">
         <StudioIcon name="maximize" size="h-4 w-4" /> {{ store.upscaling ? 'Đang nâng cấp…' : 'Nâng cấp ' + scale + '×' }}
+      </button>
+    </div>
+
+    <!-- CẤP 2 · ĐỔI KHUNG -->
+    <div v-else-if="level === 'reframe'" class="flex flex-col gap-4 pb-2">
+      <div class="grid grid-cols-5 gap-2">
+        <button
+          v-for="r in RATIOS" :key="r" type="button"
+          class="h-10 rounded-xl border text-label font-semibold transition"
+          :class="ratio === r ? 'border-brand-500 bg-brand-600/20 text-cream-50' : 'border-ink-600 bg-ink-800 text-cream-300'"
+          @click="ratio = r"
+        >{{ r }}</button>
+      </div>
+      <p class="text-micro text-cream-400">Cắt từ tâm ảnh — ảnh mới là một KẾT QUẢ riêng, ảnh gốc giữ nguyên.</p>
+      <button type="button" class="btn-magic flex h-12 items-center justify-center gap-2 rounded-2xl text-label font-bold transition active:scale-[0.98]" :disabled="reframing" @click="runReframe">
+        <StudioIcon name="crop" size="h-4 w-4" /> {{ reframing ? 'Đang cắt…' : 'Cắt theo ' + ratio }}
       </button>
     </div>
 

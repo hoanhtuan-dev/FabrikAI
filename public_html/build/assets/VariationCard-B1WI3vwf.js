@@ -1,1 +1,0 @@
-import{C as e,R as t}from"./pageBoot-Dt4d_apE.js";import{t as n}from"./RefImageCard-LBQkhbFh.js";var r={__name:`VariationCard`,setup(r){return(r,i)=>(t(),e(n,{variant:`variation`}))}};export{r as default};

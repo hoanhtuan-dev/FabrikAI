@@ -12,6 +12,7 @@ import { onMounted, ref } from 'vue';
 import CommandBar from './components/CommandBar.vue';
 import PopMenu from './components/PopMenu.vue';
 import StudioIcon from './components/StudioIcon.vue';
+import { thumbUrl, onThumbError } from './composables/useStudioThumb.js';
 
 const boot = window.__STUDIO_BOOT__ || {};
 const user = boot.user || null;
@@ -53,7 +54,7 @@ onMounted(async () => {
   if (!user) return;
   loadingRecents.value = true;
   try {
-    const r = await fetch('/latest', { headers: { Accept: 'application/json' } });
+    const r = await fetch('/api/latest', { headers: { Accept: 'application/json' } });
     if (r.ok) {
       const d = await r.json();
       recents.value = (d.items || []).filter((g) => g.media_url).slice(0, 12);
@@ -112,7 +113,7 @@ onMounted(async () => {
               v-for="g in recents" :key="g.id" href="/studio?view=library"
               class="block w-32 shrink-0 overflow-hidden rounded-2xl border border-ink-600 bg-ink-800 transition active:scale-95"
             >
-              <img :src="g.media_url" :alt="g.prompt || 'Thiết kế'" class="aspect-[3/4] w-full object-cover" loading="lazy">
+              <img :src="thumbUrl(g.media_url, 320)" :alt="g.prompt || 'Thiết kế'" class="aspect-[3/4] w-full object-cover" loading="lazy" @error="onThumbError($event, g.media_url)">
             </a>
           </div>
           <div v-else class="mt-3 rounded-2xl border border-dashed border-ink-600 px-5 py-8 text-center text-body text-cream-400">

@@ -149,7 +149,15 @@ function goPrompt(q) {
       </section>
     </main>
 
-    <CommandBar mode="prompt" space="studio" placeholder="Mô tả thiết kế / biến thể…" :running="store.generating" @go="goPrompt" />
+    <CommandBar
+      mode="prompt"
+      space="studio"
+      placeholder="Mô tả thiết kế / biến thể…"
+      :running="store.generating"
+      :model-value="store.imagePromptEn"
+      @update:model-value="(v) => { store.imagePromptEn = v; }"
+      @go="goPrompt"
+    />
     <PopMenu />
     <GalleryModal v-if="store.viewer" />
     <TriageDeck v-model:open="triageOpen" />

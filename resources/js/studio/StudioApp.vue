@@ -71,6 +71,9 @@ import NotificationCenter from './components/NotificationCenter.vue';
 // Delete/nút thùng rác không thấy gì xảy ra, cờ treo lại còn chặn cả phím tắt layer).
 import ConfirmDialog from './components/ConfirmDialog.vue';
 import StudioPhone from './components/StudioPhone.vue';
+import PopMenu from './components/PopMenu.vue';
+import { usePopmenu } from './composables/usePopmenu.js';
+import { spacesForViewport } from './spaces.js';
 const store = useStudioStore();
 // Lỗi nổ ra ngoài mọi khối try/catch (exception · promise bị từ chối) vẫn phải tới được người dùng
 // KÈM MÃ TRA CỨU — không thì nó chỉ nằm trong console của khách (docs/DESIGN_SYSTEM.md §6.5).
@@ -333,6 +336,20 @@ const booting = ref(true);
 // [Phase 2 · shell 2026] Điện thoại (≤520px) render StudioPhone — bảng điều khiển không canvas.
 // 520px (không phải 1024): khoảng 521–1023 (tablet) vẫn dùng bố cục desktop đã tối ưu sẵn (đợt 52+);
 // chỉ màn ĐIỆN THOẠI thật mới tách hẳn — đúng ranh giới của prototype shell 2026.
+// [shell 2026 · Phase 6] Orb ở header: menu KHÔNG GIAN cho bản desktop/tablet (bản phone có
+// sẵn orb trong CommandBar). Desktop đủ 5 không gian (kể cả Studio — đánh dấu đang ở đây).
+const { openPopmenu } = usePopmenu();
+function openSpacesMenu(e) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  openPopmenu({
+    anchor: rect,
+    dir: 'down',
+    items: spacesForViewport().map((s) => ({
+      id: s.id, icon: s.icon, label: s.label, desc: s.desc, url: s.url, active: s.id === 'studio',
+    })),
+  });
+}
+
 const isPhoneMql = window.matchMedia('(max-width: 520px)');
 const isPhone = ref(isPhoneMql.matches);
 onMounted(() => {
@@ -1133,14 +1150,14 @@ function onTouchEnd(e) {
              đẩy ra ngoài mép phải). [đợt 54] Hai nút điện thoại đã gỡ khỏi thanh tiêu đề (chúng về
              dock dưới đáy) nên chỗ đã có lại — trả thương hiệu về, vì một ứng dụng không có nhận diện
              nào ở đầu trang là chuyện lạ, và đây là lối về trang chủ. -->
-        <!-- [đợt 57] THƯƠNG HIỆU LÀ NÚT, KHÔNG PHẢI LIÊN KẾT. Trước đây là <a href="/"> — bấm vào là
-             TẢI LẠI CẢ TRANG, mất sạch trạng thái đang làm (ảnh đang chọn, bộ lọc, bản nháp prompt).
-             Đó là một cái bẫy nằm ngay chỗ ngón tay hay chạm nhất ở góc trên bên trái. Ở đây nó chỉ
-             là nhận diện; đã ở trang chủ rồi thì không có gì để "về" nữa. -->
-        <span class="order-2 flex shrink-0 items-center gap-2" title="FabrikAI Studio">
+        <!-- [đợt 57] THƯƠNG HIỆU KHÔNG PHẢI LIÊN KẾT về cùng một trang (tải lại = mất trạng thái
+             đang làm). [shell 2026 · Phase 6] Nay nó mở MENU KHÔNG GIAN (popmenu): điều hướng chủ
+             động sang TẠO · AGENT · BỘ SƯU TẬP · HUB — điều hướng CHỦ ĐỘNG thì mất state là đúng
+             ý người dùng, không phải cái bẫy vô tình như cũ. Studio tự đánh dấu "đang ở đây". -->
+        <button type="button" class="order-2 flex shrink-0 items-center gap-2" title="Không gian — chuyển nơi làm việc" aria-label="Mở menu không gian" @click="openSpacesMenu">
           <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-4 w-4" /></span>
           <span class="hidden font-display text-sm font-semibold text-cream-50 sm:inline">FabrikAI</span>
-        </span>
+        </button>
 
         <!-- ══ HAI NÚT LỌC CỦA MẶT LƯỚI (đợt 57) ══
              Bảng lọc KHÔNG còn là một dải trong lưới: nó là popup mở từ đây. Nhờ vậy toàn bộ diện
@@ -2002,6 +2019,8 @@ function onTouchEnd(e) {
     </div>
     <!-- GalleryModal: xem ảnh lớn (bấm vào output trong dock phải) -->
     <GalleryModal v-if="store.viewer" :actions="viewerActions" />
+    <!-- PopMenu: vỏ menu không gian của orb header (singleton usePopmenu) -->
+    <PopMenu />
     <!-- SourcePickerPopup: popup chọn nguồn ảnh (nút "Nguồn ảnh" ở activity bar) -->
     <SourcePickerPopup v-if="store.sourcePickerOpen" v-model="store.sourcePickerOpen" />
     <!-- ProjectWorkspace: popup quản lý bộ sưu tập (nút "Bộ sưu tập" ở mobile bar / chip bộ sưu tập / popover apply) -->
