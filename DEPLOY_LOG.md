@@ -7513,9 +7513,9 @@ cd /home/u310846799/domains/fabrikai.shop && /usr/bin/php artisan queue:work --s
 
 ## Kiểm tra & triển khai 2026-09-26 (Đợt 59 — ĐIỆN THOẠI MẤT PHẦN LỚN SẢN PHẨM SAU KHI BỎ CANVAS: bù lại đúng phần đã mất)
 
-> **TRẠNG THÁI: đã làm và đã kiểm chứng Ở MÁY CỤC BỘ — CHƯA deploy lên production.**
-> Mọi số đo dưới đây đến từ Chrome thật chạy trên `php artisan serve` + SQLite cục bộ. Việc đẩy lên máy
-> chủ (commit → push → `git pull`) chờ lệnh của chủ dự án; đợt này **không** chạm vào production.
+> **TRẠNG THÁI: ĐÃ DEPLOY LÊN PRODUCTION (2026-09-26, HEAD `62fd63f`) — và đã kiểm chứng trên máy chủ.**
+> Mục A–G dưới đây là phần đo Ở MÁY CỤC BỘ (Chrome thật trên `php artisan serve` + SQLite). Mục **H** là
+> chính lần deploy lên fabrikai.shop, kèm bằng chứng lấy từ máy chủ.
 
 ### A. Việc được yêu cầu
 
@@ -7632,4 +7632,24 @@ tên **viết thẳng**.
   đầu**, không phải nội dung màn hình.
 - Ô **tìm/cỡ lưới** của lưới kết quả dùng lại ĐÚNG bảng lọc của xưởng; nếu sau này bảng lọc được thiết kế
   lại cho màn rộng thì nhánh điện thoại đi theo — **cố ý**, để không có hai bảng lọc.
+
+### H. Deploy lên production — 2026-09-26
+
+| Bước | Lệnh / kết quả |
+|---|---|
+| Commit | `62fd63f` — `feat(shell-2026): dot 59 — dien thoai bu lai day du tinh nang goc (van KHONG canvas)` · 14 tệp · +1130/−138 (gồm cả `public_html/build` đã build lại) |
+| Push | `cfc79ea..62fd63f  main -> main` |
+| Sao lưu CSDL TRƯỚC khi pull | `~/bin/fabrikai-backup.sh` → `~/db-backups/fabrikai-20260924-170335.sql.gz` (**1,1 MB · 52 bảng · kết thúc hợp lệ**) · đã xoá bản cũ nhất (giữ 10) |
+| Pull | `git pull --ff-only origin main` → HEAD máy chủ **`62fd63f`** (trước: `cfc79ea`) |
+| Hậu pull | `php artisan package:discover` · `config:cache` · `route:cache` · `view:cache` · `queue:restart` — tất cả thoát 0 |
+| **Gói JS khớp từng byte** | `sha256(local public_html/build/assets/main-CHqj8_2B.js)` = `sha256(máy chủ)` = `e8db0953…40597` · tải qua HTTPS: **200 · 224.976 B** (đúng bằng bản cục bộ) |
+| HTML của `/studio` trỏ đúng asset mới | `/build/assets/main-CHqj8_2B.js` + `app-CNGixEGs.css` có trong `<head>`; `/studio` **200** |
+| Log máy chủ | **0 ERROR/CRITICAL sau khi deploy** (các dòng `proc_open` trong log là lỗi CŨ, lặp nửa giờ một lần từ `schedule:run` — đã ghi ở tài liệu deploy, không liên quan đợt này) |
+| **Kiểm bằng trình duyệt thật trên production** (khách chưa đăng nhập, Chrome 390×844 · 1440×900) | `/studio` ở **390×844**: app mount · **thanh lệnh có** · **0 phần tử DOM canvas** · không tràn ngang · **0 lỗi console · 0 exception · 0 request hỏng** — nội dung đọc được: `STUDIO · Chưa có ảnh nào · Chọn ảnh có sẵn · Tác vụ ảnh · Công cụ · Kết quả · Trợ lý · Bộ sưu tập · [dải công cụ: Bộ sưu tập · Tạo ảnh · Tạo biến thể ảnh · Mặc thử đồ …]` |
+| **Bằng chứng cho lỗi #1 đã được vá** | Trên production, khách CHƯA đăng nhập ở 390×844 **thấy banner xác thực** (`role="alertdialog"`) — trước đợt này `AuthNotice` nằm trong nhánh màn rộng nên **điện thoại không hề thấy lời giải thích nào** |
+| Màn rộng trên production | `/studio` ở 1440×900 vẫn là cây desktop (có `data-main-view`), banner xác thực hiện, **0 lỗi console** → không hồi quy |
+
+**Việc còn lại sau deploy:** chủ dự án đăng nhập bằng tài khoản thật trên điện thoại để đi hết luồng có
+tài khoản (tạo ảnh · Tác vụ ảnh · Sửa ảnh · Trợ lý · Bộ sưu tập · Thư viện · deck sàng lọc khi có lượt
+tạo ≥2 ảnh). Phần này **không thể** kiểm bằng tài khoản khách: mọi công cụ đều đòi đăng nhập.
 
