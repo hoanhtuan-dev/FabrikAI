@@ -35,6 +35,7 @@ import StudioIcon from './components/StudioIcon.vue';
 import AuthNotice from './components/AuthNotice.vue';
 import Notice from './components/Notice.vue';
 import NotificationCenter from './components/NotificationCenter.vue';
+import ShellChrome from './components/ShellChrome.vue';
 import AgentDnaStep from './components/agents/AgentDnaStep.vue';
 import AgentRadarStep from './components/agents/AgentRadarStep.vue';
 import AgentBriefStep from './components/agents/AgentBriefStep.vue';
@@ -419,5 +420,8 @@ const primaryLabel = computed(() => {
     </div>
 
     <NotificationCenter />
+    <!-- [Phase 4 · shell 2026] Thanh lệnh chung + spacer. -->
+    <div class="h-24 shrink-0" aria-hidden="true"></div>
+    <ShellChrome space="agent" placeholder="Hỏi Agent hoặc mô tả thiết kế…" />
   </div>
 </template>

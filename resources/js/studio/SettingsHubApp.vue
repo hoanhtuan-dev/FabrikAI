@@ -4,6 +4,7 @@ import StudioIcon from './components/StudioIcon.vue';
 import MySettingsApp from './MySettingsApp.vue';
 import SettingsApp from './SettingsApp.vue';
 import AdminApp from './AdminApp.vue';
+import ShellChrome from './components/ShellChrome.vue';
 import { useSessionStore } from './store/session.js';
 
 /**
@@ -158,5 +159,9 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
 
     <!-- Nội dung khu đang mở. Thuộc tính "embedded" để app con ẩn thanh tiêu đề riêng của nó. -->
     <component :is="view" :key="area" embedded />
+
+    <!-- [Phase 4 · shell 2026] Thanh lệnh chung + spacer tránh bị che nội dung cuối. -->
+    <div class="h-24 shrink-0" aria-hidden="true"></div>
+    <ShellChrome space="hub" />
   </div>
 </template>

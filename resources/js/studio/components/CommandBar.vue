@@ -85,6 +85,7 @@ function go() {
 /* Cục bộ BỐ CỤC thanh lệnh; màu/motion/gradient đều qua token & lớp dùng chung. */
 .cb {
   position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  max-width: 560px; margin-inline: auto; /* màn rộng: thanh lệnh đứng giữa, không trải full ngang */
   z-index: 60; min-height: 64px; border-radius: 24px; display: flex; align-items: center; gap: 8px;
   padding: 8px; background: rgb(16 16 21 / 0.88);
   backdrop-filter: blur(26px) saturate(1.4); -webkit-backdrop-filter: blur(26px) saturate(1.4);

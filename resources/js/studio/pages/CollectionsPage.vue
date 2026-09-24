@@ -31,6 +31,7 @@ import QcPanel from '../components/QcPanel.vue';
 import GatePanel from '../components/GatePanel.vue';
 import ProductionTracking from '../components/ProductionTracking.vue';
 import { STATUS_COLOR } from '../dataColors.js';
+import ShellChrome from '../components/ShellChrome.vue';
 
 // [Xem lại thiết kế] Bộ sưu tập đang xem bản thiết kế đã lưu.
 const designView = ref(null);
@@ -1041,6 +1042,10 @@ onBeforeUnmount(() => {
 
   <!-- Xem lại thiết kế đã lưu (Agent Studio) -->
   <ProjectDesignView v-model="designView" :settings="designView?.settings || {}" :name="designView?.name || ''" />
+  <!-- [Phase 4 · shell 2026] Thanh lệnh chung (orb → không gian; prompt → Studio). Spacer h-24
+       giữ nội dung cuối không bị thanh lệnh cố định che. -->
+  <div class="h-24 shrink-0" aria-hidden="true"></div>
+  <ShellChrome space="collections" />
 </template>
 
 <style scoped>
