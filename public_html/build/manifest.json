@@ -447,7 +447,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-Cmmzn0FH.js",
+    "file": "assets/main-C0mMUgmS.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -479,7 +479,7 @@
       "resources/js/studio/components/ProjectWorkspace.vue"
     ],
     "css": [
-      "assets/main-CHe7j7l5.css"
+      "assets/main-lRSHEHuZ.css"
     ]
   }
 }

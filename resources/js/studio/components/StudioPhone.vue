@@ -14,17 +14,29 @@
  * Chọn ảnh KHÔNG qua store.select() (hàm đó đẩy layer canvas — vô nghĩa khi không có canvas);
  * chỉ đặt preview + workingImage (đúng tinh thần bước 5.1 trong store/actions/generation.js).
  */
-import { computed, defineAsyncComponent } from 'vue';
+import { computed, defineAsyncComponent, ref, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
 import CommandBar from './CommandBar.vue';
 import PopMenu from './PopMenu.vue';
 import NotificationCenter from './NotificationCenter.vue';
+import TriageDeck from './TriageDeck.vue';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 
 const GalleryModal = defineAsyncComponent(() => import('./GalleryModal.vue'));
 
 const store = useStudioStore();
+
+/* [Phase 3] Deck sàng lọc: tự mở khi một LƯỢT TẠO (≥2 ảnh) vừa hoàn tất; mở tay qua nút Duyệt. */
+const triageOpen = ref(false);
+const batchReady = computed(() => {
+  const ids = store.lastBatch || [];
+  if (ids.length < 2) return false;
+  const byId = new Map((store.generations || []).map((g) => [g.id, g]));
+  const done = ids.filter((id) => { const g = byId.get(id); return g && g.status === 'completed' && g.media_url; });
+  return done.length >= 2;
+});
+watch(() => store.generating, (now, before) => { if (before && !now && batchReady.value) triageOpen.value = true; });
 
 const currentUrl = computed(() => store.upscaleSrc || '');
 const recents = computed(() => (store.visibleGenerations || []).filter((g) => g.media_url && g.status === 'completed').slice(0, 12));
@@ -69,10 +81,22 @@ function goPrompt(q) {
     <!-- Thanh mini: nhận diện + credit (điều hướng không gian nằm ở orb của CommandBar) -->
     <header class="flex items-center justify-between px-4 pt-3">
       <span class="text-micro uppercase tracking-[0.16em] text-cream-400">Studio</span>
-      <a href="/bang-gia" class="inline-flex h-8 items-center gap-1.5 rounded-full border border-ink-600 bg-ink-800 px-3 text-label font-semibold text-cream-200 transition hover:border-brand-400" title="Credit & gói">
-        <StudioIcon name="zap" size="h-3.5 w-3.5" class="text-brand-300" />
-        {{ Number(store.creditsLeft ?? 0).toLocaleString('vi') }}
-      </a>
+      <div class="flex items-center gap-2">
+        <button
+          v-if="batchReady"
+          type="button"
+          class="inline-flex h-8 items-center gap-1.5 rounded-full border border-ink-600 bg-ink-800 px-3 text-label font-semibold text-cream-200 transition hover:border-brand-400"
+          title="Sàng lọc lượt tạo gần nhất (vuốt giữ/bỏ)"
+          @click="triageOpen = true"
+        >
+          <StudioIcon name="checkSquare" size="h-3.5 w-3.5" class="text-brand-300" />
+          Duyệt
+        </button>
+        <a href="/bang-gia" class="inline-flex h-8 items-center gap-1.5 rounded-full border border-ink-600 bg-ink-800 px-3 text-label font-semibold text-cream-200 transition hover:border-brand-400" title="Credit & gói">
+          <StudioIcon name="zap" size="h-3.5 w-3.5" class="text-brand-300" />
+          {{ Number(store.creditsLeft ?? 0).toLocaleString('vi') }}
+        </a>
+      </div>
     </header>
 
     <main class="min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -148,6 +172,7 @@ function goPrompt(q) {
     <CommandBar mode="prompt" space="studio" placeholder="Mô tả thiết kế / biến thể…" :running="store.generating" @go="goPrompt" />
     <PopMenu />
     <GalleryModal v-if="store.viewer" />
+    <TriageDeck v-model:open="triageOpen" />
     <NotificationCenter />
   </div>
 </template>
