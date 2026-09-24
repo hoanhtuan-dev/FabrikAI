@@ -32,6 +32,9 @@ import GatePanel from '../components/GatePanel.vue';
 import ProductionTracking from '../components/ProductionTracking.vue';
 import { STATUS_COLOR } from '../dataColors.js';
 import ShellChrome from '../components/ShellChrome.vue';
+// Trình xem ảnh DÙNG CHUNG (cùng component với Studio) — màn chi tiết bộ sưu tập mở nó với ngữ cảnh
+// là ảnh của chính bộ đó (xem openDetailShot).
+import GalleryModal from '../components/GalleryModal.vue';
 
 // [Xem lại thiết kế] Bộ sưu tập đang xem bản thiết kế đã lưu.
 const designView = ref(null);
@@ -193,6 +196,85 @@ const rejectedCount = computed(() => shots.value.filter((s) => s.shot_state === 
 const selectedCount = computed(() => shotsSel.value.length);
 const totalShots = computed(() => shots.value.length);
 const runningCount = computed(() => (store.generations || []).filter((g) => g.status === 'pending' || g.status === 'processing').length);
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   MÀN CHI TIẾT BỘ SƯU TẬP — prototype `#/collection/:id` (đợt 60 · 2026-09-26)
+   ──────────────────────────────────────────────────────────────────────────────────────────────
+   VÌ SAO CẦN: prototype có HAI màn cho bộ sưu tập — danh sách (`#/collections`) và CHI TIẾT
+   (`#/collection/:id`: «N LOOK · ĐANG CHẠY» · tên + mood · chip lọc · lưới shots · sheet chia sẻ).
+   Trang thật chỉ có màn danh sách: muốn xem ảnh của MỘT bộ thì phải "áp dụng" nó rồi sang Studio —
+   tức là ĐỔI bối cảnh đang làm việc chỉ để NHÌN. Nay xem được mà không đổi gì.
+
+   Bốn quyết định:
+     · ĐƯỜNG DẪN THẬT (`/bo-suu-tap/{id}`) + `pushState` ⇒ nút back của trình duyệt/điện thoại đóng
+       màn này (không văng khỏi trang), và gửi link cho đồng nghiệp là mở đúng bộ đó;
+     · Ảnh lấy qua `store.loadProjectShots(id)` — ĐÚNG nguồn mà màn danh sách và bảng duyệt mẫu dùng
+       (không thêm endpoint);
+     · Chip lọc dựng từ VÒNG ĐỜI THẬT của ảnh (`shot_state`) và CHỈ hiện bước đang có ảnh — chip 0 ảnh
+       là chip vô nghĩa;
+     · Chạm một ảnh mở TRÌNH XEM dùng chung với NGỮ CẢNH là ảnh của bộ này (`openViewer(s, list)`),
+       không phải toàn bộ thư viện.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+const detailId = ref(null);
+const detailProject = computed(() => projects.value.find((p) => Number(p.id) === Number(detailId.value)) || null);
+const detailLoaded = computed(() => !!store.projectShots[detailId.value]);
+const detailShots = computed(() => (detailProject.value ? (store.projectShots[detailProject.value.id]?.items || []) : []));
+const detailFilter = ref('all');
+const detailChips = computed(() => {
+  const counts = {};
+  detailShots.value.forEach((s) => { const k = s.shot_state || 'idea'; counts[k] = (counts[k] || 0) + 1; });
+  return [{ key: 'all', label: 'Tất cả', count: detailShots.value.length }]
+    .concat(WORKFLOW_STEPS.filter((s) => counts[s.state]).map((s) => ({ key: s.state, label: s.label, count: counts[s.state] })));
+});
+const detailItems = computed(() => (detailFilter.value === 'all'
+  ? detailShots.value
+  : detailShots.value.filter((s) => (s.shot_state || 'idea') === detailFilter.value)));
+const detailStatusLabel = computed(() => (detailProject.value ? statusLabel(detailProject.value.status) : ''));
+
+function openDetail(p) {
+  if (!p) return;
+  detailId.value = p.id;
+  detailFilter.value = 'all';
+  store.loadProjectShots(p.id);
+  try { history.pushState({ collection: Number(p.id) }, '', '/bo-suu-tap/' + p.id); } catch (e) { /* trình duyệt chặn thì vẫn mở màn */ }
+}
+/** Đóng màn: nếu entry history là do ta gài thì lùi lại (nuốt entry), không thì đóng thẳng. */
+function closeDetail() {
+  if (history.state && history.state.collection) { history.back(); return; }
+  detailId.value = null;
+}
+/** Back/Forward của trình duyệt: màn chi tiết bám theo URL, không theo một cờ rời. */
+function onDetailPop() {
+  const m = location.pathname.match(/^\/bo-suu-tap\/(\d+)/);
+  const id = m ? Number(m[1]) : null;
+  detailId.value = id;
+  if (id) store.loadProjectShots(id);
+}
+/** Chạm một ảnh trong bộ: mở trình xem dùng chung, NGỮ CẢNH là ảnh của bộ này. */
+/** Nhãn của một bước vòng đời ảnh (dùng CHUNG bảng WORKFLOW_STEPS với thanh tiến trình). */
+function workflowLabel(state) {
+  const s = WORKFLOW_STEPS.find((x) => x.state === (state || 'idea'));
+  return s ? s.label : 'Ý tưởng';
+}
+/**
+ * ẢNH CỦA BỘ — dạng dữ liệu THẬT mà `store.loadProjectShots()` trả về:
+ * `{ id, thumb, shot_state, shot_label, prompt, created_at }` — KHÔNG phải `media_url`/`name` như một
+ * generation. Nên có lớp chuyển đổi ở đây: lưới cần dữ liệu của bộ, còn TRÌNH XEM (GalleryModal) chỉ
+ * biết dạng `media_url`. Một chỗ đổi — không rải điều kiện khắp template.
+ */
+function shotImage(s) { return (s && (s.thumb || s.media_url)) || ''; }
+function shotTitle(s) { return (s && (s.shot_label || s.name)) || ('Ảnh #' + (s && s.id)); }
+function detailViewerItems() {
+  return detailShots.value
+    .filter((s) => shotImage(s))
+    .map((s) => ({ id: s.id, media_url: shotImage(s), prompt: s.prompt || '', type: 'image', status: 'completed' }));
+}
+/** Chạm một ảnh trong bộ: mở trình xem dùng chung, NGỮ CẢNH là ảnh của bộ này. */
+function openDetailShot(s) {
+  const url = shotImage(s);
+  if (!url) return;
+  store.openViewer({ id: s.id, media_url: url, prompt: s.prompt || '', type: 'image', status: 'completed' }, detailViewerItems());
+}
 
 /** Thanh tiến trình 6 bước — số ảnh thật đang ở từng bước. */
 const workflowProgress = computed(() => WORKFLOW_STEPS.map((step) => ({
@@ -437,8 +519,11 @@ function onReviewKey(e) {
 // ══════════ LIFECYCLE ══════════
 onMounted(async () => {
   window.addEventListener('keydown', onReviewKey);
+  window.addEventListener('popstate', onDetailPop);
   if (!store.projectLoaded) await store.loadProjects();
   await store.restoreAppliedProject();   // lấy lại "bộ đang làm" từ localStorage
+  // Mở thẳng màn chi tiết khi URL là /bo-suu-tap/{id} (link đồng nghiệp gửi, hoặc F5 giữa chừng).
+  onDetailPop();
   if (applied.value) {
     store.loadProjectStats(applied.value.id);
     store.loadProjectShots(applied.value.id);
@@ -452,6 +537,7 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onReviewKey);
+  window.removeEventListener('popstate', onDetailPop);
   if (refreshTimer) clearInterval(refreshTimer);
 });
 </script>
@@ -736,7 +822,10 @@ onBeforeUnmount(() => {
             </div>
 
             <!-- Lưới thẻ bộ sưu tập -->
-            <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <!-- NHỊP LƯỚI THEO PROTOTYPE (#/collections): trên điện thoại là lưới 2 cột, và CỨ MỖI THẺ
+                 THỨ BA chiếm trọn 2 cột — nhịp bất đối xứng làm danh sách bớt đơn điệu và cho thẻ đó
+                 chỗ để lộ ảnh bìa. Từ sm trở lên quay về lưới đều (ở đó bề ngang đã đủ). -->
+            <div v-else class="grid grid-cols-2 gap-3 [&>article:nth-child(3n)]:col-span-2 sm:grid-cols-2 sm:gap-4 sm:[&>article:nth-child(3n)]:col-span-1 lg:grid-cols-3">
               <article
                 v-for="p in filteredProjects" :key="p.id"
                 class="group relative flex flex-col overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/60 transition hover:border-brand-500/40"
@@ -752,9 +841,20 @@ onBeforeUnmount(() => {
                     <span class="shrink-0 rounded-full px-2 py-0.5 text-label font-semibold" :class="statusToneClass(p.status)">{{ statusLabel(p.status) }}</span>
                   </div>
 
-                  <div v-if="p.thumbnail" class="mt-3 h-28 w-full overflow-hidden rounded-xl bg-ink-800">
+                  <!-- Ảnh bìa = LỐI VÀO MÀN CHI TIẾT (prototype: chạm thẻ bộ sưu tập → #/collection/:id).
+                       Cố ý KHÔNG đổi nút «Áp dụng» cạnh dưới: xem một bộ và ĐỔI bộ đang làm là hai việc
+                       khác nhau — trước đây muốn NHÌN ảnh của bộ khác thì phải áp dụng nó trước. -->
+                  <button
+                    v-if="p.thumbnail"
+                    type="button"
+                    class="mt-3 h-28 w-full overflow-hidden rounded-xl bg-ink-800"
+                    :title="'Mở bộ sưu tập «' + p.name + '»'"
+                    :aria-label="'Mở bộ sưu tập ' + p.name"
+                    :data-collection-open="p.id"
+                    @click="openDetail(p)"
+                  >
                     <img :src="thumbUrl(p.thumbnail)" :alt="p.name" class="h-full w-full object-cover transition group-hover:scale-105" loading="lazy" @error="onThumbError($event, p.thumbnail)">
-                  </div>
+                  </button>
 
                   <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-cream-300">
                     <span class="inline-flex items-center gap-1"><StudioIcon name="image" size="h-3.5 w-3.5" />{{ p.generations_count || 0 }} ảnh</span>
@@ -780,6 +880,9 @@ onBeforeUnmount(() => {
                       @click="pick(p)"
                     >
                       {{ store.appliedProject?.id === p.id ? 'Đang áp dụng' : 'Áp dụng' }}
+                    </button>
+                    <button class="grid h-8 w-8 place-items-center rounded-lg border border-ink-600 text-cream-300 transition hover:border-brand-400 hover:text-brand-200" :title="'Mở bộ sưu tập «' + p.name + '»'" :aria-label="'Mở bộ sưu tập ' + p.name" @click="openDetail(p)">
+                      <StudioIcon name="folderOpen" size="h-3.5 w-3.5" />
                     </button>
                     <button class="grid h-8 w-8 place-items-center rounded-lg border border-ink-600 text-cream-300 transition hover:border-brand-400 hover:text-brand-200" title="Mở trong Studio" @click="goToStudio(p)">
                       <StudioIcon name="arrowRight" size="h-3.5 w-3.5" />
@@ -1015,6 +1118,112 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+
+
+    <!-- ══════════════════════════════════════════════════════════════════════════════════════════
+         MÀN CHI TIẾT BỘ SƯU TẬP (prototype #/collection/:id) — đợt 60.
+         Màn CHIẾM TRỌN, không phải modal: nó là một ĐÍCH đến được (có URL riêng), không phải hộp thoại
+         phụ. Tầng 95 = cùng tầng với ProjectWorkspace (bề mặt chiếm trọn lớn nhất của trang này).
+         Bố cục theo prototype: hàng đầu (← · «N ẢNH · TRẠNG THÁI» · nút đóng) → tên + brief → chip lọc →
+         lưới ảnh (ô đầu TO gấp đôi) → hàng việc (Áp dụng · Mở trong Studio).
+         ══════════════════════════════════════════════════════════════════════════════════════════ -->
+    <section
+      v-if="detailProject"
+      class="fixed inset-0 z-[95] flex flex-col bg-ink-950 text-cream-100 motion-fade-in"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="'Bộ sưu tập ' + detailProject.name"
+      data-collection-detail
+    >
+      <header class="shrink-0 border-b border-ink-700 bg-ink-900 px-3 pb-3" style="padding-top: calc(env(safe-area-inset-top, 0px) + 10px)">
+        <div class="flex items-center gap-2">
+          <button type="button" class="icon-btn !h-10 !w-10 shrink-0" title="Về danh sách bộ sưu tập" aria-label="Về danh sách bộ sưu tập" data-collection-detail-back @click="closeDetail">
+            <StudioIcon name="arrowLeft" size="h-5 w-5" />
+          </button>
+          <p class="min-w-0 flex-1 truncate text-center text-micro font-semibold uppercase tracking-[0.16em] text-cream-400">
+            {{ detailProject.generations_count || detailShots.length }} ảnh · {{ detailStatusLabel }}
+          </p>
+          <button type="button" class="icon-btn !h-10 !w-10 shrink-0" title="Đóng" aria-label="Đóng" @click="closeDetail">
+            <StudioIcon name="x" size="h-5 w-5" />
+          </button>
+        </div>
+        <h2 class="mt-2 truncate font-display text-xl font-semibold text-cream-50">{{ detailProject.name }}</h2>
+        <p v-if="detailProject.brief" class="mt-1 line-clamp-2 text-body text-cream-300">{{ detailProject.brief }}</p>
+        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-micro text-cream-400">
+          <span v-if="detailProject.deadline" class="inline-flex items-center gap-1"><StudioIcon name="calendar" size="h-3.5 w-3.5" />{{ deadlineLabel(detailProject) }}</span>
+          <span v-if="detailProject.owner_name" class="inline-flex items-center gap-1"><StudioIcon name="user" size="h-3.5 w-3.5" />{{ detailProject.owner_name }}</span>
+          <span v-if="store.appliedProject?.id === detailProject.id" class="inline-flex items-center gap-1 font-semibold text-brand-200"><StudioIcon name="check" size="h-3.5 w-3.5" />Đang áp dụng</span>
+        </div>
+      </header>
+
+      <!-- Chip lọc theo VÒNG ĐỜI ẢNH — chỉ hiện bước đang có ảnh (chip 0 ảnh là chip vô nghĩa). -->
+      <div v-if="detailChips.length > 1" class="scrollbar-hide flex shrink-0 gap-2 overflow-x-auto border-b border-ink-800 px-4 py-2.5" role="tablist" aria-label="Lọc ảnh theo bước">
+        <button
+          v-for="c in detailChips" :key="c.key"
+          type="button"
+          role="tab"
+          :aria-selected="detailFilter === c.key"
+          class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-label font-semibold transition"
+          :class="detailFilter === c.key ? 'border-brand-500 bg-brand-600/20 text-cream-50' : 'border-ink-600 bg-ink-800 text-cream-300 hover:border-brand-400'"
+          :data-collection-chip="c.key"
+          @click="detailFilter = c.key"
+        >
+          {{ c.label }}<span class="text-cream-400">{{ c.count }}</span>
+        </button>
+      </div>
+
+      <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-24 pt-3">
+        <p v-if="!detailLoaded" class="py-10 text-center text-body text-cream-400" role="status">Đang tải ảnh…</p>
+        <div v-else-if="detailItems.length" class="grid grid-cols-2 gap-3">
+          <button
+            v-for="(s, i) in detailItems" :key="s.id"
+            type="button"
+            class="relative overflow-hidden rounded-2xl border border-ink-600 bg-ink-800 text-left transition active:scale-[0.98]"
+            :class="i === 0 && detailFilter === 'all' ? 'col-span-2' : ''"
+            :aria-label="'Xem ảnh ' + shotTitle(s)"
+            :data-collection-shot="s.id"
+            @click="openDetailShot(s)"
+          >
+            <img :src="thumbUrl(shotImage(s), 480)" :alt="shotTitle(s)" class="w-full object-cover" :class="i === 0 && detailFilter === 'all' ? 'aspect-[4/3]' : 'aspect-square'" loading="lazy" @error="onThumbError($event, shotImage(s))">
+            <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-950/85 to-transparent px-3 pb-2 pt-6">
+              <b class="block truncate text-label font-semibold text-cream-50">{{ shotTitle(s) }}</b>
+              <i class="block text-micro not-italic text-cream-300">{{ workflowLabel(s.shot_state) }}</i>
+            </span>
+          </button>
+        </div>
+        <div v-else class="rounded-2xl border border-dashed border-ink-600 px-6 py-10 text-center">
+          <StudioIcon name="image" size="h-7 w-7" class="mx-auto text-cream-400" />
+          <p class="mt-2 text-body text-cream-300">
+            {{ detailShots.length ? 'Không có ảnh ở bước này.' : 'Bộ này chưa có ảnh — vào Studio tạo ảnh, ảnh sẽ tự gắn vào bộ đang áp dụng.' }}
+          </p>
+          <button v-if="!detailShots.length" type="button" class="btn-magic mt-3 inline-flex h-11 items-center gap-2 rounded-full px-5 text-label font-bold" @click="goToStudio(detailProject)">
+            <StudioIcon name="sparkles" size="h-4 w-4" /> Vào Studio tạo ảnh
+          </button>
+        </div>
+      </div>
+
+      <!-- Hàng việc của bộ: ĐỔI bộ đang làm, hoặc đi tiếp sang Studio. Hai việc này KHÁC việc xem. -->
+      <footer class="shrink-0 border-t border-ink-700 bg-ink-900 px-4 py-3" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px)">
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-ink-600 bg-ink-800 text-label font-semibold text-cream-200 transition hover:border-brand-400 disabled:opacity-50"
+            :disabled="store.appliedProject?.id === detailProject.id"
+            data-collection-apply
+            @click="pick(detailProject)"
+          >
+            <StudioIcon name="check" size="h-4 w-4" class="text-brand-300" />
+            {{ store.appliedProject?.id === detailProject.id ? 'Đang áp dụng' : 'Áp dụng cho phiên này' }}
+          </button>
+          <button type="button" class="btn-magic flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl text-label font-bold transition active:scale-[0.98]" @click="goToStudio(detailProject)">
+            <StudioIcon name="arrowRight" size="h-4 w-4" /> Mở trong Studio
+          </button>
+        </div>
+      </footer>
+    </section>
+
+    <!-- Trình xem ảnh dùng chung — mở từ lưới ảnh của màn chi tiết (ngữ cảnh: ảnh CỦA BỘ NÀY). -->
+    <GalleryModal v-if="store.viewer" />
 
     <BaseModal v-model="techPackOpen" wide :title="'Phiếu kỹ thuật — ' + (applied?.name || '')">
       <TechPackEditor v-if="applied && techPackOpen" :project-id="applied.id" />

@@ -131,7 +131,13 @@
                 @php $badges = $recommended[$plan->slug] ?? []; @endphp
                 {{-- id ổn định theo slug: vừa để chia sẻ link tới đúng gói, vừa để test khoanh vùng được
                      đúng thẻ gói (không bắt nhầm tên gói xuất hiện ở khối persona/bảng so sánh). --}}
-                <article id="goi-{{ $plan->slug }}" class="card flex flex-col p-5 {{ $plan->isFree() ? '' : 'ring-1 ring-inset ring-brand-500/20' }}">
+                {{-- [Đợt 60 · 2026-09-26] GÓI NỔI BẬT — theo prototype `#/pricing` ("gói hot" có viền nhận diện
+                     và một cờ ở đầu thẻ). Trước đây thẻ gói trả phí chỉ có `ring-brand-500/20` — rất nhạt,
+                     và ở lưới một cột trên điện thoại thì không thẻ nào nổi lên: người mới phải tự đọc
+                     từng gói để biết gói nào dành cho mình.
+                     Dùng `border-brand-500` — đúng từ vựng viền của §5 (đang-chọn = brand-500), không
+                     thêm gradient/khung riêng cho card (§1: bề mặt card do lớp .card quyết định). --}}
+                <article id="goi-{{ $plan->slug }}" class="card flex flex-col p-5 {{ $plan->isFree() ? '' : ($plan->is_default ? 'border border-brand-500 shadow-lg shadow-brand-600/10' : 'ring-1 ring-inset ring-brand-500/20') }}">
                     <div class="flex flex-wrap items-center gap-2">
                         <h3 class="font-display text-lg font-semibold text-cream-50">{{ $plan->name }}</h3>
                         @if($plan->isFree())

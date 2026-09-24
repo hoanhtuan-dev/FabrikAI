@@ -111,6 +111,14 @@ Route::middleware(['auth', 'can-studio', 'nostore'])->group(function () {
 
     // [Yeu cau 2026-09-20] Trang BO SUU TAP day du - moi nguoi dung moi vao de lam viec.
     Route::get('/bo-suu-tap', [StudioController::class, 'collectionsPage'])->name('collections.page');
+    // [Đợt 60 · 2026-09-26] MÀN CHI TIẾT một bộ sưu tập — prototype `#/collection/:id`.
+    // VÌ SAO CẦN ROUTE RIÊNG: màn chi tiết có URL riêng (`pushState` khi mở) để nút back của
+    // trình duyệt/điện thoại đóng nó thay vì văng khỏi trang — nhưng URL đó phải TRẢ VỀ ĐƯỢC khi F5
+    // hoặc khi đồng nghiệp mở link. Route này render ĐÚNG view của danh sách: id chỉ có nghĩa ở phía
+    // trình duyệt (SPA tự đọc `location.pathname`), máy chủ không cần biết bộ nào — nhờ vậy quyền
+    // xem vẫn do tầng API quyết định, không có đường vòng nào qua route này.
+    Route::get('/bo-suu-tap/{project}', [StudioController::class, 'collectionsPage'])
+        ->whereNumber('project')->name('collections.show');
 
     // [Yêu cầu 2026-09-25] TRANG AGENT STUDIO đầy đủ.
     // Luồng 4 bước (DNA shop -> Tín hiệu -> Định hướng -> Thực thi) trước đây là một MODAL trong

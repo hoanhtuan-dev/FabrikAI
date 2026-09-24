@@ -34,6 +34,22 @@
       "_pageBoot-DbFeskNz.js"
     ]
   },
+  "_GalleryModal-ZH5MLAM1.css": {
+    "file": "assets/GalleryModal-ZH5MLAM1.css",
+    "src": "_GalleryModal-ZH5MLAM1.css"
+  },
+  "_GalleryModal-dqlow1ea.js": {
+    "file": "assets/GalleryModal-dqlow1ea.js",
+    "name": "GalleryModal",
+    "imports": [
+      "_pageBoot-DbFeskNz.js",
+      "_dataColors-bXR5rZin.js",
+      "_useStudioThumb-Dyk_cak5.js"
+    ],
+    "css": [
+      "assets/GalleryModal-ZH5MLAM1.css"
+    ]
+  },
   "_NotificationCenter-DPCBUQcM.js": {
     "file": "assets/NotificationCenter-DPCBUQcM.js",
     "name": "NotificationCenter",
@@ -206,7 +222,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-BIlbS244.css",
+    "file": "assets/app-CFv7nhtO.css",
     "name": "app",
     "names": [
       "app.css"
@@ -215,16 +231,16 @@
     "isEntry": true
   },
   "resources/js/studio/LibraryApp.vue": {
-    "file": "assets/LibraryApp-Brmix5--.js",
+    "file": "assets/LibraryApp-b4t3LPDg.js",
     "name": "LibraryApp",
     "src": "resources/js/studio/LibraryApp.vue",
     "isDynamicEntry": true,
     "imports": [
+      "_GalleryModal-dqlow1ea.js",
       "_pageBoot-DbFeskNz.js",
       "_dataColors-bXR5rZin.js",
       "_useStudioThumb-Dyk_cak5.js",
-      "_NotificationCenter-DPCBUQcM.js",
-      "resources/js/studio/components/GalleryModal.vue"
+      "_NotificationCenter-DPCBUQcM.js"
     ]
   },
   "resources/js/studio/agent-studio.js": {
@@ -243,11 +259,12 @@
     ]
   },
   "resources/js/studio/collections.js": {
-    "file": "assets/collections-cHaVyfe1.js",
+    "file": "assets/collections-BPGn8y4c.js",
     "name": "collections",
     "src": "resources/js/studio/collections.js",
     "isEntry": true,
     "imports": [
+      "_GalleryModal-dqlow1ea.js",
       "_pageBoot-DbFeskNz.js",
       "_dataColors-bXR5rZin.js",
       "_useStudioThumb-Dyk_cak5.js",
@@ -258,7 +275,7 @@
       "_ProjectDesignView-BStFmwLe.js"
     ],
     "css": [
-      "assets/collections-CaerkZC5.css"
+      "assets/collections-B-gJCsC5.css"
     ]
   },
   "resources/js/studio/components/CollectionsCard.vue": {
@@ -309,20 +326,6 @@
       "_boot-DGdCzAQX.js",
       "_BaseModal-DqwCplCC.js",
       "_CompareSlider-Dnpmmw-n.js"
-    ]
-  },
-  "resources/js/studio/components/GalleryModal.vue": {
-    "file": "assets/GalleryModal-BOsuAo0K.js",
-    "name": "GalleryModal",
-    "src": "resources/js/studio/components/GalleryModal.vue",
-    "isDynamicEntry": true,
-    "imports": [
-      "_pageBoot-DbFeskNz.js",
-      "_dataColors-bXR5rZin.js",
-      "_useStudioThumb-Dyk_cak5.js"
-    ],
-    "css": [
-      "assets/GalleryModal-ZH5MLAM1.css"
     ]
   },
   "resources/js/studio/components/InpaintCard.vue": {
@@ -471,7 +474,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-DHn_copN.js",
+    "file": "assets/main-Z2ylyVPx.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -499,7 +502,7 @@
       "resources/js/studio/components/TryOnCard.vue",
       "resources/js/studio/components/DirectorCard.vue",
       "resources/js/studio/components/SourcePickerPopup.vue",
-      "resources/js/studio/components/GalleryModal.vue",
+      "_GalleryModal-dqlow1ea.js",
       "resources/js/studio/components/EditImageModal.vue",
       "resources/js/studio/components/ProjectWorkspace.vue"
     ],

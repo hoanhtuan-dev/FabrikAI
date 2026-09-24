@@ -7759,3 +7759,48 @@ prototype** (việc riêng, phải làm thành một đợt có kế hoạch —
 | **Chrome thật trên production** | `/` 390×844 **và** 1440×900: màn **chào 3 slide** hiện, 3 chấm, nút «Tiếp», lối đăng nhập — **0 lỗi console**. `/studio` 390×844 (khách): **nút ← về Trang chủ có mặt** (data-phone-home) · CTA «Tạo biến thể AI · 1 credit» · 4 lối tắt · banner xác thực · **0 DOM canvas** · không tràn ngang · **0 lỗi console** |
 | Ghi chú | `artisan about` trên host này **không chạy được** (`proc_open` bị chặn — nợ đã biết, có trong tài liệu deploy). Các lệnh cache thì chạy bình thường; bằng chứng nằm ở gói JS khớp từng byte + Chrome thật. |
 
+
+---
+
+## Kiểm tra & triển khai 2026-09-26 (Đợt 61 — MÀN CHI TIẾT BỘ SƯU TẬP: màn cuối còn thiếu của prototype)
+
+> Tiếp đợt 60 theo cùng một mục tiêu (đối chiếu `/prototype`). Màn còn thiếu lớn nhất trong bảng đối
+> chiếu nay đã xong: **màn chi tiết MỘT bộ sưu tập** (`#/collection/:id`).
+
+### A. Đã làm
+
+| Việc | Chi tiết |
+|---|---|
+| **Màn chi tiết bộ sưu tập** | Màn CHIẾM TRỌN (tầng 95) với **URL riêng** `/bo-suu-tap/{id}`: hàng đầu («N ảnh · trạng thái» · ← · ✕) · tên + brief + hạn + chủ sở hữu · **chip lọc theo VÒNG ĐỜI ảnh** (chỉ hiện bước đang có ảnh) · **lưới ảnh, ô đầu to gấp đôi** · chạm ảnh → **trình xem dùng chung** với ngữ cảnh là ảnh của chính bộ đó · hàng việc «Áp dụng cho phiên này» / «Mở trong Studio» |
+| **Route trả về được** | `GET /bo-suu-tap/{project}` (chỉ nhận id SỐ) render CÙNG view danh sách — id chỉ có nghĩa ở phía trình duyệt, nên **quyền xem vẫn do tầng API quyết định**, không có đường vòng nào qua route này. Nhờ vậy F5 giữa chừng và link gửi cho đồng nghiệp đều mở đúng bộ |
+| **Back của trình duyệt/điện thoại** | `pushState` khi mở + `popstate` đọc lại URL ⇒ back ĐÓNG màn chi tiết (về danh sách), không văng khỏi trang |
+| **Lưới bất đối xứng** (#/collections) | Trên điện thoại: 2 cột, **mỗi thẻ thứ ba chiếm trọn 2 cột**; từ `sm` trở lên về lưới đều |
+| **Gói nổi bật** (#/pricing) | Gói mặc định có **viền nhận diện** `border-brand-500` thay cho `ring-brand-500/20` gần như vô hình — đúng từ vựng viền §5, **không** thêm gradient cho card |
+
+### B. Lỗi thật bắt được khi làm (và cách phát hiện)
+
+Lưới ảnh của màn chi tiết lúc đầu **trắng ảnh và chạm không mở gì**. Nguyên nhân: `store.loadProjectShots()`
+trả về dạng `{ id, thumb, shot_state, shot_label, prompt }` — **`thumb`**, không phải `media_url`/`name`
+như một generation. Màn chi tiết đã dùng sai khoá. Nay có **một lớp chuyển đổi** (`shotImage` ·
+`shotTitle` · `detailViewerItems`) và **một bài test khoá đúng chỗ này** (`s.thumb || s.media_url`) — vì
+đây là loại lỗi im lặng: không exception, chỉ là ảnh trắng.
+
+### C. Kiểm chứng
+
+| Phép kiểm | Kết quả |
+|---|---|
+| Bộ kiểm màn chi tiết (Chrome thật 390×844) | **13/13 ĐẠT** — gồm: mở từ thẻ · có URL riêng · deep-link `/bo-suu-tap/1` mở thẳng đúng bộ · chip lọc thu hẹp lưới THẬT · chạm ảnh mở trình xem · **back của trình duyệt đóng màn** · tầng 95 · không tràn ngang |
+| Bộ test PHP | **1400 → 1401 xanh** (10.857 assert) — thêm bài `test_man_chi_tiet_bo_suu_tap` (4 bất biến) |
+| Test cũ bắt lỗi thật | `DesignSystemTest` chặn viền nút `border-ink-700` (ngoài từ vựng §5) trong màn mới ⇒ sửa thành `border-ink-600` đúng luật |
+
+### D. Việc CÒN LẠI — và một quyết định CỐ Ý KHÔNG PORT
+
+- **Rail snap ngang ở bảng giá**: **cố ý không port**. Prototype là mock 3 gói; `/bang-gia` đọc từ CSDL,
+  có 4+ gói + bảng so sánh + persona + FAQ, và thẻ gói thật CAO (credit · độ phân giải · ghế · giá vốn).
+  Một rail ngang trên điện thoại bắt người dùng vuốt qua những thẻ cao hơn màn hình — tệ hơn xếp dọc.
+  Phần tinh thần của prototype (một gói nổi bật) thì đã port (mục A).
+- **Công tắc Tháng/Năm**: máy chủ bán theo đơn vị của TỪNG gói (gói xưởng bán theo VỤ 3 tháng) — thêm
+  công tắc sẽ là bịa một lựa chọn không tồn tại.
+- **Token màu/typography của prototype**: việc riêng, phải làm thành một đợt có kế hoạch (hệ token hiện
+  tại sinh từ theme daisyUI và bị ~1.400 test khoá).
+

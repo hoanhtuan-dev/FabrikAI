@@ -61,6 +61,9 @@
 | 4 | **GUI chưa đúng — Studio điện thoại** | Hàng đầu ← · nhãn ngữ cảnh · credit; **CTA chính có GIÁ credit**; **lối tắt 2×2**; cửa đầy đủ «Tác vụ ảnh — tất cả»; **tag tỉ lệ · kích thước đọc từ chính tấm ảnh**; **danh sách ảnh điều khiển được** (chạm đặt ảnh đang làm việc · mắt ẩn/hiện · thanh độ mờ) | 8/8 phép kiểm, gồm "bấm mắt đổi trạng thái thật" và "CTA mở thẳng cấp Tạo biến thể" |
 | 5 | **Deep-link `?panel=`** (để 4 intent ở Trang chủ là thật, không phải trang trí) | StudioApp đẩy yêu cầu sang nhánh đang render; StudioPhone nhận **ngay khi mount** (`immediate`) | `/studio?panel=compose` mở đúng công cụ; công cụ **bị khoá theo gói** đi tới `/bang-gia` (đường nâng cấp thật) |
 | 6 | *(phát hiện khi đối chiếu)* **Hub thiếu Đăng xuất + thanh credit** | Thẻ tài khoản ở `/cai-dat`: danh tính · **thanh tiến trình credit** (số dư / hạn mức tháng, đọc từ `/api/plan/status`) · **Đăng xuất** | 1 bài test khoá; trước đây đăng xuất chỉ có trong menu tài khoản ở Studio màn rộng |
+| 7 | **Màn chi tiết một bộ sưu tập** (`#/collection/:id`) | Màn CHIẾM TRỌN có **URL riêng** `/bo-suu-tap/{id}`: hàng đầu («N ảnh · trạng thái» · ← · ✕) · tên + brief · **chip lọc theo vòng đời ảnh** · **lưới ảnh (ô đầu to gấp đôi)** · chạm ảnh → **trình xem dùng chung với ngữ cảnh là ảnh của bộ này** · hàng việc «Áp dụng cho phiên này» / «Mở trong Studio» | **13/13 phép kiểm** trên Chrome thật: mở từ thẻ · URL riêng · back của trình duyệt đóng màn · **deep-link `/bo-suu-tap/1` mở thẳng đúng bộ** · chip lọc thu hẹp lưới thật · tầng 95, không tràn ngang |
+| 8 | **Lưới bất đối xứng ở Bộ sưu tập** (`#/collections`) | Trên điện thoại: lưới **2 cột**, **mỗi thẻ thứ ba chiếm trọn 2 cột**; từ `sm` trở lên về lưới đều | Nằm trong bộ kiểm 13/13 (không có lỗi tràn ngang ở 390px) |
+| 9 | **Gói nổi bật ở bảng giá** (`#/pricing`) | Gói mặc định có **viền nhận diện** (`border-brand-500`) thay cho vòng `ring-brand-500/20` gần như vô hình — đúng từ vựng viền §5, không thêm gradient cho card | Ở lưới một cột trên điện thoại trước đây không thẻ nào nổi lên; nay gói dành cho người mới thấy được ngay |
 
 **Tổng: 20/20 phép kiểm trên Chrome thật** (390×844) cho đợt này; full suite PHP **1400 xanh**.
 
@@ -68,9 +71,8 @@
 
 | Việc | Vì sao chưa làm | Ghi chú |
 |---|---|---|
-| **Màn chi tiết BST** (`#/collection/:id` của prototype) | Trang `/bo-suu-tap` đã có đủ công cụ quản trị (bảng thiết kế · tech pack · mẫu · QC · gate · sản xuất · chia sẻ) nhưng **thiếu một màn "một bộ sưu tập"** có lưới shots + chip lọc như prototype | Việc lớn nhất còn lại; cần một surface toàn màn + `pushState` để back hoạt động đúng |
-| **Bảng giá theo rail snap** (`#/pricing`) | `/bang-gia` render từ CSDL và đã đúng nội dung; khác prototype ở BỐ CỤC (rail ngang + công tắc Tháng/Năm) | Chỉ canh lại bố cục, không đổi dữ liệu |
-| **Lưới bất đối xứng ở Bộ sưu tập** (`#/collections`) | Trang thật có thẻ bộ sưu tập + trạng thái + tiến trình duyệt (nhiều thông tin hơn prototype) | Cân nhắc khi làm màn chi tiết |
+| **Bảng giá theo rail snap NGANG** (`#/pricing`) | Prototype là bản mock 3 gói; `/bang-gia` đọc từ CSDL và có 4+ gói, bảng so sánh, khối persona, FAQ. Thẻ gói thật CAO (credit · độ phân giải · ghế · giá vốn · CTA), nên một rail ngang trên điện thoại bắt người dùng vuốt qua những thẻ cao hơn màn hình — **tệ hơn** xếp dọc. | **CỐ Ý KHÔNG PORT**; giữ phần tinh thần (gói nổi bật — xem §4.1 dòng 9). Ghi lại đây để lần sau không ai tưởng là bỏ sót. |
+| **Công tắc Tháng/Năm ở bảng giá** | Máy chủ bán theo **đơn vị của từng gói** (`unit_label` · gói xưởng bán theo VỤ 3 tháng) — không phải mọi gói đều có giá theo năm | Thêm công tắc sẽ là bịa một lựa chọn không tồn tại |
 | **Agent dạng feed hội thoại** (`#/agent`) | `/agent-studio` là luồng 4–5 bước có chat — KHÁC kiến trúc nhưng nhiều năng lực hơn | Cố ý không hạ cấp về bản mock |
 | **Token màu/typography của prototype** (ink-0..4 · signal · magic · Fraunces/Space Grotesk) | Hệ token hiện tại sinh từ theme daisyUI và bị ~1.400 test khoá | Việc riêng, phải làm thành một đợt có kế hoạch — không trộn vào đợt port cấu trúc |
 

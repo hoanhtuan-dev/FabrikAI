@@ -185,6 +185,49 @@ class PrototypeParityTest extends TestCase
             'Trên điện thoại, ?panel= phải đi sang StudioPhone — nhánh đó không render bảng trái.');
     }
 
+    // ── D. MÀN CHI TIẾT BỘ SƯU TẬP (prototype #/collection/:id) ────────────────
+
+    /**
+     * Màn chi tiết bộ sưu tập — màn CUỐI trong bảng đối chiếu còn thiếu.
+     *
+     * Bốn bất biến, mỗi cái ứng với một quyết định đã ghi trong mã:
+     *   · có ĐƯỜNG DẪN THẬT + route trả về được khi F5 (không phải một modal không link được);
+     *   · ảnh lấy qua ĐÚNG nguồn `store.loadProjectShots` (không thêm endpoint đọc mới);
+     *   · chip lọc dựng từ vòng đời ảnh THẬT (`shot_state`) và chỉ hiện bước đang có ảnh;
+     *   · chạm ảnh mở TRÌNH XEM dùng chung với ngữ cảnh là ảnh của bộ này.
+     */
+    public function test_man_chi_tiet_bo_suu_tap(): void
+    {
+        $page = $this->code($this->src('pages/CollectionsPage.vue'));
+
+        // 1. Mở/đóng bằng URL thật + back của trình duyệt.
+        $this->assertStringContainsString('data-collection-open', $page, 'Thẻ bộ sưu tập phải có lối vào màn chi tiết.');
+        $this->assertStringContainsString('data-collection-detail', $page);
+        $this->assertStringContainsString("history.pushState({ collection: Number(p.id) }, '', '/bo-suu-tap/' + p.id)", $page,
+            'Mở màn chi tiết phải ghi URL — nếu không, gửi link cho đồng nghiệp là mở lại từ danh sách.');
+        $this->assertStringContainsString("addEventListener('popstate', onDetailPop)", $page,
+            'Nút back phải đóng màn chi tiết (bám URL), không văng khỏi trang.');
+        $this->assertStringContainsString('onDetailPop()', $page, 'F5 hoặc mở link trực tiếp phải vào đúng bộ.');
+
+        // 2. Route phía máy chủ trả về được cùng một view (SPA tự đọc pathname).
+        $routes = (string) file_get_contents(base_path('routes/web.php'));
+        $this->assertStringContainsString("Route::get('/bo-suu-tap/{project}'", $routes);
+        $this->assertStringContainsString("->whereNumber('project')", $routes,
+            'Chỉ nhận id số — không mở một route bắt mọi chuỗi dưới /bo-suu-tap.');
+
+        // 3. Nguồn ảnh + chip lọc + trình xem.
+        $this->assertStringContainsString('store.loadProjectShots(', $page);
+        $this->assertStringContainsString('data-collection-chip', $page);
+        $this->assertStringContainsString('WORKFLOW_STEPS.filter((s) => counts[s.state])', $page,
+            'Chip lọc chỉ hiện bước ĐANG CÓ ảnh — chip 0 ảnh là chip vô nghĩa.');
+        $this->assertStringContainsString('store.openViewer(', $page);
+        $this->assertStringContainsString("import GalleryModal from '../components/GalleryModal.vue'", $page,
+            'Phải dùng TRÌNH XEM dùng chung, không dựng trình xem thứ hai.');
+        // Dạng dữ liệu THẬT của ảnh-theo-bộ là `thumb` (không phải `media_url`) — chỗ dễ sai nhất.
+        $this->assertStringContainsString('s.thumb || s.media_url', $page,
+            'Ảnh của bộ dùng khoá `thumb`; quên lớp chuyển đổi là lưới ảnh trắng và chạm không mở gì.');
+    }
+
     /** Tài liệu đối chiếu phải tồn tại và nói đúng tên các màn của prototype. */
     public function test_tai_lieu_doi_chieu_prototype(): void
     {
