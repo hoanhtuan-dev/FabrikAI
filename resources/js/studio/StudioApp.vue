@@ -1128,10 +1128,6 @@ function onTouchEnd(e) {
              Bảng lọc KHÔNG còn là một dải trong lưới: nó là popup mở từ đây. Nhờ vậy toàn bộ diện
              tích dọc của lưới thuộc về ẢNH, và hai lối vào nằm ở thanh tiêu đề — chỗ người dùng đã
              quen tìm công cụ. Kính lúp mở thẳng bảng lọc với con trỏ đặt sẵn ở ô tìm. -->
-        <button type="button" class="order-4 icon-btn !h-8 !w-8 shrink-0" data-header-action="search-output"
-                title="Tìm ảnh" aria-label="Tìm ảnh" @click="openOutputSheet('search')">
-          <StudioIcon name="search" size="h-4 w-4" />
-        </button>
         <button type="button" class="order-4 icon-btn !h-8 !w-8 relative shrink-0" data-header-action="filter-output"
                 :class="hasOutputFilter ? 'is-active' : ''"
                 :title="hasOutputFilter ? 'Bộ lọc đang bật' : 'Lọc và sắp xếp kết quả'" aria-label="Lọc và sắp xếp kết quả"
@@ -1179,7 +1175,7 @@ function onTouchEnd(e) {
         <!-- ══ CỤM 1 · ĐIỀU HƯỚNG KHÔNG GIAN LÀM VIỆC (desktop): MỘT khay gom mọi lối vào, nhóm theo
              chức năng — Bộ sưu tập (chọn bối cảnh) → Nguồn ảnh · Thư viện · Bảng lệnh · Outputs.
              Vạch mảnh phân tách hai nhóm con cho mắt dễ quét. Điện thoại vẫn dùng dock dưới. -->
-        <div class="order-7 ml-auto hidden shrink-0 items-center gap-1 rounded-xl border border-ink-700 bg-ink-800/60 p-1 lg:flex" data-header-workspace>
+        <div class="order-7 ml-auto hidden shrink-0 items-center gap-1 lg:flex" data-header-workspace>
         <div class="relative">
           <button @click="openApplyPopover" class="icon-btn !h-8 !w-8" title="Bộ sưu tập — áp dụng nhanh hoặc mở bảng thiết kế quản lý"><StudioIcon name="kanban" size="h-4 w-4" /></button>
           <div v-if="applyOpen" class="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border border-ink-700 bg-ink-900 shadow-xl">
@@ -1248,15 +1244,15 @@ function onTouchEnd(e) {
 
         <!-- [đợt 35] KHAY TRÁI (tài khoản · gói & credit) — CÙNG ngôn ngữ thị giác với khay công cụ
              bên phải: viền + nền + bo góc + mục cao 32px + vạch ngăn giữa hai nhóm. -->
-        <div class="order-3 flex shrink-0 items-center gap-1 rounded-xl border border-ink-700 bg-ink-800/60 p-1" data-header-account>
+        <div class="contents" data-header-account>
         <div v-if="store.user" class="order-3 relative">
-          <button type="button" class="flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-label font-semibold text-cream-200 transition-colors hover:bg-ink-700" :class="store.creditsLow ? 'is-active' : ''"
+          <button type="button" class="icon-btn !h-8 !w-8 shrink-0" :class="store.creditsLow ? 'is-active' : ''"
                   :title="'Gói & credit — còn ' + store.creditsLeft + ' credit' + (store.planName ? ' · gói ' + store.planName : '')"
                   @click="store.togglePlanPopover()">
-            <StudioIcon name="coins" size="h-3.5 w-3.5" />
-            {{ store.creditsLeft }}
-            <span v-if="store.planName" class="hidden max-w-[8rem] truncate text-label text-cream-300 2xl:inline">{{ store.planName }}</span>
-            <StudioIcon name="chevronDown" size="h-3 w-3" />
+            <StudioIcon name="coins" size="h-4 w-4" />
+            <!-- So credit la THONG TIN, khong phai nhan: dat o huy hieu goc nhu moi icon-btn khac,
+                 thay vi keo mot nut chu ra giua thanh tieu de. -->
+            <span class="absolute -bottom-1 -right-1 rounded-full bg-ink-700 px-1 text-micro font-bold leading-tight text-cream-100">{{ store.creditsLeft }}</span>
           </button>
 
           <div v-if="store.planOpen" role="dialog" aria-label="Gói và credit"

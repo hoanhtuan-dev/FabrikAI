@@ -47,6 +47,9 @@ const store = useStudioStore();
 // [đợt 57] Bộ lọc nằm trong STORE vì bảng lọc do THANH TIÊU ĐỀ mở (nút kính lúp / nút lọc), còn
 // lưới chỉ đọc lại. Để hai bản sao local là hai chỗ để lệch nhau.
 const filter = computed({ get: () => store.outputStatus, set: (v) => { store.outputStatus = v; } });
+// Thẻ nào đang mở bảng việc (Sửa · Tải). CHỈ MỘT thẻ mở một lúc — mở thẻ khác thì thẻ trước đóng,
+// nên không bao giờ có hai bảng nút cùng nổi trên lưới.
+const menuFor = ref(null);
 // Tìm theo TÊN hoặc PROMPT — hai thứ người dùng nhớ về một tấm ảnh. Không phân biệt hoa/thường và
 // bỏ dấu tiếng Việt: gõ "ao thun" phải ra "Áo thun".
 const q = computed({ get: () => store.outputQuery, set: (v) => { store.outputQuery = v; } });
@@ -318,21 +321,39 @@ function onDragStart(e, g) {
           </template>
         </div>
 
-        <!-- ── HAI nút nhanh: Sửa · Tải. LUÔN HIỆN (xem chú thích đầu file).
-             [đợt 57] HAI NÚT CÙNG MỘT KIỂU. Trước đây «Sửa» tô brand còn «Tải» nền xám — người dùng
-             đọc đó là "Sửa là việc chính, Tải là việc phụ", trong khi cả hai đều là việc ngang nhau
-             trên một tấm ảnh đã xong. Không có việc nào chính hơn việc nào.
-             CAPTION ĐÃ BỎ: tên ảnh chiếm một dòng trong mỗi thẻ, nhân lên thành cả một hàng chữ
-             chạy ngang lưới — chỗ đó thuộc về ẢNH. Tên vẫn còn trong title + trình xem. ── -->
+        <!-- ══ THẺ ẢNH: CHỈ ẢNH + MỘT NÚT TRÒN (đợt 58) ══
+             Trước đây mỗi thẻ mang theo một thanh hai nút cao 44px ⇒ cả một hàng nút chạy ngang lưới,
+             lặp lại ở MỌI thẻ, cho hai việc người dùng chỉ làm thỉnh thoảng. Nay thẻ chỉ còn TẤM ẢNH;
+             một nút tròn nhỏ ở góc mở ra hai việc — cùng lối với nút nổi: việc phụ nằm sau một cú
+             chạm, và chỉ hiện ở thẻ ĐANG được chạm (không phải cả lưới cùng lúc).
+             Bàn phím vẫn dùng được: nút tròn là <button> thật, và hai nút trong bảng cũng là <button>
+             thật — mở bằng Enter/Space như mọi nút khác. ── -->
         <template v-if="g.status === 'completed' && g.media_url">
-          <div class="grid grid-cols-2 gap-1.5 border-t border-ink-700 p-1.5">
-            <button type="button" class="flex h-11 items-center justify-center gap-1.5 rounded-lg bg-ink-700 text-label font-semibold text-cream-200 transition hover:bg-ink-600 lg:h-8 lg:text-tiny" title="Mở màn Chỉnh ảnh: tả · khoanh vùng · vẽ cọ" :aria-label="'Sửa ' + store.genName(g)" data-edit-open @click.stop="editImage(g)">
-              <StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa
-            </button>
-            <button type="button" class="flex h-11 items-center justify-center gap-1.5 rounded-lg bg-ink-700 text-label font-semibold text-cream-200 transition hover:bg-ink-600 lg:h-8 lg:text-tiny" title="Tải ảnh gốc về máy" :aria-label="'Tải ' + store.genName(g)" @click.stop="download(g)">
-              <StudioIcon name="download" size="h-3.5 w-3.5" /> Tải
+          <div class="absolute bottom-1.5 right-1.5 z-20">
+            <button
+              type="button"
+              class="grid h-9 w-9 place-items-center rounded-full bg-scrim/75 text-cream-50 shadow-lg backdrop-blur-sm transition hover:bg-brand-600"
+              :class="menuFor === g.id ? 'bg-brand-600' : ''"
+              :title="menuFor === g.id ? 'Đóng' : 'Việc khác với ảnh này'"
+              :aria-label="menuFor === g.id ? 'Đóng bảng việc' : 'Mở bảng việc cho ảnh này'"
+              :aria-expanded="menuFor === g.id ? 'true' : 'false'"
+              :data-card-menu="g.id"
+              @click.stop="menuFor = menuFor === g.id ? null : g.id"
+            >
+              <StudioIcon :name="menuFor === g.id ? 'x' : 'plus'" size="h-4 w-4" />
             </button>
           </div>
+
+          <Transition name="cf">
+            <div v-if="menuFor === g.id" class="absolute inset-x-0 bottom-0 z-10 flex items-stretch gap-1 border-t border-ink-700 bg-ink-900/95 p-1.5 backdrop-blur-sm" data-card-actions>
+              <button type="button" class="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-ink-700 text-label font-semibold text-cream-200 transition hover:bg-ink-600 lg:h-9 lg:text-tiny" title="Mở màn Chỉnh ảnh: tả · khoanh vùng · vẽ cọ" :aria-label="'Sửa ' + store.genName(g)" data-edit-open @click.stop="editImage(g)">
+                <StudioIcon name="pencil" size="h-3.5 w-3.5" /> Sửa
+              </button>
+              <button type="button" class="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-ink-700 text-label font-semibold text-cream-200 transition hover:bg-ink-600 lg:h-9 lg:text-tiny" title="Tải ảnh gốc về máy" :aria-label="'Tải ' + store.genName(g)" @click.stop="download(g); menuFor = null">
+                <StudioIcon name="download" size="h-3.5 w-3.5" /> Tải
+              </button>
+            </div>
+          </Transition>
         </template>
         <template v-else>
           <div class="flex items-center gap-1 border-t border-ink-700 p-1.5">

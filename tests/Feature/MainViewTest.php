@@ -138,11 +138,16 @@ class MainViewTest extends TestCase
         // Đếm nút trong ĐÚNG khối hai nút nhanh (từ mốc đánh dấu tới thẻ đóng của khối).
         // Không đếm cả file: mỗi card còn một <button> BỌC ẢNH (chạm ảnh = mở trình xem) và một
         // nút Xoá cho thẻ "đang chạy/lỗi" — hai thứ đó vẫn phải còn.
-        $start = strpos($grid, 'HAI nút nhanh: Sửa');
-        $this->assertNotFalse($start, 'Thiếu mốc đánh dấu khối hai nút nhanh trong TEMPLATE.');
+        // [đợt 58] Hai việc nhanh nay nằm SAU một nút tròn ở góc thẻ — thẻ chỉ còn tấm ảnh. Bất biến
+        // giữ nguyên: đúng HAI việc nhanh (Sửa · Tải), và CHỈ MỘT thẻ mở bảng một lúc.
+        $start = strpos($grid, 'data-card-actions');
+        $this->assertNotFalse($start, 'Thiếu bảng hai việc nhanh (data-card-actions) trong thẻ.');
         $bar = substr($grid, $start);
         $bar = substr($bar, 0, strpos($bar, '</div>'));
-        $this->assertSame(2, substr_count($bar, '<button'), 'Khối nút nhanh của lưới phải có ĐÚNG hai nút.');
+        $this->assertSame(2, substr_count($bar, '<button'), 'Bảng việc của thẻ phải có ĐÚNG hai nút: Sửa · Tải.');
+        $this->assertStringContainsString('const menuFor = ref(null)', $grid,
+            'Phải có trạng thái "thẻ nào đang mở bảng việc" — mở tất cả cùng lúc là cả lưới đầy nút.');
+        $this->assertStringContainsString('data-card-menu', $grid, 'Thiếu nút tròn mở bảng việc.');
 
         // Hai nút đó là Sửa và Tải — không phải hai nút khác.
         $this->assertStringContainsString('data-edit-open', $bar, 'Nút nhanh thứ nhất phải là «Sửa».');

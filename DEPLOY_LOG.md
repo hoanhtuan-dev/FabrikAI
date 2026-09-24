@@ -960,6 +960,45 @@ thumbnail của máy chủ vẫn là **640**. Một ô ảnh 390 CSS px trên m�
 (thêm một phía mà quên phía kia là ảnh lỗi). ĐO ĐƯỢC ở `deviceScaleFactor: 3`: ô 159px ⇒ trình duyệt
 chọn `?size=640` (159x3 = 477, cỡ kế tiếp là 640 — đúng, không còn kéo giãn).
 
+## Phiên 2026-09-23 (đợt 58) — HEADER GỌN + THẺ ẢNH CHỈ CÒN ẢNH
+
+### 1. HEADER: 63px → 53px, KHÔNG CÒN KHUNG NỀN/VIỀN
+
+- **Bỏ nút tìm ảnh** trên header (đã có nút lọc mở bảng lọc kèm ô tìm).
+- **Bỏ nền + viền + đệm của CẢ HAI khay** (`data-header-account` và `data-header-workspace`).
+  Một khung bao quanh nhóm icon làm mắt đọc chúng thành một "cụm điều khiển" riêng, trong khi chúng
+  NGANG HÀNG với các icon khác trên cùng thanh. ĐO ĐƯỢC: số khung nền/viền còn lại trong header = **0**.
+- **Nút credit về dạng icon** (chỉ icon + huy hiệu số ở góc), thay vì một nút chữ chiếm giữa thanh.
+- Khối thương hiệu vốn đã là khối tĩnh từ đợt 57 (không tải lại trang). ĐO LẠI: `brand la link = false`.
+
+ĐO ĐƯỢC: header **53px** ở 390px (trước 63px), **49px** ở 1280px. Không tràn ngang.
+
+### 2. THẺ ẢNH: CHỈ ẢNH + MỘT NÚT TRÒN
+
+Mỗi thẻ trước đây mang theo một thanh hai nút cao 44px ⇒ **cả một hàng nút chạy ngang lưới, lặp lại ở
+MỌI thẻ**, cho hai việc người dùng chỉ làm thỉnh thoảng.
+
+Nay thẻ chỉ còn **tấm ảnh**; một **nút tròn nhỏ ở góc** (dấu `+`) mở ra **Sửa · Tải**, đổi thành dấu ✕
+khi đang mở. **CHỈ MỘT thẻ mở một lúc** — mở thẻ khác thì thẻ trước đóng, nên không bao giờ có hai bảng
+nút cùng nổi trên lưới.
+
+ĐO ĐƯỢC: thẻ mặc định có **2 nút** (chạm ảnh + nút tròn); sau khi bấm nút tròn → bảng việc hiện
+(`bangViec=true`). Bàn phím vẫn dùng được: cả ba đều là `<button>` thật.
+
+### 3. VIỆC CHƯA LÀM — NÓI THẲNG
+
+**Chưa chuyển được nút «Gói & credit» vào menu Cài đặt ở góc trái dưới.**
+
+Tôi đã thử hai lần bằng cách cắt khối popup (~200 dòng) ra khỏi header và dán vào cạnh menu Cài đặt.
+Cả hai lần đều **làm hỏng tệp** (lần đầu: popup bị dán vào TRONG menu — mà menu có `overflow-hidden`
+nên popup bị cắt; lần hai: phép đếm thẻ `<div>` nuốt mất cả khay tài khoản).
+
+Tôi đã **khôi phục từ bản sao lưu** và dừng cách đó, thay vì đẩy lên một header hỏng. Việc này cần làm
+bằng tay theo từng bước nhỏ có build kiểm sau mỗi bước — hẹn làm riêng ở lượt sau, không gộp vào lượt
+này nữa.
+
+Phần ĐÃ làm được của yêu cầu đó: nút credit không còn là một nút chữ to giữa header (đã thành icon).
+
 ### 7. NỢ CÒN LẠI (ghi để phiên sau không tưởng đã xong)
 
 - **Sổ chi phí chỉ có dữ liệu TỪ SAU deploy.** Mọi lượt trước đó không nằm trong `provider_usage`; báo cáo 30 ngày đầu sẽ thiếu. Đối chiếu hoá đơn thật bằng `php artisan studio:pricing --usage=30`.

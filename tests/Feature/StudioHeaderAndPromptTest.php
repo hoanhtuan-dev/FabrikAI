@@ -68,7 +68,10 @@ class StudioHeaderAndPromptTest extends TestCase
         foreach ([
             // [đợt 53] Từng phải ẩn dưới sm vì thanh tiêu đề tràn ở 320px. [đợt 54] Hai nút điện thoại
             // đã gỡ khỏi thanh tiêu đề (về dock) nên chỗ có lại — thương hiệu trở về ở MỌI bề rộng.
-            'class="order-2 flex shrink-0 items-center gap-2"' => 'thương hiệu FabrikAI',
+            'class="order-2 flex shrink-0 items-center gap-2"' => 'thương hiệu FabrikAI (khối tĩnh, KHÔNG phải liên kết — bấm không được tải lại trang)',
+            // [đợt 58] Hai khay bỏ nền + viền: header chỉ còn icon trần.
+            'class="contents" data-header-account>' => 'khay tài khoản (đã bỏ nền/viền)',
+            'class="order-7 ml-auto hidden shrink-0 items-center gap-1 lg:flex"' => 'khay công cụ (đã bỏ nền/viền)',
             // [đợt 35] Hai nút này nay nằm trong KHAY TRÁI (data-header-account) — thứ tự trong khay lo
             // bằng order-1/order-3 vì mã nguồn xếp credit trước tài khoản.
             'class="order-1 relative"' => 'nút + menu tài khoản',
@@ -77,18 +80,23 @@ class StudioHeaderAndPromptTest extends TestCase
             // đứng ở thanh tiêu đề, không nằm trong chrome của mặt nào.
             'class="order-4 hidden icon-btn !h-8 !w-8 shrink-0 lg:grid"' => 'nút đổi mặt Lưới ⇄ Bảng ghép (chỉ từ lg)',
             'class="order-5 ml-auto' => 'nút Bộ sưu tập (điện thoại)',
-            'class="order-7 ml-auto hidden' => 'khay điều hướng không gian làm việc',
+            'class="order-7 ml-auto hidden shrink-0 items-center gap-1 lg:flex"' => 'khay điều hướng không gian làm việc (đã bỏ nền/viền)',
         ] as $needle => $what) {
             $this->assertStringContainsString($needle, $app, "Thiếu thứ tự cho {$what}.");
         }
 
         // [đợt 35] Khay TRÁI phải dùng ĐÚNG bộ lớp của khay PHẢI ⇒ hai bên đồng bộ thị giác.
-        $this->assertStringContainsString(
-            'order-3 flex shrink-0 items-center gap-1 rounded-xl border border-ink-700 bg-ink-800/60 p-1" data-header-account',
-            $app,
-            'Khay trái (tài khoản · credit) chưa đồng bộ với khay công cụ bên phải.'
-        );
-        $this->assertStringContainsString('order-7 ml-auto hidden shrink-0 items-center gap-1 rounded-xl border border-ink-700 bg-ink-800/60 p-1 lg:flex" data-header-workspace', $app,
+        // [đợt 58] ĐỔI CHÍNH SÁCH: cả hai khay BỎ nền + viền + đệm. Lý do: header chỉ có icon, và một
+        // khung bao quanh nhóm icon làm mắt đọc chúng thành một "cụm điều khiển" riêng — trong khi
+        // chúng ngang hàng với các icon khác trên cùng thanh. Bất biến "hai khay đồng bộ nhau" GIỮ
+        // NGUYÊN, chỉ đổi bộ lớp chung.
+        $this->assertStringContainsString('class="contents" data-header-account>', $app,
+            'Khay trái (tài khoản) phải là khối trong suốt, không nền/viền.');
+        $this->assertStringContainsString('class="order-7 ml-auto hidden shrink-0 items-center gap-1 lg:flex" data-header-workspace>', $app,
+            'Khay phải phải cùng bộ lớp với khay trái (không nền/viền) — hai bên phải đồng bộ.');
+        $this->assertStringNotContainsString('rounded-xl border border-ink-700 bg-ink-800/60 p-1', $app,
+            'Header không được còn khung nền/viền bao quanh nhóm nút.');
+        $this->assertStringContainsString('class="order-7 ml-auto hidden shrink-0 items-center gap-1 lg:flex" data-header-workspace>', $app,
             'Khay công cụ bên phải phải giữ nguyên bộ lớp đó.');
 
         $this->assertStringContainsString('>FabrikAI</span>', $app, 'Thương hiệu FabrikAI phải còn trong header.');
