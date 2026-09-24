@@ -21,6 +21,7 @@ import CommandBar from './CommandBar.vue';
 import PopMenu from './PopMenu.vue';
 import NotificationCenter from './NotificationCenter.vue';
 import TriageDeck from './TriageDeck.vue';
+import PhoneActions from './PhoneActions.vue';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 
 const GalleryModal = defineAsyncComponent(() => import('./GalleryModal.vue'));
@@ -29,6 +30,8 @@ const store = useStudioStore();
 
 /* [Phase 3] Deck sàng lọc: tự mở khi một LƯỢT TẠO (≥2 ảnh) vừa hoàn tất; mở tay qua nút Duyệt. */
 const triageOpen = ref(false);
+/* [Phase 6] Tác vụ ảnh: sheet Options → Action (PhoneActions) thay lưới nút phẳng. */
+const actionsOpen = ref(false);
 const batchReady = computed(() => {
   const ids = store.lastBatch || [];
   if (ids.length < 2) return false;
@@ -50,23 +53,6 @@ function pickGen(g) {
 }
 function openCurrent() {
   if (store.preview) store.openViewer(store.preview);
-}
-function variant() {
-  if (!currentUrl.value) { store.toast('Chọn hoặc tạo một ảnh trước.', 'error'); return; }
-  store.refgen(store.upscaleSrc, store.imagePromptEn || '', 70, 2);
-}
-function download() {
-  const g = store.preview;
-  if (!g || !g.id) { store.toast('Chưa có ảnh để tải.', 'error'); return; }
-  window.location.href = '/api/generations/' + g.id + '/download';
-}
-async function share() {
-  const url = currentUrl.value;
-  if (!url) { store.toast('Chưa có ảnh để chia sẻ.', 'error'); return; }
-  try {
-    if (navigator.share) { await navigator.share({ title: 'FabrikAI', url }); }
-    else { await navigator.clipboard.writeText(url); store.toast('Đã chép liên kết ảnh.', 'success'); }
-  } catch (e) { /* người dùng tự huỷ sheet chia sẻ — không phải lỗi */ }
 }
 function goPrompt(q) {
   // Rỗng = không làm gì (ConceptCard popup chỉ có trong cây desktop; trên phone prompt chính là ô này).
@@ -123,21 +109,15 @@ function goPrompt(q) {
         </div>
       </div>
 
-      <!-- Hành động nhanh -->
-      <div class="mt-3 grid grid-cols-4 gap-2">
-        <button type="button" class="btn-magic flex h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-bold transition active:scale-95" @click="variant">
-          <StudioIcon name="sparkles" size="h-4 w-4" />Biến thể
-        </button>
-        <button type="button" class="flex h-12 flex-col items-center justify-center gap-0.5 rounded-2xl border border-ink-600 bg-ink-800 text-[11px] font-semibold text-cream-200 transition hover:border-brand-400 active:scale-95" @click="download">
-          <StudioIcon name="download" size="h-4 w-4" />Tải
-        </button>
-        <button type="button" class="flex h-12 flex-col items-center justify-center gap-0.5 rounded-2xl border border-ink-600 bg-ink-800 text-[11px] font-semibold text-cream-200 transition hover:border-brand-400 active:scale-95" @click="share">
-          <StudioIcon name="share" size="h-4 w-4" />Chia sẻ
-        </button>
-        <a href="/bo-suu-tap" class="flex h-12 flex-col items-center justify-center gap-0.5 rounded-2xl border border-ink-600 bg-ink-800 text-[11px] font-semibold text-cream-200 transition hover:border-brand-400 active:scale-95">
-          <StudioIcon name="ruler" size="h-4 w-4" />Tech pack
-        </a>
-      </div>
+      <!-- Tác vụ ảnh: MỘT nút mở sheet Options → Action (lồng cấp, có nút ← và back của máy) -->
+      <button
+        type="button"
+        class="btn-magic mt-3 flex h-13 w-full items-center justify-center gap-2 rounded-2xl text-label font-bold transition active:scale-[0.98] disabled:opacity-45"
+        :disabled="!currentUrl"
+        @click="actionsOpen = true"
+      >
+        <StudioIcon name="sliders" size="h-4 w-4" /> Tác vụ ảnh
+      </button>
 
       <!-- Rail kết quả gần đây -->
       <section v-if="recents.length" class="mt-5">
@@ -173,6 +153,7 @@ function goPrompt(q) {
     <PopMenu />
     <GalleryModal v-if="store.viewer" />
     <TriageDeck v-model:open="triageOpen" />
+    <PhoneActions v-model:open="actionsOpen" />
     <NotificationCenter />
   </div>
 </template>

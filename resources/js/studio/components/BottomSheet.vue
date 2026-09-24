@@ -11,8 +11,9 @@ import StudioIcon from './StudioIcon.vue';
 const props = defineProps({
   open: { type: Boolean, default: false },
   title: { type: String, default: '' },
+  back: { type: Boolean, default: false },   // hiện nút ← lùi cấp (phát sự kiện 'back')
 });
-const emit = defineEmits(['update:open']);
+const emit = defineEmits(['update:open', 'back']);
 
 const dragY = ref(0);
 let startY = 0, dragging = false;
@@ -52,6 +53,9 @@ watch(() => props.open, (v) => { if (!v) dragY.value = 0; });
           @pointercancel="grabUp"
         />
         <div v-if="title" class="bs-head">
+          <button v-if="back" type="button" class="bs-x" aria-label="Quay lại" @click="emit('back')">
+            <StudioIcon name="arrowLeft" size="h-4 w-4" />
+          </button>
           <span class="bs-title">{{ title }}</span>
           <button type="button" class="bs-x" aria-label="Đóng" @click="emit('update:open', false)">
             <StudioIcon name="x" size="h-4 w-4" />
