@@ -391,7 +391,7 @@ export const projectsActions = {
       this.select(g);
       const onLibrary = window.location.pathname.includes('/library');
       if (onLibrary) {
-        window.location.href = '/?step=' + step + '&id=' + g.id;
+        window.location.href = '/studio?step=' + step + '&id=' + g.id;
       } else {
         this.step = step;
       }

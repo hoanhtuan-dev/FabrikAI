@@ -70,6 +70,7 @@ import NotificationCenter from './components/NotificationCenter.vue';
 // của " Dọn toàn bộ canvas?" (trước đây cờ confirmDeleteOpen không có popup nào render ⇒ bấm
 // Delete/nút thùng rác không thấy gì xảy ra, cờ treo lại còn chặn cả phím tắt layer).
 import ConfirmDialog from './components/ConfirmDialog.vue';
+import StudioPhone from './components/StudioPhone.vue';
 const store = useStudioStore();
 // Lỗi nổ ra ngoài mọi khối try/catch (exception · promise bị từ chối) vẫn phải tới được người dùng
 // KÈM MÃ TRA CỨU — không thì nó chỉ nằm trong console của khách (docs/DESIGN_SYSTEM.md §6.5).
@@ -329,6 +330,16 @@ const projectsOpen = ref(false);
 const promptPopupOpen = ref(false);  // popup độc lập cho Prompt Tạo Ảnh (ConceptCard)
 // [P0] Chờ boot async xong mới render UI thật — tránh flash cấu hình sai (panel lộn, activity lỗi).
 const booting = ref(true);
+// [Phase 2 · shell 2026] Điện thoại (≤520px) render StudioPhone — bảng điều khiển không canvas.
+// 520px (không phải 1024): khoảng 521–1023 (tablet) vẫn dùng bố cục desktop đã tối ưu sẵn (đợt 52+);
+// chỉ màn ĐIỆN THOẠI thật mới tách hẳn — đúng ranh giới của prototype shell 2026.
+const isPhoneMql = window.matchMedia('(max-width: 520px)');
+const isPhone = ref(isPhoneMql.matches);
+onMounted(() => {
+  const onChange = (e) => { isPhone.value = e.matches; };
+  isPhoneMql.addEventListener('change', onChange);
+  onBeforeUnmount(() => isPhoneMql.removeEventListener('change', onChange));
+});
 // [Yêu cầu 2026-09-17] Menu Cài đặt ở GÓC TRÁI DƯỚI CÙNG của activity bar.
 const settingsOpen = ref(false);
 // Backdrop chỉ là <div> bắt click (không nhận bàn phím) nên phải tự lo đóng bằng Escape.
@@ -477,7 +488,7 @@ onMounted(async () => {
       // [Shell 2026 · Phase 1] Trang chủ prompt-first chuyển sang kèm ?prompt= → mở sẵn popup
       // prompt với nội dung đó, người dùng chỉ việc bấm Tạo.
       const promptParam = params.get('prompt');
-      if (promptParam) { store.sceneSetup.prompt = promptParam; store.promptOpen = true; }
+      if (promptParam) { store.imagePromptEn = promptParam; store.sceneSetup.prompt = promptParam; store.promptOpen = true; }
       // [P0.4] Mở đúng bộ sưu tập đang làm từ URL (?bo=5) hoặc localStorage — không bắt đầu từ trống.
       const bo = params.get('bo');
       if (bo) {
@@ -1094,7 +1105,10 @@ function onTouchEnd(e) {
 }
 </script>
 <template>
-  <div v-if="!booting" class="studio-shell flex h-full w-full flex-col bg-ink-950 text-cream-100">
+  <!-- [Phase 2 · shell 2026] ĐIỆN THOẠI: Studio là bảng điều khiển, KHÔNG canvas (quyết định
+       2026-09-24). v-if — không phải v-show: không một phần tử DOM canvas nào được tạo. -->
+  <StudioPhone v-if="!booting && isPhone" />
+  <div v-else-if="!booting" class="studio-shell flex h-full w-full flex-col bg-ink-950 text-cream-100">
     <!-- [Đợt 0.1] Banner 3 trạng thái xác thực — thay thế 403 im lặng bằng thông báo rõ ràng -->
     <AuthNotice />
     <!-- ══ Top account bar: thông tin người dùng + đăng nhập/đăng xuất + điều hướng quản trị ══ -->
