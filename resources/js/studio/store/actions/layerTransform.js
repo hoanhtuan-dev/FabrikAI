@@ -381,6 +381,22 @@ export const layerTransformActions = {
       // chọn khi ẩn. Hàng trong bảng Lớp vẫn sáng nên luôn biết đang chọn layer nào.
       this.saveLayerLayout();
     },
+    /**
+     * ĐẶT ĐỘ MỜ CHO MỘT LAYER THEO ID (đợt 60).
+     *
+     * VÌ SAO CẦN THÊM: thanh trượt độ mờ ở bảng Lớp (màn rộng) sửa độ mờ của ĐƠN VỊ ĐANG CHỌN
+     * (`updateUnitTransform('opacity', …)`), nên nó chỉ đúng khi người dùng đã chọn layer đó. Màn Studio
+     * trên điện thoại hiện danh sách lớp có thanh trượt NGAY TRÊN TỪNG HÀNG (theo prototype) — kéo thanh
+     * của hàng nào phải sửa hàng đó, không được kéo theo việc "chọn layer" (chọn layer là việc khác, và
+     * trên điện thoại nó còn đổi cả ảnh đang làm việc).
+     */
+    setLayerOpacity(id, value) {
+      const l = this.canvasLayers.find((x) => x.id === id);
+      if (!l) return;
+      const v = Math.min(1, Math.max(0, Number(value)));
+      l.opacity = Number.isFinite(v) ? v : 1;
+      this.saveLayerLayout();
+    },
     // Khóa/mở khóa layer (chống xóa/đổi tên/di chuyển nhầm).
     toggleLayerLock(id) {
       const l = this.canvasLayers.find((x) => x.id === id);

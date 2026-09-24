@@ -37,7 +37,7 @@
 | 6 | **Viền và nền của nút dùng từ vựng ĐÓNG** — nút nghỉ `border-ink-600` · đang chọn `border-brand-500` · hover `hover:border-brand-400` · nền `bg-ink-800` → `hover:bg-ink-700` | §5 |
 | 7 | **Giao diện không rò rỉ chi tiết kỹ thuật** (tên model AI · nhà cung cấp · mã HTTP · ngoại lệ); chi tiết đi vào `storage/logs/laravel.log` và `console`, người dùng đọc **mã tra cứu** | §6 |
 | 8 | **Vùng chạm ≥ 24×24** (nút chỉ icon ≥ 40×40), nút chỉ icon phải có `aria-label`, tiến trình `role="status"`, lỗi `role="alert"` | §8 |
-| 9 | **Không emoji trong chrome** — icon lấy từ `icons.json` qua `StudioIcon` (**138 icon**) | §9 |
+| 9 | **Không emoji trong chrome** — icon lấy từ `icons.json` qua `StudioIcon` (**140 icon**) | §9 |
 | 10 | **Chi phí hiện TRƯỚC khi bấm**; kết quả luôn có bước tiếp theo; trạng thái (gói · credit · việc đang chạy) luôn nhìn thấy | §12–§13 |
 | 11 | **Trên điện thoại KHÔNG có canvas** — và mọi tính năng canvas cần có đường tương đương hoặc nói thật là chỉ có ở màn rộng | §15.6 |
 | 12 | **Điều hướng phải lồng cấp được: Review → Options → Action**, với nút ← lùi một cấp, ✕ đóng hết, và **nút back của máy lùi đúng từng cấp** | §15.7 |
@@ -265,7 +265,7 @@ npm run build                   # 4. CSS bán cho khách — máy chủ KHÔNG c
 
 | Component | Thay cho |
 |---|---|
-| `StudioIcon.vue` (`icons.json` — **138 icon**, cũng là nguồn cho PHP `App\Support\IconRegistry`) | mọi `<svg>` chép tay, mọi emoji |
+| `StudioIcon.vue` (`icons.json` — **140 icon**, cũng là nguồn cho PHP `App\Support\IconRegistry`) | mọi `<svg>` chép tay, mọi emoji |
 | `LoadingSpinner.vue` (`text · subtext · progress`) | **mọi bộ tiến trình tự chế** (chấm · thanh · phần trăm) |
 | `ConfirmDialog.vue` | popup xác nhận tự viết (đã từng có 3 bản khác nhau) |
 | `BaseModal.vue` | khung modal tự viết |
@@ -1255,7 +1255,10 @@ một màn hình ai cũng thấy nhưng không ai dùng được — và mọi n
 
 | Điện thoại CÓ | Điện thoại KHÔNG có |
 |---|---|
-| Ảnh đang làm việc, chạm để mở **trình xem toàn màn hình** (kèm danh sách tính năng của ảnh) | **Canvas**, bảng ghép nhiều lớp, tay cầm kéo giãn/xoay |
+| **Nút ← về Trang chủ («Tạo»)** + nhãn ngữ cảnh (bộ sưu tập · ảnh đang làm việc) ở hàng đầu | **Canvas**, bảng ghép nhiều lớp, tay cầm kéo giãn/xoay |
+| Ảnh đang làm việc, chạm để mở **trình xem toàn màn hình** (kèm danh sách tính năng của ảnh) · tag **tỉ lệ · kích thước THẬT** của chính tấm ảnh | |
+| **CTA chính có GIÁ credit** («Tạo biến thể AI · N credit») + **lối tắt 2×2** (Nâng cấp 4× · Tải xuống · Chia sẻ · Tech pack) + cửa đầy đủ «Tác vụ ảnh — tất cả» | |
+| **Danh sách ảnh trong phiên ĐIỀU KHIỂN ĐƯỢC**: chạm để đặt ảnh đang làm việc · nút mắt ẩn/hiện · thanh độ mờ | |
 | **Tác vụ ảnh** (Options → Action): biến thể · **sửa ảnh** · nâng cấp · đổi khung · tải · chia sẻ · tech pack · xoá | Xếp lớp / ghép layer / bố cục nhiều ảnh — *cần màn hình lớn* |
 | **Công cụ** — sheet liệt kê **cả 9 công cụ** + 2 mục 'action' (Prompt Tạo Ảnh · Agent thiết kế) theo **cùng cấu hình owner quản lý**, chọn một công cụ ⇒ mở đúng card của nó trong **màn chiếm trọn** (`PhoneSurface.vue`) | Ba dock kéo giãn được |
 | **Kết quả** — lưới kết quả THẬT (`ResultGrid`): lọc trạng thái · tìm không dấu · sắp xếp · cỡ lưới · phạm vi bộ sưu tập · bấm mở trình xem · nút Sửa/Tải trên thẻ | Quick Open `Ctrl+K` · phím tắt canvas · bảng lệnh |
@@ -1271,8 +1274,13 @@ một màn hình ai cũng thấy nhưng không ai dùng được — và mọi n
    chỗ. Nhánh điện thoại **không** dùng chung template với nhánh canvas (không có chuỗi `v-if` lồng nhau).
 2. **Bố cục theo §7.2**: `h-dvh` · chrome đáy `fixed` + `max-width:560px` + `env(safe-area-inset-bottom)` ·
    spacer `h-24` cuối vùng cuộn · thang tầng cố định.
-3. **Mọi hành động với ảnh đi qua một cửa duy nhất** ("Tác vụ ảnh") — không rải nút phẳng khắp màn; lưới 4
-   nút cũ đã được thay vì nó khiến người dùng phải đoán nút nào làm gì (§15.7).
+3. **Mọi hành động với ảnh đi qua MỘT BẢN LOGIC** — không phải qua một nút duy nhất, mà qua một
+   composable duy nhất (`composables/useImageActions.js`). [Đợt 60] Prototype đã duyệt yêu cầu màn Studio
+   có **CTA chính + hàng lối tắt 2×2** (Nâng cấp 4× · Tải xuống · Chia sẻ · Tech pack) NGAY TRÊN MÀN, bên
+   cạnh cửa đầy đủ «Tác vụ ảnh — tất cả» (8 hành động, lồng cấp §15.7). Hai lối vào là chủ ý; điều KHÔNG
+   được phép là hai bản logic: mọi lời gọi API (`/api/refgen` · `/api/upscale` · `/api/reframe` · tải ·
+   chia sẻ · xoá) nằm ở composable dùng chung, và `tests/Feature/PrototypeParityTest.php` cấm hai
+   component tự gọi lại endpoint đó.
 4. **Không hiện nút cho việc không chạy được**: việc chỉ làm được ở màn rộng (xếp lớp · kéo giãn ·
    ba dock) **không** xuất hiện trên điện thoại, kể cả ở dạng mờ; giao diện **nói thật** ("cần màn hình
    lớn") thay vì đưa người dùng vào ngõ cụt (luật 56 ở §14). **Nhưng** "cần canvas" KHÔNG đồng nghĩa
@@ -1294,9 +1302,13 @@ xem đối tượng        chọn VIỆC với đối tượng       làm việc
 ```
 
 **Ví dụ chuẩn — Studio trên điện thoại:** chạm ảnh → *Review* (trình xem toàn màn hình) → nút **Tác vụ ảnh**
-→ *Options* (6 hàng: Tạo biến thể AI · Nâng cấp ảnh · Đổi khung hình · Tải về · Chia sẻ · Tech pack ·
-Xoá ảnh) → chọn một hàng → *Action* (slider "mức giữ nét gốc" + số biến thể + nút **Tạo 2 biến thể**; hoặc
-chọn 2×/4× + nút **Nâng cấp**; hoặc xác nhận **Xoá vĩnh viễn**).
+→ *Options* (8 hàng: Tạo biến thể AI · **Sửa ảnh** · Nâng cấp ảnh · Đổi khung hình · Tải về · Chia sẻ ·
+Tech pack · Xoá ảnh) → chọn một hàng → *Action* (slider "mức giữ nét gốc" + số biến thể + nút **Tạo 2 biến
+thể**; hoặc chọn 2×/4× + nút **Nâng cấp**; hoặc xác nhận **Xoá vĩnh viễn**).
+
+> [Đợt 60] Màn Studio còn có **lối tắt** mở thẳng vào đúng những cấp Action đó (CTA «Tạo biến thể AI · N
+> credit» + hàng chip 2×2) — qua prop `startAt` của `PhoneActions`. Lối tắt KHÔNG tạo cấp mới, chỉ bỏ
+> một cú bấm; bản logic vẫn là một (xem luật 3 ở §15.6).
 
 **Bảy luật của mô hình này:**
 

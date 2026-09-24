@@ -565,6 +565,10 @@ onMounted(async () => {
       if (panel && ACTIVITY_CARDS[panel]) {
         activeActivity.value = panel;
         store.leftPanelOpen = true;
+        // [Đợt 60] ĐIỆN THOẠI: nhánh điện thoại KHÔNG render bảng trái, nên `?panel=outfit` từ Trang chủ
+        // trước đây chỉ bật một cờ vô hình — người dùng bấm «Lookbook» rồi thấy màn Studio trống như cũ.
+        // Nay yêu cầu đi tiếp sang StudioPhone qua ĐÚNG prop mà revealActivity đang dùng (một kênh).
+        if (isPhone.value) phoneToolRequest.value = { n: (phoneToolRequest.value.n || 0) + 1, id: panel };
       }
       // [2026-09-25] Mở SẴN một popup khi trang khác chuyển sang đây. Hiện dùng cho luồng
       // Agent Studio: "Áp dụng vào Canvas" ghi prompt rồi tới /?panel=concept&open=prompt — người
@@ -1210,6 +1214,17 @@ function onTouchEnd(e) {
              đang làm). [shell 2026 · Phase 6] Nay nó mở MENU KHÔNG GIAN (popmenu): điều hướng chủ
              động sang TẠO · AGENT · BỘ SƯU TẬP · HUB — điều hướng CHỦ ĐỘNG thì mất state là đúng
              ý người dùng, không phải cái bẫy vô tình như cũ. Studio tự đánh dấu "đang ở đây". -->
+        <!-- ══ ← VỀ TRANG CHỦ («Tạo») — yêu cầu trực tiếp của chủ dự án (đợt 60) ══
+             Trước đây đường về Trang chủ từ Studio chỉ có MỘT: chạm thương hiệu → chọn «Tạo» trong menu
+             Không gian. Hai cú chạm cho việc quay lại nơi vừa rời, và cú chạm đầu nằm ở menu dùng để
+             ĐỔI không gian — không phải nút «về».
+             Là <a href="/"> (không phải router) nên mở tab mới / sao chép liên kết vẫn đúng.
+             Chỉ hiện từ sm: ở 320px thanh tiêu đề đã kín chỗ (đo được ở đợt 53/57), và màn điện thoại
+             thật dùng StudioPhone — nó đã có nút này ở hàng đầu (data-phone-home). -->
+        <a href="/" class="order-1 hidden icon-btn !h-8 !w-8 shrink-0 sm:grid" title="Về Trang chủ · Tạo" aria-label="Về Trang chủ — Tạo" data-header-home>
+          <StudioIcon name="home" size="h-4 w-4" />
+        </a>
+
         <button type="button" class="order-2 flex shrink-0 items-center gap-2" title="Không gian — chuyển nơi làm việc" aria-label="Mở menu không gian" @click="openSpacesMenu">
           <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-4 w-4" /></span>
           <span class="hidden font-display text-sm font-semibold text-cream-50 sm:inline">FabrikAI</span>

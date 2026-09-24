@@ -439,5 +439,13 @@
   "mic": {
     "svg": "<path d=\"M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z\"/><path d=\"M19 10v2a7 7 0 0 1-14 0v-2\"/><line x1=\"12\" x2=\"12\" y1=\"19\" y2=\"22\"/>",
     "note": "Ra lệnh bằng giọng nói"
+  },
+  "bell": {
+    "svg": "<path d=\"M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z\"/><path d=\"M10 19a2.2 2.2 0 0 0 4 0\"/>",
+    "note": "Thông báo (chuông) — Trang chủ"
+  },
+  "radar": {
+    "svg": "<path d=\"M12 21a9 9 0 1 0-9-9\"/><path d=\"M12 17a5 5 0 1 0-5-5\"/><path d=\"M12 12 3.5 20.5\"/><circle cx=\"12\" cy=\"12\" r=\"1\"/><path d=\"M12 3v4\"/><path d=\"M21 12h-4\"/>",
+    "note": "Radar xu hướng (tín hiệu thị trường) — Trang chủ"
   }
 }

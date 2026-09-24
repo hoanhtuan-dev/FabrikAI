@@ -7653,3 +7653,96 @@ tên **viết thẳng**.
 tài khoản (tạo ảnh · Tác vụ ảnh · Sửa ảnh · Trợ lý · Bộ sưu tập · Thư viện · deck sàng lọc khi có lượt
 tạo ≥2 ảnh). Phần này **không thể** kiểm bằng tài khoản khách: mọi công cụ đều đòi đăng nhập.
 
+
+---
+
+## Kiểm tra & triển khai 2026-09-26 (Đợt 60 — NÚT VỀ TRANG CHỦ + PORT PROTOTYPE 2026: màn còn thiếu & GUI chưa đúng)
+
+> **Yêu cầu:** "thêm nút điều hướng về home — tạo cho studio; phân tích sâu và triển khai các màn hình còn
+> thiếu và gui chưa đúng theo link này: https://fabrikai.shop/prototype — lưu ý đã loại bỏ canvas".
+>
+> **Nguồn đối chiếu:** `/prototype` — bản trong repo (`prototype/`) và bản trên máy chủ **khớp md5 từng
+> tệp** (đã kiểm 17/17 tệp). Toàn bộ phân tích nằm ở `docs/PROTOTYPE_2026_DOI_CHIEU.md`.
+
+### A. Nút điều hướng về Trang chủ («Tạo») — ở CẢ HAI nhánh
+
+| Nhánh | Trước | Sau |
+|---|---|---|
+| Điện thoại (`StudioPhone`) | Đường về Trang chủ chỉ có MỘT: chạm orb → chọn «Tạo» trong menu Không gian (2 cú chạm, và cú đầu nằm ở menu dùng để ĐỔI không gian) | Nút **← ở hàng đầu** (`data-phone-home`), là `<a href="/">` — mở tab mới/sao chép liên kết vẫn đúng |
+| Màn rộng/tablet (`StudioApp`) | Như trên (menu Không gian) | Nút **nhà riêng ở thanh tiêu đề** (`data-header-home`, `<a href="/">`), đứng trước thương hiệu — ẩn dưới `sm` vì ở 320px thanh tiêu đề đã kín chỗ (đo được ở đợt 53/57) |
+
+### B. Màn còn thiếu: CHÀO MỪNG 3 slide
+
+Prototype mở đầu bằng `#/onboarding` (3 slide + dots + «Tiếp/Bắt đầu»). Sản phẩm thật **không có màn đó**:
+khách vào `/` gặp một thẻ chào hai dòng rồi bị hỏi mật khẩu — tức là **phải gõ mật khẩu trước khi biết sản
+phẩm làm được gì**.
+
+Nay: `components/OnboardingSlides.vue` (3 slide · vuốt ngang · chấm vị trí · nút «Tiếp/Bắt đầu» · lối
+«Đã có tài khoản? Đăng nhập»). Khác prototype ở hai chỗ, có lý do: **không dùng ảnh "vải" giả** (sản phẩm
+này bán ảnh thật) và **có lối đăng nhập một chạm** cho người quay lại.
+
+### C. GUI chưa đúng — Trang chủ
+
+| Việc | Prototype | Trước | Sau |
+|---|---|---|---|
+| 4 lối vào | Concept · Photoshoot · Lookbook · Tech pack (bốn VIỆC) | Concept · Agent · Bộ sưu tập · Thư viện (trộn điều hướng vào việc) | Bốn **VIỆC** của prototype, mỗi ô mở thẳng công cụ qua `?panel=` |
+| Chuông | có | **không có** | Có — mở sheet **Hoạt động gần đây** với dữ liệu THẬT (`/api/latest`, **mọi** trạng thái: đang chạy · xong · lỗi) |
+| Radar xu hướng | thẻ tĩnh "tuần 39" | không có | Thẻ **chỉ hiện khi có dữ liệu thật** từ sổ nguồn của agent (`/api/design-agent/findings`) — thẻ radar rỗng là thẻ nói dối |
+
+### D. GUI chưa đúng — Studio điện thoại (theo `renderPhone()` của prototype)
+
+- Hàng đầu: **← về Tạo** · **nhãn ngữ cảnh THẬT** («Bộ sưu tập · Ảnh #30», dựng từ dữ liệu phiên — không
+  bịa như «THU ĐÔNG 26 · LOOK 04» của bản mock) · nút Duyệt (khi có lượt chờ) · credit.
+- **CTA chính có GIÁ CREDIT**: «Tạo biến thể AI · N credit» (N từ `store.planCostImage`) — nguyên tắc 3 của
+  prototype và luật 10 §0. Bấm là mở **thẳng** cấp Action (prop `startAt` của `PhoneActions`).
+- **Hàng lối tắt 2×2**: Nâng cấp 4× · Tải xuống · Chia sẻ · Tech pack + cửa đầy đủ «Tác vụ ảnh — tất cả».
+- **Tag tỉ lệ · kích thước đọc từ CHÍNH tấm ảnh** (`naturalWidth/Height`) — đo được: «0.56:1 · 723×1280».
+- **Danh sách ảnh ĐIỀU KHIỂN ĐƯỢC**: chạm để đặt ảnh đang làm việc · **mắt ẩn/hiện** (`toggleLayerVisible`)
+  · **thanh độ mờ** (action mới `setLayerOpacity` — sửa ĐÚNG hàng đang kéo, không kéo theo việc chọn layer).
+- Bốn cổng vào (Công cụ · Kết quả · Trợ lý · Bộ sưu tập) gọn lại thành **một dải chip** — prototype không có
+  ô vuông nào ở màn Studio, và chiều cao tiết kiệm được là chỗ cho chính tấm ảnh.
+
+### E. Hai phát hiện khi đối chiếu (không ai yêu cầu, nhưng là lỗi thật)
+
+1. **`?panel=` từ Trang chủ không tới được nhánh điện thoại**: nó chỉ bật `store.leftPanelOpen` — một bảng
+   **không tồn tại** trên điện thoại ⇒ bấm «Photoshoot» ở Trang chủ rồi thấy màn Studio trống. Nay yêu cầu
+   đi sang `StudioPhone` qua đúng prop `phoneToolRequest`, và **nhận ngay khi mount** (`immediate`) — thiếu
+   `immediate` thì yêu cầu ĐẦU TIÊN (đúng loại người dùng tạo ra bằng cách bấm một ô ở Trang chủ) rơi vào
+   khoảng không.
+2. **Hub thiếu Đăng xuất và thanh credit**: prototype `#/hub` có cả hai; bản thật chỉ có con số credit trần,
+   và Đăng xuất chỉ nằm trong menu tài khoản ở Studio màn rộng — nghịch lý vì `/cai-dat` chính là nơi mọi
+   thứ thuộc về tài khoản. Nay có thẻ tài khoản: danh tính · **thanh tiến trình credit** (số dư / hạn mức
+   tháng từ `/api/plan/status`, kẹp 100% nhưng in đủ hai con số) · **Đăng xuất**.
+
+### F. MỘT bản logic cho hai lối vào
+
+Lối tắt trên màn và sheet «Tác vụ ảnh» cùng gọi biến thể/nâng cấp/đổi khung/tải/chia sẻ/xoá ⇒ bốn hành
+động API được tách vào `composables/useImageActions.js`; hai component **không** còn tự gọi `/api/upscale`
+hay `/api/reframe` (`PrototypeParityTest` cấm điều đó). Cửa sổ 8 hành động vẫn nguyên (thêm «Sửa ảnh» từ
+đợt 59).
+
+### G. Khoá bằng test — `tests/Feature/PrototypeParityTest.php` (8 bài, 82 assert)
+
+Nút về Trang chủ ở cả hai nhánh (và phải là `<a href="/">`) · màn chào đúng **3 slide** + dots + «Bắt đầu» +
+lối đăng nhập + **không ảnh giả** · 4 intent đúng tên prototype + `?panel=` · chuông có nhãn trạng thái ·
+radar **ẩn khi rỗng** · Studio điện thoại có CTA-giá-credit + 4 lối tắt + cửa đầy đủ + mắt/độ mờ · hai lối
+vào dùng **một** composable · Hub có thanh credit + đăng xuất · deep-link `?panel=` tới đúng nhánh · tài
+liệu đối chiếu tồn tại và ghi rõ "đã loại bỏ canvas".
+
+### H. Kiểm chứng (Chrome thật 390×844 · CDP)
+
+| Phép kiểm | Kết quả |
+|---|---|
+| Bộ kiểm prototype (20 phép kiểm) | **20/20 ĐẠT** (ban đầu 18/20 và **cả hai lỗi đều là lỗi thật** — xem mục E) |
+| Luồng thật: gõ prompt (bàn phím thật của CDP) → Tạo → ảnh hiện | `/api/generate` 200 · `/api/process` 200 · preview «Xem lớn» + tag «0.56:1 · 723×1280» · CTA «Tạo biến thể AI · 1 credit» · danh sách ảnh 1 hàng có mắt + độ mờ |
+| Ghi chú kỹ thuật khi đo | Sự kiện `input` **tổng hợp** không đi qua `v-model` của Vue ⇒ phải dùng `Input.insertText` + `Input.dispatchKeyEvent` của CDP. Đã ghi lại vì lần sau sẽ mất thời gian như lần này. |
+| Bộ test PHP | **1392 → 1400 xanh** (10.843 assert) — thêm 8 bài mới, 0 đỏ |
+| Sửa test cũ | `DesignSystemTest` đòi tài liệu ghi đúng số icon ⇒ cập nhật **138 → 140** (thêm `bell` · `radar` vào `icons.json` — nguồn icon duy nhất) |
+| Bẫy đã tránh | `v-html` cho tiêu đề slide sẽ mở một **cửa XSS** phải khai báo ngoại lệ trong `StudioXssSinksTest`; thay bằng tiêu đề 3 phần (`{{ }}` + `<em>`) ⇒ cửa đó biến mất. Chữ dùng độ mờ (`text-cream-100/90`) bị `ThemeSystemTest` chặn đúng như thiết kế ⇒ dùng 4 bậc đặc. |
+
+### I. Việc CÒN LẠI (ghi rõ trong `docs/PROTOTYPE_2026_DOI_CHIEU.md` §4.2)
+
+Màn **chi tiết bộ sưu tập** (`#/collection/:id`) · **bảng giá dạng rail snap** (`#/pricing`) · **lưới bất đối
+xứng** ở Bộ sưu tập · Agent dạng feed (cố ý KHÔNG hạ cấp về bản mock) · **token màu/typography của
+prototype** (việc riêng, phải làm thành một đợt có kế hoạch — hệ token hiện tại bị ~1.400 test khoá).
+

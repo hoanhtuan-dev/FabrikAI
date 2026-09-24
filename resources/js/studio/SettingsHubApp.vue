@@ -85,6 +85,44 @@ function onPop() {
 
 onMounted(() => window.addEventListener('popstate', onPop));
 onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
+
+/**
+ * THẺ TÀI KHOẢN CỦA HUB — thanh credit + ĐĂNG XUẤT (đợt 60 · 2026-09-26).
+ *
+ * VÌ SAO THÊM: prototype `#/hub` mở đầu bằng thẻ tài khoản có THANH TIẾN TRÌNH credit và kết thúc bằng
+ * nút Đăng xuất. Bản thật thiếu cả hai:
+ *   · credit chỉ là một con số trần — không ai biết mình còn bao nhiêu phần của hạn mức tháng;
+ *   · ĐĂNG XUẤT chỉ có trong menu tài khoản ở `/studio` (màn rộng) ⇒ trang Cài đặt, nơi mọi thứ thuộc
+ *     về tài khoản đều nằm, lại không có nút thoát.
+ *
+ * Số liệu lấy từ `/api/plan/status` — ĐÚNG endpoint mà bảng «Gói & credit» đang dùng (một nguồn). Hạn
+ * mức là `plan.credits_per_month`; số dư có thể LỚN HƠN hạn mức (credit cộng dồn), nên thanh bị KẸP ở
+ * 100% còn hai con số vẫn in đủ — thanh chỉ để liếc, con số mới là sự thật.
+ */
+const planInfo = ref(null);
+async function loadPlanInfo() {
+  if (!session.me) return;
+  try {
+    const r = await fetch('/api/plan/status', { headers: { Accept: 'application/json' } });
+    if (r.ok) planInfo.value = await r.json();
+  } catch (e) { /* không đọc được thì thẻ vẫn hiện số dư từ store — không chặn ai */ }
+}
+const creditsNow = computed(() => Number(session.credits ?? 0));
+const creditsCap = computed(() => Number(planInfo.value?.plan?.credits_per_month ?? 0));
+const creditPct = computed(() => (creditsCap.value > 0 ? Math.min(100, Math.round((creditsNow.value / creditsCap.value) * 100)) : 0));
+const planName = computed(() => planInfo.value?.plan?.name || '');
+
+/** Đăng xuất qua fetch (route Laravel POST /dang-xuat) — cùng lối với StudioApp: XSRF-TOKEN cookie. */
+async function logout() {
+  const m = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
+  const token = m ? decodeURIComponent(m[1]) : '';
+  try {
+    await fetch('/dang-xuat', { method: 'POST', headers: { 'X-XSRF-TOKEN': token, Accept: 'application/json' } });
+  } catch (e) { /* lỗi mạng thì vẫn đưa người dùng về trang chủ */ }
+  window.location.href = '/';
+}
+
+onMounted(loadPlanInfo);
 </script>
 
 <template>
@@ -156,6 +194,38 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
         </div>
       </div>
     </header>
+
+    <!-- ══ THẺ TÀI KHOẢN (prototype #/hub) — danh tính · credit có hạn mức · ĐĂNG XUẤT ══ -->
+    <div v-if="session.me" class="mx-auto w-full max-w-[1400px] px-4 pt-4 sm:px-5 lg:px-6" data-hub-account>
+      <div class="rounded-2xl border border-ink-700 bg-ink-900/70 p-4">
+        <div class="flex items-center gap-3">
+          <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand-600/20 text-body font-bold text-brand-200">{{ session.initial }}</span>
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-body font-semibold text-cream-100">{{ session.name }}</p>
+            <p class="truncate text-micro text-cream-400">{{ session.roleLabel }}<template v-if="planName"> · gói {{ planName }}</template></p>
+          </div>
+          <a href="/bang-gia" class="shrink-0 rounded-full border border-ink-600 bg-ink-800 px-3 py-1.5 text-label font-semibold text-cream-200 transition hover:border-brand-400">Gói</a>
+          <button
+            type="button"
+            class="shrink-0 rounded-full border border-danger/40 px-3 py-1.5 text-label font-semibold text-danger transition hover:bg-danger/10"
+            title="Đăng xuất khỏi tài khoản"
+            data-hub-logout
+            @click="logout"
+          >
+            Đăng xuất
+          </button>
+        </div>
+        <div v-if="creditsCap > 0" class="mt-3">
+          <div class="h-2 overflow-hidden rounded-full bg-ink-800">
+            <i class="block h-full rounded-full bg-brand-500" :style="{ width: creditPct + '%' }"></i>
+          </div>
+          <p class="mt-1.5 text-micro text-cream-400" data-hub-credits>
+            {{ creditsLabel }} / {{ creditsCap.toLocaleString('vi-VN') }} credit hạn mức tháng — credit cộng dồn không mất.
+          </p>
+        </div>
+        <p v-else-if="creditsLabel" class="mt-2 text-micro text-cream-400" data-hub-credits>{{ creditsLabel }} credit</p>
+      </div>
+    </div>
 
     <!-- Nội dung khu đang mở. Thuộc tính "embedded" để app con ẩn thanh tiêu đề riêng của nó. -->
     <component :is="view" :key="area" embedded />

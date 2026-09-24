@@ -21,22 +21,35 @@ import StudioIcon from './StudioIcon.vue';
 import BottomSheet from './BottomSheet.vue';
 import { useNavStack } from '../composables/useNavStack.js';
 import { haptic } from '../composables/useHaptics.js';
+import { useImageActions } from '../composables/useImageActions.js';
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  /**
+   * Mở thẳng vào MỘT cấp con ('variant' · 'upscale' · 'reframe' · 'delete').
+   * Rỗng = mở cấp Options như cũ.
+   * VÌ SAO CẦN: hàng chip trên màn Studio (theo prototype: «Upscale 4K», «Tạo biến thể AI») phải đi tới
+   * ĐÚNG cấp Action trong MỘT chạm; nếu bắt người dùng qua cấp Options thì hàng chip chỉ là lối vào thứ
+   * hai của cùng một sheet — thêm một cú bấm mà không thêm thông tin.
+   */
+  startAt: { type: String, default: '' },
 });
 const emit = defineEmits(['update:open', 'edit']);
 
 const store = useStudioStore();
 const nav = useNavStack();
+/* Bốn hành động API nay nằm ở MỘT composable dùng chung với hàng chip của màn Studio — xem
+   composables/useImageActions.js (lý do: hai lối vào, một bản logic). */
+const { runVariant: doVariant, runUpscale: doUpscale, runReframe: doReframe, download: doDownload, share: doShare, remove: doRemove } = useImageActions();
 
 const level = computed(() => nav.state.stack[nav.state.stack.length - 1] || null);
 const TITLES = { options: 'Tác vụ ảnh', variant: 'Tạo biến thể', upscale: 'Nâng cấp ảnh', reframe: 'Đổi khung hình', delete: 'Xoá ảnh này?' };
 const title = computed(() => TITLES[level.value] || '');
 const hasImage = computed(() => !!store.upscaleSrc);
 
+const LEVELS = ['options', 'variant', 'upscale', 'reframe', 'delete'];
 watch(() => props.open, (v) => {
-  if (v) nav.open('options');
+  if (v) nav.open(LEVELS.includes(props.startAt) ? props.startAt : 'options');
   else if (nav.state.stack.length) nav.closeAll();
 });
 /* Stack rỗng (người dùng bấm back của máy tới hết) → đóng sheet về phía cha. */
@@ -51,35 +64,16 @@ const sim = ref(70);
 const variants = ref(2);
 async function runVariant() {
   if (!hasImage.value) return;
-  haptic(12);
   close();
-  await store.refgen(store.upscaleSrc, store.imagePromptEn || '', sim.value, variants.value);
+  await doVariant(sim.value, variants.value);
 }
 
-/* ── Upscale (giống UpscaleCard: cùng endpoint, cùng cờ upscaling) ── */
+/* ── Upscale ── */
 const scale = ref(2);
 async function runUpscale() {
   if (!hasImage.value || store.upscaling) return;
-  haptic(12);
   close();
-  store.upscaling = true;
-  try {
-    const d = await store.api('/api/upscale', {
-      image: store.upscaleSrc,
-      scale: Number(scale.value) || 2,
-      refine: Number(store.upscaleRefine) || 0,
-      vibrance: Number(store.vibrance) || 0,
-      project_id: store.appliedProjectId(),
-    });
-    store.addGen({
-      id: d.generation_id, type: 'image', status: d.status || 'completed',
-      model: d.model || 'upscale', provider: d.provider || 'upscale',
-      media_url: d.media_url, error: d.error || null,
-      credits_cost: Number(d.credits_cost ?? 0), created_at: 'Vừa nâng cấp',
-    });
-    store.toast('Đã nâng cấp ảnh (' + scale.value + 'x).');
-  } catch (e) { store.failToast(e, 'Lỗi nâng cấp ảnh.'); }
-  finally { store.upscaling = false; }
+  await doUpscale(scale.value);
 }
 
 /* ── Sửa ảnh: mở màn Chỉnh ảnh của xưởng (tả · khoanh vùng · cọ) — nơi gọi lo việc mở ── */
@@ -95,43 +89,15 @@ const RATIOS = ['3:4', '4:5', '1:1', '9:16', '16:9'];
 const reframing = ref(false);
 async function runReframe() {
   if (!hasImage.value || reframing.value) return;
-  haptic(12);
   reframing.value = true;
-  try {
-    const d = await store.api('/api/reframe', { image: store.upscaleSrc, ratio: ratio.value, project_id: store.appliedProjectId() });
-    store.addGen({
-      id: d.generation_id, type: 'image', status: 'completed',
-      model: 'reframe', provider: 'reframe', media_url: d.media_url,
-      credits_cost: 0, created_at: 'Vừa đổi khung',
-    });
-    close();
-    store.toast('Đã đổi khung ' + ratio.value + ' — xem ở Kết quả gần đây.');
-  } catch (e) { store.failToast(e, 'Lỗi đổi khung hình.'); }
+  try { if (await doReframe(ratio.value)) close(); }
   finally { reframing.value = false; }
 }
 
 /* ── Việc trực tiếp (không cần cấp con) ── */
-function download() {
-  const g = store.preview;
-  close();
-  if (!g || !g.id) { store.toast('Chưa có ảnh để tải.', 'error'); return; }
-  window.location.href = '/api/generations/' + g.id + '/download';
-}
-async function share() {
-  const url = store.upscaleSrc;
-  close();
-  if (!url) { store.toast('Chưa có ảnh để chia sẻ.', 'error'); return; }
-  try {
-    if (navigator.share) { await navigator.share({ title: 'FabrikAI', url }); }
-    else { await navigator.clipboard.writeText(url); store.toast('Đã chép liên kết ảnh.', 'success'); }
-  } catch (e) { /* người dùng tự huỷ sheet chia sẻ */ }
-}
-async function runDelete() {
-  const g = store.preview;
-  close();
-  if (!g || !g.id) return;
-  await store.deleteGen(g);
-}
+function download() { close(); doDownload(); }
+async function share() { close(); await doShare(); }
+async function runDelete() { close(); await doRemove(); }
 </script>
 
 <template>
