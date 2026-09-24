@@ -192,7 +192,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-B5sy-QL_.css",
+    "file": "assets/app-CNGixEGs.css",
     "name": "app",
     "names": [
       "app.css"
@@ -456,7 +456,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-dHV2OcpB.js",
+    "file": "assets/main-CHqj8_2B.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -471,7 +471,7 @@
       "_NotificationCenter-C7HaVgKZ.js"
     ],
     "dynamicImports": [
-      "resources/js/studio/components/GalleryModal.vue",
+      "resources/js/studio/LibraryApp.vue",
       "resources/js/studio/components/CollectionsCard.vue",
       "resources/js/studio/components/SuggestCard.vue",
       "resources/js/studio/components/ConceptCard.vue",
@@ -483,12 +483,12 @@
       "resources/js/studio/components/TryOnCard.vue",
       "resources/js/studio/components/DirectorCard.vue",
       "resources/js/studio/components/SourcePickerPopup.vue",
-      "resources/js/studio/LibraryApp.vue",
+      "resources/js/studio/components/GalleryModal.vue",
       "resources/js/studio/components/EditImageModal.vue",
       "resources/js/studio/components/ProjectWorkspace.vue"
     ],
     "css": [
-      "assets/main-DWzA69Dk.css"
+      "assets/main-Dq9zxdA3.css"
     ]
   }
 }

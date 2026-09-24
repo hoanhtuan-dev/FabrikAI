@@ -6,8 +6,14 @@
  * → chọn một mục (ACTION: sheet con có tham số + nút xác nhận). ← lùi một cấp, ✕ đóng hết,
  * nút back của máy lùi đúng từng cấp (useNavStack gài History API).
  *
- * Chỉ gồm việc CHẠY ĐƯỢC KHÔNG CẦN CANVAS: biến thể (refgen), upscale, tải, chia sẻ, tech pack,
- * xoá. Công cụ khoanh vùng (inpaint…) là việc của canvas → chỉ có trên màn rộng.
+ * Chỉ gồm việc CHẠY ĐƯỢC KHÔNG CẦN CANVAS: biến thể (refgen), sửa ảnh (tả · khoanh · cọ), upscale,
+ * đổi khung, tải, chia sẻ, tech pack, xoá.
+ *
+ * [Đợt 59 · 2026-09-26] «Sửa ảnh» vào đây sau khi KIỂM LẠI mã: màn Chỉnh ảnh (EditImageModal) vốn
+ * đã chạy bằng ngón tay — `touch-action: none` + pointer events cho cả khoanh khung lẫn vẽ cọ, và
+ * bố cục `flex-col` dưới lg nên trên điện thoại nó là ảnh ở trên, tham số ở dưới. Câu «khoanh vùng
+ * là việc của canvas» chỉ đúng với CÔNG CỤ CANVAS (RegionTools trên bảng ghép), không đúng với màn
+ * một-ảnh này. Giữ nguyên tắc §15.10: chỉ mở nút cho việc CHẠY ĐƯỢC.
  */
 import { computed, ref, watch } from 'vue';
 import { useStudioStore } from '../store.js';
@@ -19,7 +25,7 @@ import { haptic } from '../composables/useHaptics.js';
 const props = defineProps({
   open: { type: Boolean, default: false },
 });
-const emit = defineEmits(['update:open']);
+const emit = defineEmits(['update:open', 'edit']);
 
 const store = useStudioStore();
 const nav = useNavStack();
@@ -74,6 +80,13 @@ async function runUpscale() {
     store.toast('Đã nâng cấp ảnh (' + scale.value + 'x).');
   } catch (e) { store.failToast(e, 'Lỗi nâng cấp ảnh.'); }
   finally { store.upscaling = false; }
+}
+
+/* ── Sửa ảnh: mở màn Chỉnh ảnh của xưởng (tả · khoanh vùng · cọ) — nơi gọi lo việc mở ── */
+function goEdit() {
+  haptic(12);
+  close();
+  emit('edit');
 }
 
 /* ── Đổi khung hình (POST /api/reframe — crop tâm theo tỉ lệ, đồng bộ, miễn phí) ── */
@@ -134,6 +147,11 @@ async function runDelete() {
       <button type="button" class="opt" :disabled="!hasImage" @click="go('variant')">
         <span class="opt-ic opt-ic--magic"><StudioIcon name="sparkles" size="h-[18px] w-[18px]" /></span>
         <span class="opt-main"><b>Tạo biến thể AI</b><i>Diễn giải lại ảnh theo hướng mới</i></span>
+        <StudioIcon name="chevronRight" size="h-4 w-4" class="text-cream-400" />
+      </button>
+      <button type="button" class="opt" :disabled="!hasImage" data-phone-action="edit" @click="goEdit">
+        <span class="opt-ic"><StudioIcon name="pencil" size="h-[18px] w-[18px]" /></span>
+        <span class="opt-main"><b>Sửa ảnh</b><i>Tả điều muốn đổi · khoanh vùng · vẽ cọ</i></span>
         <StudioIcon name="chevronRight" size="h-4 w-4" class="text-cream-400" />
       </button>
       <button type="button" class="opt" :disabled="!hasImage || store.upscaling" @click="go('upscale')">

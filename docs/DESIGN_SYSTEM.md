@@ -1248,13 +1248,21 @@ không tồn tại canvas** — không phải "ẩn", mà **không có phần t�
 Vì sao: 390px không đủ chỗ cho ba dock + thanh công cụ canvas + tay cầm layer. Bản thu nhỏ của canvas cho ra
 một màn hình ai cũng thấy nhưng không ai dùng được — và mọi nỗ lực "nhồi cho vừa" đều lấy chỗ của chính ảnh.
 
+> **[Đợt 59 · 2026-09-26] Bảng này đã được viết lại.** Bản trước chỉ liệt kê 5-6 thứ và kết luận
+> điện thoại "không có" gần hết — trong khi thứ thật sự không có chỉ là **canvas và ba dock**. Hệ quả
+> đo được: 9 công cụ của xưởng, trợ lý, lưới kết quả có lọc, nguồn ảnh, thư viện, bộ sưu tập, thông
+> báo… **không có lối vào nào** trên điện thoại. Người dùng điện thoại mất phần lớn sản phẩm.
+
 | Điện thoại CÓ | Điện thoại KHÔNG có |
 |---|---|
-| Ảnh đang làm việc, chạm để mở trình xem toàn màn hình | Canvas, layer, tay cầm kéo giãn/xoay |
-| **Tác vụ ảnh** (Options → Action): biến thể · nâng cấp · đổi khung · tải · chia sẻ · tech pack · xoá | Khoanh vùng/thay vùng, ghép layer, compose |
-| Rail **Kết quả gần đây** (chạm để đổi ảnh đang làm việc) | Ba dock kéo giãn được |
-| Danh sách **lớp** (chỉ đọc — biết mình đang có gì) | Quick Open `Ctrl+K`, phím tắt canvas |
-| Chip **credit** + nút **Duyệt** (khi có lượt chờ sàng lọc) trên header | Thanh trạng thái canvas |
+| Ảnh đang làm việc, chạm để mở **trình xem toàn màn hình** (kèm danh sách tính năng của ảnh) | **Canvas**, bảng ghép nhiều lớp, tay cầm kéo giãn/xoay |
+| **Tác vụ ảnh** (Options → Action): biến thể · **sửa ảnh** · nâng cấp · đổi khung · tải · chia sẻ · tech pack · xoá | Xếp lớp / ghép layer / bố cục nhiều ảnh — *cần màn hình lớn* |
+| **Công cụ** — sheet liệt kê **cả 9 công cụ** + 2 mục 'action' (Prompt Tạo Ảnh · Agent thiết kế) theo **cùng cấu hình owner quản lý**, chọn một công cụ ⇒ mở đúng card của nó trong **màn chiếm trọn** (`PhoneSurface.vue`) | Ba dock kéo giãn được |
+| **Kết quả** — lưới kết quả THẬT (`ResultGrid`): lọc trạng thái · tìm không dấu · sắp xếp · cỡ lưới · phạm vi bộ sưu tập · bấm mở trình xem · nút Sửa/Tải trên thẻ | Quick Open `Ctrl+K` · phím tắt canvas · bảng lệnh |
+| **Trợ lý** (modal trợ lý thiết kế) · **Bộ sưu tập** (bảng thiết kế) · **Nguồn ảnh** · **Thư viện & ảnh của tôi** | Thanh trạng thái canvas · vách ngăn kéo dock |
+| **Màn Chỉnh ảnh** (tả điều muốn đổi · khoanh khung · vẽ cọ) — đường thay thế cho khoanh vùng trên canvas | |
+| Rail **Kết quả gần đây** (chạm để đổi ảnh đang làm việc) + danh sách **lớp** (chỉ đọc) | |
+| Chip **credit** + nút **Duyệt** (khi có lượt chờ sàng lọc) trên header · **thông báo** (toast) · hộp xác nhận | |
 | **Thanh lệnh** ở đáy: orb Không gian · ô prompt · nút gửi | Nút nổi (FAB) — việc chính đã ở thanh lệnh |
 
 **Luật của nhánh điện thoại:**
@@ -1265,9 +1273,12 @@ một màn hình ai cũng thấy nhưng không ai dùng được — và mọi n
    spacer `h-24` cuối vùng cuộn · thang tầng cố định.
 3. **Mọi hành động với ảnh đi qua một cửa duy nhất** ("Tác vụ ảnh") — không rải nút phẳng khắp màn; lưới 4
    nút cũ đã được thay vì nó khiến người dùng phải đoán nút nào làm gì (§15.7).
-4. **Không hiện nút cho việc không chạy được**: công cụ cần canvas **không** xuất hiện trên điện thoại, kể cả
-   ở dạng mờ. Nếu một việc chỉ làm được ở màn rộng, giao diện **nói thật** ("Công cụ này cần màn hình lớn")
-   thay vì đưa người dùng vào ngõ cụt (luật 56 ở §14).
+4. **Không hiện nút cho việc không chạy được**: việc chỉ làm được ở màn rộng (xếp lớp · kéo giãn ·
+   ba dock) **không** xuất hiện trên điện thoại, kể cả ở dạng mờ; giao diện **nói thật** ("cần màn hình
+   lớn") thay vì đưa người dùng vào ngõ cụt (luật 56 ở §14). **Nhưng** "cần canvas" KHÔNG đồng nghĩa
+   "không có đường tương đương": trước khi coi một việc là chỉ-có-ở-màn-rộng, phải **đọc lại mã** xem
+   bề mặt một-ảnh của nó có chạy bằng ngón tay không (đợt 59 đã tìm ra hai trường hợp bị bỏ sót như
+   vậy: `EditImageModal` và cả 9 card công cụ — chúng vốn đã chạy được ở màn hẹp, chỉ thiếu lối vào).
 5. **Chọn ảnh trên điện thoại không đẩy layer canvas** — nó gọi `setWorkingImage(img, kind)` (ảnh đang làm
    việc là state độc lập với canvas). Nhờ vậy nhánh điện thoại không phải "giả lập" canvas để có ảnh nguồn.
 6. **Kiểm ở 390×844**, không chỉ ở bề rộng máy tính.
@@ -1350,7 +1361,9 @@ chọn 2×/4× + nút **Nâng cấp**; hoặc xác nhận **Xoá vĩnh viễn**)
 | Tạo ảnh từ prompt | card **Tạo ảnh** + Quick Open | thanh lệnh ở đáy |
 | Biến thể / nâng cấp / đổi khung / tải / chia sẻ / tech pack / xoá | thanh hành động trên thumbnail + card | **Tác vụ ảnh** (Options → Action) |
 | Xem ảnh lớn | trình xem thư viện | trình xem toàn màn hình (chạm ảnh) |
-| Khoanh vùng / thay vùng · ghép layer · compose | ✓ card + canvas | **không có** — nói rõ cần màn hình lớn |
+| Khoanh vùng / thay vùng trên **bảng ghép nhiều lớp** | ✓ RegionTools trên canvas | **không có** — nói rõ cần màn hình lớn |
+| Khoanh vùng / tả / vẽ cọ trên **MỘT ảnh** | ✓ màn Chỉnh ảnh | ✓ màn Chỉnh ảnh (cùng component, chạy bằng ngón tay) |
+| Ghép layer · compose nhiều ảnh | ✓ bảng ghép | ghép layer: **không có** · công cụ **Studio** (một nguồn ảnh + bộ tham số): ✓ trong màn chiếm trọn |
 | Kéo giãn dock · phím tắt canvas · `Ctrl+K` | ✓ | không có (không có dock/canvas) |
 | Duyệt kết quả hàng loạt | lưới kết quả + bộ lọc | **deck sàng lọc** (vuốt) |
 | Chuyển không gian | orb ở header | orb trong thanh lệnh |
@@ -1358,6 +1371,44 @@ chọn 2×/4× + nút **Nâng cấp**; hoặc xác nhận **Xoá vĩnh viễn**)
 **Luật:** cột "Điện thoại" **không bao giờ** chứa một nút dẫn tới việc không chạy được. Nếu một việc chỉ có ở
 màn rộng, giao diện điện thoại hoặc **không nhắc tới**, hoặc nói thẳng **"cần màn hình lớn hơn"** — nhưng
 tuyệt đối không hiện nút rồi báo lỗi (luật 56 ở §14).
+
+**Luật thứ hai, rút ra từ chính đợt 59:** cột "Điện thoại" chỉ được ghi **"không có"** sau khi đã **đọc
+mã** của bề mặt đó. Suốt từ Phase 2, bảng này ghi "không có" cho **compose**, **khoanh vùng** và **cả 9
+công cụ** — trong khi chúng chỉ thiếu LỐI VÀO, không phải thiếu khả năng: mọi card công cụ vốn đã được
+render ở màn hẹp (đó là tầng 2 của dock tablet), và `EditImageModal` vốn đã dùng pointer events +
+`touch-action: none`. Một dòng "không có" viết theo cảm giác đã che mất phần lớn sản phẩm của người
+dùng điện thoại.
+
+### 15.11 MÀN CHIẾM TRỌN trên điện thoại — `PhoneSurface.vue`
+
+Mọi việc cần **trọn màn hình** trên điện thoại (một công cụ của xưởng · lưới kết quả) dùng **CÙNG MỘT
+KHUNG**: `components/PhoneSurface.vue`. Cấp chỉ là **nội dung** của khung đó — đúng luật §15.7 luật 6
+(khung sheet dùng chung), chỉ khác tầng: sheet là 80, màn chiếm trọn là 90.
+
+| Việc | Cách làm |
+|---|---|
+| Mở công cụ | Sheet **Công cụ** (cấp Options) → chọn → `PhoneSurface` render **đúng card của xưởng** (`surfaceTool.cards`), **không có bản sao công cụ nào** |
+| Mở lưới kết quả | Nút **Kết quả** → `PhoneSurface` + `ResultGrid` + thanh **Lọc & sắp xếp · Tìm** của chính nó |
+| Lùi một cấp | Nút **←** (`data-phone-surface-back`) phát sự kiện `back`; nơi gọi lùi ngăn xếp điều hướng |
+| Đóng hết | Nút **✕** (`data-phone-surface-close`) |
+| Đổi công cụ | Nút **Đổi** (`data-phone-surface-switch`) — lùi về ĐÚNG cấp danh sách, không mở thêm cấp |
+| Back của máy | `useNavStack.js` — ngăn xếp là **nguồn sự thật**, ba cờ hiển thị chỉ là hình chiếu của nó |
+
+**Ba luật của khung này:**
+
+1. **Ngăn xếp là nguồn sự thật duy nhất.** `top = nav.state.stack[last]`; `toolsOpen` · `toolOpen` ·
+   `resultsOpen` đều là `computed` từ nó. Nhờ vậy ba đường (← · ✕ · back của máy) không thể lệch nhau:
+   không có trạng thái thứ hai nào để quên cập nhật.
+2. **Mở từ danh sách là ĐI SÂU một cấp** (`nav.push('tool')`), **mở từ màn chính là mở chuỗi mới**
+   (`nav.open('tool')`) — chỉ khác đúng một tham số, nhưng quyết định nút ← quay về **danh sách** hay
+   về **màn chính**.
+3. **Bề mặt không phụ thuộc bề rộng phải mount ở CẤP GỐC của template.** Đây là luật đã trả giá: từ
+   Phase 2 tới đợt 59, cả khối lớp phủ dùng chung nằm **lọt trong** `<div v-else-if="!booting">` của
+   nhánh màn rộng (thẻ đóng của nhánh ở dòng cuối tệp) ⇒ điện thoại **không có** trình xem ảnh · menu
+   không gian · trợ lý · màn Chỉnh ảnh · bộ chọn nguồn · bảng bộ sưu tập · **trung tâm thông báo** (mọi
+   `store.toast()` biến mất) · hộp xác nhận xoá · banner xác thực. Không exception, không log — chỉ là
+   bấm mà màn hình đứng yên. Nay chúng nằm sau dấu mốc `<!-- /NHÁNH MÀN RỘNG -->`, và
+   `tests/Feature/PhoneStudioParityTest.php` khoá đúng vị trí đó.
 
 ---
 
@@ -1406,6 +1457,7 @@ tuyệt đối không hiện nút rồi báo lỗi (luật 56 ở §14).
 | 34 | 2026-09-24 | Ba trang phụ (Agent · Bộ sưu tập · Hub) mỗi nơi một kiểu chrome và không có điều hướng chung | **Phase 4 · `ShellChrome.vue`** cho cả ba trang + `spaces.js` làm **nguồn duy nhất** cho menu Không gian | một nguồn cho **5 không gian** · thanh lệnh trần **560px** khi ở màn rộng |
 | 35 | 2026-09-26 | Yêu cầu: màn hình bên trong phải **mobile-first** và **lồng cấp Review → Options → Action**, có **đầy đủ nút điều hướng** | **Phase 5–6**: `CommandBar.vue` (orb + ô nhập + nút gửi `.btn-magic` + vòng `.aurora-ring`) · `PopMenu.vue` neo theo **toạ độ nút** · `BottomSheet.vue` (kéo xuống đóng · prop `back`) · **`useNavStack.js`** gài History API để **nút back của máy lùi từng cấp** · `PhoneActions.vue` (Options → Action: biến thể · nâng cấp · **đổi khung** · tải · chia sẻ · tech pack · xoá) · `useHaptics.js` | 4 nút phẳng → **1 cửa "Tác vụ ảnh"** · dùng lại endpoint có sẵn `/api/reframe` · back của máy lùi đúng cấp (không văng khỏi trang) |
 | 36 | 2026-09-26 | Ba khiếu nại sau khi lên production: **Studio không có nút điều hướng** · **"Gần đây" không lấy được ảnh** · **prompt đã nhập không hiện ở nơi gõ** | Header Studio (màn rộng) mở **menu Không gian** từ nút thương hiệu · sửa `/latest` → **`/api/latest`** và ảnh rail đi qua `thumbUrl()` · thanh lệnh StudioPhone **buộc hai chiều vào `store.imagePromptEn`** · đối chiếu **mọi endpoint** của các màn mới với `route:list` | rail "Gần đây" **0 → N ảnh** · prompt `?prompt=` **hiện sẵn** trong ô nhập điện thoại · **1385 test / 10.651 assert XANH** |
+| 37 | 2026-09-26 | **Điện thoại mất phần lớn sản phẩm sau khi bỏ canvas**: 9 công cụ · trợ lý · lưới kết quả có lọc · nguồn ảnh · thư viện · bộ sưu tập · thông báo — **không có lối vào nào**. Và **không một lớp phủ dùng chung nào tồn tại trên điện thoại**: cả khối đó nằm lọt trong nhánh màn rộng (thẻ đóng ở dòng cuối tệp) ⇒ bấm "Sửa ảnh"/"Trợ lý" không có gì xảy ra, mọi `store.toast()` biến mất | **Bù lại đúng phần đã mất, KHÔNG dựng lại canvas**: `PhoneSurface.vue` (một khung cho mọi màn chiếm trọn) · sheet **Công cụ** sinh từ cấu hình owner (9 panel + 2 action, khoá theo gói vẫn hiện kèm ổ khoá) · **Kết quả** = `ResultGrid` thật + thanh Lọc/Tìm của chính nó · 4 cửa Công cụ · Kết quả · Trợ lý · Bộ sưu tập · **Sửa ảnh** vào sheet Tác vụ ảnh (màn Chỉnh ảnh vốn đã chạy bằng ngón tay) · **lớp phủ dùng chung dời ra CẤP GỐC template** · `revealActivity` rẽ nhánh điện thoại qua `phoneToolRequest` (trước đây yêu cầu điều hướng bật một cờ vô hình) · ngăn xếp điều hướng là nguồn sự thật cho cả ba cờ hiển thị | đo trên Chrome thật **390×844**: **26/27 → 27/27** phép kiểm ĐẠT · canvas trong DOM điện thoại **0** · spacer `h-24` và **0 tràn ngang** · 9/9 công cụ có lối vào + render được nội dung · back của máy lùi **đúng từng cấp** (công cụ → danh sách → thoát) · màn rộng **không hồi quy** (1440: 5 nút header + canvas; 768: dock 9 công cụ) · **1385 → 1405 test XANH** |
 
 ### 16.1 Số đo trước → sau của cả hành trình
 
@@ -1495,6 +1547,8 @@ tuyệt đối không hiện nút rồi báo lỗi (luật 56 ở §14).
 | `tests/Feature/UserFacingMessagesTest.php` | §6 (không rò rỉ chi tiết kỹ thuật ở nhãn tiến trình, luồng stream, cửa chặn ở biên, state lỗi) |
 | `tests/Feature/SuggestStreamTest.php` | §6 (cấm nêu tên model/provider trong nhãn tiến trình & lỗi) |
 | `tests/Feature/ToolbarAreaTest.php` | §7 (vùng toolbar cao cố định + cuộn trục X) |
+| `tests/Feature/PhoneStudioParityTest.php` | §15.6 + §15.10 + §15.11 (lớp phủ dùng chung phải ở **cấp gốc template** · mọi công cụ gốc có lối vào từ `StudioPhone` và đi qua **cùng cấu hình owner** · không mount lại lớp phủ singleton · yêu cầu điều hướng trên điện thoại đi sang đúng nhánh · **không có DOM canvas** + `h-dvh` + spacer `h-24` + tầng `90` của màn chiếm trọn · tài liệu không được nói sai về điện thoại) |
+| `tests/Feature/MobileFirstUiTest.php` | §7.2 + §15.6 (cỡ thumbnail theo chỗ đặt · sàn chạm cho thanh trượt/ô đánh dấu · mặt lưới không còn chrome canvas · lưới có lọc trạng thái và hai trạng thái rỗng KHÁC nhau · quản lý lưới: phạm vi · tìm không dấu · sắp xếp · cỡ lưới đi cặp với `sizes` · dải ảnh của trình xem) |
 | `tests/Feature/ClientErrorReportTest.php` | §6.5 (mã tra cứu của lỗi trình duyệt: log · định dạng mã · gộp trùng · throttle · bảng chữ JS = PHP · không chỗ nào còn đẩy `e.message` thô vào toast lỗi hay ném bỏ `error_code` của máy chủ) |
 | `tests/Feature/ModuleRegistryTest.php` | §14 luật 33 (mọi route studio phải thuộc một module của gói) |
 | `tests/Feature/UserCatalogTest.php` | §15.1 (4 URL cài đặt cũ vẫn trả 200) |

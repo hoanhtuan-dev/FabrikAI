@@ -7508,3 +7508,128 @@ cd /home/u310846799/domains/fabrikai.shop && /usr/bin/php artisan queue:work --s
 - **8 dòng job rác** trong bảng `jobs` (không phải việc đang chờ). Dọn được bằng một lệnh, nhưng chỉ nên
   làm sau khi có cron worker (nếu không thì lần sau lại đầy).
 - **Cron**: hai dòng ở mục C — việc của chủ dự án, cần hPanel.
+
+---
+
+## Kiểm tra & triển khai 2026-09-26 (Đợt 59 — ĐIỆN THOẠI MẤT PHẦN LỚN SẢN PHẨM SAU KHI BỎ CANVAS: bù lại đúng phần đã mất)
+
+> **TRẠNG THÁI: đã làm và đã kiểm chứng Ở MÁY CỤC BỘ — CHƯA deploy lên production.**
+> Mọi số đo dưới đây đến từ Chrome thật chạy trên `php artisan serve` + SQLite cục bộ. Việc đẩy lên máy
+> chủ (commit → push → `git pull`) chờ lệnh của chủ dự án; đợt này **không** chạm vào production.
+
+### A. Việc được yêu cầu
+
+> "kiểm tra sâu mobile mode sau khi chuyển đổi và xóa canvas khỏi mobile → triển khai đầy đủ tính năng gốc
+> đã có → có thể điều chỉnh|viết lại để phù hợp với thiết kế gui mới."
+
+Ba việc, theo thứ tự: **đo** bản điện thoại hiện tại · **đối chiếu** với tính năng gốc · **bù lại** phần
+đã mất theo thiết kế shell 2026 (không dựng lại canvas).
+
+### B. Cách đo (không phải đọc mã suy đoán)
+
+Dựng lại đúng môi trường thật: `php artisan serve` trên SQLite cục bộ + **Chrome thật** điều khiển qua
+CDP (`--headless=new --remote-debugging-port`, emulation **390×844 · mobile · touch 5 điểm**), đăng nhập
+bằng một tài khoản khách thật, rồi **đo DOM** (không chụp ảnh rồi đoán): phần tử nào tồn tại, ô nào tràn
+màn hình, vùng chạm nào dưới sàn, tầng z-index nào đang dùng, nút nào bấm mà không có gì xảy ra.
+
+### C. Đo được gì — BA LỖI THẬT, và lỗi thứ ba là loại im lặng nhất
+
+| # | Đo được trên Chrome 390×844 | Nguyên nhân thật |
+|---|---|---|
+| 1 | Bấm **«Sửa ảnh»** và **«Trợ lý»** ⇒ **không có gì xảy ra**. Không exception, không log, không toast | Toàn bộ khối lớp phủ dùng chung (GalleryModal · PopMenu · SourcePickerPopup · ProjectWorkspace · bảng lệnh · EditImageModal · ChatModal · ConceptCard) **nằm LỌT trong `<div v-else-if="!booting">` của nhánh màn rộng** — thẻ đóng của nhánh đó ở **dòng cuối tệp**. Nhánh điện thoại `v-if` nên cả khối không được render |
+| 2 | `store.toast()` **không hiện ở đâu** trên điện thoại; người dùng bị 403 **không thấy lời giải thích**; hộp xác nhận xoá không có | `NotificationCenter` · `AuthNotice` · `ConfirmDialog` là lớp phủ `fixed` nhưng cũng nằm trong nhánh màn rộng |
+| 3 | **Không có lối vào nào** tới 9 công cụ của xưởng (Tạo ảnh có tham số · Tạo biến thể · Mặc thử đồ · Sửa ảnh · Studio · Ghép trang phục · Upscale · Kịch bản quay · Bộ sưu tập), tới **trợ lý**, tới **lưới kết quả có lọc/tìm/sắp xếp**, tới **Nguồn ảnh · Thư viện · Bộ sưu tập**, và **không có cách nào đăng xuất** | Bản Phase 2 của `StudioPhone.vue` chỉ có: ảnh đang làm việc · Tác vụ ảnh · rail 12 ảnh · danh sách lớp đọc · thanh lệnh. Các card công cụ **vốn đã render được ở màn hẹp** (đó là tầng 2 của dock tablet) — chúng chỉ **thiếu lối vào**, không thiếu khả năng |
+| 4 | Bấm một công cụ **bị khoá theo gói** (vd «Ghép trang phục») ⇒ có toast "Mở «Gói & credit» để nâng cấp" nhưng **không có gì để mở** | Bảng «Gói & credit» là popover neo vào **nút tài khoản ở thanh tiêu đề** — thanh đó không tồn tại trong nhánh điện thoại |
+
+Lỗi #1 là loại **im lặng hoàn toàn**: không có exception, không có log, không có cảnh báo — chỉ là người
+dùng bấm và màn hình đứng yên. Nó tồn tại từ Phase 2 tới đợt này vì **không bài test nào kiểm "node nằm
+trong nhánh nào"**, và vì tệp `StudioApp.vue` để thẻ đóng của nhánh ở dòng cuối (2.124) — nhìn bằng mắt
+thì mọi thứ "trông như" đang ở cấp gốc.
+
+### D. Đã làm
+
+**1. Một khung cho mọi màn chiếm trọn — `components/PhoneSurface.vue`** (mới)
+Thang tầng 90 (cùng tầng deck sàng lọc/trình xem) · `env(safe-area-inset-*)` · một hàng đầu: **← lùi một
+cấp · tên việc · Đổi · ✕ đóng hết**. Cấp chỉ là **nội dung** của khung (§15.7 luật 6).
+
+**2. `StudioPhone.vue` viết lại — bù đúng phần đã mất, KHÔNG dựng lại canvas**
+- **4 cửa ngang cấp**: Công cụ · Kết quả · Trợ lý · Bộ sưu tập.
+- **Dải công cụ**: 9 công cụ, chạm MỘT lần là vào thẳng; danh sách sinh từ **cùng cấu hình owner quản lý**
+  (`activityNav`) — không bản sao thứ hai.
+- **Sheet Công cụ**: 9 panel + 2 mục 'action' (Prompt Tạo Ảnh · Agent thiết kế) + Nguồn ảnh · Thư viện &
+  ảnh của tôi · Bộ sưu tập & dự án · Cài đặt · Agent thiết kế · **Tài khoản & đăng xuất**.
+- **Kết quả**: `ResultGrid` THẬT trong màn chiếm trọn + thanh **Lọc & sắp xếp · Tìm** của chính nó (trên
+  màn rộng hai nút này nằm ở `<header>` — header không có ở nhánh điện thoại, nên thiếu hàng này là lưới
+  **chết**: xem được mà không lọc được).
+- **Tài khoản**: danh tính · Gói & credit · Cài đặt & quản trị · Agent Studio · **Đăng xuất** (đi qua ĐÚNG
+  hàm `logout()` của StudioApp — một bản logic).
+- **Màn Chỉnh ảnh** (tả · khoanh khung · vẽ cọ) vào sheet **Tác vụ ảnh** — đường thay thế cho khoanh vùng
+  trên canvas, và nó **vốn đã chạy bằng ngón tay** (`touch-action: none` + pointer events).
+- `canBack` = ngăn xếp còn cấp trước ⇒ **← chỉ hiện khi thật sự có cấp để lùi**; ngăn xếp điều hướng là
+  **nguồn sự thật**, ba cờ hiển thị chỉ là hình chiếu của nó (nên ← · ✕ · back của máy không thể lệch nhau).
+- Chừa chỗ cho thanh lệnh bằng **spacer `h-24`** (§7.2 luật 3 — bản cũ chỉ có `pb-3`, nội dung cuối bị
+  thanh lệnh che).
+
+**3. `StudioApp.vue` — lớp phủ dùng chung dời ra CẤP GỐC**
+Sau dấu mốc `<!-- /NHÁNH MÀN RỘNG (≥521px) -->`: GalleryModal (kèm `:actions="viewerActions"`) · PopMenu ·
+SourcePickerPopup · ProjectWorkspace · bảng lệnh · EditImageModal · ChatModal · AuthNotice (`v-if="!booting"`) ·
+NotificationCenter · ConfirmDialog · ConceptCard. Nguyên tắc ghi ngay tại chỗ trong mã: **bề mặt nào không
+phụ thuộc bề rộng thì mount ở cấp gốc** — thêm lớp phủ mới mặc định có mặt ở CẢ HAI nhánh.
+
+**4. Ba chỗ nối còn thiếu**
+- `revealActivity()` rẽ nhánh điện thoại: yêu cầu điều hướng (`store.requestActivity` — thẻ trong Trợ lý,
+  nút trong trình xem ảnh) nay đi qua prop `phoneToolRequest` sang ĐÚNG nhánh đang render. Trước đây nó bật
+  hai cờ của nhánh tablet — cờ bật, không có gì hiện ra.
+- `openUpgradeFor()` rẽ nhánh điện thoại ⇒ **đi tới trang `/bang-gia`** (đường thật, cùng đích) thay vì mở
+  popover không render.
+- `StudioPhone` **không mount lại** lớp phủ singleton (PopMenu · GalleryModal · NotificationCenter ·
+  ChatModal): chúng là singleton, mount hai nơi là hai lớp phủ cùng lúc.
+
+**5. Ngưỡng điện thoại thành MỘT nguồn** — `PHONE_MAX_W = 520` + `PHONE_MQ`, khai ở đầu script (trước đây
+chuỗi `(max-width: 520px)` viết hai lần, và `revealActivity` không biết mình ở nhánh nào).
+
+### E. Khoá bằng test — `tests/Feature/PhoneStudioParityTest.php` (7 bài, 109 assert)
+
+| Bài | Khoá điều gì |
+|---|---|
+| `test_lop_phu_dung_chung_nam_ngoai_ca_hai_nhanh` | Mọi lớp phủ dùng chung phải ở **cấp gốc** template (đọc theo quy ước thụt lề của tệp) và **sau** dấu mốc đóng nhánh màn rộng — đúng lỗi #1 |
+| `test_trinh_xem_anh_tren_dien_thoai_co_danh_sach_tinh_nang` | `GalleryModal` phải có `:actions` |
+| `test_dien_thoai_co_loi_vao_moi_cong_cu` | Prop từ StudioApp (một nguồn) · sheet Công cụ có 9 panel + action + ổ khoá cho mục bị khoá · màn chiếm trọn render **chính card** của xưởng · 4 cửa · Nguồn ảnh/Thư viện/Bộ sưu tập/Cài đặt/Agent · `ResultGrid` + thanh lọc · Tài khoản + Đăng xuất |
+| `test_studio_phone_khong_mount_lai_lop_phu_dung_chung` | Không import lại 8 lớp phủ singleton |
+| `test_yeu_cau_dieu_huong_tren_dien_thoai_di_sang_dung_nhanh` | `revealActivity` rẽ nhánh `isPhone` trước nhánh tablet · ngưỡng là hằng số dùng chung |
+| `test_dien_thoai_khong_tao_dom_canvas_va_theo_luat_bo_cuc` | `v-if` (không `v-show`) · `h-dvh` · spacer `h-24` · tầng `90` + safe-area · ← / ✕ có `aria-label` · ngăn xếp là nguồn sự thật · đường nâng cấp `/bang-gia` · haptic không thay tín hiệu nhìn thấy |
+| `test_tai_lieu_noi_dung_ve_dien_thoai` | Tài liệu không được nói sai về điện thoại (bảng §15.6 cũ nói "không có khoanh vùng" — **sai**) |
+
+**Sửa thêm một test cũ**: `StudioGuiConfigTest` bắt sai `:name="icon"` (tên icon đến từ **dữ liệu**) thành
+"icon không có trong registry" — thêm `(?<!:)` vào mẫu literal. Guard không đổi ý nghĩa: nó chỉ nói về
+tên **viết thẳng**.
+
+### F. Kiểm chứng (số đo, không phải ý định)
+
+| Phép kiểm trên Chrome thật | Trước | Sau |
+|---|---|---|
+| Bộ kiểm điện thoại 390×844 (30 phép kiểm: canvas · bố cục · lớp phủ · công cụ · back của máy · tài khoản) | **chưa có** (phần lớn bấm không có gì xảy ra) | **30/30 ĐẠT** |
+| Phần tử DOM canvas ở 390px | 0 | **0** (giữ nguyên quyết định §15.6) |
+| Tràn ngang ở 390px | không | **không** |
+| Công cụ có lối vào + render được nội dung | 0/9 | **9/9** (8 mở được; «Ghép trang phục» bị khoá theo gói của tài khoản thử ⇒ mời nâng cấp rồi **mở trang /bang-gia**) |
+| Lớp phủ dùng chung có mặt trên điện thoại | 0/10 | **10/10** |
+| Back của máy | — | lùi **đúng từng cấp**: công cụ → danh sách → thoát; Tài khoản → danh sách |
+| Màn rộng không hồi quy | 1440px: 5 nút header + mặt canvas; 768px: dock 9 công cụ + màn công cụ | **giữ nguyên** |
+| Bộ test PHP | 1385 xanh | **1392 xanh** (10.756 assert) — thêm 7 bài mới, 0 đỏ |
+
+### G. Nợ còn lại (nói thẳng)
+
+- **Xếp lớp / ghép nhiều layer / kéo giãn** vẫn **chỉ có ở màn rộng** — đó là việc cần con trỏ chính xác và
+  bề ngang, không phải chỗ nên "nhồi cho vừa". Giao diện điện thoại **nói thật** điều đó (danh sách lớp chỉ
+  đọc + một dòng chỉ sang «Tác vụ ảnh → Sửa ảnh»).
+- **Ba dock kéo giãn** và **bảng lệnh `Ctrl+K`** vẫn là của màn rộng.
+- Deck sàng lọc (`TriageDeck`) chưa được đo lại trong đợt này: nó cần một **lượt tạo ≥2 ảnh** thật, mà môi
+  trường cục bộ không có API key ⇒ phải kiểm trên production (hoặc bằng cách gieo một batch giả).
+- `resources/views/studio/index.blade.php` có một `<div>Đang tải FabrikAI…</div>` nằm **sau**
+  `#studio-root` và `aria-hidden`. **Đã kiểm lại: đây KHÔNG phải rác** — nó giữ chỗ trong lúc bundle JS
+  đang tải (ứng dụng phủ lên khi mount), và `grep` cho thấy không mã nào chờ nó biến mất. Tác dụng phụ
+  duy nhất: mọi phép đo `innerText` của trang đều kèm dòng đó — khi viết script đo, nhớ nó là **dòng
+  đầu**, không phải nội dung màn hình.
+- Ô **tìm/cỡ lưới** của lưới kết quả dùng lại ĐÚNG bảng lọc của xưởng; nếu sau này bảng lọc được thiết kế
+  lại cho màn rộng thì nhánh điện thoại đi theo — **cố ý**, để không có hai bảng lọc.
+

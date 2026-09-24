@@ -124,7 +124,11 @@ class StudioGuiConfigTest extends TestCase
 
             preg_match_all('/<StudioIcon\b[^>]*>/s', $src, $tags);
             foreach ($tags[0] ?? [] as $tag) {
-                if (preg_match('/\bname="([a-zA-Z][a-zA-Z0-9]*)"/', $tag, $m) === 1) {
+                // [Đợt 59] (?<!:) là BẮT BUỘC: không có nó, mẫu này bắt luôn `:name="icon"` (tên icon
+                // đến từ DỮ LIỆU — cấu hình owner, prop của khung dùng chung) và báo sai rằng có một
+                // icon tên "icon" không tồn tại trong registry. Guard ở đây chỉ nói về TÊN VIẾT THẲNG;
+                // tên động đã được nhánh `:name="…"` bên dưới kiểm qua các chuỗi hằng trong biểu thức.
+                if (preg_match('/(?<!:)\bname="([a-zA-Z][a-zA-Z0-9]*)"/', $tag, $m) === 1) {
                     if (! in_array($m[1], $known, true)) {
                         $missing[] = $rel.' → name="'.$m[1].'"';
                     }

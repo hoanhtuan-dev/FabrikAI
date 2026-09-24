@@ -75,6 +75,13 @@ import PopMenu from './components/PopMenu.vue';
 import { usePopmenu } from './composables/usePopmenu.js';
 import { spacesForViewport } from './spaces.js';
 const store = useStudioStore();
+// [Phase 2 · shell 2026] NGƯỠNG ĐIỆN THOẠI — MỘT nguồn duy nhất (§15.6 luật 1).
+// Khai ở ĐẦU script chứ không phải cạnh chỗ dùng: revealActivity() (bên dưới) phải biết mình đang ở
+// nhánh nào, mà nó được gọi từ nhiều nơi — khai muộn hơn là vùng chết tạm thời (TDZ) của const.
+const PHONE_MAX_W = 520;
+const PHONE_MQ = '(max-width: ' + PHONE_MAX_W + 'px)';
+const isPhoneMql = window.matchMedia(PHONE_MQ);
+const isPhone = ref(isPhoneMql.matches);
 // Lỗi nổ ra ngoài mọi khối try/catch (exception · promise bị từ chối) vẫn phải tới được người dùng
 // KÈM MÃ TRA CỨU — không thì nó chỉ nằm trong console của khách (docs/DESIGN_SYSTEM.md §6.5).
 toastClientErrors((text) => store.toast(text, 'error'));
@@ -270,12 +277,24 @@ async function loadGuiConfig() {
 function openUpgradeFor(id) {
   const info = store.moduleInfo(id);
   const plans = store.plansWithModule(id);
-  store.toast(
-    'Tính năng «' + ((info && info.name) || id) + '» không có trong gói của bạn'
-    + (plans.length ? ' — có ở gói ' + plans.map((p) => p.name).join(' · ') + '.' : '.')
-    + ' Mở «Gói & credit» để nâng cấp.',
-    'error',
-  );
+  const msg = 'Tính năng «' + ((info && info.name) || id) + '» không có trong gói của bạn'
+    + (plans.length ? ' — có ở gói ' + plans.map((p) => p.name).join(' · ') + '.' : '.');
+  /**
+   * [Đợt 59 · 2026-09-26] ĐIỆN THOẠI PHẢI CÓ ĐƯỜNG NÂNG CẤP THẬT.
+   *
+   * Bảng «Gói & credit» là popover neo vào NÚT TÀI KHOẢN ở thanh tiêu đề (`md:absolute` theo khối
+   * `relative` của nút đó). Nhánh điện thoại KHÔNG có thanh tiêu đề ấy ⇒ bật `store.planOpen` ở đó là
+   * mở một bề mặt không render: người dùng đọc câu "Mở «Gói & credit» để nâng cấp" rồi… không có gì để
+   * mở. Đo được ở 390×844: bấm «Ghép trang phục» (bị khoá theo gói) chỉ ra toast, hết.
+   * Nay điện thoại đi tới TRANG `/bang-gia` — cùng đích, là đường thật, render từ CSDL, dùng được ở
+   * mọi bề rộng (§15.10: giao diện không được dẫn vào ngõ cụt).
+   */
+  if (isPhone.value) {
+    store.toast(msg + ' Đang mở trang Gói & credit…', 'error');
+    window.location.href = '/bang-gia';
+    return;
+  }
+  store.toast(msg + ' Mở «Gói & credit» để nâng cấp.', 'error');
   store.planOpen = true;
   store.planCatalogOpen = true;
   store.togglePlanPopover && store.loadPlanStatus(true);
@@ -305,9 +324,14 @@ function revealActivity(id) {
   // ảnh) đều mở được bảng của một module họ chưa trả tiền. Một luật, một chỗ.
   const target = activityNav.value.find((a) => a.id === id);
   if (target && target.locked) { openUpgradeFor(id); return; }
-  // [đợt 54] ĐIỆN THOẠI: mở THẲNG công cụ đó, toàn màn hình — kể cả khi nó đang là công cụ hiện tại.
-  // Trước đây nhánh "đã đúng nhóm" chỉ bật ngăn kéo; nay ngăn kéo không còn là nơi làm việc, nên
-  // "đưa tôi tới X" phải luôn kết thúc ở màn hình làm việc của X.
+  // [đợt 59 · 2026-09-26] ĐIỆN THOẠI THẬT (≤520px) có cây riêng (StudioPhone) ⇒ hai ref của nhánh
+  // tablet (toolsListOpen · mobileToolOpen) KHÔNG được render ở đó. Trước lần này, yêu cầu điều hướng
+  // (thẻ gợi ý trong Trợ lý · nút trong trình xem ảnh) rơi vào khoảng không: cờ được bật, không có gì
+  // hiện ra, người dùng bấm mà màn hình đứng yên. Nay đẩy yêu cầu sang ĐÚNG nhánh đang render.
+  if (isPhone.value) { phoneToolRequest.value = { n: (phoneToolRequest.value.n || 0) + 1, id }; return; }
+  // [đợt 54] MÀN HẸP (tablet 521–1023): mở THẲNG công cụ đó, toàn màn hình — kể cả khi nó đang là
+  // công cụ hiện tại. Trước đây nhánh "đã đúng nhóm" chỉ bật ngăn kéo; nay ngăn kéo không còn là nơi
+  // làm việc, nên "đưa tôi tới X" phải luôn kết thúc ở màn hình làm việc của X.
   if (window.innerWidth < 1024) { selectActivity(id); return; }
   if (id === activeActivity.value) {
     // Đã đúng nhóm: chỉ mở bảng, KHÔNG toggle đóng lại.
@@ -320,6 +344,21 @@ watch(() => store.activityRequest && store.activityRequest.n, (n) => {
   if (! n) return;
   revealActivity(store.activityRequest && store.activityRequest.id);
 });
+/**
+ * YÊU CẦU ĐIỀU HƯỚNG GỬI SANG NHÁNH ĐIỆN THOẠI (đợt 59).
+ *
+ * StudioPhone nhận yêu cầu qua PROP (không qua store): nó là con của chính component này, nên một
+ * prop là đường ngắn nhất và không thêm trạng thái thứ hai vào kho dữ liệu. `n` là SỐ LẦN yêu cầu —
+ * hai lần bấm cùng một công cụ phải mở lại được (nếu chỉ so `id`, lần thứ hai không có gì đổi).
+ */
+const phoneToolRequest = ref({ n: 0, id: '' });
+/** Bốn việc mà chỉ StudioApp làm được (mở lớp phủ dùng chung / điều hướng trang) — phone chỉ phát ý. */
+function onPhonePrompt() { store.promptOpen = true; }
+function onPhoneAgent() { window.location.href = AGENT_STUDIO_URL; }
+function onPhoneSource() { store.sourcePickerOpen = true; }
+function onPhoneLibrary() { goLibrary(); }
+function onPhoneCollections() { projectsOpen.value = true; }
+function onPhoneAssistant() { openChat(); }
 
 const activeActivity = ref('concept');
 // [đợt 54] HAI tầng của luồng công cụ trên điện thoại, thay cho một ngăn kéo trộn lẫn:
@@ -350,8 +389,7 @@ function openSpacesMenu(e) {
   });
 }
 
-const isPhoneMql = window.matchMedia('(max-width: 520px)');
-const isPhone = ref(isPhoneMql.matches);
+// (isPhoneMql · isPhone khai ở đầu script — xem chú thích NGƯỠNG ĐIỆN THOẠI.)
 onMounted(() => {
   const onChange = (e) => { isPhone.value = e.matches; };
   isPhoneMql.addEventListener('change', onChange);
@@ -1124,10 +1162,28 @@ function onTouchEnd(e) {
 <template>
   <!-- [Phase 2 · shell 2026] ĐIỆN THOẠI: Studio là bảng điều khiển, KHÔNG canvas (quyết định
        2026-09-24). v-if — không phải v-show: không một phần tử DOM canvas nào được tạo. -->
-  <StudioPhone v-if="!booting && isPhone" />
+  <StudioPhone
+    v-if="!booting && isPhone"
+    :activity-nav="activityNav"
+    :toolbar-actions="toolbarActions"
+    :settings-entry="settingsEntry"
+    :tool-request="phoneToolRequest"
+    @upgrade="openUpgradeFor"
+    @open-prompt="onPhonePrompt"
+    @open-agent="onPhoneAgent"
+    @open-source="onPhoneSource"
+    @open-library="onPhoneLibrary"
+    @open-collections="onPhoneCollections"
+    @open-assistant="onPhoneAssistant"
+    @logout="logout"
+  />
   <div v-else-if="!booting" class="studio-shell flex h-full w-full flex-col bg-ink-950 text-cream-100">
     <!-- [Đợt 0.1] Banner 3 trạng thái xác thực — thay thế 403 im lặng bằng thông báo rõ ràng -->
-    <AuthNotice />
+    <!-- [đợt 59 · 2026-09-26] AuthNotice · NotificationCenter · ConfirmDialog ĐÃ RỜI khỏi đây —
+         chúng nay nằm ở khối DÙNG CHUNG cuối template. Vì sao: cả ba là lớp phủ `fixed` (banner xác
+         thực · trung tâm thông báo · hộp xác nhận xoá) nhưng lại nằm TRONG nhánh desktop, nên nhánh
+         điện thoại không có thông báo nào và không có hộp xác nhận nào: mọi `store.toast()` trên
+         điện thoại biến mất không dấu vết, và người dùng 403 không thấy lời giải thích. -->
     <!-- ══ Top account bar: thông tin người dùng + đăng nhập/đăng xuất + điều hướng quản trị ══ -->
     <!-- [2026-09-26 · thiết kế lại] ĐIỆN THOẠI: thanh này co lại còn MỘT dòng (avatar 28px + tên + nút),
          bỏ dòng vai trò và giảm đệm dọc (2,5 → 1,5). ĐO ĐƯỢC trước khi sửa: thanh cao **61px** trên màn
@@ -1538,27 +1594,6 @@ function onTouchEnd(e) {
         </div>
       </div>
     </header>
-    <!-- [Trục 2 — 2026-09-20] Trung tâm thông báo kiểu VSCode (thay ô flashMsg đơn lẻ):
-         xếp chồng · tự tắt theo loại · đóng tay được · kèm thẻ tiến trình việc đang chạy. -->
-    <NotificationCenter />
-    <!-- Xác nhận XÓA ĐỐI TƯỢNG ĐANG CHỌN (1 đối tượng cũng vào đây — không xóa ngay tay).
-         Đặt ở shell chứ không trong bảng Lớp: bảng Lớp có thể đang bị thu gọn mà phím Delete
-         vẫn phải hoạt động. -->
-    <ConfirmDialog
-      :open="store.confirmDeleteOpen"
-      :title="'Xóa ' + store.selectionUnitLabels.length + ' đối tượng?'"
-      confirm-label="Xóa"
-      @confirm="store.confirmDeleteSelection()"
-      @cancel="store.confirmDeleteOpen = false"
-    >
-      <template v-if="store.selectionUnitLabels.length">
-        <b>{{ store.selectionUnitLabels.slice(0, 4).join(' · ') }}</b><span v-if="store.selectionUnitLabels.length > 4"> · …</span><br>
-      </template>
-      <template v-if="store.lockedSelectionCount">
-        <span class="text-warn">{{ store.lockedSelectionCount }} đối tượng đang KHÓA sẽ được giữ lại (mở khóa rồi xóa sau).</span><br>
-      </template>
-      Chỉ gỡ khỏi canvas — ảnh kết quả vẫn còn trong <b>Output/Thư viện</b>. Có thể hoàn tác (Ctrl+Z).
-    </ConfirmDialog>
     <!-- ══ Thư viện (SPA view nhúng trong /studio — thay thế trang riêng /api/library) ══ -->
     <LibraryApp v-if="store.studioView === 'library'" embedded @back="store.studioView = 'studio'" />
     <!-- [Đợt 0.6] Đã gỡ banner "Cài đặt FabrikAI" (PWA) — Chốt Q4 bỏ PWA hoàn toàn, nên không còn gì
@@ -2017,53 +2052,106 @@ function onTouchEnd(e) {
         <div class="space-y-2.5"><component :is="c" v-for="(c,i) in panel" :key="i" /></div>
       </div>
     </div>
-    <!-- GalleryModal: xem ảnh lớn (bấm vào output trong dock phải) -->
-    <GalleryModal v-if="store.viewer" :actions="viewerActions" />
-    <!-- PopMenu: vỏ menu không gian của orb header (singleton usePopmenu) -->
-    <PopMenu />
-    <!-- SourcePickerPopup: popup chọn nguồn ảnh (nút "Nguồn ảnh" ở activity bar) -->
-    <SourcePickerPopup v-if="store.sourcePickerOpen" v-model="store.sourcePickerOpen" />
-    <!-- ProjectWorkspace: popup quản lý bộ sưu tập (nút "Bộ sưu tập" ở mobile bar / chip bộ sưu tập / popover apply) -->
-    <ProjectWorkspace v-if="projectsOpen" v-model="projectsOpen" />
-    <!-- Prompt Tạo Ảnh (ConceptCard): popup độc lập — nút sparkles ở right toolbar (dưới cùng) -->
-    <!-- ══ Command Palette (VSCode-style) ══ -->
-    <div v-if="paletteOpen" role="dialog" aria-modal="true" aria-label="Bảng lệnh" class="fixed inset-0 z-[110] flex items-start justify-center pt-[12vh]" @click.self="paletteOpen = false">
-      <div class="motion-pop-in w-full max-w-lg overflow-hidden rounded-xl border border-ink-600 bg-ink-900 shadow-2xl">
-        <div class="flex items-center gap-2 border-b border-ink-700 px-3 py-2.5">
-          <StudioIcon name="search" size="h-4 w-4" class="text-cream-400" />
-          <input ref="paletteInput" v-model="paletteQuery" class="min-w-0 flex-1 bg-transparent text-sm text-cream-100 placeholder:text-cream-400 focus:outline-none" placeholder="Tìm lệnh, bộ sưu tập, mẫu việc, ảnh…  ( > lệnh · # bộ sưu tập · @ ảnh )" @keydown.esc="paletteOpen = false" />
-          <span class="rounded border border-ink-700 px-1.5 py-0.5 text-label text-cream-400">esc</span>
-        </div>
-        <div class="max-h-[50vh] overflow-y-auto p-1.5">
-          <!-- [Trục 4] Kết quả theo NHÓM (Lệnh · Bộ sưu tập · Mẫu việc · Ảnh đã tạo) -->
-          <template v-for="grp in paletteGroups" :key="grp.name">
-            <p class="px-2.5 pb-1 pt-2 text-label font-semibold uppercase tracking-wide text-cream-400">{{ grp.name }}</p>
-            <button v-for="cmd in grp.items" :key="cmd.id" @click="runCommand(cmd)" class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm text-cream-100 transition hover:bg-brand-600/25">
-              <StudioIcon :name="cmd.icon" size="h-4 w-4" class="shrink-0 text-brand-300" />
-              <span class="min-w-0 flex-1 truncate">{{ cmd.label }}</span>
-              <span class="shrink-0 text-label text-cream-400">{{ cmd.hint }}</span>
-            </button>
-          </template>
-          <p v-if="!paletteItems.length" class="px-2.5 py-6 text-center text-xs text-cream-400">Không tìm thấy kết quả.</p>
-        </div>
-        <div class="flex items-center gap-3 border-t border-ink-700 px-3 py-1.5 text-label text-cream-400">
-          <span><b class="text-cream-300">&gt;</b> lệnh</span>
-          <span><b class="text-cream-300">#</b> bộ sưu tập</span>
-          <span><b class="text-cream-300">@</b> ảnh đã tạo</span>
-        </div>
+  </div><!-- /NHÁNH MÀN RỘNG (≥521px) -->
+
+  <!-- ══════════════════════════════════════════════════════════════════════════════════════════
+       LỚP PHỦ & BANNER DÙNG CHUNG — NGOÀI CẢ HAI NHÁNH (điện thoại ⇄ màn rộng). Đợt 59.
+       ────────────────────────────────────────────────────────────────────────────────────────
+       ĐÂY LÀ CHỖ DỄ SAI NHẤT CỦA TỆP NÀY, và đã sai thật: từ Phase 2 tới đợt 59, toàn bộ khối lớp
+       phủ dưới đây nằm LỌT trong `<div v-else-if="!booting">` của nhánh màn rộng — vì thẻ đóng của
+       nhánh đó nằm ở dòng CUỐI tệp. Hệ quả đo được trên Chrome 390×844: điện thoại KHÔNG có
+       trình xem ảnh (GalleryModal) · KHÔNG có menu không gian (PopMenu) · KHÔNG có trợ lý
+       (ChatModal) · KHÔNG có màn Chỉnh ảnh (EditImageModal) · KHÔNG có bộ chọn nguồn ảnh · KHÔNG
+       có bảng bộ sưu tập · KHÔNG có trung tâm thông báo (mọi store.toast() biến mất) · KHÔNG có
+       hộp xác nhận xoá · KHÔNG có banner xác thực. Không exception, không log — chỉ là người dùng
+       bấm mà màn hình đứng yên.
+       LUẬT RÚT RA: bề mặt nào KHÔNG phụ thuộc bề rộng thì phải mount ở CẤP GỐC của template. Một
+       lớp phủ mới thêm vào đây mặc định có mặt ở cả hai nhánh — đó là điều ta muốn.
+       (Phần CHỈ có ở màn rộng vẫn nằm trong nhánh trên: ba dock, canvas, bảng lệnh… và hai bề mặt
+       đã có bản riêng cho điện thoại: LƯỚI KẾT QUẢ và THƯ VIỆN — StudioPhone tự mount chúng theo
+       thiết kế shell 2026 §15.6.) -->
+  <!-- GalleryModal: xem ảnh lớn — chạm ảnh ở điện thoại, bấm output ở dock phải màn rộng -->
+  <GalleryModal v-if="store.viewer" :actions="viewerActions" />
+  <!-- PopMenu: vỏ menu không gian của orb header (singleton usePopmenu) -->
+  <PopMenu />
+  <!-- SourcePickerPopup: popup chọn nguồn ảnh (nút "Nguồn ảnh" ở activity bar) -->
+  <SourcePickerPopup v-if="store.sourcePickerOpen" v-model="store.sourcePickerOpen" />
+  <!-- ProjectWorkspace: popup quản lý bộ sưu tập (nút "Bộ sưu tập" ở mobile bar / chip bộ sưu tập / popover apply) -->
+  <ProjectWorkspace v-if="projectsOpen" v-model="projectsOpen" />
+  <!-- Prompt Tạo Ảnh (ConceptCard): popup độc lập — nút sparkles ở right toolbar (dưới cùng) -->
+  <!-- ══ Command Palette (VSCode-style) ══ -->
+  <div v-if="paletteOpen" role="dialog" aria-modal="true" aria-label="Bảng lệnh" class="fixed inset-0 z-[110] flex items-start justify-center pt-[12vh]" @click.self="paletteOpen = false">
+    <div class="motion-pop-in w-full max-w-lg overflow-hidden rounded-xl border border-ink-600 bg-ink-900 shadow-2xl">
+      <div class="flex items-center gap-2 border-b border-ink-700 px-3 py-2.5">
+        <StudioIcon name="search" size="h-4 w-4" class="text-cream-400" />
+        <input ref="paletteInput" v-model="paletteQuery" class="min-w-0 flex-1 bg-transparent text-sm text-cream-100 placeholder:text-cream-400 focus:outline-none" placeholder="Tìm lệnh, bộ sưu tập, mẫu việc, ảnh…  ( > lệnh · # bộ sưu tập · @ ảnh )" @keydown.esc="paletteOpen = false" />
+        <span class="rounded border border-ink-700 px-1.5 py-0.5 text-label text-cream-400">esc</span>
+      </div>
+      <div class="max-h-[50vh] overflow-y-auto p-1.5">
+        <!-- [Trục 4] Kết quả theo NHÓM (Lệnh · Bộ sưu tập · Mẫu việc · Ảnh đã tạo) -->
+        <template v-for="grp in paletteGroups" :key="grp.name">
+          <p class="px-2.5 pb-1 pt-2 text-label font-semibold uppercase tracking-wide text-cream-400">{{ grp.name }}</p>
+          <button v-for="cmd in grp.items" :key="cmd.id" @click="runCommand(cmd)" class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm text-cream-100 transition hover:bg-brand-600/25">
+            <StudioIcon :name="cmd.icon" size="h-4 w-4" class="shrink-0 text-brand-300" />
+            <span class="min-w-0 flex-1 truncate">{{ cmd.label }}</span>
+            <span class="shrink-0 text-label text-cream-400">{{ cmd.hint }}</span>
+          </button>
+        </template>
+        <p v-if="!paletteItems.length" class="px-2.5 py-6 text-center text-xs text-cream-400">Không tìm thấy kết quả.</p>
+      </div>
+      <div class="flex items-center gap-3 border-t border-ink-700 px-3 py-1.5 text-label text-cream-400">
+        <span><b class="text-cream-300">&gt;</b> lệnh</span>
+        <span><b class="text-cream-300">#</b> bộ sưu tập</span>
+        <span><b class="text-cream-300">@</b> ảnh đã tạo</span>
       </div>
     </div>
-    <!-- ChatModal: MODAL TRỢ LÝ — mount thường trực (tự ẩn/hiện theo store.chatOpen) để câu đang gõ
-         dở và lịch sử hội thoại không mất khi đóng/mở lại. Ba lối vào, TẤT CẢ đều đi qua openChat()
-         ở trên: NÚT NỔI trong vùng canvas (components/ChatFab.vue — lối vào chính, hiện ở mọi bề
-         rộng), lệnh trong bảng lệnh, và nút phụ «Hỏi trợ lý» ở màn hình canvas trống. -->
-
-    <!-- [Bước 5.3] Màn Chỉnh ảnh — mount thường trực, tự ẩn/hiện theo store.editImageOpen -->
-    <EditImageModal />
-    <ChatModal />
-    <ConceptCard v-if="conceptPromptOpened" popup />
-    <!-- [2026-09-25] Agent Studio KHÔNG còn mount ở đây: nó là trang riêng /agent-studio
-         (AgentStudioApp.vue + agent-studio.js). Nút «Agent thiết kế» trên activity bar điều
-         hướng sang đó — xem runToolbarAction(). -->
   </div>
+  <!-- ChatModal: MODAL TRỢ LÝ — mount thường trực (tự ẩn/hiện theo store.chatOpen) để câu đang gõ
+       dở và lịch sử hội thoại không mất khi đóng/mở lại. Ba lối vào, TẤT CẢ đều đi qua openChat()
+       ở trên: NÚT NỔI trong vùng canvas (components/ChatFab.vue — lối vào chính, hiện ở mọi bề
+       rộng), lệnh trong bảng lệnh, và nút phụ «Hỏi trợ lý» ở màn hình canvas trống. -->
+
+  <!-- [Bước 5.3] Màn Chỉnh ảnh — mount thường trực, tự ẩn/hiện theo store.editImageOpen -->
+  <EditImageModal />
+  <ChatModal />
+  <!-- ══════════════════════════════════════════════════════════════════════════════════════
+       LỚP PHỦ & BANNER DÙNG CHUNG CHO CẢ HAI NHÁNH (điện thoại ⇄ màn rộng) — đợt 59.
+       Đặt ở ĐÂY (ngoài cả hai nhánh) là quyết định, không phải tiện tay: đây là những bề mặt mà
+       "đang ở nhánh nào" KHÔNG được quyết định việc chúng có tồn tại hay không —
+         · AuthNotice        — nói vì sao tài khoản chưa dùng được xưởng (403 im lặng là lỗi thật);
+         · NotificationCenter— MỌI store.toast() đi qua đây; thiếu nó là mọi phản hồi biến mất;
+         · ConfirmDialog     — hộp xác nhận xoá đối tượng đang chọn.
+       Trước đợt này cả ba nằm trong nhánh desktop ⇒ điện thoại không có thông báo, không có xác
+       nhận, không có banner xác thực. Một danh sách ~6 lớp phủ ở một chỗ cũng dễ soát hơn là rải
+       theo hai nhánh: thêm lớp phủ mới thì mặc định nó có mặt ở CẢ HAI. -->
+  <!-- v-if="!booting" đặt RIÊNG trên AuthNotice (không bọc cả khối trong <template>): lúc đang boot,
+       trạng thái xác thực chưa biết nên banner có thể nháy lên rồi tắt. Hai lớp phủ còn lại không cần
+       — chúng chỉ hiện khi có việc thật (toast đang chờ · hộp xác nhận đang mở). Giữ mọi mục ở ĐÚNG
+       2 dấu cách cũng là điều kiện để PhoneStudioParityTest đọc được "node này ở cấp gốc". -->
+  <AuthNotice v-if="!booting" />
+  <!-- [Trục 2 — 2026-09-20] Trung tâm thông báo kiểu VSCode (thay ô flashMsg đơn lẻ):
+       xếp chồng · tự tắt theo loại · đóng tay được · kèm thẻ tiến trình việc đang chạy. -->
+  <NotificationCenter />
+  <!-- Xác nhận XÓA ĐỐI TƯỢNG ĐANG CHỌN (1 đối tượng cũng vào đây — không xóa ngay tay).
+       Đặt ở shell chứ không trong bảng Lớp: bảng Lớp có thể đang bị thu gọn mà phím Delete
+       vẫn phải hoạt động. -->
+  <ConfirmDialog
+    :open="store.confirmDeleteOpen"
+    :title="'Xóa ' + store.selectionUnitLabels.length + ' đối tượng?'"
+    confirm-label="Xóa"
+    @confirm="store.confirmDeleteSelection()"
+    @cancel="store.confirmDeleteOpen = false"
+  >
+    <template v-if="store.selectionUnitLabels.length">
+      <b>{{ store.selectionUnitLabels.slice(0, 4).join(' · ') }}</b><span v-if="store.selectionUnitLabels.length > 4"> · …</span><br>
+    </template>
+    <template v-if="store.lockedSelectionCount">
+      <span class="text-warn">{{ store.lockedSelectionCount }} đối tượng đang KHÓA sẽ được giữ lại (mở khóa rồi xóa sau).</span><br>
+    </template>
+    Chỉ gỡ khỏi canvas — ảnh kết quả vẫn còn trong <b>Output/Thư viện</b>. Có thể hoàn tác (Ctrl+Z).
+  </ConfirmDialog>
+  <ConceptCard v-if="conceptPromptOpened" popup />
+  <!-- [2026-09-25] Agent Studio KHÔNG còn mount ở đây: nó là trang riêng /agent-studio
+       (AgentStudioApp.vue + agent-studio.js). Nút «Agent thiết kế» trên activity bar điều
+       hướng sang đó — xem runToolbarAction(). -->
 </template>
