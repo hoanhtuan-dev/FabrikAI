@@ -37,7 +37,19 @@ function goPrompt(q) {
   window.location.assign(q ? '/studio?prompt=' + encodeURIComponent(q) : '/studio');
 }
 
+// [Phase 5] Rảnh tay thì TẢI TRƯỚC bundle Studio: người dùng gõ prompt xong sang /studio
+// là mở gần như tức thì. URL bundle do blade tính sẵn (Vite::asset) — không đọc manifest phía client.
+function prefetchStudio() {
+  const url = window.__STUDIO_MAIN_URL__;
+  if (!url || document.querySelector('link[data-prefetch-studio]')) return;
+  const l = document.createElement('link');
+  l.rel = 'modulepreload'; l.href = url; l.dataset.prefetchStudio = '1';
+  document.head.appendChild(l);
+}
+
 onMounted(async () => {
+  if ('requestIdleCallback' in window) window.requestIdleCallback(prefetchStudio, { timeout: 4000 });
+  else setTimeout(prefetchStudio, 2000);
   if (!user) return;
   loadingRecents.value = true;
   try {

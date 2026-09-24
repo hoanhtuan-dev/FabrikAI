@@ -8,6 +8,7 @@
 import { computed, watch } from 'vue';
 import StudioIcon from './StudioIcon.vue';
 import { usePopmenu } from '../composables/usePopmenu.js';
+import { haptic } from '../composables/useHaptics.js';
 
 const { state, closePopmenu } = usePopmenu();
 
@@ -26,6 +27,7 @@ const pos = computed(() => {
 });
 
 function pick(item) {
+  haptic(8);
   closePopmenu();
   if (item.onSelect) { item.onSelect(item); return; }
   if (item.url) { window.location.assign(item.url); }

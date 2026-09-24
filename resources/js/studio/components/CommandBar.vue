@@ -13,6 +13,7 @@
 import { ref } from 'vue';
 import StudioIcon from './StudioIcon.vue';
 import { usePopmenu } from '../composables/usePopmenu.js';
+import { haptic } from '../composables/useHaptics.js';
 import { spacesForViewport } from '../spaces.js';
 
 const props = defineProps({
@@ -27,6 +28,7 @@ const { openPopmenu } = usePopmenu();
 const text = ref('');
 
 function openSpaces(e) {
+  haptic(10);
   const rect = e.currentTarget.getBoundingClientRect();
   openPopmenu({
     anchor: rect,
@@ -38,6 +40,7 @@ function openSpaces(e) {
 }
 
 function go() {
+  haptic(12);
   emit('go', text.value.trim());
   text.value = '';
 }

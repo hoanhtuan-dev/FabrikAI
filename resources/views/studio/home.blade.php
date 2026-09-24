@@ -29,7 +29,12 @@
             ] : null,
         ];
     @endphp
-    <script>window.__STUDIO_BOOT__ = @json($boot);</script>
+    <script>
+        window.__STUDIO_BOOT__ = @json($boot);
+        // URL bundle Studio (đã hash theo build) — Trang chủ modulepreload trước khi rảnh tay
+        // để chuyển sang /studio gần như tức thì (Phase 5).
+        window.__STUDIO_MAIN_URL__ = @json(Vite::asset('resources/js/studio/main.js'));
+    </script>
 </head>
 <body class="min-h-dvh bg-ink-900 text-cream-100 antialiased">
     <div id="home-root" class="min-h-dvh"></div>

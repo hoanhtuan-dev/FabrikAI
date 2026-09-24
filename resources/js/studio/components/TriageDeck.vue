@@ -12,6 +12,7 @@
 import { computed, ref, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
+import { haptic } from '../composables/useHaptics.js';
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -55,6 +56,7 @@ async function decide(keep) {
   const g = current.value;
   if (!g) return;
   dx.value = 0;
+  haptic(keep ? 10 : 22);
   if (keep) { kept.value++; }
   else { dropped.value++; await store.deleteGen(g); }
   idx.value++;
