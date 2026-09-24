@@ -136,7 +136,7 @@ const primaryLabel = computed(() => {
 
     <!-- ══ THANH TRÊN (Material top app bar) — một thanh duy nhất cho nhận diện + điều khiển ══ -->
     <header class="elev-bar relative z-30 flex shrink-0 items-center gap-1.5 bg-ink-900 px-2 py-1.5 sm:gap-2 sm:px-4 sm:py-2">
-      <a href="/" class="icon-btn motion-ui h-8 w-8 shrink-0" aria-label="Về Studio" title="Về Studio (xưởng thiết kế)">
+      <a href="/studio" class="icon-btn motion-ui h-8 w-8 shrink-0" aria-label="Về Studio" title="Về Studio (xưởng thiết kế)">
         <StudioIcon name="arrowLeft" size="h-4 w-4" />
       </a>
 
@@ -345,7 +345,7 @@ const primaryLabel = computed(() => {
                 <a href="/bang-gia" class="btn-brand state-layer flex items-center gap-2 !px-5 !py-2.5 text-sm" title="Xem bảng giá và các gói có Agent Studio">
                   <StudioIcon name="coins" size="h-4 w-4" /> Xem gói &amp; nâng cấp
                 </a>
-                <a href="/" class="btn-ghost btn-sm state-layer">Về Studio</a>
+                <a href="/studio" class="btn-ghost btn-sm state-layer">Về Studio</a>
               </div>
             </div>
 

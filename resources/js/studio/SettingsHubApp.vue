@@ -91,7 +91,7 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
     <!-- ═════════ Thanh tiêu đề DUY NHẤT của mọi khu ═════════ -->
     <header class="sticky top-0 z-40 border-b border-ink-700 bg-ink-900/95 backdrop-blur">
       <div class="mx-auto flex w-full max-w-[1400px] flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5 lg:px-6">
-        <a href="/" class="tool-btn shrink-0" title="Về xưởng thiết kế">
+        <a href="/studio" class="tool-btn shrink-0" title="Về xưởng thiết kế">
           <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" />
           <span class="hidden sm:inline">Studio</span>
         </a>

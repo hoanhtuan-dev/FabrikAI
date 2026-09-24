@@ -85,7 +85,9 @@ Route::post('/api/cron/tick', [App\Http\Controllers\CronController::class, 'tick
 Route::post('/api/webhooks/fal', [App\Http\Controllers\FalWebhookController::class, 'handle'])->name('webhooks.fal');
 
 // ── SPA pages (Blade shells) ──
-Route::get('/', [StudioController::class, 'appIndex'])->name('home');
+Route::get('/', [StudioController::class, 'homePage'])->name('home');
+// Studio canvas (xưởng) — trước ở '/', dời sang '/studio' khi Trang chủ prompt-first ra đời.
+Route::get('/studio', [StudioController::class, 'appIndex'])->name('studio');
 // [Quyết định 2026-09-17] /settings là CÀI ĐẶT TOÀN CỤC (API key · model registry) ⇒ cấp OWNER.
 // Trước đây shell này công khai: khách tải được vỏ trang cấu hình (API của nó vốn đã ở nhóm ADMIN).
 Route::middleware(['auth', 'admin', 'nostore'])->get('/settings', [StudioController::class, 'settingsPage'])->name('settings.page');

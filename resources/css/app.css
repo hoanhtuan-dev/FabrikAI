@@ -168,61 +168,61 @@
     /* @theme:sync:start */
     /* ── theme gốc · chế độ TỐI · 50 token · sinh bởi "php artisan theme:sync" ── */
     /* BỀ MẶT (nền trang → panel → card → ba mức viền) */
-    --color-ink-950: #15191e;
-    --color-ink-900: #191e24;
-    --color-ink-800: #1d232a;
-    --color-ink-700: #292f37;
-    --color-ink-600: #3d444b;
-    --color-ink-500: #5e666d;
+    --color-ink-950: #0b0b0e;
+    --color-ink-900: #131318;
+    --color-ink-800: #1a1a21;
+    --color-ink-700: #26262d;
+    --color-ink-600: #3b3b41;
+    --color-ink-500: #5e5d61;
 
     /* BỐN BẬC NỘI DUNG (chữ chính → ghi chú phụ; mọi bậc đạt WCAG AA) */
-    --color-cream-50: #f3fbff;
-    --color-cream-100: #ecf9ff;
-    --color-cream-200: #c4cfd6;
-    --color-cream-300: #a4afb5;
-    --color-cream-400: #909aa1;
+    --color-cream-50: #f8f7f3;
+    --color-cream-100: #f5f3ec;
+    --color-cream-200: #c4c3bf;
+    --color-cream-300: #a5a4a2;
+    --color-cream-400: #909090;
 
     /* DẢI NHẤN (50–300 là bậc CHỮ, 400–600 là nút/viền, 700–950 là nền tint) */
-    --color-brand-50: #f0f3ff;
-    --color-brand-100: #d7deff;
-    --color-brand-200: #bcc6ff;
-    --color-brand-300: #9ba7ff;
-    --color-brand-400: #8590ff;
-    --color-brand-500: #7178ff;
-    --color-brand-600: #605dff;
-    --color-brand-700: #3f4599;
-    --color-brand-800: #333b75;
-    --color-brand-900: #293154;
-    --color-brand-950: #222a3d;
+    --color-brand-50: #fef1ed;
+    --color-brand-100: #fcd8ce;
+    --color-brand-200: #f8bbac;
+    --color-brand-300: #f09780;
+    --color-brand-400: #e97d62;
+    --color-brand-500: #e16041;
+    --color-brand-600: #d84016;
+    --color-brand-700: #7e3427;
+    --color-brand-800: #5e2d27;
+    --color-brand-900: #412625;
+    --color-brand-950: #2b2023;
 
     /* HAI DẢI PHỤ (badge: clay ← secondary · gold ← accent) */
-    --color-clay-500: #f43098;
-    --color-clay-600: #bb2274;
-    --color-gold-400: #5fdcc7;
-    --color-gold-500: #00d3bb;
+    --color-clay-500: #8b7cff;
+    --color-clay-600: #695ec4;
+    --color-gold-400: #e8c172;
+    --color-gold-500: #e3b34b;
 
     /* MÀU VAI TRÒ CỦA THEME (mỗi màu kèm màu chữ "-content") */
-    --color-primary: #605dff;
+    --color-primary: #d84016;
     --color-primary-content: #ffffff;
-    --color-secondary: #f43098;
-    --color-secondary-content: #000000;
-    --color-accent: #00d3bb;
-    --color-accent-content: #084d49;
-    --color-neutral: #09090b;
-    --color-neutral-content: #e4e4e7;
-    --color-info: #00bafe;
-    --color-info-content: #042e49;
-    --color-success: #00d390;
-    --color-success-content: #004c39;
-    --color-warning: #fcb700;
-    --color-warning-content: #793205;
-    --color-error: #ff627d;
-    --color-error-content: #4d0218;
+    --color-secondary: #8b7cff;
+    --color-secondary-content: #16132b;
+    --color-accent: #e3b34b;
+    --color-accent-content: #2a1d05;
+    --color-neutral: #232329;
+    --color-neutral-content: #f5f3ec;
+    --color-info: #38bdf8;
+    --color-info-content: #082f44;
+    --color-success: #3ecf8e;
+    --color-success-content: #052e1f;
+    --color-warning: #ffb224;
+    --color-warning-content: #42290a;
+    --color-error: #ff5c5c;
+    --color-error-content: #4a0d12;
 
     /* HÌNH HỌC (từ theme: bán kính · kích thước · độ dày viền · độ sâu) */
     --radius-selector: 0.5rem;
-    --radius-field: 0.25rem;
-    --radius-box: 0.5rem;
+    --radius-field: 0.375rem;
+    --radius-box: 0.75rem;
     --size-selector: 0.25rem;
     --size-field: 0.25rem;
     --border: 1px;
@@ -396,55 +396,55 @@
     /* @theme:sync:start */
     /* ── bản đối ứng · chế độ SÁNG · 42 token · sinh bởi "php artisan theme:sync" ── */
     /* BỀ MẶT (nền trang → panel → card → ba mức viền) */
-    --color-ink-950: #e5eef8;
-    --color-ink-900: #eff8ff;
-    --color-ink-800: #f6feff;
-    --color-ink-700: #e5edee;
-    --color-ink-600: #cad3d4;
-    --color-ink-500: #a2abae;
+    --color-ink-950: #ececf6;
+    --color-ink-900: #f5f6ff;
+    --color-ink-800: #fcfcff;
+    --color-ink-700: #ebebed;
+    --color-ink-600: #d1d1d2;
+    --color-ink-500: #aaa9a9;
 
     /* BỐN BẬC NỘI DUNG (chữ chính → ghi chú phụ; mọi bậc đạt WCAG AA) */
-    --color-cream-50: #0b1013;
-    --color-cream-100: #1c262a;
-    --color-cream-200: #394347;
-    --color-cream-300: #50595d;
-    --color-cream-400: #60696d;
+    --color-cream-50: #100f0c;
+    --color-cream-100: #25241f;
+    --color-cream-200: #42413d;
+    --color-cream-300: #585854;
+    --color-cream-400: #686765;
 
     /* DẢI NHẤN (50–300 là bậc CHỮ, 400–600 là nút/viền, 700–950 là nền tint) */
-    --color-brand-50: #f0f3ff;
-    --color-brand-100: #04041b;
-    --color-brand-200: #131242;
-    --color-brand-300: #2a287a;
-    --color-brand-400: #3b39a4;
-    --color-brand-500: #4d4bd1;
-    --color-brand-600: #605dff;
-    --color-brand-700: #9cabff;
-    --color-brand-800: #b6c5ff;
-    --color-brand-900: #d0ddff;
-    --color-brand-950: #e5efff;
+    --color-brand-50: #fef1ed;
+    --color-brand-100: #150200;
+    --color-brand-200: #370901;
+    --color-brand-300: #661905;
+    --color-brand-400: #8b260a;
+    --color-brand-500: #b03310;
+    --color-brand-600: #d84016;
+    --color-brand-700: #f09b87;
+    --color-brand-800: #f6baac;
+    --color-brand-900: #fad6ce;
+    --color-brand-950: #fcebe9;
 
     /* HAI DẢI PHỤ (badge: clay ← secondary · gold ← accent) */
-    --color-clay-500: #f43098;
-    --color-clay-600: #bb2274;
-    --color-gold-400: #00786a;
-    --color-gold-500: #00d3bb;
+    --color-clay-500: #8b7cff;
+    --color-clay-600: #695ec4;
+    --color-gold-400: #836627;
+    --color-gold-500: #e3b34b;
 
     /* MÀU VAI TRÒ CỦA THEME (mỗi màu kèm màu chữ "-content") */
-    --color-primary: #605dff;
+    --color-primary: #d84016;
     --color-primary-content: #ffffff;
-    --color-secondary: #f43098;
-    --color-secondary-content: #000000;
-    --color-accent: #00d3bb;
-    --color-accent-content: #084d49;
-    --color-neutral: #09090b;
-    --color-neutral-content: #e4e4e7;
-    --color-info: #00729e;
+    --color-secondary: #8b7cff;
+    --color-secondary-content: #16132b;
+    --color-accent: #e3b34b;
+    --color-accent-content: #2a1d05;
+    --color-neutral: #232329;
+    --color-neutral-content: #f5f3ec;
+    --color-info: #1e7298;
     --color-info-content: #ffffff;
-    --color-success: #007a52;
+    --color-success: #217951;
     --color-success-content: #ffffff;
-    --color-warning: #8b6400;
+    --color-warning: #8e620f;
     --color-warning-content: #ffffff;
-    --color-error: #b54357;
+    --color-error: #b94141;
     --color-error-content: #ffffff;
     /* @theme:sync:end */
 
@@ -1504,3 +1504,21 @@ html[data-theme='light'] {
    (b) toàn bộ khối viết theo lối "nền sáng" (bg-white/70, text-ink-900, border-cream-200) nên KHÔNG
    theo theme Sáng/Tối — để lại chỉ tạo nguồn màu thứ hai cho người sau chép nhầm.
    Bản cũ nằm trong lịch sử git; storefront thật dùng layouts/app.blade.php. */
+/* ══ SHELL 2026 (Phase 0 · 2026-09-24) — bề mặt kính + gradient "magic" DÙNG CHUNG ═══════════
+   CommandBar/PopMenu/BottomSheet/HomeApp dùng các lớp này thay vì tự khai gradient trong
+   <style scoped> — DesignSystemTest §2 ("mọi card một bề mặt") cấm gradient nhận diện rải rác.
+   Một màn hình chỉ nên có MỘT điểm magic: nút Tạo, hoặc viền aurora khi AI đang chạy. */
+.btn-magic {
+    background: linear-gradient(135deg, var(--color-brand-600), var(--color-clay-500));
+    color: var(--color-primary-content);
+}
+@property --aurora-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.aurora-ring { position: relative; }
+.aurora-ring::before {
+    content: ""; position: absolute; inset: -1.5px; border-radius: inherit; padding: 1.5px;
+    background: conic-gradient(from var(--aurora-angle, 0deg), var(--color-brand-500), var(--color-clay-500), var(--color-brand-500));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    animation: aurora-spin 2.4s linear infinite; pointer-events: none;
+}
+@keyframes aurora-spin { to { --aurora-angle: 360deg; } }

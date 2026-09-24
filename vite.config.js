@@ -23,6 +23,9 @@ export default defineConfig({
                 // /studio thành trang riêng, nên có entry riêng: trang này KHÔNG cần cả xưởng thiết
                 // kế (canvas · dock · layers) mà main.js chở theo.
                 'resources/js/studio/agent-studio.js',
+                // [Shell 2026 · Phase 1] TRANG CHỦ prompt-first '/' — entry nhẹ, không kéo theo
+                // canvas/store của xưởng (main.js).
+                'resources/js/studio/home.js',
             ],
             refresh: true,
             publicDirectory: 'public_html',

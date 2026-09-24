@@ -58,7 +58,7 @@
 <body>
     <div class="screen-only">
         <button type="button" class="btn" onclick="window.print()">In / Lưu thành PDF</button>
-        <a class="btn ghost" href="/">Về Studio</a>
+        <a class="btn ghost" href="/studio">Về Studio</a>
         <span class="sub">Trong hộp thoại in, chọn đích là “Lưu thành PDF”.</span>
     </div>
 

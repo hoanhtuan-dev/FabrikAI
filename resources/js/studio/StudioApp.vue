@@ -474,6 +474,10 @@ onMounted(async () => {
         await store.load();
       const params = new URLSearchParams(window.location.search);
       if (params.get('view') === 'library') store.studioView = 'library';
+      // [Shell 2026 · Phase 1] Trang chủ prompt-first chuyển sang kèm ?prompt= → mở sẵn popup
+      // prompt với nội dung đó, người dùng chỉ việc bấm Tạo.
+      const promptParam = params.get('prompt');
+      if (promptParam) { store.sceneSetup.prompt = promptParam; store.promptOpen = true; }
       // [P0.4] Mở đúng bộ sưu tập đang làm từ URL (?bo=5) hoặc localStorage — không bắt đầu từ trống.
       const bo = params.get('bo');
       if (bo) {

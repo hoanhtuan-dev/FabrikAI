@@ -235,7 +235,10 @@ final class ThemeRamp
             return $primary;
         }
 
-        return ThemeColor::shadeUntil($primary, $pole === '#ffffff' ? '#000000' : '#ffffff', ['#ffffff'], ThemeColor::AA);
+        // [Sửa 2026-09-24] Hướng "tối đi" phải LUÔN là #000000 ở cả hai chế độ. Bản cũ đảo về
+        // '#ffffff' khi $pole đen (chế độ Sáng): primary sáng (#ff4d1c) bị pha trắng mãi không đạt
+        // AA ⇒ brand-600 thoái hoá thành #ffffff — nút chính của theme Sáng thành cục trắng.
+        return ThemeColor::shadeUntil($primary, '#000000', ['#ffffff'], ThemeColor::AA);
     }
 
     /**

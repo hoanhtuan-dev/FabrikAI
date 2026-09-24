@@ -94,6 +94,16 @@ class StudioController extends Controller
     /**
      * FabrikAI SPA page shells (độc lập, không còn tiền tố /studio).
      */
+    /**
+     * [Shell 2026 · Phase 1] TRANG CHỦ prompt-first: '/' nay là sảnh "Hôm nay bạn muốn tạo gì?"
+     * (trước mở thẳng Studio). Studio canvas dời sang '/studio'. Shell công khai như cũ —
+     * khách thấy màn chào + lối đăng nhập; API vẫn yêu cầu auth như trước.
+     */
+    public function homePage()
+    {
+        return response()->view('studio.home')->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
     public function appIndex()
     {
         return response()->view('studio.index')->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');

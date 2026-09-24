@@ -41,7 +41,7 @@ class StudioFlowTest extends TestCase
     public function test_studio_spa_shell_is_public_but_api_requires_auth(): void
     {
         // SPA shell công khai (Vue tự gọi /api/boot); API vẫn yêu cầu đăng nhập.
-        $this->get('/')->assertOk()->assertSee('studio-root');
+        $this->get('/studio')->assertOk()->assertSee('studio-root');
         // FabrikAI render JSON cho mọi request /api/* (bootstrap/app.php shouldRenderJsonWhen)
         // nên guest nhận 401 thay vì redirect về trang đăng nhập.
         $this->getJson('/api/latest')->assertStatus(401);
@@ -58,7 +58,7 @@ class StudioFlowTest extends TestCase
      */
     public function test_studio_is_open_to_active_users_but_admin_area_is_not(): void
     {
-        $this->get('/')->assertOk()->assertSee('studio-root');
+        $this->get('/studio')->assertOk()->assertSee('studio-root');
 
         $customer = User::where('email', 'user@fabrikai.shop')->first();
 
@@ -73,13 +73,14 @@ class StudioFlowTest extends TestCase
         $blocked->forceFill(['is_active' => false])->save();
         $this->actingAs($blocked->fresh())->getJson('/api/latest')->assertForbidden();
 
-        $this->actingAs($this->admin())->get('/')->assertOk();
+        $this->actingAs($this->admin())->get('/studio')->assertOk();
     }
 
     public function test_root_serves_the_spa_shell(): void
     {
-        // SPA gốc; dữ liệu thư viện vẫn admin-only qua /api/library/*.
-        $this->actingAs($this->admin())->get('/')->assertOk()->assertSee('studio-root');
+        // [Shell 2026] '/' là Trang chủ prompt-first; shell xưởng SPA nay ở '/studio'.
+        $this->actingAs($this->admin())->get('/studio')->assertOk()->assertSee('studio-root');
+        $this->actingAs($this->admin())->get('/')->assertOk()->assertSee('home-root');
     }
 
     public function test_studio_generate_image_and_video(): void

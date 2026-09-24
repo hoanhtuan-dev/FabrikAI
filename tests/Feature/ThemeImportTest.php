@@ -172,18 +172,19 @@ class ThemeImportTest extends TestCase
     {
         $dark = ThemeLibrary::tokens('dark');
 
-        // Chế độ TỐI là CHÍNH theme gốc: mọi màu vai trò phải đúng giá trị của liên kết.
-        $this->assertSame('#1d232a', $dark['--color-ink-800']);
-        $this->assertSame('#605dff', $dark['--color-primary']);
-        $this->assertSame('#f43098', $dark['--color-secondary']);
-        $this->assertSame('#00d3bb', $dark['--color-accent']);
-        $this->assertSame('#09090b', $dark['--color-neutral']);
-        $this->assertSame('#ff627d', $dark['--color-error']);
+        // Chế độ TỐI là CHÍNH theme gốc: mọi màu vai trò phải đúng giá trị của payload.
+        // [Brand 2026-09-24 — "Atelier × AI Lab"] bảng mới thay theme daisyUI "dark" cũ.
+        $this->assertSame('#1a1a21', $dark['--color-ink-800']);
+        $this->assertSame('#d84016', $dark['--color-primary']);
+        $this->assertSame('#8b7cff', $dark['--color-secondary']);
+        $this->assertSame('#e3b34b', $dark['--color-accent']);
+        $this->assertSame('#232329', $dark['--color-neutral']);
+        $this->assertSame('#ff5c5c', $dark['--color-error']);
 
-        // …trừ ĐÚNG hai màu CHỮ mà daisyUI để dưới ngưỡng AA (đo được 4,13:1 và 3,04:1).
+        // Nút chính cam hiệu lệnh + chữ trắng: cặp này được chọn để đạt AA ngay từ payload
+        // (không còn cần phép chỉnh như #edf1fe/#605dff của theme cũ).
         $this->assertSame('#ffffff', $dark['--color-primary-content']);
-        $this->assertLessThan(ThemeColor::AA, ThemeColor::contrast('#edf1fe', '#605dff'), 'Giá trị gốc phải thật sự chưa đạt, nếu không phép chỉnh là vô nghĩa.');
-        $this->assertGreaterThanOrEqual(ThemeColor::AA, ThemeColor::contrast($dark['--color-primary-content'], '#605dff'));
+        $this->assertGreaterThanOrEqual(ThemeColor::AA, ThemeColor::contrast($dark['--color-primary-content'], '#d84016'));
 
         // app.css đã commit phải khớp từng ký tự với theme gốc — đây là chốt canh "sinh rồi quên commit".
         $this->assertTrue(ThemeCss::inSync(),
@@ -382,13 +383,13 @@ class ThemeImportTest extends TestCase
         // Quay về bảng màu gốc bằng nút "Dùng bảng màu gốc" (không phải bằng cách xoá theme).
         $this->actingAs($this->admin())->post(route('theme.reset', 'dark'))->assertRedirect();
         $this->assertNull(ThemeLibrary::active('dark'));
-        $this->assertSame('#605dff', ThemeLibrary::tokens('dark')['--color-primary']);
+        $this->assertSame('#d84016', ThemeLibrary::tokens('dark')['--color-primary']);
         $this->assertSame(2, Theme::count(), 'Quay về gốc KHÔNG được xoá theme khỏi thư viện.');
 
         // Xoá theme đang bật ⇒ chế độ đó tự quay về gốc, không để lại một con trỏ trỏ vào hư không.
         $this->actingAs($this->admin())->delete(route('theme.destroy', $light))->assertRedirect();
         $this->assertNull(ThemeLibrary::active('light'));
-        $this->assertSame('#605dff', ThemeLibrary::tokens('light')['--color-primary']);
+        $this->assertSame('#d84016', ThemeLibrary::tokens('light')['--color-primary']);
         $this->assertSame(1, Theme::count());
 
         // Hoàn tác cả lô ⇒ xoá nốt theme còn lại của lần import đó.
