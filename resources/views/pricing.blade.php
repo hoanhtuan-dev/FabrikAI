@@ -128,7 +128,14 @@
 
         <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             @foreach($plans as $plan)
-                @php $badges = $recommended[$plan->slug] ?? []; @endphp
+                @php
+                    $badges = $recommended[$plan->slug] ?? [];
+                    // GÓI NỔI BẬT = gói TRẢ PHÍ RẺ NHẤT (máy chủ đã tính sẵn ở `$cheapestPaid`).
+                    // VÌ SAO KHÔNG dùng `is_default`: gói mặc định của hệ thống là gói MIỄN PHÍ — nếu lấy nó
+                    // làm "gói hot" thì thẻ nổi bật lại là thẻ không bán gì. Người mới cần thấy gói trả phí
+                    // rẻ nhất (đó cũng là ý của prototype: một thẻ nổi bật, có cờ ở đầu).
+                    $isHot = $cheapestPaid && $cheapestPaid->id === $plan->id;
+                @endphp
                 {{-- id ổn định theo slug: vừa để chia sẻ link tới đúng gói, vừa để test khoanh vùng được
                      đúng thẻ gói (không bắt nhầm tên gói xuất hiện ở khối persona/bảng so sánh). --}}
                 {{-- [Đợt 60 · 2026-09-26] GÓI NỔI BẬT — theo prototype `#/pricing` ("gói hot" có viền nhận diện
@@ -137,11 +144,15 @@
                      từng gói để biết gói nào dành cho mình.
                      Dùng `border-brand-500` — đúng từ vựng viền của §5 (đang-chọn = brand-500), không
                      thêm gradient/khung riêng cho card (§1: bề mặt card do lớp .card quyết định). --}}
-                <article id="goi-{{ $plan->slug }}" class="card flex flex-col p-5 {{ $plan->isFree() ? '' : ($plan->is_default ? 'border border-brand-500 shadow-lg shadow-brand-600/10' : 'ring-1 ring-inset ring-brand-500/20') }}">
+                <article id="goi-{{ $plan->slug }}" data-hot-plan="{{ $isHot ? '1' : '0' }}" class="card flex flex-col p-5 {{ $plan->isFree() ? '' : ($isHot ? 'border border-brand-500 shadow-lg shadow-brand-600/10' : 'ring-1 ring-inset ring-brand-500/20') }}">
                     <div class="flex flex-wrap items-center gap-2">
                         <h3 class="font-display text-lg font-semibold text-cream-50">{{ $plan->name }}</h3>
                         @if($plan->isFree())
                             <span class="rounded-full bg-info/15 px-2 py-0.5 text-label font-semibold text-info">Bắt đầu</span>
+                        @elseif($isHot)
+                            {{-- Nhãn nói ĐÂY LÀ GỢI Ý của chúng tôi (đúng sự thật), không nói "phổ biến nhất"
+                                 (một lời tuyên bố về số liệu mà trang này không có). --}}
+                            <span class="rounded-full bg-brand-600 px-2 py-0.5 text-label font-semibold text-primary-content" data-hot-badge>Nên bắt đầu</span>
                         @elseif($plan->is_default)
                             <span class="rounded-full bg-warn/15 px-2 py-0.5 text-label font-semibold text-warn">Mặc định</span>
                         @endif
