@@ -7746,3 +7746,16 @@ Màn **chi tiết bộ sưu tập** (`#/collection/:id`) · **bảng giá dạng
 xứng** ở Bộ sưu tập · Agent dạng feed (cố ý KHÔNG hạ cấp về bản mock) · **token màu/typography của
 prototype** (việc riêng, phải làm thành một đợt có kế hoạch — hệ token hiện tại bị ~1.400 test khoá).
 
+
+### J. Deploy lên production — 2026-09-26 (đợt 60)
+
+| Bước | Kết quả |
+|---|---|
+| Commit | `b64dfb1` · Push: `c9ebf7f..b64dfb1 main -> main` |
+| Sao lưu CSDL TRƯỚC khi pull | `~/db-backups/fabrikai-20260924-175845.sql.gz` — **1,1 MB · 52 bảng · kết thúc hợp lệ** |
+| Pull | HEAD máy chủ **`b64dfb1`** · `package:discover` · `config:cache` · `route:cache` · `view:cache` · `queue:restart` |
+| **Gói JS khớp TỪNG BYTE** | `sha256(home-C8iN_mhM.js)` local = máy chủ = `19f592ef…ea85`; chuỗi `data-onboarding` **có** trong gói đang phục vụ |
+| HTTP | `/` 200 · `/studio` 200 · `/cai-dat` 302 (khách ⇒ đăng nhập, đúng) · `/prototype/` 200 (nguồn đối chiếu vẫn mở được) |
+| **Chrome thật trên production** | `/` 390×844 **và** 1440×900: màn **chào 3 slide** hiện, 3 chấm, nút «Tiếp», lối đăng nhập — **0 lỗi console**. `/studio` 390×844 (khách): **nút ← về Trang chủ có mặt** (data-phone-home) · CTA «Tạo biến thể AI · 1 credit» · 4 lối tắt · banner xác thực · **0 DOM canvas** · không tràn ngang · **0 lỗi console** |
+| Ghi chú | `artisan about` trên host này **không chạy được** (`proc_open` bị chặn — nợ đã biết, có trong tài liệu deploy). Các lệnh cache thì chạy bình thường; bằng chứng nằm ở gói JS khớp từng byte + Chrome thật. |
+
