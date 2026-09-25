@@ -7888,3 +7888,15 @@ không dùng đường cũ của khu Cài đặt · ba họ chữ có token + đ
 
 **Full suite: 1401 → 1407 XANH** (10.937 assert).
 
+
+### F. Deploy lên production — 2026-09-26 (đợt 62)
+
+| Bước | Kết quả |
+|---|---|
+| Sao lưu CSDL trước khi pull | `~/db-backups/fabrikai-20260925-042244.sql.gz` (1,1 MB · 52 bảng · kết thúc hợp lệ) |
+| Commit · Push | `f68a5ac` · `823b6b4..f68a5ac main -> main` |
+| HEAD máy chủ | **`f68a5ac`** — `config:cache` · `route:cache` · `view:cache` đều ok |
+| **Font trên production** | `/` trả 3 `<link rel=preload as=font>` (Inter · Fraunces · Space Grotesk) + `fonts-CUVRvF6C.css`; tải thật: `inter-400…woff2` **200 · 23.664 B** · `fraunces-400…woff2` **200 · 17.968 B** · `space-grotesk-400…woff2` **200 · 13.388 B** |
+| **Chrome thật trên production (390×844 ×2 DPR, 3 màn)** | `/` · `/studio` · `/bang-gia`: `document.fonts` → **cả ba họ `loaded`**, request woff2 toàn **200**; `h1` = **Fraunces**, `.micro-label` = **Space Grotesk**, `body` = **Inter** · `/studio`: 4 chip, nút mở sheet ghi «Việc khác — sửa ảnh · đổi khung · xoá», **không còn hàng «Lối khác»**, không tràn ngang · **0 lỗi console** ở cả ba màn |
+| Bộ test PHP | **1407 xanh** (10.937 assert) |
+
