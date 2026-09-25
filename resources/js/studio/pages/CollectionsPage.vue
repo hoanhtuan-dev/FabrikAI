@@ -1140,7 +1140,7 @@ onBeforeUnmount(() => {
           <button type="button" class="icon-btn !h-10 !w-10 shrink-0" title="Về danh sách bộ sưu tập" aria-label="Về danh sách bộ sưu tập" data-collection-detail-back @click="closeDetail">
             <StudioIcon name="arrowLeft" size="h-5 w-5" />
           </button>
-          <p class="min-w-0 flex-1 truncate text-center text-micro font-semibold uppercase tracking-[0.16em] text-cream-400">
+          <p class="micro-label min-w-0 flex-1 truncate text-center text-cream-400">
             {{ detailProject.generations_count || detailShots.length }} ảnh · {{ detailStatusLabel }}
           </p>
           <button type="button" class="icon-btn !h-10 !w-10 shrink-0" title="Đóng" aria-label="Đóng" @click="closeDetail">

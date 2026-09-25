@@ -267,7 +267,7 @@ function editCurrent() {
       <!-- Nhãn ngữ cảnh: «BỘ SƯU TẬP · ẢNH» như prototype («THU ĐÔNG 26 · LOOK 04»), dựng từ dữ liệu
            THẬT đang có trong phiên (bộ sưu tập đang áp + ảnh đang làm việc). Không có gì thì nói
            «Studio» — không bịa tên. -->
-      <span class="min-w-0 flex-1 truncate text-center text-micro uppercase tracking-[0.16em] text-cream-400" data-phone-context>{{ contextLabel }}</span>
+      <span class="micro-label min-w-0 flex-1 truncate text-center text-cream-400" data-phone-context>{{ contextLabel }}</span>
       <div class="flex shrink-0 items-center gap-2">
         <button
           v-if="batchReady"
@@ -355,9 +355,11 @@ function editCurrent() {
         </a>
       </div>
 
-      <!-- Cửa ĐẦY ĐỦ: 8 hành động (biến thể · sửa ảnh · nâng cấp · đổi khung · tải · chia sẻ · tech pack
-           · xoá) theo mô hình lồng cấp Review → Options → Action (§15.7). Hàng chip ở trên chỉ là lối
-           tắt tới ĐÚNG những hành động này — không phải bộ hành động thứ hai. -->
+      <!-- ══ VIỆC KHÁC — ba việc KHÔNG có mặt trên màn này: sửa ảnh · đổi khung · xoá ══
+           [Đợt 62 · dọn trùng lặp] Nút này trước đây mở danh sách ĐỦ 8 việc, trong đó **5 việc đã nằm
+           ngay trên màn** (CTA «Tạo biến thể AI» + 4 chip) ⇒ cùng một việc có HAI lối vào trên cùng một
+           màn hình. Nay mỗi việc chỉ có MỘT lối vào: việc đáng một cú chạm thì ở trên màn, phần còn lại
+           ở đây. Màn hẹp thì chỗ là thứ đắt nhất. -->
       <button
         type="button"
         class="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-ink-600 bg-ink-900 text-label font-semibold text-cream-200 transition hover:border-brand-400 active:bg-ink-800 disabled:opacity-45"
@@ -365,7 +367,7 @@ function editCurrent() {
         data-phone-actions-door
         @click="openActions()"
       >
-        <StudioIcon name="sliders" size="h-4 w-4" class="text-brand-300" /> Tác vụ ảnh — tất cả
+        <StudioIcon name="sliders" size="h-4 w-4" class="text-brand-300" /> Việc khác — sửa ảnh · đổi khung · xoá
       </button>
 
       <!-- Bốn lối vào ngang cấp: công cụ · kết quả · trợ lý · bộ sưu tập.
@@ -441,7 +443,7 @@ function editCurrent() {
       <section v-if="layers.length" class="mt-5">
         <div class="flex items-baseline justify-between">
           <h2 class="text-label font-semibold text-cream-300">Ảnh trong phiên ({{ layers.length }})</h2>
-          <span class="text-micro font-semibold uppercase tracking-[0.14em] text-cream-400">Chạm mắt để ẩn/hiện</span>
+          <span class="micro-label text-cream-400">Chạm mắt để ẩn/hiện</span>
         </div>
         <ul class="mt-2 space-y-1.5" data-phone-layers>
           <li v-for="l in layers" :key="l.id" class="rounded-xl bg-ink-800 px-3 py-2" :class="l.visible === false ? 'opacity-60' : ''">

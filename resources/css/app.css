@@ -147,11 +147,19 @@
 
 @theme {
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
-    /* [2026-09-26 · thiết kế lại] MỘT họ chữ cho cả giao diện: bỏ serif ở tiêu đề.
-       Lý do: bản tối giản + Material chỉ cần một họ; tiêu đề serif cạnh nhãn sans làm giao diện có hai
-       giọng, và trên mobile chữ serif ở cỡ nhỏ xuống nét kém rõ. Mọi chỗ đang dùng `font-display` tự
-       đổi theo — không phải sửa file nào. */
-    --font-display: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    /* ══ BA HỌ CHỮ — ĐÚNG PROTOTYPE (đợt 62 · 2026-09-26) ══════════════════════════════════════
+       prototype/css/tokens.css khai ba biến: --f-ui · --f-display · --f-mono. Ta có đúng ba:
+         · --font-sans    = Inter        — chữ giao diện (mọi thứ đọc);
+         · --font-display = Fraunces     — TIÊU ĐỀ (serif, có bản nghiêng) — chất "fashion house";
+         · --font-mono    = Space Grotesk— NHÃN NHỎ IN HOA — chất "kỹ thuật/phòng lab".
+       [Đảo một quyết định trước đó] Bản 2026-09-26 từng bỏ serif và cho `--font-display` trỏ vào Inter,
+       với lý do "một họ cho bản tối giản, serif ở cỡ nhỏ xuống nét". Đảo lại vì hai lẽ ĐO ĐƯỢC:
+         (1) Fraunces vẫn được TẢI (4 weight + italic) mà KHÔNG dùng ở đâu ⇒ vừa nặng vừa vô nghĩa;
+         (2) lo ngại "cỡ nhỏ" không áp dụng: `font-display` chỉ đặt trên TIÊU ĐỀ (≥18px), không đặt cho
+             chữ thường hay nhãn — tài liệu §1.3 vốn đã ghi "Tiêu đề card: font-display (Fraunces)".
+       Mọi chỗ đang dùng `font-display` tự đổi theo — không phải sửa file nào. */
+    --font-display: 'Fraunces', Georgia, ui-serif, serif;
+    --font-mono: 'Space Grotesk', ui-monospace, SFMono-Regular, Menlo, monospace;
 
     /* ══ BẢNG MÀU — KHỐI SINH TỰ ĐỘNG, KHÔNG SỬA TAY ═══════════════════════════════════════
        [2026-09-25] Từ đây bảng màu KHÔNG còn được viết tay. Nó được sinh bởi
@@ -694,6 +702,31 @@ html[data-theme='light'] {
 
     .kicker {
         @apply text-xs font-semibold uppercase tracking-[0.2em] text-brand-300;
+    }
+    /* [Đợt 62] NHÃN NHỎ IN HOA — họ chữ MONO theo prototype (`.micro`/`.micro-s` trong
+       prototype/css/app.css dùng Space Grotesk, tracking .16em). Vì sao là một LỚP DÙNG CHUNG thay vì
+       viết `font-mono` rải rác: nhãn nhỏ phải giống nhau ở mọi màn (đó là "chữ ký kỹ thuật" của bộ
+       nhận diện); rải ra thì màn nào cũng một kiểu tracking, và lần sau đổi là phải sửa hàng chục chỗ.
+       Màu để nơi gọi quyết định (nền tối/sáng khác nhau) nên lớp này KHÔNG đặt màu. */
+    .micro-label {
+        font-family: var(--font-mono);
+        font-size: var(--text-micro);
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        line-height: 1.2;
+    }
+    /* Biến thể NHẤN (prototype `.micro-s`): cùng cỡ, màu nhấn — dùng cho nhãn mở đầu màn.
+       Khai lại thuộc tính thay vì `@apply micro-label`: Tailwind v4 KHÔNG cho @apply một lớp component
+       tự định nghĩa (báo "Cannot apply unknown utility class") — đã trúng đúng lỗi này khi build. */
+    .micro-label-accent {
+        font-family: var(--font-mono);
+        font-size: var(--text-micro);
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        line-height: 1.2;
+        color: var(--color-brand-300);
     }
 
     .link {

@@ -6,6 +6,8 @@
     <meta name="theme-color" content="{{ theme_color() }}">
     <meta name="color-scheme" content="dark light">
     @include('partials.theme')
+    {{-- Font tự-host của build (Inter · Fraunces · Space Grotesk) — xem App\Support\BuildFonts. --}}
+    @include('partials.fonts')
     <title>FabrikAI · {{ \App\Support\SettingsAreas::find($area)['label'] ?? 'Cài đặt' }}</title>
     @vite(['resources/css/app.css', 'resources/js/studio/hub.js'])
 </head>

@@ -29,9 +29,19 @@ export default defineConfig({
             ],
             refresh: true,
             publicDirectory: 'public_html',
+            /* [Đợt 62 · 2026-09-26] BA HỌ CHỮ THEO PROTOTYPE (prototype/css/tokens.css khai đúng ba
+               biến: --f-ui · --f-display · --f-mono):
+                 · Inter        — toàn bộ chữ giao diện;
+                 · Fraunces     — chữ TIÊU ĐỀ (display serif, có bản nghiêng cho nhấn);
+                 · Space Grotesk— NHÃN NHỎ IN HOA (kiểu "kỹ thuật/phòng lab" của prototype).
+               VÌ SAO PHẢI SỬA: bản trước khai `--font-display: 'Inter'` (bỏ serif) trong khi vẫn TẢI
+               Fraunces 4 weight + italic ⇒ vừa lệch prototype vừa tải thừa ~4 tệp font cho một họ chữ
+               không dùng ở đâu. Nay Fraunces được dùng thật, và Space Grotesk được tải thêm — tổng số
+               họ chữ vẫn là 3, đúng bằng prototype. */
             fonts: [
                 bunny('Inter', { weights: [400, 500, 600, 700] }),
                 bunny('Fraunces', { weights: [400, 500, 600, 700], variants: ['italic'] }),
+                bunny('Space Grotesk', { weights: [400, 500, 600] }),
             ],
         }),
         tailwindcss(),

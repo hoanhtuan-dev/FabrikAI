@@ -7,6 +7,8 @@
     <meta name="theme-color" content="{{ theme_color() }}">
     <meta name="color-scheme" content="dark light">
     @include('partials.theme')
+    {{-- Font tự-host của build (Inter · Fraunces · Space Grotesk) — xem App\Support\BuildFonts. --}}
+    @include('partials.fonts')
     {{-- T5: PWA đã GỠ HẲN (2026-09-17) — đã xoá `/sw.js` + `/manifest.json` + các icon chỉ phục vụ
          manifest. Trước đó service worker không bao giờ được đăng ký lại, nên PWA vốn là code chết.
          Việc gỡ SW cũ trong trình duyệt người dùng vẫn chạy ở `pageBoot.js` (cần thiết: xoá file trên

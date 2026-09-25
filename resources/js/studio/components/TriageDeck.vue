@@ -76,7 +76,7 @@ watch(() => props.open, (v) => { if (v) { idx.value = 0; kept.value = 0; dropped
   <Teleport to="body">
     <div v-if="open && queue.length" class="tri-root" role="dialog" aria-label="Sàng lọc kết quả">
       <div class="tri-head">
-        <span class="text-micro uppercase tracking-[0.16em] text-cream-400">Sàng lọc lượt tạo</span>
+        <span class="micro-label text-cream-400">Sàng lọc lượt tạo</span>
         <span class="text-label font-semibold text-cream-200">{{ Math.min(idx + 1, queue.length) }}/{{ queue.length }}</span>
       </div>
 

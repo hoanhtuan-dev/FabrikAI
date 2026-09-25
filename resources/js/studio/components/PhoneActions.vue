@@ -43,7 +43,12 @@ const nav = useNavStack();
 const { runVariant: doVariant, runUpscale: doUpscale, runReframe: doReframe, download: doDownload, share: doShare, remove: doRemove } = useImageActions();
 
 const level = computed(() => nav.state.stack[nav.state.stack.length - 1] || null);
-const TITLES = { options: 'Tác vụ ảnh', variant: 'Tạo biến thể', upscale: 'Nâng cấp ảnh', reframe: 'Đổi khung hình', delete: 'Xoá ảnh này?' };
+/**
+ * TIÊU ĐỀ TỪNG CẤP. Cấp 'options' nay tên là «Việc khác» — vì đây KHÔNG còn là danh sách đầy đủ:
+ * biến thể · nâng cấp · tải · chia sẻ · tech pack đã nằm NGAY TRÊN MÀN Studio (CTA + hàng chip), nên
+ * lặp lại chúng ở đây là hai lối vào cho cùng một việc trên cùng một màn hình (đợt 62 dọn phần đó).
+ */
+const TITLES = { options: 'Việc khác', variant: 'Tạo biến thể', upscale: 'Nâng cấp ảnh', reframe: 'Đổi khung hình', delete: 'Xoá ảnh này?' };
 const title = computed(() => TITLES[level.value] || '');
 const hasImage = computed(() => !!store.upscaleSrc);
 
@@ -110,19 +115,9 @@ async function runDelete() { close(); await doRemove(); }
   >
     <!-- CẤP 1 · OPTIONS -->
     <div v-if="level === 'options'" class="flex flex-col gap-1.5 pb-2">
-      <button type="button" class="opt" :disabled="!hasImage" @click="go('variant')">
-        <span class="opt-ic opt-ic--magic"><StudioIcon name="sparkles" size="h-[18px] w-[18px]" /></span>
-        <span class="opt-main"><b>Tạo biến thể AI</b><i>Diễn giải lại ảnh theo hướng mới</i></span>
-        <StudioIcon name="chevronRight" size="h-4 w-4" class="text-cream-400" />
-      </button>
       <button type="button" class="opt" :disabled="!hasImage" data-phone-action="edit" @click="goEdit">
         <span class="opt-ic"><StudioIcon name="pencil" size="h-[18px] w-[18px]" /></span>
         <span class="opt-main"><b>Sửa ảnh</b><i>Tả điều muốn đổi · khoanh vùng · vẽ cọ</i></span>
-        <StudioIcon name="chevronRight" size="h-4 w-4" class="text-cream-400" />
-      </button>
-      <button type="button" class="opt" :disabled="!hasImage || store.upscaling" @click="go('upscale')">
-        <span class="opt-ic"><StudioIcon name="maximize" size="h-[18px] w-[18px]" /></span>
-        <span class="opt-main"><b>Nâng cấp ảnh</b><i>Phóng to 2×/4× giữ chi tiết</i></span>
         <StudioIcon name="chevronRight" size="h-4 w-4" class="text-cream-400" />
       </button>
       <button type="button" class="opt" :disabled="!hasImage" @click="go('reframe')">
@@ -130,18 +125,6 @@ async function runDelete() { close(); await doRemove(); }
         <span class="opt-main"><b>Đổi khung hình</b><i>Cắt theo tỉ lệ 3:4 · 1:1 · 9:16…</i></span>
         <StudioIcon name="chevronRight" size="h-4 w-4" class="text-cream-400" />
       </button>
-      <button type="button" class="opt" :disabled="!hasImage" @click="download">
-        <span class="opt-ic"><StudioIcon name="download" size="h-[18px] w-[18px]" /></span>
-        <span class="opt-main"><b>Tải về máy</b><i>Ảnh gốc độ phân giải đầy đủ</i></span>
-      </button>
-      <button type="button" class="opt" :disabled="!hasImage" @click="share">
-        <span class="opt-ic"><StudioIcon name="share" size="h-[18px] w-[18px]" /></span>
-        <span class="opt-main"><b>Chia sẻ</b><i>Gửi qua app khác hoặc chép liên kết</i></span>
-      </button>
-      <a href="/bo-suu-tap" class="opt">
-        <span class="opt-ic"><StudioIcon name="ruler" size="h-[18px] w-[18px]" /></span>
-        <span class="opt-main"><b>Tech pack</b><i>Phiếu kỹ thuật trong Bộ sưu tập</i></span>
-      </a>
       <button type="button" class="opt" :disabled="!hasImage" @click="go('delete')">
         <span class="opt-ic text-danger"><StudioIcon name="trash" size="h-[18px] w-[18px]" /></span>
         <span class="opt-main"><b class="text-danger">Xoá ảnh</b><i>Xoá hẳn khỏi thư viện</i></span>

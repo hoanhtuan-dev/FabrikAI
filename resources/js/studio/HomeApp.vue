@@ -130,7 +130,7 @@ onMounted(async () => {
     <template v-else>
       <header class="mx-auto flex w-full max-w-3xl items-center justify-between px-5 pt-6">
         <div class="flex flex-col gap-0.5">
-          <span class="text-micro uppercase tracking-[0.16em] text-cream-400">{{ greeting() }}</span>
+          <span class="micro-label text-cream-400">{{ greeting() }}</span>
           <span class="text-title font-semibold">{{ user.name }}</span>
         </div>
         <div class="flex items-center gap-2">
@@ -194,7 +194,7 @@ onMounted(async () => {
              (/api/design-agent/findings). Không có dữ liệu ⇒ không có thẻ — thẻ radar rỗng là thẻ nói dối. -->
         <section v-if="radar" class="mt-7" data-home-radar>
           <a href="/agent-studio" class="block overflow-hidden rounded-3xl border border-ink-600 bg-gradient-to-br from-brand-600/25 via-ink-800 to-clay-500/20 p-5 transition hover:border-brand-400 active:scale-[0.99]">
-            <span class="inline-flex items-center gap-1.5 text-micro font-semibold uppercase tracking-[0.16em] text-brand-200">
+            <span class="micro-label inline-flex items-center gap-1.5 text-brand-200">
               <StudioIcon name="radar" size="h-3.5 w-3.5" /> Radar xu hướng
             </span>
             <p class="mt-2 line-clamp-3 font-display text-lg font-semibold leading-snug text-cream-50">{{ radar.title }}</p>
@@ -205,13 +205,13 @@ onMounted(async () => {
           </a>
         </section>
 
-        <!-- Lối còn lại, gọn MỘT hàng chữ — bản đầy đủ nằm ở menu Không gian trên thanh lệnh. -->
-        <nav class="mt-7 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-ink-700 pt-4 text-label" aria-label="Lối khác">
-          <a href="/agent-studio" class="font-semibold text-cream-300 transition hover:text-brand-200">Design Agent</a>
-          <a href="/bo-suu-tap" class="font-semibold text-cream-300 transition hover:text-brand-200">Bộ sưu tập</a>
-          <a href="/studio?view=library" class="font-semibold text-cream-300 transition hover:text-brand-200">Thư viện</a>
-          <a href="/cai-dat" class="font-semibold text-cream-300 transition hover:text-brand-200">Cài đặt</a>
-        </nav>
+        <!-- [Đợt 62 · dọn trùng lặp] HÀNG LỐI KHÁC ĐÃ GỠ (Design Agent · Bộ sưu tập · Thư viện · Cài đặt).
+             Bốn liên kết đó đều đã có lối vào khác NGAY TRÊN MÀN NÀY hoặc trên thanh lệnh:
+               · Design Agent — thẻ Radar ngay trên (nút «Nhờ Agent phân tích») + menu Không gian;
+               · Bộ sưu tập · Cài đặt — menu Không gian ở orb thanh lệnh;
+               · Thư viện — «Xem tất cả» ở khối Gần đây.
+             Bỏ đi thì màn Trang chủ đúng nhịp prototype (đầu màn · 4 việc · gần đây · radar) và không
+             còn chỗ nào có hai lối vào cho cùng một đích. -->
       </main>
     </template>
 

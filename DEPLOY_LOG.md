@@ -7823,3 +7823,68 @@ như một generation. Màn chi tiết đã dùng sai khoá. Nay có **một l�
 > Chrome giữ nguyên tiến trình cũ theo `--user-data-dir`, nên lần chạy sau **kết nối vào phiên CŨ đã đăng
 > nhập** ⇒ phép kiểm "khách thấy màn chào" báo sai. Mỗi lần đo: giết theo cổng + xoá thư mục profile.
 
+
+---
+
+## Kiểm tra & triển khai 2026-09-26 (Đợt 62 — DỌN TRÙNG LẶP · ĐÚNG URL · ĐÚNG FONT: bám prototype)
+
+> Yêu cầu: "Rà soát sâu → tối ưu → clean các tính năng trùng lặp trong cùng 1 màn hình → đảm bảo gọi đúng
+> url (tính năng) cho từng nút, màn hình → cài đặt đúng fonts chữ hoặc tương đương theo Prototype → bám
+> sát Prototype nhất có thể".
+
+### A. Dọn trùng lặp TRONG CÙNG MỘT MÀN HÌNH
+
+| Màn | Trước | Sau |
+|---|---|---|
+| Studio điện thoại | «Tác vụ ảnh — tất cả» mở **8 việc**, trong đó **5 việc đã nằm ngay trên màn** (CTA «Tạo biến thể AI» + 4 chip) ⇒ hai lối vào cho một việc | Mỗi việc **một lối vào**: 5 việc trên màn; sheet còn **3 việc không có mặt trên màn** (Sửa ảnh · Đổi khung · Xoá), đổi tên «Việc khác — sửa ảnh · đổi khung · xoá» |
+| Trang chủ | Hàng «Lối khác» (Design Agent · Bộ sưu tập · Thư viện · Cài đặt) trùng menu Không gian (3 đích) + thẻ Radar + «Xem tất cả» (2 đích) | Gỡ hẳn; màn Trang chủ đúng nhịp prototype (đầu màn · 4 việc · gần đây · radar) |
+| Hub | Credit hiện **hai chỗ**: chip trần ở thanh tiêu đề + thẻ tài khoản (có hạn mức tháng & thanh tiến trình) | Chip ở thanh tiêu đề gỡ; credit chỉ còn trong thẻ tài khoản |
+
+### B. ĐÚNG URL CHO TỪNG NÚT — và một bài test canh MỌI liên kết
+
+- Sửa 3 nút còn dùng đường cũ: lệnh «Mở Prompt Templates» trong bảng lệnh (`/presets` → `/cai-dat/presets`)
+  và 2 liên kết trong khu Hệ thống (`/presets` · `/model-settings` → `/cai-dat/presets` · `/cai-dat/model`).
+  Đường cũ vẫn chạy cho bookmark — nhưng **giao diện chỉ dùng một từ vựng URL** (đường chính thức theo
+  `App\Support\SettingsAreas`).
+- **Test mới quét MỌI tệp Vue/Blade**: mỗi `href="/…"` và mỗi `location.href = '/…'` phải phân giải được
+  thành **route GET có thật** (bỏ qua tiền tố tĩnh/API). Một href gõ sai trước đây chỉ lộ ra khi có người
+  bấm đúng nút đó ở đúng trạng thái đó; nay nó đỏ ngay trong bộ test.
+- Test thứ hai: **không tệp giao diện nào dùng đường cũ** của khu Cài đặt.
+
+### C. FONT — lỗi thật: ba họ chữ CHƯA BAO GIỜ ĐƯỢC NẠP
+
+`laravel-vite-plugin/fonts` đã tự-host và phát ra `public/build/assets/fonts-<hash>.css` (đủ @font-face cho
+Inter · Fraunces · Space Grotesk) + `fonts-manifest.json` — **nhưng không trang nào nạp tệp CSS đó**. Hệ quả:
+cả ba họ chỉ là *tên* trong CSS, trình duyệt rơi về `system-ui` ở **mọi máy**; `document.fonts` rỗng; HTML
+không có một `<link>` font nào. (Thêm nữa: Fraunces bị tải mà **không dùng ở đâu** vì `--font-display` trỏ
+vào Inter.)
+
+Đã làm:
+- `App\Support\BuildFonts` đọc `fonts-manifest.json` → `resources/views/partials/fonts.blade.php` nạp
+  `fonts.css` + **preload một weight woff2 mỗi họ**; partial này được chèn vào 6 head (5 trang SPA +
+  `layouts/app`) ngay sau `partials.theme`.
+- `--font-display: 'Fraunces', …` (đúng prototype + đúng tài liệu §1.3 vốn đã ghi "font-display (Fraunces)")
+  và thêm `--font-mono: 'Space Grotesk', …` + lớp dùng chung `.micro-label` / `.micro-label-accent`
+  cho nhãn nhỏ in hoa (prototype: `.micro` dùng --f-mono, tracking .16em).
+- `vite.config.js` nạp thêm **Space Grotesk**; tổng số họ chữ = **3**, đúng bằng prototype.
+
+**Đo lại trên Chrome thật:** `document.fonts` = **22 mặt chữ**, cả ba họ ở trạng thái `loaded`; request
+`inter-400…woff2` · `fraunces-400…woff2` · `space-grotesk-400…woff2` đều **200**; `h1` = Fraunces,
+`.micro-label` = Space Grotesk, `body` = Inter.
+
+### D. HAI LỖI QUY TRÌNH (ghi để lần sau không lặp)
+
+1. **Build ĐỎ mà tưởng XANH**: tôi xem kết quả build qua `| tail -2` nên chỉ thấy dòng cuối — build đã thất
+   bại (SFC lỗi thẻ đóng ở `HomeApp.vue`) mà vẫn tưởng thành công và đi tiếp. Từ nay đọc thẳng dấu
+   `✓ built` / `Build failed`.
+2. **Blade comment trong tệp Vue**: viết `{{-- --}}` trong `SettingsApp.vue` — repo có test CẤM đúng điều
+   này và build đỏ ngay. Luật đã lường trước, tôi vẫn phạm.
+
+### E. Khoá bằng test — `tests/Feature/PrototypeCleanupTest.php` (6 bài, 60 assert)
+
+Mỗi việc một lối vào ở Studio điện thoại (và nhãn nút phải nói đúng: không còn «tất cả») · Trang chủ không
+còn hàng lối khác nhưng vẫn đủ lối vào · Hub credit một chỗ · **mọi liên kết nội bộ phân giải được** ·
+không dùng đường cũ của khu Cài đặt · ba họ chữ có token + được khai ở vite + nhãn nhỏ dùng lớp chung.
+
+**Full suite: 1401 → 1407 XANH** (10.937 assert).
+

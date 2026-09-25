@@ -153,17 +153,17 @@ onMounted(loadPlanInfo);
           <span class="max-w-[5.5rem] truncate">{{ session.name }}</span>
         </span>
 
-        <!-- Danh tính + credit (màn hình rộng). Số credit lấy từ store dùng chung nên nếu khu Quản
-             trị vừa cộng/trừ credit của chính bạn thì con số này đổi ngay, không cần tải lại. -->
+        <!-- [Đợt 62 · dọn trùng lặp] CHIP CREDIT Ở THANH TIÊU ĐỀ ĐÃ GỠ.
+             Thẻ tài khoản ngay dưới thanh này (data-hub-account) đã hiện credit KÈM hạn mức tháng và
+             thanh tiến trình — con số trần ở đây là bản sao nghèo thông tin hơn của cùng một dữ liệu,
+             trên cùng một màn hình. Danh tính vẫn giữ ở đây vì thanh tiêu đề cần biết "ai đang mở"
+             khi người dùng cuộn qua thẻ tài khoản. Dữ liệu credit vẫn từ CÙNG store dùng chung. -->
         <div v-if="session.me" class="hidden items-center gap-2 lg:flex">
           <span data-hub-user :title="session.email"
                 class="flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-800/70 px-2.5 py-1.5 text-xs font-semibold text-cream-200">
             <span class="grid h-5 w-5 place-items-center rounded-full bg-brand-600/25 text-label font-bold text-brand-200">{{ session.initial }}</span>
             <span class="max-w-[10rem] truncate">{{ session.name }}</span>
             <span class="text-cream-400">· {{ session.roleLabel }}</span>
-          </span>
-          <span v-if="creditsLabel" class="flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-800/70 px-2.5 py-1.5 text-xs font-semibold text-cream-200">
-            <StudioIcon name="coins" size="h-3.5 w-3.5" /> {{ creditsLabel }}
           </span>
         </div>
 

@@ -883,7 +883,9 @@ const baseCommands = computed(() => ([
   { id: 'chat', label: 'Mở Trợ lý (hỏi đáp & tra nguồn)', hint: 'chat', icon: 'bot', run: () => openChat() },
   // [đợt 27] Mọi lối vào cài đặt đi qua /cai-dat — trang hợp nhất ba khu (khu chỉ owner do máy chủ tự ẩn).
     { id: 'settings', label: 'Mở Cài đặt & quản trị', hint: 'settings', icon: 'gear', run: () => { window.location.href = '/cai-dat'; } },
-  { id: 'presets', label: 'Mở Prompt Templates', hint: 'presets', icon: 'template', run: () => { window.location.href = '/presets'; } },
+  // [Đợt 62] Đích là ĐƯỜNG CHÍNH THỨC của khu Cài đặt (/cai-dat/presets), không phải đường cũ /presets:
+  // đường cũ vẫn chạy (giữ cho bookmark) nhưng nút trong app phải dùng MỘT từ vựng URL duy nhất.
+  { id: 'presets', label: 'Mở Prompt Templates', hint: 'cài đặt', icon: 'template', run: () => { window.location.href = '/cai-dat/presets'; } },
   { id: 'zoom-in', label: 'Phóng to canvas', hint: 'zoomIn', icon: 'zoomIn', run: () => store.zoomIn() },
   { id: 'zoom-out', label: 'Thu nhỏ canvas', hint: 'zoomOut', icon: 'zoomOut', run: () => store.zoomOut() },
   { id: 'zoom-fit', label: 'Vừa khung hình', hint: 'zoomFit', icon: 'maximize', run: () => store.zoomFit() },

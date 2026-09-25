@@ -9,6 +9,8 @@
     <meta name="theme-color" content="{{ theme_color() }}">
     <meta name="color-scheme" content="dark light">
     @include('partials.theme')
+    {{-- Font tự-host của build (Inter · Fraunces · Space Grotesk) — xem App\Support\BuildFonts. --}}
+    @include('partials.fonts')
     <title>@yield('title', 'FabrikAI') — FabrikAI</title>
     @yield('meta')
     @vite(['resources/css/app.css'])

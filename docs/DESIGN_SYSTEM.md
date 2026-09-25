@@ -155,6 +155,25 @@ nên **không thể** có cài đặt cỡ chữ cho người dùng. Nay mỗi b
 | Tiêu đề nhỏ | `text-title` | 14px | `text-[13px]` |
 
 - Tiêu đề card: `font-display` (Fraunces) + `text-base font-semibold text-brand-300` + icon 16px.
+
+**[Đợt 62 · 2026-09-26] BA HỌ CHỮ — ĐÚNG PROTOTYPE, VÀ LẦN ĐẦU TIÊN ĐƯỢC NẠP THẬT.**
+
+| Vai | Token | Họ chữ | Dùng ở đâu |
+|---|---|---|---|
+| Giao diện | `--font-sans` | **Inter** | mọi chữ đọc (mặc định của `body`) |
+| Tiêu đề | `--font-display` | **Fraunces** (serif, có bản nghiêng) | `h1`–`h4` + mọi chỗ dùng `font-display` — chất "fashion house" của prototype |
+| Nhãn nhỏ in hoa | `--font-mono` | **Space Grotesk** | lớp dùng chung `.micro-label` / `.micro-label-accent` — chất "kỹ thuật/phòng lab" |
+
+- **Lỗi thật đã sửa:** `laravel-vite-plugin/fonts` vốn đã tự-host và phát ra đủ thứ
+  (`public/build/assets/fonts-<hash>.css` + `fonts-manifest.json`), nhưng **không trang nào nạp tệp CSS
+  đó** ⇒ cả ba họ chỉ là *tên* trong CSS, còn trình duyệt rơi về `system-ui` ở **mọi máy**. Đo trên Chrome:
+  `document.fonts` rỗng, HTML không có một `<link>` font nào. Nay `partials/fonts.blade.php` (đọc
+  `App\Support\BuildFonts`) nạp `fonts.css` + preload **một** weight woff2 mỗi họ. Sau khi sửa:
+  **22 mặt chữ, cả ba họ ở trạng thái `loaded`**, request woff2 trả 200.
+- **Nhãn nhỏ in hoa dùng MỘT lớp** (`.micro-label`): rải `font-mono` khắp nơi thì màn nào cũng một kiểu
+  tracking, và lần sau đổi là phải sửa hàng chục chỗ.
+- Fraunces trước đó **vẫn được tải mà không dùng ở đâu** (vì `--font-display` trỏ vào Inter) — nay được
+  dùng thật; tổng số họ chữ vẫn là **3**, đúng bằng prototype.
 - **Đã nhích +1px mọi bậc** so với trước (phản hồi thật: "tỷ lệ chữ vẫn hơi nhỏ"), và **mọi bậc rem mặc
   định của Tailwind** (`text-xs/sm/base/lg/xl/2xl/3xl`) cũng nhân theo cùng công tắc — nếu không thì nửa
   app to lên còn nửa kia đứng yên.
@@ -266,6 +285,7 @@ npm run build                   # 4. CSS bán cho khách — máy chủ KHÔNG c
 | Component | Thay cho |
 |---|---|
 | `StudioIcon.vue` (`icons.json` — **140 icon**, cũng là nguồn cho PHP `App\Support\IconRegistry`) | mọi `<svg>` chép tay, mọi emoji |
+| `.micro-label` · `.micro-label-accent` (`app.css` — họ chữ mono + tracking .16em cho nhãn nhỏ in hoa) | tự viết lại `text-micro uppercase tracking-[0.16em]` ở từng màn |
 | `LoadingSpinner.vue` (`text · subtext · progress`) | **mọi bộ tiến trình tự chế** (chấm · thanh · phần trăm) |
 | `ConfirmDialog.vue` | popup xác nhận tự viết (đã từng có 3 bản khác nhau) |
 | `BaseModal.vue` | khung modal tự viết |

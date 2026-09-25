@@ -76,6 +76,24 @@
 | **Agent dạng feed hội thoại** (`#/agent`) | `/agent-studio` là luồng 4–5 bước có chat — KHÁC kiến trúc nhưng nhiều năng lực hơn | Cố ý không hạ cấp về bản mock |
 | **Token màu/typography của prototype** (ink-0..4 · signal · magic · Fraunces/Space Grotesk) | Hệ token hiện tại sinh từ theme daisyUI và bị ~1.400 test khoá | Việc riêng, phải làm thành một đợt có kế hoạch — không trộn vào đợt port cấu trúc |
 
+### 4.2b Đợt 62 — DỌN TRÙNG LẶP · ĐÚNG URL · ĐÚNG FONT
+
+| Việc | Trước (đo được) | Sau |
+|---|---|---|
+| **Studio điện thoại — hai lối vào cho một việc** | Nút «Tác vụ ảnh — tất cả» mở danh sách **8 việc**, trong đó **5 việc đã nằm ngay trên màn** (CTA «Tạo biến thể AI» + 4 chip: Nâng cấp 4× · Tải xuống · Chia sẻ · Tech pack) | Mỗi việc **một lối vào**: 5 việc ở trên màn, sheet còn đúng **3 việc không có mặt trên màn** (Sửa ảnh · Đổi khung · Xoá) và đổi tên thành «Việc khác — sửa ảnh · đổi khung · xoá» |
+| **Trang chủ — hàng «Lối khác»** | 4 liên kết (Design Agent · Bộ sưu tập · Thư viện · Cài đặt) **trùng** với menu Không gian (3 đích) và với thẻ Radar + «Xem tất cả» (2 đích) | Gỡ hẳn hàng đó — màn Trang chủ đúng nhịp prototype (đầu màn · 4 việc · gần đây · radar); mọi đích vẫn còn lối vào |
+| **Hub — credit hai chỗ** | Chip credit trần ở thanh tiêu đề **+** thẻ tài khoản (credit kèm hạn mức tháng và thanh tiến trình) | Chip ở thanh tiêu đề gỡ; credit chỉ còn trong thẻ tài khoản (danh tính vẫn ở thanh tiêu đề) |
+| **URL của nút** | Nút trong app còn dùng **đường cũ**: `/presets` (lệnh trong bảng lệnh) · `/model-settings` (2 liên kết trong khu Hệ thống) | Dùng **đường chính thức** `/cai-dat/presets` · `/cai-dat/model`; đường cũ vẫn chạy cho bookmark, nhưng app chỉ dùng **một từ vựng URL** |
+| **Font chữ (yêu cầu trực tiếp)** | Ba họ chữ chỉ là *tên trong CSS*: **không trang nào nạp `fonts.css`** mà plugin đã phát ra ⇒ mọi máy rơi về `system-ui`; Fraunces bị tải mà không dùng ở đâu | `partials/fonts.blade.php` nạp `fonts.css` + preload 1 weight/họ. `--font-display` = **Fraunces**, thêm `--font-mono` = **Space Grotesk** cho nhãn nhỏ in hoa qua lớp `.micro-label`. Đo lại trên Chrome: **22 mặt chữ · cả 3 họ `loaded` · woff2 trả 200** |
+
+**Ba lỗi thật bắt được trong đợt này** (đều là loại im lặng):
+
+1. **Font chưa bao giờ được nạp** — nhìn mã thì tưởng đã cấu hình xong (vite có `bunny(...)`, CSS có tên họ chữ); chỉ khi đếm `document.fonts` và soi `<link>` mới thấy không có gì được tải.
+2. **Build đỏ mà tưởng xanh** — xem kết quả build qua `| tail -2` nên chỉ thấy dòng cuối; build đã thất bại (SFC lỗi thẻ đóng) mà vẫn tưởng thành công. Từ nay đọc thẳng dấu `✓ built` / `Build failed`.
+3. **Blade comment trong tệp Vue** — repo có test cấm điều này; viết `{{-- --}}` trong `SettingsApp.vue` và build đỏ ngay. Đúng lỗi mà luật đã lường trước.
+
+**Khoá bằng test** — `tests/Feature/PrototypeCleanupTest.php` (6 bài): mỗi việc một lối vào ở Studio · Trang chủ không còn hàng lối khác · Hub credit một chỗ · **mọi liên kết nội bộ phải phân giải được thành route GET** (quét MỌI tệp Vue/Blade) · **không dùng đường cũ** của khu Cài đặt · ba họ chữ có token + được khai ở vite + nhãn nhỏ dùng lớp chung.
+
 ### 4.3 Ba luật của prototype — trạng thái sau đợt này
 
 1. **MỘT thanh lệnh** — ✓ đã theo từ Phase 0 (`CommandBar.vue`).

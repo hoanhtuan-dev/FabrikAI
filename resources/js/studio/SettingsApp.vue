@@ -847,8 +847,11 @@ onMounted(() => { section.value = sectionFromUrl(); load(); });
           </div>
           <p class="px-3 text-label leading-relaxed text-cream-300">
             Cài đặt ở đây là TOÀN CỤC. Tuỳ chọn riêng của bạn nằm ở
-            <a href="/presets" class="link">Prompt Templates</a> và
-            <a href="/model-settings" class="link">Khuôn mặt &amp; Dáng</a>.
+            <!-- [Đợt 62] Dùng ĐƯỜNG CHÍNH THỨC của khu Cài đặt (/cai-dat/presets · /cai-dat/model).
+                 Đường cũ /presets · /model-settings vẫn chạy (giữ cho bookmark cũ) nhưng nút trong app
+                 chỉ được dùng MỘT từ vựng URL — xem PrototypeParityTest. -->
+            <a href="/cai-dat/presets" class="link">Prompt Templates</a> và
+            <a href="/cai-dat/model" class="link">Khuôn mặt &amp; Dáng</a>.
           </p>
         </nav>
 

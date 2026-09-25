@@ -7,6 +7,8 @@
     <meta name="theme-color" content="{{ theme_color() }}">
     <meta name="color-scheme" content="dark light">
     @include('partials.theme')
+    {{-- Font tự-host của build (Inter · Fraunces · Space Grotesk) — xem App\Support\BuildFonts. --}}
+    @include('partials.fonts')
     <link rel="apple-touch-icon" href="/icons/studio-apple-touch-icon.png">
     <link rel="icon" type="image/png" href="/icons/studio-favicon-32.png">
     <title>FabrikAI — Hôm nay bạn muốn tạo gì?</title>

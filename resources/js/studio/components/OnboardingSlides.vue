@@ -79,11 +79,11 @@ function up(e) {
     <div class="relative flex flex-1 items-center justify-center overflow-hidden rounded-3xl border border-ink-600 bg-gradient-to-br from-brand-600/30 via-ink-800 to-clay-500/25">
       <!-- Bậc chữ dùng 4 mức ĐẶC của hệ token (không độ mờ): text-cream-100 · 300 — xem §1.1. -->
       <StudioIcon :name="slide.icon" size="h-16 w-16" class="text-cream-100" />
-      <span class="absolute bottom-3 right-4 text-micro font-semibold uppercase tracking-[0.16em] text-cream-300">FabrikAI</span>
+      <span class="micro-label absolute bottom-3 right-4 text-cream-300">FabrikAI</span>
     </div>
 
     <div class="mt-6">
-      <p class="text-micro font-semibold uppercase tracking-[0.16em] text-brand-300">Atelier · AI</p>
+      <p class="micro-label-accent">Atelier · AI</p>
       <h1 class="mt-2 font-display text-[30px] font-semibold leading-[1.12] tracking-[-0.02em] text-cream-50">
         {{ slide.title[0] }}<em class="text-brand-300">{{ slide.title[1] }}</em>{{ slide.title[2] }}
       </h1>

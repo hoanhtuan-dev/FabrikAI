@@ -7,6 +7,8 @@
     <meta name="theme-color" content="{{ theme_color() }}">
     <meta name="color-scheme" content="dark light">
     @include('partials.theme')
+    {{-- Font tự-host của build (Inter · Fraunces · Space Grotesk) — xem App\Support\BuildFonts. --}}
+    @include('partials.fonts')
     <title>FabrikAI — Bộ sưu tập</title>
     @vite(['resources/css/app.css', 'resources/js/studio/collections.js'])
     @php
