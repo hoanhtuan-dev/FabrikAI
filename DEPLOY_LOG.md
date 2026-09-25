@@ -7976,3 +7976,16 @@ Nay `PrototypeCleanupTest` khoá đúng chỗ này (`assertStringNotContainsStri
 **Test:** `PrototypeCleanupTest` nay **9 bài** (thêm: chạm ảnh ở Trang chủ mở trình xem · một màn xem ảnh
 duy nhất · trình xem có luồng không bức tường nút · khoá `props.actions`).
 
+
+### G. Deploy lên production — 2026-09-26 (đợt 63)
+
+| Bước | Kết quả |
+|---|---|
+| Sao lưu CSDL trước khi pull | `~/db-backups/fabrikai-20260925-052704.sql.gz` (1,1 MB · 52 bảng · kết thúc hợp lệ) |
+| Commit · Push | `749139d` · `139d69f..749139d main -> main` |
+| HEAD máy chủ | **`749139d`** · `config:cache` · `route:cache` · `view:cache` ok |
+| **Gói trình xem khớp TỪNG BYTE** | `sha256(GalleryModal-C9-LeIJJ.js)` local = máy chủ = `6af38622…f7ee2d` |
+| HTML production | `/studio` trỏ `main-U6eRu_-g.js` (gói mới) |
+| **Chrome thật trên production (390×844 · DPR 2)** | `/studio`: nút **← về Trang chủ** có · **4 lối tắt** · banner xác thực · **0 lỗi console** · `/`: màn chào 3 slide cho khách |
+| Bộ test PHP | **1410 xanh** (10.970 assert) |
+
