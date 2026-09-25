@@ -8068,3 +8068,15 @@ Bộ sưu tập | [dải 9 công cụ]` — mỗi mục một việc, 0 lỗi co
 | Công cụ «Sửa ảnh» | MỘT màn có đủ: ảnh + 3 chế độ (`describe · rect · brush`) + nút chạy «Sửa ảnh · 1 credit» + **hàng «Việc tiếp theo»**; nút «Vẽ mask» trên canvas đã vắng |
 | Màn Studio | 6 lối tắt đúng tên · **0** điều khiển lớp · **0** lưới công cụ trong sheet · sheet «Khác» chỉ còn 6 mục nguồn/không gian |
 
+
+### G. Deploy lên production — 2026-09-26 (đợt 64)
+
+| Bước | Kết quả |
+|---|---|
+| Sao lưu CSDL trước khi pull | `~/db-backups/fabrikai-20260925-062939.sql.gz` (1,1 MB · 52 bảng · kết thúc hợp lệ) |
+| Commit · Push | `f771c11` · `5e7bfd3..f771c11 main -> main` |
+| HEAD máy chủ | **`f771c11`** · `config:cache` · `route:cache` · `view:cache` ok |
+| Gói mới đang phục vụ | `main-TB0DcdDq.js` + `main-BInOuCXD.css` |
+| **Chrome thật trên production (390×844 · DPR 2)** | `/studio`: 6 lối tắt đúng tên (`edit · upscale · reframe · download · share · techpack`) · **không còn nút «Việc khác»** · 4 cửa (`other · results · assistant · collections`) · dải **9 công cụ** · **0 điều khiển lớp** · **0 lưới công cụ trong sheet** · **0 lỗi console** |
+| Bộ test PHP | **1410 xanh** (10.993 assert) |
+
