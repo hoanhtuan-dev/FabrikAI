@@ -29,9 +29,21 @@ const props = defineProps({
 
 const store = useStudioStore();
 
-const items = computed(() => store.viewerItems);
-const idx = computed(() => items.value.findIndex(g => g.id === store.viewer?.id));
-const current = computed(() => items.value[idx.value] || store.viewer);
+/**
+ * TRÌNH XEM MỘT ẢNH — không còn là "trình duyệt nhiều ảnh" (đợt 64 · 2026-09-26).
+ *
+ * Yêu cầu trực tiếp của chủ dự án: "trình xem ảnh chỉ cần xem 1 ảnh". Đã GỠ:
+ *   · dải thumbnail bên trái (aside 72px, chỉ desktop) · hai mũi tên ‹ › · bộ đếm "N / M"
+ *   · `nav()` · `prefetchNeighbors()` (tải trước ảnh kề) · phím ← → · `scrollStripToActive()`
+ *   · ngữ cảnh danh sách `viewerList` (mỗi nơi mở trình xem lại truyền một danh sách khác nhau:
+ *     lưới kết quả truyền cả lưới, màn chi tiết bộ sưu tập truyền ảnh của bộ, thư viện truyền thư viện
+ *     ⇒ CÙNG một hành động "xem ảnh" mà hành vi phụ thuộc nơi bấm).
+ *
+ * VÌ SAO LÀ LÀM GỌN THẬT, KHÔNG PHẢI CẮT BỚT TÍNH NĂNG: chuyển ảnh đã có ĐÚNG một chỗ — lưới Kết quả
+ * (mở ảnh khác = chạm ô khác). Trình xem chỉ làm một việc: xem tấm ảnh đang mở, và làm gì đó với nó.
+ * Bớt được cả một tầng trạng thái (danh sách ngữ cảnh) lẫn 4 lời gọi tải trước ảnh.
+ */
+const current = computed(() => store.viewer);
 const isVideo = computed(() => current.value?.type === 'video');
 const imgError = ref(false);
 
@@ -82,16 +94,6 @@ const techOpen = ref(false);
 const shown = ref({ id: store.viewer?.id ?? null, url: store.viewer?.media_url || '' });
 const loadedUrls = new Set(); // url đã load xong → chuyển ngay, không chớp trắng
 let probeId = 0;
-function prefetchNeighbors() {
-  const arr = items.value; const i = idx.value;
-  if (!arr.length) return;
-  for (const d of [-1, 1]) {
-    const n = arr[(i + d + arr.length) % arr.length];
-    if (n && n.media_url && n.type !== 'video' && !loadedUrls.has(n.media_url)) {
-      const im = new Image(); im.onload = () => loadedUrls.add(n.media_url); im.src = n.media_url;
-    }
-  }
-}
 function requestShow(c) {
   if (!c || !c.media_url || c.type === 'video') { shown.value = { id: c?.id ?? null, url: '' }; return; }
   const url = c.media_url;
@@ -103,18 +105,12 @@ function requestShow(c) {
   probe.src = url;
 }
 
-function nav(d) {
-  const n = items.value[(idx.value + d + items.value.length) % items.value.length];
-  if (n) { store.viewer = n; }
-}
 function close() { store.viewer = null; }
 
-// Đổi ảnh (mọi cách: nav / click thumbnail / xóa) → reset zoom + hủy confirm + scroll strip theo
+// Đổi ảnh (mở ảnh khác từ lưới, hoặc xoá) → reset zoom + huỷ trạng thái xác nhận.
 watch(() => current.value?.id, () => {
   resetZoom(); resetConfirm(); imgError.value = false; attachOpen.value = false; attachBusy.value = false;
   requestShow(current.value);
-  prefetchNeighbors();
-  nextTick(scrollStripToActive);
 });
 
 // ── Xóa an toàn: xác nhận 2 bước, tự reset sau 3.5s ──
@@ -128,16 +124,13 @@ async function doDelete() {
   if (deleting.value) return;
   const g = current.value; if (!g) return;
   deleting.value = true;
-  const at = idx.value; // vị trí trước khi xóa
   try {
     const ok = await store.deleteGen(g);
     resetConfirm();
     if (!ok) return; // xóa thất bại → giữ modal
-    const left = items.value;
-    if (!left.length) { close(); return; }
-    const next = left[Math.min(Math.max(at, 0), left.length - 1)];
-    store.viewer = next;
-    resetZoom();
+    // Xoá xong thì ĐÓNG trình xem: nó chỉ xem MỘT ảnh, và ảnh đó không còn nữa. (Trước đây nhảy sang
+    // ảnh kề trong danh sách ngữ cảnh — hành vi đó thuộc về lưới Kết quả, nơi người dùng chọn ảnh.)
+    close();
   } finally {
     deleting.value = false;
   }
@@ -206,15 +199,6 @@ function onImgLoad() { imgError.value = false; if (shown.value.url) loadedUrls.a
 // xem và chồng chỗ với thanh thu/phóng. Nay nó ra NGOÀI khung ảnh thành một cột riêng bên trái, nên
 // không còn gì đè lên ảnh. Hệ quả: bỏ luôn bốn hàm kéo-ngang (wheel→ngang, pointer capture…).
 // Cột dọc cuộn bằng con lăn mặc định của trình duyệt — không cần mã nào.
-const stripEl = ref(null);
-function scrollStripToActive() {
-  const el = stripEl.value;
-  if (!el) return;
-  const active = el.querySelector('[data-active="true"]');
-  // block:'center' (không phải inline) vì cột chạy DỌC.
-  if (active) active.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-}
-
 // ── ĐIỀU PHỐI TỚI TÍNH NĂNG (trung tâm điều phối) ──
 /**
  * Đưa ảnh này sang một nhóm công cụ khác. Ba bước, ĐÚNG thứ tự:
@@ -341,15 +325,12 @@ function onKey(e) {
     if (confirming.value) { resetConfirm(); return; } // Esc ưu tiên hủy xác nhận xóa, không đóng modal
     close();
   }
-  else if (e.key === 'ArrowLeft') { e.preventDefault(); nav(-1); }
-  else if (e.key === 'ArrowRight') { e.preventDefault(); nav(1); }
+  // [Đợt 64] Phím ← → đã gỡ cùng dải thumbnail: trình xem chỉ xem MỘT ảnh.
 }
 onMounted(() => {
   window.addEventListener('keydown', onKey, true);
   document.body.style.overflow = 'hidden'; // khóa scroll nền khi modal mở
-  nextTick(scrollStripToActive);
   nextTick(() => rootEl.value?.focus?.());
-  prefetchNeighbors();
 });
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey, true);
@@ -365,43 +346,15 @@ onBeforeUnmount(() => {
       <StudioIcon name="x" size="h-5 w-5" />
     </button>
     <div class="flex h-full w-full max-w-[1600px] flex-col gap-2 lg:flex-row">
-      <!-- ══ DẢI ẢNH — CỘT BÊN TRÁI, NGOÀI KHUNG ẢNH (chỉ desktop) ══
-           [đợt 52] Trước đây dải này NẰM TRONG khung ảnh (absolute bottom-14) — nó đè lên chính
-           tấm ảnh đang xem và chồng chỗ với thanh thu/phóng ở bottom-3; trên màn thấp thì hai thứ
-           đó chạm nhau. Nay nó ra ngoài, thành cột riêng: ảnh không còn bị che, và không còn cặp
-           nút nào chồng lên nhau.
-           ĐIỆN THOẠI: ẨN. Ở đó bề ngang là thứ đắt nhất, và đã có hai nút ‹ › để chuyển ảnh —
-           thêm một cột thumbnail nữa là lấy chỗ của chính tấm ảnh mà người ta mở ra để xem. -->
-      <aside
-        v-show="items.length > 1"
-        ref="stripEl"
-        class="scrollbar-hide hidden w-[72px] shrink-0 flex-col gap-1.5 overflow-y-auto rounded-lg border border-ink-700/60 bg-ink-900/60 p-1.5 lg:flex"
-        aria-label="Chọn ảnh khác"
-      >
-        <button
-          v-for="g in items" :key="g.id"
-          type="button"
-          class="relative aspect-square w-full shrink-0 overflow-hidden rounded-lg border-2 transition"
-          :class="current?.id === g.id ? 'border-brand-500' : 'border-ink-600 hover:border-ink-500'"
-          :data-active="current?.id === g.id ? 'true' : 'false'"
-          :title="'Xem ' + store.genName(g)"
-          :aria-label="'Xem ' + store.genName(g)"
-          :aria-current="current?.id === g.id ? 'true' : undefined"
-          @click="store.viewer = g"
-        >
-          <img :src="thumbUrl(g.media_url, 320)" class="pointer-events-none h-full w-full select-none bg-ink-900 object-cover" loading="lazy" decoding="async" draggable="false" @error="onThumbError($event, g.media_url)" />
-        </button>
-      </aside>
-
+      <!-- ══ [Đợt 64] DẢI ẢNH + HAI MŨI TÊN CHUYỂN ẢNH ĐÃ GỠ ═══════════════════════════════════════
+           Yêu cầu trực tiếp: "trình xem ảnh chỉ cần xem 1 ảnh".
+           VÌ SAO GỠ ĐƯỢC MÀ KHÔNG MẤT GÌ: chuyển ảnh đã có ĐÚNG MỘT chỗ — lưới Kết quả (chạm ô khác là
+           mở ảnh khác). Dải thumbnail 72px chỉ có ở desktop, còn hai mũi tên chỉ đổi ảnh trong một
+           danh sách ngữ cảnh mà MỖI nơi mở trình xem lại truyền một kiểu (lưới truyền cả lưới, màn
+           chi tiết bộ sưu tập truyền ảnh của bộ, thư viện truyền thư viện) ⇒ cùng một cú bấm mà hành
+           vi phụ thuộc nơi xuất phát. Bỏ đi thì trình xem chỉ còn MỘT việc: xem tấm ảnh này. -->
       <!-- ══ Khu vực ảnh ══ -->
       <div class="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-ink-700/60 bg-ink-900/40">
-        <!-- Chuyển ảnh — NẰM TRONG khung ảnh, KHÔNG neo theo màn hình.
-             [đợt 52] Trước đây hai nút này là absolute theo CẢ hộp thoại (left-2/right-2 của lớp phủ).
-             Khi dải ảnh chuyển thành cột bên trái, nút ‹ lập tức đè lên cột đó (đo được trên Chrome:
-             đè 21x25px lên thumbnail). Neo vào khung ảnh thì nút luôn ở trên chính tấm ảnh, và không
-             bao giờ chạm vào cột dải ảnh — dù sau này cột đó rộng bao nhiêu. -->
-        <button v-if="items.length > 1" @click="nav(-1)" class="absolute left-2 top-1/2 z-30 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-ink-900/90 text-xl text-cream-100 transition hover:bg-brand-600" title="Ảnh trước (←)" aria-label="Ảnh trước">‹</button>
-        <button v-if="items.length > 1" @click="nav(1)" class="absolute right-2 top-1/2 z-30 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-ink-900/90 text-xl text-cream-100 transition hover:bg-brand-600" title="Ảnh sau (→)" aria-label="Ảnh sau">›</button>
 
         <!-- Video: phát trực tiếp, không zoom/pan (fit trọn khung, centered) -->
         <video v-if="isVideo && current?.media_url" :src="current.media_url" controls autoplay loop muted playsinline
@@ -431,7 +384,7 @@ onBeforeUnmount(() => {
             <span v-if="['pending','processing'].includes(current.status)" class="h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent"></span>
             {{ statusMeta.label }}
           </span>
-          <span v-if="items.length > 1" class="shrink-0 rounded-full border border-ink-700 bg-ink-900/90 px-2 py-0.5 text-label font-semibold text-cream-200">{{ idx + 1 }} / {{ items.length }}</span>
+
         </div>
         <!-- Zoom toolbar (chỉ khi có ảnh) -->
         <div v-if="current?.media_url && !isVideo" class="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-ink-700 bg-ink-900/95 px-1.5 py-1 shadow-lg">

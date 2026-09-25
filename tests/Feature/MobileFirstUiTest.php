@@ -350,29 +350,40 @@ class MobileFirstUiTest extends TestCase
 
     // ── 4. TRÌNH XEM ẢNH LÀ TRUNG TÂM ĐIỀU PHỐI ────────────────────────────────
 
-    public function test_dai_anh_ra_ngoai_khung_anh_va_an_tren_dien_thoai(): void
+    /**
+     * TRÌNH XEM CHỈ XEM MỘT ẢNH (đợt 64 · 2026-09-26) — ĐẢO quyết định của đợt 52.
+     *
+     * Yêu cầu trực tiếp của chủ dự án: "trình xem ảnh chỉ cần xem 1 ảnh".
+     *
+     * Đợt 52 từng đưa dải thumbnail RA NGOÀI khung ảnh (cột 72px, chỉ desktop) để nó không đè lên ảnh.
+     * Nay gỡ hẳn cùng hai mũi tên ‹ › và bộ đếm "N / M": chuyển ảnh đã có ĐÚNG MỘT chỗ là lưới Kết quả,
+     * còn "ngữ cảnh danh sách" của trình xem thì mỗi nơi mở lại truyền một kiểu (lưới truyền cả lưới,
+     * màn chi tiết bộ sưu tập truyền ảnh của bộ, thư viện truyền thư viện) ⇒ cùng một cú bấm mà hành vi
+     * phụ thuộc nơi xuất phát.
+     *
+     * Kiểm MÃ SỐNG (bóc chú thích): tệp này ghi lại lịch sử ngay tại chỗ, kiểm cả tệp là cấm tài liệu.
+     */
+    public function test_trinh_xem_chi_xem_mot_anh(): void
     {
-        $v = $this->src('components/GalleryModal.vue');
+        $v = $this->code($this->src('components/GalleryModal.vue'));
 
-        // Dải ảnh là CỘT riêng, chỉ hiện từ lg, KHÔNG nằm trong khung ảnh nữa.
-        $this->assertStringContainsString('aria-label="Chọn ảnh khác"', $v);
-        $this->assertMatchesRegularExpression(
-            '/v-show="items\.length > 1"[\s\S]{0,400}?hidden w-\[72px\][\s\S]{0,200}?lg:flex/',
-            $v,
-            'Dải ảnh phải là cột 72px chỉ hiện từ lg (điện thoại ẩn — bề ngang là thứ đắt nhất ở đó).'
-        );
-        // Không còn dải nào neo trong khung ảnh. Kiểm MÃ SỐNG: chú thích ở đầu tệp ghi lại lịch sử
-        // ("trước đây nằm trong khung ảnh ở absolute bottom-14") nên kiểm cả tệp là cấm chính tài liệu.
-        $this->assertStringNotContainsString('absolute bottom-14', $this->code($v),
-            'Dải ảnh cũ nằm TRONG khung ảnh (bottom-14) và chồng thanh thu/phóng — phải không còn.');
+        // Không còn dải thumbnail, không còn mũi tên chuyển ảnh, không còn bộ đếm.
+        $this->assertStringNotContainsString('aria-label="Chọn ảnh khác"', $v, 'Dải thumbnail phải được gỡ.');
+        $this->assertStringNotContainsString('aria-label="Ảnh trước', $v, 'Mũi tên ‹ phải được gỡ.');
+        $this->assertStringNotContainsString('aria-label="Ảnh sau', $v, 'Mũi tên › phải được gỡ.');
+        $this->assertStringNotContainsString('idx + 1 }} / {{ items.length', $v, 'Bộ đếm «N / M» phải được gỡ.');
+        $this->assertStringNotContainsString('absolute bottom-14', $v, 'Dải ảnh cũ trong khung ảnh vẫn phải không còn.');
 
-        // Mũi tên chuyển ảnh neo vào KHUNG ẢNH, không neo theo hộp thoại (nếu không sẽ đè lên cột dải ảnh).
-        $this->assertStringContainsString('aria-label="Ảnh trước', $v);
-        $this->assertDoesNotMatchRegularExpression(
-            '/rounded-full bg-ink-900\/90 text-xl text-cream-100 transition hover:bg-brand-600 sm:h-10/',
-            $v,
-            'Mũi tên ‹ › cũ neo theo lớp phủ (đè lên cột dải ảnh sau khi dải ra ngoài).'
-        );
+        // Không còn máy móc "nhiều ảnh": danh sách ngữ cảnh, tải trước ảnh kề, phím ← →.
+        foreach (['viewerItems', 'prefetchNeighbors', "e.key === 'ArrowLeft'", "e.key === 'ArrowRight'"] as $dead) {
+            $this->assertStringNotContainsString($dead, $v, 'Còn mã của trình duyệt nhiều ảnh: '.$dead);
+        }
+
+        // Trình xem đọc ĐÚNG một ảnh từ store.
+        $this->assertStringContainsString('const current = computed(() => store.viewer)', $v);
+        // Và store không còn danh sách ngữ cảnh.
+        $this->assertStringNotContainsString('viewerList', $this->code($this->src('store/state.js')));
+        $this->assertStringNotContainsString('viewerList', $this->code($this->src('store/getters.js')));
     }
 
     public function test_thong_tin_anh_va_thong_tin_ky_thuat_mac_dinh_an(): void

@@ -58,10 +58,12 @@ class PrototypeCleanupTest extends TestCase
             $this->assertStringContainsString($keep, $options, 'Sheet thiếu việc '.$keep.' — không được bỏ cả lối vào.');
         }
 
-        // Trên màn: đúng 4 chip + 1 CTA (prototype), và nhãn nút mở sheet nói rõ nó KHÔNG còn là 'tất cả'.
-        $this->assertSame(4, substr_count($phone, 'data-phone-quick='), 'Studio phải có ĐÚNG 4 lối tắt như prototype.');
-        $this->assertStringContainsString('Việc khác — sửa ảnh · đổi khung · xoá', $phone,
-            'Nhãn cũ «Tác vụ ảnh — tất cả» nay SAI: danh sách đã thu hẹp còn 3 việc.');
+        /* [Đợt 64] SÁU lối tắt (2×3) + 1 CTA, và KHÔNG còn nút «Việc khác» trên màn chính.
+           Prototype gốc có 4 ô; nay thêm «Sửa ảnh» và «Đổi khung» — hai việc trước đây nằm sau nút
+           «Việc khác» đã gỡ. Điều bất biến giữ nguyên: MỖI VIỆC ĐÚNG MỘT LỐI VÀO (không ô nào trùng ô nào). */
+        $this->assertSame(6, substr_count($phone, 'data-phone-quick='), 'Studio có ĐÚNG 6 lối tắt, mỗi ô một việc.');
+        $this->assertStringNotContainsString('data-phone-actions-door', $phone,
+            'Nút «Việc khác» trên màn chính đã gỡ: ba việc của nó đã có chỗ đúng hơn.');
     }
 
     /** Bóc đúng khối CẤP 1 (options) của PhoneActions để kiểm việc lặp. */

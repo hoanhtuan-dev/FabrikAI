@@ -199,7 +199,13 @@ const GRID_SIZES = computed(() => (DENSITY[density.value] || DENSITY.m).sizes);
  * khoanh vùng TRÊN CANVAS nhiều layer. Màn mới làm đúng một việc, trên đúng một ảnh — và chạy được
  * trên điện thoại.
  */
-function editImage(g) { store.select(g); store.editImageOpen = true; }
+/**
+ * SỬA ẢNH từ một ô trong lưới (đợt 64).
+ * Trước đây: `store.select(g); store.editImageOpen = true` — mở MÀN «Chỉnh ảnh» riêng. Nay màn đó đã
+ * nhập vào công cụ gốc «Sửa ảnh», nên đường đúng là: chọn ảnh làm ảnh đang làm việc, rồi mở ĐÚNG công
+ * cụ đó qua kênh điều phối (`requestActivity`) — điện thoại mở công cụ toàn màn, màn rộng mở bảng công cụ.
+ */
+function editImage(g) { store.select(g); store.requestActivity('inpaint'); }
 function download(g) {
   if (!g || !g.id) return;
   window.location.href = '/api/generations/' + g.id + '/download';

@@ -122,17 +122,24 @@ class PrototypeParityTest extends TestCase
         $this->assertStringContainsString('onPreviewLoad', $phone);
         $this->assertStringContainsString('naturalWidth', $phone);
 
-        // Bốn lối tắt 2×2 + vẫn còn CỬA ĐẦY ĐỦ 8 hành động.
-        foreach (['upscale', 'download', 'share', 'techpack'] as $q) {
+        /* SÁU lối tắt (2×3) — đợt 64: «Sửa ảnh» và «Đổi khung» được ĐƯA LÊN ĐÂY khỏi nút «Việc khác»
+           (đã gỡ), vì đó là hai việc chính với một tấm ảnh. Mỗi việc vẫn ĐÚNG một lối vào. */
+        foreach (['edit', 'upscale', 'reframe', 'download', 'share', 'techpack'] as $q) {
             $this->assertStringContainsString('data-phone-quick="'.$q.'"', $phone, 'Thiếu lối tắt '.$q.'.');
         }
-        $this->assertStringContainsString('data-phone-actions-door', $phone);
+        $this->assertSame(6, substr_count($phone, 'data-phone-quick='), 'Đúng 6 lối tắt — không thêm ô nào trùng việc.');
+        $this->assertStringNotContainsString('data-phone-actions-door', $phone,
+            'Nút «Việc khác» trên màn chính đã gỡ: sửa ảnh + đổi khung thành lối tắt, xoá nằm trong trình xem.');
 
-        // Danh sách ảnh ĐIỀU KHIỂN ĐƯỢC: mắt ẩn/hiện + thanh độ mờ (prototype: «CHẠM MẮT ĐỂ ẨN/HIỆN»).
-        $this->assertStringContainsString('data-phone-layer-eye', $phone);
-        $this->assertStringContainsString('store.toggleLayerVisible', $phone, 'Phải dùng ĐÚNG action bảng Lớp đang dùng.');
-        $this->assertStringContainsString('data-phone-layer-opacity', $phone);
-        $this->assertStringContainsString('store.setLayerOpacity', $phone);
+        /* [Đợt 64 — ĐẢO QUYẾT ĐỊNH] KHÔNG còn khối «Lớp» trên điện thoại.
+           Yêu cầu trực tiếp: "bỏ các tính năng xếp lớp và scale trên điện thoại". Trước đó tôi đã thêm
+           khối này theo prototype; nay gỡ vì đo được nó VÔ NGHĨA TẠI CHỖ: bảng ghép không tồn tại trên
+           điện thoại (§15.6), nên kéo thanh độ mờ hay bấm con mắt KHÔNG đổi gì trên màn hình. */
+        $this->assertStringNotContainsString('data-phone-layer-eye', $phone, 'Điện thoại không còn điều khiển lớp.');
+        $this->assertStringNotContainsString('data-phone-layer-opacity', $phone);
+        $this->assertStringNotContainsString('store.toggleLayerVisible', $phone);
+        $this->assertStringNotContainsString('store.setLayerOpacity', $phone);
+        $this->assertStringNotContainsString('data-phone-layers', $phone, 'Không còn danh sách lớp trên điện thoại.');
     }
 
     /**

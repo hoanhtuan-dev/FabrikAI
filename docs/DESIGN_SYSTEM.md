@@ -1278,8 +1278,9 @@ một màn hình ai cũng thấy nhưng không ai dùng được — và mọi n
 | **Nút ← về Trang chủ («Tạo»)** + nhãn ngữ cảnh (bộ sưu tập · ảnh đang làm việc) ở hàng đầu | **Canvas**, bảng ghép nhiều lớp, tay cầm kéo giãn/xoay |
 | Ảnh đang làm việc, chạm để mở **trình xem toàn màn hình** (kèm danh sách tính năng của ảnh) · tag **tỉ lệ · kích thước THẬT** của chính tấm ảnh | |
 | **CTA chính có GIÁ credit** («Tạo biến thể AI · N credit») + **lối tắt 2×2** (Nâng cấp 4× · Tải xuống · Chia sẻ · Tech pack) + cửa đầy đủ «Tác vụ ảnh — tất cả» | |
-| **Danh sách ảnh trong phiên ĐIỀU KHIỂN ĐƯỢC**: chạm để đặt ảnh đang làm việc · nút mắt ẩn/hiện · thanh độ mờ | |
+| ~~Danh sách ảnh trong phiên có nút mắt + thanh độ mờ~~ → **ĐÃ GỠ (đợt 64)**: bảng ghép không tồn tại trên điện thoại nên hai điều khiển đó KHÔNG đổi gì trên màn hình. Ảnh đang làm việc đổi từ dải «Kết quả gần đây» | |
 | **Tác vụ ảnh** (Options → Action): biến thể · **sửa ảnh** · nâng cấp · đổi khung · tải · chia sẻ · tech pack · xoá | Xếp lớp / ghép layer / bố cục nhiều ảnh — *cần màn hình lớn* |
+| **6 lối tắt một-chạm** ngay trên màn: Sửa ảnh · Nâng cấp 4× · Đổi khung · Tải xuống · Chia sẻ · Tech pack — mỗi ô MỘT việc, không ô nào trùng ô nào | Nút «Việc khác» trên màn chính (đã gỡ ở đợt 64: việc của nó đã có chỗ đúng hơn) |
 | **Công cụ** — sheet liệt kê **cả 9 công cụ** + 2 mục 'action' (Prompt Tạo Ảnh · Agent thiết kế) theo **cùng cấu hình owner quản lý**, chọn một công cụ ⇒ mở đúng card của nó trong **màn chiếm trọn** (`PhoneSurface.vue`) | Ba dock kéo giãn được |
 | **Kết quả** — lưới kết quả THẬT (`ResultGrid`): lọc trạng thái · tìm không dấu · sắp xếp · cỡ lưới · phạm vi bộ sưu tập · bấm mở trình xem · nút Sửa/Tải trên thẻ | Quick Open `Ctrl+K` · phím tắt canvas · bảng lệnh |
 | **Trợ lý** (modal trợ lý thiết kế) · **Bộ sưu tập** (bảng thiết kế) · **Nguồn ảnh** · **Thư viện & ảnh của tôi** | Thanh trạng thái canvas · vách ngăn kéo dock |
@@ -1301,7 +1302,12 @@ một màn hình ai cũng thấy nhưng không ai dùng được — và mọi n
    được phép là hai bản logic: mọi lời gọi API (`/api/refgen` · `/api/upscale` · `/api/reframe` · tải ·
    chia sẻ · xoá) nằm ở composable dùng chung, và `tests/Feature/PrototypeParityTest.php` cấm hai
    component tự gọi lại endpoint đó.
-4. **Không hiện nút cho việc không chạy được**: việc chỉ làm được ở màn rộng (xếp lớp · kéo giãn ·
+4. **MỘT MÀN SỬA ẢNH, MỘT TRÌNH XEM** (đợt 64). Bề mặt chỉnh ảnh (tả · khoanh · cọ — chạy bằng ngón
+   tay) nằm **TRONG công cụ «Sửa ảnh»**, không phải một màn riêng: trước đây công cụ gốc có prompt/preset/
+   model/giá nhưng chọn vùng phải vẽ trên canvas (điện thoại không có), còn "màn Chỉnh ảnh" làm được vùng
+   sửa nhưng thiếu hết phần tham số. Trình xem ảnh **chỉ xem MỘT ảnh** — không dải thumbnail, không mũi
+   tên chuyển ảnh, không bộ đếm "N/M": chuyển ảnh là việc của lưới Kết quả.
+5. **Không hiện nút cho việc không chạy được**: việc chỉ làm được ở màn rộng (xếp lớp · kéo giãn ·
    ba dock) **không** xuất hiện trên điện thoại, kể cả ở dạng mờ; giao diện **nói thật** ("cần màn hình
    lớn") thay vì đưa người dùng vào ngõ cụt (luật 56 ở §14). **Nhưng** "cần canvas" KHÔNG đồng nghĩa
    "không có đường tương đương": trước khi coi một việc là chỉ-có-ở-màn-rộng, phải **đọc lại mã** xem

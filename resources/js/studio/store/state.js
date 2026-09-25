@@ -121,7 +121,7 @@ export function studioState() {
     // Trong bước 5.2–5.3 hai mặt SONG SONG: canvas chưa bị xoá, chỉ đổi vai thành hàng công cụ.
     mainView: 'grid',
     // Màn "Chỉnh ảnh" (bước 5.3) — MỘT ảnh, ba chế độ Tả/Khoanh/Cọ. Mặc định 'Tả' (không mask).
-    editImageOpen: false,
+    // [Đợt 64] Đã gỡ `editImageOpen`: bề mặt chỉnh ảnh nằm trong công cụ «Sửa ảnh», không còn màn riêng.
     texture: 5,
     // upscale params (fabric-weave slider removed — it affected dark skin & detail edges)
     upscaleScale: 2,
@@ -489,7 +489,7 @@ export function studioState() {
   // [đợt 57] Bảng lọc nằm trong POPUP do thanh tiêu đề mở, không phải một dải chiếm chỗ trong lưới.
   // '' = đóng · 'filter' = mở bảng lọc · 'search' = mở bảng lọc và đặt con trỏ vào ô tìm.
   outputSheet: '',
-    viewerList: null,             // danh sách tùy chỉnh cho GalleryModal (vd: outputs của 1 dự án) — ưu tiên cao nhất trong viewerItems
+    // [Đợt 64] Đã gỡ `viewerList` — trình xem chỉ xem MỘT ảnh nên không còn "danh sách ngữ cảnh"ms
     projectView: 'board',         // 'board' (kanban) | 'list'
     projectsArchived: false,      // lọc dự án đã lưu trữ
     projectScope: 'own',          // 'own' (bộ sưu tập của mình) | 'pending' (hàng đợi duyệt — Super Admin)

@@ -264,16 +264,11 @@ function workflowLabel(state) {
  */
 function shotImage(s) { return (s && (s.thumb || s.media_url)) || ''; }
 function shotTitle(s) { return (s && (s.shot_label || s.name)) || ('Ảnh #' + (s && s.id)); }
-function detailViewerItems() {
-  return detailShots.value
-    .filter((s) => shotImage(s))
-    .map((s) => ({ id: s.id, media_url: shotImage(s), prompt: s.prompt || '', type: 'image', status: 'completed' }));
-}
-/** Chạm một ảnh trong bộ: mở trình xem dùng chung, NGỮ CẢNH là ảnh của bộ này. */
+/** Chạm một ảnh trong bộ: mở trình xem dùng chung — chỉ tấm ảnh đó (đợt 64: trình xem xem MỘT ảnh). */
 function openDetailShot(s) {
   const url = shotImage(s);
   if (!url) return;
-  store.openViewer({ id: s.id, media_url: url, prompt: s.prompt || '', type: 'image', status: 'completed' }, detailViewerItems());
+  store.openViewer({ id: s.id, media_url: url, prompt: s.prompt || '', type: 'image', status: 'completed' });
 }
 
 /** Thanh tiến trình 6 bước — số ảnh thật đang ở từng bước. */

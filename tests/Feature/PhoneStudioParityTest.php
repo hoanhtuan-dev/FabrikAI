@@ -71,9 +71,11 @@ class PhoneStudioParityTest extends TestCase
         $this->assertMatchesRegularExpression('/^ {2}<div v-else-if="!booting"/m', $inside);
 
         // Mọi lớp phủ dùng chung: cấp gốc (2 dấu cách) VÀ sau dấu mốc.
+        // [Đợt 64] `<EditImageModal` ĐÃ RỜI danh sách này: nó không còn là lớp phủ dùng chung mà là
+        // BỀ MẶT CHỈNH ẢNH nhúng trong công cụ «Sửa ảnh» (InpaintCard) — xem test riêng bên dưới.
         foreach ([
             '<GalleryModal', '<PopMenu', '<SourcePickerPopup', '<ProjectWorkspace',
-            '<EditImageModal', '<ChatModal', '<NotificationCenter', '<AuthNotice',
+            '<ChatModal', '<NotificationCenter', '<AuthNotice',
             '<ConfirmDialog', '<ConceptCard',
         ] as $tag) {
             $this->assertMatchesRegularExpression('/^ {2}'.$tag.'\b/m', $outside,
@@ -118,13 +120,18 @@ class PhoneStudioParityTest extends TestCase
                 'StudioApp phải truyền '.$prop.' xuống StudioPhone (một nguồn, không bản sao).');
         }
 
-        // 2. Sheet Công cụ render cả panel lẫn mục 'action', có khoá theo gói.
-        $this->assertStringContainsString('data-phone-tool-list', $phone);
-        $this->assertStringContainsString('data-phone-tool-item', $phone);
-        $this->assertStringContainsString('v-for="a in activityNav"', $phone);
-        $this->assertStringContainsString('v-for="a in toolbarActions"', $phone);
+        /* 2. DẢI CÔNG CỤ LÀ LỐI VÀO DUY NHẤT của 9 công cụ (đợt 64).
+           Trước đây danh sách công cụ có HAI chỗ: dải công cụ ngay trên màn VÀ lưới 9 công cụ trong
+           sheet «Công cụ» — hai lối vào cho cùng một việc. Nay sheet chỉ còn nhóm "đổi không gian /
+           nguồn dữ liệu" (Nguồn ảnh · Tệp & nguồn · Bộ sưu tập · Cài đặt · Agent · Tài khoản). */
+        $this->assertStringContainsString('data-phone-tool-rail', $phone, 'Dải công cụ là lối vào chính.');
+        $this->assertStringContainsString('v-for="a in activityNav"', $phone, 'Dải công cụ sinh từ cấu hình owner.');
         $this->assertStringContainsString("a.locked ? 'lock' : a.icon", $phone,
             'Công cụ bị khoá theo gói vẫn phải HIỆN (kèm ổ khoá) — giấu đi là giấu luôn tính năng khách có thể mua.');
+        $this->assertStringNotContainsString('data-phone-tool-list', $phone,
+            'Lưới 9 công cụ trong sheet PHẢI được gỡ — nó trùng với dải công cụ.');
+        $this->assertStringNotContainsString('data-phone-tool-item', $phone);
+        $this->assertStringContainsString('data-phone-more-entries', $phone, 'Sheet «Khác» mở từ dải công cụ.');
 
         // 3. Chọn công cụ ⇒ màn chiếm trọn render ĐÚNG card của nó (không bản sao công cụ).
         $this->assertStringContainsString('data-phone-tool-panel', $phone);
@@ -134,8 +141,8 @@ class PhoneStudioParityTest extends TestCase
             'Màn công cụ phải render chính card của xưởng (cùng component với màn rộng).'
         );
 
-        // 4. Bốn cửa còn lại của sản phẩm, mỗi cửa MỘT chỗ.
-        foreach (['tools', 'results', 'assistant', 'collections'] as $gate) {
+        // 4. Bốn cửa còn lại của sản phẩm, mỗi cửa MỘT chỗ. Cửa đầu nay tên «other» (sheet «Khác»).
+        foreach (['other', 'results', 'assistant', 'collections'] as $gate) {
             $this->assertStringContainsString('data-phone-gate="'.$gate.'"', $phone, 'Thiếu cửa '.$gate.'.');
         }
         $this->assertSame(4, substr_count($phone, 'data-phone-gate='), 'Bốn cửa — không thêm cửa thứ năm ở đây (§4: một màn một hành động chính).');
@@ -161,12 +168,22 @@ class PhoneStudioParityTest extends TestCase
         $this->assertStringContainsString('@logout="logout"', $app,
             'Đăng xuất phải đi qua ĐÚNG hàm logout() của StudioApp (một bản logic: fetch + XSRF + điều hướng).');
 
-        // 8. Màn Chỉnh ảnh (tả · khoanh · cọ) là đường THAY THẾ cho khoanh vùng trên canvas.
+        /* [Đợt 64] MỘT MÀN SỬA ẢNH: bề mặt chỉnh ảnh (tả · khoanh · cọ) nằm TRONG công cụ «Sửa ảnh»,
+           không còn là màn riêng mở bằng cờ `store.editImageOpen`. Trên điện thoại, mọi lối vào «Sửa
+           ảnh» đều mở ĐÚNG công cụ đó (toàn màn), nên nó chạy được bằng ngón tay. */
         $actions = $this->code($this->src('components/PhoneActions.vue'));
         $this->assertStringContainsString('data-phone-action="edit"', $actions);
         $this->assertStringContainsString("emit('edit')", $actions);
-        $this->assertStringContainsString('store.editImageOpen = true', $phone,
-            'Nhánh điện thoại phải mở màn Chỉnh ảnh bằng ĐÚNG cờ của xưởng (không tự dựng màn thứ hai).');
+        $this->assertStringContainsString("props.activityNav.find((a) => a.id === 'inpaint')", $phone,
+            'Nhánh điện thoại phải mở CÔNG CỤ «Sửa ảnh» — công cụ này chứa bề mặt chỉnh ảnh.');
+        $this->assertStringNotContainsString('editImageOpen', $phone,
+            'Không còn màn «Chỉnh ảnh» riêng — bỏ hẳn cờ đó.');
+
+        // Và công cụ gốc phải THẬT SỰ nhúng bề mặt chỉnh ảnh (không chỉ nói suông trong tài liệu).
+        $inpaint = $this->code($this->src('components/InpaintCard.vue'));
+        $this->assertStringContainsString("import EditImageModal from './EditImageModal.vue'", $inpaint);
+        $this->assertStringContainsString('<EditImageModal />', $inpaint,
+            'Công cụ «Sửa ảnh» phải nhúng bề mặt chỉnh ảnh — nếu không, hai nửa lại tách rời như trước.');
     }
 
     /**

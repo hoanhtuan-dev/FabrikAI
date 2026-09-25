@@ -159,8 +159,20 @@ class MainViewTest extends TestCase
         // requestActivity) — kiểm mã sống, không kiểm tài liệu.
         $gridCode = preg_replace('#/\*.*?\*/#s', '', $grid);
         $gridCode = preg_replace('#(?<!:)//[^\n]*#', '', $gridCode);
-        $this->assertStringNotContainsString('requestActivity', $gridCode,
-            'Lưới không còn tự mở công cụ — việc đó đã thuộc về trình xem ảnh.');
+
+        /* [Đợt 64] Nút «Sửa» trên thẻ ĐI THẲNG tới công cụ «Sửa ảnh» — và CHỈ nó được làm vậy.
+           Bất biến cũ ("lưới không tự mở công cụ") vẫn đúng về TINH THẦN: lưới không được trở thành
+           bảng phóng công cụ. Nay có ĐÚNG MỘT lời gọi điều phối, và nó ứng với chính nhãn của nút:
+           nút ghi «Sửa» thì phải mở đường sửa ảnh — bắt người dùng qua trình xem rồi bấm thêm một lần
+           là nút nói một đằng làm một nẻo. Mọi công cụ KHÁC vẫn chỉ mở được từ trình xem. */
+        $this->assertSame(1, substr_count($gridCode, "store.requestActivity('inpaint')"),
+            'Nút «Sửa» trên thẻ phải mở ĐÚNG công cụ Sửa ảnh, và chỉ một lời gọi điều phối.');
+        $this->assertSame(1, substr_count($gridCode, 'requestActivity'),
+            'Lưới chỉ được có MỘT lời gọi điều phối (nút Sửa) — không thành bảng phóng công cụ.');
+        foreach (['variation', 'upscale', 'compose', 'tryon', 'director'] as $other) {
+            $this->assertStringNotContainsString("requestActivity('".$other."')", $gridCode,
+                'Lưới không được mở công cụ '.$other.' — việc đó thuộc về trình xem ảnh.');
+        }
 
         // ...và trình xem phải THẬT SỰ nhận việc: đi qua đúng kênh requestActivity.
         $viewer = (string) file_get_contents(resource_path('js/studio/components/GalleryModal.vue'));

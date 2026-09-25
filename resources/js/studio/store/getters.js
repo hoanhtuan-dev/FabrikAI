@@ -60,12 +60,10 @@ export const studioGetters = {
     },
 
     activeBatch() { return this.generations.filter(g => this.lastBatch.includes(g.id)); },
-    // Nguồn ảnh cho GalleryModal: viewerList (context riêng, vd outputs của dự án) →
-    // thư viện (nếu đang ở /api/library) → outputs Studio.
-    viewerItems() {
-      if (this.viewerList && this.viewerList.length) return this.viewerList.filter(g => g.media_url);
-      return (this.libraryItems && this.libraryItems.length) ? this.libraryItems.filter(g => g.media_url) : this.generations.filter(g => g.media_url);
-    },
+    /**
+     * [Đợt 64] `viewerItems` ĐÃ GỠ cùng danh sách ngữ cảnh của trình xem.
+     * Trình xem chỉ đọc `store.viewer` (một ảnh) — không cần getter trả về "cả bộ ảnh".
+     */
     // Outputs hiển thị ở Studio: lọc theo dự án đang áp dụng khi bật toggle.
     visibleGenerations() {
       const pid = this.appliedProjectId();

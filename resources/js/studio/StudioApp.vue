@@ -46,7 +46,8 @@ const LibraryApp = asyncModal(() => import('./LibraryApp.vue'));
 const GalleryModal = asyncModal(() => import('./components/GalleryModal.vue'));
 // [Bước 5.3 — 2026-09-26] MÀN "CHỈNH ẢNH": MỘT ảnh, ba chế độ Tả/Khoanh/Cọ (mặc định Tả).
 // Nạp lười như mọi popup khác: người dùng chưa chắc mở nó trong phiên làm việc.
-const EditImageModal = asyncModal(() => import('./components/EditImageModal.vue'));
+// [Đợt 64] Đã gỡ mount riêng của «màn Chỉnh ảnh»: bề mặt chỉnh ảnh nay nằm TRONG công cụ «Sửa ảnh»
+// (InpaintCard nhúng EditImageModal.vue). Một màn sửa ảnh, không còn cờ `store.editImageOpen`.
 const ProjectWorkspace = asyncModal(() => import('./components/ProjectWorkspace.vue'));
 import StudioIcon from './components/StudioIcon.vue';
 import LayersPanel from './components/LayersPanel.vue';
@@ -2163,8 +2164,9 @@ function onTouchEnd(e) {
        ở trên: NÚT NỔI trong vùng canvas (components/ChatFab.vue — lối vào chính, hiện ở mọi bề
        rộng), lệnh trong bảng lệnh, và nút phụ «Hỏi trợ lý» ở màn hình canvas trống. -->
 
-  <!-- [Bước 5.3] Màn Chỉnh ảnh — mount thường trực, tự ẩn/hiện theo store.editImageOpen -->
-  <EditImageModal />
+  <!-- [Đợt 64] «Màn Chỉnh ảnh» KHÔNG còn mount ở đây: bề mặt chỉnh ảnh nay nằm TRONG công cụ
+       «Sửa ảnh» (InpaintCard nhúng EditImageModal.vue). Trước đây nó là mặt thứ hai mở bằng cờ riêng
+       \`store.editImageOpen\` — hai màn cùng một việc. -->
   <ChatModal />
   <!-- ══════════════════════════════════════════════════════════════════════════════════════
        LỚP PHỦ & BANNER DÙNG CHUNG CHO CẢ HAI NHÁNH (điện thoại ⇄ màn rộng) — đợt 59.

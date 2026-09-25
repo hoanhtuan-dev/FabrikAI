@@ -4,10 +4,17 @@ import { useStudioStore } from '../store.js';
 import { useJobTicker } from '../composables/useJobTicker.js';
 import { thumbUrl } from '../composables/useStudioThumb.js';
 import CompareSlider from './CompareSlider.vue';
+// Bề mặt chỉnh ảnh dùng chung (tả · khoanh · cọ). Tên tệp là EditImageModal.vue vì nó từng là một MÀN
+// riêng; vai trò nay là "bề mặt chỉnh ảnh của công cụ Sửa ảnh" — xem chú thích đầu tệp đó.
+import EditImageModal from './EditImageModal.vue';
+// Hành động trên MỘT ảnh (tải · chia sẻ) — CÙNG bản logic với sheet «Tác vụ ảnh» trên điện thoại.
+import { useImageActions } from '../composables/useImageActions.js';
 import StudioIcon from './StudioIcon.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 import BaseModal from './BaseModal.vue';
 const store = useStudioStore();
+/* Tải · Chia sẻ dùng CHUNG bản logic với sheet «Tác vụ ảnh» (composables/useImageActions.js). */
+const { download, share } = useImageActions();
 
 const beforeUrl = ref('');
 const compareOpen = ref(false);
@@ -68,7 +75,8 @@ const blockReason = computed(() => {
   return '';
 });
 const canSubmit = computed(() => !blockReason.value && !store.inpainting);
-const maskActive = computed(() => store.inpaintMaskMode !== 'none');
+// [Đợt 64] Đã gỡ `maskActive`: nút «Vẽ mask trên canvas» không còn trong card này (bề mặt chỉnh ảnh
+// nhúng bên dưới tự lo việc chọn vùng). Đường cong Bezier trên canvas vẫn ở RegionTools cho màn rộng.
 </script>
 <template>
   <div class="card p-5">
@@ -88,32 +96,46 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     </div>
     <div v-else class="mt-3 rounded-lg border border-dashed border-ink-700 bg-cream-50/5 p-3 text-xs text-cream-400">Chọn một ảnh trên <b>canvas</b> (Nguồn / Kết quả / sản phẩm) để sửa.</div>
 
-    <!-- Vẽ mask -->
-    <div v-if="activeImg" class="mt-3 space-y-2">
-      <button @click="store.toggleInpaintMask('path')"
-              class="group flex w-full items-center justify-center gap-2.5 rounded-lg border px-4 py-3 text-sm font-semibold motion-ui motion-ui--size duration-base"
-              :class="store.inpaintMaskMode === 'path'
-                ? 'border-brand-500 bg-gradient-to-r from-brand-600 to-brand-500 text-primary-content shadow-lg shadow-brand-900/30'
-                : 'border-ink-600 bg-brand-600/10 text-brand-200 hover:border-brand-400 hover:bg-brand-600/20 hover:shadow-md hover:shadow-brand-900/20 active:scale-[.98]'">
-        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors"
-              :class="store.inpaintMaskMode === 'path' ? 'bg-cream-50/20' : 'bg-brand-600/25 group-hover:bg-brand-600/35'">
-          <StudioIcon name="penTool" size="h-4 w-4" />
-        </span>
-        <span class="flex flex-col items-start text-left leading-tight">
-          <span class="text-title font-bold">{{ store.inpaintMaskMode === 'path' ? 'Đang vẽ mask — đóng kín để hoàn tất' : 'Vẽ mask' }}</span>
-          <span class="text-label opacity-80">Vùng chọn bằng đường cong (Bezier)</span>
-        </span>
-      </button>
-      <!-- Undo / Redo riêng cho mask -->
-      <div v-if="store.inpaintMaskMode === 'path'" class="flex justify-center gap-1.5">
-        <button @click="store.inpaintPathUndo()" class="flex items-center gap-1 rounded-full border border-ink-600 px-2.5 py-1 text-label font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-ink-800" title="Hoàn tác (Ctrl+Z)"><StudioIcon name="undo" size="h-3 w-3" /> Hoàn tác</button>
-        <button @click="store.inpaintPathRedo()" class="flex items-center gap-1 rounded-full border border-ink-600 px-2.5 py-1 text-label font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-ink-800" title="Làm lại (Ctrl+Y)"><StudioIcon name="redo" size="h-3 w-3" /> Làm lại</button>
-      </div>
-      <div v-if="maskActive || store.inpaintMaskDone" class="flex justify-center">
-        <button @click="store.clearInpaintMask()" class="rounded-full bg-danger/25 px-3 py-1 text-label font-semibold text-danger transition-colors hover:bg-danger hover:text-cream-50">Bỏ mask</button>
-      </div>
+    <!-- ══ BỀ MẶT CHỈNH ẢNH — MỘT màn sửa ảnh duy nhất (đợt 64) ═══════════════════════════════════════
+         Trước đây chỗ này là nút «Vẽ mask (đường cong Bezier)» — nó bật `store.inpaintMaskMode='path'`
+         rồi người dùng VẼ TRÊN CANVAS (§RegionTools). Trên điện thoại KHÔNG có canvas ⇒ cả công cụ
+         «Sửa ảnh» không dùng được ở đó, trong khi một màn khác («Chỉnh ảnh») lại làm được đúng việc này.
+
+         Nay công cụ này NHÚNG chính bề mặt chỉnh ảnh đó (`EditImageModal.vue` — tên tệp giữ nguyên,
+         vai trò là "bề mặt chỉnh ảnh"): ba chế độ Tả · Khoanh · Cọ chạy bằng ngón tay, kèm làm-mềm-mép và
+         cỡ cọ. Nhờ vậy: MỘT màn sửa ảnh, chạy được ở MỌI bề rộng, và không còn cảnh "công cụ gốc thiếu
+         nửa này, màn phụ thiếu nửa kia".
+         Vẽ mask bằng đường cong trên canvas VẪN còn ở thanh công cụ canvas (RegionTools) cho ai làm
+         việc nhiều lớp trên màn rộng — nó là công cụ CANVAS, không phải đường duy nhất của card này. -->
+    <div v-if="activeImg" class="mt-3 overflow-hidden rounded-lg border border-ink-700 bg-ink-900/40">
+      <EditImageModal />
     </div>
-    <div v-if="maskActive" class="mt-1.5 rounded-md border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-label text-brand-200">Vẽ đường cong quanh vùng cần sửa — quay lại điểm đầu để đóng kín, vùng chọn tự thành mask.</div>
+
+    <!-- ══ VIỆC TIẾP THEO VỚI ẢNH NÀY (đợt 64) ═══════════════════════════════════════════════════════
+         Yêu cầu: "thêm các tính năng và action mới vào để thuận tiện trên điện thoại".
+         VÌ SAO Ở ĐÂY: sau khi sửa xong một ảnh, việc người dùng muốn làm ngay là TẢI nó về, CHIA SẺ,
+         phóng to, hoặc tạo biến thể — mà trước đây mỗi việc đó nằm ở một màn khác (Tác vụ ảnh / công cụ
+         Upscale / biến thể), tức là phải rời khỏi chỗ vừa làm xong.
+         Hai việc đầu chạy TẠI CHỖ qua bản logic dùng chung (`useImageActions` — cùng hàm với sheet Tác
+         vụ ảnh, không phải bản sao); hai việc sau ĐIỀU HƯỚNG qua kênh chuẩn `store.requestActivity`
+         (màn rộng mở bảng công cụ, điện thoại mở công cụ toàn màn) — không tự mở lớp phủ. -->
+    <template v-if="activeImg">
+      <p class="label mt-4">Việc tiếp theo</p>
+      <div class="mt-1 grid grid-cols-2 gap-1.5">
+        <button type="button" class="flex items-center justify-center gap-1.5 rounded-md border border-ink-600 bg-ink-800 px-2 py-2 text-label font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-ink-700" title="Tải ảnh gốc về máy" data-inpaint-next="download" @click="download()">
+          <StudioIcon name="download" size="h-3.5 w-3.5" class="text-brand-300" /> Tải xuống
+        </button>
+        <button type="button" class="flex items-center justify-center gap-1.5 rounded-md border border-ink-600 bg-ink-800 px-2 py-2 text-label font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-ink-700" title="Gửi qua app khác hoặc chép liên kết" data-inpaint-next="share" @click="share()">
+          <StudioIcon name="share" size="h-3.5 w-3.5" class="text-brand-300" /> Chia sẻ
+        </button>
+        <button type="button" class="flex items-center justify-center gap-1.5 rounded-md border border-ink-600 bg-ink-800 px-2 py-2 text-label font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-ink-700" title="Phóng to 2×/4× giữ chi tiết" data-inpaint-next="upscale" @click="store.requestActivity('upscale')">
+          <StudioIcon name="maximize" size="h-3.5 w-3.5" class="text-brand-300" /> Nâng cấp
+        </button>
+        <button type="button" class="flex items-center justify-center gap-1.5 rounded-md border border-ink-600 bg-ink-800 px-2 py-2 text-label font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-ink-700" title="Sinh các phương án mới giống ảnh này" data-inpaint-next="variant" @click="store.requestActivity('variation')">
+          <StudioIcon name="variations" size="h-3.5 w-3.5" class="text-brand-300" /> Tạo biến thể
+        </button>
+      </div>
+    </template>
     <!-- Trạng thái mask đã lưu: lưới mini preview -->
     <div v-else-if="store.inpaintMaskDone" class="mt-1.5 rounded-md border border-ok/40 bg-ok/10 px-2.5 py-2 text-label text-ok">
       <div class="grid grid-cols-[auto_1fr_auto] items-center gap-3">

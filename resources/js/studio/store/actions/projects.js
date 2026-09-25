@@ -295,7 +295,7 @@ export const projectsActions = {
             if (inDetail && Number(this.activeProject.id) !== Number(newPid)) {
               this.activeProjectGenerations = this.activeProjectGenerations.filter(g => Number(g.id) !== Number(gid));
               this.activeProject.generations_count = Math.max(0, (this.activeProject.generations_count || 1) - 1);
-              if (this.viewerList) this.viewerList = this.viewerList.filter(g => Number(g.id) !== Number(gid));
+              // (Đã gỡ dòng lọc `viewerList`: trình xem không còn danh sách ngữ cảnh.)
             }
           }
           const bump = (pid, d) => { const p = this.projects.find(x => Number(x.id) === Number(pid)); if (p) p.generations_count = Math.max(0, (p.generations_count || 0) + d); };
@@ -375,9 +375,15 @@ export const projectsActions = {
       this.activeProjectGenerations = [];
       this.activeProjectReviewOnly = false;
     },
-    // Mở GalleryModal với ngữ cảnh danh sách rõ ràng (mặc định: thư viện / outputs).
-    openViewer(g, list = null) {
-      this.viewerList = list;
+    /**
+     * MỞ TRÌNH XEM cho ĐÚNG MỘT ảnh (đợt 64 · 2026-09-26).
+     *
+     * Trước đây: `openViewer(g, list)` — nơi gọi truyền thêm một DANH SÁCH ngữ cảnh để trình xem biết
+     * "ảnh kề" là ảnh nào (lưới kết quả truyền cả lưới, màn chi tiết bộ sưu tập truyền ảnh của bộ, thư
+     * viện truyền thư viện). Nay trình xem chỉ xem một ảnh nên tham số đó không còn nghĩa; bỏ nó đi là
+     * bỏ luôn một tầng trạng thái, và mọi lối mở trình xem hành xử GIỐNG NHAU (trước đây khác nhau).
+     */
+    openViewer(g) {
       this.viewer = g;
     },
     // Điều hướng chuẩn khi bấm "Chỉnh sửa" / "Tạo video" từ GalleryModal —

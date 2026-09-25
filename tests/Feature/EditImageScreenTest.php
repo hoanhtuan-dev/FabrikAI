@@ -106,10 +106,18 @@ class EditImageScreenTest extends TestCase
     {
         $grid = (string) file_get_contents(resource_path('js/studio/components/ResultGrid.vue'));
 
-        $posSelect = strpos($grid, 'store.select(g); store.editImageOpen = true;');
+        /* [Đợt 64] Đường mở nay là: đặt ảnh đang làm việc RỒI mở CÔNG CỤ «Sửa ảnh» (bề mặt chỉnh ảnh
+           nằm trong công cụ đó). Bất biến cũ vẫn nguyên giá trị: chọn ảnh TRƯỚC khi mở, nếu không thì
+           bề mặt mở ra với ảnh cũ — chỉ đổi cái được mở (công cụ thay vì màn riêng). */
+        $posSelect = strpos($grid, "store.select(g); store.requestActivity('inpaint');");
         $this->assertNotFalse($posSelect,
-            'Nút «Sửa» phải đặt ảnh đang làm việc RỒI mới mở màn — nếu không, màn mở ra với ảnh cũ.');
-        $this->assertStringContainsString('data-edit-open', $grid, 'Nút mở màn Chỉnh ảnh thiếu dấu hiệu nhận biết.');
+            'Nút «Sửa» phải đặt ảnh đang làm việc RỒI mới mở công cụ Sửa ảnh — nếu không, nó mở ra với ảnh cũ.');
+        // Kiểm MÃ SỐNG: tệp này ghi lại lịch sử ngay tại chỗ ("trước đây: store.editImageOpen = true"),
+        // nên kiểm cả tệp là cấm chính tài liệu của nó — phải bóc chú thích trước.
+        $gridCode = (string) preg_replace('#/\*.*?\*/#s', '', (string) preg_replace('#<!--.*?-->#s', '', $grid));
+        $this->assertStringNotContainsString('editImageOpen', $gridCode,
+            'Màn «Chỉnh ảnh» riêng đã nhập vào công cụ — không còn cờ editImageOpen trong mã.');
+        $this->assertStringContainsString('data-edit-open', $grid, 'Nút mở sửa ảnh thiếu dấu hiệu nhận biết.');
     }
 
     /**

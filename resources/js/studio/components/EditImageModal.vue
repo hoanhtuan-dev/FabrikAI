@@ -22,13 +22,37 @@
  *   brush: mask_mode='brush' + mask_data = PNG base64, NỀN TRẮNG + NÉT ĐEN (xem buildMaskImage)
  * Không thêm tham số nào mới ⇒ backend không phải sửa một dòng.
  */
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
-import BaseModal from './BaseModal.vue';
 import StudioIcon from './StudioIcon.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 import CompareSlider from './CompareSlider.vue';
 
+/**
+ * [Đợt 64 · 2026-09-26] COMPONENT NÀY NAY LÀ **BỀ MẶT CHỈNH ẢNH CỦA CÔNG CỤ «SỬA ẢNH»**, không còn là
+ * một màn riêng.
+ *
+ * YÊU CẦU TRỰC TIẾP: "đang có 2 màn hình chỉnh ảnh trùng lặp -> ưu tiên trình chỉnh sửa của công cụ gốc
+ * và thêm các tính năng và action mới vào để thuận tiện trên điện thoại".
+ *
+ * Trước đợt này có HAI đường sửa ảnh:
+ *   · `InpaintCard` (công cụ gốc «Sửa ảnh»): có prompt · preset · model · giá · nút chạy — nhưng chọn
+ *     vùng thì phải vẽ mask TRÊN CANVAS (`inpaintMaskMode='path'` + RegionTools) ⇒ TRÊN ĐIỆN THOẠI
+ *     KHÔNG dùng được (không có canvas);
+ *   · `EditImageModal` («Chỉnh ảnh»): bề mặt sửa chạy bằng ngón tay (tả · khoanh · cọ) nhưng là MÀN
+ *     THỨ HAI, mở bằng cờ riêng, và không có phần prompt/preset/model/giá của công cụ.
+ * Người dùng phải chọn một trong hai, và mỗi bên thiếu đúng thứ bên kia có.
+ *
+ * Nay: bề mặt này ĐƯỢC NHÚNG vào chính công cụ «Sửa ảnh» ⇒ MỘT màn sửa ảnh duy nhất, có đủ cả hai nửa:
+ * vùng sửa (tả · khoanh · cọ, chạy bằng ngón tay) và tham số của công cụ. Nó không còn tự mở/đóng:
+ * sống và chết theo công cụ đang được mở.
+ *
+ * Hợp đồng mask gửi lên backend KHÔNG đổi (rect: region chuẩn hoá · brush: PNG nền trắng nét đen) —
+ * xem chú thích đầu tệp. Nhờ vậy lượt sửa đi qua ĐÚNG `store.inpaint()` như trước.
+ *
+ * (Tên tệp giữ nguyên `EditImageModal.vue` để không phải đổi hàng loạt đường dẫn trong test; vai trò
+ * thật của nó là "bề mặt chỉnh ảnh", và điều đó được ghi ở đây.)
+ */
 const store = useStudioStore();
 
 /** 'describe' (Tả — mặc định) | 'rect' (Khoanh) | 'brush' (Cọ) */
@@ -235,8 +259,8 @@ async function run() {
 const compareBefore = ref('');
 const compareOpen = ref(false);
 
-function close() {
-  store.editImageOpen = false;
+/** Dừng mọi thao tác đang dở (dùng khi đổi chế độ hoặc khi công cụ chứa nó bị đóng). */
+function stopInteractions() {
   painting.value = false;
   dragging.value = false;
 }
@@ -250,9 +274,12 @@ watch(mode, async (m) => {
   if (m === 'describe') { store.inpaintMaskDone = false; }
 });
 
-// Mở màn: nạp ảnh đang làm việc, đặt lại prompt và khởi tạo cọ nếu đang ở chế độ Cọ.
-watch(() => store.editImageOpen, async (open) => {
-  if (!open) return;
+/**
+ * KHỞI TẠO khi bề mặt được gắn vào công cụ: nạp prompt đang có của công cụ và khởi tạo cọ nếu đang ở
+ * chế độ Cọ. Trước đây việc này treo vào cờ `store.editImageOpen` của màn riêng; nay gắn theo VÒNG ĐỜI
+ * của component (nó chỉ tồn tại khi công cụ «Sửa ảnh» đang mở).
+ */
+onMounted(async () => {
   prompt.value = store.inpaintPrompt || '';
   feather.value = Number(store.inpaintFeather) || 0;
   if (mode.value === 'brush') await initBrush();
@@ -263,7 +290,13 @@ onBeforeUnmount(() => { ctx = null; brushCanvas.value = null; });
 </script>
 
 <template>
-  <BaseModal :model-value="store.editImageOpen" full title="Chỉnh ảnh" @update:model-value="close">
+  <!-- ══ BỀ MẶT CHỈNH ẢNH — ĐƯỢC NHÚNG TRONG CÔNG CỤ «SỬA ẢNH» ══════════════════════════════════════
+       [Đợt 64] Không còn `<BaseModal>`: nó từng là MÀN RIÊNG mở bằng cờ `store.editImageOpen`, tức là
+       màn chỉnh ảnh THỨ HAI bên cạnh công cụ «Sửa ảnh». Nay nó là phần thân của công cụ đó — công cụ
+       mở thì bề mặt này sống, công cụ đóng thì nó chết theo. Một màn sửa ảnh, đủ cả hai nửa:
+       vùng sửa (tả · khoanh · cọ) và tham số (preset · model · giá · nút chạy của công cụ).
+       Bố cục đổi theo chỗ đứng: trong công cụ (khung hẹp) thì xếp DỌC ảnh-trên/tham số-dưới. -->
+  <div class="flex h-full min-h-0 flex-col">
     <div class="flex h-full min-h-0 flex-col lg:flex-row">
       <!-- ── VÙNG ẢNH (chiếm phần lớn; trên điện thoại là phần trên) ── -->
       <div ref="wrapEl" class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-ink-950 p-3">
@@ -380,5 +413,5 @@ onBeforeUnmount(() => { ctx = null; brushCanvas.value = null; });
     </div>
 
     <CompareSlider v-model="compareOpen" :before="compareBefore" :after="src" />
-  </BaseModal>
+  </div>
 </template>

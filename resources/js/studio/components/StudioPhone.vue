@@ -175,7 +175,7 @@ watch(() => store.generating, (now, before) => { if (before && !now && batchRead
 
 const currentUrl = computed(() => store.upscaleSrc || '');
 const recents = computed(() => (store.visibleGenerations || []).filter((g) => g.media_url && g.status === 'completed').slice(0, 12));
-const layers = computed(() => store.canvasLayers || []);
+// [Đợt 64] Đã gỡ `layers` (danh sách lớp) — khối «Lớp» không còn trên điện thoại.
 const activeId = computed(() => (store.preview && store.preview.id) ?? null);
 
 function pickGen(g) {
@@ -187,22 +187,8 @@ function openCurrent() {
   if (store.preview) store.openViewer(store.preview);
 }
 /**
- * CHỌN MỘT ẢNH TRONG PHIÊN LÀM ẢNH ĐANG LÀM VIỆC (chạm hàng trong danh sách).
- * KHÔNG gọi store.selectLayer(): trên điện thoại nó kéo theo cả "layer đang chọn" + isolate của canvas —
- * một trạng thái không có bề mặt nào để nhìn. Ở đây chỉ đặt ẢNH ĐANG LÀM VIỆC (đúng tinh thần bước 5.1),
- * cùng lối với pickGen() phía trên.
- */
-function pickLayer(l) {
-  if (!l) return;
-  haptic(8);
-  const url = l.src || l.image;
-  if (!url) return;
-  if (l.genId != null) {
-    store.previewId = l.genId;
-    store.preview = { id: l.genId, media_url: url, type: 'image', status: 'completed' };
-  }
-  store.setWorkingImage(l.genId != null ? { id: l.genId, media_url: url } : url, l.genId != null ? 'generation' : 'source');
-}
+// [Đợt 64] Đã gỡ `pickLayer()` cùng danh sách lớp: ảnh đang làm việc nay chỉ đổi từ dải
+// «Kết quả gần đây» (pickGen) — một đường, và đúng bản chất state (không phải "layer đang chọn").
 function goPrompt(q) {
   // Ô prompt của thanh lệnh là ĐƯỜNG CHÍNH để tạo ảnh trên điện thoại (đợt 59: bảng "Prompt Tạo Ảnh"
   // đầy đủ vẫn mở được từ sheet Công cụ cho ai cần tham số — hai đường, một trường prompt).
@@ -256,7 +242,10 @@ function editCurrent() {
   if (!store.workingImage && store.preview && store.preview.media_url) store.setWorkingImage(store.preview, 'generation');
   if (!store.workingImage) return;
   haptic(12);
-  store.editImageOpen = true;
+  // [Đợt 64] Mở CÔNG CỤ «Sửa ảnh» (chứa bề mặt chỉnh ảnh), không mở màn «Chỉnh ảnh» riêng nữa —
+  // hai màn cùng một việc đã nhập làm một.
+  const item = props.activityNav.find((a) => a.id === 'inpaint');
+  if (item) pickTool(item);
 }
 </script>
 
@@ -354,11 +343,22 @@ function editCurrent() {
         <StudioIcon name="sparkles" size="h-4 w-4" /> Tạo biến thể AI<span v-if="imageCost"> · {{ imageCost }} credit</span>
       </button>
 
-      <!-- ══ BỐN LỐI TẮT (2×2 như prototype): mỗi ô là MỘT hành động chạy được ngay, cùng bản logic
-           với sheet «Tác vụ ảnh». Ô nào chưa có ảnh thì KHOÁ và nói lý do ngay dưới (luật 5 §0). ══ -->
+      <!-- ══ SÁU LỐI TẮT (2×3): mỗi ô MỘT việc chạy được ngay, không ô nào trùng ô nào.
+           [Đợt 64] Từ 4 lên 6 ô vì hai việc được ĐƯA LÊN ĐÂY khỏi nút «Việc khác» đã gỡ:
+             · «Sửa ảnh» — việc chính với một tấm ảnh, mở công cụ chứa bề mặt chỉnh ảnh;
+             · «Đổi khung» — cắt theo tỉ lệ, việc hay dùng khi chuẩn bị ảnh đăng bán.
+           «Xoá» KHÔNG lên đây: nó nằm trong TRÌNH XEM (nơi người dùng đang nhìn kỹ tấm ảnh trước khi xoá).
+           Ô nào chưa có ảnh thì KHOÁ (luật 5 §0: nút khoá phải nói được lý do — màn có sẵn trạng thái
+           «Chưa có ảnh nào — mô tả thiết kế ở thanh dưới», và chính CTA cũng khoá như vậy). ══ -->
       <div class="mt-2 grid grid-cols-2 gap-2">
+        <button type="button" class="flex h-12 items-center justify-center gap-2 rounded-2xl border border-ink-600 bg-ink-800 text-label font-semibold text-cream-200 transition hover:border-brand-400 active:bg-ink-700 disabled:opacity-45" :disabled="!currentUrl" data-phone-quick="edit" @click="editCurrent()">
+          <StudioIcon name="pencil" size="h-4 w-4" class="text-brand-300" /> Sửa ảnh
+        </button>
         <button type="button" class="flex h-12 items-center justify-center gap-2 rounded-2xl border border-ink-600 bg-ink-800 text-label font-semibold text-cream-200 transition hover:border-brand-400 active:bg-ink-700 disabled:opacity-45" :disabled="!currentUrl" data-phone-quick="upscale" @click="openActions('upscale')">
           <StudioIcon name="maximize" size="h-4 w-4" class="text-brand-300" /> Nâng cấp 4×
+        </button>
+        <button type="button" class="flex h-12 items-center justify-center gap-2 rounded-2xl border border-ink-600 bg-ink-800 text-label font-semibold text-cream-200 transition hover:border-brand-400 active:bg-ink-700 disabled:opacity-45" :disabled="!currentUrl" data-phone-quick="reframe" @click="openActions('reframe')">
+          <StudioIcon name="crop" size="h-4 w-4" class="text-brand-300" /> Đổi khung
         </button>
         <button type="button" class="flex h-12 items-center justify-center gap-2 rounded-2xl border border-ink-600 bg-ink-800 text-label font-semibold text-cream-200 transition hover:border-brand-400 active:bg-ink-700 disabled:opacity-45" :disabled="!currentUrl" data-phone-quick="download" @click="doDownload()">
           <StudioIcon name="download" size="h-4 w-4" class="text-brand-300" /> Tải xuống
@@ -371,20 +371,14 @@ function editCurrent() {
         </a>
       </div>
 
-      <!-- ══ VIỆC KHÁC — ba việc KHÔNG có mặt trên màn này: sửa ảnh · đổi khung · xoá ══
-           [Đợt 62 · dọn trùng lặp] Nút này trước đây mở danh sách ĐỦ 8 việc, trong đó **5 việc đã nằm
-           ngay trên màn** (CTA «Tạo biến thể AI» + 4 chip) ⇒ cùng một việc có HAI lối vào trên cùng một
-           màn hình. Nay mỗi việc chỉ có MỘT lối vào: việc đáng một cú chạm thì ở trên màn, phần còn lại
-           ở đây. Màn hẹp thì chỗ là thứ đắt nhất. -->
-      <button
-        type="button"
-        class="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-ink-600 bg-ink-900 text-label font-semibold text-cream-200 transition hover:border-brand-400 active:bg-ink-800 disabled:opacity-45"
-        :disabled="!currentUrl"
-        data-phone-actions-door
-        @click="openActions()"
-      >
-        <StudioIcon name="sliders" size="h-4 w-4" class="text-brand-300" /> Việc khác — sửa ảnh · đổi khung · xoá
-      </button>
+      <!-- ══ [Đợt 64] NÚT «VIỆC KHÁC» ĐÃ GỠ KHỎI MÀN CHÍNH ═══════════════════════════════════════════
+           Ba việc nó chứa nay đã có chỗ ĐÚNG hơn, mỗi việc MỘT chỗ:
+             · SỬA ẢNH  → thành lối tắt trên màn (chip «Sửa ảnh») vì đây là việc chính với một tấm ảnh,
+                            và nó mở công cụ chứa bề mặt chỉnh ảnh (tả · khoanh · cọ);
+             · ĐỔI KHUNG → chip riêng (cắt theo tỉ lệ, hay dùng cho ảnh đăng bán);
+             · XOÁ        → đã nằm trong TRÌNH XEM («Việc khác» của trình xem), nơi người dùng đang nhìn
+                            kỹ tấm ảnh trước khi quyết định xoá — không phải một nút trên màn chính.
+           Nhờ vậy màn Studio còn ĐÚNG 6 lối tắt + 1 nút chính, tất cả đều có việc thật đằng sau.
 
       <!-- Bốn lối vào ngang cấp: công cụ · kết quả · trợ lý · bộ sưu tập.
            Đây là phần bù cho dock 4 đích của màn rộng, dựng theo §15.7 (mỗi mục là một CỬA, không
@@ -392,8 +386,8 @@ function editCurrent() {
       <!-- Bốn lối vào ngang cấp, nay là MỘT dải chip (hàng 44px) thay vì bốn ô 64px: prototype không
            có ô vuông nào ở màn Studio, và chiều cao tiết kiệm được là chỗ cho chính tấm ảnh. -->
       <nav class="scrollbar-hide -mx-4 mt-5 flex gap-2 overflow-x-auto px-4" aria-label="Lối vào chính">
-        <button type="button" class="flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-ink-600 bg-ink-800 px-4 text-label font-semibold text-cream-200 transition hover:border-brand-400 active:bg-ink-700" data-phone-gate="tools" @click="openTools">
-          <StudioIcon name="sliders" size="h-4 w-4" class="text-brand-300" /> Công cụ
+        <button type="button" class="flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-ink-600 bg-ink-800 px-4 text-label font-semibold text-cream-200 transition hover:border-brand-400 active:bg-ink-700" data-phone-gate="other" @click="openTools">
+          <StudioIcon name="sliders" size="h-4 w-4" class="text-brand-300" /> Khác
         </button>
         <button type="button" class="flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-ink-600 bg-ink-800 px-4 text-label font-semibold text-cream-200 transition hover:border-brand-400 active:bg-ink-700" data-phone-gate="results" @click="openResults">
           <StudioIcon name="grid" size="h-4 w-4" class="text-brand-300" /> Kết quả
@@ -411,7 +405,9 @@ function editCurrent() {
       <section v-if="activityNav.length" class="mt-5">
         <div class="flex items-baseline justify-between">
           <h2 class="text-label font-semibold text-cream-300">Công cụ</h2>
-          <button type="button" class="text-micro font-semibold text-brand-300" @click="openTools">Tất cả</button>
+          <!-- [Đợt 64] Nhãn «Tất cả» đổi thành «Khác»: sheet nay KHÔNG liệt kê lại công cụ (chúng ở
+               ngay dải này) mà chứa nhóm việc khác (nguồn ảnh · tệp & nguồn · bộ sưu tập · cài đặt…). -->
+          <button type="button" class="text-micro font-semibold text-brand-300" data-phone-more-entries @click="openTools">Khác</button>
         </div>
         <div class="scrollbar-hide -mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1" data-phone-tool-rail>
           <button
@@ -448,53 +444,20 @@ function editCurrent() {
         </div>
       </section>
 
-      <!-- ══ ẢNH TRONG PHIÊN — ĐIỀU KHIỂN ĐƯỢC (theo prototype: «Lớp · N» · «CHẠM MẮT ĐỂ ẨN/HIỆN» ·
-           thanh độ mờ trên từng hàng). Trước đợt này danh sách chỉ ĐỌC, và nhãn còn gọi nó là «Lớp trên
-           bảng ghép» — tên của một bề mặt không tồn tại trên điện thoại (§15.6).
-           Ở đây mỗi hàng làm ĐÚNG ba việc, cả ba đều có thật:
-             · chạm ảnh/tên ⇒ ẢNH ĐANG LÀM VIỆC đổi sang ảnh đó (mọi công cụ một-ảnh đọc nó);
-             · nút mắt ⇒ `store.toggleLayerVisible` (cùng action bảng Lớp màn rộng đang gọi);
-             · thanh độ mờ ⇒ `store.setLayerOpacity` (action thêm ở đợt này — sửa ĐÚNG hàng đang kéo).
-           Xếp lớp bằng cách kéo trên bảng ghép vẫn là việc của màn rộng, và dòng cuối nói thẳng điều đó. -->
-      <section v-if="layers.length" class="mt-5">
-        <div class="flex items-baseline justify-between">
-          <h2 class="text-label font-semibold text-cream-300">Ảnh trong phiên ({{ layers.length }})</h2>
-          <span class="micro-label text-cream-400">Chạm mắt để ẩn/hiện</span>
-        </div>
-        <ul class="mt-2 space-y-1.5" data-phone-layers>
-          <li v-for="l in layers" :key="l.id" class="rounded-xl bg-ink-800 px-3 py-2" :class="l.visible === false ? 'opacity-60' : ''">
-            <div class="flex items-center gap-2.5">
-              <button type="button" class="flex min-w-0 flex-1 items-center gap-2.5 text-left" :title="'Đặt «' + (l.name || 'Ảnh') + '» làm ảnh đang làm việc'" :aria-label="'Đặt ' + (l.name || 'Ảnh') + ' làm ảnh đang làm việc'" @click="pickLayer(l)">
-                <img v-if="l.src || l.image" :src="thumbUrl(l.src || l.image, 160)" :alt="l.name || 'Ảnh'" class="h-9 w-9 shrink-0 rounded-lg object-cover" loading="lazy" @error="onThumbError($event, l.src || l.image)">
-                <span class="min-w-0 flex-1 truncate text-label text-cream-200">{{ l.name || 'Ảnh' }}</span>
-              </button>
-              <button
-                type="button"
-                class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-cream-300 transition hover:bg-ink-700 hover:text-cream-50"
-                :aria-label="(l.visible === false ? 'Hiện' : 'Ẩn') + ' ' + (l.name || 'ảnh')"
-                :title="(l.visible === false ? 'Hiện' : 'Ẩn') + ' trên bảng ghép'"
-                :data-phone-layer-eye="l.id"
-                @click="store.toggleLayerVisible(l.id)"
-              >
-                <StudioIcon :name="l.visible === false ? 'eyeOff' : 'eye'" size="h-4 w-4" />
-              </button>
-            </div>
-            <label class="mt-1.5 flex items-center gap-2">
-              <span class="text-micro text-cream-400">Độ mờ</span>
-              <input
-                type="range" min="0" max="1" step="0.05"
-                :value="l.opacity != null ? l.opacity : 1"
-                class="h-6 min-w-0 flex-1 accent-brand-500"
-                :aria-label="'Độ mờ của ' + (l.name || 'ảnh')"
-                :data-phone-layer-opacity="l.id"
-                @input="store.setLayerOpacity(l.id, $event.target.value)"
-              >
-              <span class="w-9 shrink-0 text-right text-micro tabular-nums text-cream-300">{{ Math.round((l.opacity != null ? l.opacity : 1) * 100) }}%</span>
-            </label>
-          </li>
-        </ul>
-        <p class="mt-2 text-micro text-cream-400">Xếp lớp &amp; kéo giãn cần màn hình lớn. Sửa một ảnh thì dùng <b class="text-cream-300">Sửa ảnh</b> ở trên.</p>
-      </section>
+      <!-- ══ [Đợt 64 · ĐÃ GỠ KHỐI «LỚP» KHỎI ĐIỆN THOẠI] ═══════════════════════════════════════════
+           Yêu cầu trực tiếp: "bỏ các tính năng xếp lớp và scale trên điện thoại".
+
+           VÌ SAO GỠ LÀ ĐÚNG (không phải cắt tính năng): khối này cho ẩn/hiện và đổi ĐỘ MỜ của từng
+           lớp trong BẢNG GHÉP — mà bảng ghép KHÔNG tồn tại trên điện thoại (§15.6: không có DOM
+           canvas). Hệ quả đo được: người dùng kéo thanh độ mờ trên điện thoại và **không thấy gì đổi**
+           (không có composite nào để nhìn), còn ẩn/hiện một lớp thì chỉ đổi trạng thái mà màn hình
+           không hề phản ánh. Đó là loại điều khiển tệ nhất: có, bấm được, và vô nghĩa tại chỗ.
+
+           Ảnh đang làm việc vẫn đổi được — bằng đường ĐÚNG của nó: chạm một ảnh ở dải «Kết quả gần
+           đây» (ảnh đang làm việc là state riêng, không phải "layer đang chọn").
+           Xếp lớp · kéo giãn · độ mờ vẫn nguyên vẹn ở màn rộng (bảng Lớp trong Studio).
+           Nút mắt và thanh độ mờ KHÔNG mất chức năng ở đâu cả — chúng chỉ không xuất hiện ở nơi không
+           có gì để nhìn. -->
 
       <!-- Chừa chỗ cho thanh lệnh (§7.2 luật 3): spacer, KHÔNG dùng padding-bottom trên khung cuộn. -->
       <div class="h-24 shrink-0" aria-hidden="true"></div>
@@ -516,38 +479,16 @@ function editCurrent() {
     <TriageDeck v-model:open="triageOpen" />
     <PhoneActions v-model:open="actionsOpen" :start-at="actionsAt" @edit="editCurrent" />
 
-    <!-- ══ CẤP OPTIONS · DANH SÁCH CÔNG CỤ ══════════════════════════════════════════════════
-         Sinh từ CÙNG cấu hình owner quản lý và CÙNG dữ liệu khoá-theo-gói của thanh công cụ
-         desktop; mục bị khoá vẫn HIỆN (khách biết có tính năng này) nhưng bấm là mời nâng cấp. -->
-    <BottomSheet :open="toolsOpen" title="Công cụ" @update:open="closeAll">
-      <div class="grid grid-cols-2 gap-1.5 pb-1" data-phone-tool-list>
-        <button
-          v-for="a in activityNav" :key="'tl-' + a.id"
-          type="button"
-          class="flex min-h-14 items-center gap-2 rounded-xl border border-ink-600 bg-ink-800 px-3 text-left text-body font-semibold transition-colors active:bg-ink-700"
-          :class="a.locked ? 'text-cream-400 opacity-60' : 'text-cream-100'"
-          :data-phone-tool-item="a.id"
-          :title="a.locked ? a.label + ' — không có trong gói của bạn (bấm để nâng cấp)' : a.label"
-          @click="pickTool(a, true)"
-        >
-          <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-5 w-5" class="shrink-0 text-brand-300" />
-          <span class="min-w-0 flex-1 truncate">{{ a.label }}</span>
-        </button>
-        <button
-          v-for="a in toolbarActions" :key="'ta-' + a.id"
-          type="button"
-          class="flex min-h-14 items-center gap-2 rounded-xl border border-ink-600 bg-ink-800 px-3 text-left text-body font-semibold text-cream-100 transition-colors active:bg-ink-700"
-          :class="a.locked ? 'text-cream-400 opacity-60' : 'text-cream-100'"
-          :data-phone-tool-item="a.id"
-          @click="pickTool(a, true)"
-        >
-          <StudioIcon :name="a.locked ? 'lock' : a.icon" size="h-5 w-5" class="shrink-0 text-brand-300" />
-          <span class="min-w-0 flex-1 truncate">{{ a.label }}</span>
-        </button>
-      </div>
-
-      <!-- Lối vào KHÔNG phải công cụ — chúng đổi KHÔNG GIAN/nguồn dữ liệu, không phải việc đang làm. -->
-      <div class="mt-3 space-y-1.5 border-t border-ink-700 pt-3 pb-2">
+    <!-- ══ CẤP OPTIONS · «KHÁC» — chỉ những thứ KHÔNG phải công cụ ══════════════════════════════════
+         [Đợt 64 · dọn trùng lặp cuối cùng] LƯỚI 9 CÔNG CỤ ĐÃ GỠ khỏi sheet này.
+         VÌ SAO: 9 công cụ đó đã có ĐÚNG một lối vào — **dải công cụ** ngay trên màn (một cú chạm, có
+         icon + nhãn, sinh từ cùng cấu hình owner quản lý). Sheet này liệt kê lại y hệt 9 mục đó ⇒ hai
+         lối vào cho cùng một việc, và người dùng phải đoán "dải kia và sheet này khác gì nhau".
+         Sheet nay chỉ còn việc ĐỔI KHÔNG GIAN / NGUỒN DỮ LIỆU (Nguồn ảnh · Tệp & nguồn · Bộ sưu tập ·
+         Cài đặt · Agent · Tài khoản) — nhóm việc mà dải công cụ KHÔNG có. Nhãn đổi từ «Công cụ» →
+         «Khác» cho đúng thứ nó chứa. -->
+    <BottomSheet :open="toolsOpen" title="Khác" @update:open="closeAll">
+      <div class="space-y-1.5 pb-1">
         <button type="button" class="flex min-h-12 w-full items-center gap-2 rounded-xl border border-ink-600 bg-ink-800 px-3 text-left text-body font-semibold text-cream-100" @click="closeAll(); emit('open-source')">
           <StudioIcon name="imagePlus" size="h-5 w-5" class="text-brand-300" /> Nguồn ảnh
         </button>

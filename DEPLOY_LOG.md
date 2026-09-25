@@ -7989,3 +7989,82 @@ duy nhất · trình xem có luồng không bức tường nút · khoá `props.
 | **Chrome thật trên production (390×844 · DPR 2)** | `/studio`: nút **← về Trang chủ** có · **4 lối tắt** · banner xác thực · **0 lỗi console** · `/`: màn chào 3 slide cho khách |
 | Bộ test PHP | **1410 xanh** (10.970 assert) |
 
+
+---
+
+## Kiểm tra & triển khai 2026-09-26 (Đợt 64 — HỆ THỐNG LẠI LUỒNG ĐIỆN THOẠI: một màn sửa ảnh · bỏ lớp/scale · trình xem một ảnh)
+
+> Yêu cầu: "kiểm tra lại luồng làm việc thật sâu. hệ thống lại -> có thể lược bỏ hoặc thêm tính năng để luồng
+> tinh gọn. + đang có 2 màn hình chỉnh ảnh trùng lặp -> ưu tiên trình chỉnh sửa của công cụ gốc và thêm các
+> tính năng và action mới vào để thuận tiện trên điện thoại. bỏ các tính năng xếp lớp và scale trên điện
+> thoại. Quan trọng! tinh chỉnh -> tối ưu -> nâng cấp -> clean để luồng tinh gọn, dễ hiểu trên điện thoại ->
+> tránh trùng lặp, rườm rà -> trình xem ảnh chỉ cần xem 1 ảnh".
+
+### A. HAI MÀN SỬA ẢNH ⇒ MỘT (ưu tiên công cụ gốc)
+
+| | Trước | Sau |
+|---|---|---|
+| **Công cụ gốc «Sửa ảnh»** (`InpaintCard`) | prompt · preset · model · giá · nút chạy — nhưng chọn vùng phải **vẽ mask trên CANVAS** (`inpaintMaskMode='path'`) ⇒ **trên điện thoại không dùng được** | **NHÚNG bề mặt chỉnh ảnh** (`EditImageModal.vue` — tả · khoanh · cọ, pointer events) ⇒ chạy bằng ngón tay ở MỌI bề rộng, vẫn đủ prompt/preset/model/giá |
+| **«Màn Chỉnh ảnh»** (`EditImageModal`) | màn THỨ HAI, mở bằng cờ `store.editImageOpen`, có vùng sửa nhưng thiếu hết phần tham số của công cụ | Không còn là màn riêng: **mount ở gốc đã gỡ**, cờ `editImageOpen` đã xoá khỏi state, mọi lối vào «Sửa» mở ĐÚNG công cụ |
+| Vẽ mask đường cong (Bezier) trên canvas | đường DUY NHẤT của card | vẫn còn ở thanh công cụ canvas (`RegionTools`) cho màn rộng — nó là công cụ CANVAS, không phải đường duy nhất của card |
+
+**Action MỚI thêm vào công cụ** (yêu cầu "thêm tính năng và action mới để thuận tiện trên điện thoại"):
+hàng **«Việc tiếp theo»** ngay trong công cụ — **Tải xuống · Chia sẻ** (chạy tại chỗ, qua composable dùng
+chung `useImageActions` với sheet Tác vụ ảnh) và **Nâng cấp · Tạo biến thể** (điều hướng qua kênh chuẩn
+`store.requestActivity`). Trước đây mỗi việc đó phải rời màn vừa sửa xong.
+
+### B. BỎ XẾP LỚP + SCALE TRÊN ĐIỆN THOẠI
+
+Khối «Ảnh trong phiên» (nút mắt ẩn/hiện + thanh độ mờ từng hàng) **đã gỡ**, cùng `pickLayer()` và action
+`setLayerOpacity` (không còn nơi gọi ⇒ gỡ luôn, không để mã chết).
+
+**Vì sao gỡ là ĐÚNG, không phải cắt tính năng:** hai điều khiển đó sửa trạng thái của **BẢNG GHÉP** — mà bảng
+ghép không tồn tại trên điện thoại (§15.6). Đo được: kéo thanh độ mờ hay bấm con mắt **không đổi gì trên màn
+hình**. Ảnh đang làm việc vẫn đổi được bằng đường đúng: chạm một ảnh ở dải «Kết quả gần đây». Xếp lớp · kéo
+giãn · độ mờ vẫn nguyên vẹn ở màn rộng (bảng Lớp).
+
+### C. TRÌNH XEM ẢNH CHỈ XEM **MỘT ẢNH**
+
+Đã gỡ: **dải thumbnail 72px** · **hai mũi tên ‹ ›** · **bộ đếm "N / M"** · `nav()` · `prefetchNeighbors()`
+(tải trước ảnh kề) · **phím ← →** · và cả **ngữ cảnh danh sách** `viewerList` trong store.
+
+VÌ SAO LÀ LÀM GỌN THẬT: chuyển ảnh đã có ĐÚNG một chỗ — **lưới Kết quả**. Còn danh sách ngữ cảnh thì mỗi nơi
+mở trình xem lại truyền một kiểu (lưới truyền cả lưới · màn chi tiết bộ sưu tập truyền ảnh của bộ · thư viện
+truyền thư viện) ⇒ cùng một cú bấm mà hành vi phụ thuộc nơi xuất phát. Xoá một ảnh nay chỉ ĐÓNG trình xem,
+không nhảy sang ảnh kề (việc chọn ảnh khác thuộc về lưới).
+
+Đo trên Chrome 1440×900: `strip: false · arrows: 0 · counter: false · panel: true · primary: 2 · more: true`.
+
+### D. LUỒNG ĐIỆN THOẠI TINH GỌN (bỏ 3 lối trùng, thêm 2 lối đúng)
+
+| Thay đổi | Vì sao |
+|---|---|
+| **GỠ nút «Việc khác» trên màn chính** | ba việc của nó nay có chỗ đúng: **Sửa ảnh** và **Đổi khung** thành lối tắt trên màn; **Xoá** nằm trong TRÌNH XEM (nơi người dùng đang nhìn kỹ tấm ảnh trước khi xoá) |
+| **4 lối tắt → 6 lối tắt** (Sửa ảnh · Nâng cấp 4× · Đổi khung · Tải xuống · Chia sẻ · Tech pack) | mỗi ô MỘT việc, không ô nào trùng ô nào; hai việc mới là hai việc chính với một tấm ảnh |
+| **Sheet «Công cụ» → «Khác»**, gỡ LƯỚI 9 CÔNG CỤ bên trong | 9 công cụ đã có ĐÚNG một lối vào: **dải công cụ** ngay trên màn (một cú chạm, có icon + nhãn, sinh từ cùng cấu hình owner quản lý). Sheet liệt kê lại y hệt ⇒ hai lối vào cho cùng một việc. Nay sheet chỉ chứa nhóm ĐỔI KHÔNG GIAN/NGUỒN DỮ LIỆU: Nguồn ảnh · Tệp & nguồn · Bộ sưu tập & dự án · Cài đặt · Agent · Tài khoản |
+| **Cửa thứ nhất đổi tên «Công cụ» → «Khác»** | nhãn phải nói đúng thứ nó mở |
+
+**Màn Studio điện thoại sau khi gọn** (đọc trên Chrome thật): `Xem lớn 1:1 · 1024×1024 | Tạo biến thể AI ·
+1 credit | Sửa ảnh · Nâng cấp 4× · Đổi khung · Tải xuống · Chia sẻ · Tech pack | Khác · Kết quả · Trợ lý ·
+Bộ sưu tập | [dải 9 công cụ]` — mỗi mục một việc, 0 lỗi console.
+
+### E. TEST — đổi 4 khoá cũ, thêm khoá mới
+
+| Test | Thay đổi |
+|---|---|
+| `MobileFirstUiTest` | bài "dải ảnh ra ngoài khung" → **"trình xem chỉ xem MỘT ảnh"** (cấm dải · mũi tên · bộ đếm · `viewerItems` · `prefetchNeighbors` · phím ← →) |
+| `PhoneStudioParityTest` | `<EditImageModal` rời danh sách lớp phủ dùng chung (nay là bề mặt nhúng); khối «Lớp» **cấm** có trên điện thoại (đảo quyết định đợt 60); công cụ Sửa ảnh **phải** nhúng bề mặt chỉnh ảnh |
+| `PrototypeCleanupTest` | 4 lối tắt → **6 lối tắt**, và nút «Việc khác» trên màn chính **phải vắng** |
+| `MainViewTest` | lưới chỉ được có **ĐÚNG MỘT** lời gọi `requestActivity` (nút «Sửa»), và không mở công cụ nào khác — nút ghi «Sửa» thì phải mở đường sửa ảnh |
+| `EditImageScreenTest` | đường mở nay là `store.select(g); store.requestActivity('inpaint')`; cấm `editImageOpen` trong MÃ SỐNG (bóc chú thích — tệp ghi lịch sử ngay tại chỗ) |
+
+**Full suite: 1410 xanh** (10.993 assert).
+
+### F. Kiểm chứng Chrome thật (390×844)
+
+| Phép kiểm | Kết quả |
+|---|---|
+| Trình xem | `strip: false · arrows: 0 · counter: false`; panel có 2 nút chính + «Việc khác»; **0 exception** |
+| Công cụ «Sửa ảnh» | MỘT màn có đủ: ảnh + 3 chế độ (`describe · rect · brush`) + nút chạy «Sửa ảnh · 1 credit» + **hàng «Việc tiếp theo»**; nút «Vẽ mask» trên canvas đã vắng |
+| Màn Studio | 6 lối tắt đúng tên · **0** điều khiển lớp · **0** lưới công cụ trong sheet · sheet «Khác» chỉ còn 6 mục nguồn/không gian |
+
