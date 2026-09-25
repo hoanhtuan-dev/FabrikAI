@@ -74,6 +74,7 @@ import StudioPhone from './components/StudioPhone.vue';
 import PopMenu from './components/PopMenu.vue';
 import { usePopmenu } from './composables/usePopmenu.js';
 import { spacesForViewport } from './spaces.js';
+import { PHONE_NAV } from './phoneNav.js';
 const store = useStudioStore();
 // [Phase 2 · shell 2026] NGƯỠNG ĐIỆN THOẠI — MỘT nguồn duy nhất (§15.6 luật 1).
 // Khai ở ĐẦU script chứ không phải cạnh chỗ dùng: revealActivity() (bên dưới) phải biết mình đang ở
@@ -574,6 +575,23 @@ onMounted(async () => {
       // Agent Studio: "Áp dụng vào Canvas" ghi prompt rồi tới /?panel=concept&open=prompt — người
       // dùng phải thấy NGAY ô prompt vừa được điền, chứ không phải tự đi tìm.
       if (params.get('open') === 'prompt') store.promptOpen = true;
+      /**
+       * [Đợt 63] `?open=viewer` — mở THẲNG TRÌNH XEM cho ảnh vừa được chọn qua `?id=`.
+       *
+       * VÌ SAO CẦN: Trang chủ (và mọi chỗ khác) muốn "chạm ảnh = xem ảnh". Trình xem là component DÙNG
+       * CHUNG (GalleryModal) và nó đọc ảnh từ store — nên đường đúng là: chọn ảnh ở đây (đã có sẵn qua
+       * `?id=` trong store.load()) rồi mở trình xem, KHÔNG dựng một trình xem thứ hai ở trang khác và
+       * cũng không nhét pinia + store vào gói JS của Trang chủ (gói đó cố ý nhẹ).
+       */
+      if (params.get('open') === 'viewer' && store.preview) store.openViewer(store.preview);
+      /**
+       * `?open=results` — mở LƯỚI KẾT QUẢ: trên điện thoại là màn chiếm trọn «Kết quả» (StudioPhone
+       * đọc qua prop), trên màn rộng là mặt lưới (mặc định, nhưng đặt tường minh cho chắc).
+       */
+      if (params.get('open') === 'results') {
+        store.setMainView('grid');
+        if (isPhone.value) phoneToolRequest.value = { n: (phoneToolRequest.value.n || 0) + 1, id: PHONE_NAV.RESULTS };
+      }
       store.loadPaletteFromImage(store.upscaleSrc);
       window.addEventListener('keydown', onCanvasKey);
       window.addEventListener('keydown', onLayerKeys);
@@ -845,6 +863,15 @@ function selectActivity(id) {
  * lệnh đang gọi nó (tests/Feature/StaticIntegrityTest.php khoá sự có mặt của goLibrary trong menu).
  */
 function goLibrary() { store.openLibrary(); }
+/**
+ * MỞ CHẾ ĐỘ QUẢN LÝ ẢNH AI từ thanh tiêu đề (bản màn rộng của StudioPhone.openLibraryManage) —
+ * cùng ba bước, cùng thứ tự, và cùng đi qua `store.openLibrary()`.
+ */
+function openLibraryManage() {
+  store.libraryTab = 'generations';
+  store.libraryManage = true;
+  goLibrary();
+}
 
 // ── Command Palette (VSCode-style: Ctrl+Shift+P / F1 / Ctrl+K) ──
 const paletteOpen = ref(false);
@@ -1242,6 +1269,14 @@ function onTouchEnd(e) {
                 @click="openOutputSheet('filter')">
           <StudioIcon name="filter" size="h-4 w-4" />
           <span v-if="hasOutputFilter" class="absolute right-0 top-0 h-2 w-2 rounded-full bg-brand-400"></span>
+        </button>
+        <!-- [Đợt 63] QUẢN LÝ ẢNH AI — cùng lý do như ở nhánh điện thoại (xem StudioPhone.openLibraryManage):
+             Thư viện không còn là màn xem ảnh thứ hai, nên cửa vào chế độ quản lý phải nằm Ở ĐÂY, cạnh
+             bộ lọc của chính lưới kết quả. -->
+        <button type="button" class="order-4 icon-btn !h-8 !w-8 shrink-0" data-header-action="manage"
+                title="Quản lý ảnh AI: thống kê · dọn rác · gắn bộ sưu tập hàng loạt" aria-label="Quản lý ảnh AI"
+                @click="openLibraryManage">
+          <StudioIcon name="kanban" size="h-4 w-4" />
         </button>
 
         <!-- ══ ĐỔI MẶT CHÍNH: Lưới kết quả ⇄ Bảng ghép ══

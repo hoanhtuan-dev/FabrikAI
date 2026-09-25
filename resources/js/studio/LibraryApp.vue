@@ -132,6 +132,18 @@ function onSearchInput(e) {
 
 function openViewer(g) { store.openViewer(g); }
 
+/**
+ * ĐÓNG CHẾ ĐỘ QUẢN LÝ — về LƯỚI KẾT QUẢ (nơi duy nhất xem/duyệt ảnh AI).
+ * Vì sao là hàm ở đây chứ không phải một liên kết: chế độ này là một CỜ trong store (`libraryManage`)
+ * do lưới Kết quả bật; đóng nó phải trả cờ về false VÀ rời mặt Thư viện, nếu không người dùng ở lại
+ * một màn chỉ còn hai tab File/Prompt mà không biết vì sao mình tới đó.
+ */
+function closeManage() {
+  store.libraryManage = false;
+  store.studioView = 'studio';
+  if (typeof history !== 'undefined') history.pushState({ view: 'results' }, '', '/studio?open=results');
+}
+
 function switchTab(tab) {
   store.libraryTab = tab;
   if (tab === 'uploads') {
@@ -262,7 +274,10 @@ function clickProjectChip(g) {
 }
 
 onMounted(async () => {
-  store.libraryManage = false;
+  // [Đợt 63] Chế độ QUẢN LÝ nay được bật TỪ LƯỚI KẾT QUẢ (tab 'generations' là màn quản lý, không còn
+  // là tab xem ảnh). Vì vậy chỉ đặt lại cờ khi người dùng vào Thư viện ở hai tab Tệp/Prompt — nếu xoá
+  // cờ ở mọi lần mount thì lối vào từ Kết quả vừa mở đã bị tắt ngay.
+  if (store.libraryTab !== 'generations') store.libraryManage = false;
   await store.loadLibrary(true);
   await store.refreshLibraryScan();
   store.loadUploads();
@@ -303,21 +318,36 @@ onMounted(async () => {
                   title="Làm mới thư viện" aria-label="Làm mới thư viện">
             <StudioIcon name="refresh" size="h-4 w-4" />
           </button>
-          <button @click="store.libraryManage = !store.libraryManage"
-                  class="tool-btn" :class="store.libraryManage ? 'is-active' : ''"
-                  :title="store.libraryManage ? 'Đang quản lý — bấm để thoát' : 'Chọn & dọn dẹp ảnh'">
-            <StudioIcon name="kanban" size="h-3.5 w-3.5" />
-            <template v-if="store.libraryManage">Đang quản lý</template>
-            <template v-else>Quản lý / Dọn dẹp</template>
+          <!-- [Đợt 63] NÚT «Quản lý / Dọn dẹp» Ở ĐÂY ĐÃ GỠ — cửa vào chế độ quản lý nay nằm ở LƯỚI KẾT QUẢ
+               (nút «Quản lý» cạnh bộ lọc). Hai cửa cho cùng một chế độ là đúng thứ vừa dọn: người dùng
+               phải đoán "vào Thư viện rồi bấm Quản lý" hay "bấm Quản lý ở Kết quả" thì giống nhau không.
+               Khi vào từ Kết quả, dòng nhắc ở trên (data-library-manage-note) đã nói rõ đang ở đâu và có
+               nút «Về Kết quả». -->
+          <button v-if="store.libraryTab === 'generations'" @click="closeManage"
+                  class="tool-btn" title="Xong — về lưới Kết quả">
+            <StudioIcon name="check" size="h-3.5 w-3.5" /> Xong
           </button>
         </div>
       </div>
 
-      <!-- ══ Tab điều hướng: Ảnh đã tạo / File tải lên / Prompt ══ -->
+      <!-- ══ Tab điều hướng: File tải lên / Prompt ══════════════════════════════════════════════════════
+           [Đợt 63 · HỢP NHẤT MÀN XEM ẢNH] TAB «Ảnh đã tạo» ĐÃ GỠ.
+           VÌ SAO: nó là màn xem ảnh THỨ HAI. Lưới Kết quả (ResultGrid) đã liệt kê đúng những ảnh đó, kèm
+           bộ lọc trạng thái · phạm vi bộ sưu tập · tìm không dấu · sắp xếp · cỡ lưới · trình xem. Hai màn
+           cùng trả lời một câu hỏi ("ảnh AI của tôi đâu") là hai chỗ để lệch nhau, và người dùng phải
+           chọn xem cái nào.
+           Còn lại của Thư viện là thứ KHÔNG có ở Kết quả: FILE người dùng tải lên và PROMPT đã lưu.
+           Màn QUẢN LÝ (thống kê · dọn rác · gắn bộ sưu tập hàng loạt) KHÔNG mất: nó vẫn là `generations`
+           nhưng chỉ mở từ nút «Quản lý / Dọn dẹp» — tức là một CÔNG CỤ mở TỪ màn Kết quả, không phải một
+           màn xem ảnh song song. -->
+      <div v-if="store.libraryManage" class="mb-3 flex items-center gap-2 rounded-xl border border-brand-500/30 bg-brand-600/10 px-3 py-2" data-library-manage-note>
+        <StudioIcon name="sliders" size="h-4 w-4" class="shrink-0 text-brand-200" />
+        <p class="min-w-0 flex-1 text-label leading-snug text-cream-200">
+          Đang ở chế độ <b>Quản lý ảnh AI</b> (thống kê · dọn rác · gắn bộ sưu tập hàng loạt) — mở từ lưới Kết quả.
+        </p>
+        <button type="button" class="shrink-0 rounded-full border border-ink-600 bg-ink-800 px-3 py-1.5 text-label font-semibold text-cream-200" @click="closeManage">Về Kết quả</button>
+      </div>
       <div class="seg mb-4 !p-1">
-        <button @click="switchTab('generations')" class="seg-btn !py-2" :class="store.libraryTab === 'generations' ? 'is-active' : ''" title="Ảnh AI đã tạo">
-          <StudioIcon name="image" size="h-4 w-4"/> Ảnh đã tạo
-        </button>
         <button @click="switchTab('uploads')" class="seg-btn !py-2" :class="store.libraryTab === 'uploads' ? 'is-active' : ''" title="File đã tải lên">
           <StudioIcon name="folderOpen" size="h-4 w-4"/> File tải lên
           <span v-if="uploadStats.unused_count" class="ml-1 rounded-full bg-danger/30 px-1.5 py-0.5 text-label font-semibold text-danger">{{ uploadStats.unused_count }}</span>

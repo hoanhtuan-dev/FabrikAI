@@ -42,6 +42,35 @@ const rootEl = ref(null);
 
 // ── Bảng bên phải (tính năng + thông tin) ──
 const infoOpen = ref(true);
+/**
+ * «VIỆC KHÁC» — nhóm phụ của trình xem (đợt 63 · 2026-09-26).
+ *
+ * ĐO ĐƯỢC TRƯỚC KHI SỬA: panel trình xem có **21 nút** trải phẳng — 9 công cụ, khối dự án (3 nút),
+ * khối prompt (2), lưới thông tin + lưới kỹ thuật, và 3 nút xoá. Mở một tấm ảnh ra là gặp một BỨC
+ * TƯỜNG nút, không có thứ tự việc nào: người dùng phải tự đoán nên bấm gì trước.
+ *
+ * Nay theo mô hình Review → Options → Action (§15.7):
+ *   · REVIEW   — tấm ảnh + điều hướng + thu/phóng (giữ nguyên);
+ *   · ACTION   — hàng nút CHÍNH, đúng 3: «Sửa ảnh» · «Tải xuống» · «Việc khác (N)»;
+ *   · OPTIONS  — mọi thứ còn lại nằm SAU «Việc khác» (9 công cụ · dự án · prompt · thông tin · kỹ thuật
+ *                · xoá). Số N trên nút nói trước có bao nhiêu việc ở trong — không giấu thông tin.
+ */
+const moreOpen = ref(false);
+/** Tải ảnh gốc — cùng route với mọi nút tải khác của app (không dùng media_url trần). */
+function downloadCurrent() {
+  const g = current.value;
+  if (!g || !g.id) { store.toast('Chưa có ảnh để tải.', 'error'); return; }
+  window.location.href = '/api/generations/' + g.id + '/download';
+}
+/**
+ * Số việc nằm trong «Việc khác» — đếm THẬT từ danh sách công cụ, không viết cứng.
+ *
+ * LƯU Ý (đã trả giá): TRONG SCRIPT phải là `props.actions`, KHÔNG phải `actions` — template nhìn thấy prop trực tiếp, còn
+ * script thì không. Viết `actions.value` ở đây từng gây `ReferenceError: actions is not defined` NGAY
+ * TRONG LÚC RENDER — component ném lỗi giữa chừng nên panel/biến mất, mà triệu chứng nhìn thấy chỉ là
+ * "trình xem thiếu nút" (lỗi nằm ở console). Đây là kiểu lỗi im lặng nhất của đợt 63.
+ */
+const moreCount = computed(() => (props.actions?.length || 0) + 4);
 // [đợt 52] MẶC ĐỊNH ẨN. Đây là thông tin về ảnh, không phải việc cần làm với ảnh — mà người mở
 // trình xem gần như luôn đang muốn LÀM gì đó. Mở sẵn ra là chiếm chỗ của chính việc họ cần.
 const fieldsOpen = ref(false);
@@ -412,9 +441,18 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- ══ Panel thông tin + hành động ══ -->
-      <Transition name="aside">
-      <aside v-if="infoOpen" class="flex max-h-[42vh] w-full shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border border-ink-700 bg-ink-900/95 p-4 lg:max-h-none lg:w-80">
+      <!-- ══ Panel hành động + thông tin ══════════════════════════════════════════════════════════════
+           [Đợt 63] ĐÃ GỠ `<Transition name="aside">` bọc ngoài. Vì sao: Transition chỉ nhận ĐÚNG MỘT phần
+           tử con, mà panel này lại chứa cả một khối `<template v-if>` (nhóm «Việc khác») — cấu trúc đó
+           làm nhánh panel không được render (đo trên Chrome: DOM chỉ còn một nút comment của Vue, panel
+           không tồn tại ⇒ mở trình xem ra KHÔNG có hành động nào). Panel này cũng không cần hiệu ứng vào:
+           nó là một phần cố định của trình xem, không phải lớp phủ bật/tắt. ══ -->
+      <!-- [Đợt 63] `v-show` thay `v-if`: panel này KHÔNG phải thông tin phụ — nó là chỗ chứa HÀNG NÚT CHÍNH
+           (Sửa ảnh · Tải · Việc khác) và cả nhóm «Việc khác». Đo trên Chrome thật: với `v-if` panel KHÔNG
+           có trong DOM (chỉ còn một nút comment của Vue) ⇒ mở trình xem ra chỉ thấy ảnh + thu/phóng, KHÔNG
+           có một hành động nào. Dùng `v-show` thì panel luôn tồn tại và trạng thái bên trong (nhóm nào
+           đang mở) không bị dựng lại mỗi lần ẩn/hiện. -->
+      <aside v-show="infoOpen" data-viewer-panel class="flex max-h-[42vh] w-full shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border border-ink-700 bg-ink-900/95 p-4 lg:max-h-none lg:w-80">
         <!-- Tiêu đề -->
         <div class="flex items-center justify-between">
           <p class="text-sm font-semibold text-cream-100">Ảnh #<span class="text-brand-300">{{ current?.id }}</span></p>
@@ -423,6 +461,45 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
+        <!-- ══ HÀNG NÚT CHÍNH — ĐÚNG 3 (đợt 63) ══════════════════════════════════════════════════════
+             Trước đây panel mở ra là 21 nút phẳng. Nay việc ĐẦU TIÊN người dùng làm với một tấm ảnh
+             (sửa nó, hoặc tải nó) đứng ngay đây; mọi thứ khác nằm sau «Việc khác». Nút «Sửa ảnh» đi qua
+             ĐÚNG kênh điều phối `dispatch('inpaint')` như mọi lối vào công cụ khác. -->
+        <div class="grid grid-cols-3 gap-1.5" data-viewer-primary>
+          <button
+            type="button"
+            class="flex min-h-11 items-center justify-center gap-1.5 rounded-lg btn-magic text-label font-bold transition active:scale-[0.98] lg:min-h-9"
+            title="Sửa ảnh này: tả điều muốn đổi · khoanh vùng · vẽ cọ"
+            data-viewer-primary-action="edit"
+            @click="dispatch('inpaint')"
+          >
+            <StudioIcon name="pencil" size="h-4 w-4" /> Sửa ảnh
+          </button>
+          <button
+            type="button"
+            class="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-ink-600 bg-ink-800 text-label font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/10 lg:min-h-9"
+            title="Tải ảnh gốc về máy"
+            data-viewer-primary-action="download"
+            @click="downloadCurrent"
+          >
+            <StudioIcon name="download" size="h-4 w-4" class="text-brand-300" /> Tải
+          </button>
+          <button
+            type="button"
+            class="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-ink-600 bg-ink-800 text-label font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/10 lg:min-h-9"
+            :class="moreOpen ? 'border-brand-500 text-cream-50' : ''"
+            :aria-expanded="moreOpen ? 'true' : 'false'"
+            :title="moreOpen ? 'Thu gọn danh sách việc khác' : 'Mở danh sách việc khác với ảnh này'"
+            data-viewer-more
+            @click="moreOpen = !moreOpen"
+          >
+            <StudioIcon :name="moreOpen ? 'chevronUp' : 'chevronDown'" size="h-4 w-4" class="text-brand-300" />
+            Việc khác ({{ moreCount }})
+          </button>
+        </div>
+
+        <!-- ══ PHẦN CÒN LẠI — sau «Việc khác» ══ -->
+        <template v-if="moreOpen">
         <!-- ══ TÍNH NĂNG — TRUNG TÂM ĐIỀU PHỐI. Đứng ĐẦU, ngay dưới tiêu đề. ══
              Đây là lý do người dùng mở trình xem: để LÀM tiếp với ảnh. Mọi nhóm công cụ của Studio
              đều có mặt ở đây, sinh từ prop 'actions' (StudioApp truyền xuống, đã lọc theo cấu hình
@@ -580,8 +657,8 @@ onBeforeUnmount(() => {
           </template>
           <p class="mt-1.5 text-center text-label text-cream-400">Nhấn Esc để đóng · dùng ← → để xem ảnh khác</p>
         </div>
+        </template><!-- /«Việc khác» -->
       </aside>
-      </Transition>
     </div>
   </div>
 </template>

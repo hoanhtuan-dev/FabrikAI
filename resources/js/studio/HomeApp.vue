@@ -174,12 +174,22 @@ onMounted(async () => {
         <section class="mt-9">
           <div class="flex items-center justify-between">
             <h2 class="text-title font-semibold">Gần đây</h2>
-            <a href="/studio?view=library" class="text-label font-semibold text-brand-300 hover:text-brand-200">Xem tất cả</a>
+            <!-- «Xem tất cả» = mở LƯỚI KẾT QUẢ (nơi DUY NHẤT để xem/duyệt ảnh AI đã tạo).
+                 Trước đây trỏ /studio?view=library — tức là mở THƯ VIỆN, một màn thứ hai cũng liệt kê
+                 ảnh AI; hai màn cho một việc là đúng thứ đợt 63 dọn. -->
+            <a href="/studio?open=results" class="text-label font-semibold text-brand-300 hover:text-brand-200" data-home-see-all>Xem tất cả</a>
           </div>
           <div v-if="recents.length" class="-mx-5 mt-3 flex gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <!-- [Đợt 63 · sửa lỗi người dùng báo] CHẠM MỘT ẢNH = XEM ẢNH ĐÓ.
+                 Trước đây cả dải ảnh là <a href="/studio?view=library"> ⇒ chạm vào một tấm ảnh lại nhảy
+                 sang màn THƯ VIỆN. Người dùng gọi đó là lỗi, và đúng: một tấm ảnh hứa "xem tôi", không
+                 hứa "mở danh sách". Nay mỗi ảnh là một nút tới /studio?id=<id>&open=viewer — Studio mở
+                 ĐÚNG ảnh đó và bật TRÌNH XEM ngay (một trình xem duy nhất, dùng chung với Studio). -->
             <a
-              v-for="g in recents" :key="g.id" href="/studio?view=library"
+              v-for="g in recents" :key="g.id" :href="'/studio?id=' + g.id + '&open=viewer'"
               class="block w-32 shrink-0 overflow-hidden rounded-2xl border border-ink-600 bg-ink-800 transition active:scale-95"
+              :data-home-recent="g.id"
+              :aria-label="'Xem ảnh ' + (g.prompt || ('#' + g.id))"
             >
               <img :src="thumbUrl(g.media_url, 320)" :alt="g.prompt || 'Thiết kế'" class="aspect-[3/4] w-full object-cover" loading="lazy" @error="onThumbError($event, g.media_url)">
             </a>

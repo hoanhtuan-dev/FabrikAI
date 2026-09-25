@@ -102,6 +102,8 @@ function schedulePlan() {
 }
 
 onMounted(async () => {
+  // Nhận ẢNH ĐANG LÀM VIỆC vào ô ảnh người mẫu (xem chú thích ở fillSlotFromWorking).
+  fillSlotFromWorking();
   await store.loadSceneCatalog();
   schedulePlan();
 });
@@ -112,9 +114,45 @@ onBeforeUnmount(() => {
 watch(() => JSON.stringify(store.sceneSetup), () => schedulePlan());
 watch(selectedCount, () => schedulePlan());
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+   NHẬN ẢNH ĐANG LÀM VIỆC VÀO Ô ẢNH NGƯỜI MẪU (đợt 63 · 2026-09-26)
+   ──────────────────────────────────────────────────────────────────────────────────────────────────
+   VẤN ĐỀ ĐO ĐƯỢC (người dùng báo "một số tính năng không nhận ảnh đã chọn"): trên điện thoại, chọn một
+   ảnh rồi mở công cụ «Studio» thì ô Ảnh người mẫu TRỐNG — trong khi «Tạo biến thể» · «Mặc thử đồ» ·
+   «Sửa ảnh» · «Gợi ý từ ảnh» đều nhận đúng ảnh đó. Đo bằng Chrome thật: card Studio render **0 thẻ <img>**
+   và hiện dòng «Chưa có ảnh…», bốn card kia render đúng ảnh đang chọn.
+
+   VÌ SAO: card này đọc ảnh từ `selected[]` — chỉ được điền khi người dùng bấm chọn trong Thư viện ảnh —
+   trong khi mọi công cụ một-ảnh khác đọc getter chung `store.upscaleSrc` (ảnh đang làm việc).
+
+   CÁCH SỬA: điền ô trống bằng ẢNH ĐANG LÀM VIỆC khi mở card, và NÓI RÕ nguồn gốc trên ảnh («Ảnh đang
+   chọn»). Ba chi tiết cố ý:
+     · chỉ điền khi ô TRỐNG — người dùng đã chọn ảnh khác thì không được ghi đè;
+     · điền XONG mà người dùng bấm «Bỏ ảnh» thì KHÔNG điền lại (cờ `slotCleared`) — nếu không, nút Bỏ ảnh
+       trông như hỏng;
+     · ảnh đang làm việc ĐỔI trong lúc card đang mở thì cập nhật theo, nhưng chỉ khi ô vẫn là ảnh auto.
+   ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+const slotCleared = ref(false);
+const slotFromWorking = ref(false);
+function fillSlotFromWorking() {
+  if (slotCleared.value || selected.value[0] || !store.upscaleSrc) return;
+  selected.value[0] = {
+    url: store.upscaleSrc,
+    name: (store.workingImage && store.workingImage.name) || 'Ảnh đang chọn',
+  };
+  slotFromWorking.value = true;
+  slotImgError.value[0] = false;
+}
+watch(() => store.upscaleSrc, () => { if (slotFromWorking.value && !selected.value[0]) fillSlotFromWorking(); });
+
 function openSlot(i) { targetSlot.value = i; open.value = true; }
-function onPick(img) { selected.value[targetSlot.value] = img; slotImgError.value[targetSlot.value] = false; open.value = false; }
-function removeSlot(i) { selected.value[i] = null; slotImgError.value[i] = false; }
+function onPick(img) {
+  selected.value[targetSlot.value] = img;
+  slotImgError.value[targetSlot.value] = false;
+  open.value = false;
+  if (targetSlot.value === 0) { slotFromWorking.value = false; slotCleared.value = false; }
+}
+function removeSlot(i) { selected.value[i] = null; slotImgError.value[i] = false; if (i === 0) { slotCleared.value = true; slotFromWorking.value = false; } }
 function onSlotImgError(i) { slotImgError.value[i] = true; }
 function slotTitle(i) { return slots.value[i] ? slots.value[i].name : 'Ảnh'; }
 function toggleChip(id) {
@@ -185,13 +223,19 @@ function retry() { lastIds.value = []; store.clearComposeStatus(); run(); }
         <template v-if="selected[0]">
           <img :src="selected[0].url" class="h-full w-full object-cover" @error="onSlotImgError(0)">
           <span v-if="slotImgError[0]" class="absolute inset-0 grid place-items-center bg-ink-900"><StudioIcon name="image" size="h-8 w-8" /></span>
-          <span class="absolute inset-x-0 bottom-0 bg-scrim/70 px-2 py-1 text-label font-semibold text-scrim-content">Giữ nguyên ảnh này · bấm để đổi</span>
+          <span class="absolute inset-x-0 bottom-0 bg-scrim/70 px-2 py-1 text-label font-semibold text-scrim-content">
+            <template v-if="slotFromWorking">Ảnh đang chọn · bấm để đổi</template>
+            <template v-else>Giữ nguyên ảnh này · bấm để đổi</template>
+          </span>
           <span @click.stop="removeSlot(0)" title="Bỏ ảnh" class="motion-ui absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-danger text-danger-content hover:bg-danger"><StudioIcon name="x" size="h-3.5 w-3.5" /></span>
         </template>
         <span v-else class="flex flex-col items-center gap-1 text-cream-300">
           <StudioIcon name="shirt" size="h-6 w-6" />
           <span class="text-body font-semibold">Bấm để chọn ảnh người mẫu</span>
-          <span class="text-label text-cream-400">Lấy từ Thư viện ảnh — kết quả ở bước 「Tạo ảnh」</span>
+          <span class="text-label text-cream-400">
+            <template v-if="store.upscaleSrc">Hoặc dùng ảnh đang làm việc — nó sẽ tự điền khi mở công cụ này</template>
+            <template v-else>Lấy từ Thư viện ảnh — kết quả ở bước 「Tạo ảnh」</template>
+          </span>
         </span>
       </button>
     </div>

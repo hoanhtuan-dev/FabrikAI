@@ -86,7 +86,101 @@ class PrototypeCleanupTest extends TestCase
             'Trang chủ phải có ĐÚNG một lối tới Agent (thẻ Radar) — thêm hàng lối khác là lối thứ hai.');
         // Nhưng lối vào vẫn phải tồn tại — không phải gỡ rồi để ngõ cụt.
         $this->assertStringContainsString('/studio?panel=concept', $home);
-        $this->assertStringContainsString('/studio?view=library', $home, 'Lối vào Thư viện phải còn (qua «Xem tất cả»).');
+    }
+
+    /**
+     * TRANG CHỦ — CHẠM MỘT ẢNH LÀ XEM ẢNH ĐÓ (lỗi người dùng báo, đợt 63).
+     *
+     * Trước đây cả dải «Gần đây» là `<a href="/studio?view=library">`: chạm vào một TẤM ẢNH lại nhảy
+     * sang màn THƯ VIỆN. Một tấm ảnh hứa "xem tôi", không hứa "mở danh sách". Bài test khoá cả hai vế:
+     * mỗi ảnh đi tới ĐÚNG ảnh đó và mở TRÌNH XEM; còn «Xem tất cả» tới LƯỚI KẾT QUẢ (nơi duy nhất để
+     * duyệt ảnh AI) — KHÔNG còn trỏ vào Thư viện.
+     */
+    public function test_trang_chu_cham_anh_la_mo_trinh_xem(): void
+    {
+        $home = $this->code($this->src('HomeApp.vue'));
+
+        $this->assertStringContainsString("'/studio?id=' + g.id + '&open=viewer'", $home,
+            'Mỗi ảnh gần đây phải mở ĐÚNG ảnh đó trong TRÌNH XEM, không phải chuyển sang màn khác.');
+        $this->assertStringNotContainsString("href=\"/studio?view=library\"", $home,
+            'Trang chủ không được trỏ vào Thư viện để xem ảnh AI — Thư viện nay là tệp tải lên & prompt.');
+        $this->assertStringContainsString('href="/studio?open=results"', $home,
+            '«Xem tất cả» phải mở LƯỚI KẾT QUẢ (màn duy nhất để xem/duyệt ảnh AI).');
+
+        // StudioApp phải HIỂU hai tham số đó (nếu không thì liên kết chỉ là ước muốn).
+        $app = $this->code($this->src('StudioApp.vue'));
+        $this->assertStringContainsString("params.get('open') === 'viewer'", $app);
+        $this->assertStringContainsString('store.openViewer(store.preview)', $app);
+        $this->assertStringContainsString("params.get('open') === 'results'", $app);
+        $this->assertStringContainsString('PHONE_NAV.RESULTS', $app, 'Nhánh điện thoại phải mở màn Kết quả qua hằng số dùng chung.');
+        $this->assertStringContainsString('PHONE_NAV.RESULTS', $this->code($this->src('components/StudioPhone.vue')));
+    }
+
+    /**
+     * MỘT MÀN XEM ẢNH — Thư viện KHÔNG còn tab «Ảnh đã tạo» (đợt 63).
+     *
+     * Hai màn cùng liệt kê ảnh AI là hai chỗ để lệch nhau; nay lưới Kết quả là màn duy nhất, còn Thư
+     * viện giữ đúng thứ nó có mà lưới không có: FILE tải lên và PROMPT đã lưu. Chế độ QUẢN LÝ vẫn còn
+     * nhưng chỉ mở từ Kết quả.
+     */
+    public function test_mot_man_xem_anh_duy_nhat(): void
+    {
+        $lib = $this->code($this->src('LibraryApp.vue'));
+
+        $this->assertStringNotContainsString("switchTab('generations')", $lib,
+            'Tab «Ảnh đã tạo» phải được gỡ: ảnh AI xem ở lưới Kết quả, không ở Thư viện.');
+        $this->assertStringContainsString("switchTab('uploads')", $lib);
+        $this->assertStringContainsString("switchTab('suggest')", $lib);
+        $this->assertStringContainsString('data-library-manage-note', $lib,
+            'Vào chế độ quản lý phải có dòng nhắc nói rõ đang ở đâu + lối «Về Kết quả».');
+
+        // Cửa vào chế độ quản lý nằm ở lưới Kết quả (cả hai nhánh), không ở Thư viện.
+        $this->assertStringContainsString('data-phone-results-manage', $this->code($this->src('components/StudioPhone.vue')));
+        $this->assertStringContainsString('data-header-action="manage"', $this->code($this->src('StudioApp.vue')));
+        $this->assertStringContainsString("store.libraryTab = 'generations'", $this->code($this->src('components/StudioPhone.vue')));
+    }
+
+    /**
+     * TRÌNH XEM ẢNH CÓ LUỒNG — không còn bức tường nút (đợt 63).
+     *
+     * ĐO ĐƯỢC trước khi sửa: panel trình xem có **21 nút** trải phẳng. Nay: hàng nút CHÍNH đúng 3
+     * («Sửa ảnh» · «Tải» · «Việc khác»), phần còn lại nằm sau nút «Việc khác» có đếm số việc.
+     */
+    public function test_trinh_xem_co_luong_khong_buc_tuong_nut(): void
+    {
+        $viewer = $this->code($this->src('components/GalleryModal.vue'));
+
+        $this->assertStringContainsString('data-viewer-primary', $viewer);
+        foreach (['edit', 'download'] as $a) {
+            $this->assertStringContainsString('data-viewer-primary-action="'.$a.'"', $viewer, 'Thiếu nút chính '.$a.'.');
+        }
+        $this->assertStringContainsString('data-viewer-more', $viewer, 'Thiếu nút «Việc khác» (nhóm phụ).');
+        $this->assertStringContainsString('const moreOpen = ref(false)', $viewer,
+            'Nhóm phụ phải ĐÓNG sẵn — mở ra là mặc định thấy 3 nút chính, không phải 21.');
+        $this->assertStringContainsString('moreCount', $viewer, 'Nút «Việc khác» phải nói trước có bao nhiêu việc.');
+        $this->assertStringContainsString('const moreCount = computed(() => (props.actions?.length || 0) + 4)', $viewer,
+            'Số việc phải ĐẾM từ danh sách thật (props.actions), không viết cứng.');
+
+        // Nút chính «Sửa ảnh» đi qua ĐÚNG kênh điều phối (không tự mở panel).
+        $this->assertStringContainsString("@click=\"dispatch('inpaint')\"", $viewer);
+        /* ⚠️ TRONG SCRIPT phải là `props.actions`, không phải `actions`.
+           Đã trúng lỗi này: `actions.value.length` trong script gây `ReferenceError: actions is not
+           defined` NGAY LÚC RENDER — template thấy prop trực tiếp, script thì không. Triệu chứng nhìn
+           thấy chỉ là "trình xem thiếu nút", còn lỗi nằm ở console. Bài này khoá đúng chỗ đó. */
+        $script = substr($viewer, 0, (int) strpos($viewer, '<template>'));
+        $this->assertStringNotContainsString('actions.value', $script,
+            'Trong <script> phải dùng props.actions — `actions` chỉ tồn tại trong template.');
+        $this->assertStringContainsString('props.actions?.length', $script);
+
+        // Đếm nút: phần chính không được phình lại thành bức tường.
+        // Cắt ở ĐẦU thẻ <button> của nút «Việc khác», không phải ở thuộc tính data-viewer-more của nó —
+        // thuộc tính nằm TRONG thẻ, nên cắt theo thuộc tính là tính luôn nút thứ ba (đã trúng bẫy này).
+        $primaryStart = strpos($viewer, 'data-viewer-primary');
+        $moreStart = strpos($viewer, 'data-viewer-more');
+        $moreBtnStart = strrpos(substr($viewer, 0, (int) $moreStart), '<button');
+        $band = substr($viewer, (int) $primaryStart, (int) $moreBtnStart - (int) $primaryStart);
+        $this->assertSame(2, substr_count($band, '<button'),
+            'Hàng nút CHÍNH chỉ có 2 nút (Sửa · Tải); nút thứ ba là «Việc khác» mở nhóm phụ.');
     }
 
     /** HUB: credit chỉ hiện ở MỘT chỗ (thẻ tài khoản có hạn mức + thanh tiến trình). */

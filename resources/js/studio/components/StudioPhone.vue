@@ -46,6 +46,7 @@ import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import { haptic } from '../composables/useHaptics.js';
 import { useNavStack } from '../composables/useNavStack.js';
 import { useImageActions } from '../composables/useImageActions.js';
+import { PHONE_NAV } from '../phoneNav.js';
 
 // Thư viện nhúng: TRÙNG với đường của màn rộng (store.openLibrary() đổi studioView), nên nhánh điện
 // thoại phải render nó — trước đây lệnh này mở một mặt chỉ tồn tại trong cây desktop ⇒ bấm «Thư viện»
@@ -109,6 +110,17 @@ function openTools() { haptic(8); nav.open('tools'); }
 function openActions(at = '') { actionsAt.value = at; actionsOpen.value = true; }
 function openAccount() { haptic(8); nav.push('account'); }
 function openResults() { haptic(8); nav.open('results'); }
+/**
+ * MỞ CHẾ ĐỘ QUẢN LÝ ẢNH AI (thống kê · dọn rác · chọn hàng loạt) — cửa duy nhất, đặt trên màn Kết quả.
+ * Đi qua ĐÚNG action `store.openLibrary()` (thoát công cụ canvas rồi đổi mặt) chứ không tự ghi hai cờ:
+ * lối vào thứ hai mà quên một bước là hành xử khác lối thứ nhất.
+ */
+function openLibraryManage() {
+  haptic(8);
+  store.libraryTab = 'generations';
+  store.libraryManage = true;
+  store.openLibrary();
+}
 function closeAll() { nav.closeAll(); }
 function backOne() { haptic(8); nav.pop(); }
 
@@ -143,9 +155,13 @@ function switchTool() { haptic(8); if (canBack.value) nav.pop(); else nav.open('
  */
 watch(() => props.toolRequest && props.toolRequest.n, (n) => {
   if (!n) return;
-  const item = props.activityNav.find((a) => a.id === (props.toolRequest && props.toolRequest.id));
+  const id = props.toolRequest && props.toolRequest.id;
+  // Đích KHÔNG phải công cụ: lưới kết quả (xem phoneNav.js). Thiếu nhánh này thì yêu cầu rơi xuống
+  // nhánh "không tìm thấy công cụ" ⇒ mở bảng nâng cấp gói, sai hẳn ý người dùng.
+  if (id === PHONE_NAV.RESULTS) { openResults(); return; }
+  const item = props.activityNav.find((a) => a.id === id);
   if (item) pickTool(item);
-  else { nav.closeAll(); emit('upgrade', props.toolRequest && props.toolRequest.id); }
+  else { nav.closeAll(); emit('upgrade', id); }
 }, { immediate: true });
 
 const batchReady = computed(() => {
@@ -536,7 +552,10 @@ function editCurrent() {
           <StudioIcon name="imagePlus" size="h-5 w-5" class="text-brand-300" /> Nguồn ảnh
         </button>
         <button type="button" class="flex min-h-12 w-full items-center gap-2 rounded-xl border border-ink-600 bg-ink-800 px-3 text-left text-body font-semibold text-cream-100" @click="closeAll(); emit('open-library')">
-          <StudioIcon name="library" size="h-5 w-5" class="text-brand-300" /> Thư viện &amp; ảnh của tôi
+          <!-- [Đợt 63] Nhãn nói ĐÚNG thứ còn ở đó: Thư viện nay là FILE tải lên + PROMPT đã lưu
+               (tab «Ảnh đã tạo» đã gỡ — ảnh AI xem ở «Kết quả»). Tên cũ «Thư viện & ảnh của tôi» hứa
+               cả ảnh AI, nên người dùng mở ra rồi đi tìm ảnh của mình ở một chỗ không có nữa. -->
+          <StudioIcon name="folderOpen" size="h-5 w-5" class="text-brand-300" /> Tệp &amp; nguồn (file tải lên · prompt)
         </button>
         <button type="button" class="flex min-h-12 w-full items-center gap-2 rounded-xl border border-ink-600 bg-ink-800 px-3 text-left text-body font-semibold text-cream-100" @click="closeAll(); emit('open-collections')">
           <StudioIcon name="folderOpen" size="h-5 w-5" class="text-brand-300" /> Bộ sưu tập &amp; dự án
@@ -638,6 +657,19 @@ function editCurrent() {
             @click="store.outputSheet = 'search'"
           >
             <StudioIcon name="search" size="h-4 w-4" class="text-brand-300" /> Tìm
+          </button>
+          <!-- [Đợt 63] QUẢN LÝ ẢNH — cửa DUY NHẤT vào chế độ thống kê/dọn rác/chọn hàng loạt.
+               Trước đây cửa này nằm trong Thư viện, mà Thư viện lại có nguyên một tab «Ảnh đã tạo»:
+               hai màn cùng liệt kê ảnh AI. Nay chỉ còn MỘT màn xem ảnh (lưới này) và việc quản lý mở
+               TỪ ĐÂY — vẫn là cùng trang Thư viện nhưng mang cờ quản lý + dòng nhắc «đang ở chế độ...». -->
+          <button
+            type="button"
+            class="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-ink-600 bg-ink-800 px-3 text-label font-semibold text-cream-200 transition hover:border-brand-400 active:bg-ink-700"
+            title="Quản lý ảnh AI: thống kê · dọn rác · gắn bộ sưu tập hàng loạt"
+            data-phone-results-manage
+            @click="openLibraryManage"
+          >
+            <StudioIcon name="kanban" size="h-4 w-4" class="text-brand-300" /> Quản lý
           </button>
         </div>
         <div class="min-h-0 flex-1">

@@ -7900,3 +7900,79 @@ không dùng đường cũ của khu Cài đặt · ba họ chữ có token + đ
 | **Chrome thật trên production (390×844 ×2 DPR, 3 màn)** | `/` · `/studio` · `/bang-gia`: `document.fonts` → **cả ba họ `loaded`**, request woff2 toàn **200**; `h1` = **Fraunces**, `.micro-label` = **Space Grotesk**, `body` = **Inter** · `/studio`: 4 chip, nút mở sheet ghi «Việc khác — sửa ảnh · đổi khung · xoá», **không còn hàng «Lối khác»**, không tràn ngang · **0 lỗi console** ở cả ba màn |
 | Bộ test PHP | **1407 xanh** (10.937 assert) |
 
+
+---
+
+## Kiểm tra & triển khai 2026-09-26 (Đợt 63 — 4 LỖI NGƯỜI DÙNG BÁO: chạm ảnh ở Trang chủ · hai màn xem ảnh · trình xem rối · công cụ không nhận ảnh)
+
+> Người dùng báo bốn việc. Cả bốn đều **đúng**, và ba trong bốn là loại lỗi im lặng.
+
+### A. Trang chủ: chạm ảnh gần đây KHÔNG mở ảnh — đó là LỖI, đã sửa
+
+Cả dải «Gần đây» là `<a href="/studio?view=library">`: chạm vào một **tấm ảnh** lại nhảy sang màn
+**Thư viện**. Một tấm ảnh hứa "xem tôi", không hứa "mở danh sách".
+
+Nay mỗi ảnh là `/studio?id=<id>&open=viewer` ⇒ Studio chọn ĐÚNG ảnh đó và **mở trình xem ngay**
+(`?open=viewer` là từ vựng sẵn có của app: `?open=prompt` đã dùng cho luồng Agent). Và «Xem tất cả» nay
+tới `/studio?open=results` — **lưới Kết quả**, nơi duy nhất để duyệt ảnh AI.
+
+### B. Hai màn xem ảnh ⇒ HỢP NHẤT còn MỘT
+
+Thư viện có tab «Ảnh đã tạo» — **màn xem ảnh thứ hai** liệt kê đúng những ảnh mà lưới Kết quả đã liệt kê
+(kèm bộ lọc trạng thái · phạm vi bộ sưu tập · tìm · sắp xếp · cỡ lưới · trình xem). Hai màn cùng trả lời một
+câu hỏi là hai chỗ để lệch nhau.
+
+Nay:
+- **Lưới Kết quả** = màn DUY NHẤT để xem/duyệt ảnh AI;
+- **Thư viện** = đúng thứ lưới không có: **File tải lên** · **Prompt đã lưu** (tab «Ảnh đã tạo» đã gỡ);
+- **chế độ QUẢN LÝ** (thống kê · dọn rác · gắn bộ sưu tập hàng loạt) KHÔNG mất: nó mở từ nút **«Quản lý»**
+  trên lưới Kết quả — một cửa duy nhất, có dòng nhắc «đang ở chế độ Quản lý ảnh AI» + nút «Về Kết quả».
+- Nút «Quản lý / Dọn dẹp» trong Thư viện **đã gỡ** (cửa thứ hai cho cùng một chế độ).
+- Nhãn lối vào trong sheet công cụ: «Thư viện & ảnh của tôi» → **«Tệp & nguồn (file tải lên · prompt)»** —
+  tên cũ hứa cả ảnh AI, người dùng mở ra rồi đi tìm ảnh của mình ở chỗ không có nữa.
+
+### C. Trình xem ảnh: 21 nút phẳng ⇒ có LUỒNG
+
+**ĐO ĐƯỢC:** panel trình xem có **21 nút** trải phẳng (9 công cụ · 3 nút dự án · 2 nút prompt · lưới thông
+tin · lưới kỹ thuật · 3 nút xoá). Mở một tấm ảnh ra là gặp một bức tường nút, không có thứ tự việc nào.
+
+Nay theo Review → Options → Action (§15.7): **hàng nút CHÍNH đúng 2** («Sửa ảnh» · «Tải») + **«Việc khác (N)»**
+mở nhóm phụ (N đếm THẬT từ danh sách công cụ, không viết cứng). Đo lại trên Chrome: đóng thì
+`[data-viewer-action] = 0`, mở «Việc khác» thì hiện **8 công cụ**; panel luôn có mặt (`v-show` thay `v-if`),
+nên **trình xem không bao giờ mở ra mà không có hành động nào**.
+
+### D. Công cụ KHÔNG nhận ảnh đã chọn ⇒ đã sửa (có số đo)
+
+| Công cụ | Trước | Sau |
+|---|---|---|
+| Gợi ý từ ảnh · Tạo biến thể · Mặc thử đồ · Sửa ảnh | ✓ nhận ảnh đang chọn | ✓ |
+| **Studio (Ghép ảnh)** | ❌ **0 thẻ ảnh**, hiện «Chưa có ảnh…» dù đã chọn ảnh | ✓ tự điền **ảnh đang làm việc** vào ô Ảnh người mẫu, có nhãn «Ảnh đang chọn · bấm để đổi» |
+
+Vì sao: card Studio đọc `selected[]` (chỉ có khi tự bấm chọn trong Thư viện ảnh), trong khi mọi công cụ
+một-ảnh khác đọc getter chung `store.upscaleSrc`. Nay ô trống được điền từ ảnh đang làm việc, với ba chi
+tiết cố ý: chỉ điền khi ô TRỐNG · bấm «Bỏ ảnh» thì KHÔNG điền lại · ảnh đang làm việc đổi thì cập nhật theo.
+
+### E. LỖI QUY TRÌNH đắt nhất đợt này (ghi để không lặp)
+
+Trong lúc tách nhóm «Việc khác», tôi viết `const moreCount = computed(() => actions.value.length + 4)`
+trong `<script>` — nhưng `actions` là **prop**, và trong script phải là `props.actions`. Kết quả:
+`ReferenceError: actions is not defined` **ngay lúc render** ⇒ panel (và cả hàng nút chính) không được vẽ.
+Triệu chứng nhìn thấy chỉ là "trình xem thiếu nút"; lỗi thật nằm ở **console**, và tôi đã mất nhiều vòng đo
+(đổi `v-if` → `v-show`, gỡ `<Transition>`) trước khi chịu đọc `Runtime.exceptionThrown`.
+
+**Luật rút ra:** với component nạp LƯỜI, khi "thiếu UI" thì **đọc console TRƯỚC**, rồi mới sửa cấu trúc.
+Nay `PrototypeCleanupTest` khoá đúng chỗ này (`assertStringNotContainsString('actions.value', $script)`).
+
+### F. Kiểm chứng & test
+
+| Phép kiểm (Chrome thật 390×844) | Kết quả |
+|---|---|
+| Trang chủ | ảnh gần đây → `/studio?id=15&open=viewer` · «Xem tất cả» → `/studio?open=results` |
+| Bấm ảnh từ Trang chủ | **trình xem MỞ đúng ảnh**, 2 nút chính + «Việc khác (12)», 9→8 công cụ chỉ hiện khi mở nhóm |
+| Công cụ Studio | 1 ảnh, nhãn «Ảnh đang chọn» ⇒ **nhận ảnh đã chọn** |
+| Lưới Kết quả | có «Quản lý»; vào chế độ quản lý có dòng nhắc + tab Thư viện chỉ còn «File · Prompt» |
+| Lỗi console | **0** (trước khi sửa `props.actions`: 1 ReferenceError) |
+
+**Test:** `PrototypeCleanupTest` nay **9 bài** (thêm: chạm ảnh ở Trang chủ mở trình xem · một màn xem ảnh
+duy nhất · trình xem có luồng không bức tường nút · khoá `props.actions`).
+

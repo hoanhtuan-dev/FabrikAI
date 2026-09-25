@@ -34,12 +34,8 @@
       "_pageBoot-DbFeskNz.js"
     ]
   },
-  "_GalleryModal-ZH5MLAM1.css": {
-    "file": "assets/GalleryModal-ZH5MLAM1.css",
-    "src": "_GalleryModal-ZH5MLAM1.css"
-  },
-  "_GalleryModal-dqlow1ea.js": {
-    "file": "assets/GalleryModal-dqlow1ea.js",
+  "_GalleryModal-C9-LeIJJ.js": {
+    "file": "assets/GalleryModal-C9-LeIJJ.js",
     "name": "GalleryModal",
     "imports": [
       "_pageBoot-DbFeskNz.js",
@@ -47,8 +43,12 @@
       "_useStudioThumb-Dyk_cak5.js"
     ],
     "css": [
-      "assets/GalleryModal-ZH5MLAM1.css"
+      "assets/GalleryModal-cCV4YNXH.css"
     ]
+  },
+  "_GalleryModal-cCV4YNXH.css": {
+    "file": "assets/GalleryModal-cCV4YNXH.css",
+    "src": "_GalleryModal-cCV4YNXH.css"
   },
   "_NotificationCenter-DPCBUQcM.js": {
     "file": "assets/NotificationCenter-DPCBUQcM.js",
@@ -255,12 +255,12 @@
     "isEntry": true
   },
   "resources/js/studio/LibraryApp.vue": {
-    "file": "assets/LibraryApp-b4t3LPDg.js",
+    "file": "assets/LibraryApp-DuerMXQY.js",
     "name": "LibraryApp",
     "src": "resources/js/studio/LibraryApp.vue",
     "isDynamicEntry": true,
     "imports": [
-      "_GalleryModal-dqlow1ea.js",
+      "_GalleryModal-C9-LeIJJ.js",
       "_pageBoot-DbFeskNz.js",
       "_dataColors-bXR5rZin.js",
       "_useStudioThumb-Dyk_cak5.js",
@@ -283,12 +283,12 @@
     ]
   },
   "resources/js/studio/collections.js": {
-    "file": "assets/collections-Cu87ifUY.js",
+    "file": "assets/collections-DBprBKM1.js",
     "name": "collections",
     "src": "resources/js/studio/collections.js",
     "isEntry": true,
     "imports": [
-      "_GalleryModal-dqlow1ea.js",
+      "_GalleryModal-C9-LeIJJ.js",
       "_pageBoot-DbFeskNz.js",
       "_dataColors-bXR5rZin.js",
       "_useStudioThumb-Dyk_cak5.js",
@@ -409,7 +409,7 @@
     ]
   },
   "resources/js/studio/components/StudioCard.vue": {
-    "file": "assets/StudioCard-BU3ACw3A.js",
+    "file": "assets/StudioCard-rcWJ0c3x.js",
     "name": "StudioCard",
     "src": "resources/js/studio/components/StudioCard.vue",
     "isDynamicEntry": true,
@@ -471,7 +471,7 @@
     ]
   },
   "resources/js/studio/home.js": {
-    "file": "assets/home-BG3qmCck.js",
+    "file": "assets/home-Ba4ad_fo.js",
     "name": "home",
     "src": "resources/js/studio/home.js",
     "isEntry": true,
@@ -498,7 +498,7 @@
     ]
   },
   "resources/js/studio/main.js": {
-    "file": "assets/main-D54eeDkS.js",
+    "file": "assets/main-U6eRu_-g.js",
     "name": "main",
     "src": "resources/js/studio/main.js",
     "isEntry": true,
@@ -526,7 +526,7 @@
       "resources/js/studio/components/TryOnCard.vue",
       "resources/js/studio/components/DirectorCard.vue",
       "resources/js/studio/components/SourcePickerPopup.vue",
-      "_GalleryModal-dqlow1ea.js",
+      "_GalleryModal-C9-LeIJJ.js",
       "resources/js/studio/components/EditImageModal.vue",
       "resources/js/studio/components/ProjectWorkspace.vue"
     ],
