@@ -94,6 +94,16 @@
 
 **Khoá bằng test** — `tests/Feature/PrototypeCleanupTest.php` (6 bài): mỗi việc một lối vào ở Studio · Trang chủ không còn hàng lối khác · Hub credit một chỗ · **mọi liên kết nội bộ phải phân giải được thành route GET** (quét MỌI tệp Vue/Blade) · **không dùng đường cũ** của khu Cài đặt · ba họ chữ có token + được khai ở vite + nhãn nhỏ dùng lớp chung.
 
+### 4.2c Đợt 64 — HỆ THỐNG LẠI LUỒNG ĐIỆN THOẠI (một màn sửa ảnh · bỏ lớp/scale · trình xem một ảnh)
+
+| Việc | Trước | Sau |
+|---|---|---|
+| **Hai màn sửa ảnh** | Công cụ gốc «Sửa ảnh» có prompt/preset/model/giá nhưng chọn vùng phải **vẽ trên canvas** (điện thoại không có) · «Màn Chỉnh ảnh» làm được vùng sửa nhưng thiếu hết tham số | **MỘT màn**: công cụ gốc NHÚNG bề mặt chỉnh ảnh (tả · khoanh · cọ) ⇒ chạy bằng ngón tay ở mọi bề rộng; cờ `editImageOpen` và mount riêng đã gỡ |
+| **Action mới trong công cụ** | Sau khi sửa phải rời màn mới tải/chia sẻ/nâng cấp được | Hàng **«Việc tiếp theo»**: Tải xuống · Chia sẻ (tại chỗ, composable dùng chung) · Nâng cấp · Tạo biến thể (qua `requestActivity`) |
+| **Xếp lớp + scale trên điện thoại** | Khối «Ảnh trong phiên» có mắt ẩn/hiện + thanh độ mờ từng hàng — mà bảng ghép KHÔNG tồn tại trên điện thoại ⇒ kéo/bấm không đổi gì trên màn hình | Đã gỡ (kèm `pickLayer` và action `setLayerOpacity` không còn nơi gọi). Ảnh đang làm việc đổi từ dải «Kết quả gần đây» |
+| **Trình xem** | Dải thumbnail 72px · hai mũi tên ‹ › · bộ đếm "N/M" · tải trước ảnh kề · phím ← → · danh sách ngữ cảnh `viewerList` (mỗi nơi mở truyền một kiểu) | **Chỉ xem MỘT ảnh** — chuyển ảnh là việc của lưới Kết quả |
+| **Màn Studio điện thoại** | 4 lối tắt + nút «Việc khác» (3 việc) + sheet «Công cụ» có **lưới 9 công cụ trùng dải công cụ** | **6 lối tắt** (Sửa ảnh · Nâng cấp 4× · Đổi khung · Tải xuống · Chia sẻ · Tech pack) + sheet **«Khác»** chỉ chứa nhóm đổi không gian/nguồn dữ liệu. Nút «Việc khác» gỡ: Sửa ảnh + Đổi khung lên lối tắt, Xoá vào trình xem |
+
 ### 4.3 Ba luật của prototype — trạng thái sau đợt này
 
 1. **MỘT thanh lệnh** — ✓ đã theo từ Phase 0 (`CommandBar.vue`).
