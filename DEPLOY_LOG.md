@@ -7804,3 +7804,22 @@ như một generation. Màn chi tiết đã dùng sai khoá. Nay có **một l�
 - **Token màu/typography của prototype**: việc riêng, phải làm thành một đợt có kế hoạch (hệ token hiện
   tại sinh từ theme daisyUI và bị ~1.400 test khoá).
 
+
+### E. Deploy lên production — 2026-09-26 (đợt 61 + bản vá bảng giá)
+
+| Bước | Kết quả |
+|---|---|
+| Sao lưu CSDL trước khi pull | `~/db-backups/fabrikai-20260924-180840.sql.gz` (1,1 MB · 52 bảng · kết thúc hợp lệ) |
+| Commit | `d00a665` (màn chi tiết BST + lưới bất đối xứng + gói nổi bật) → `60caec3` (vá: gói nổi bật = gói TRẢ PHÍ rẻ nhất) |
+| HEAD máy chủ | **`60caec3`** — khớp local và origin |
+| **Gói JS khớp TỪNG BYTE** | `sha256(collections-BPGn8y4c.js)` local = máy chủ = `b88d17eb…00d4a` |
+| Route mới | `GET /bo-suu-tap/{project}` → khách nhận **302 về /dang-nhap** (KHÔNG phải 404) ⇒ route phân giải đúng, và quyền vẫn do tầng auth quyết định |
+| **Chrome thật trên production (390×844)** | `/bang-gia`: thẻ nổi bật = `goi-starter`, nhãn «Nên bắt đầu», **0 lỗi console**, không tràn ngang · `/studio`: **nút ← về Trang chủ có mặt** · `/`: **màn chào 3 slide** · `/bo-suu-tap`: về trang đăng nhập |
+| Log máy chủ | Chỉ còn lỗi `proc_open` định kỳ của `schedule:run` (nợ đã biết từ trước, 30 phút/lần) — **không có lỗi nào từ đợt này** |
+| Bộ test PHP | **1401 xanh** (10.857 assert) |
+
+> **Ghi chú vận hành (đã trả giá):** `pkill -f 'remote-debugging-port=93xx'` **tự giết chính shell đang chạy**
+> vì chuỗi lệnh của shell cũng chứa mẫu đó — dùng mẫu có ngoặc (`'remote-debugging-por[t]=93xx'`). Và
+> Chrome giữ nguyên tiến trình cũ theo `--user-data-dir`, nên lần chạy sau **kết nối vào phiên CŨ đã đăng
+> nhập** ⇒ phép kiểm "khách thấy màn chào" báo sai. Mỗi lần đo: giết theo cổng + xoá thư mục profile.
+
